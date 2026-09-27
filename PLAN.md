@@ -59,10 +59,10 @@ Where each batch stands, as of 2026-09-27:
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (`npm run fingers`), not yet judged on the Mac; 9f–9h, 9j and 9k–9p open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
-| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); none yet judged on the Mac; steps 4–6 not started |
-| 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
+| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
+| 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; the rest not started |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1087,6 +1087,20 @@ The steps, most visible first. Each is one PR with its own check, and every step
      hands the plate, on the CPU; neither reads the GPU (next item). Every look changes with music
      playing; waiting on the owner's eyes (judging.md 15).
    - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.**
+     **Shipped** (with 14d): two causes, both measured by `npm run kicks`, which plays
+     the band's own score (`bandStep`) through the live ear. The clock's onset, the
+     smoothed bass crossing 0.45, never crossed in the chorus, where the sawtooth
+     bass holds the level over the line: 59 of 160 chorus kicks heard at 20 fps (110
+     at 60). And a loop reading the onset's `hit` loses the kicks that land on
+     readings it never sees, since the ear reads at 60 Hz and the loop is handed the
+     latest reading: 46 of 160 at a 20 fps plate. The clock and the song's shape now
+     read the kick's onset by its time (`at` moving), and the onset calls a kick that
+     lands with a bass note (next item but one): 155–160 of 160 chorus kicks, every
+     intro and verse kick bar one, at 60, 30 and 20 fps, 48 and 44.1 kHz, late frames
+     or not. The
+     band's scheduler was not a cause (0 of 62 kicks late on the cloud's busy page,
+     `window.__band()` under `?debug`). Still owed: the count in the app on the Mac
+     (next item). What was found:
      The band plays four on the floor at 122 bpm, two kicks a second, outside its
      break. `npm run squeeze` counted the kicks the show heard on the Mac shard: 6 in
      12 s and 9 in 12 s on #192's run, and on the #190 deploy (main, 2026-09-27) 3 in
@@ -1101,6 +1115,24 @@ The steps, most visible first. Each is one PR with its own check, and every step
      these kicks, so a band the show hears one kick in four of is a quarter of the
      show. *Check to write:* heard kicks against the kicks the band played, in the
      app on the Mac, logged by section.
+   - **Count the heard kicks in the app on the Mac.** `npm run kicks` hears the band
+     offline, through the ear's code; nothing yet counts it in the running app, where
+     the plate's frames and the band's timer share a busy page. Both counts are there
+     under `?debug`: `chromaglassDebug().heardKicks()` (onsets the loop saw) and `window.__band()`
+     (kicks the band scheduled, and how many late). *Check to write:* a Mac check
+     that plays the band for 30 s and asks for nine in ten of its kicks heard.
+   - **A kick with its bass note read as low mids.** **Shipped** with the item above.
+     The kick onset would not fire when a frame's new energy at 150–400 Hz came
+     within 6 dB of the new energy under 120 Hz (`KICK_TILT_DB`, which keeps snare
+     bodies off the kick). The band starts a bass note on every kick, and its
+     harmonics put the kick's lead at 3.9–5.9 dB: the ear called 134 of the chorus's
+     160 kicks at 48 kHz and 124 at 44.1 kHz (a Mac runs at either; the bins fall
+     differently), and 4 of the intro's 31. At 3 dB it calls all of them at both
+     rates, and the lone snare in `npm run bands` still fires no kick (it first does
+     at 1 dB). `npm run kicks` now runs at both rates and holds the ear's own onsets
+     to 95 % in every section. Not yet heard on real records: a kick under a bass
+     guitar played on the beat is the same case, and a floor tom the other side of
+     it, and `bands` has no tom.
    - **A check that reads a kick's press on the GPU.** `npm run squeeze` counts the
      cells and depth the kick hands the plate and the gap its release gives back, on
      the CPU: a regression in the upload (the plate not marked dirty, the flush
@@ -1246,13 +1278,40 @@ version in the same PR (see the operating rules below).
    row's name whole beside its tag. **Owed:** the Mac look in `docs/judging.md` §13
    (the key's edge on a real film; Add over a bright plate). The front plate has no
    blend: it is the glass the rest is laid on.
-4. **Crossfade a row.** A level ridden by hand is a fade; a row's own fade time and a
-   cut/fade pad, so a film can come in over two bars from a pad. *Check:* a node
-   harness on the fade curve, and the film table (no hard cuts).
-5. **The mixer on a narrow desk.** At 1024 px the docked sheet covers half the plate.
-   A compact layout (the level column only, the grade opening over it) when the window
-   is narrow. *Check:* layout at 1024/1280/1440, the plate at least two-thirds
-   uncovered.
+4. **Crossfade a row**, *shipped* (#195). Each row has a Fade button beside its level
+   that takes it out over the row's fade time and brings it back to where it was (a
+   film at 40% comes back at 40%); pressed while it runs, it turns round from where it
+   is, in its share of the time; a fader moved during a fade stops it there. The fade
+   time is in bars, in the row's drawer (0 to 8, 0 is a cut, two bars to start),
+   counted at the tempo the desk sends or taps, else the one heard, else 120. Seven
+   pads (Mixer: Fade In/Out, per row), each fade time MIDI-learnable; the desk,
+   Settings, the phone's Mix sheet and the remote all have the buttons. `npm run
+   rowfade` 48/48 drives whole fades at the show timer's 16 ms: no step past the
+   curve's steepest (0.0024 on a four-second fade from 0.4), at rest at both ends,
+   on time, the turn-round, the hand, the cut, a Go during a fade on every row, the tempo the bars
+   are counted at, and the wiring; held red against twenty broken fades. A song's glide
+   of a level, and a sequence stage's writes, stop a take on it, as a hand does; a
+   new look forgets where its gel and lumia were taken out from; the remote's
+   buttons light from the display's state. `npm run phone` presses the front plate's
+   button on a phone and reads it walk to 0 in 3.8 s over 41 levels, turn round and
+   come back. Found on the way and fixed here: a Go laid each step of its fade down
+   whole, the room's settings as they were when it was pressed, so a film taken out
+   (or a fader ridden) during a Go flickered back once a step; the look fade now
+   keeps the room as it is (`keepRoom`), and a take on the gel or the lumia pressed during
+   a Go, whose levels the look also sets, is the take's to the end of the Go (`lookStep`;
+   the Go undid it, 63 steps back up, before). **Owed:** the Mac look in
+   `docs/judging.md` §13, and a film coming in from a pad filmed by hand
+   (`film.yml`) to show no hard cut in its motion table.
+5. **The mixer on a narrow desk**, *shipped* (#196). At 1024 px the docked sheet
+   covered half the plate. Done more simply than the compact layout planned here:
+   the docked Mixer is the rides' column wide at every window (304 px, was 440), so
+   it lies over the rides it stands in for and never over the plate; the row's name
+   keeps its width, the tag gives way, and the blend buttons sit closer. Measured
+   against the plate's own box: 29% of it covered at 1024, 18% at 1280 and 15% at
+   1440 before, 0% at all three now. `npm run layout` opens it at the three widths
+   with a row's drawer open and asks that none of the plate is under it, all five
+   blend buttons are there, and nothing in it is cut, crowded or spills (27/27).
+   The phone's Mix sheet is its own layout (step 1) and is unchanged.
 6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
    each projector's plate is a row, with its own grade at the projector's scope (R2).
    This is the large one; it waits on R1.
@@ -1267,6 +1326,32 @@ touches the Mixer; the second looks like the adapter going away under the run. W
 after it. And #193's first show shard died before any test ran: the runner could not
 resolve github.com at checkout.
 
+Found while shipping step 4, not yet done: #195's deploy (main 6c6d17e) went red on
+two Mac checks that passed on the same tree in its PR run and again in #196's run
+right after, so step 4 went live only with #196. `npm run ears` on the open shard:
+"visible with the wall asking too" drew 14 frames in 2 s where it asks more than 20
+(35 in #196's run); every reading was in the right place, so the floor counted the
+runner's frame rate, not the ear, and the "Gaps in the plan" thread has a fix on #194.
+`npm run squeeze` on the show shard: "the tapped beat drives the show's clock" read a
+beat every 396.6 ms against 401.4 ms tapped (2 ms allowed), with the plate stepping
+255 times in 12 s where it steps about 320; the Mixer's fades only read the tempo. The
+tempo the taps set is the plain mean of their gaps, so something moved the clock off it
+after the taps; worth reading whether the clock falls back to the heard beat when a
+frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
+
+Found while building step 4. Changed here, for Steve to confirm: Back reverts the
+look and whatever of the room the change itself moved (Lucky's roll of the
+microphone's Sensitivity and Bass Boost), but no longer the room's settings the hand
+changed after it (the film's level, the Mixer, the dimmer), since each step of a look
+fade keeps the room as it is now; that is RIG_KEYS' own rule, but Back used to undo a
+film's level changed after the Go. If Back should undo those too, it wants its own
+path rather than the look fade's. Not done here: a take pressed during a Go wins over
+the Go for that row, but a hand on the gel wheel's or the lumia's slider during a Go
+still does not (the Go's next step puts the look's level back), and inside a sequence
+a take on the gel or the lumia during a stage's glide is stopped by the glide's next
+tick, as a hand's is (the button lights once and nothing moves). The rule a Go now
+keeps (a later press wins, to the end of the change) would settle both.
+
 Found while building step 3, not yet done: the logo darkens what is under it by up to
 8 steps of 255 in the pixel or two where its card meets its clear margin, on its own
 way in as much as any blend, because its texture is filtered with its colour not
@@ -1276,13 +1361,29 @@ Premultiplying on upload would take it out. And once, in a cloud session,
 5.60× (1.40 times, 3.40 wanted): the zoom followed the first of six finger moves
 (50 → 70 px) and none after. It passed on the next run (3.40) and on every run before;
 the Mix sheet is shut by then. Worth reading whether a touchMove can be dropped while
-the page is busy.
+the page is busy. Seen again building step 4: three runs in seven with `PW_WEBGPU=1`
+(1.40, 1.40, 3.00 times), on step 4's tree and once on step 3's. Sending the move the
+pinch's once-a-frame throttle holds back when the frame is up, instead of at the lift,
+did not stop it, so the later moves seem not to reach the pinch at all (inferred, not
+measured): the touch listeners' cleanup drops the pinch, and a plate rebuilt mid-pinch
+would do exactly this.
 
-Found while building step 1, small and not yet done: the remote's Mixer has no check
-of its own (`npm run phone` drives the phone layout, not `?remote=1`), and on landscape
-phones narrower than about 800 px the dock's tools fall under the 48 px target (about
-770 px before the Mix button took a slot; `npm run phone` holds 812×375), so a two-row
-landscape dock is owed for the smallest phones.
+Found while building step 1, both **done** (#198): the remote's Mixer had no check of
+its own (`npm run phone` drives the phone layout, not `?remote=1`); `npm run remotemix`
+now starts the show server with a display and a phone on the remote and asks the
+display's own settings that the phone lists its rows in its order, moves the stack by
+the stack's rule, sets a blend and a level, walks a take down over the fade time set on
+the display and back, and takes another row with its own button (12 checks, in the
+Measure job; the order asked is one set on the display, since a remote that never read
+it drew the default and agreed). And on landscape phones narrower than about 800 px the dock's
+tools fell under the 48 px target (42 px at 740×360, 35 at 667×375): there the dock is
+now two rows, the ten tools over the five sheets, at 48 px and 4 px gaps, and one row
+from 800 up. The second row cost the plate its height (48% of a 667×375 screen, under
+the half a landscape plate is held to) until the top row, a full-width band of touch
+between the look and the three buttons, let touches through to the plate: 60% there
+now, and 79% at 844×390 (was 65%). `npm run phone` holds 800×360, 799×360, 740×360 and
+667×375, asks which sizes get one row and that a finger in the top gap lands on the
+plate (243 checks, was 177).
 
 Three Mac checks went red once each on commits that did not touch them, one per run,
 while this batch's plan was going in (#177), and no cause is known yet:
@@ -1300,6 +1401,14 @@ while this batch's plan was going in (#177), and no cause is known yet:
   time B. With two failures now at 0.34–0.35 and nine to thirteen
   passes at 0.63–0.99, the split is bimodal, which reads like one finger's drops
   landing a beat later than the other's in the window, not noise round a mean.
+  **A third time on #196 (ed42edd, 2026-09-27 16:04Z)**, a desk-only change: A 81
+  against B 221, 0.37, the mirrors clear, 0.0 cells of drift, 100 readbacks. The
+  three low fingers read 62, 81 and 81 and the high ones 181 to 234: one finger
+  laying about one drop's dye and the other about three, where a phase difference
+  between the two fingers' drop clocks (each counts DROP_EVERY solver steps from its
+  own touch) can only make them one drop apart. So look at what can take a whole
+  drop away: a drop's splash (`autoInject('drop')`) carried out of the measuring
+  disk, or two drops on one spot capped at the plate's density ceiling.
   (#186 changed where a press lands; the held Drop's splash lands on whole cells
   already, so it lays the same as before.)
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
@@ -1312,7 +1421,12 @@ while this batch's plan was going in (#177), and no cause is known yet:
   Not #181's stop (that one sat a quarter second after the first step). Worth
   measuring what the page does while Chromium creates the device (the table shows
   no frames counted between 0.77 s and 3.48 s), and whether 4b should own every
-  stop before the device is given rather than only the first.
+  stop before the device is given rather than only the first. Again on #194's run
+  on 5fd3636 (2026-09-27): 3.52 s from 1.04 s, the device asked at 0.83 s and given
+  at 4.56 s, while the control's stop at the GPU's start began at 1.43 s, so the
+  check's 0.25 s match to it missed and the stop counted as an opening stop. #194
+  changes nothing that runs before the device is given (its ladder is built once a
+  device and a stage exist); 5fd3636's parent 1d842d1 passed the same shard.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
@@ -1481,11 +1595,35 @@ forms and a 15 % cut.
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
    The upload key stays with the owner, never in the repo. Then the closed test
    starts, 12 testers for 14 days, while the iPhone work carries on. *Not started.*
-4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`, the
-   `native` tier, no service worker on that tier, permission strings, the audio
-   session set to play and record through the speaker, the idle timer off while the
-   plate runs, status bar and home indicator hidden, minimum iOS 26, and an
-   `xcodebuild` step on the macOS runner. *Not started.*
+4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`,
+   no service worker in the app, permission strings, status bar hidden, minimum
+   iOS 26, and an `xcodebuild` step on the macOS runner. ***Built*** (the "iPhone
+   app" workflow compiles it for the simulator; `npm run ios` opens it in Xcode on
+   the Mac), not yet run on a phone (`docs/judging.md` §16). Changed from the
+   plan: the app takes the website's quality ladder, not the `native` tier's,
+   because `capacitor://localhost` read as a laptop serving itself and would
+   have offered a phone 1024² at three device pixels (`detectTier`, checked by
+   `npm run applink`); it gets more once a phone's heat over a set is measured.
+   Still owed from this step: the audio session (music through the speaker
+   while the mic is on) and the idle timer, which lean on WebKit's own
+   handling until the phone shows whether they need native code; the home
+   indicator.
+4a. **The app is also the laptop's remote** (asked for 2026-09-27: "make the
+   remote control work on the iPhone app … switch back and forth between
+   modes"). More › Laptop remote asks once for the laptop's address (paste the
+   Phone line `npm run remote` prints, or type it) and remembers it; the remote
+   carries it as `?relay=` and connects there, since the app's own origin has
+   no relay (`src/lib/appLink.ts`). Play here goes back to the plate. Only in
+   the app: the website's https page cannot open a plain ws:// socket to a
+   laptop. Only the app's remote follows `?relay=`: review found that the
+   laptop's display followed it too, so a crafted link opened on the laptop
+   handed its show key and the show to any host it named; fixed before
+   merge. `npm run applink` (Measure) checks all of it on a real relay with a
+   stand-in laptop, the page on another origin and a stranger's host. ***Built***, not yet on a
+   phone. Open: the iPad in the app gets the full layout, which has no Laptop
+   remote button yet, and neither does a phone that took More › Full layout
+   (until the app is reopened); a QR code on the laptop that opens the app straight
+   into its remote (a `chromaglass://` link) would save the typing.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*
 6. **A privacy policy page** on Firebase Hosting, and the store listings: text,
@@ -1711,6 +1849,83 @@ anywhere): a Retina laptop with a 1080p stage starts at the stage's own pixels a
 offers 1024²; a 1x laptop with a 4K stage has a bottom rung with fewer pixels than its
 top. Then `npm run ladder` on the Mac with a stage.
 
+**Shipped** (2026-09-27). With a stage attached the ladder is the stage's
+(`stageLadder`, `lib/platform.ts`): a rung's `dpr` is its share of the projector's own
+width and height, and the laptop's ratio is not read. The show opens at the grid its
+GPU class opens on at every pixel the projector has; above that the grids climb at
+full pixels; at it the pixel rungs come first (0.75, then 0.5 of the stage), then the
+smaller grids at half. `canvasPixelsFor` draws a stage at the rung's share and no
+longer takes the laptop's ratio, so a fixed grid (the governor off), which asks for 1,
+now fills a Retina laptop's projector too. The governor is built again when a wall
+comes or goes, and only when the rungs differ; when the rung it is on is still among
+them (a wall window crossing 1920×1200 gains or loses only 1024²) it stays on it. After
+the GPU runs out of memory on a wall, the ladder is built again under the grid that
+failed and opens at the whole stage, where stepping down would have walked its pixel
+rungs to half the stage for good (`npm run rungs`: out of memory at 512², now 384² at
+1920×1080, walked down 384² at 960×540). The wall window scales with
+`imageSmoothingQuality` 'high', set after every resize because a canvas's new width
+resets it. With no stage the ladder is exactly what it was.
+
+1024² is offered by the stage's *pixels*, not its ratio: at most 1920×1200. The gate
+was measured as a pixel count (1024² held at 1.0 Mpx and fell to 22 fps at 4.1 Mpx,
+with the same step cost), and a projector's ratio stands for its pixels badly: a 4K
+projector at 1x has 8.3 Mpx, and a 1080p one behind 150 % scaling has a ratio of 1.5
+and the same 2.1 Mpx as at 100 %.
+
+`npm run rungs`, 73 of 73 (the old code, bridged to the new `canvasPixelsFor` signature,
+fails every new stage case). Two stage ladders are written out rung by rung, and the
+1024² gate is held at 1920×1200 (offered) and 2560×1440 (not). The Mac's
+`webgpu-smoke` asks the running show which ladder it is on (a rung at 0.75 of the wall
+while it is up, none once it closes) and reads the wall's smoothing across a resize that
+changes the canvas. A Retina laptop (2x) on a 1080p
+wall opened at **960×540** (1280×720 at 1.5x), now at **1920×1080**, on the hosted page
+and locally, for every GPU class. 1024² was not offered (grids 768, 512, 512, 384, 256),
+now at 1920×1080. A 1x laptop on a 4K wall had **8.29 Mpx** on its top rung and its
+bottom one; now 8.29 at the top (768²) and **2.07** at the bottom (256² at 1920×1080),
+and it is no longer offered 1024² at 8.3 Mpx. The canvas sizes a 1080p or 4K wall gets
+were five different ladders from a 1x, 1.25x, 1.5x, 2x and 3x laptop; now one. The old
+assertion that a rung of 1 drew a Retina laptop's wall at 960 of 1920 was this bug
+written down, and is replaced by what a share draws (1920×1080 at 1, 960×540 at 0.5).
+Eighteen no-stage ladders, printed before the change for every tier at 1x to 3x
+(phones included), are a fixture the new ladder matches rung for rung and start for
+start. The mirror's smoothing, read by hand from a wall window opened by the built app
+in a cloud session: 'low' when it opened and 'low' after a resize before, 'high' and
+'high' after; `npm run webgpu` asks the same on the Mac.
+
+*The phone:* no phone version, because a phone has no stage. The wall that follows a
+stage's pixels is the wall window (`StageMirror`), a second window on the same machine
+mirroring the show's canvas; the phone's own controls have no wall button, and a phone
+on a wall goes there through the phone's screen mirroring (AirPlay, Android's cast
+screen), which the page cannot see and which shows the phone's own pixels, or through
+a Chromecast, whose receiver runs its own show at its own pixels with no stage. The
+phone keeps the no-stage ladder, which the fixture holds (its 2.625x and 3x lines).
+
+*Still owed, on the Mac:* whether 1024² holds on a 1080p wall. 2.07 Mpx sits between
+what was measured to hold (1.0) and to fail (4.1), so what `npm run ladder` with a
+stage should show is the canvas at 1920×1080 on the top three rungs, 1440×810 and
+960×540 below them, whatever the laptop's ratio, and 1024² at 1920×1080 at or near 30
+fps at thirty steps. If it does not hold, the gate comes down to what does. And the
+owner's look at a 0.75 rung on a real projector through the 'high' mirror.
+
+*Found along the way, not done:*
+- `npm run ladder` cannot attach a stage. It opens one page, and a wall window opened
+  from it would share that page's device scale factor, so a Retina laptop driving a
+  1x projector cannot be staged in one browser context. A `?stage=1920x1080`
+  diagnostic knob, like `?dpr=`, calling `setStage` would let it measure the wall.
+- A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before. The start
+  rule weighs the GPU class and not the stage's pixels; the governor finds the 0.75
+  rung within seconds, but a wall above 1920×1200 could open there.
+- The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall
+  rather than a pixel ratio, and the bench's `dpr` reads the same number. On a stage it
+  should say so ("of the wall").
+- A wall coming or going builds a new governor, which forgets a step rate it had given
+  up and waits out its settling period again, and forgets rungs a solver that would not
+  start had marked failed (only running out of memory sets the cap it keeps).
+- `PW_WEBGPU=1 npm run phone` went red once in two runs on "spreading them zooms in by
+  as much as they spread" (3.00 times of 3.40): the zoom was read before the pinch's
+  last move landed, on a software plate a few frames a second. Green on the rerun; the
+  phone's code was not touched here.
+
 ### 14d. The beat clock hears a smoothed bass level, not the kick
 
 **Read in the code.** The frame loop feeds `BeatClock.update` with
@@ -1729,6 +1944,16 @@ take.
 onset by a gain (about 0.3) rather than snapping it. *Measure:* a `learn` case that
 drives the clock the way the live loop does (smoothed bass, trust 0.7) and prints
 kicks to lock and the spread of the lead.
+
+**Shipped.** The loop hands the clock the kick's onset and the time it landed (the
+reading's `at`, watched for a change, so no kick is lost between frames), and `npm
+run learn` drives the clock that way at the shipped trust, 0.7. `npm run kicks`
+measures it on the band's own score: locked after 8 kicks at 60, 30 and 20 fps (8
+or 9 before, the heard kicks it did lock on being early ones), 170 of 256 kicks
+fired ahead at 20 fps against 99, lead −8 ± 13 ms (−14 ± 20 before). The phase
+pull was tried at 0.3 and did no better on this band (spread 18 ms against 13 at
+20 fps), so `hear()` still snaps: with the onset's own time the snap's jitter is
+the onset's, a few ms, not the smoothed level's 30–55.
 
 ### 14e. The picture and the room disagree about when the kick is
 
@@ -1771,7 +1996,12 @@ top of the solver.
 Measured since, by `npm run ears` on the Mac runner (2026-09-27): with the show
 window covered and nothing else drawing, the ear's 16 ms tick read 15 times a
 second, not 60 (inferred: each reading re-renders `App`, and the main thread could
-not take more); the visible app drew 28 frames a second in the same run.
+not take more); the visible app drew 28 frames a second in the same run. On #195's
+deploy (main 6c6d17e) the visible page drew 14 frames in two seconds while the rest
+of the show was still being built behind it, and `npm run ears` went red on a floor
+of twenty frame readings, with the ear doing what it should (the wall's 10 asks all
+read in the page's stalls). The floor now asks that every frame the page drew read
+(#194); how slowly a busy page draws is this item's to fix, not that check's.
 
 *Fix:* the frame loop reads the analyser and the ride's shadow itself; React keeps
 the meters, at about ten updates a second, with the arrays reused. *Measure:* count

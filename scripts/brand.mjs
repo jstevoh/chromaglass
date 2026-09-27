@@ -13,6 +13,7 @@
  *   public/icon-192.png, -512.png   installed-app icons (rounded tile, clear corners)
  *   public/icon-maskable-512.png    full bleed, burst inside Android's safe circle
  *   public/apple-touch-icon.png     full bleed; iOS rounds the corners itself
+ *   ios/…/AppIcon-512@2x.png        the iPhone app's icon, 1024 full bleed
  *   public/og-card.png              what a shared link unfurls into
  *   src/assets/brand/lockup.svg     mark and name, for the headers
  *   src/assets/brand/mark.svg       the dish alone, where the name will not fit
@@ -54,6 +55,9 @@ const PNG = [
   // guarantees only the middle 80%; at 0.7 the longest finger ends inside it.
   ['public/icon-maskable-512.png', icon({ shape: 'square', scale: 0.7 }), 512, 512],
   ['public/apple-touch-icon.png', icon({ shape: 'square', scale: 0.92 }), 180, 180],
+  // The iPhone app's icon (PLAN.md §12): the touch icon's drawing at the one
+  // size Xcode asks for. Full bleed and opaque, as the App Store requires.
+  ['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', icon({ shape: 'square', scale: 0.92 }), 1024, 1024],
   ['public/og-card.png', shareCard(words), 1200, 630],
   ['docs/brand/google-logo-120.png', icon({ shape: 'tile' }), 120, 120],
   ['docs/brand/avatar-800.png', icon({ shape: 'square', scale: 0.8 }), 800, 800],

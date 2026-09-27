@@ -4,9 +4,10 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { Slider } from './ui';
 import {
   MIX_SOURCE_INFO, MIX_GRADES, MIX_CONTROLS, MIX_LAMP, MIX_BLENDS, MIX_BLEND_LABEL, OWN_BLEND,
-  blendKey, gradeKey, gradeLabel, mixStack, moveInMix,
+  blendKey, fadeKey, gradeKey, gradeLabel, mixStack, moveInMix, MIX_FADE_KEYS,
   type MixSource, type MixMover, type MixBlend,
 } from '../lib/mixer';
+import type { FadeWay } from '../lib/mixFade';
 import { PIN_RANGE } from '../lib/deskPins';
 import { readSetting } from '../lib/readout';
 
@@ -30,6 +31,13 @@ import { readSetting } from '../lib/readout';
  * its own says so in its tag, so a film left on Add is seen with the drawer
  * shut; the front plate has none, being the glass the rest is laid on.
  *
+ * Each row's take button (PLAN.md §11 step 4, lib/mixFade.ts) sits beside its
+ * level, since it is the level's other hand: the fader rides, the button
+ * takes the row out over its fade time, in bars, and brings it back to where
+ * it was. It says what a press will do ("Fade out", "Cut in" at no bars), and
+ * lights while a fade runs, when a press turns it round. The fade time is in
+ * the drawer with the blend: set for a song, not ridden.
+ *
  * Nothing here decides anything: the order's rules (the front plate stays,
  * only the lamp's sources pass it) are `moveInMix`'s, so an arrow that cannot
  * move a row is disabled rather than pressed and ignored.
@@ -50,6 +58,14 @@ export interface MixerPanelProps {
   touch?: boolean;
   /** The settings panel's pin chips, beside each slider. */
   chips?: (key: keyof VisualizerSettings) => ReactNode;
+  /**
+   * A row's take button pressed. Without it the buttons are not drawn: a take
+   * is a timed walk the show runs (App's `fadeRow`), not a patch this panel
+   * can send.
+   */
+  onFade?: (id: MixSource) => void;
+  /** The rows fading now, and which way, so a running fade's button is lit. */
+  fading?: Partial<Record<MixSource, FadeWay>>;
   testId?: string;
 }
 
@@ -63,7 +79,7 @@ const BLEND_HINT: Record<Exclude<MixBlend, 'own'>, string> = {
 
 const SPEC = (key: keyof VisualizerSettings) => PIN_RANGE.get(String(key)) ?? { min: 0, max: 1 };
 
-export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = false, chips, testId = 'mixer' }: MixerPanelProps) {
+export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = false, chips, onFade, fading = {}, testId = 'mixer' }: MixerPanelProps) {
   const [open, setOpen] = useState<MixSource | null>(null);
   const stack = mixStack(settings.mixOrder);
   const rows = [...stack].reverse();
@@ -72,7 +88,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
     id !== 'front' && moveInMix(settings.mixOrder, id, dir) !== mixStack(settings.mixOrder).join(' ');
   const s = settings as unknown as Record<string, number>;
   const lampish = (id: MixSource) => (MIX_LAMP as readonly string[]).includes(id);
-  const ownKey = (key: keyof VisualizerSettings) => MIX_CONTROLS.some(c => c.key === key);
+  const ownKey = (key: keyof VisualizerSettings) => MIX_CONTROLS.some(c => c.key === key) || MIX_FADE_KEYS.includes(key);
   const blendOf = (id: MixMover): MixBlend => {
     const b = (settings as unknown as Record<string, unknown>)[String(blendKey(id))];
     return (MIX_BLENDS as readonly unknown[]).includes(b) ? b as MixBlend : 'own';
@@ -85,7 +101,12 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
     return (
       <div className="mb-3" role="radiogroup" aria-label={`${MIX_SOURCE_INFO[id].name}'s blend`} data-testid={`${testId}-${id}-blend`}>
         <div className="mb-1 text-[12px] text-text-2">Blend</div>
-        <div className="grid grid-cols-5 gap-1">
+        {/*
+          Five in a row, tight: in the desk's docked Mixer, the width of the
+          rides' column, "Multiply" at the usual spacing was 2 px wider than
+          its fifth (`npm run layout`).
+        */}
+        <div className="grid grid-cols-5 gap-0.5">
           {MIX_BLENDS.map(b => (
             <button
               key={b}
@@ -94,7 +115,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
               onClick={() => onSetting({ [blendKey(id)]: b } as Partial<VisualizerSettings>)}
               title={b === 'own' ? `Its own way in: ${ownIs(id)}` : BLEND_HINT[b]}
               data-testid={`${testId}-${id}-blend-${b}`}
-              className={`rounded-md border text-[12px] transition-colors ${touch ? 'h-12' : 'h-7'} ${
+              className={`min-w-0 rounded-md border text-[12px] tracking-tight transition-colors ${touch ? 'h-12' : 'h-7'} ${
                 now === b ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border text-text-2 hover:bg-hover'
               }`}
             >
@@ -132,7 +153,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
             value={v}
             min={spec.min}
             max={spec.max}
-            step={String(key).endsWith('Hue') ? 1 : 0.01}
+            step={String(key).endsWith('Hue') ? 1 : String(key).endsWith('Fade') ? 0.5 : 0.01}
             display={readSetting(String(key), v, spec.min, spec.max)}
             onChange={n => onSetting({ [key]: n } as Partial<VisualizerSettings>)}
             midiKey={`setting:${String(key)}`}
@@ -148,6 +169,35 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
         */}
         {chips && ownKey(key) && <div className="pt-0.5">{chips(key)}</div>}
       </div>
+    );
+  };
+
+  /**
+   * The take button. What a press does is read the way the fade reads it
+   * (`RowFades.wayOf`): a running fade turns round, a row up goes out, a row
+   * at nothing comes in.
+   */
+  const take = (id: MixSource) => {
+    const level = s[String(MIX_SOURCE_INFO[id].level)];
+    const running = fading[id];
+    const way: FadeWay = running ? (running === 'out' ? 'in' : 'out') : (typeof level !== 'number' || level > 0.001 ? 'out' : 'in');
+    const bars = s[String(fadeKey(id))];
+    const cut = typeof bars === 'number' && bars <= 0;
+    const label = `${cut ? 'Cut' : 'Fade'} ${way}`;
+    return (
+      <button
+        onClick={() => onFade?.(id)}
+        aria-pressed={!!running}
+        aria-label={`${MIX_SOURCE_INFO[id].name}: ${label.toLowerCase()}`}
+        title={running ? `Fading ${running}; press to turn it round` : cut ? `${label} at once (its fade time is 0)` : `${label} over its fade time`}
+        data-testid={`${testId}-${id}-take`}
+        data-way={way}
+        className={`mt-1 shrink-0 rounded-md border px-2 text-[12px] transition-colors ${touch ? 'h-12 min-w-[76px]' : 'h-7 min-w-[64px]'} ${
+          running ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border text-text-2 hover:bg-hover'
+        }`}
+      >
+        {label}
+      </button>
     );
   };
 
@@ -175,7 +225,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
   return (
     <div className="flex flex-col gap-1.5" data-testid={testId}>
       <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} leading-snug text-muted`}>
-        Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens. Grade opens a row's blend and grade.
+        Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens. {onFade ? 'Fade takes a row out over its fade time and back. ' : ''}Grade opens a row's blend, fade time and grade.
       </p>
       {rows.map(id => {
         const info = MIX_SOURCE_INFO[id];
@@ -221,7 +271,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
               <button
                 onClick={() => setOpen(isOpen ? null : id)}
                 aria-expanded={isOpen}
-                aria-label={id === 'front' ? `${info.name}'s grade: brightness, contrast, saturation, hue` : `${info.name}'s blend and grade`}
+                aria-label={id === 'front' ? `${info.name}'s fade time and grade: brightness, contrast, saturation, hue` : `${info.name}'s blend, fade time and grade`}
                 className={`flex shrink-0 items-center gap-1 rounded-md px-2 text-[12px] transition-colors hover:bg-hover ${
                   touch ? 'h-12' : 'h-7'
                 } ${graded ? 'text-accent-text' : 'text-text-2'}`}
@@ -247,11 +297,15 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
                 )}
               </div>
             ) : (
-              <div className="px-1">{slider(info.level, 'Level')}</div>
+              <div className="flex items-start gap-2 px-1">
+                <div className="min-w-0 flex-1">{slider(info.level, 'Level')}</div>
+                {onFade && take(id)}
+              </div>
             )}
             {isOpen && (
               <div className="border-t border-border px-1 pt-3" data-testid={`${testId}-${id}-grade`}>
                 {id !== 'front' && blendPicker(id)}
+                {slider(fadeKey(id), 'Fade time')}
                 {MIX_GRADES.map(g => slider(gradeKey(id, g), gradeLabel(g)))}
                 <button
                   onClick={() => onSetting(Object.fromEntries(MIX_GRADES.map(g => {

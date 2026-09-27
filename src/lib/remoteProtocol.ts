@@ -15,6 +15,7 @@
 
 import type { VisualizerSettings } from '../types';
 import type { CastMessage } from './castProtocol';
+import { isPhoneApp, relayFromUrl, relaySocketUrl } from './appLink';
 
 /** WebSocket path the relay listens on. */
 export const REMOTE_WS_PATH = '/remote-ws';
@@ -60,7 +61,10 @@ export type RemoteAction =
   /** Record the show to a video file / stop. */
   | 'record-toggle'
   /** Start or stop recording a performance: what is painted, with the song playing. */
-  | 'performance-toggle';
+  | 'performance-toggle'
+  /** A Mixer row's take button (lib/mixFade.ts): out over its fade time, or back in. */
+  | 'mix-fade-led' | 'mix-fade-gel' | 'mix-fade-lumia' | 'mix-fade-front'
+  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
@@ -101,6 +105,12 @@ export interface RemoteState {
   /** Whether a film and a logo are loaded, so the remote's mixer can say when a row has nothing on the wall. */
   filmLoaded?: boolean;
   markLoaded?: boolean;
+  /**
+   * The Mixer rows fading now, and which way (lib/mixFade.ts), so the remote's
+   * take buttons light and say what a press will do as the desk's do: from the
+   * level alone, a fade half-way out read "Fade out", and a press turned it back in.
+   */
+  rowFading?: Partial<Record<'led' | 'gel' | 'lumia' | 'front' | 'back' | 'film' | 'mark', 'in' | 'out'>>;
 }
 
 export type RemoteMessage =
@@ -166,8 +176,22 @@ export type RemoteMessage =
    */
   | { type: 'liquid'; id: string };
 
-/** Build the ws:// URL for the relay from the page's own origin. */
-export function remoteSocketUrl(): string {
+/**
+ * Build the ws:// URL for the relay: the page's own origin, which is the show
+ * server that served it, or, for the iPhone app's remote only, the laptop the
+ * app was pointed at with `?relay=` (its own origin has no relay behind it;
+ * see `lib/appLink.ts`).
+ *
+ * Only that one case follows `?relay=`. The laptop's display and a network
+ * display learn the show key from their own origin and then open this
+ * socket, so if they followed a relay named in the address, one crafted link
+ * opened on the laptop would hand its key, and the show, to whatever host
+ * the link named (found in review, and checked by `npm run applink`). A
+ * controller outside the app has no reason to go anywhere but home either.
+ */
+export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror'): string {
+  const relay = role === 'controller' && isPhoneApp() ? relayFromUrl() : null;
+  if (relay) return relaySocketUrl(relay, REMOTE_WS_PATH);
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${window.location.host}${REMOTE_WS_PATH}`;
 }

@@ -602,6 +602,13 @@ export interface VisualizerSettings {
   */
   ledBlend: MixBlend; gelBlend: MixBlend; lumiaBlend: MixBlend;
   backBlend: MixBlend; filmBlend: MixBlend; markBlend: MixBlend;
+  /*
+    Each row's fade time, in bars (lib/mixFade.ts): how long its take button
+    (a pad, a tap) takes to bring it in or out; 0 is a cut. Two bars for
+    every row: a time, not a picture, so no look draws differently for it.
+  */
+  ledFade: number; gelFade: number; lumiaFade: number; frontFade: number;
+  backFade: number; filmFade: number; markFade: number;
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
@@ -918,6 +925,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lumiaBright: 1, lumiaContrast: 1, lumiaSat: 1, lumiaHue: 0,
   ledBlend: 'own', gelBlend: 'own', lumiaBlend: 'own',
   backBlend: 'own', filmBlend: 'own', markBlend: 'own',
+  ledFade: 2, gelFade: 2, lumiaFade: 2, frontFade: 2, backFade: 2, filmFade: 2, markFade: 2,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure

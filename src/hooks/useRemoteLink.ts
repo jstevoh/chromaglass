@@ -96,7 +96,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       if (closedRef.current) return;
       let socket: WebSocket;
       try {
-        socket = new WebSocket(remoteSocketUrl());
+        socket = new WebSocket(remoteSocketUrl(role));
       } catch {
         scheduleRetry();
         return;

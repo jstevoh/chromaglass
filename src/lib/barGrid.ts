@@ -209,7 +209,7 @@ const BAR_SURE_ON = 2.2, BAR_SURE_OFF = 1.5;
 const KICK_THERE_DB = 12, KICK_FLOOR_DB = -70;
 const SLIP = 0.2, TEMPO_SLIP = 0.04, SLIP_HOLD = 4;
 const ON_BEAT = 0.2;
-const MIN_BEAT_CONFIDENCE = 0.15;
+export const MIN_BEAT_CONFIDENCE = 0.15;
 
 interface Frame { t: number; onset: number; harmony: number[]; snare: number; kick: number; }
 interface Beat { harmony: number[]; snare: number; kick: number; }

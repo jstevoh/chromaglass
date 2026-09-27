@@ -144,7 +144,7 @@ try {
     await ctx.close();
   }
 
-  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
+  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['the breakpoint', 800, 360, 0.5], ['under the breakpoint', 799, 360, 0.5], ['a small landscape', 740, 360, 0.5], ['the smallest landscape', 667, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
     const { ctx, page } = await phonePage(w, h);
     const up = await visible(page, 'phone-stage');
     check(`${label} ${w}×${h}: the phone layout is up`, up);
@@ -160,6 +160,38 @@ try {
     check(`${label}: each is 48 px or more`, small.length === 0,
       small.length ? small.map(id => { const b = boxes[DOCK.indexOf(id)]; return `${id} ${Math.round(b.width)}×${Math.round(b.height)}`; }).join(', ')
         : `smallest ${Math.round(Math.min(...boxes.filter(Boolean).map(b => Math.min(b.width, b.height))))} px`);
+    /*
+      One row where it fits, two where it does not: a landscape phone 800 px
+      wide or more has the tools and the sheets side by side, since height is
+      what the plate is short of there, and a narrower one has the sheets
+      under the tools (where one row put the tools at 42 px on a 740 and 35
+      on a 667). Portrait is always two. Read from where the Dye and the
+      Looks buttons sit, the last tool and the first sheet.
+    */
+    if (boxes[9] && boxes[10]) {
+      const oneRow = Math.abs(boxes[9].y + boxes[9].height / 2 - (boxes[10].y + boxes[10].height / 2)) < 8;
+      const wantOne = w > h && w >= 800;
+      check(`${label}: the dock is ${wantOne ? 'one row' : 'two rows'}`, oneRow === wantOne,
+        `the tools' row at ${Math.round(boxes[9].y)}, the sheets' at ${Math.round(boxes[10].y)}`);
+    }
+    /*
+      The strip across the top between the look and the three buttons is the
+      plate's: the row that holds them once took every touch across it, 65 px
+      deep. Asked at the middle of the gap, where a finger lands, and not only
+      through the plate's share, which read 50% at 740 and 667 with the band
+      back and so could not tell.
+    */
+    const gap = await page.evaluate(() => {
+      const look = document.querySelector('[data-testid="phone-look-button"]')?.getBoundingClientRect();
+      const right = ['phone-zoom', 'phone-play', 'phone-hide']
+        .map(id => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect()).filter(Boolean);
+      if (!look || !right.length) return null;
+      const x = (look.right + Math.min(...right.map(r => r.left))) / 2;
+      const y = look.top + look.height / 2;
+      return { x: Math.round(x), y: Math.round(y), plate: !!document.elementFromPoint(x, y)?.closest('[data-testid="plate-frame"]') };
+    });
+    check(`${label}: a finger between the look and the buttons at the top lands on the plate`, !!gap?.plate,
+      gap ? `(${gap.x}, ${gap.y})` : 'the look button or the three buttons are missing');
     const covered = await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"]' });
     check(`${label}: nothing covers a control`, covered.length === 0, covered.slice(0, 4).join('; '));
     const leg = await legibility(page);
@@ -335,6 +367,128 @@ try {
       }
       check('portrait: every row\'s blend is five buttons of 48 px or more, Add pressed is what that row, and only that row, then says, and its name stays whole beside the tag',
         blendRows.every(r => r.ok), blendRows.map(r => r.say).join(' · '));
+      /*
+        Each row's take button (lib/mixFade.ts, PLAN.md §11 step 4), on the
+        front plate, the one row every look has on the wall: a thumb's size
+        beside the level, saying what a press does, lit while it runs, and
+        the level walked down over two bars (four seconds at the 120 counted
+        when nothing is heard or sent) rather than cut. Read off the level
+        slider itself, so what is measured is what the show wrote, through
+        React, at whatever rate the page's timer really ran at. The curve's
+        own shape, step by step, is `npm run rowfade`'s; here the question
+        is only whether the phone's press reaches it and no sample jumps.
+        A jump is measured against the time between the two samples, not
+        one number for all: the steepest part of a four-second fade moves
+        1.5 × dt / 4000 between samples dt apart (0.03 at 80 ms), and a
+        flat 0.2 let a timer slowed from 16 ms to 400 ms, writing steps of
+        0.13, through.
+      */
+      const take = 'phone-mixer-front-take';
+      const lvl = () => page.getByTestId('phone-mixer-frontLevel').locator('input').first().inputValue().then(Number);
+      const lit = async () => (await page.getByTestId(take).first().getAttribute('aria-pressed')) === 'true';
+      const say = async () => (await page.getByTestId(take).first().innerText()).trim();
+      await page.getByTestId(take).first().scrollIntoViewIfNeeded();
+      const takeBox = await box(page, take);
+      const saidOut = await say();
+      // `fadeMs` is the whole fade's time, for the steepest a sample may move.
+      const walk = async (to, ms, fadeMs = 4000) => {
+        const seen = [{ t: 0, v: await lvl() }];
+        const t0 = Date.now();
+        let litWhile = false;
+        let saidWhile = '';
+        while (Date.now() - t0 < ms) {
+          await page.waitForTimeout(80);
+          const v = await lvl();
+          // Stamped as the level is read, before the other two reads, whose
+          // time varies with the page and would stretch or shrink the gap.
+          const t = Date.now() - t0;
+          if (await lit()) { litWhile = true; if (!saidWhile) saidWhile = await say(); }
+          seen.push({ t, v });
+          if (v === to) break;
+        }
+        // Twice the steepest the curve moves (1.5 × dt / fade), plus a tick
+        // for the page drawing the level a frame behind the fade, plus the
+        // slider's 0.01: 0.058 at 80 ms, against the 0.13 of a slowed timer.
+        const over = seen.slice(1).map((p, i) => Math.abs(p.v - seen[i].v) / (2 * (p.t - seen[i].t + 16) / fadeMs + 0.01));
+        const drops = seen.slice(1).map((p, i) => Math.abs(p.v - seen[i].v));
+        return { seen, litWhile, saidWhile, last: seen[seen.length - 1], most: Math.max(0, ...drops), jumped: Math.max(0, ...over) > 1, between: new Set(seen.map(p => p.v).filter(v => v > 0 && v < 1)).size };
+      };
+      await page.getByTestId(take).first().tap();
+      const out = await walk(0, 8000);
+      const outDown = out.seen.every((p, i) => !i || p.v <= out.seen[i - 1].v);
+      check('portrait: a row\'s take button is a thumb\'s size and says Fade out; pressed, it is lit and says Fade in while the front plate walks down to 0, never back up, over about two bars and not in a jump',
+        takeBox && takeBox.height >= 48 && saidOut === 'Fade out' && out.litWhile && out.saidWhile === 'Fade in' && outDown && out.last.v === 0
+          && out.last.t >= 2500 && out.last.t <= 6500 && !out.jumped && out.between >= 8,
+        `${Math.round(takeBox?.height ?? 0)} px "${saidOut}", 0 at ${out.last.t} ms, ${out.between} levels on the way, largest step between samples ${out.most.toFixed(3)}${out.jumped ? ' (a jump for its time)' : ''}${out.litWhile ? `, "${out.saidWhile}" while lit` : ', never lit'}${outDown ? '' : ', went back up'}`);
+      // The slider shows the level to its step of 0.01, so it reads 0 for the
+      // fade's last hundred-odd milliseconds, when the walk is still landing.
+      let outLit = true;
+      for (let i = 0; i < 15 && outLit; i++) { outLit = await lit(); if (outLit) await page.waitForTimeout(100); }
+      const saidIn = await say();
+      check('portrait: once out it says Fade in and is no longer lit', saidIn === 'Fade in' && !outLit, `"${saidIn}"${outLit ? ', still lit 1.5 s after' : ''}`);
+      // In, turned round part-way, and in again: back to where it was, 1.
+      await page.getByTestId(take).first().tap();
+      await page.waitForTimeout(1200);
+      const turnAt = await lvl();
+      await page.getByTestId(take).first().tap();
+      const turned = await walk(0, 8000);
+      await page.getByTestId(take).first().tap();
+      const home = await walk(1, 8000);
+      check('portrait: pressed again part-way in, it turns round from there without a jump, and comes back to where it was',
+        turnAt > 0 && turnAt < 1 && !turned.jumped && turned.last.v === 0 && home.last.v === 1 && !home.jumped,
+        `turned at ${turnAt.toFixed(2)}, largest step ${turned.most.toFixed(3)}${turned.jumped ? ' (a jump for its time)' : ''}; back to ${home.last.v}${home.jumped ? ', with a jump' : ''}`);
+      /*
+        The hand wins: the level's own slider moved while the take runs stops
+        the take where the hand put it, and the button goes out. The rule is
+        `RowFades.handOn`'s and rowfade drives it there; this is the app's
+        wiring of it (every slider goes through updateSettings), which a
+        handOnLevels that did nothing left green in rowfade.
+      */
+      await page.getByTestId(take).first().tap();
+      await page.waitForTimeout(1000);
+      const slider = page.getByTestId('phone-mixer-frontLevel').locator('input').first();
+      await slider.focus();
+      await page.keyboard.press('ArrowLeft');
+      await page.waitForTimeout(100);
+      const handAt = await lvl();
+      await page.waitForTimeout(1000);
+      const handLater = await lvl();
+      const handLit = await lit();
+      check('portrait: a hand on the level\'s slider while it fades stops the fade where the hand put it, and the button goes out',
+        handAt > 0.05 && handAt < 0.99 && Math.abs(handLater - handAt) < 1e-9 && !handLit,
+        `the hand at ${handAt.toFixed(2)}, a second later ${handLater.toFixed(2)}${handLit ? ', still lit' : ''}`);
+      await page.keyboard.press('End');
+      await page.waitForTimeout(200);
+      await tap(page, 'phone-mixer-front-open');
+      const fadeText = async () => ((await visible(page, 'phone-mixer-frontFade')) ? (await page.getByTestId('phone-mixer-frontFade').first().innerText()) : '').replace(/\s+/g, ' ').trim();
+      const fadeTime = await fadeText();
+      check('portrait: and its fade time is in the row\'s drawer, in bars', /Fade time 2 bars\b/.test(fadeTime), JSON.stringify(fadeTime));
+      /*
+        And the take counts that row's own fade time, as the app reads it:
+        set to one bar in the drawer, the same press lands in about half the
+        time the two bars above took. Every run before this one uses the
+        default, so a fade that counted two bars whatever the drawer said, or
+        another row's fade time, passed all of it.
+      */
+      await page.getByTestId('phone-mixer-frontFade').locator('input').first().focus();
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowLeft');
+      await page.waitForTimeout(200);
+      const oneBar = await fadeText();
+      const topAgain = await lvl();
+      await page.getByTestId(take).first().tap();
+      const short = await walk(0, 8000, 2000);
+      check('portrait: set to one bar in the drawer, the same take lands in about half the time',
+        /Fade time 1 bar\b/.test(oneBar) && topAgain === 1 && short.last.v === 0 && short.last.t >= 1200 && short.last.t <= 3300
+          && short.last.t < out.last.t * 0.7 && !short.jumped,
+        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms)${short.jumped ? ', with a jump' : ''}`);
+      await page.getByTestId(take).first().tap();
+      await walk(1, 8000, 2000);
+      await page.getByTestId('phone-mixer-frontFade').locator('input').first().focus();
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowRight');
+      await tap(page, 'phone-mixer-front-open');
+
       // And back up, so the rest of the run plays the default stack.
       await tap(page, 'phone-mixer-film-up');
       const back = await rowsOf();

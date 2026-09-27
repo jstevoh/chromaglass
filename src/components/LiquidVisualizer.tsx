@@ -29,7 +29,7 @@ import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
-import { canvasPixelsFor, detectTier, devicePixels, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -4265,6 +4265,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
+  /**
+   * Every kick onset the ear handed the clock, once each (`npm run kicks`,
+   * and the Mac's checks, compare it with the kicks the clock fired and the
+   * kicks the band played).
+   */
+  const heardKicksRef = useRef({ n: 0, lastAt: null as number | null });
   /*
     Sound learn, read by the loop through refs like every other live prop: the
     bindings change when the map does, the trigger handler on every render of
@@ -4407,6 +4413,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const frameRef = useRef(frame);
   frameRef.current = frame;
   const resizeRef = useRef<() => void>(() => {});
+  /** Build the governor's ladder again for the stage now attached, or none (PLAN.md §14c). */
+  const reladderRef = useRef<() => void>(() => {});
   const [staged, setStaged] = useState(false);
   /**
    * A song render in progress: its rate, the steps a second it holds the
@@ -4899,6 +4907,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     setStage: (size) => {
       stageRef.current = size && size.width > 0 && size.height > 0 ? { width: Math.round(size.width), height: Math.round(size.height) } : null;
       setStaged(stageRef.current !== null);
+      reladderRef.current();
       resizeRef.current();
     },
     loadFilmFile: async (file: File) => {
@@ -5432,13 +5441,41 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // threshold crossing, so they all land together.
         {
           const nowMs = showNow();
-          const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
+          /*
+            The kick the ear heard since the last frame, and when: the
+            analyser's own kick onset (lib/audioFeatures.ts, spectral flux on
+            30–120 Hz), not the smoothed bass level crossing a line, which the
+            chorus of the show's own band held over the line from kick to kick
+            and so never crossed (`npm run kicks`: 59 of 160 chorus kicks heard
+            at 20 fps, 156 now).
+
+            Read from the onset's time, `at`, which a reading carries until
+            the next kick, and not from `hit`, which is true on the one
+            reading the kick landed on. The ear and this loop do not tick
+            together and React hands the loop the latest reading, not every
+            one: on a busy page (the cloud's, drawing a dozen frames a
+            second) the loop saw 1 hit in 30 s of the band while the ear
+            fired on its kicks. `at` changing is a kick however many readings
+            went by between two frames. Live, the reading's time is the
+            page's clock, the same as `nowMs`, so the clock is told when the
+            kick landed, not when this frame got round to it; a render's
+            readings keep song time, and there the frame is the time it was
+            heard.
+          */
+          const earReading = currentAudioData?.features ?? null;
+          const kickAt = earReading?.onsets?.kick?.at ?? null;
+          let heardAt: number | null = null;
+          if (kickAt !== null && kickAt !== heardKicksRef.current.lastAt) {
+            heardKicksRef.current.lastAt = kickAt;
+            heardKicksRef.current.n++;
+            heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
+          }
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
           // A clock from the desk, a tapped tempo or a typed one, if there is
           // one. Handed over every frame — the reading carries its own
           // sequence number, so the clock can tell a new beat from a held one.
           beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
-          kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
+          kickRef.current = beatClockRef.current.update(nowMs, heardAt, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
             Sound learn's triggers, right after the clock has decided this
@@ -7506,6 +7543,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         render's clock had caught up with the page's age.
       */
       beatClockRef.current = new BeatClock();
+      /*
+        And the kick the loop last handed it is taken as heard: the onset's
+        time on the reading now is on the clock being left (song seconds out
+        of a render, the page's back into the live show), so the first
+        reading on the other clock always differs from it. Forgotten, that
+        difference read as a kick, and the fresh clock pressed the plate
+        once on the hand-back with nothing playing.
+      */
+      heardKicksRef.current.lastAt = audioDataRef.current?.features?.onsets?.kick?.at ?? null;
       soundLearnRef.current.reset();
       // The song's shape is timed on the readings' clock, which a render
       // starts again at zero: its history and references belong to the song
@@ -7837,6 +7883,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
+        /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
+        heardKicks: () => heardKicksRef.current.n,
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,
@@ -7968,6 +8016,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       gridCapRef.current = Math.min(gridCapRef.current, grid - 1);
       const governor = governorRef.current;
       console.warn(`ChromaGlass: out of GPU memory at ${grid}² (${detail}); capping the grid below it.`);
+      /*
+        On a projector the ladder is rebuilt under the cap instead: its rungs
+        below the opening grid are all at half the stage, so stepping down
+        from a grid that ran out of memory would give up the wall's pixels
+        for good along with the grid (`stageLadder`). The new ladder opens
+        at the largest grid that fits, on the whole stage.
+      */
+      if (governor && stageRef.current && renderer && !cancelled) {
+        govern(renderer, true);
+        return;
+      }
       if (governor && governor.failRung(performance.now() * 0.001)) return;
       if (!healStage(`out of GPU memory at the smallest grid (${grid}²)`)) {
         setGpuFailure({ failure: 'no-adapter', detail: `out of GPU memory even at ${grid}²` });
@@ -8022,19 +8081,53 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
 
-    /** The renderer is up: size it, give the governor its ladder, and go. */
-    const startWith = (r: PlateRenderer) => {
-      renderer = r;
-      const ladder = qualityLadder(tier, r.info.gpuClass);
+    /*
+      The governor, on the ladder for what the canvas is drawn for: the
+      laptop's screen, or a projector's own pixels when one is attached
+      (PLAN.md §14c, `stageLadder` in lib/platform.ts).
+
+      A stage comes and goes during a show, so this runs again when it does
+      (`setStage`), and not only when the renderer starts. It used to run
+      only here, which was harmless while a stage's rungs were the laptop's
+      rungs anyway. Now they are not: a governor left holding the laptop's
+      ladder under a stage would read its rungs as shares of the projector.
+      The wall window announces its size on every resize and fullscreen
+      change, and most of those change nothing the ladder depends on, so a
+      new governor is built only when the rungs differ: a new one starts its
+      settling period again and forgets a step rate it had given up.
+
+      And when the rungs do differ but the one it is on is still among them,
+      it stays on it. A wall window dragged across 1920×1200, or opened on a
+      Retina screen and then fullscreened on the projector, gains or loses
+      the 1024² rung and nothing else; opening the new ladder at its start
+      would drop a plate that had climbed to 768² back to 512² and rebuild
+      the solver mid-show (the pre-push review). Attaching or detaching a
+      wall changes every rung, so those still open at the start.
+    */
+    let ladderKey = '';
+    const govern = (r: PlateRenderer, fresh: boolean) => {
+      const ladder = qualityLadder(tier, r.info.gpuClass, stageRef.current, gridCapRef.current);
+      const key = ladder.rungs.map((x) => `${x.grid}@${x.dpr}`).join(' ');
+      if (!fresh && key === ladderKey && governorRef.current) return;
+      ladderKey = key;
+      const was = fresh ? null : governorRef.current?.rung;
+      const keep = was ? ladder.rungs.findIndex((x) => x.grid === was.grid && x.dpr === was.dpr) : -1;
       governorRef.current = new QualityGovernor(
         ladder.rungs,
-        PINNED_RUNG ?? ladder.start,
+        PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start),
         performance.now() * 0.001,
         PINNED_RUNG !== null,
       );
       // Below whatever ran out of memory before.
       const g = governorRef.current;
       while (g.rung.grid > gridCapRef.current && g.failRung(performance.now() * 0.001)) { /* down a rung */ }
+    };
+    reladderRef.current = () => { if (renderer && !cancelled) govern(renderer, false); };
+
+    /** The renderer is up: size it, give the governor its ladder, and go. */
+    const startWith = (r: PlateRenderer) => {
+      renderer = r;
+      govern(r, true);
       r.resize();
       render();
     };
@@ -8060,7 +8153,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const dpr = dprRef.current;
       const px = renderingRef.current ?? canvasPixelsFor(
         dpr, stageRef.current, stage?.device.limits.maxTextureDimension2D ?? 8192,
-        devicePixels(), { width: window.innerWidth, height: window.innerHeight },
+        { width: window.innerWidth, height: window.innerHeight },
       );
       canvas.width = px.width;
       canvas.height = px.height;
@@ -8765,7 +8858,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const resize = () => {
       const px = renderingRef.current ?? canvasPixelsFor(
         dprRef.current, stageRef.current, renderer?.maxTexture ?? 8192,
-        devicePixels(), { width: window.innerWidth, height: window.innerHeight },
+        { width: window.innerWidth, height: window.innerHeight },
       );
       canvas.width = px.width;
       canvas.height = px.height;

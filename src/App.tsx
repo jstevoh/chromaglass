@@ -26,7 +26,7 @@ import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DronePa
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
-import { blendLooks, targetLook, evolvedLook, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { targetLook, evolvedLook, lookStep, roomMoved, roomBack, RIG_KEYS, DEFAULT_FADE_SECONDS, type RoomMove } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -87,7 +87,8 @@ import { CrashReportButton, QuickReportDot, openCrashReport } from './components
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
-import { blendKey, nextBlend, raiseInMix, type MixMover } from './lib/mixer';
+import { blendKey, nextBlend, raiseInMix, MIX_SOURCE_INFO, type MixMover, type MixSource } from './lib/mixer';
+import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -771,6 +772,13 @@ export default function App() {
       // calibration and the beat clock are all exercised for real.
       const band = startSimulatedMusic();
       simulatedRef.current = band;
+      // Under ?debug, the band's kick count for a check to set the heard
+      // kicks against. It stays defined after the source changes and then
+      // reads null: "no band now", which a check must not read as a band
+      // that played nothing.
+      if (new URLSearchParams(window.location.search).has('debug')) {
+        (window as unknown as { __band?: () => unknown }).__band = () => simulatedRef.current?.stats() ?? null;
+      }
       void band.resume();
       setAudioStream(band.stream);
       return;
@@ -1362,9 +1370,31 @@ export default function App() {
   /** The drift's moves in flight: each dial from where it was to where it is going, and how far along. */
   const driftGlide = useRef(new Map<string, { from: number; to: number; at: number }>());
 
+  /*
+    The Mixer's take buttons (lib/mixFade.ts), declared here because both of
+    the hand's ways into the settings, just below, tell them when a hand has
+    taken a row's level: the hand wins, and the fade stops where it was put.
+  */
+  const rowFades = useRef(new RowFades()).current;
+  const [rowFading, setRowFading] = useState<Partial<Record<MixSource, FadeWay>>>({});
+  const handOnLevels = (keys: Iterable<string>) => {
+    if (rowFades.handOn(keys)) setRowFading(rowFades.running());
+  };
+  /*
+    A new look sets the levels that belong to a look, the gel wheel's and the
+    lumia's (the other rows' levels are the room's, RIG_KEYS), so a take on
+    either stops as the look comes in, as a hand's move would stop it: two
+    walks writing one setting would fight a tick at a time.
+  */
+  const lookTakesLevels = () => {
+    handOnLevels(LOOK_LEVEL_KEYS);
+    rowFades.forget(['gel', 'lumia']);
+  };
+
   const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
     setDocDirty(true);
+    handOnLevels(Object.keys(newSettings));
     /*
       A hand's move is where the drift wanders from now on (lib/drift.ts).
       The drift holds each dial inside a window round its anchor, and the
@@ -1376,6 +1406,7 @@ export default function App() {
   };
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
+    lookTakesLevels();
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
     // (the microphone's calibration, the dimmer, the logo, the grid) stays.
     setSettings(prev => {
@@ -1395,7 +1426,9 @@ export default function App() {
 
   const applyUserPreset = (p: UserPreset) => {
     // A saved look is a look like any other. Anything added to the app since it
-    // was saved comes from the base rather than from whatever was playing.
+    // was saved comes from the base rather than from whatever was playing,
+    // and like any other it stops a take on the gel and the lumia.
+    lookTakesLevels();
     setSettings(prev => targetLook(prev, p.settings));
     setPinnedPresetId(p.id);
     // Your own look, opened: ⌘S from here writes over it rather than making
@@ -1493,6 +1526,11 @@ export default function App() {
    * should not inherit the last one's dyes.
    */
   const newLook = () => {
+    // An empty plate: no take left walking over the defaults, none lit, and
+    // no level remembered from the plate before to bring a row back to.
+    rowFades.clear();
+    rowFades.forget(FADE_ROWS);
+    setRowFading({});
     setSettings({ ...DEFAULT_SETTINGS });
     setClearTrigger(v => v + 1);
     visualizerRef.current?.setHarmonyLock(null);
@@ -1665,6 +1703,7 @@ export default function App() {
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
     ride.write(String(key), value);
     setDocDirty(true);
+    if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
     if (rideFrame.current) return;
     rideFrame.current = requestAnimationFrame(() => {
       rideFrame.current = 0;
@@ -1729,7 +1768,7 @@ export default function App() {
   // the fade would arrive in three steps.)
   const lookFadeRef = useRef<ShowIntervalHandle | null>(null);
   /** The look before the last Go, so one step back is always available. */
-  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
+  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings; room?: RoomMove } | null>(null);
 
   /*
     The phone (components/phone/PhoneStage.tsx, lib/phone.ts): a touch screen
@@ -1960,24 +1999,41 @@ export default function App() {
    * objects a second, and the solver is the expensive part of a settings
    * change rather than React.
    */
+  /*
+    The room's settings (RIG_KEYS: the mixer, the dimmer, the film's and the
+    logo's levels) are the same in `from` and `to`, both taken from the plate
+    as the fade began, and each tick used to lay the whole blend down: so a
+    film brought in from its take button, or a fader ridden, during a Go was
+    put back to where it was when the Go was pressed, thirty times a second,
+    for as long as the Go ran. They are the room's, not the look's, so each
+    tick keeps them as they are now, and keeps a row taken from its button
+    since the Go began as it is too (lib/lookFade's lookStep says why).
+  */
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
+    lookTakesLevels();
     const from = settingsRef.current;
-    if (seconds <= 0) { setSettings(to); setFading(0); return; }
+    if (seconds <= 0) { setSettings(prev => lookStep(from, to, 1, prev)); setFading(0); return; }
     const started = showNow();
     const ms = seconds * 1000;
     lookFadeRef.current = showInterval(() => {
       const t = Math.min(1, (showNow() - started) / ms);
+      // A take pressed since the Go began (the gel's or the lumia's, whose
+      // level the look also sets) is left to its button, to the Go's end.
+      const taken = rowFades.levelsTakenSince(started);
       if (t >= 1) {
         if (lookFadeRef.current) clearShowInterval(lookFadeRef.current);
         lookFadeRef.current = null;
-        setSettings(to);
+        setSettings(prev => lookStep(from, to, 1, prev, taken));
         setFading(0);
         return;
       }
-      setSettings(blendLooks(from, to, t));
+      setSettings(prev => lookStep(from, to, t, prev, taken));
       setFading(t);
     }, 33, 'look-fade');
+    // lookTakesLevels closes over nothing that changes: the one RowFades and
+    // React's own setter, so the callback is still made once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sendLook = useCallback((next: ArmedLook, seconds: number) => {
@@ -2023,6 +2079,12 @@ export default function App() {
     if (prev.id) adoptPreset(prev.id);
     visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
     fadeSettingsTo(prev.settings, fadeSeconds);
+    // The room the change itself moved (Lucky's microphone roll), where the
+    // hand has not moved it since; the fade keeps the room as it is.
+    if (prev.room) {
+      const back = roomBack(prev.room, settingsRef.current);
+      if (Object.keys(back).length) setSettings(s => ({ ...s, ...back }));
+    }
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
   useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
@@ -2080,7 +2142,9 @@ export default function App() {
 
   const sequencer = useShowSequencer({
     getSettings: () => settingsRef.current,
-    applySettings: (patch) => setSettings(prev => ({ ...prev, ...patch })),
+    // A stage's glide writes its levels every tick: a take on one of them stops,
+    // or the two walks would fight a tick at a time.
+    applySettings: (patch) => { handOnLevels(Object.keys(patch)); setSettings(prev => ({ ...prev, ...patch })); },
     adoptPreset,
     setPaletteWindow: (size, lead) => visualizerRef.current?.setPaletteWindow(size, lead),
     sectionLabel: musicIntel.state.section?.label ?? null,
@@ -2244,8 +2308,11 @@ export default function App() {
   }, [luckyArmed]);
 
   const triggerLucky = () => {
-    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
-    setSettings(luckyLook(settings, liquidTypes.map(t => t.color)));
+    const next = luckyLook(settings, liquidTypes.map(t => t.color));
+    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current, room: roomMoved(settingsRef.current, next) };
+    // A look coming in, like a Go's: a take on the gel or the lumia stops.
+    lookTakesLevels();
+    setSettings(next);
     setPinnedPresetId(null);
     // Randomize inject style for the evolve: Lucky's own stream, like its roll.
     const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
@@ -2692,6 +2759,43 @@ export default function App() {
     setSettings(prev => ({ ...prev, [key]: nextBlend(prev[key]) }));
     setDocDirty(true);
   };
+  /*
+    A row's take button (lib/mixFade.ts): out over its fade time, or back in
+    to where it was. The bars are counted at the tempo the desk sends or taps,
+    else the one the bar grid hears in the music, else 120.
+
+    On the show timer, not requestAnimationFrame, for the dimmer's reason: the
+    laptop's window spends a show behind the projector's, and a film taken
+    out from a pad while the operator watches the wall must still go.
+  */
+  const rowFadeTimer = useRef<ShowIntervalHandle | null>(null);
+  const fadeBpm = (): number => {
+    const bar = visualizerRef.current?.songShape().bar;
+    return fadeTempo(tempoRef.current?.bpm ?? 0, bar?.period ?? 0, bar?.beatConfidence ?? 0);
+  };
+  const fadeRow = (id: MixSource) => {
+    const cur = settingsRef.current as unknown as Record<string, unknown>;
+    const levelKey = String(MIX_SOURCE_INFO[id].level);
+    const level = typeof cur[levelKey] === 'number' ? cur[levelKey] as number : 1;
+    // A song's glide of this level stops: the button is the later hand.
+    const glide = glidesRef.current.get(levelKey);
+    if (glide) { clearShowInterval(glide); glidesRef.current.delete(levelKey); }
+    const first = rowFades.press(id, level, barsToMs(fadeBarsOf(settingsRef.current, id), fadeBpm()), showNow());
+    if (first !== level) setSettings(prev => ({ ...prev, [levelKey]: first }));
+    setDocDirty(true);
+    setRowFading(rowFades.running());
+    if (rowFadeTimer.current || !rowFades.isFading(id)) return;
+    rowFadeTimer.current = showInterval(() => {
+      const levels = rowFades.step(showNow());
+      const patch = Object.fromEntries(Object.entries(levels).map(([row, v]) => [String(MIX_SOURCE_INFO[row as MixSource].level), v]));
+      if (Object.keys(patch).length) setSettings(prev => ({ ...prev, ...patch }));
+      const running = rowFades.running();
+      setRowFading(prev => Object.keys(prev).join() === Object.keys(running).join() && Object.values(prev).join() === Object.values(running).join() ? prev : running);
+      if (!Object.keys(running).length && rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
+    }, 16, 'row-fade');
+  };
+  useEffect(() => () => { if (rowFadeTimer.current) clearShowInterval(rowFadeTimer.current); }, []);
+  const mixTakes = { onFade: fadeRow, fading: rowFading };
   const runActionRef = useRef<((a: MidiAction) => void) | null>(null);
   const runAction = (a: MidiAction) => {
     switch (a) {
@@ -2745,6 +2849,13 @@ export default function App() {
       case 'mix-blend-back':  stepBlend('back'); break;
       case 'mix-blend-film':  stepBlend('film'); break;
       case 'mix-blend-mark':  stepBlend('mark'); break;
+      case 'mix-fade-led':    fadeRow('led'); break;
+      case 'mix-fade-gel':    fadeRow('gel'); break;
+      case 'mix-fade-lumia':  fadeRow('lumia'); break;
+      case 'mix-fade-front':  fadeRow('front'); break;
+      case 'mix-fade-back':   fadeRow('back'); break;
+      case 'mix-fade-film':   fadeRow('film'); break;
+      case 'mix-fade-mark':   fadeRow('mark'); break;
       // Every action, or `tsc` names the one that is missing. A pad wired to
       // an action nobody wrote a case for is a dead pad, and silent.
       default: unhandled('an action', a);
@@ -2794,7 +2905,8 @@ export default function App() {
     fadeSeconds,
     filmLoaded: filmSource !== 'none',
     markLoaded,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded]);
+    rowFading,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -2868,6 +2980,9 @@ export default function App() {
             case 'performance-toggle': togglePerformance(); break;
             case 'go':            goLook(); break;
             case 'back':          revertLook(); break;
+            case 'mix-fade-led': case 'mix-fade-gel': case 'mix-fade-lumia': case 'mix-fade-front':
+            case 'mix-fade-back': case 'mix-fade-film': case 'mix-fade-mark':
+              fadeRow(message.action.slice('mix-fade-'.length) as MixSource); break;
             // A phone may be a newer build than the display, so an action
             // this one does not know is possible rather than impossible: it
             // is said out loud instead of swallowed. `tsc` still requires a
@@ -2924,6 +3039,8 @@ export default function App() {
     const timers = glidesRef.current;
     const running = timers.get(String(key));
     if (running) clearShowInterval(running);
+    // A song's glide of a Mixer row's level stops a take on it (lib/mixFade.ts).
+    handOnLevels([String(key), ...Object.keys(atEnd ?? {})]);
     const from = Number((settingsRef.current as unknown as Record<string, unknown>)[key] ?? 0);
     if (!(seconds > 0)) { setSettings(p => ({ ...p, [key]: to, ...(atEnd ?? {}) })); return; }
     const started = showNow();
@@ -3023,6 +3140,9 @@ export default function App() {
       if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
       for (const t of glidesRef.current.values()) clearShowInterval(t);
       glidesRef.current.clear();
+      if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
+      rowFades.clear();
+      setRowFading({});
       driftGlide.current.clear();
       aimTick.current = 0;
       const kept = { settings: settingsRef.current, anchor: driftAnchor.current, active: isActiveRef.current, playing: !!el && !el.paused };
@@ -3042,8 +3162,10 @@ export default function App() {
         if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
         for (const t of glidesRef.current.values()) clearShowInterval(t);
         glidesRef.current.clear();
+        if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
+        rowFades.clear();
         renderHoldRef.current = false;
-        flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); });
+        flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); setRowFading({}); });
         driftAnchor.current = kept.anchor;
         driftGlide.current.clear();
         // The song plays on if it was playing: a render interrupts listening, it does not end it.
@@ -4284,7 +4406,7 @@ export default function App() {
             onFingering={(v) => updateSettings({ fingering: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
-            mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded }}
+            mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes }}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
@@ -4358,6 +4480,7 @@ export default function App() {
       <AnimatePresence>
         {showSettings && (
           <SettingsPanel
+            mixTakes={mixTakes}
             songDetection={musicSettings.enabled}
             onSongDetection={(on) => updateMusicSettings({ enabled: on })}
             settings={settings}
@@ -4784,6 +4907,7 @@ export default function App() {
           onSetting={updateSettings}
           hasFilm={filmSource !== 'none'}
           hasMark={markLoaded}
+          takes={mixTakes}
           ccFor={ccFor}
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}

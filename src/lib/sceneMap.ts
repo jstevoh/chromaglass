@@ -34,6 +34,7 @@ import type { ModulatorFeature, Modulators } from './modulators';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
 import { PINNABLE, onStep } from './deskPins';
+import { MIX_FADE_KEYS } from './mixer';
 
 /**
  * What a patch may be plugged into.
@@ -58,7 +59,11 @@ import { PINNABLE, onStep } from './deskPins';
   under a plan made when the stage was entered.
 */
 // Follow the Song the same: the sequencer reads it from the app's settings.
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow']);
+// And the Mixer rows' fade times (lib/mixFade.ts): App reads one when its row's
+// take button is pressed, from the app's settings, so a patch on it would show
+// in the bay and change nothing.
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow',
+  ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
   !String(s.key).startsWith('scene') && !NOT_A_TARGET.has(String(s.key)));

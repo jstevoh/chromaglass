@@ -24,6 +24,22 @@ export interface BeatTick {
 const MIN_PERIOD = 300;    // 200 bpm
 const MAX_PERIOD = 1000;   // 60 bpm
 const ONSET = 0.45;
+/**
+ * An onset from a level crossing a line, for a caller that has only a level.
+ *
+ * The show no longer hears its kicks this way (the kick's onset: `update`), but a
+ * level is what a synthetic test hands the clock, and the crossing is the
+ * old rule exactly: over 0.45 from at or under it.
+ */
+export class LevelOnsets {
+  private last = 0;
+  /** `now` if `level` crossed the line on this frame, else null. */
+  at(now: number, level: number): number | null {
+    const hit = level > ONSET && this.last <= ONSET;
+    this.last = level;
+    return hit ? now : null;
+  }
+}
 
 /** Fold an interval into the 60–200 bpm range by halving or doubling. */
 const fold = (ms: number): number => {
@@ -42,8 +58,9 @@ export class BeatClock {
   private lastBeat = 0;          // when the last accepted beat fell (ms)
   private predictedAt = 0;       // the next beat the clock expects
   private firedPrediction = false;
-  private lastLevel = 0;
   private lastOnsetAt = -Infinity;
+  /** The last onset taken, so one reading seen on two frames is one kick. */
+  private lastHeard = -Infinity;
   /**
    * Until when an outside tempo is driving.
    *
@@ -70,8 +87,8 @@ export class BeatClock {
     this.lastBeat = 0;
     this.predictedAt = 0;
     this.firedPrediction = false;
-    this.lastLevel = 0;
     this.lastOnsetAt = -Infinity;
+    this.lastHeard = -Infinity;
     this.externalUntil = 0;
     this.externalSeq = -1;
   }
@@ -140,14 +157,29 @@ export class BeatClock {
   }
 
   /**
-   * Feed the bass level once a frame. `trust` (0..1) is how much the show
-   * lets the clock run ahead of the microphone; `leadMs` how far ahead of
-   * the heard onset a predicted kick fires — the pipeline's latency plus
-   * whatever anticipation the show wants.
+   * Once a frame, with the time of a kick heard since the last frame, if one
+   * was (`heardAt`, ms, the same clock as `now`; null when none was). `trust`
+   * (0..1) is how much the show lets the clock run ahead of the microphone;
+   * `leadMs` how far ahead of the heard onset a predicted kick fires — the
+   * pipeline's latency plus whatever anticipation the show wants.
+   *
+   * It used to take the bass level and call an onset where it crossed 0.45.
+   * On the show's own band that heard 110 of 158 chorus kicks at 60 fps and
+   * 59 at 20 (`npm run kicks`): the chorus's bassline holds the smoothed
+   * level over the line from one kick to the next, so there is no crossing
+   * to find, and fewer frames a second smooth it over more. The kick's
+   * spectral flux (`audioFeatures.ts`, the onset sound learn and the song's
+   * shape already use) is a new arrival of low energy, not a level, and a
+   * held note makes none.
+   *
+   * An onset is taken once: the same reading seen on two frames (the loop
+   * and the ear do not tick together) carries the same time, and the second
+   * is not a second kick.
    */
-  update(now: number, bass01: number, trust: number, leadMs: number): BeatTick {
-    const onset = bass01 > ONSET && this.lastLevel <= ONSET;
-    this.lastLevel = bass01;
+  update(now: number, heardAt: number | null, trust: number, leadMs: number): BeatTick {
+    const onset = heardAt !== null && heardAt > this.lastHeard;
+    if (onset) this.lastHeard = heardAt;
+    const at = onset ? Math.min(now, heardAt) : now;
     let kick = false;
     let predicted = false;
 
@@ -164,16 +196,16 @@ export class BeatClock {
     const locked = this.isLocked(now, trust);
 
     if (onset) {
-      this.lastOnsetAt = now;
-      this.onsets.push(now);
-      while (this.onsets.length > 32 || now - this.onsets[0] > 12000) this.onsets.shift();
+      this.lastOnsetAt = at;
+      this.onsets.push(at);
+      while (this.onsets.length > 32 || at - this.onsets[0] > 12000) this.onsets.shift();
       // A heard beat the clock already fired for is the same beat: absorb it.
       // (Judged before the onset re-times the clock.)
-      const sameBeat = locked && this.firedPrediction && Math.abs(now - this.predictedAt) < this.period * 0.3;
+      const sameBeat = locked && this.firedPrediction && Math.abs(at - this.predictedAt) < this.period * 0.3;
       // Driven from outside, an onset is only ever a thing to absorb. Letting
       // `hear` run would let a loud crowd or a bass note off the grid pull the
       // period away from the clock that is telling the truth.
-      if (!driven) this.hear(now);
+      if (!driven) this.hear(at);
       if (!sameBeat) kick = true;
     }
 
@@ -229,6 +261,10 @@ export class BeatClock {
     const err = now - expected;
     if (Math.abs(err) < this.period * 0.3) {
       // On the beat (or a multiple of it): nudge the period, snap the phase.
+      // (Pulling the phase a third of the way instead, PLAN 14d's proposal,
+      // was measured on the show's band by `npm run kicks` and did no better:
+      // a lead spread of 18 ms at 20 fps against 13 snapped, 5 against 6 at
+      // 60, though more beats ran ahead, 183 of 256 against 170 at 20.)
       if (k <= 2) this.period += ((since / k) - this.period) * 0.15;
       this.period = Math.max(MIN_PERIOD, Math.min(MAX_PERIOD, this.period));
       this.lastBeat = now;
