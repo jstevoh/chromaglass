@@ -58,6 +58,7 @@
     "panel": "esbuild scripts/panel.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/panel.mjs && node node_modules/.cache/panel.mjs",
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
+    "ears": "npm run build && node --experimental-strip-types scripts/ears.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "crash": "npm run build && node scripts/crash.mjs",
     "watch": "node scripts/watch.mjs",

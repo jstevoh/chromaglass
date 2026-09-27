@@ -62,6 +62,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); none yet judged on the Mac; steps 4–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; the rest not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -87,6 +88,17 @@ bracket its comment describes ("a Finger that makes dye still has to beat both")
 Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
+
+*Found 2026-09-27, not yet done:* **the mirror check's "and nowhere else" goes red at
+exactly its limit on changes that cannot move a pixel.** #191 (PLAN.md only) read
+"Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
+against an allowance of 11.1, at the tool's mirror through the centre
+(`scripts/mirror.mjs`, the Mac plate shard). It has been red at its limit on other
+branches that do not touch the plate. Either the mirror echo it was written to catch
+comes back now and then, or the allowance is drawn from a drift reading that is
+sometimes as large as the echo; which of the two is the first thing to settle, from
+the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
+of these costs the owner a by-hand re-run.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -1528,3 +1540,324 @@ network):
   records (File System Access).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
+
+## 14. The show at the gig: hearing, timing, speed and the picture on the wall
+
+Asked on 2026-09-27: "What else am I missing in plan.md? What other efficiency,
+latency, and quality updates would help us". The code was read for it the same day,
+four ways at once (what a frame costs, how late the plate answers, what the wall
+shows, what stops a set), against this plan, `docs/roadmap.md`,
+`docs/stability-plan.md`, `docs/webgpu-plan.md`, `docs/filters-plan.md` and
+`docs/rig-plan.md`, so that nothing below is already written somewhere else. Nothing
+is built. Each item says what the code does now, with where, whether that is read in
+the code or inferred from how a browser behaves, and what would measure a fix. The
+order is what a performer or an audience would notice first.
+
+What is already handled and so is not here: the wake lock (re-taken on every return
+to the page, and held by the projector window too); the picture when the show window
+is covered (the projector window drives the frames); fades, the dimmer and the
+gamepad on timers rather than animation frames; MIDI unplugged and plugged back in;
+the phone link's reconnect; readbacks that skip rather than wait; splats landing in
+the frame they were made; dither before every 8-bit screen; the plate's bicubic
+upsample. Display-P3 and HDR are H4 in `docs/roadmap.md`, linear-light blending is
+deferred in `docs/webgpu-plan.md`, and the soft edge between projectors is rig R3.
+
+### 14a. The show goes deaf when its window is hidden
+
+**Read in the code.** The sound analysis runs only on the show window's animation
+frames (`requestAnimationFrame(update)`, `src/hooks/useAudioAnalyzer.ts`), and it is
+the only place the analyser is read. The app already knows the show window spends a
+set hidden behind the projector's (the comment over the look fade's timer in
+`App.tsx`), which is why the picture, the fades and the gamepad were all moved off
+animation frames. The analysis was not. So the moment the performer goes fullscreen
+on the projector, or switches to Ableton, the wall keeps moving on the last reading
+it had, which may be the top of a kick, and stops hearing the music. This is the one
+item here that can quietly ruin a whole set.
+
+**Shipped** (asked "Do #1 now", 2026-09-27). `lib/earClock.ts` decides who reads:
+the window's own frames always, as before; the projector's frame ask
+(`__chromaglassFrame` calls `wallAsked`) only while those frames have stopped for
+50 ms, so the plate hears once per frame the wall draws; and a worker's 16 ms tick
+only while neither is coming (covered with no wall, which is still a show on a
+network display or the phone). Taking the frames first keeps one reading per drawn
+frame, which matters because the level smoothing is per reading. A watchdog on its
+own timer calls the ear deaf when the audio context is not running or nothing has
+been read for half a second; the desk's sound line then starts "not hearing" and the
+phone's Sound dot turns amber with a line in its sheet. A suspended context is asked
+back on its `statechange` and on the next touch or key (Chrome starts one suspended
+on a page nobody has touched; iOS interrupts one for a call). Whether a finger's
+lift wakes it on the iPhone is not yet tried. The wall and the tick read 50 ms after the
+frames stop while the page says it is hidden (Chrome says so of a covered window),
+and only after a quarter second while it says it is visible, so a visible window at
+15 fps, 240 Hz or with ragged frames reads exactly its frames, as before. (A stall
+measured from the frames alone went red on the Mac runner's first run: its busy app
+drew 28 frames a second, and the tick read between them. The same went red on its
+second run behind the wall: covered, the wall drew 44 a second and the tick read 5
+times in its gaps. The tick now gives the wall's asks a quarter second whether the
+page is hidden or not, so it takes over a quarter second after the wall closes. On
+its third run a visible page read 3 ticks against 46 frames: the Mac's show is still
+building pipelines behind it for its first half minute, and its frames stalled past a
+quarter second, which is what the tick is for; the check now holds each tick or ask a
+visible page reads against the page's last frame before it (more than 250 ms), which
+a broken build with a long task or a slow uncover cannot pass. Queued ticks after a
+long task read once, not once each.)
+
+`npm run ears` (26 checks, no GPU needed; on the Mac's `open` shard) measures it. A
+headless window is never hidden, so it withholds the show's animation frames itself.
+Covered, with the wall asking: 38 distinct levels in two seconds, one reading per
+frame asked for (120 over 121); with no wall, 38 on the tick; the control on the
+same page (frames withheld, no ask, the tick stopped, the ear as it was before)
+holds **one** level and is called deaf. A build whose ear reads on frames alone went
+red on all three "keeps hearing" lines. Visible with the wall asking, only the frames
+read (122 frame, 0 ask).
+
+*Still owed:* the owner's look on the Mac, covering the show window with another app
+for thirty seconds and reading `chromaglassCastState().ear.reads` before and after
+(about sixty ticks a second with no wall, and the desk not saying "not hearing").
+The worker's tick is chosen because a hidden page's own timers are held to about one
+a second; that is Chrome's documented behaviour and cannot be shown headless.
+
+*Found along the way, not done:* the look fade, the dimmer, the drift glides and the
+simulated band run on the page's own timers (`showInterval`, `simulatedMusic.ts`),
+moved there so a covered window would not freeze them. A hidden page's timers are
+held to about one a second (much less after five minutes hidden), so a Go fired from
+a MIDI pad while the show window is covered steps through its crossfade a second at a
+time instead of gliding. The same worker tick could drive them.
+
+### 14b. With the wall up, the plate may draw twice a refresh and the governor cannot see it
+
+**Read in the code; the doubling is inferred.** The projector window asks the show
+for a frame on every one of its own refreshes (`CastDisplay.tsx`). The guard in
+`__chromaglassFrame` (`LiquidVisualizer.tsx`) only compares against the projector's
+previous ask (`lastExternalFrame`); the show's own frames never set it. With the desk
+visible on the laptop and the wall fullscreen on the projector, both windows get
+animation frames on different displays' clocks, and each ask cancels the show's
+pending frame and draws another. Every draw carries the readback and the mirror copy.
+The governor is fed the interleaved intervals, so two half-rate clocks look like one
+full-rate one and it never steps down while the wall is up.
+
+*Fix:* stamp the time of every draw, whichever window asked for it, and skip any ask
+within about 0.6 of a refresh of the last draw; feed the governor the interval
+between real draws. *Measure:* extend `npm run wall` with the mirror popup and both
+windows animating: frames drawn a second no more than about 1.1 times one display's
+refresh.
+
+### 14c. The projector's resolution comes from the laptop's pixel ratio
+
+**Read in the code.** `qualityLadder` builds its rungs from `devicePixels()`, the
+laptop's ratio, and with a stage attached `canvasPixelsFor` scales the stage by
+`dpr / devicePx`. Two ways this goes wrong on a wall:
+
+- *A Retina laptop:* the show opens on the `dpr: 1` rung, so a 1920×1080 projector
+  starts at **960×540** (`npm run rungs` asserts exactly this half), and the 1024²
+  rung, written for projectors, is gated on `dpr <= 1` and never offered. At 150 %
+  Windows scaling it is 1280×720, stretched by 1.5. The mirror then scales with
+  `drawImage` and `imageSmoothingQuality` is never set, so it stays at `'low'`.
+- *A 1x laptop on a 4K projector:* `frac` is 1 on every rung, so every rung draws the
+  full 3840×2160, and the governor has only the grid to give up while the plate's
+  shading, which is bound by pixels, stays where it was.
+
+*Fix:* when a stage is attached, build the pixel rungs from the stage (1.0, 0.75,
+0.5 of it) rather than from the laptop, offer 1024² by the stage's ratio, and set the
+mirror's smoothing to `'high'`. *Measure:* two new cases in `npm run rungs` (it runs
+anywhere): a Retina laptop with a 1080p stage starts at the stage's own pixels and
+offers 1024²; a 1x laptop with a 4K stage has a bottom rung with fewer pixels than its
+top. Then `npm run ladder` on the Mac with a stage.
+
+### 14d. The beat clock hears a smoothed bass level, not the kick
+
+**Read in the code.** The frame loop feeds `BeatClock.update` with
+`currentAudioData.bass / 70` and the clock calls an onset when that crosses 0.45
+(`beatClock.ts`). That level has been smoothed twice (the analyser's time constant,
+then `LEVEL_SMOOTHING.bass`), so where the crossing lands moves by roughly 30–55 ms
+with how loud the kick is (worked from the constants), while the flux onset that
+`audioFeatures.ts` already computes for the kick goes unused here. `hear()` then snaps
+the phase fully to each onset, so that jitter goes straight into the next predicted
+beat. At the shipped trust of 0.7 the clock needs about seven kicks to lock, some
+three seconds at 120 bpm. `npm run learn` feeds the clock the flux kick at trust 1,
+so its "ahead of the microphone" figure (§5) describes a path the live show does not
+take.
+
+*Fix:* feed the clock the kick onset and its time, and pull the phase toward each
+onset by a gain (about 0.3) rather than snapping it. *Measure:* a `learn` case that
+drives the clock the way the live loop does (smoothed bass, trust 0.7) and prints
+kicks to lock and the spread of the lead.
+
+### 14e. The picture and the room disagree about when the kick is
+
+**Read in the code; the output delays are inferred.**
+
+- *The app's own songs* are analysed from `captureStream()`, before the output
+  device, and nothing reads `outputLatency`, `baseLatency` or `getOutputTimestamp`.
+  On wired output that roughly cancels the analysis delay; on Bluetooth or AirPlay
+  (150–300 ms) the plate leads the room by that much, and a locked kick adds Beat
+  Lead on top. For a shelf song the precomputed `SongEar` (`songTrack.ts`, used today
+  only by Render) could be read at `currentTime − outputLatency`, with no analysis
+  delay at all.
+- *One Beat Lead for every tempo source.* `beatLead` is described as the
+  microphone's latency, but the clock applies it the same to MIDI clock and a tapped
+  tempo, which have almost none. Switching from the mic to the desk's clock moves
+  every kick by the mic's delay. Split it into the rig's display lag and a measured
+  microphone delay, calibrated by tapping along or by a click played out and heard
+  back.
+- *MIDI clock* is timed with `performance.now()` in the handler (`useMidi.ts`)
+  rather than the message's own `timeStamp`, so a slow frame delays the beat; and
+  without a Start message, or after a 400 ms dropout, the pulse count starts on
+  whichever pulse came first, up to half a beat off. Use `timeStamp`, and let an
+  audio onset or a tap set the phase when no Start has come.
+
+*Measure:* `outputLatency` in `chromaglassDebug()`; a unit test with jittered MIDI
+timestamps next to `npm run timecode`; a speaker-to-microphone click on the Mac next
+to `film`.
+
+### 14f. Sound and MIDI reach the plate a frame late, through a whole-app render
+
+**Read in the code.** Every frame the analyser calls `setAudioData` with two new
+arrays (`useAudioAnalyzer.ts`), which re-renders the whole ~4,400-line `App`; only
+then does an effect copy it into `audioDataRef`, after this frame's loop has run, so
+the plate reads the sound one frame late. A MIDI CC goes through an animation frame,
+`setSettings` and an effect the same way (`rideSetting`, `App.tsx`). `App.tsx` already
+avoids exactly this elsewhere ("a re-render of the whole shell sixty times a
+second"). On a weaker laptop that is dropped frames and garbage-collection hitches on
+top of the solver.
+
+Measured since, by `npm run ears` on the Mac runner (2026-09-27): with the show
+window covered and nothing else drawing, the ear's 16 ms tick read 15 times a
+second, not 60 (inferred: each reading re-renders `App`, and the main thread could
+not take more); the visible app drew 28 frames a second in the same run.
+
+*Fix:* the frame loop reads the analyser and the ride's shadow itself; React keeps
+the meters, at about ten updates a second, with the arrays reused. *Measure:* count
+`App` renders a second under `?debug` in `npm run desk` with a stream running (12 or
+fewer), and stamp the reading's time against the frame's.
+
+### 14g. A knocked cable: the audio interface and the projector do not come back
+
+**Read in the code; what macOS does with the window is inferred.**
+
+- *Audio.* When the input track ends, the handler sets the source to none
+  (`track.onended`, `App.tsx`), and `devicechange` only refreshes the list of inputs.
+  Plug the interface back in and the plate still plays deaf until someone opens
+  Settings; the only sign is "silent" in the desk's audio line. Remember the intended
+  input, reopen it when `devicechange` says it is back, and show a loud "input lost"
+  on the desk and the phone.
+- *Projector.* Automatic sending is skipped while a cast is open (`useProjector.ts`),
+  the "send there" chip is hidden while casting, and `openWindow` only focuses a live
+  window. Pull the HDMI and push it back, and the projector window has been moved to
+  the laptop and out of fullscreen, and the wall shows an empty desktop. On
+  `screenschange` while casting, move the window back to the projector; the existing
+  next-click refill restores fullscreen.
+
+*Measure:* `npm run shelf` or `npm run music` with a fake stream whose track stops
+and comes back; a stubbed `getScreenDetails` with a fake `screenschange` in
+`npm run panel`.
+
+### 14h. No internet at the venue
+
+**Read in the code.**
+
+- The service worker saves nothing ahead of time (`install` only calls
+  `skipWaiting()`, `public/sw.js`); a built file is cached only once it has been
+  fetched. So after a deploy, the projector window's code and the song-map worker may
+  not be there offline.
+- A failed chunk matches `Failed to fetch` on the error screen, whose `startOver()`
+  unregisters every service worker and deletes every cache (`src/main.tsx`): offline,
+  that turns one missing file into a site that cannot be reloaded at all.
+- The fonts come from Google (`src/index.css`), which the worker does not handle.
+- Song ID and lyrics fetch with no timeout (`fingerprint.ts`, `lyrics.ts`), and one
+  busy flag gates the local fingerprint match, the song-end detector and the remote
+  ID together (`useMusicIntelligence.ts`), so a request that hangs on venue Wi-Fi
+  stops songs the local library knows from being recognised.
+
+*Fix:* precache every built file on install; never `startOver()` while
+`!navigator.onLine`; serve the fonts from the site; `AbortSignal.timeout(8000)` on
+both requests and a busy flag of the local matcher's own. *Measure:* extend
+`npm run sw` (load, go offline, open `?cast=true`, reload: the app still draws) and
+`npm run music` with a stub that never answers.
+
+### 14i. What the wall shows: clipping, banding and the flash guard
+
+**Read in the code; how visible each is is inferred until the lab renders it.**
+
+- *The projector's gain and gamma work on an 8-bit picture.* The output pass's scene
+  is the canvas's format (`output.ts`), and the frame is already dithered to 8 bits
+  when `pow(col * gain, gamma)` runs (`wgsl/output.ts`). At gamma 0.5 code 1 becomes
+  code 16: dark fades jump off black and the dither grows into speckle. Gain above 1
+  clips each channel on its own, so saturated colours change hue (orange at 2.2
+  turns yellow). Draw the scene in `rgba16float`, dither once in the output pass, and
+  roll off with a shoulder that keeps the hue.
+- *The camera caps white at about two thirds of the lamp.* With the camera on, the
+  plate draws into the camera's scene in the canvas's 8-bit format (`camera.ts`), so
+  the light above 1 the plate leaves unclamped for it is clipped anyway, and
+  `aces(col * 1.12)` then peaks at 0.83. Oil on Water, Colorful Cosmos and Sunny Side
+  Up use it. `rgba16float` for that scene, and/or an ACES scaled so 1 stays 1.
+- *The dye reaches the plate in 8 bits and is then magnified.* `packDye` stores
+  `sqrt(d/8)` in `rgba8unorm` (`wgsl/pack.ts`), and each texel covers 5.6 screen pixels
+  at 512² on 1080p and 11 at 4K, with the closeup multiplying thin-dye contrast about
+  ten times. Bicubic smooths between texels but cannot put the lost levels back, so
+  slow gradients can terrace. `docs/webgpu-plan.md` calls it "probably gone"; nothing
+  measures it. Sample the float fields or pack to `rgba16float`.
+- *The flash guard reads screen values, not light.* `luma()` in `wgsl/probe.ts`
+  weights the canvas's encoded values, while the guard's thresholds are relative
+  luminance, which is defined on linear light. A strobe between 0.85 and 0.95 reads as
+  0.08, under the 0.10 flash step, though in light it is 0.16, so bright strobes go
+  uncounted; a kick from black to 0.3 reads 0.3 but is 0.07, so dark shows are dimmed
+  for nothing. This is a safety item: decode to linear before the weights.
+- *Keystone and corner pins* resample the whole frame bilinearly at the same size
+  (`output.ts`), which softens by up to half a pixel and turns pixel-scale grain into
+  a fixed pattern. Catmull-Rom (the plate's `textureBicubic`) and the grain after the
+  warp.
+
+*Measure:* lab ramps through the output pass at gain 2.2 and gamma 0.6 (largest step
+between neighbouring codes, hue drift on colour patches); a flat white plate through
+the camera (at least 0.97); a radial dye ramp flat and in the closeup (distinct levels,
+widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
+`npm run wall`'s traces; a one-pixel grating through a 5 % keystone.
+
+### 14j. Heat, battery and frames nobody sees
+
+**Read in the code; the thermal behaviour is inferred.**
+
+- *No frame-rate cap.* The loop draws on every animation frame and the readback runs
+  in each, so a 120 Hz ProMotion MacBook, a 90/120 Hz Android phone or a 144 Hz
+  laptop pays for 120–144 draws a second of a liquid that steps at 60 or 30. Cap the
+  draw rate at 60, or twice the step rate when the governor has halved it.
+- *A readback every frame, even frozen.* `syncFromGpu()` runs for every layer each
+  frame whatever the solver did; with the plate frozen the solver stops but the draw
+  and the readback go on at the display's rate. Read back only on a frame that stepped
+  or wrote deltas.
+- *The governor knows nothing of heat.* It climbs whenever frames are fast and
+  retries a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
+  is warming up climbs, drops frames for a second and a half, steps down, and does it
+  again every minute and a half. Every Apple GPU classes as `strong` (`device.ts`), so
+  an iPhone opens at 512² and climbs; the phone layout does not touch the ladder; and
+  the adapter is always asked for `high-performance`, which wakes the discrete GPU on
+  dual-GPU laptops. Double the wait each time the same rung fails, cap a phone's climb
+  at its starting rung, and consider a "cool / battery" output setting (low-power
+  adapter, 30 steps, a capped top rung) that ships with its phone control.
+- *The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
+  the timer on `gamepadconnected`.
+
+*Measure:* Chromium with `--disable-frame-rate-limit`, draws a second at 65 or fewer
+while steps hold; frozen, readbacks a second near 0; `npm run rungs` with a simulated
+machine whose capacity sinks, rung changes in ten minutes bounded.
+
+### 14k. Smaller, for the same pass
+
+- *The tablet remote* holds a slider for 50 ms on the tablet and another 50 ms on the
+  display, both trailing (`RemoteControl.tsx`, `App.tsx`), then steps the value with
+  no easing: at least 100 ms before anything moves. The pad throttles on the leading
+  edge with no trailing send, so the end of a flick is dropped. Send the first change
+  at once, keep one trailing send, and ease on the display. The cast's audio goes out
+  at 30 Hz with no onsets or beat phase, so a network display locks its own kicks.
+- *The mouse and fingers on the main canvas* use `mousemove` and `touchmove`, keeping
+  the last position, so each frame gets one straight chord and a fast circle is
+  flattened. `pointermove` with `getCoalescedEvents` for the path and
+  `getPredictedEvents` for the tip (`npm run phone`, and `tools` on the Mac).
+- *A check before the show.* Sound moving, projector found and fullscreen, screen
+  kept awake, the cache complete, MIDI present, the GPU's rung: every signal exists,
+  nothing gathers them. A panel on the desk, and its phone version, with a `panel`
+  check.
+- *A deploy mid-show can mix versions:* a projector window opened after a deploy runs
+  the new build against the old show, and the cast hello carries no build version
+  (`castProtocol.ts`). Inferred; send the version and warn on a mismatch.

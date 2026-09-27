@@ -1171,11 +1171,12 @@ export default function App() {
     smooth: settings.sceneSmooth ?? 0.35,
   });
 
-  const liveAudio = useAudioAnalyzer(
+  const ear = useAudioAnalyzer(
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
     settings.autoCalibrate !== false, calibrateNonce,
   );
+  const liveAudio = ear.audioData;
   /*
     What the show hears: the room, or a song being rendered.
 
@@ -2462,6 +2463,8 @@ export default function App() {
     rounds of measuring the wrong plate before anyone thought to check the
     instrument. Reading refs means it cannot be stale.
   */
+  const earDebugRef = useRef(ear.debug);
+  earDebugRef.current = ear.debug;
   const liveDebugRef = useRef({ isCasting, castState, audioData, songChange, isAutomated });
   liveDebugRef.current = { isCasting, castState, audioData, songChange, isAutomated };
   useEffect(() => {
@@ -2472,6 +2475,7 @@ export default function App() {
           isCasting: l.isCasting,
           castState: l.castState,
           audio: l.audioData,
+          ear: earDebugRef.current(),
           songChange: l.songChange,
           // Straight from the render rather than from the cast snapshot, which
           // is assembled for a receiver and not for a question.
@@ -3407,8 +3411,15 @@ export default function App() {
     phone: () => { setHelpFocus('live'); setShowHelp(true); setShowSettings(false); setShowMidi(false); setShowSequencer(false); },
   }), [openSettingsAt]);
 
+  /*
+    Deaf is said first and in words: listening, but nothing arriving (the
+    audio context suspended or interrupted, or no reading for half a second;
+    hooks/useAudioAnalyzer.ts). A deaf plate still moves, so the only way a
+    performer finds out is being told. Not while a render holds the ear.
+  */
+  const earDeaf = ear.deaf && audioSource !== 'none' && !renderHold;
   const deskAudioLine = audioSource === 'none' ? 'silent'
-    : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}${songLine ? ` · ${songLine}` : ''}`;
+    : `${earDeaf ? 'not hearing · ' : ''}${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}${songLine ? ` · ${songLine}` : ''}`;
 
   /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
   const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
@@ -4249,6 +4260,7 @@ export default function App() {
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
             songLine={audioSource === 'none' ? '' : songLine}
+            deaf={earDeaf}
             show={{
               running: sequencer.status.running,
               paused: !!sequencer.status.sequenceId && !sequencer.status.running,
