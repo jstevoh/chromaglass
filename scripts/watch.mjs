@@ -943,6 +943,35 @@ async function selftest() {
   check('C at 1.5 s: that and 4.1–6.0 s; A: none', fz.length === 2 && near(fz[1].from, 4.1) && near(fz[1].to, 6) && !fzA.length,
     `C: ${show(fz)}; A: ${show(fzA)}`);
 
+  // A blip, as the recorder's encoder makes one in a still picture (see
+  // freezes()): still from 1.0 to 7.0 s at 10 samples a second but for three
+  // samples at 3.0 s decaying from 0.15%. With blipSeconds it is one
+  // stillness; without, it is split where the blip is. A burst of four
+  // samples (0.4 s) at 0.3 s of blip allowed still ends it, and so does
+  // motion that goes on.
+  const made = (fn) => ({ rate: 10, rows: Array.from({ length: 90 }, (_, k) => ({ t: k / 10, motion: fn(k / 10) })) });
+  const blip = { '3.0': 0.15, '3.1': 0.08, '3.2': 0.03 };
+  const B1 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : blip[t.toFixed(1)] ?? 0.01);
+  const B2 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : t > 2.95 && t < 3.35 ? 0.2 : 0.01);
+  const b1 = freezes(B1, { below: 0.025, blipSeconds: 0.5 }), b0 = freezes(B1, { below: 0.025 }), b2 = freezes(B2, { below: 0.025, blipSeconds: 0.3 });
+  // And as moving.mjs asks (half a second, under 0.3%, a quarter of the
+  // stillness at most): a one-sample jump of 0.9% at 4.0 s, a beat flash the
+  // freeze did not stop, splits it; so does a plate moving 0.2% four samples
+  // in every five, which with nothing but a length it came out still.
+  const ASKED = { below: 0.025, blipSeconds: 0.5, blipBelow: 0.3 };
+  const B3 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : Math.abs(t - 4) < 0.05 ? 0.9 : blip[t.toFixed(1)] ?? 0.01);
+  const B4 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : Math.round(t * 10) % 5 === 0 ? 0.01 : 0.2);
+  const b1a = freezes(B1, ASKED), b3 = freezes(B3, ASKED), b4 = freezes(B4, ASKED);
+  check('a codec blip inside a stillness does not split it, when asked; four samples of motion do',
+    b1.length === 1 && near(b1[0].from, 0.9) && near(b1[0].to, 7) && b0.length === 2 && near(b0[0].to, 3) && near(b0[1].from, 3.2)
+      && b2.length === 2 && near(b2[0].to, 3) && near(b2[1].from, 3.3),
+    `blip allowed: ${show(b1)}; not: ${show(b0)}; a 0.4 s burst at 0.3 s allowed: ${show(b2)}`);
+  check('as moving asks it, the blip is carried, a 0.9% jump is not, and a plate moving in bursts is never still',
+    b1a.length === 1 && near(b1a[0].from, 0.9) && near(b1a[0].to, 7)
+      && b3.length === 2 && near(b3[0].to, 4) && near(b3[1].from, 4)
+      && b4.length === 0,
+    `blip: ${show(b1a)}; jump at 4.0 s: ${show(b3)}; bursts: ${show(b4)}`);
+
   // D's answers come from how it was made. Where a number depends on the
   // motion's exact size (rise, decay, peak, calm, half-life), the answer is
   // the same measure worked out on D's raw frames before the codec, by a
@@ -1027,22 +1056,52 @@ export async function watchVideo(input, options = {}) {
  * picture through a lossy codec measured 0.000 to 0.002 in the self-test. The
  * slowest moving plate is orders above that. A bar near the slow plate would
  * call a calm look a freeze.
+ *
+ * `blipSeconds`: how long a change may last inside a stillness and not end
+ * it, if the picture is still again straight after. Off (0) unless asked.
+ * A still canvas recorded as the app records it (captureStream, MediaRecorder,
+ * VP9 at 12 Mbps) does not stay still in the file: the encoder re-sends the
+ * picture now and then, and the decoded frame changes by 0.14–0.15% for one
+ * sample, then 0.07–0.08%, then 0.02–0.03%, and is back under 0.02% in about
+ * a third of a second; about 1.7 s into the stillness, and again later
+ * (measured in Chromium with a plate-like canvas stopped for six seconds,
+ * three takes, while chasing `npm run moving`'s late freezes). Real motion
+ * starting again goes on. The same stretch through the codec was split in
+ * two by that blip whenever the bar for still sat under 0.15%.
+ *
+ * What may be carried, and how much, is bounded, or a plate that moves in
+ * bursts reads as still (the check-skeptic review of the first version: a
+ * 0.9% jump every 1.2 s, a beat flash through a freeze, was bridged, and so
+ * was a plate moving four samples in five). `blipBelow`: every sample carried
+ * must be under it; the encoder's blip peaks at 0.15%, a plate that moves
+ * is several times that. `blipShare`: the samples carried may be at most
+ * this share of the stillness so far, blip included; the encoder's is three
+ * samples in the seventeen or more before it, a train of bursts is most of
+ * its samples.
  */
-export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2 } = {}) {
+export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds = 0, blipBelow = Infinity, blipShare = 0.25 } = {}) {
   const out = [];
-  let start = -1;
+  let start = -1, carried = 0;
   const rows = r.rows;
   for (let k = 1; k <= rows.length; k++) {
     const quiet = k < rows.length && rows[k].motion < below;
     if (quiet && start < 0) start = k;
     if (!quiet && start >= 0) {
+      // A blip: motion in samples covering no more than blipSeconds (each
+      // sample stands for 1/rate), then still again.
+      // The stretch carries on through it, from the first quiet sample after.
+      if (blipSeconds > 0 && k < rows.length) {
+        let j = k;
+        while (j < rows.length && rows[j].motion >= below && rows[j].motion < blipBelow && rows[j].t - rows[k].t + 1 / r.rate <= blipSeconds + 1e-9) j++;
+        if (j < rows.length && rows[j].motion < below && carried + (j - k) <= blipShare * (j - start)) { carried += j - k; k = j; continue; }
+      }
       // From the last sample before the stillness to the first that moved
       // again (or the end of the clip): a picture still from 0.0 until it
       // changes at 2.0 is two seconds still, not the 1.9 between the first
       // and last identical samples.
       const from = rows[start - 1].t, to = k < rows.length ? rows[k].t : rows[k - 1].t + 1 / r.rate;
       if (to - from >= minSeconds - 1e-9) out.push({ from, to, seconds: to - from });
-      start = -1;
+      start = -1; carried = 0;
     }
   }
   return out;

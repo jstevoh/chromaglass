@@ -225,7 +225,14 @@ try {
       for (let y = 0; y < n; y += step) for (let x = 0; x < n; x += step) {
         if (Math.hypot((x + 0.5) / n - cx, (y + 0.5) / n - cy) < 0.12) g += b.data[x + y * n] - a.data[x + y * n];
       }
-      if (g > best.gain) best = { x: cx, y: cy, gain: g * step * step / (n * n) * 1e4 };
+      // Compared as stored: this compared each raw sum against the best as
+      // stored, scaled 4.3 times larger at 192², so a later spot took over
+      // only with over 4.3 times the gain, and the spot printed leaned toward
+      // the first scanned, low y then low x (the check-skeptic review, the
+      // loop copied out: gains of 0.3 at 0.3,0.3 and 1.0 at 0.7,0.7 read as
+      // 0.64,0.64; the true peak is 0.70,0.70).
+      const gs = g * step * step / (n * n) * 1e4;
+      if (gs > best.gain) best = { x: cx, y: cy, gain: gs };
     }
     return best;
   });
@@ -267,6 +274,23 @@ try {
     if (!best || g.gain > best.gain) best = g;
   }
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
+  /*
+    Printed, not judged: the hand's path, and how far the place the drag
+    gathered most (anywhere on the plate) lies from it. The one miss in 74
+    runs from 2026-09-25 to 27 (deploy 36269575619, a commit that touched
+    nothing the magnet runs through) gathered +183 at 0.72,0.32 with the
+    solver's magnet held at 0.56,0.27 the whole hold, and nothing within
+    0.12 of any point the hand had been; that log did not say where the hand
+    had been, so whether the liquid was carried off the path, or gathered
+    where the path was not, could not be told. The next one will say. (And
+    the "+183 at 0.72,0.32" was read by the spot finder above before its
+    comparison was fixed, which leaned toward the first spots scanned: the
+    true peak may have been elsewhere.)
+  */
+  if (gathered && trail.length) {
+    const off = Math.min(...trail.map(p => Math.hypot(p.x - gathered.x, p.y - gathered.y)));
+    console.log(`     the hand's path: ${trail.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')}; where it gathered most is ${off.toFixed(2)} from it`);
+  }
   console.log(`     along the hand's ${trail.length} positions, the drag gathered most at ` +
     (best ? `${best.at.x.toFixed(2)},${best.at.y.toFixed(2)}: ${best.d0.toFixed(0)} → ${best.d1.toFixed(0)}, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'nowhere'));
   /*
