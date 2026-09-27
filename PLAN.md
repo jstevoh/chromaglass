@@ -1110,7 +1110,7 @@ version in the same PR (see the operating rules below).
    byte-identical to before. `npm run mixer` measures it (31 checks, each held red
    against a broken shader). **Owed:** the Mac look in `docs/judging.md` §13 (the film
    between the plates, the LED beam, whether 0–200 % is the right travel).
-2. **The other pictures as rows**, *shipped* (#PR). The lumia and the gel wheel
+2. **The other pictures as rows**, *shipped* (#189). The lumia and the gel wheel
    were each still set in their own corner of Settings (the camera already comes in
    as the film). Each is now a row with its level (Lumia and Gel Wheel, the same
    settings) and its own grade. With the LED ring they are the lamp's three, the
