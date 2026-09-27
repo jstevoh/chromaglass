@@ -1517,9 +1517,12 @@ frames stop while the page says it is hidden (Chrome says so of a covered window
 and only after a quarter second while it says it is visible, so a visible window at
 15 fps, 240 Hz or with ragged frames reads exactly its frames, as before. (A stall
 measured from the frames alone went red on the Mac runner's first run: its busy app
-drew 28 frames a second, and the tick read between them.)
+drew 28 frames a second, and the tick read between them. The same went red on its
+second run behind the wall: covered, the wall drew 44 a second and the tick read 5
+times in its gaps. The tick now gives the wall's asks a quarter second whether the
+page is hidden or not, so it takes over a quarter second after the wall closes.)
 
-`npm run ears` (21 checks, no GPU needed; on the Mac's `open` shard) measures it. A
+`npm run ears` (23 checks, no GPU needed; on the Mac's `open` shard) measures it. A
 headless window is never hidden, so it withholds the show's animation frames itself.
 Covered, with the wall asking: 38 distinct levels in two seconds, one reading per
 frame asked for (120 over 121); with no wall, 38 on the tick; the control on the

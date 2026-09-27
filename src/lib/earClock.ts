@@ -21,7 +21,7 @@
  *          while the window is visible nothing about how the show hears has
  *          changed, reading for reading.
  *   ask    the projector window asking the show for a frame. Taken only while
- *          the show's own frames have stopped (see EAR_STALL_MS: at once when
+ *          the show's own frames have stopped (see EAR_STALL_MS: after 50 ms when
  *          the page says it is hidden, after a quarter second when it does
  *          not), so the plate hears once per frame the wall draws.
  *   tick   a worker's timer, about sixty a second. Taken only while neither of
@@ -72,6 +72,18 @@ export const EAR_STALL_MS = 50;
 export const EAR_STALL_VISIBLE_MS = 250;
 
 /**
+ * How long the tick holds back after the wall's last ask: a quarter second,
+ * whether the page is hidden or not. The asks are the wall window's animation frames, and they are as
+ * ragged as any window's: on the Mac runner, with the show covered and the
+ * wall drawing 44 a second, the tick read 5 times in two seconds in the gaps
+ * between them, the same doubling the visible stall was raised to stop. The
+ * short stall is for the handover it was written for, the show's own frames
+ * stopping as the wall covers it; the wall closing is the rarer event, and a
+ * quarter second without a reading then is well inside EAR_DEAF_MS.
+ */
+export const EAR_ASK_HOLD_MS = 250;
+
+/**
  * Two readings from *different* drivers closer than this are one. It stops a
  * wall's ask and the show's own frame landing in the same instant, as they can
  * when the window is uncovered, from both being read. It is never applied
@@ -102,7 +114,7 @@ export class EarClock {
     let take: boolean;
     if (driver === 'frame') take = true;
     else if (driver === 'ask') take = now - this.offered.frame > stall;
-    else take = now - this.offered.frame > stall && now - this.offered.ask > stall;
+    else take = now - this.offered.frame > stall && now - this.offered.ask > EAR_ASK_HOLD_MS;
     if (take && driver !== this.lastDriver && now - this.lastRead < EAR_MIN_GAP_MS) take = false;
     if (take) {
       this.reads[driver]++;

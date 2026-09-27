@@ -106,9 +106,21 @@ const check = (name, ok, detail = '') => {
   check('and the first of them within 70 ms of the last frame',
     firstAsk !== undefined && firstAsk - 1000 <= 70,
     `${firstAsk === undefined ? 'none' : (firstAsk - 1000).toFixed(1)} ms after the frames stopped`);
-  const ticks3 = within(taken.tick, 2070, 3000);
-  check('covered with no wall, the worker\'s tick reads about sixty a second',
-    ticks3 >= 55, `${ticks3} readings in 930 ms`);
+  /*
+    The wall closes at 2000. The tick gives the wall's asks a quarter second
+    (the wall's frames are as ragged as any window's; see the ragged wall
+    below), so it has to take over within a third of a second, and from then
+    on read every time it offers.
+  */
+  const lastAsk2 = Math.max(...taken.ask.filter(t => t < 2000));
+  const firstTick3 = taken.tick.find(t => t >= 2000);
+  check('covered with no wall, the worker\'s tick takes over within a third of a second',
+    firstTick3 !== undefined && firstTick3 - lastAsk2 <= 330,
+    `${firstTick3 === undefined ? 'none' : (firstTick3 - lastAsk2).toFixed(0)} ms after the wall's last ask`);
+  const offered3 = events.filter(e => e.driver === 'tick' && e.t >= 2330 && e.t < 3000).length;
+  const ticks3 = within(taken.tick, 2330, 3000);
+  check('and reads about sixty a second, every tick it offers',
+    ticks3 === offered3 && ticks3 >= 40, `${ticks3} of ${offered3} ticks in 670 ms`);
   const frames4 = events.filter(e => e.driver === 'frame' && e.t >= 3000).length;
   check('uncovered, the frames read again, all of them, and the tick stops',
     within(taken.frame, 3000, 4000) === frames4 && within(taken.tick, 3000 + 1, 4000) === 0,
@@ -129,6 +141,31 @@ const check = (name, ok, detail = '') => {
   const nextFrame = ear.offer('frame', lastAsk + 1.5 + 1000 / 60, false);
   check('an ask and a frame 1.5 ms apart are one reading, and the next frame reads',
     !tookFrame && nextFrame, `the frame 1.5 ms after the ask ${tookFrame ? 'read too' : 'did not read'}; the one after ${nextFrame ? 'did' : 'did not'}`);
+}
+
+/*
+  Covered, with the wall's frames ragged. On the Mac runner the wall drew 44
+  a second with the show covered, and the tick read 5 times in two seconds in
+  the gaps between them, each one a second reading for a frame the wall drew.
+  Gaps from 20 to 200 ms, as a busy machine's frames come, with the tick
+  running all along: every ask reads, no tick does.
+*/
+{
+  const ear = new EarClock();
+  let seed = 7;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const events = [];
+  for (let t = 0; t < 2000; t += 20 + rand() * 180) events.push({ driver: 'ask', t });
+  for (let t = 3.1; t < 2000; t += 16) events.push({ driver: 'tick', t });
+  events.sort((a, b) => a.t - b.t);
+  const took = { ask: 0, tick: 0 };
+  let offered = 0;
+  for (const e of events) {
+    if (e.driver === 'ask') offered++;
+    if (ear.offer(e.driver, e.t, true)) took[e.driver]++;
+  }
+  check('covered with the wall\'s frames ragged, 20 to 200 ms apart, every ask reads and no tick',
+    took.ask === offered && took.tick === 0, `${took.ask} of ${offered} asks, ${took.tick} ticks`);
 }
 
 /*
