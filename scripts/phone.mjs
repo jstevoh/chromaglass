@@ -475,16 +475,16 @@ try {
       await settle(1200);
       /*
         Where the fingers are on the plate while they hold, not where the same
-        pixels were when the places were picked. rotationSpeed 0 only turns
-        the motor off: the plate is a flywheel and coasts on its spinDrag
-        (types.ts), and over ten Mac runs the same pixel (45, 110) landed on a
-        different cell in nearly every one. Seconds pass between picking the
-        places and the hold (six places tried, a clear, a settle), so the
-        cells had moved out from under the disks, a finger far from the middle
-        furthest: on the Mac, 62 against 181 for a pair that reads 0.63 to
-        0.99 of each other on every other run. Braking the plate instead
-        (spinDrag 1) was tried and upset the closeup's checks after this one,
-        which are held to where a finger landed a moment before.
+        pixels were when the places were picked, and how far apart the two
+        are. Asked after a Mac run read A 62 against B 181 (0.34 of each
+        other; 0.63 to 0.99 on every other run), on the theory that the plate
+        was still coasting (rotationSpeed 0 only turns its motor off, and the
+        same pixel lands on a different cell from run to run). The first run
+        that printed it read 0.0 cells: the resting angle differs between
+        runs, not within one, so coasting was not that failure's cause, which
+        is still open (PLAN.md, batch 11). Measuring at the held cells is
+        right either way, and the drift in the line says which it was next
+        time.
       */
       const held = (await hands()).hands;
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);

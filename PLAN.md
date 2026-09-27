@@ -844,6 +844,18 @@ phones narrower than about 800 px the dock's tools fall under the 48 px target (
 770 px before the Mix button took a slot; `npm run phone` holds 812×375), so a two-row
 landscape dock is owed for the smallest phones.
 
+Two Mac checks went red once each on commits that did not touch them, while this
+batch's plan was going in (#177), and neither cause is known yet:
+
+- `npm run phone`, "two fingers holding Drop lay dye under both": A 62 against B
+  181, 0.34 of each other where the check asks 0.4 (0.63–0.99 over the nine other
+  runs that have it). Not the plate coasting: the line now prints how far the
+  fingers' cells moved between picking and holding, and it read 0.0 on the next
+  run. Look next at the held Drop's drops (`dropHeight`), which land every
+  DROP_EVERY steps with a splash.
+- `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
+  run after, where every other shard passed.
+
 ## Not doing
 
 - **Kaleidoscope, tiling, tunnel, halftone, posterize, solarize.** Warps of a picture.
