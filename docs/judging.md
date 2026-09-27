@@ -315,6 +315,9 @@ cannot be read there. Things to look at, on Oil & Water:
   coloured blobs drawn on top;
 - whether their rims are clean or show a fine radial hatching where the flow
   shears them (the lab showed a faint one);
+- two drops that have just merged: in the lab a faint seam where their
+  rims met stays inside the body for a few seconds before it fades; say
+  whether it reads as two oils blending or as a line drawn inside;
 - dragging a finger through a drop: it should go with the finger and keep
   its colour;
 - after a few minutes of pouring: the pours stop adding oil once the bodies
