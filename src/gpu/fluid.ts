@@ -575,6 +575,11 @@ export class WebGPUFluid {
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
       ['mixCarry', [RGBA32], false],
+      // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
+      // its first steps, only a Finger or a Blow does, so like mixCarry it is
+      // built behind the show; waited for at the open, `npm run startup`
+      // fails it as asked for by none.
+      ['phaseCarry', [R32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
       ['rxnStep', [RGBA32], open.reaction],
@@ -582,7 +587,6 @@ export class WebGPUFluid {
       ['gridSplat', [RGBA32], open.reaction || open.gel],
       // The second phase, single-channel, and what it does to the flow.
       ['phaseSplat', [R32], open.phase],
-      ['phaseCarry', [R32], open.phase],
       ['phaseAdvect', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
       ['phaseRelax', [R32], open.phase],

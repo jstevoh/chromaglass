@@ -439,8 +439,10 @@ the carry in the lab). Worth looking at, on Magnet Garden or Ferro Paint:
 
 - a Finger drawn through a pool drags a tongue of ferrofluid along with the
   dye, and the pool closes behind it;
-- Blow held over a pool opens a hole under it; moved across, it pushes the
-  ferrofluid ahead of it;
+- Blow held over a pool opens a hole under it; moved across, even slowly, it
+  pushes a tongue of ferrofluid ahead of it and does not leave a row of holes;
+- with Automation on, the ferrofluid stays put between hands (only a hand
+  carries it);
 - the same on the phone, with a finger on Finger or Blow; a finger on the
   Magnet is still a magnet.
 

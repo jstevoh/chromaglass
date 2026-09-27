@@ -18,8 +18,10 @@
  * Each gesture is worked out as the app works it out, by the same functions
  * (lib/handCarry.ts: fingerCarry, blowCarry, which LiquidVisualizer's
  * fingerDrag and blowPhase call), from the arguments each hand gives: the
- * mouse's Finger (strength 0.09), the phone's (0.045, fingerDrag's half),
- * the mouse's Blow held still (a puff) and moved (along the stroke). The
+ * mouse's Finger (strength 0.09), a remote hand's (0.045: performGesture's,
+ * which is the phone as the laptop's remote, a pen, OSC and replay; a phone
+ * touching the plate itself is the pointer, with the mouse's numbers), the
+ * mouse's Blow held still (a puff) and moved (along the stroke). The
  * tool's push is added to the flow as well, a disc of the tool's own
  * strength without its swirl: a stand-in, which moved the pool 0.06 % of
  * the plate with the app's own velocity loops copied cell for cell and
@@ -29,13 +31,13 @@
  *
  *   1. a Finger stroke across a pool carries the ferrofluid along it: the
  *      pool's centre of mass moves at least 0.02 of the plate the stroke's
- *      way for the mouse's Finger and 0.013 for the phone's, and with the
+ *      way for the mouse's Finger and 0.013 for a remote hand's, and with the
  *      push alone less than 0.005
  *   2. a puff held over a pool blows a hole in it: the ferrofluid within
  *      the puff's half radius falls to under half of what it was, and with
  *      the push alone stays over nine tenths
- *   3. a Blow moved across the pool pushes it along, the mouse's and the
- *      phone's (a directed blow, wider): at least 0.005 of the plate, the
+ *   3. a Blow moved across the pool pushes it along, the mouse's and a
+ *      remote hand's (a directed blow, wider): at least 0.005 of the plate, the
  *      push alone less than 0.002. Less than the Finger asks, because a
  *      blow is narrower and takes less (0.48 against 0.72): it carries a
  *      tongue from where it crossed the pool to where it stopped rather
@@ -61,8 +63,8 @@ const check = (name, ok, detail = '') => {
 const { page, close } = await openLab();
 try {
   /*
-    One gesture on a fresh pool: `tool` is 'finger', 'phone finger', 'puff'
-    'blow moved' or 'phone blow'; with
+    One gesture on a fresh pool: `tool` is 'finger', 'remote finger', 'puff'
+    'blow moved' or 'remote blow'; with
     `carry` false only the tool's push is added. Returns the pool's centre
     of mass, the ferrofluid inside the half radius of where the gesture
     ended, and the mass, before and after.
@@ -91,8 +93,8 @@ try {
     for (let i = 1; i <= events; i++) {
       const p = tool === 'puff' ? { x: pool.x * L, y: pool.y * L } : along(i);
       const c = tool === 'finger' ? lab.fingerCarry(p.x, p.y, 7, 0.09, 1, 0, L)
-        : tool === 'phone finger' ? lab.fingerCarry(p.x, p.y, 7, 0.09 * 0.5, 1, 0, L)
-        : tool === 'phone blow' ? lab.blowCarry(p.x, p.y, 4 + 2, 0.06, 1, 0, L)
+        : tool === 'remote finger' ? lab.fingerCarry(p.x, p.y, 7, 0.09 * 0.5, 1, 0, L)
+        : tool === 'remote blow' ? lab.blowCarry(p.x, p.y, 4 + 2, 0.06, 1, 0, L)
         : lab.blowCarry(p.x, p.y, 4, 0.06, tool === 'puff' ? 0 : 1, 0, L);
       gesture.push({ ...c, push: tool.includes('finger') ? (tool === 'finger' ? 0.09 : 0.045) : 0.06 });
     }
@@ -115,7 +117,7 @@ try {
   }, { tool, carry });
 
   const got = {};
-  for (const tool of ['finger', 'phone finger', 'puff', 'blow moved', 'phone blow']) for (const carry of [true, false]) {
+  for (const tool of ['finger', 'remote finger', 'puff', 'blow moved', 'remote blow']) for (const carry of [true, false]) {
     const t0 = Date.now();
     const m = got[`${tool} ${carry ? 'carried' : 'pushed'}`] = await run(tool, carry);
     console.log(`  ${tool}, ${carry ? 'with the carry' : 'the push alone'}: centre of mass moved ${((m.after.cx - m.before.cx) * 100).toFixed(2)}% of the plate along x, ` +
@@ -124,15 +126,15 @@ try {
   console.log('');
   const dx = (m) => m.after.cx - m.before.cx;
   const kept = (m) => m.after.inside / Math.max(m.before.inside, 1e-9);
-  check('a Finger stroke carries the ferrofluid along it, the mouse\'s and the phone\'s',
-    dx(got['finger carried']) >= 0.02 && dx(got['phone finger carried']) >= 0.013 &&
-      Math.abs(dx(got['finger pushed'])) < 0.005 && Math.abs(dx(got['phone finger pushed'])) < 0.005,
-    `${(dx(got['finger carried']) * 100).toFixed(2)}% and ${(dx(got['phone finger carried']) * 100).toFixed(2)}% of the plate the stroke's way, against ${(dx(got['finger pushed']) * 100).toFixed(2)}% and ${(dx(got['phone finger pushed']) * 100).toFixed(2)}% with the push alone`);
+  check('a Finger stroke carries the ferrofluid along it, the mouse\'s and a remote hand\'s',
+    dx(got['finger carried']) >= 0.02 && dx(got['remote finger carried']) >= 0.013 &&
+      Math.abs(dx(got['finger pushed'])) < 0.005 && Math.abs(dx(got['remote finger pushed'])) < 0.005,
+    `${(dx(got['finger carried']) * 100).toFixed(2)}% and ${(dx(got['remote finger carried']) * 100).toFixed(2)}% of the plate the stroke's way, against ${(dx(got['finger pushed']) * 100).toFixed(2)}% and ${(dx(got['remote finger pushed']) * 100).toFixed(2)}% with the push alone`);
   check('a puff blows a hole in it', kept(got['puff carried']) < 0.5 && kept(got['puff pushed']) > 0.9,
     `${(kept(got['puff carried']) * 100).toFixed(0)}% left under the puff, against ${(kept(got['puff pushed']) * 100).toFixed(0)}% with the push alone`);
-  check('a Blow moved across it pushes it along, the mouse\'s and the phone\'s',
-    ['blow moved', 'phone blow'].every(t => dx(got[`${t} carried`]) >= 0.005 && Math.abs(dx(got[`${t} pushed`])) < 0.002),
-    ['blow moved', 'phone blow'].map(t => `${(dx(got[`${t} carried`]) * 100).toFixed(2)}% against ${(dx(got[`${t} pushed`]) * 100).toFixed(2)}%`).join('; ') + ' with the push alone');
+  check('a Blow moved across it pushes it along, the mouse\'s and a remote hand\'s',
+    ['blow moved', 'remote blow'].every(t => dx(got[`${t} carried`]) >= 0.005 && Math.abs(dx(got[`${t} pushed`])) < 0.002),
+    ['blow moved', 'remote blow'].map(t => `${(dx(got[`${t} carried`]) * 100).toFixed(2)}% against ${(dx(got[`${t} pushed`]) * 100).toFixed(2)}%`).join('; ') + ' with the push alone');
   const drift = Math.max(...Object.values(got).map(m => Math.abs(m.after.mass / m.before.mass - 1)));
   check('and none is made or lost', drift < 0.001, `worst ${(drift * 100).toFixed(4)}%`);
 } finally {
