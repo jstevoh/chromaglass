@@ -24,6 +24,7 @@
 import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup, type Prep } from './kit';
 import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
+import { spikesOnAxis } from './wgsl/spikes';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
@@ -162,6 +163,31 @@ const MAZE_FINEST = 3;
 const MAZE_GAIN = 2;
 /** The share of the maze's field that is uniform (a coil under the whole plate); the hand magnet adds the rest where it is. */
 const MAZE_UNIFORM = 0.45;
+/*
+  A magnet close enough to stand the ferrofluid up into spikes (the Magnet
+  tool pressed under the glass; wgsl/spikes.ts has why and where, and
+  spikesOnAxis how far into them a magnet is). What changes under them,
+  each ramped in with the spikes so a magnet brought up slowly (Magnet
+  Height on a fader) never steps:
+
+  The magnet's pull at half, where there is a maze field: at full it held
+  the pool packed round under the magnet, the one round blob that was
+  reported, and the domes need the liquid to be able to spread out between
+  them. The maze's flow at twice: it is what carries the liquid into the
+  domes and out of the valleys (mazeForce, from μ, which now has the
+  spikes' wells in it); at the maze's own gain the pool had barely begun to
+  part after four seconds. Both were chosen by rendering the lab's Magnet
+  Garden with the magnet held, pull 1 and 0.5, flow 1, 2 and 4: at pull 1
+  the domes stayed packed in one raspberry, and at four times the flow the
+  pool thinned to grey, the plate past half full falling from 8.6% to 7.3%
+  in five seconds on 384². Without a maze field (the Magnet on Classic,
+  which pours ferrofluid to gather) the pull stays whole: gathering along
+  the hand is what `npm run magnet` holds that tool to, and the domes were
+  only tuned on the ferrofluid looks. SPIKE_RELAX: see the phase stage.
+*/
+const SPIKE_PULL = 0.5;
+const SPIKE_FLOW = 2;
+const SPIKE_RELAX = 16;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
 const LIES_GRID = 128;
@@ -260,7 +286,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 36;      // 35 used (33 is the vec2's alignment), rounded up for the uniform's 16-byte tail
+const SIM_FLOATS = 48;      // 36 scalars (33 is the vec2's alignment), then the fingers' three magnets at 36..47
 
 export class WebGPUFluid {
   readonly N: number;
@@ -731,6 +757,12 @@ export class WebGPUFluid {
     f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
     const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
     f[34] = -(p.gravityX ?? 0) / gl; f[35] = -(p.gravityY ?? -1) / gl;
+    const extras = p.magnetStrength > 0.0001 ? p.extraMagnets ?? [] : [];
+    for (let k = 0; k < 3; k++) {
+      const m = extras[k];
+      f[36 + k * 4] = m?.x ?? 0; f[37 + k * 4] = m?.y ?? 0;
+      f[38 + k * 4] = p.magnetHeight; f[39 + k * 4] = m ? p.magnetStrength : 0;
+    }
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -991,7 +1023,15 @@ export class WebGPUFluid {
     const period = MAZE_PERIOD / Math.pow(MAZE_FINEST, Math.max(0, Math.min(1, p.mazeDetail ?? 0)));
     const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
     const mazeK = { m2: 0.16 * kk, alpha: (1.16 * kk) ** 2 };
-    if (maze <= 0.001) this.mazeReady = false;
+    /*
+      Whether a magnet is close enough under the glass to stand the
+      ferrofluid up into spikes (wgsl/spikes.ts, spikeAmp on the magnet's
+      axis, where the field is strongest): then the spikes' wells go into μ
+      and the maze's flow carries the liquid into them, maze field or not.
+    */
+    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    const spikes = spikeAmt > 0;
+    if (maze <= 0.001 && !spikes) this.mazeReady = false;
     this.writeSim(p, disp);
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
@@ -1161,7 +1201,7 @@ export class WebGPUFluid {
         // repulsion: pulled hard to one spot, the ferrofluid stacks into
         // rings round it rather than a maze (the gradient orders the
         // stripes across it). Still enough that the maze follows the hand.
-        const pull = 1 - 0.75 * maze;
+        const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
             Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
@@ -1173,7 +1213,7 @@ export class WebGPUFluid {
       stage('maze force', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!],
-          this.arg('maze force', [MAZE_GAIN * (N / 256) * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+          this.arg('maze force', [MAZE_GAIN * (1 + (SPIKE_FLOW - 1) * spikeAmt) * (N / 256) * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
         this.vel.swap();
       });
     }
@@ -1433,7 +1473,22 @@ export class WebGPUFluid {
         this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);
         this.phase.swap();
       }
-      if (maze > 0.001) {
+      /*
+        Under spikes, the pressure again after the separation. The spikes'
+        wells draw the liquid into each dome by the Cahn–Hilliard flux, and
+        μ reads the phase clamped to full, so nothing in it pushes back once
+        a dome is past full. Measured (npm run spikes, the fullest cell):
+        1.17 with no passes here, 1.04 with six, 1.008 with sixteen. Run
+        between the substeps instead, the same passes spread each dome back
+        into its valleys before it had parted, so they run after.
+      */
+      if (spikes) {
+        for (let j = 0; j < SPIKE_RELAX; j++) {
+          this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
+          this.phase.swap();
+        }
+      }
+      if (maze > 0.001 || spikes) {
         // Once more on where the phase ended, for the next step's force.
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         this.mazeReady = true;

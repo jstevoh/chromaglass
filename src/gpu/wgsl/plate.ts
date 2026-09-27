@@ -22,6 +22,7 @@
  */
 
 import { PLATE_STRUCT } from './plateFields';
+import { SPIKES_WGSL } from './spikes';
 import { filmTableWgsl } from '../../lib/filmTable';
 
 /** Bindings every plate shader shares. */
@@ -672,6 +673,47 @@ fn dishToPlate(uvScreen: vec2f, layer: i32, aspect: f32, c: f32, s: f32) -> vec2
 }
 
 // Blend mode functions
+${SPIKES_WGSL}
+/*
+  The ferrofluid's spikes drawn (spikes.ts says where they are and why): the
+  solver gathers the pool into a dome under each (phaseMu), which is a plan
+  view of how much of the gap is filled and has no height; the peak on the
+  dome is drawn here, as the glint and the rim are. Returns (height 0–1, the
+  direction down its side, the field's share of full spikes here).
+*/
+fn spikeAt(p: vec2f) -> vec4f {
+  var best = vec4f(0.0);
+  for (var k = 0; k < 4; k++) {
+    let m = U.magnets[k];
+    let amp = spikeAmp(p, m);
+    if (amp <= 0.001) { continue; }
+    let h = max(m.z, 0.02);
+    let to = p - m.xy;
+    let r2 = dot(to, to);
+    let t = spikeTip(p, m);
+    let tip = t.xy;
+    let dmin = t.z;
+    /*
+      A cone with a sharp point, concave, as a peak's sides are, meeting the
+      next at half a pitch. And leaning out: a peak stands along the field,
+      and off the magnet's axis the field fans outward, so seen from above
+      every peak off the middle is drawn out along the line from the magnet,
+      a point aimed away from it. At the pool's rim that is the star.
+    */
+    let rel2 = p - tip;
+    let outward = select(vec2f(1.0, 0.0), to / sqrt(r2), r2 > 1e-10);
+    let along = dot(rel2, outward);
+    let across = rel2 - along * outward;
+    let lean = clamp(sqrt(r2) / (sqrt(r2) + h), 0.0, 1.0);
+    let dAniso = length(vec2f(along * (1.0 - 0.55 * lean), length(across) * (1.0 + 0.9 * lean)));
+    let s = clamp(dAniso / (0.5 * SPIKE_PITCH), 0.0, 1.0);
+    let height = amp * pow(1.0 - s, 3.0);
+    let down = select(vec2f(0.0), rel2 / max(dmin, 1e-6), dmin > 1e-6);
+    if (height > best.x || amp > best.w) { best = vec4f(max(height, best.x), down, max(amp, best.w)); }
+  }
+  return best;
+}
+
 fn blendScreen(a: vec3f, b: vec3f) -> vec3f    { return 1.0 - (1.0 - a) * (1.0 - b); }
 fn blendLighter(a: vec3f, b: vec3f) -> vec3f   { return max(a, b); }
 fn blendExclusion(a: vec3f, b: vec3f) -> vec3f { return a + b - 2.0 * a * b; }
@@ -1763,7 +1805,11 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
     */
     if (U.phaseAmount > 0.002) {
       let ph = clamp(view.phase, 0.0, 1.0);
-      if (ph > 0.004) {
+      // The spikes (spikeAt), where a magnet is close under it: read before
+      // the test for ferrofluid here, since a peak on a pool's rim stands out
+      // past the line, over water the solver has no ferrofluid in.
+      let sp = spikeAt(fuvBase);
+      if (ph > 0.004 || sp.x > 0.001) {
         /*
           Where the ferrofluid ends, as a line rather than a ramp.
 
@@ -1797,7 +1843,15 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
         // Signed distance to the half-full line in plate units, inside positive.
         // Where the field is flat there is no line near, and the sign alone
         // says which side: capped at eight cells either way.
-        let d = clamp((ph - 0.5) / max(slope, 1e-4), -8.0 * cell, 8.0 * cell);
+        var d = clamp((ph - 0.5) / max(slope, 1e-4), -8.0 * cell, 8.0 * cell);
+        /*
+          At the pool's edge a peak stands its side out past the line, so the
+          outline is a star of points rather than a round rim. By no more
+          than six cells: past eight the distance to the line is not known
+          (the clamp above), and a peak whose point is over open water would
+          draw there as a black spot with no pool under it.
+        */
+        d += min(sp.x * 0.9 * SPIKE_PITCH, 6.0 * cell);
         let dc = d / cell;
         // A floor under the pixel, for where the screen's coordinates stop
         // changing (the kaleidoscope clamps them at its corners) and there is
@@ -1846,6 +1900,43 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
         let H = normalize(keyPlate + vec3f(0.0, 0.0, 1.0));
         let glint = pow(max(dot(Nd, H), 0.0), 220.0);
         pc += vec3f(1.0, 0.97, 0.92) * glint * 0.9 * amt;
+        /*
+          And each peak lit by the same key: its side is steep, so only the
+          sliver of it facing the light catches it, a white point on every
+          peak on the same side; and a dull sheen down that side, which is
+          what shows a black peak against a black pool at all.
+        */
+        if (sp.x > 0.001) {
+          // The side's slope: a cone's, steepening toward the point (the
+          // height goes as the cube of the distance from the valley).
+          let steep = 6.0 * pow(sp.x * sp.w, 0.67);
+          let Ns = normalize(vec3f(sp.yz * steep, 1.0));
+          let face = max(dot(Ns, H), 0.0);
+          let body = smoothstep(0.0, 0.06, sp.x);
+          // A black gloss reflects the room, more of it the steeper it is
+          // seen (Fresnel), warmer on the side facing the key: the peaks'
+          // outlines in grey, which is how a black peak on a black pool shows.
+          // Clamped: at a tip Ns is straight up, and a normalize that lands
+          // a hair over 1 would make this pow NaN on every tip.
+          let fres = pow(max(1.0 - Ns.z, 0.0), 2.0);
+          let room = mix(vec3f(0.16, 0.17, 0.2), vec3f(0.75, 0.72, 0.66), clamp(dot(Ns.xy, keyPlate.xy) * 1.4 + 0.3, 0.0, 1.0));
+          /*
+            A peak's sides are not smooth: they are ridged from the point
+            down, the finer spikes a big one carries, and from above the
+            reflection breaks into rays round its point, the star in every
+            dome of Colored I. Nine a turn, turned a little per peak so
+            neighbours do not match.
+          */
+          let ang = atan2(sp.z, sp.y);
+          let rays = 0.5 + 0.5 * cos(ang * 9.0 + sp.w * 3.0);
+          pc += room * fres * body * amt * (0.25 + 0.95 * rays);
+          pc += vec3f(1.0, 0.97, 0.92) * pow(face, 70.0) * 1.2 * body * amt;
+          // And the point itself, where every direction meets: a white dot,
+          // a fifth of the way to the valley across. At a tenth (the first
+          // try) it was under a pixel at 1x and the references' dots are
+          // the brightest thing on each dome.
+          pc += vec3f(1.0, 0.98, 0.95) * smoothstep(0.5, 0.8, sp.x / max(sp.w, 1e-3)) * 0.9 * amt;
+        }
 
         /*
           The meniscus on the water's side: a thin bright line just outside,

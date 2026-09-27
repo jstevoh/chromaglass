@@ -91,6 +91,7 @@
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",
+    "spikes": "node scripts/spikes.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferropour": "node scripts/ferropour.mjs",
     "pops": "node scripts/pops.mjs",
