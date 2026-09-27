@@ -146,16 +146,19 @@ const STEADY_SLACK_S = Number(process.env.STARTUP_STEADY_SLACK ?? 3);
  * The most time before the first step the page's thread may be held from
  * outside it, all told (4b). This is not what tells Chromium's stop from
  * the show's: that is the page's own timer, its long tasks and its long
- * animation frames (frameGaps in open()). It is the backstop if that ever tells wrong, so that no
- * reading of the instruments excuses the ten-second freeze this check
- * exists for. Over the fifty-three cold openings of 26-27 September the
- * stop at Chromium's start ran 1.25 to 4.05 s in the show (median 2.48)
- * and 1.40 to 4.18 s in the control (median 3.00); two shows went over
- * this (4.05 s, run 36294600123, and 3.75 s, 36338802046, each wholly
- * inside a device request that took four seconds), as they did under the
- * rule this replaces.
+ * animation frames (frameGaps in open()). It is the backstop if that
+ * ever tells wrong, so that no reading of the instruments excuses the
+ * nine-second freeze this check exists for. Over the fifty-three cold
+ * openings of 26-27 September the stop at Chromium's start ran 1.25 to
+ * 4.05 s in the show (median 2.48) and 1.40 to 4.18 s in the control
+ * (median 3.00). At 3.5 s, the cap before this, two shows went over (4.05 s,
+ * run 36294600123, and 3.75 s, 36338802046, each wholly inside a device
+ * request that took four seconds): red on Chromium's time, not the show's.
+ * Four and a half is above every opening read, the control's included, and
+ * half the freeze; the owner chose it (2026-09-27). A stop of the show's
+ * own does not reach this cap at all, being counted whole by check 4.
  */
-const COLD_CAP_S = 3.5;
+const COLD_CAP_S = 4.5;
 /**
  * How long the page's thread must run nothing, no frame, no timer, no long
  * task and no long animation frame, for the stretch to count as held (4b).

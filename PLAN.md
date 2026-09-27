@@ -1462,7 +1462,7 @@ while this batch's plan was going in (#177), and no cause is known yet:
   tick every 100 ms marks the page's thread; any stretch of half a second or more,
   beginning in the first 3 s and ending before the first step, with no frame, no
   tick, no long task and no long animation frame is time the thread was held from
-  outside, taken out of check 4's frame gaps and held by 4b to 3.5 s all told. If
+  outside, taken out of check 4's frame gaps and held by 4b to 4.5 s all told. If
   either kind of entry cannot be seen or the timer runs slow, nothing is taken out.
   Long animation frames are there because the check-skeptic review found that the
   page's own JavaScript run after an `await` on a WebGPU promise (all the show's GPU
@@ -1473,8 +1473,8 @@ while this batch's plan was going in (#177), and no cause is known yet:
   gone. Read against the 53 logs: #204's red and 36339282520's split stop (1.28 s
   then 1.68 s) now count as one held stretch each, 2.57 s and about 3 s; 2 of the 53
   (4.05 s on 36294600123, 3.75 s on 36338802046, each wholly inside a four-second
-  device request) still go over the 3.5 s cap, as they did before, and #194's 3.52 s
-  would sit at it. *Open:* whether to raise that cap for them, or leave them red.
+  device request) went over the old 3.5 s cap, as did #194's 3.52 s; the owner chose
+  to raise it to 4.5 s, above every opening read (the controls' longest 4.18 s).
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
