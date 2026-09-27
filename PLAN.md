@@ -924,6 +924,11 @@ while this batch's plan was going in (#177), and no cause is known yet:
   steps 1.89 s), just after the first step while the remaining pipelines build
   behind it; main's deploy of the same code read 1.70 s. Before touching the limit,
   read the spread over the last runs (the `steward` skill's rule for a margin).
+  Since: 2.43 s at 19.6 s on #177's deploy, 1.30 s on #179's PR and 2.03 s at
+  16.40 s on its deploy (2026-09-27), each time the frames standing still for about
+  two seconds just after the first step, on a runner slow enough that the control's
+  own device took 5.3 s. Three deploys in a row stopped here while their PRs passed;
+  a thread cannot re-run a job (403), so each costs a re-run by hand.
 
 ## Not doing
 
