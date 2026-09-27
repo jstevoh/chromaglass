@@ -354,15 +354,46 @@ try {
         return h;
       };
       const A2 = { x: A.x + 60, y: A.y }, B2 = { x: B.x - 60, y: B.y };
+      const ref = { A: await alone(A), B: await alone(B), A2: await alone(A2), B2: await alone(B2) };
       /*
-        The dye's two fingers, both in the top half and at different heights.
-        A and B above sit nearly point-mirrored through the plate's middle, so
-        dye laid at one finger also filled the disk at the other's mirror: a
-        solver that drew every drop mirrored, or transposed, measured the same
-        as a right one.
+        The dye's two fingers, chosen so the places a wrong hand would put
+        their dye are clear of both. A and B above sit nearly point-mirrored
+        through the plate's middle, so dye at one filled the disk at the
+        other's mirror, and a solver drawing every drop mirrored measured the
+        same as a right one.
+
+        Chosen, not fixed, because a phone's screen is a small window on the
+        plate: the grid is 1.5 times the screen's long side, so the whole
+        portrait screen is about 60 by 130 cells round the middle, and which
+        cells a place lands on turns with the plate's angle, which differs
+        from run to run. Two fixed places, on the Mac, had their mirrors,
+        transposes and flips all within reach of each other (one control
+        left for one finger, none for the other). So six places toward the
+        corners of the plate's part of the screen (clear of the top bar and
+        the dock) are each read once, and the pair whose controls are most
+        clear of both fingers lays the dye.
       */
-      const DA = { x: 110, y: 300 }, DB = { x: 290, y: 370 };
-      const ref = { A: await alone(A), B: await alone(B), A2: await alone(A2), B2: await alone(B2), DA: await alone(DA), DB: await alone(DB) };
+      const n = await page.evaluate(() => window.chromaglassDebug().gridSize);
+      const R = 0.06 * n;
+      const controlsOf = (p) => [
+        { x: n - 1 - p.x, y: n - 1 - p.y }, { x: p.y, y: p.x },
+        { x: n - 1 - p.x, y: p.y }, { x: p.x, y: n - 1 - p.y },
+      ];
+      const clearOf = (fingers) => (c) => fingers.every(f => Math.hypot(c.x - f.x, c.y - f.y) > 2.5 * R);
+      const spots = [];
+      for (const at of [{ x: 45, y: 110 }, { x: 345, y: 110 }, { x: 195, y: 110 }, { x: 45, y: 610 }, { x: 345, y: 610 }, { x: 195, y: 610 }]) {
+        const cell = await alone(at);
+        if (cell) spots.push({ at, cell });
+      }
+      let pick = null;
+      for (let i = 0; i < spots.length; i++) for (let j = i + 1; j < spots.length; j++) {
+        const f = [spots[i].cell, spots[j].cell];
+        if (Math.hypot(f[0].x - f[1].x, f[0].y - f[1].y) <= 2.5 * R) continue;
+        const clear = Math.min(...f.map(p => controlsOf(p).filter(clearOf(f)).length));
+        if (!pick || clear > pick.clear) pick = { clear, a: spots[i], b: spots[j] };
+      }
+      const DA = pick?.a.at ?? { x: 45, y: 110 }, DB = pick?.b.at ?? { x: 45, y: 610 };
+      ref.DA = pick?.a.cell; ref.DB = pick?.b.cell;
       const same = (h, r) => !!h && !!r && Math.abs(h.x - r.x) <= 1 && Math.abs(h.y - r.y) <= 1;
       const fmt = (hs) => hs.map(h => `(${h.x}, ${h.y})`).join(' ');
 
@@ -419,35 +450,32 @@ try {
       await settle(700);
       const after = await snap();
       const rb1 = await readbacks();
-      const n = await page.evaluate(() => window.chromaglassDebug().gridSize);
       if (rb0 < 0) {
         check('the plate counts its readbacks, so the dye check knows it can look', false, 'fluids[0].readbacks is gone');
+      } else if (!pick) {
+        check('two places on the screen keep their mirrors clear, so the dye can be told from a wrong hand\'s', false, `${spots.length} places read`);
       } else if (rb1 - rb0 >= 3) {
-        const R = 0.06 * n;
         const disk = (c) => {
           let sum = 0;
           for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < R) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
           return sum;
         };
         const fingers = [ref.DA, ref.DB];
-        const clear = (c) => fingers.every(f => Math.hypot(c.x - f.x, c.y - f.y) > 2.5 * R);
         const rows = fingers.map(p => {
           const laid = disk(p);
-          const elsewhere = [
-            { x: n - 1 - p.x, y: n - 1 - p.y }, { x: p.y, y: p.x },
-            { x: n - 1 - p.x, y: p.y }, { x: p.x, y: n - 1 - p.y },
-          ].filter(clear).map(disk);
+          const elsewhere = controlsOf(p).filter(clearOf(fingers)).map(disk);
           return { laid, elsewhere, worst: Math.max(0, ...elsewhere) };
         });
         const ok = rows.every(r => r.laid > 5 && r.elsewhere.length >= 2 && r.laid > 3 * r.worst)
           && Math.min(rows[0].laid, rows[1].laid) > 0.4 * Math.max(rows[0].laid, rows[1].laid);
         check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
           rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
-            + `; ${rb1 - rb0} readbacks`);
+            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)}; ${rb1 - rb0} readbacks`);
       } else if (NEED_GPU) {
         check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
       } else {
-        console.log(` --   no readbacks from the plate here (${rb1 - rb0} in two seconds): the dye under both fingers is not measured (the Mac shard measures it)`);
+        console.log(` --   no readbacks from the plate here (${rb1 - rb0} in two seconds): the dye under both fingers is not measured (the Mac shard measures it); `
+          + `it would lay it at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt([ref.DA, ref.DB])}, ${pick.clear} clear controls each`);
       }
 
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
