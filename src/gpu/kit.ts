@@ -228,6 +228,7 @@ export class PipelineCache {
       if (bySource.has(code)) return true;
       bySource.set(code, p);
       if (this.ledger) this.ledger.ahead++;
+      await firstUse(this.device, p, code);
       return true;
     } catch { return false; /* built on the frame instead (above) */ }
   }
@@ -276,6 +277,77 @@ export class PipelineCache {
   }
 }
 
+/*
+  A compute pipeline's first dispatch, done once, ahead, on scraps.
+
+  What was reported: every opening of the show on CI's Mac stopped drawing
+  for 1.0 to 2.4 s a quarter second after its first step (`npm run
+  startup`, over thirty-seven runs; three deploys in a row went red on its
+  2 s limit). Every pipeline the first steps use was built ahead, and none
+  on the frame. The stop is there on a warm shader cache as well (each of
+  the forty looks opened warm: median 0.92 to 1.35 s over four runs), so it
+  is not a compile. A bare page's first WebGPU frame does not stop (0.07 s),
+  nor does one making the seventy-three textures the show makes then and
+  clearing each (0.07 s, run 36303170127). And the page is not busy: by a
+  quarter second after the first step it has made its textures and handed
+  over its first eight steps at the usual eight hundred writes a step, and
+  then waits, frames and all, until the GPU process gives it the next frame.
+  What those first steps do that no later step does is run each of some
+  fifty pipelines for the first time on this device, and a first run costs
+  something a later one does not: on this runner, inferred to be most of a
+  second and a half for the lot.
+
+  So a pipeline built ahead is also run once here, one workgroup on
+  one-texel scraps of the kinds its shader declares, while the starting
+  frame is up and in turn with the rest, so the show's first steps find
+  every one of them already run. Inside an error scope: a scrap the shader
+  does not like is a first run that did not happen, not a GPU error for the
+  loop's error count, and the frame still runs it as it always did.
+*/
+interface Scraps { uniform: GPUBuffer; storage: GPUBuffer; sampler: GPUSampler; tex: Map<string, GPUTexture> }
+const scrapsByDevice = new WeakMap<GPUDevice, Scraps>();
+
+async function firstUse(device: GPUDevice, pipeline: GPUComputePipeline, code: string): Promise<void> {
+  let s = scrapsByDevice.get(device);
+  if (!s) {
+    s = {
+      uniform: device.createBuffer({ label: 'first use', size: 4096, usage: GPUBufferUsage.UNIFORM }),
+      storage: device.createBuffer({ label: 'first use', size: 65536, usage: GPUBufferUsage.STORAGE }),
+      sampler: device.createSampler({ label: 'first use', magFilter: 'linear', minFilter: 'linear' }),
+      tex: new Map(),
+    };
+    scrapsByDevice.set(device, s);
+  }
+  const scraps = s;
+  const tex = (format: GPUTextureFormat, usage: number) => {
+    const key = `${format}/${usage}`;
+    let t = scraps.tex.get(key);
+    if (!t) { t = device.createTexture({ label: 'first use', size: [1, 1], format, usage }); scraps.tex.set(key, t); }
+    return t;
+  };
+  device.pushErrorScope('validation');
+  try {
+    const entries: GPUBindGroupEntry[] = layoutEntries(code).map((e) => {
+      if (e.buffer) return { binding: e.binding, resource: { buffer: e.buffer.type === 'uniform' ? scraps.uniform : scraps.storage } };
+      if (e.sampler) return { binding: e.binding, resource: scraps.sampler };
+      if (e.storageTexture) return { binding: e.binding, resource: tex(e.storageTexture.format, GPUTextureUsage.STORAGE_BINDING).createView() };
+      const kind = e.texture?.sampleType;
+      const format: GPUTextureFormat = kind === 'uint' ? 'rgba32uint' : kind === 'sint' ? 'rgba32sint' : 'rgba16float';
+      return { binding: e.binding, resource: tex(format, GPUTextureUsage.TEXTURE_BINDING).createView({ dimension: e.texture?.viewDimension ?? '2d' }) };
+    });
+    const enc = device.createCommandEncoder({ label: 'first use' });
+    const pass = enc.beginComputePass({ label: 'first use' });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, device.createBindGroup({ label: 'first use', layout: pipeline.getBindGroupLayout(0), entries }));
+    pass.dispatchWorkgroups(1);
+    pass.end();
+    device.queue.submit([enc.finish()]);
+  } catch { /* no first run; the frame's is the first */ } finally {
+    await device.popErrorScope().catch(() => null);
+  }
+  await device.queue.onSubmittedWorkDone().catch(() => undefined);
+}
+
 /**
  * One pipeline to build ahead, not yet asked for: `gpu/prepare.ts` asks for
  * them one at a time (see there), so an owner hands over the asking, not a
@@ -303,6 +375,11 @@ export type RenderRecipe = (module: (code: string) => GPUShaderModule) => GPURen
  * their format, and samplers.
  */
 export function layoutFromWgsl(device: GPUDevice, code: string, label?: string, stage = GPUShaderStage.COMPUTE): GPUBindGroupLayout {
+  return device.createBindGroupLayout({ label, entries: layoutEntries(code, stage) });
+}
+
+/** `layoutFromWgsl`'s entries, before they are made a layout. */
+export function layoutEntries(code: string, stage = GPUShaderStage.COMPUTE): GPUBindGroupLayoutEntry[] {
   const entries: GPUBindGroupLayoutEntry[] = [];
   const re = /@group\(0\)\s*@binding\((\d+)\)\s*var(?:<(\w+)(?:,\s*\w+)?>)?\s+(\w+)\s*:\s*([^;]+);/g;
   for (const m of code.matchAll(re)) {
@@ -339,7 +416,7 @@ export function layoutFromWgsl(device: GPUDevice, code: string, label?: string, 
       entries.push({ binding, visibility, texture: { sampleType: sampled ? 'float' : 'unfilterable-float' } });
     } else if (type === 'sampler') entries.push({ binding, visibility, sampler: { type: 'filtering' } });
   }
-  return device.createBindGroupLayout({ label, entries });
+  return entries;
 }
 
 /** A bind group for a pipeline's group 0 from resources in binding order: buffers, textures (their default view), samplers or views. */
