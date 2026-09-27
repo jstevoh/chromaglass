@@ -96,8 +96,6 @@ export interface Prepared {
    * a stop that one build spans end to end is that build's.
    */
   builds: [key: string, at: number, ms: number][];
-  /** For the half behind the show: how long it waited for the show to be drawing steadily first. */
-  held?: number;
 }
 
 /**
@@ -107,57 +105,6 @@ export interface Prepared {
  * asking the new stage for "the" prepare got nothing until that one ended.
  */
 export const prepareLog: Prepared[] = [];
-
-/*
-  The half behind the show used to start the moment the opening's was done,
-  a quarter second before the show's first step. On CI's cold Mac every
-  opening then stopped drawing for 1.3 to 2.4 s about a quarter second after
-  that step (`npm run startup`, check 4: 2.43 s, 2.02 s and 2.03 s on the
-  deploys of #177, #178 and #179, 1.50 s on #179's own PR run), with no long
-  task on the page's thread: the GPU process held the frames while the show's
-  first frames (its textures made and cleared, forty-odd pipelines used for
-  the first time) and the first compiles behind it arrived together. The
-  limit is two seconds, so the same stop went red or green by chance, which
-  is why a PR passed and its deploy did not.
-
-  So the rest waits until the show has been drawing steadily first, and each
-  of its compiles is then one more thing between two drawn frames rather than
-  part of the opening's pile. It costs a second or two before a look changed
-  to mid-show finds its own pipelines built, against the fifteen to twenty
-  the half behind takes on a cold Mac anyway.
-*/
-
-/**
- * How long the show must have been drawing steadily, every animation frame
- * within STEADY_FRAME_MS of the one before, before the half behind it starts;
- * and the longest that is waited for, so a page that never draws smoothly (a
- * slow machine, a hidden tab) still gets its pipelines built.
- */
-const STEADY_MS = 1500;
-const STEADY_FRAME_MS = 100;
-const STEADY_CAP_MS = 10_000;
-
-/**
- * Resolves once the page has drawn STEADY_MS of animation frames with no gap
- * over STEADY_FRAME_MS, or after STEADY_CAP_MS whatever it drew; with how
- * long it waited.
- */
-function drawingSteadily(): Promise<number> {
-  const t0 = performance.now();
-  return new Promise((resolve) => {
-    if (typeof requestAnimationFrame !== 'function') { resolve(0); return; }
-    let from = t0, last = t0;
-    const tick = (t: number) => {
-      if (t - last > STEADY_FRAME_MS) from = t;
-      last = t;
-      if (t - from >= STEADY_MS || t - t0 >= STEADY_CAP_MS) resolve(Math.round(performance.now() - t0));
-      else requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-    // A tab in the background draws nothing: the cap still ends the wait.
-    setTimeout(() => resolve(Math.round(performance.now() - t0)), STEADY_CAP_MS + 100);
-  });
-}
 
 /** Whether `p` settles within `ms`. */
 function within(p: Promise<void>, ms: number): Promise<boolean> {
@@ -173,7 +120,7 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
  * PREPARE_TIMEOUT_MS has passed. A device lost part way would otherwise have
  * every remaining build refused one after another, each counted as a try.
  */
-async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[], held?: number): Promise<Prepared> {
+async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[]): Promise<Prepared> {
   const t0 = performance.now();
   let gone = false;
   void device.lost.then(() => { gone = true; });
@@ -195,10 +142,74 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
-    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times, held,
+    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times,
   };
   prepareLog.push(done);
   return done;
+}
+
+/*
+  WebGPU's own pipelines, which no list of ours names. The browser builds a
+  few pipelines of its own, inside the GPU process, the first time a page
+  asks for what they do: turning a pass's timestamps into nanoseconds when a
+  query set is resolved (every frame here, where the device has
+  'timestamp-query': `GpuProfiler`), and drawing a page's picture into a
+  texture for `copyExternalImageToTexture` (the beads' mask and the mark, on
+  the frames they change). Neither goes through `createComputePipeline` or
+  `createRenderPipeline`, so `npm run startup`'s count at WebGPU never saw
+  them, and on a cold Metal cache each is a full compile on the frame.
+
+  What was reported: `npm run startup` on CI's Mac found every opening
+  stopping for 1.0 to 2.4 s a quarter second after the first step, over all
+  thirty-seven runs since #164, and the three deploys of #177 to #179 went red
+  on it against its 2 s limit while their PR runs passed at 1.3 to 1.5 s.
+  Holding the pipelines built behind the show until it drew steadily moved
+  them five seconds later and left the stop exactly where it was (2.07 s, no
+  build of ours under way, run 36298506575): it is the show's own first
+  frames. These two are what those frames ask the GPU for that nothing built
+  ahead. Each is done here once on a scrap of a texture, in turn with the
+  rest, and timed like them.
+*/
+function webgpuPrep(device: GPUDevice): Prep[] {
+  const done = () => device.queue.onSubmittedWorkDone().then(() => true, () => false);
+  const preps: Prep[] = [];
+  if (device.features.has('timestamp-query')) {
+    preps.push({
+      key: 'webgpu/timestamps', later: false, build: async () => {
+        try {
+          const querySet = device.createQuerySet({ label: 'warm timestamps', type: 'timestamp', count: 2 });
+          const buf = device.createBuffer({ label: 'warm timestamps', size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+          const enc = device.createCommandEncoder({ label: 'warm timestamps' });
+          enc.beginComputePass({ timestampWrites: { querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } }).end();
+          enc.resolveQuerySet(querySet, 0, 2, buf, 0);
+          device.queue.submit([enc.finish()]);
+          const ok = await done();
+          querySet.destroy(); buf.destroy();
+          return ok;
+        } catch { return false; }
+      },
+    });
+  }
+  if (typeof OffscreenCanvas === 'function') {
+    preps.push({
+      key: 'webgpu/copyExternalImage', later: false, build: async () => {
+        try {
+          const source = new OffscreenCanvas(1, 1);
+          source.getContext('2d')?.fillRect(0, 0, 1, 1);
+          // The format and usage `WebGPUPlate.setSource` copies into.
+          const texture = device.createTexture({
+            label: 'warm copy', size: [1, 1], format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+          });
+          device.queue.copyExternalImageToTexture({ source }, { texture }, [1, 1]);
+          const ok = await done();
+          texture.destroy();
+          return ok;
+        } catch { return false; }
+      },
+    });
+  }
+  return preps;
 }
 
 /**
@@ -215,13 +226,12 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),
     ...WebGPUPostChain.prepare(device, format, open),
+    ...webgpuPrep(device),
   ];
   const opening = await buildInTurn(device, 'opening', builds.filter((b) => !b.later));
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
-  const rest = builds.filter((b) => b.later);
-  void drawingSteadily()
-    .then((held) => buildInTurn(device, 'later', rest, held))
+  void buildInTurn(device, 'later', builds.filter((b) => b.later))
     .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
   return opening;
 }

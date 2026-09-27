@@ -256,6 +256,29 @@ async function open(query, looks) {
         GPUDevice.prototype[name] = function (d) { direct.push([performance.now(), d?.label ?? '']); return f.call(this, d); };
       }
       /*
+        The first time the page asked WebGPU for each thing it can do, and
+        how often. A stop that no build of ours was under way for (run
+        36298506575: 2.07 s from 17.17 s, a tenth of a second after the
+        first step) is something else the first frames asked the GPU
+        process for the first time; this is how the next one is named.
+      */
+      const firsts = new Map();
+      window.__startupFirsts = firsts;
+      for (const name of ['GPUDevice', 'GPUQueue', 'GPUCommandEncoder', 'GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPUBuffer', 'GPUCanvasContext', 'GPUTexture']) {
+        const proto = globalThis[name]?.prototype;
+        if (!proto) continue;
+        for (const key of Object.getOwnPropertyNames(proto)) {
+          const d = Object.getOwnPropertyDescriptor(proto, key);
+          if (key === 'constructor' || typeof d?.value !== 'function') continue;
+          const f = d.value, what = `${name.slice(3)}.${key}`;
+          proto[key] = function (...a) {
+            const row = firsts.get(what);
+            if (row) row[1]++; else firsts.set(what, [performance.now(), 1]);
+            return f.apply(this, a);
+          };
+        }
+      }
+      /*
         When the page asked for the GPU and when it had it. The first stop
         seen with the pipelines built ahead (2.08 s from 1.01 s, run
         36255595521) came before any step and before the prepare, with no
@@ -426,6 +449,7 @@ async function open(query, looks) {
           for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
           return { gap: gap / 1000, at: at == null ? null : at / 1000, first: ts.length ? ts[0] / 1000 : null };
         })(),
+        firsts: [...window.__startupFirsts].map(([what, [at, n]]) => [what, at / 1000, n]),
         box: (d?.crash?.thisLoad?.() ?? []).map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`),
       };
     }, [watch, MAX_GAP_S]);
@@ -525,7 +549,7 @@ const milestones = (o) => {
   const p = o.prepared;
   if (p?.at != null) parts.push(`built ahead from ${at(p.at / 1000)} to ${at((p.at + p.ms) / 1000)}`);
   const b = o.behind;
-  if (b?.at != null) parts.push(`the rest behind it from ${at(b.at / 1000)} to ${at((b.at + b.ms) / 1000)}${b.held != null ? ` (after ${at(b.held / 1000)} waiting for the show to draw steadily)` : ''}`);
+  if (b?.at != null) parts.push(`the rest behind it from ${at(b.at / 1000)} to ${at((b.at + b.ms) / 1000)}`);
   parts.push(`first step ${at(o.firstStep == null ? null : o.firstStep / 1000)}`);
   parts.push(`longest wait for a frame before it ${say(o.framesBefore)}`);
   return parts.join('; ');
@@ -546,7 +570,11 @@ const underWay = (o, gap) => {
   const fmt = ([, key, at, ms]) => `${key} ${(ms / 1000).toFixed(2)} s from ${(at / 1000).toFixed(2)} s`;
   const inGap = gap?.at == null ? [] : all.filter(([, , at, ms]) => at < (gap.at + gap.gap) * 1000 && at + ms > gap.at * 1000);
   const slowest = (half) => all.filter(([h]) => h === half).sort((x, y) => y[3] - x[3]).slice(0, 4).map(fmt).join(', ') || 'none';
-  return `builds under way in the longest frame gap: ${inGap.length ? inGap.map(fmt).join(', ') : 'none'}; slowest ahead: ${slowest('ahead')}; slowest behind: ${slowest('behind')}`;
+  // What the page asked of WebGPU for the first time in the second before
+  // the stop began, or during it.
+  const asked = gap?.at == null ? [] : (o.firsts ?? []).filter(([, at]) => at >= gap.at - 1 && at <= gap.at + gap.gap);
+  return `builds under way in the longest frame gap: ${inGap.length ? inGap.map(fmt).join(', ') : 'none'}; slowest ahead: ${slowest('ahead')}; slowest behind: ${slowest('behind')}`
+    + `; asked of WebGPU for the first time from a second before it: ${asked.length ? asked.map(([w, at]) => `${w} at ${at.toFixed(2)} s`).join(', ') : 'nothing'}`;
 };
 
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
