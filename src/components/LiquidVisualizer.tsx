@@ -4265,6 +4265,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
+  /**
+   * Every kick onset the ear handed the clock, once each (`npm run kicks`,
+   * and the Mac's checks, compare it with the kicks the clock fired and the
+   * kicks the band played).
+   */
+  const heardKicksRef = useRef({ n: 0, lastAt: null as number | null });
   /*
     Sound learn, read by the loop through refs like every other live prop: the
     bindings change when the map does, the trigger handler on every render of
@@ -5435,13 +5441,41 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // threshold crossing, so they all land together.
         {
           const nowMs = showNow();
-          const bassNow = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
+          /*
+            The kick the ear heard since the last frame, and when: the
+            analyser's own kick onset (lib/audioFeatures.ts, spectral flux on
+            30–120 Hz), not the smoothed bass level crossing a line, which the
+            chorus of the show's own band held over the line from kick to kick
+            and so never crossed (`npm run kicks`: 59 of 160 chorus kicks heard
+            at 20 fps, 156 now).
+
+            Read from the onset's time, `at`, which a reading carries until
+            the next kick, and not from `hit`, which is true on the one
+            reading the kick landed on. The ear and this loop do not tick
+            together and React hands the loop the latest reading, not every
+            one: on a busy page (the cloud's, drawing a dozen frames a
+            second) the loop saw 1 hit in 30 s of the band while the ear
+            fired on its kicks. `at` changing is a kick however many readings
+            went by between two frames. Live, the reading's time is the
+            page's clock, the same as `nowMs`, so the clock is told when the
+            kick landed, not when this frame got round to it; a render's
+            readings keep song time, and there the frame is the time it was
+            heard.
+          */
+          const earReading = currentAudioData?.features ?? null;
+          const kickAt = earReading?.onsets?.kick?.at ?? null;
+          let heardAt: number | null = null;
+          if (kickAt !== null && kickAt !== heardKicksRef.current.lastAt) {
+            heardKicksRef.current.lastAt = kickAt;
+            heardKicksRef.current.n++;
+            heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
+          }
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
           // A clock from the desk, a tapped tempo or a typed one, if there is
           // one. Handed over every frame — the reading carries its own
           // sequence number, so the clock can tell a new beat from a held one.
           beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
-          kickRef.current = beatClockRef.current.update(nowMs, bassNow, trust, Math.max(0, currentSettings.beatLead ?? 0));
+          kickRef.current = beatClockRef.current.update(nowMs, heardAt, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
             Sound learn's triggers, right after the clock has decided this
@@ -7509,6 +7543,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         render's clock had caught up with the page's age.
       */
       beatClockRef.current = new BeatClock();
+      /*
+        And the kick the loop last handed it is taken as heard: the onset's
+        time on the reading now is on the clock being left (song seconds out
+        of a render, the page's back into the live show), so the first
+        reading on the other clock always differs from it. Forgotten, that
+        difference read as a kick, and the fresh clock pressed the plate
+        once on the hand-back with nothing playing.
+      */
+      heardKicksRef.current.lastAt = audioDataRef.current?.features?.onsets?.kick?.at ?? null;
       soundLearnRef.current.reset();
       // The song's shape is timed on the readings' clock, which a render
       // starts again at zero: its history and references belong to the song
@@ -7840,6 +7883,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
+        /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
+        heardKicks: () => heardKicksRef.current.n,
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,

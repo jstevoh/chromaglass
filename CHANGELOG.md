@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the phone's dock on small landscape phones, and the top of the plate
+
+- **Under 800 px wide in landscape the dock is two rows**, the ten tools
+  over the five sheets, so every tool stays 48 px (it was 42 px at 740×360
+  and 35 at 667×375). From 800 up it is one row, as before.
+- **The strip across the top of the phone's plate takes fingers again**:
+  only the look button and the three buttons at the right take a touch; the
+  space between them was a dead band 65 px deep. The plate a finger can land
+  on went from 65% to 79% of an 844×390 screen.
+- `npm run remotemix` drives the remote's Mixer from a phone against a
+  real display through the show server (12 checks, on every PR).
+
 ### Changed — the desk's Mixer lies over the rides, not the plate
 
 - **The docked Mixer on the Perform desk is the rides' column wide** (304

@@ -227,10 +227,14 @@ function song() {
     const clock = new BeatClock();
     const out = [];
     track.forEach((f, i) => {
-      // As the visualizer: the render's clock, bass over 70, trust 0 (the
-      // onset as heard: what a render with Beat Prediction at 0 plays).
+      // As the visualizer: the render's clock, the analyser's kick onset
+      // heard on the frame it is read, trust 0. `hit` here and not the
+      // onset's time moving, as the live loop reads it, because a render
+      // hands every frame its own reading: none goes by unread, so the two
+      // are the same kicks (`npm run kicks` holds the live rule) (the onset as heard: what a
+      // render with Beat Prediction at 0 plays).
       const now = RENDER_ORIGIN_MS + (i * 1000) / fps;
-      if (clock.update(now, Math.min(1, f.bass / 70), 0, 0).kick) out.push(i / fps);
+      if (clock.update(now, f.features.onsets.kick.hit ? now : null, 0, 0).kick) out.push(i / fps);
     });
     return out;
   };

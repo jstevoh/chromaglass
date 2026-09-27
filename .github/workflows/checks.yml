@@ -106,6 +106,16 @@ jobs:
       - name: The song's shape
         run: npm run shape
 
+      # The kicks (PLAN.md §14d): the show's own band, its score rendered to
+      # samples at 48 and 44.1 kHz and heard through the live ear, with the
+      # plate at 60, 30 and 20 fps and frames late, and the ear reading at
+      # 60 Hz under a slower plate: every section's kicks heard by the clock
+      # and by the ear itself, the song's shape counting them, the lock
+      # within the first bars; and the old ear, the smoothed bass crossing
+      # its line, missing the chorus as the Mac did.
+      - name: The kicks
+        run: npm run kicks
+
       # The one (PLAN.md §10, step 3): the beats and which of them is the one,
       # on eight synthesised songs whose bars are known (four on the floor
       # and a rock beat, a chord a bar or every two), 20 dB down, at 30 fps,
@@ -241,6 +251,14 @@ jobs:
       # tools shard below.
       - name: The phone
         run: npm run phone
+
+      # The remote's Mixer (scripts/remotemix.mjs): the show server and two
+      # browsers, a display and a phone on ?remote=1, every question asked of
+      # the display's settings. No GPU: the display's socket, settings and
+      # fades run on its "needs WebGPU" screen. The phone's step above built
+      # dist/, which the show server serves, so this runs the script alone.
+      - name: The remote's Mixer
+        run: node --experimental-strip-types scripts/remotemix.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU

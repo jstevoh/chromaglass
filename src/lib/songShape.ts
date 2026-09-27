@@ -334,6 +334,8 @@ export class SongShape {
   private between = false;
   /** The kick's hits over the last BEAT_S seconds. */
   private kicks: number[] = [];
+  /** The kick onset's time on the last reading, so a kick is counted once however many frames carry it. */
+  private kickAt: number | null = null;
   /** Whether this song's beat has come in yet: nothing breaks down or builds before it has. */
   private beatIn = false;
   /** The level the room fell to when the last song was forgotten: the next begins when sound rises well over it. */
@@ -355,6 +357,7 @@ export class SongShape {
     this.arrivedAt = -Infinity;
     this.beatIn = false;
     this.kicks = [];
+    this.kickAt = null;
     this.between = false;
     this.roomDb = -Infinity;
     this.state = { section: 'quiet', intensity: 0, action: 0, tension: 0, lastDrop: null, time: 0 };
@@ -385,7 +388,19 @@ export class SongShape {
       return events;
     }
     const db = reading.db;
-    if (reading.onsets?.kick?.hit) this.kicks.push(time);
+    // A kick is the onset's time changing, not `hit`: `hit` is true on the
+    // one analyser reading the kick landed on, and the show's loop is handed
+    // the latest reading once a frame, not every one. The ear reads at 60 Hz
+    // and a busy plate draws at 20, so two readings in three went by unseen
+    // and with them two kicks in three, which is how the beat never "came
+    // in" on a page that could not keep up (the same loss the beat clock
+    // had, `npm run kicks`). `at` stays on the last kick's time until the
+    // next, so seeing it move is seeing a kick whichever frame it reaches.
+    const kickAt = reading.onsets?.kick?.at ?? null;
+    if (kickAt !== null && kickAt !== this.kickAt) {
+      this.kickAt = kickAt;
+      if (kickAt <= time) this.kicks.push(kickAt);
+    }
     while (this.kicks.length > 0 && time - this.kicks[0] > BEAT_S) this.kicks.shift();
     const topP = TOP_BANDS.reduce((s, i) => s + powOf(db[i]), 0) / TOP_BANDS.length;
     // A song begins with its first sound, not with the stream: digital
