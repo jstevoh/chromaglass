@@ -572,7 +572,65 @@ const watch = (page) => {
           }, null, { timeout: 25_000 }).then((h) => h.jsonValue()).catch(() => null);
           check('the projector window is given a picture',
             lit !== null, lit === null ? 'the wall stayed dark' : `${(lit * 100).toFixed(0)}% of it lit`);
+          /*
+            And it enlarges what it is given at the best smoothing it has.
+
+            Since PLAN.md §14c the show draws a projector at three quarters
+            or half of its pixels when the governor gives pixels up, and the
+            wall window scales that up with `drawImage`, which a 2D context
+            does at 'low' unless told otherwise; nothing told it. Read from
+            the wall's own context, then again after the window changes size,
+            because assigning a canvas's width resets its context to 'low':
+            set once when the window opened, it would pass the first read and
+            be gone by the first fullscreen. Read by hand in a cloud session
+            on the same build: 'low' and 'low' before §14c, 'high' and 'high'
+            after.
+
+            The resize is to half the size the window opened at, and the
+            canvas has to have changed width: a fixed 1280×720 passed a
+            smoothing set only once whenever the window happened to open at
+            that size already, since nothing was resized (the check-skeptic's
+            control).
+          */
+          const smoothing = () => opened.evaluate(() => {
+            const c = document.querySelector('#stage-canvas');
+            const x = c?.getContext('2d');
+            return {
+              read: x ? `${x.imageSmoothingEnabled ? 'on' : 'off'}, ${x.imageSmoothingQuality}` : 'no wall canvas',
+              width: c?.width ?? 0, w: innerWidth, h: innerHeight,
+            };
+          });
+          const first = await smoothing();
+          await opened.setViewportSize({ width: Math.max(320, Math.round(first.w / 2)), height: Math.max(180, Math.round(first.h / 2)) });
+          await opened.waitForTimeout(500);
+          const resized = await smoothing();
+          check('the wall enlarges a smaller frame at its best smoothing, and keeps it through a resize',
+            first.read === 'on, high' && resized.read === 'on, high' && resized.width > 0 && resized.width !== first.width,
+            `opened at ${first.width} wide: ${first.read}; resized to ${resized.width}: ${resized.read}`);
+          /*
+            And the show is on the wall's own ladder while the wall is up, and
+            back on the laptop's once it closes. Nothing else asks the running
+            app: \`npm run rungs\` asks \`qualityLadder\` what it would give a
+            stage, and an app that never handed it the stage, or never built
+            the governor again when the stage came and went, passes every line
+            of it (the check-skeptic dropped both and it stayed 70/70). A rung
+            at 0.75 is the mark: a stage's ladder has one, and no laptop's
+            ladder does (the laptop's pixel rungs are the screen's ratio, 1 and
+            up, and the hosted page's cap of 1.5).
+          */
+          const quarter = () => page.evaluate(() => {
+            const g = window.chromaglassDebug().governor;
+            return g ? g.rungs.some((r) => Math.abs(r.dpr - 0.75) < 1e-6) : null;
+          });
+          const walled = await quarter();
           await opened.close();
+          const back = await page.waitForFunction(() => {
+            const g = window.chromaglassDebug().governor;
+            return g && !g.rungs.some((r) => Math.abs(r.dpr - 0.75) < 1e-6);
+          }, null, { timeout: 5_000 }).then(() => true).catch(() => false);
+          check('the show draws the wall on the wall\'s own ladder, and goes back to the laptop\'s when it closes',
+            walled === true && back,
+            `wall up: ${walled === null ? 'no governor' : walled ? 'a rung at 0.75 of the wall' : 'no rung at 0.75 (the laptop\'s ladder)'}; closed: ${back ? 'back on the laptop\'s' : 'still on the wall\'s'}`);
         }
       }
 
