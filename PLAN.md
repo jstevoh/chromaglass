@@ -112,6 +112,26 @@ its light was in a few bright cells that a 2.2 gain clips at white, which lifts 
 mean far less than the grade. If so, the check should read cells the gain cannot clip
 (below 1/2.2 before the grade) rather than the whole frame's mean.
 
+**Deploys no longer re-measure a tree its PR already passed** (this PR, `npm run
+deploygate`). Measured 2026-09-27, 1 AM to 11 AM PT: 18 red runs, 5 of 16 deploys.
+Every deploy re-ran the four Mac shards; 16 of the last 20 merges published exactly
+the tree their PR's `Checks` had just passed on, and 3 of the 5 red deploys (#189,
+#195, #196) were that tree going red the second time on a check nothing in it
+touched. `deploy.yml` now skips the checks when the tree is the PR run's (the head
+contained main, and its run was green) and runs them in full otherwise. It halves
+the Mac jobs per merge, which is also what had run times at 20–55 minutes by noon
+against 10 at 1 AM.
+
+*Found 2026-09-27, not yet done:* the checks that went red on deploys that day, on code
+they do not measure (besides the Finger, the mirror and the wall's gain above): Beat Squeeze on two deploys (#190's,
+"with the band playing, the show hears kicks — 3 in 45 s"; #195's, "the tapped beat
+drives the show's clock — 149.5 bpm tapped at 122"), the ear on #195's deploy ("the
+wall only where the frames stalled past 250 ms — 0 of 10 read within 250 ms"), the
+phone's two-finger Drop on #186's deploy (B 81 against 2/0/0, fine by eye), `qa` on
+#189's deploy with no WebGPU adapter in 10 s, and `startup`'s GPU-start stop at 3.52 s
+against 3.5 on #194. Each wants what §0 asks of the Finger: find whether the check or
+the product is wrong, from the numbers it prints.
+
 The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
 backtrace, in `macCormack`), with a gathering cell held to the most its upstream

@@ -20,6 +20,13 @@ name: Checks
 # but cannot present its canvas (the P0 spike) — so every check that needs a
 # picture runs on macOS, and ubuntu keeps the ones that need only arithmetic.
 
+# The run's title carries the commit it tested, which for a pull request is
+# GitHub's merge of the head into its base, not the head. The deploy reads it
+# back (`scripts/deploygate.sh`) to ask whether main's new tree is the tree
+# this run passed on, directly, rather than inferring it from the head. Ignored
+# when `deploy.yml` calls this workflow, which keeps its own title.
+run-name: "${{ github.event.pull_request.title || 'Checks' }} (tests ${{ github.sha }})"
+
 on:
   workflow_call:
   pull_request:
