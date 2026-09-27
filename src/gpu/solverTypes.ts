@@ -70,6 +70,8 @@ export interface GpuStepParams {
   vorticity?: number;
   /** Surface tension between oil and water (Cahn–Hilliard + capillary force). */
   oilTension?: number;
+  /** Oil Bodies: the oil and the water each keep their own colour (see bodyPartition). */
+  oilBodies?: number;
   /** The ferrofluid's labyrinth under a strong field (Ohta–Kawasaki). */
   ferroLabyrinth?: number;
   /** How fine the maze is: 0 keeps MAZE_PERIOD, 1 is a third of it (the grid still sets a floor of twelve cells). */
@@ -177,6 +179,8 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
+  carryMix?(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void;
   addRxn?(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void;
   addLiesegang?(x: number, y: number, radius: number, amount?: number): void;
   readonly chemistryLive?: { rxn: boolean; lies: boolean };

@@ -2412,7 +2412,18 @@ class FluidSimulation {
       because both halves read the same mirror.
     */
     // More per act than it was: it acts once per current reading, not every step.
-    this.carryDye(x, y, r, ux, uy, Math.min(0.75, strength * 8));
+    const carried = this.carryDye(x, y, r, ux, uy, Math.min(0.75, strength * 8));
+    /*
+      With Oil Bodies the oil goes with its colour, the same take and the
+      same hop (carryMix), and only when the colour went (the carry acts once
+      per reading of the dye, not every step). Before the deltas fold, so the
+      colour carried here lands in the oil that went with it and stays the
+      oil's.
+    */
+    if (carried && (this.lastSettings?.oilBodies ?? 0) > 0.001 && this.gpu?.carryMix) {
+      const L = this.size;
+      this.gpu.carryMix(x / L, y / L, r / L, ux, uy, Math.min(0.75, strength * 8), Math.max(1, Math.round(r * 0.45)) / L);
+    }
     // And the chemistry under it is averaged, which is the mixing.
     this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
   }
@@ -2423,8 +2434,8 @@ class FluidSimulation {
    * The conserving half of a drag: what leaves one cell arrives in another,
    * because both are read from the same mirror in the same pass.
    */
-  private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): void {
-    if (!this.gpu || !this.dyeMirrorCurrent()) return;
+  private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): boolean {
+    if (!this.gpu || !this.dyeMirrorCurrent()) return false;
     let moved = false;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
@@ -2456,6 +2467,7 @@ class FluidSimulation {
       }
     }
     if (moved) this.dyeMoved();
+    return true;
   }
 
   /** A puff with a direction: air pushed across the plate the way a straw or a pen tilt would. */
@@ -3154,6 +3166,7 @@ class FluidSimulation {
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
+      oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),

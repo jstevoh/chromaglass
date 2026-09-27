@@ -369,6 +369,13 @@ export interface VisualizerSettings {
   vorticityConfinement: number;
   /** Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge (Cahn–Hilliard with its capillary force). */
   oilTension: number;
+  /**
+    Oil Bodies: the oil and the water each keep their own colour, and a body's
+    colour moves with it (the dye carried as the oil is, and levelled only
+    through its own liquid). Needs Oil Tension, which is what puts oil on the
+    plate. 0 is the plate as it was: one dye, blending across every edge.
+  */
+  oilBodies: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor). */
@@ -701,6 +708,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   magnetWalk: 0,            // still: a look that places its magnet keeps it there
   vorticityConfinement: 0,
   oilTension: 0,
+  oilBodies: 0,             // off: one dye across oil and water, as every look had it
   surfactantFlow: 0,
   solutalBuoyancy: 0,
   plateUpright: 0,

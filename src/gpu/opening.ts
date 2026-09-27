@@ -47,6 +47,8 @@ export interface Opening {
    * no list naming it, which is how a new kernel brings the freeze back.
    */
   displace: boolean;
+  /** Oil Bodies: the dye carried as the oil is and kept in its own liquid (oil-and-water). */
+  bodies: boolean;
   /** The particles (stardust-collapse). */
   particles: boolean;
   /** The plate filmed by a camera (oil-on-water and its kind). */
@@ -65,6 +67,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     phase: on(s.phaseAmount),
     maze: on(s.phaseAmount) && on(s.magnetStrength),
     displace: on(s.phaseAmount) && on(s.phaseDisplace),
+    bodies: on(s.oilTension) && on(s.oilBodies),
     particles: on(s.particles),
     camera: on(s.camera),
     stock: on(s.stock),

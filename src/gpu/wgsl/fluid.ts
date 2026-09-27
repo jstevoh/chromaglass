@@ -1664,7 +1664,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let d = length(uvOf(id) - A.a.xy) / max(A.a.z, 1e-4);
   let f = select(0.0, (1.0 - d * d) * A.a.w, d < 1.0);
-  let m = textureLoad(src, p, 0) + A.b * f;
+  /*
+    The oil lands flat, full to its edge and sharp at it (a cell and a half
+    on any grid), where the soap and the acid land as a dome. A dome of oil
+    is half full across most of its width, and half full is inside
+    Cahn–Hilliard's spinodal: the pour broke up at the grid's finest scale
+    before it could round, and the capillary force followed the break-up
+    (see mixForce). A body of oil is what a pour of oil is.
+  */
+  let fo = clamp((1.0 - d) * A.a.z * S.n / 1.5 + 0.5, 0.0, 1.0) * A.a.w;
+  let m = textureLoad(src, p, 0) + A.b * vec4f(fo, f, f, f);
   textureStore(dst, p, vec4f(clamp(m.r, 0.0, 1.0), clamp(m.g, 0.0, 1.0), clamp(m.b, -1.0, 1.0), m.a));
 }`,
 
@@ -1712,6 +1721,227 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
         + flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
   let m = here.rgb - d;
   textureStore(dst, p, vec4f(m.r, max(m.g, 0.0), m.b, here.a));
+}`,
+
+  /*
+    Oil Bodies: the dye rides the flow the way the oil does (oilBodies).
+
+    The dye is otherwise carried by a backtrace (macCormack), and the oil by
+    the fluxes across each cell's faces (mixAdvect). Those are two different
+    answers to where the liquid went, and over a stir they part: the oil's
+    edge is in one place and its colour's edge a cell or two from it, and
+    the colour is on the wrong side. So with Oil Bodies on, both shares of
+    the dye (the plate's whole dye, and the oil's part of it, see
+    bodyPartition) go through the same faces with the same fluxes as the oil,
+    and a body's colour and its edge move as one.
+
+    It is also the only way the dye survives the oil's own flow. The backtrace
+    thins or thickens a cell by how much the flow spreads or gathers there
+    (the Jacobian in macCormack), and the capillary flow's leftovers at the
+    grid scale, which a collocated projection cannot see, spread and gather
+    from one cell to the next; a thickening is held to the neighbourhood's
+    most, a thinning is not, so every step lost a little. Measured in the lab
+    (128², one oil drop with its colour, Oil Tension 0.5, 120 steps): 61% of
+    the dye kept with the backtrace. Fluxes across faces are conservative
+    whatever the flow does, and these are Rhie–Chow faces, which see the
+    grid-scale part the projection cannot.
+
+    A copy of mixAdvect over four channels, into the dye's own format.
+  */
+  bodyAdvect: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var<storage, read> pr: array<f32>;
+${PACKED}
+fn mx(p: vec2i, n: i32) -> vec4f { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0); }
+fn mm(a: vec4f, b: vec4f) -> vec4f {
+  return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
+}
+fn flux(a: vec2i, e: vec2i, n: i32) -> vec4f {
+  let b = a + e;
+  if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec4f(0.0); }
+  let t = vec2i(e.y, e.x);
+  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let pa = packedAt(a.x, a.y, n);
+  let pb = packedAt(b.x, b.y, n);
+  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
+  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
+  let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
+  if (c >= 0.0) {
+    let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
+    return c * (mx(a, n) + 0.5 * (1.0 - c) * s);
+  }
+  let s = mm(mx(b, n) - mx(a, n), mx(b + e, n) - mx(b, n));
+  return c * (mx(b, n) - 0.5 * (1.0 + c) * s);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let d = flux(p, vec2i(1, 0), n) - flux(p - vec2i(1, 0), vec2i(1, 0), n)
+        + flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
+  // Upwind and limited, so it never takes more than a cell holds; the floor
+  // is only for the rounding in a half-float dye.
+  textureStore(dst, p, max(textureLoad(src, p, 0) - d, vec4f(0.0)));
+}`,
+
+  /*
+    Oil Bodies: the oil dragged by a hand, as the dye is (carryMix, and
+    carryDye in the app). The dye's carry is a take and a put, on the CPU,
+    through the deltas; the oil lives only here, so its carry is here, the
+    same geometry as a gather: each cell keeps what the hand did not take
+    from it and receives what was taken a hop behind it. Run as the gesture
+    happens, before the frame's deltas fold in, so the colour the same drag
+    carries lands in oil that has already arrived (bodyLand) and stays the
+    oil's. Without it a finger drew a body's colour out across the water and
+    left the oil where it was, colourless.
+
+    A.a = (x, y, radius, take), A.b.xy = the hop, all in plate units.
+  */
+  mixCarry: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+fn took(uv: vec2f) -> f32 { return A.a.w * max(0.0, 1.0 - length(uv - A.a.xy) / A.a.z); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let uv = uvOf(id);
+  let m = textureLoad(src, p, 0);
+  let from = uv - A.b.xy;
+  let q = vec2i(floor(from * S.n));
+  var got = 0.0;
+  if (q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n)) {
+    got = textureLoad(src, q, 0).r * took((vec2f(q) + 0.5) / S.n);
+  }
+  textureStore(dst, p, vec4f(m.r * (1.0 - took(uv)) + got, m.gba));
+}`,
+
+  /*
+    Oil Bodies: what lands in a body becomes its colour.
+
+    The frame's dye (the deltas, pours and splats alike) is shared at the
+    moment it lands, by how much of the cell is oil: all of it the oil's deep
+    in a body, none of it in open water, and in between at the edge. So a
+    drop of dyed oil poured with its colour keeps it, edge and all, and
+    painting over a body colours the oil. The first version handed dye to a
+    body only where the whole neighbourhood was oil (it still does that for
+    anything else that reaches the dye), and a fresh drop's own colour at
+    its edge counted as the water's, was levelled out into the water, and
+    ringed the drop with its own colour. The oil's share takes the same
+    multiplier as the dye (a fade, a drain), so the two stay one plate.
+  */
+  bodyLand: `${HEAD}
+@group(0) @binding(2) var oil: texture_2d<f32>;
+@group(0) @binding(3) var addT: texture_2d<f32>;
+@group(0) @binding(4) var mulT: texture_2d<f32>;
+@group(0) @binding(5) var mixT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let c = clamp(textureLoad(mixT, p, 0).r, 0.0, 1.0);
+  let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + max(textureLoad(addT, p, 0), vec4f(0.0)) * c;
+  textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
+}`,
+
+  /*
+    Oil Bodies: each liquid keeps its own colour.
+
+    The plate's dye is one field, and everything that reads or moves it
+    (the picture, the regulator, the drain, the bubbles) goes on doing so.
+    Beside it the oil carries its own share of that dye, so the water's share
+    is what is left: w = dye − o, both per channel. Two things keep each
+    share in its own liquid, both exchanges between neighbouring cells,
+    computed the same way from both sides, so no dye is made or lost.
+
+    **Each colour evened out through its own liquid, across the edge.**
+    What is levelled is the colour per unit of its liquid, w/(1 − c) for the
+    water's and o/c for the oil's, so at rest a cell half oil holds half the
+    water colour the open water beside it does, and none is pushed past the
+    edge into the wrong liquid. That one rule does all four jobs the ferrofluid
+    needed two passes for (phaseDisplace): where the oil advances into a
+    cell, the water there thins in water, its colour's concentration rises
+    and it leaves ahead of the edge; the oil's colour, thin in the new oil,
+    is drawn in behind it; where the oil retreats, the reverse. It moves
+    only across the edge (the band where either cell is between about a
+    tenth and nine tenths oil): run everywhere it would blur the water's
+    swirls, which is the picture. Inside a body a little more of the oil's
+    own evening-out (A.a.z) blends two drops that have merged, slowly, as
+    two dyed oils do.
+
+    Cahn–Hilliard is why this has to be told rather than carried: the oil's
+    edge mostly moves by an exchange of oil between cells with no liquid
+    moving, as the ferrofluid's does, so no flow could have taken the
+    colour along.
+
+    **What lands in a body becomes its colour.** Dye poured deep inside
+    the oil (or, the other way, into open water with no oil within two
+    cells) has no edge to be levelled across, so it is handed to the liquid
+    it landed in (A.a.y a pass). Painting over an oil body colours the oil; a drop of
+    dyed oil poured with its colour keeps it. That is the performer's
+    dropper: the colour and the oil go in together.
+
+    A.a = (evening-out rate, hand-over rate, inside rate, 1 to write the
+    oil's share, 0 the whole dye). Run twice a pass, once for each output,
+    from the same inputs.
+  */
+  bodyPartition: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var oil: texture_2d<f32>;
+@group(0) @binding(4) var mixT: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+struct Share { w: vec4f, o: vec4f, f: f32 };
+fn share(p: vec2i) -> Share {
+  let t = max(textureLoad(dye, p, 0), vec4f(0.0));
+  let o = clamp(textureLoad(oil, p, 0), vec4f(0.0), t);
+  return Share(t - o, o, clamp(textureLoad(mixT, p, 0).r, 0.0, 1.0));
+}
+// How much of an edge a cell is: 1 from about a sixth to five sixths oil,
+// falling to 0 in open water and deep in a body.
+fn band(f: f32) -> f32 { return clamp(6.0 * f * (1.0 - f), 0.0, 1.0); }
+const E = 0.02;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let h = share(p);
+  var w = h.w;
+  var o = h.o;
+  let offs = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
+  for (var i = 0; i < 4; i++) {
+    let q = p + offs[i];
+    if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
+    let s = share(q);
+    let edge = max(band(h.f), band(s.f));
+    // A fifth of what the giver holds, at most, to each of four: never more
+    // than it has, whatever the concentrations say.
+    let gw = edge * (2.0 - h.f - s.f) * 0.5;
+    w += clamp(A.a.x * gw * (s.w / (1.0 - s.f + E) - h.w / (1.0 - h.f + E)), -0.2 * h.w, 0.2 * s.w);
+    let go = edge * (h.f + s.f) * 0.5 + A.a.z * min(h.f, s.f);
+    o += clamp(A.a.x * go * (s.o / (s.f + E) - h.o / (h.f + E)), -0.2 * h.o, 0.2 * s.o);
+  }
+  /*
+    Handed over only where the whole neighbourhood is the one liquid: next to
+    an edge the evening-out above is what puts a colour back where it
+    belongs, and a hand-over there turned the oil's colour that a stir had
+    left a cell outside its body into the water's, for good. The lab showed
+    it as a green haze (amber in teal) along the trailing side of a body.
+  */
+  var lo = 1.0;
+  var hi = 0.0;
+  for (var j = -2; j <= 2; j++) { for (var i = -2; i <= 2; i++) {
+    let c = clamp(textureLoad(mixT, clampP(p + vec2i(i, j), S.n), 0).r, 0.0, 1.0);
+    lo = min(lo, c);
+    hi = max(hi, c);
+  } }
+  let toOil = A.a.y * smoothstep(0.85, 0.95, lo) * h.w;
+  let toWater = A.a.y * (1.0 - smoothstep(0.05, 0.15, hi)) * h.o;
+  w += toWater - toOil;
+  o += toOil - toWater;
+  let out = select(w + o, o, A.a.w > 0.5);
+  textureStore(dst, p, select(vec4f(0.0), max(out, vec4f(0.0)), finite4(out)));
 }`,
 
   /*
@@ -1846,12 +2076,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The oil, blurred [1 4 6 4 1]² into a scratch texture, for mixForce to
+    take the edge's direction and curvature from.
+  */
+  mixSmooth: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let w = array<f32, 5>(1.0, 4.0, 6.0, 4.0, 1.0);
+  var t = 0.0;
+  for (var j = -2; j <= 2; j++) { for (var i = -2; i <= 2; i++) {
+    t += w[i + 2] * w[j + 2] * clamp(textureLoad(src, clampP(p + vec2i(i, j), S.n), 0).r, 0.0, 1.0);
+  } }
+  textureStore(dst, p, vec4f(t / 256.0, 0.0, 0.0, 0.0));
+}`,
+
+  /*
     What the mix does to the flow, and what gravity does to the dye.
 
     **Capillary (Korteweg) force**, −σ c ∇μ: the Cahn–Hilliard free energy's
     own force on the liquid, which is surface tension in a diffuse
     interface. It is what makes an oil blob in water pull itself round and
-    carry the dye inside it along. A.a.x = σ.
+    carry the dye inside it along. A.a.x = σ, A.a.y the most it may add.
 
     (Marangoni flow is not here: see marangoniFlux.)
 
@@ -1869,22 +2117,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
-fn mm4(p: vec2i, n: f32) -> vec4f { return textureLoad(mix, clampP(p, n), 0); }
+@group(0) @binding(5) var soft: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
+fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
+fn grad(p: vec2i, n: f32) -> vec2f {
+  return 0.5 * vec2f(cs(p + vec2i(1, 0), n) - cs(p - vec2i(1, 0), n), cs(p + vec2i(0, 1), n) - cs(p - vec2i(0, 1), n));
+}
+// The edge's unit normal, fading to nothing where there is no edge to have one.
+fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   var v = textureLoad(vel, p, 0);
-  let m = mm4(p, n);
-  let gx = mm4(p + vec2i(1, 0), n) - mm4(p - vec2i(1, 0), n);
-  let gy = mm4(p + vec2i(0, 1), n) - mm4(p - vec2i(0, 1), n);
-  // In the potential form, −c ∇μ: equal to μ ∇c up to a gradient the
-  // projection removes, and far smoother, because μ varies gently across a
-  // drop where ∇c is a spike on its edge. The spike form left compression
-  // behind that piled the oil past full and lost it at the guard.
-  let capillary = -clamp(m.r, 0.0, 1.0) * vec2f(gx.a, gy.a) * 0.5 * A.a.x;
-  let marangoni = -vec2f(gx.g, gy.g) * 0.5 * A.a.y;
+  // CAPILLARY_DOC
+  let g = grad(p, n);
+  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
+  var capillary = A.a.x * kappa * g;
+  let cl = length(capillary);
+  if (cl > A.a.y) { capillary *= A.a.y / cl; }
   let wax = textureLoad(dye, p, 0).a;
   let rho = wax - S.meanD;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
@@ -1899,7 +2150,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let down = dot(uvOf(id) - vec2f(0.5), normalize(A.b.xy));
     heat += A.a.z * smoothstep(A.a.w - 0.08, A.a.w, down) * clamp(wax * 2.0, 0.0, 1.0);
   }
-  v = vec4f(v.xy + capillary + marangoni + buoy, heat, v.w);
+  v = vec4f(v.xy + capillary + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));
 }`,
 
