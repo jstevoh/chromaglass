@@ -1190,7 +1190,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="fingering"
         />
         <Info>
-          A press (the tool, the pad, a kick with Beat Squeeze) breaks into radial fingers instead of a smooth ring: the thin liquid shooting through the thick one, the Fillmore sunburst.
+          A press (the tool, a finger, the pad) goes down round and comes up in fingers: as the glass lifts, the rim it pushed out breaks into radial fingers drawn back toward the centre, the Fillmore sunburst. 0 is a round press that lifts round.
         </Info>
         <Slider
           label="Oil Beads"

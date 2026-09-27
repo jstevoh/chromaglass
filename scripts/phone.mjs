@@ -115,11 +115,13 @@ process.on('exit', stopServer);
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;
 const browser = await launchChromium(chromium, { headless: !HEADED });
 
+// Every page error, kept so a check can ask whether one came during its gesture.
+const pageErrors = [];
 const phonePage = async (width, height, { touch = true, query = '' } = {}) => {
   const ctx = await browser.newContext({ viewport: { width, height }, isMobile: touch, hasTouch: touch, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   page.setDefaultTimeout(60_000);
-  page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
+  page.on('pageerror', (e) => { pageErrors.push(e.message); console.log('  [pageerror]', e.message.slice(0, 200)); });
   await page.goto(`${URL}${query}`, { waitUntil: 'load' });
   for (let i = 0; i < 40 && !(await page.getByTestId('phone-stage').count()) && !(await page.getByTestId('liquid-water').count()); i++) await page.waitForTimeout(250);
   await page.waitForTimeout(800);
@@ -233,6 +235,31 @@ try {
     const amountUp = await visible(page, 'phone-amount');
     if (amountUp) await shot(page, `${label.replace(/ /g, '-')}-amount`);
     check(`${label}: a second tap on it opens its Amount`, amountUp);
+    const magnetFingers = await visible(page, 'phone-press-fingering');
+    await tap(page, 'phone-tool-magnet');
+    /*
+      Fingering on the Press tool's own Amount (lib/squish.ts: the glass
+      breaks into fingers as it lifts): there with the Press in hand, under
+      its Amount, and nowhere else, and it goes to 100 % and back. Read from
+      the slider's own words, as the desk's sliders are.
+    */
+    await tap(page, 'phone-tool-press');
+    await tap(page, 'phone-tool-press');
+    const pressFingers = await visible(page, 'phone-press-fingering');
+    let fingersUp = null, fingersBack = null, under = false;
+    if (pressFingers) {
+      const amountBox = await box(page, 'phone-amount-slider'), fingersBox = await box(page, 'phone-press-fingering');
+      under = !!amountBox && !!fingersBox && fingersBox.y >= amountBox.y + amountBox.height - 1;
+      await page.getByTestId('phone-press-fingering').locator('input').focus();
+      await page.keyboard.press('End');
+      fingersUp = (await page.getByTestId('phone-press-fingering').innerText()).match(/(\d+)%/)?.[1];
+      await page.keyboard.press('Home');
+      fingersBack = (await page.getByTestId('phone-press-fingering').innerText()).match(/(\d+)%/)?.[1];
+    }
+    check(`${label}: the Press's Amount has Fingering under it, and only the Press's, and it goes to 100 % and back`,
+      pressFingers && !magnetFingers && under && fingersUp === '100' && fingersBack === '0',
+      `on the Press ${pressFingers}, on the Magnet ${magnetFingers}, under the Amount ${under}, ${fingersUp}% then ${fingersBack}%`);
+    await tap(page, 'phone-tool-press');
     await tap(page, 'phone-tool-magnet');
     // Closed, with the dock still up and Magnet still in hand: "not visible"
     // alone was also what a tap that took the whole stage down would read.
@@ -557,6 +584,72 @@ try {
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ ...B2, id: 2 }] });
       await settle(150);
       check('and lifting it too lets go', (await hands()).hands.length === 0);
+      /*
+        The Press under a finger, held and let go (lib/squish.ts): nothing
+        lifts while the finger is down, and once it comes off the plate lays
+        the lift. Counted by the plate's own press memory, since the fingers
+        a lift draws are for the lab to measure (`npm run lift`) and this is
+        about the phone's finger reaching it at all.
+      */
+      await page.getByTestId('phone-tool-press').click();
+      await settings({ fingering: 0.8 });
+      const lift = () => page.evaluate(() => {
+        const f = window.chromaglassDebug().fluids[0];
+        if (!f.pressLift) throw new Error('the plate has no pressLift');
+        return { steps: f.pressLift.steps, held: f.pressLift.held(performance.now()), plateSteps: f.stepCount, last: f.lastLift };
+      });
+      const errorsFrom = pageErrors.length;
+      const liftFrom = await lift();
+      await touch('touchStart', [{ ...A, id: 5 }]);
+      await settle(600);
+      const whileHeld = await lift();
+      await touch('touchEnd', [{ ...A, id: 5 }]);
+      await settle(900);
+      const afterLift = await lift();
+      /*
+        The press is laid by the plate's own step, and on software WebGPU the
+        full app's plate barely steps (0 to 4 steps while the finger was
+        down, over five runs, measured): there is nothing to ask. Keyed on
+        the steps *while the finger was down*, since a plate that stepped
+        only after it lifted has no press to lift (one cloud run went red
+        that way, keyed on the whole window), and on the steps after it
+        came off, since the lift is laid by a step and runs for a second and
+        a bit of wall time: a plate that stepped while held and stalled after
+        has no lift to show either (two cloud runs went red that way, 135 of
+        136). The Mac shard always asks (PHONE_GPU=1).
+
+        Asked there: the press reached the plate's memory while held, and
+        once the finger came off the plate laid a lift *where the finger
+        was*: the cell the same finger alone lands on (ref.A, above), and
+        some cells of it. A count of lift steps alone passed with the lift
+        never laid (check-skeptic). "Nothing while held" reads the last lift
+        laid, not the step count: a press resets the count, so a lift laid in
+        a slow frame mid-hold and then pressed over read 0; the last lift is
+        only cleared when the plate forgets its presses, so it also says the
+        one read after is this gesture's.
+      */
+      const heldSteps = whileHeld.plateSteps - liftFrom.plateSteps;
+      const afterSteps = afterLift.plateSteps - whileHeld.plateSteps;
+      /*
+        A lift that threw would stop the plate's steps, which is exactly what
+        the skip reads as a plate too slow to ask (check-skeptic): so an error
+        on the page during the gesture fails the check, skip or no skip.
+      */
+      const errors = pageErrors.slice(errorsFrom);
+      if (errors.length) {
+        check('the Press held and let go raises no error on the page', false, errors[0].slice(0, 200));
+      } else if ((heldSteps < 10 || afterSteps < 10) && !NEED_GPU) {
+        console.log(` --   the plate took ${heldSteps} steps while the finger was down here and ${afterSteps} after: the Press's lift is not asked (PHONE_GPU=1 on the Mac shard asks it)`);
+      } else {
+        const last = afterLift.last;
+        const near = !!last && !!ref.A && Math.hypot(last.x - ref.A.x, last.y - ref.A.y) <= 2;
+        check('a finger holding the Press lifts nothing until it comes off, then the glass lifts into fingers where it was',
+          whileHeld.held && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
+            && afterLift.steps > 0 && near && last.cells > 0,
+          `held ${whileHeld.held} over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
+      }
+      await settings({ fingering: 0 });
+      await page.getByTestId('phone-tool-dropper').click();
 
       /*
         Dye at both fingers, and not anywhere a wrong hand would put it.

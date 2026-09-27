@@ -41,6 +41,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
+import { squishDisc, PressLifts, type Presser, type Stroke } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -847,8 +848,18 @@ class FluidSimulation {
   private squishSteps = 0;
   private squishLastAt = 0;
   private squishLastStep = -1;
+  /**
+   * The press's memory, for the lift (lib/squish.ts): where the last press
+   * was, how deep it went and when it let go, so that the glass coming back
+   * up can break the rim it left into fingers. Public for the phone's
+   * check (`npm run phone`), which reads it and `lastLift` to see a lift
+   * run where the finger was.
+   */
+  readonly pressLift = new PressLifts();
+  /** The last lift this plate laid: where, and how many cells it touched. */
+  lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -1703,6 +1714,9 @@ class FluidSimulation {
     this.pressure.fill(0); this.dhdt.fill(0);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
+    // A lift still running would go on laying the old plate's spokes into
+    // the cleared one for up to a second, at the old look's Fingering.
+    this.pressLift.forget(); this.lastLift = null;
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
@@ -2248,104 +2262,80 @@ class FluidSimulation {
   }
 
   /**
-   * Press the top glass over a disc. With `fingering`, the thinning is not
-   * even round the press: the film thins more along a ring of spokes and the
-   * outflow is pushed along them, so the front breaks into radial fingers
-   * (Saffman–Taylor: the thin liquid shooting through the thick one) instead
-   * of spreading as a smooth ring. The spoke phase is fixed by where the press
-   * is, so a held press keeps its fingers.
+   * Press the top glass over a disc: the film thins by `amount` under it.
+   *
+   * With `fingering`, the press is still round (lib/squish.ts: squeezing is
+   * the stable direction of Saffman–Taylor): the centre clears and, in a
+   * press's first moments, the dye stands up in a round rim. The fingers
+   * come when it lets go. The outermost disc of a press (`pileTips`) is
+   * remembered, and once no press has come for 150 ms the step lays the
+   * lift, the spokes running in from the rim as the glass comes up
+   * (`liftStep`). A drop's impact is the `splash` stroke, which keeps the
+   * fingers on the way down that every press used to draw.
    */
-  applySquish(x: number, y: number, radius: number, amount: number, fingering = 0, pileTips = false) {
+  applySquish(x: number, y: number, radius: number, amount: number, fingering = 0, pileTips = false, stroke: Exclude<Stroke, 'lift'> = 'press', who: Presser = 'hand') {
     radius = Math.round(radius * GRID_SCALE);
-    const r2 = radius * radius;
-    // Each press gets its own spoke count and phase (from where it is, so a
-    // held press keeps them), and each spoke its own width, length and
-    // strength, with a second harmonic shifting the spacing: a ragged
-    // sunburst with dye surviving between the fingers, not a turbine.
-    const seed = fingering > 0 ? (((x * 73856093) ^ (y * 19349663)) >>> 0) : 0;
-    const spokes = fingering > 0 ? 8 + (seed % 9) + Math.round(8 * fingering) : 0;
-    const phase = fingering > 0 ? ((seed >>> 8) % 1000) / 1000 * Math.PI * 2 : 0;
-    const spokeGain = fingering * 0.9;
-    // The first moments of a press shove the dye out to the fingers' tips,
-    // where it piles up as a bright rim (the reference's bright finger
-    // ends). Counted per press so a held press does not keep piling.
-    // The pile at the fingers' tips belongs to one press, counted in solver
-    // steps: only the outermost of the tool's nested radii piles (the Mac's
-    // seventh look found the three radii tiling the palm with a blob), and a
-    // press is one press while it keeps coming, even as a finger drifts
-    // across grid cells; a pause of a moment starts a new one (a beat
-    // squeeze on every kick).
+    // The first moments of a press shove the dye out to its front, where it
+    // piles up as a bright rim (the reference's bright finger ends, round
+    // now on a press, at the fingers' tips on a splash). Counted per press
+    // so a held press does not keep piling.
+    // The pile belongs to one press, counted in solver steps: only the
+    // outermost of the tool's nested radii piles (the Mac's seventh look
+    // found the three radii tiling the palm with a blob), and a press is one
+    // press while it keeps coming, even as a finger drifts across grid
+    // cells; a pause of a moment starts a new one.
     const nowMs = showNow();
     if (nowMs - this.squishLastAt > 150) { this.squishSteps = 0; this.squishLastStep = -1; }
     this.squishLastAt = nowMs;
     if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
     const pile = pileTips && fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
-    const spokeProp = (s: number) => { const h = ((s + 1) * 2654435761 + seed) >>> 0; return { w: 0.5 + ((h & 255) / 255) * 0.9, len: 0.45 + (((h >>> 8) & 255) / 255) * 0.6, k: 0.25 + (((h >>> 16) & 255) / 255) * 0.75 }; };
-    const TAU = Math.PI * 2;
-    for (let i = -radius; i <= radius; i++) {
-      for (let j = -radius; j <= radius; j++) {
-        const d2 = i * i + j * j;
-        if (d2 >= r2) continue;
-        const nx = x + i;
-        const ny = y + j;
-        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
-          const idx = nx + ny * this.size;
-          this.dirty = true;
-          let a = amount;
-          if (spokes > 0 && d2 > 0) {
-            const theta = Math.atan2(j, i);
-            const warped = theta + 0.35 * Math.cos((spokes * 0.5 + 1) * theta + phase * 1.7) / spokes * TAU;
-            const sIdx = Math.floor(((warped + phase / spokes) / TAU * spokes) % spokes + spokes) % spokes;
-            const prop = spokeProp(sIdx);
-            const raw = Math.cos(spokes * warped + phase);
-            // Narrow spokes: the cosine sharpened by this spoke's width.
-            const ang = Math.max(-1, Math.min(1, (raw - (1 - prop.w * 0.85)) / (prop.w * 0.85)));
-            a *= Math.max(0.05, 1 + spokeGain * ang * prop.k);
-            // Along a spoke the outflow is shoved outward, and the invading
-            // thin liquid carves the dye out of the channel (more toward the
-            // rim, so the centre is not hollowed at once): the fingers stay
-            // visible even once the gap has bottomed out and the flow stops.
-            const dist = Math.sqrt(d2);
-            // Under the palm the glass clears: the dye is pushed out to the
-            // fingers' tips and the centre reads as near-black glass.
-            if (dist < radius * 0.3) {
-              const core = 1 - Math.min(0.05, amount * 1.4) * fingering * (1 - dist / (radius * 0.3));
-              if (this.gpu) this.mul[idx] *= core;
-              else { this.density[idx] *= core; this.densityR[idx] *= core; this.densityG[idx] *= core; this.densityB[idx] *= core; }
-            }
-            // The rim at the finger's end: a band hugging this spoke's own
-            // tip, where the dye pushed along the channel piles up.
-            const tipW = pile > 0 && ang > 0.1 ? Math.max(0, 1 - Math.abs(dist - radius * prop.len) / (radius * 0.2)) : 0;
-            if (ang > 0 && dist < radius * prop.len) {
-              const push = amount * 8 * ang * fingering * prop.k;
-              this.vx[idx] += (i / dist) * push;
-              this.vy[idx] += (j / dist) * push;
-              if (ang > 0.25 && tipW === 0) {
-                // Gentle per step: the finger reads over a held press and a
-                // faint one stays faint; the dye between spokes is untouched,
-                // and the channel stops short of the tip so the rim stands.
-                const thin = 1 - Math.min(0.08, amount * 2.2) * fingering * prop.k * (ang - 0.25) / 0.75 * (0.25 + 0.75 * dist / (radius * prop.len));
-                if (this.gpu) this.mul[idx] *= thin;
-                else { this.density[idx] *= thin; this.densityR[idx] *= thin; this.densityG[idx] *= thin; this.densityB[idx] *= thin; }
-              }
-            }
-            if (tipW > 0) {
-              const thick = 1 + pile * prop.k * ang * tipW;
-              if (this.gpu) this.mul[idx] *= thick;
-              else { this.density[idx] *= thick; this.densityR[idx] *= thick; this.densityG[idx] *= thick; this.densityB[idx] *= thick; }
-            }
-          }
-          if (this.gpu) {
-            this.gap[idx] -= a;    // a delta; the shader clamps and derives dh/dt
-            continue;
-          }
-          const prevGap = this.gap[idx];
-          this.gap[idx] = Math.max(0.005, this.gap[idx] - a);
-          this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
-        }
-      }
+    /*
+      Only a press at a whole cell is remembered. Beat Squeeze's centre is a
+      fraction of a cell (PLAN §10 step 4), so its stroke lays nothing; left
+      in, its memory ran a lift of some seventy steps after every kick that
+      walked the disc, laid nothing either, and marked the plate dirty for a
+      full upload each step (pre-push review).
+    */
+    if (pileTips && stroke === 'press' && Number.isInteger(x) && Number.isInteger(y)) this.pressLift.press(who, x, y, radius, amount, fingering, nowMs);
+    squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, this.squishCell);
+  }
+
+  /**
+   * The glass coming back up after a press (lib/squish.ts), laid once a
+   * solver step for as long as the lift runs: nothing while a press is held,
+   * and nothing at all with Fingering at 0.
+   */
+  private liftStep(): void {
+    for (const lift of this.pressLift.step(showNow(), this.dtSeconds)) {
+      // Cells that land: an index that is not a whole number is a write a
+      // typed array drops without a word (the beat squeeze's fractional
+      // centre, PLAN §10 step 4), and counting those called a lift that
+      // laid nothing a lift.
+      let cells = 0;
+      squishDisc(this.size, lift.x, lift.y, lift.radius, lift.amount, lift.fingering, 'lift', 0, (idx, gap, vx, vy, m) => {
+        if (Number.isInteger(idx)) cells++;
+        this.squishCell(idx, gap, vx, vy, m);
+      });
+      this.lastLift = { x: lift.x, y: lift.y, cells };
     }
   }
+
+  /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
+  private readonly squishCell = (idx: number, gap: number, vx: number, vy: number, m: number): void => {
+    this.dirty = true;
+    this.vx[idx] += vx;
+    this.vy[idx] += vy;
+    if (this.gpu) {
+      if (m !== 1) this.mul[idx] *= m;
+      this.gap[idx] += gap;    // a delta; the shader clamps and derives dh/dt
+      return;
+    }
+    if (m !== 1) { this.density[idx] *= m; this.densityR[idx] *= m; this.densityG[idx] *= m; this.densityB[idx] *= m; }
+    const prevGap = this.gap[idx];
+    // As the shader's squeezeUpdate: a lift opens the glass back to rest (0.03 here), never past it.
+    this.gap[idx] = gap > 0 ? Math.min(prevGap + gap, Math.max(prevGap, 0.03)) : Math.max(0.005, prevGap + gap);
+    this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
+  };
 
   blowAir(x: number, y: number, radius: number, strength: number) {
     radius = Math.round(radius * GRID_SCALE);
@@ -2664,7 +2654,7 @@ class FluidSimulation {
     const S = this.size;
     const k = GRID_SCALE;
     const inside = (px: number, py: number) => px >= 2 && px < S - 2 && py >= 2 && py < S - 2;
-    this.applySquish(x, y, (dropR / k) * (1.6 + 1.8 * h), 0.0012 * e, this.dropFingering, true);
+    this.applySquish(x, y, (dropR / k) * (1.6 + 1.8 * h), 0.0012 * e, this.dropFingering, true, 'splash');
 
     const r0 = dropR * 0.6, r1 = dropR * (2 + 3 * h);
     const R = Math.ceil(r1);
@@ -2809,6 +2799,7 @@ class FluidSimulation {
     // Finite first, then clamped: a clamp cannot catch a NaN, it carries one.
     this.dt = Number.isFinite(wantDt) ? Math.min(Math.max(wantDt, DT_FLOOR), 0.05) : DT_FLOOR;
     this.stepIndex++;
+    this.liftStep();
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
     this.lastStep = p;
@@ -5857,8 +5848,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // ── The room's hands ───────────────────────────────────
         // Everyone the sensor is holding is a projectionist. Standing still is
-        // a palm on the top glass, so the film thins and fingering breaks it
-        // into spokes exactly as the Press tool does; moving is a puff along
+        // a palm on the top glass, so the film thins exactly as the Press tool
+        // does, and lifts into spokes (with Fingering) when they move on; moving is a puff along
         // the way they are going; arriving is a drop of their own dye.
         //
         // The dye is the point. A track's id picks from the working harmony,
@@ -6652,7 +6643,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
                 const a = 0.0024 * squeezeAmt * bass01 * accent;
                 const fg = currentSettings.fingering ?? 0;
-                leadPlate.applySquish(cx, cy, 40, a, fg, true);
+                leadPlate.applySquish(cx, cy, 40, a, fg, true, 'press', 'kick');
                 leadPlate.applySquish(cx, cy, 27, a, fg);
                 leadPlate.applySquish(cx, cy, 15, a, fg);
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);

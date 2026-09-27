@@ -296,6 +296,10 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # A press goes down round and lifts into fingers, and a plain spring lift does not.
+      - name: The press and its lift
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run lift
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.

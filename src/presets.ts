@@ -1385,7 +1385,7 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.15,
       bubbles: 0.15,
       beads: 0.2,
-      fingering: 0.6,              // a palm on the glass breaks into spokes
+      fingering: 0.6,              // a palm on the glass lifts into spokes as they move on
       plateRock: 0.2,
       beatSqueeze: 0.5,
       lightPlay: 0.35,

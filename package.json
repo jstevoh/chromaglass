@@ -104,6 +104,7 @@
     "particles": "node scripts/particles.mjs",
     "derive": "node scripts/derive.mjs",
     "straw": "node scripts/straw.mjs",
+    "lift": "node scripts/lift.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
     "press": "npm run build && node scripts/press.mjs",

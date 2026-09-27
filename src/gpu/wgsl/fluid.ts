@@ -764,7 +764,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (A.a.x > 0.5) {
     let dg = textureLoad(addT, vec2i(id.xy), 0).a;
     if (dg != 0.0) {
-      let g2 = max(0.004, gap + dg);
+      // A press closes the gap (down to the floor); the one thing that
+      // opens it is a press's lift (lib/squish.ts), and that brings the
+      // glass back up to where it rests, never past it. Uncapped, at the
+      // default look's spring (half back to rest in about 1,450 steps, 24 s)
+      // the lift opened the film to 0.081 against a rest of 0.030 and held
+      // it for tens of seconds, and to 0.053 even on the lab's spring, forty
+      // times the app's (check-skeptic, pre-push review). A gap already past
+      // rest is left where it is, not pulled down.
+      var g2 = max(0.004, gap + dg);
+      if (dg > 0.0) { g2 = min(g2, max(gap, rest)); }
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }
