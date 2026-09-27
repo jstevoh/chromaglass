@@ -954,10 +954,23 @@ async function selftest() {
   const B1 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : blip[t.toFixed(1)] ?? 0.01);
   const B2 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : t > 2.95 && t < 3.35 ? 0.2 : 0.01);
   const b1 = freezes(B1, { below: 0.025, blipSeconds: 0.5 }), b0 = freezes(B1, { below: 0.025 }), b2 = freezes(B2, { below: 0.025, blipSeconds: 0.3 });
+  // And as moving.mjs asks (half a second, under 0.3%, a quarter of the
+  // stillness at most): a one-sample jump of 0.9% at 4.0 s, a beat flash the
+  // freeze did not stop, splits it; so does a plate moving 0.2% four samples
+  // in every five, which with nothing but a length it came out still.
+  const ASKED = { below: 0.025, blipSeconds: 0.5, blipBelow: 0.3 };
+  const B3 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : Math.abs(t - 4) < 0.05 ? 0.9 : blip[t.toFixed(1)] ?? 0.01);
+  const B4 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : Math.round(t * 10) % 5 === 0 ? 0.01 : 0.2);
+  const b1a = freezes(B1, ASKED), b3 = freezes(B3, ASKED), b4 = freezes(B4, ASKED);
   check('a codec blip inside a stillness does not split it, when asked; four samples of motion do',
     b1.length === 1 && near(b1[0].from, 0.9) && near(b1[0].to, 7) && b0.length === 2 && near(b0[0].to, 3) && near(b0[1].from, 3.2)
       && b2.length === 2 && near(b2[0].to, 3) && near(b2[1].from, 3.3),
     `blip allowed: ${show(b1)}; not: ${show(b0)}; a 0.4 s burst at 0.3 s allowed: ${show(b2)}`);
+  check('as moving asks it, the blip is carried, a 0.9% jump is not, and a plate moving in bursts is never still',
+    b1a.length === 1 && near(b1a[0].from, 0.9) && near(b1a[0].to, 7)
+      && b3.length === 2 && near(b3[0].to, 4) && near(b3[1].from, 4)
+      && b4.length === 0,
+    `blip: ${show(b1a)}; jump at 4.0 s: ${show(b3)}; bursts: ${show(b4)}`);
 
   // D's answers come from how it was made. Where a number depends on the
   // motion's exact size (rise, decay, peak, calm, half-life), the answer is
@@ -1055,10 +1068,20 @@ export async function watchVideo(input, options = {}) {
  * three takes, while chasing `npm run moving`'s late freezes). Real motion
  * starting again goes on. The same stretch through the codec was split in
  * two by that blip whenever the bar for still sat under 0.15%.
+ *
+ * What may be carried, and how much, is bounded, or a plate that moves in
+ * bursts reads as still (the check-skeptic review of the first version: a
+ * 0.9% jump every 1.2 s, a beat flash through a freeze, was bridged, and so
+ * was a plate moving four samples in five). `blipBelow`: every sample carried
+ * must be under it; the encoder's blip peaks at 0.15%, a plate that moves
+ * is several times that. `blipShare`: the samples carried may be at most
+ * this share of the stillness so far, blip included; the encoder's is three
+ * samples in the seventeen or more before it, a train of bursts is most of
+ * its samples.
  */
-export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds = 0 } = {}) {
+export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds = 0, blipBelow = Infinity, blipShare = 0.25 } = {}) {
   const out = [];
-  let start = -1;
+  let start = -1, carried = 0;
   const rows = r.rows;
   for (let k = 1; k <= rows.length; k++) {
     const quiet = k < rows.length && rows[k].motion < below;
@@ -1069,8 +1092,8 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
       // The stretch carries on through it, from the first quiet sample after.
       if (blipSeconds > 0 && k < rows.length) {
         let j = k;
-        while (j < rows.length && rows[j].motion >= below && rows[j].t - rows[k].t + 1 / r.rate <= blipSeconds + 1e-9) j++;
-        if (j < rows.length && rows[j].motion < below) { k = j; continue; }
+        while (j < rows.length && rows[j].motion >= below && rows[j].motion < blipBelow && rows[j].t - rows[k].t + 1 / r.rate <= blipSeconds + 1e-9) j++;
+        if (j < rows.length && rows[j].motion < below && carried + (j - k) <= blipShare * (j - start)) { carried += j - k; k = j; continue; }
       }
       // From the last sample before the stillness to the first that moved
       // again (or the end of the clip): a picture still from 0.0 until it
@@ -1078,7 +1101,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
       // and last identical samples.
       const from = rows[start - 1].t, to = k < rows.length ? rows[k].t : rows[k - 1].t + 1 / r.rate;
       if (to - from >= minSeconds - 1e-9) out.push({ from, to, seconds: to - from });
-      start = -1;
+      start = -1; carried = 0;
     }
   }
   return out;

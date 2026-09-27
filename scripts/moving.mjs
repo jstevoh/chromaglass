@@ -116,7 +116,8 @@ try {
     const rows = [];
     window.__movingSteps = rows;
     const tick = () => {
-      rows.push([Date.now(), window.chromaglassDebug?.()?.fluids?.[0]?.stepIndex ?? -1]);
+      const d = window.chromaglassDebug?.();
+      rows.push([Date.now(), d?.fluids?.[0]?.stepIndex ?? -1, d?.active?.() ?? null]);
       if (rows.length < 3000) setTimeout(tick, 100);
     };
     tick();
@@ -131,30 +132,61 @@ try {
   }
   [froze, thawed] = got.cues.map(c => c.ran);
   t0 = got.t0;
-  steps = (await page.evaluate(() => window.__movingSteps ?? [])).map(([ms, n]) => ({ t: (ms - t0) / 1000, n }));
+  steps = (await page.evaluate(() => window.__movingSteps ?? [])).map(([ms, n, on]) => ({ t: (ms - t0) / 1000, n, on }));
 } finally {
   await browser.close();
 }
 
 console.log(`  ${LOOK}, recorded ${SECONDS} s with a band in a box (running ${(9 + opening.waited).toFixed(1)} s after load${opening.gap >= 1 ? `, after ${opening.gap.toFixed(1)} s with no frame` : ''}), frozen on purpose ${froze.toFixed(1)}–${thawed.toFixed(1)} s: ${take}\n`);
 
-// The stretch the plate did not step: from the first sample showing the
-// count it held at the thaw command, to the first showing more.
-const reported = steps.length > 0 && steps.every(x => x.n >= 0);
-const held = [...steps].reverse().find(x => x.t < thawed)?.n;
-const stopped = steps.find(x => x.t > froze - 0.5 && x.n === held)?.t;
-const resumed = steps.find(x => x.t > thawed && x.n > held)?.t;
-const stood = reported && stopped != null && resumed != null && steps.filter(x => x.t >= stopped && x.t < resumed).every(x => x.n === held);
-// Both ends bounded, and tightly: the key reaches the loop through one
-// React effect (isActiveRef), a frame or two, and the thaw has landed within
-// a tenth of a second on every run. Half a second either way is a lag an
+/*
+  The stretch the plate stood: from the first sample at which the loop read
+  the liquid as frozen (its own flag, chromaglassDebug().active, the one the
+  solver's step is gated on) to the first step after it read it running
+  again, and not one step taken in between.
+
+  It was the stretch from the first sample showing the count held at the
+  thaw key to the first showing more, and that raced the thaw. `thawed` is
+  when the palette's Enter came back to this script, after the key up, and
+  on a busy page the thaw can reach the loop, and the loop step, before
+  then. When a sample lands in that gap, the count "held at the thaw" is
+  already the first step after it, no earlier sample shows it, and the
+  plate reads as stepping through the whole freeze. PR #174's run
+  36281532848 printed exactly that, once in the 31 runs that printed this
+  line: "freeze pressed 12.9 s, last step 16.8 s; thaw pressed 16.8 s,
+  stepping 17.0 s". The palette's row read "Thaw the liquid" before that
+  Enter, so the app had frozen, and the loop's flag follows the app's in the
+  same commit (LiquidVisualizer's isActiveRef effect); the stop the key made
+  at 12.9 s was most likely there, and the check lost it. That was inferred
+  from the one line, since the run kept no samples, so the flag is now read
+  beside the count: a freeze that never reaches the loop, a stray step taken
+  while frozen, and a thaw that lands early each read as what they are.
+*/
+const reported = steps.length > 0 && steps.every(x => x.n >= 0 && typeof x.on === 'boolean');
+const off = steps.find(x => x.t > froze - 1 && x.t < thawed && x.on === false);
+const on = off && steps.find(x => x.t > off.t && x.on === true);
+const held = off?.n;
+const frozenRows = off && on ? steps.filter(x => x.t >= off.t && x.t < on.t) : [];
+const strays = frozenRows.length ? Math.max(...frozenRows.map(x => x.n)) - held : 0;
+const stopped = off?.t;
+const resumed = on ? steps.find(x => x.t >= on.t && x.n > held)?.t : undefined;
+const stood = reported && off != null && on != null && strays === 0 && resumed != null;
+// Both ends bounded, and tightly, and on both sides: the key reaches the
+// loop through one React effect (isActiveRef), a frame or two, and the thaw
+// has landed within a tenth of a second on every run. Both sides, because
+// the thaw is now read from the flag: a freeze that thawed itself at 14.5 s
+// would otherwise pass, as early is never late (the check-skeptic's
+// review). Half a second either way is a lag an
 // operator would feel, and a product fault this check must not absorb by
 // timing the film from the plate instead of the key.
 check('the plate stops stepping when frozen and steps again when thawed',
-  stood && stopped - froze < 0.5 && resumed - thawed < 0.5,
-  !reported ? 'the page does not report the plate\'s steps'
-    : stood ? `freeze pressed ${froze.toFixed(1)} s, last step ${stopped.toFixed(1)} s; thaw pressed ${thawed.toFixed(1)} s, stepping ${resumed.toFixed(1)} s`
-      : `no still stretch in the steps between ${froze.toFixed(1)} and ${thawed.toFixed(1)} s`);
+  stood && Math.abs(stopped - froze) < 0.5 && Math.abs(resumed - thawed) < 0.5,
+  !reported ? 'the page does not report the plate\'s steps and whether it is running'
+    : !off ? `the loop never read the liquid as frozen between the freeze (${froze.toFixed(1)} s) and the thaw (${thawed.toFixed(1)} s)`
+      : !on ? `the loop read the liquid as frozen from ${stopped.toFixed(1)} s and never running again`
+        : strays > 0 ? `the plate took ${strays} steps while the loop read it frozen, ${stopped.toFixed(1)}–${on.t.toFixed(1)} s`
+          : resumed == null ? `no step after the loop read the liquid running again at ${on.t.toFixed(1)} s`
+            : `freeze pressed ${froze.toFixed(1)} s, frozen ${stopped.toFixed(1)} s; thaw pressed ${thawed.toFixed(1)} s, running ${on.t.toFixed(1)} s, stepping ${resumed.toFixed(1)} s`);
 if (!stood) process.exit(1);
 let r;
 try {
@@ -218,11 +250,18 @@ const below = Math.max(2 * frozenP90, 0.005);
   sample slower still ends well inside it, and the thaw, which goes on,
   never does.
 
-  The ninth run (36281532848) is not this and stays red: the plate took
-  steps through the whole freeze ("last step 16.8 s"), and the first check
-  above says so.
+  And only a blip: each sample carried under 0.3%, twice the encoder's
+  peak, and under a quarter of what the plate moves outside the freeze,
+  for a calm look whose whole motion is near 0.3%; and at most a quarter
+  of the stillness (freezes()'s blipBelow and blipShare). A plate that flashes on the beat through a freeze, or moves in
+  bursts, changes by several times that, and is not carried; the watch
+  self-test has both.
+
+  The ninth run (36281532848) is not this: it read as the plate stepping
+  through the whole freeze ("last step 16.8 s"), which the first check
+  above now reads from the loop's own flag (see there).
 */
-const found = freezes(r, { below, minSeconds: 2, blipSeconds: 0.5 })
+const found = freezes(r, { below, minSeconds: 2, blipSeconds: 0.5, blipBelow: Math.min(0.3, movingMedian / 4) })
   .map(f => ({ ...f, from: Math.max(f.from, r.rows[0].t + 2) }))   // the recorder's own start-up is not the plate
   .filter(f => f.to - f.from >= 2 - 1e-9);
 const control = found.filter(f => f.from < resumed && f.to > stopped);

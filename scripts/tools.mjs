@@ -129,6 +129,8 @@ try {
   await clear();
   await pool(A);
   await settle(3000);   // past the pool's own settling, as for the Finger below
+  await snap('idleA');
+  await settle(2000);
   await snap('idle0');
   await settle(2000);
   const at = await (async () => { await page.mouse.move(...screen(...A)); return page.evaluate(() => window.chromaglassDebug().pointer()); })();
@@ -137,11 +139,10 @@ try {
   for (let i = 0; i < 40; i++) { await page.mouse.move(...screen(A[0] + 0.06 * Math.sin(i / 3), A[1] + 0.04 * Math.cos(i / 4))); await settle(50); }
   await snap('hover');
   /*
-    The pool left alone again for two seconds after, the pointer resting
-    where the sweep ended.
+    Judged per solver step, against the larger of two windows left alone
+    before it.
 
-    Judged per solver step, against the larger of the two windows left alone.
-    It was judged against the two seconds before only, as a total, and went
+    It was judged against the one two seconds before, as a total, and went
     red once in 75 runs (deploy 36270301147, a commit that changed only
     PLAN.md): 192 → 174 hovering against 195 → 192 left alone. Across those
     75 runs the hover window lost more than the window before it in 56, which
@@ -153,20 +154,30 @@ try {
     ranged from 3 to over 20 in those runs), and the allowance is twice it,
     so a quiet one shrank the bar under an ordinary hover. So each window is
     counted in the solver steps it spanned (stepIndex, read with the dye),
-    and the plate's own rate is the larger of before and after.
+    and the plate's own rate is the larger of two windows before.
+
+    Not after. A window after the hover was the first version's second
+    control, and the check-skeptic review saw what that does: if the hover
+    does stir the pool, the stir goes on settling after it, the after window
+    loses more, and the allowance grows with the very fault it is judging.
+    It is still read and printed, so a stir that lingers is seen.
   */
   await settle(2000);
   await snap('idle2');
-  const i0 = await measure('idle0', at), i1 = await measure('idle1', at), hv = await measure('hover', at), i2 = await measure('idle2', at);
-  const stepsAt = await page.evaluate(() => ['idle0', 'idle1', 'hover', 'idle2'].map(k => window.__toolSnaps[k].step));
+  const iA = await measure('idleA', at), i0 = await measure('idle0', at), i1 = await measure('idle1', at), hv = await measure('hover', at), i2 = await measure('idle2', at);
+  const stepsAt = await page.evaluate(() => ['idleA', 'idle0', 'idle1', 'hover', 'idle2'].map(k => window.__toolSnaps[k].step));
   const span = (a, b) => stepsAt[b] - stepsAt[a];
-  const stepsOk = stepsAt.every(n => n >= 0) && span(0, 1) > 0 && span(1, 2) > 0 && span(2, 3) > 0;
-  const idleRate = Math.max(Math.abs(i1.disc - i0.disc) / Math.max(1, span(0, 1)), Math.abs(i2.disc - hv.disc) / Math.max(1, span(2, 3)));
-  const hoverMove = Math.abs(hv.disc - i1.disc), idleMove = idleRate * span(1, 2);
+  const stepsOk = stepsAt.every(n => n >= 0) && [0, 1, 2, 3].every(k => span(k, k + 1) > 0);
+  const idleRate = Math.max(Math.abs(i0.disc - iA.disc) / Math.max(1, span(0, 1)), Math.abs(i1.disc - i0.disc) / Math.max(1, span(1, 2)));
+  const hoverMove = Math.abs(hv.disc - i1.disc), idleMove = idleRate * span(2, 3);
+  // A pool to hover over: with none (an empty plate, or readbacks of zeros)
+  // nothing moves, hovering or not, and the check would pass on nothing.
+  const pooled = i1.disc > 5;
   check('moving over the plate with no button down leaves it alone',
-    stepsOk && hoverMove <= Math.max(2, 2 * idleMove) + 0.05 * i1.disc,
+    stepsOk && pooled && hoverMove <= Math.max(2, 2 * idleMove) + 0.05 * i1.disc,
     !stepsOk ? `the plate did not step through every window (steps ${stepsAt.join(', ')})`
-      : `dye under the pointer ${i1.disc.toFixed(0)} → ${hv.disc.toFixed(0)} hovering over ${span(1, 2)} steps; left alone ${i0.disc.toFixed(0)} → ${i1.disc.toFixed(0)} over ${span(0, 1)} before and ${hv.disc.toFixed(0)} → ${i2.disc.toFixed(0)} over ${span(2, 3)} after, ${idleMove.toFixed(1)} at that rate over the hover's steps`);
+      : !pooled ? `no pool under the pointer to hover over (${i1.disc.toFixed(1)})`
+        : `dye under the pointer ${i1.disc.toFixed(0)} → ${hv.disc.toFixed(0)} hovering over ${span(2, 3)} steps; left alone before ${iA.disc.toFixed(0)} → ${i0.disc.toFixed(0)} → ${i1.disc.toFixed(0)} over ${span(0, 1)} and ${span(1, 2)} steps (${(Math.abs(i0.disc - iA.disc) / Math.max(1, span(0, 1))).toFixed(3)} and ${(Math.abs(i1.disc - i0.disc) / Math.max(1, span(1, 2))).toFixed(3)} a step), ${idleMove.toFixed(1)} at the faster rate over the hover's steps; after, ${hv.disc.toFixed(0)} → ${i2.disc.toFixed(0)} over ${span(3, 4)}`);
 
   // ── The pouring tools ───────────────────────────────────────────
   const laid = {};

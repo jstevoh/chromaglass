@@ -7558,6 +7558,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The phrasing, so a check can watch the signal rather than guess from
         // the picture whether it is arriving.
         phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
+        /*
+          Whether the loop reads the liquid as running: the flag the solver's
+          step is gated on (Freeze the liquid, F), as the loop sees it, not as
+          the App last rendered it. `npm run moving` samples it beside the
+          step count, so that a freeze that did not take and a check that
+          misread one are told apart (see the freeze's comment there).
+        */
+        active: () => isActiveRef.current,
         /** Where the pointer is on the plate, in grid cells: where a tool acts. */
         pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */

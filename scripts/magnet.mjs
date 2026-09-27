@@ -225,7 +225,14 @@ try {
       for (let y = 0; y < n; y += step) for (let x = 0; x < n; x += step) {
         if (Math.hypot((x + 0.5) / n - cx, (y + 0.5) / n - cy) < 0.12) g += b.data[x + y * n] - a.data[x + y * n];
       }
-      if (g > best.gain) best = { x: cx, y: cy, gain: g * step * step / (n * n) * 1e4 };
+      // Compared as stored: this compared each raw sum against the best as
+      // stored, scaled 4.3 times larger at 192², so a later spot took over
+      // only with over 4.3 times the gain, and the spot printed leaned toward
+      // the first scanned, low y then low x (the check-skeptic review, the
+      // loop copied out: gains of 0.3 at 0.3,0.3 and 1.0 at 0.7,0.7 read as
+      // 0.64,0.64; the true peak is 0.70,0.70).
+      const gs = g * step * step / (n * n) * 1e4;
+      if (gs > best.gain) best = { x: cx, y: cy, gain: gs };
     }
     return best;
   });
@@ -275,7 +282,10 @@ try {
     solver's magnet held at 0.56,0.27 the whole hold, and nothing within
     0.12 of any point the hand had been; that log did not say where the hand
     had been, so whether the liquid was carried off the path, or gathered
-    where the path was not, could not be told. The next one will say.
+    where the path was not, could not be told. The next one will say. (And
+    the "+183 at 0.72,0.32" was read by the spot finder above before its
+    comparison was fixed, which leaned toward the first spots scanned: the
+    true peak may have been elsewhere.)
   */
   if (gathered && trail.length) {
     const off = Math.min(...trail.map(p => Math.hypot(p.x - gathered.x, p.y - gathered.y)));
