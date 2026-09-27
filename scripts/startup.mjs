@@ -264,6 +264,28 @@ async function open(query, looks) {
       */
       const firsts = new Map();
       window.__startupFirsts = firsts;
+      /*
+        And how much memory the page asked for, and wrote, when. The stop
+        after the first step kept on a warm cache (median 1.15 s over the
+        forty looks' openings, run 36300733762), so it is not a compile:
+        what the first frames make and fill is the next thing to see.
+      */
+      const bytes = [];
+      window.__startupBytes = bytes;
+      const bpp = { rgba32float: 16, rgba32uint: 16, rgba16float: 8, rg32float: 8, r32float: 4, rg16float: 4, r16float: 2, r8unorm: 1 };
+      const texBytes = (d) => {
+        const [w, h = 1, z = 1] = Array.isArray(d.size) ? d.size : [d.size.width, d.size.height ?? 1, d.size.depthOrArrayLayers ?? 1];
+        return w * h * z * (bpp[d.format] ?? 4);
+      };
+      const log = (proto, key, kind, size) => {
+        const f = proto?.[key];
+        if (!f) return;
+        proto[key] = function (...a) { try { bytes.push([performance.now(), kind, size(...a)]); } catch { /* measure only */ } return f.apply(this, a); };
+      };
+      log(GPUDevice.prototype, 'createTexture', 'texture', (d) => texBytes(d));
+      log(GPUDevice.prototype, 'createBuffer', 'buffer', (d) => d.size);
+      log(GPUQueue.prototype, 'writeTexture', 'written', (_, data) => data.byteLength ?? 0);
+      log(GPUQueue.prototype, 'writeBuffer', 'written', (_, __, data, ___, size) => size ?? data.byteLength ?? 0);
       for (const name of ['GPUDevice', 'GPUQueue', 'GPUCommandEncoder', 'GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPUBuffer', 'GPUCanvasContext', 'GPUTexture']) {
         const proto = globalThis[name]?.prototype;
         if (!proto) continue;
@@ -449,6 +471,7 @@ async function open(query, looks) {
           for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
           return { gap: gap / 1000, at: at == null ? null : at / 1000, first: ts.length ? ts[0] / 1000 : null };
         })(),
+        bytes: window.__startupBytes.filter(([t]) => t <= now).map(([t, k, n]) => [t / 1000, k, n]),
         firsts: [...window.__startupFirsts].map(([what, [at, n]]) => [what, at / 1000, n]),
         box: (d?.crash?.thisLoad?.() ?? []).map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`),
       };
@@ -633,7 +656,16 @@ const underWay = (o, gap) => {
   // What the page asked of WebGPU for the first time in the second before
   // the stop began, or during it.
   const asked = gap?.at == null ? [] : (o.firsts ?? []).filter(([, at]) => at >= gap.at - 1 && at <= gap.at + gap.gap);
-  return `builds under way in the longest frame gap: ${inGap.length ? inGap.map(fmt).join(', ') : 'none'}; slowest ahead: ${slowest('ahead')}; slowest behind: ${slowest('behind')}`
+  const mb = (from, to) => {
+    const sum = { texture: [0, 0], buffer: [0, 0], written: [0, 0] };
+    for (const [t, k, n] of o.bytes ?? []) if (t >= from && t <= to) { sum[k][0]++; sum[k][1] += n; }
+    return Object.entries(sum).map(([k, [c, n]]) => `${c} ${k === 'written' ? 'writes' : `${k}s`} (${(n / 2 ** 20).toFixed(1)} MB)`).join(', ');
+  };
+  const step = o.firstStep == null ? null : o.firstStep / 1000;
+  const made = `made and written in the longest frame gap and the second before it: ${gap?.at == null ? 'nothing to say' : mb(gap.at - 1, gap.at + gap.gap)}`
+    + `; in the two seconds from a second before the first step: ${step == null ? 'no step' : mb(step - 1, step + 1)}`
+    + `; before that, all told: ${step == null ? 'no step' : mb(0, step - 1)}`;
+  return `${made}; builds under way in the longest frame gap: ${inGap.length ? inGap.map(fmt).join(', ') : 'none'}; slowest ahead: ${slowest('ahead')}; slowest behind: ${slowest('behind')}`
     + `; asked of WebGPU for the first time from a second before it: ${asked.length ? asked.map(([w, at]) => `${w} at ${at.toFixed(2)} s`).join(', ') : 'nothing'}`;
 };
 
