@@ -43,6 +43,9 @@ import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
+import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
+import { wantsPhoneLayout, PHONE_OFF_KEY } from './lib/phone';
+import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
 import { useSongShows } from './hooks/useSongShows';
@@ -1701,6 +1704,34 @@ export default function App() {
   /** The look before the last Go, so one step back is always available. */
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
+  /*
+    The phone (components/phone/PhoneStage.tsx, lib/phone.ts): a touch screen
+    with a phone's short side gets the plate edge to edge and the tools under
+    the thumb, instead of the narrow-screen overlay below. Read again on every
+    resize and turn, because a phone turned to landscape is still a phone
+    (844 wide, which is under the desks' 1024 anyway) and a laptop window
+    dragged narrow is still a laptop.
+  */
+  const readPhone = () => {
+    if (typeof window === 'undefined') return false;
+    let sessionOff = false;
+    try { sessionOff = sessionStorage.getItem(PHONE_OFF_KEY) === '1'; } catch { /* private */ }
+    return wantsPhoneLayout({
+      query: window.location.search,
+      coarse: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      sessionOff,
+    });
+  };
+  const [phone, setPhone] = useState(readPhone);
+  useEffect(() => {
+    const onResize = () => setPhone(readPhone());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** What the desk should say is on stage. */
   /**
    * Is there room for a desk?
@@ -1710,8 +1741,8 @@ export default function App() {
    * pixels and the whole thing is unusable — found by the QA harness, which
    * happened to run the desk check at phone width after the small-screen
    * check had resized the window, and reported a 420px preview in a 420px
-   * page. Below this, Perform quietly behaves as Design; a phone already has
-   * a control surface of its own in the remote.
+   * page. Below this, Perform quietly behaves as Design; a phone has a
+   * layout of its own (above), and the remote when it drives a laptop's show.
    */
   const [roomForDesk, setRoomForDesk] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 1024));
   useEffect(() => {
@@ -1720,17 +1751,20 @@ export default function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const performing = deskMode === 'perform' && roomForDesk;
-  const designing = deskMode === 'design' && roomForDesk;
+  // A phone is never a desk, whatever its width turned sideways.
+  const performing = deskMode === 'perform' && roomForDesk && !phone;
+  const designing = deskMode === 'design' && roomForDesk && !phone;
 
   /*
     Below that width neither desk lays out, and the floating overlay UI — the
     bottle rail, the toolbar, the title bar — is what the app shows instead.
-    It is not legacy so much as the narrow-screen surface: a phone already has
-    a control surface of its own in the remote, and a small laptop window gets
-    the one that does not need three columns.
+    It is not legacy so much as the narrow-screen surface: a phone has its own
+    (PhoneStage), and a small laptop window gets the one that does not need
+    three columns.
   */
-  const deskUp = roomForDesk;
+  const deskUp = roomForDesk && !phone;
+  /** The laptop's floating overlay: below the desks' width, and not on a phone. */
+  const overlayUp = !deskUp && !phone;
 
   // The hole in the desk layout the plate is painted over. Both desks leave
   // one; without a desk the plate fills the window, as it always has.
@@ -1793,6 +1827,19 @@ export default function App() {
       : ['#52525B', '#27272A'];
     return `linear-gradient(135deg, ${a}, ${b})`;
   }, []);
+  /*
+    The phone's list of looks: the preset menu's groups (the projected show,
+    the photographs, the closeups) and then the ones saved here, each with
+    the two colours the desks' cue rows show for it.
+  */
+  const phoneLooks = useMemo<PhoneLook[]>(() => {
+    const groupOf = (p: { id: string; settings: Partial<VisualizerSettings> }) =>
+      isUserPresetId(p.id) ? 'Yours' : p.settings.macroMode ? 'Closeup' : p.settings.renderStyle === 'photo' ? 'Photograph' : 'Light show';
+    const order = ['Light show', 'Photograph', 'Closeup', 'Yours'];
+    return allPresets
+      .map(p => ({ id: p.id, name: p.name, description: p.description, group: groupOf(p), swatch: swatchOf(p.id) }))
+      .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+  }, [allPresets, swatchOf]);
   const setActive = setList.items.length > 0;
   const cues = useMemo<Cue[]>(() => {
     return setList.items.map(item => {
@@ -2465,6 +2512,57 @@ export default function App() {
   const toggleRecording = useCallback(() => {
     recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
   }, [recorder, audioStream]);
+
+  // ── The phone's own hands: a pinch on the closeup, and Tilt ──
+  /*
+    Two fingers on the closeup set its magnification directly (a pinch is a
+    position, not a step like + and −), and like the zoom keys it carries the
+    flag with it, so pinching all the way out lands on the plate with the
+    closeup off rather than stranded at 1x with it on.
+  */
+  const pinchZoom = useCallback((z: number) => {
+    const zoom = Math.round(Math.max(1, Math.min(16, z)) * 100) / 100;
+    updateSettings({ macroZoom: zoom, macroMode: zoom > 1.05 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /*
+    Tilt writes the look's own Gravity and Tilt Direction while it is on
+    (lib/phone.ts), so what it moves is what the faders move and a look
+    saved mid-tilt keeps the tilt it was saved with. Turning it off puts back
+    the look's own two values: the ones from before Tilt, or, if a new look
+    has come in since, that look's (Tilt's next reading has already written
+    over them by the time it is turned off, so they are taken from the look
+    as it arrives).
+  */
+  const tiltWas = useRef<{ plateUpright: number; tiltDirection: number } | null>(null);
+  const tilt = useDeviceTilt(({ upright, direction }) => updateSettings({ plateUpright: upright, tiltDirection: direction }));
+  const toggleTilt = useCallback(async () => {
+    if (tilt.on) { tilt.stop(); return; }
+    const cur = settingsRef.current;
+    tiltWas.current = { plateUpright: cur.plateUpright ?? 0, tiltDirection: cur.tiltDirection ?? 180 };
+    if (!(await tilt.start())) tiltWas.current = null;
+  }, [tilt.on, tilt.start, tilt.stop]);
+  // However Tilt ended (the toggle, or the hook finding no sensor), the look
+  // gets its own two values back.
+  useEffect(() => {
+    if (tilt.on || !tiltWas.current) return;
+    updateSettings(tiltWas.current);
+    tiltWas.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tilt.on]);
+  useEffect(() => {
+    if (!tiltWas.current) return;
+    const look = allPresets.find(p => p.id === pinnedPresetId)?.settings;
+    tiltWas.current = {
+      plateUpright: look?.plateUpright ?? DEFAULT_SETTINGS.plateUpright,
+      tiltDirection: look?.tiltDirection ?? DEFAULT_SETTINGS.tiltDirection,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinnedPresetId]);
+  // The Tilt toggle is on the phone's Play sheet and nowhere else, so leaving
+  // the phone layout ("Full layout", a resize) must not leave the plate
+  // following the hand with no way to stop it.
+  useEffect(() => { if (!phone && tilt.on) tilt.stop(); }, [phone, tilt.on, tilt.stop]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -3205,7 +3303,7 @@ export default function App() {
    * Whether the cue bar is occupying the bottom centre of a narrow screen.
    * The minimise chips live there too and have to give way to it.
    */
-  const cueBarUp = !deskUp && !!(cued || fading > 0 || previousLook.current);
+  const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
 
   const deskDots = useMemo(() => ({
     mic: audioSource !== 'none',
@@ -3281,12 +3379,15 @@ export default function App() {
   }, []);
 
   return (
-    <div className={`relative w-full h-screen bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
+    // On a phone the height is the dynamic viewport's: 100vh there is the
+    // height with the browser's bars hidden, which put the dock under them.
+    <div className={`relative w-full ${phone ? 'h-[100dvh]' : 'h-screen'} bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
         ref={visualizerRef}
         audioData={audioData} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         onAim={aimMacro}
+        onPinchZoom={phone ? pinchZoom : undefined}
         toolAmount={toolAmount}
         drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
@@ -3328,7 +3429,7 @@ export default function App() {
           if (musicFile?.track) playTrack(nextTrack(musicFile.track.src));
           else if (el && musicFile) { el.currentTime = 0; void el.play().catch(() => {}); }
         }} />
-      {libraryOpen && overlaysVisible && (
+      {libraryOpen && overlaysVisible && !phone && (
         <div className="fixed bottom-28 left-1/2 z-50 -translate-x-1/2 w-[min(92vw,460px)] rounded-2xl border border-white/10 bg-black/80 p-3 backdrop-blur-xl shadow-2xl" data-testid="music-library">
           <div className="mb-2 flex items-center justify-between px-1">
             <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">
@@ -3363,7 +3464,7 @@ export default function App() {
           </p>
         </div>
       )}
-      {musicFile && overlaysVisible && (
+      {musicFile && overlaysVisible && !phone && (
         <div className="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-xl shadow-2xl" data-testid="music-player">
           <button onClick={toggleMusic} className="p-1.5 rounded-full hover:bg-white/10" aria-label={musicPlaying ? 'Pause music' : 'Play music'} data-testid="music-play">
             {musicPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
@@ -3441,7 +3542,7 @@ export default function App() {
           <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
         </div>
       )}
-      {(settings.macroZoom ?? 1) > 1.05 && overlaysVisible && (
+      {(settings.macroZoom ?? 1) > 1.05 && overlaysVisible && !phone && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
           <Microscope size={12} className="ml-1" />
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
@@ -3472,7 +3573,7 @@ export default function App() {
         {toast && (
           <div
             key="toast"
-            className="pointer-events-none absolute bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl"
+            className={`pointer-events-none absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-black/70 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
             data-testid="toast"
           >
             {toast}
@@ -3491,7 +3592,7 @@ export default function App() {
         */}
         {sceneResume && !sceneOn && (
           <div
-            className="absolute bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full border border-white/15 bg-black/80 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl"
+            className={`absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full border border-white/15 bg-black/80 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
             data-testid="scene-resume"
             role="dialog"
             aria-label="Room camera"
@@ -3544,7 +3645,7 @@ export default function App() {
         two places is a control you cannot trust.
       */}
       <AnimatePresence>
-        {showControls && !showSettings && !deskUp && (
+        {showControls && !showSettings && overlayUp && (
           <>
             {/* ── Left Controls ───────────────────────────────── */}
             <motion.div
@@ -4020,12 +4121,89 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
+      {phone && showControls && (
+        <>
+          <PhoneStage
+            // Mid-fade the settings are between two looks and match neither,
+            // so the look is named by where it is going: the name a thumb
+            // just picked, not "Custom" for the two seconds of the crossfade.
+            lookName={activePresetName ?? (fading > 0 ? allPresets.find(p => p.id === pinnedPresetId)?.name ?? null : null)}
+            lookSwatch={swatchOf((activePresetId ?? (fading > 0 ? pinnedPresetId : null)) ?? undefined)}
+            looks={phoneLooks}
+            activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+            // A look from the phone crossfades in, as Go does on the desk: a
+            // thumb in front of a room should never cut the plate to clean glass.
+            onLook={(id) => goLookNow(id)}
+            onRandomLook={() => {
+              const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
+              if (pool.length) goLookNow(stream('phone.look').pick(pool).id);
+            }}
+            onRevert={previousLook.current ? revertLook : null}
+            tool={activeTool}
+            onTool={setActiveTool}
+            amount={toolAmount}
+            onAmount={(v) => setToolAmount(activeTool, v)}
+            liquids={liquidTypes}
+            selectedLiquidId={selectedLiquidId}
+            onLiquid={setSelectedLiquidId}
+            dyeColors={DROPPER_COLORS}
+            onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
+            palettes={COLOR_HARMONIES.map((h, i) => ({ name: COLOR_HARMONY_NAMES[i], colors: h.slice(0, 4).map(pi => PALETTE[pi].hex) }))}
+            paletteLock={paletteLock}
+            onPalette={selectPalette}
+            onImageDye={() => fileInputRef.current?.click()}
+            playing={isActive}
+            onPlay={() => setIsActive(v => !v)}
+            evolving={isAutomated}
+            onEvolve={setIsAutomated}
+            evolveSpeed={settings.automateRate ?? 0}
+            onEvolveSpeed={(v) => updateSettings({ automateRate: v })}
+            layers={settings.layerCount}
+            activeLayer={activeLayer}
+            onLayer={setActiveLayer}
+            onClear={() => setClearTrigger(n => n + 1)}
+            onDrain={() => setDrainTrigger(n => n + 1)}
+            onSpin={() => flickPlate(activeLayer)}
+            onLucky={triggerLucky}
+            zoom={settings.macroZoom ?? 1}
+            onZoom={() => runAction('macro-toggle')}
+            camera={settings.macroCamera ?? 'hold'}
+            onCamera={(c) => updateSettings({ macroCamera: c })}
+            tilt={{ supported: tilt.supported, on: tilt.on, refused: tilt.refused, silent: tilt.silent, onToggle: () => { void toggleTilt(); } }}
+            audioSource={audioSource}
+            onAudioSource={(src) => { void handleSourceChange(src); }}
+            onMusicFile={() => musicInputRef.current?.click()}
+            tracks={LIBRARY}
+            nowPlaying={musicFile ? { name: musicFile.name, src: musicFile.track?.src ?? null } : null}
+            musicPlaying={musicPlaying}
+            onToggleMusic={toggleMusic}
+            onTrack={playTrack}
+            soundDrive={settings.audioImpact}
+            onSoundDrive={(v) => updateSettings({ audioImpact: v })}
+            onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
+            onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
+            onGuide={() => { setShowHelp(true); setShowSettings(false); }}
+            recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording }}
+            onHide={hideOverlays}
+            onFullLayout={() => {
+              try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
+              setPhone(false);
+            }}
+          />
+          {/* The song-file picker the Sound sheet reaches for; on the laptop it
+              lives in the overlay's audio column, which a phone does not draw. */}
+          <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
+        </>
+      )}
+
       {/* ── Run-it-locally nudge (hosted build, once the governor has stepped down) ── */}
       {/* One child per AnimatePresence: it tells its children apart by key, two
           without one both read as "", and React warned on every frame the
           pair was up. The components here take no `key` in their props type. */}
       <AnimatePresence>
-        {showControls && !showSettings && !isMinimized && <RunLocallyCard status={engineStatus} />}
+        {showControls && !showSettings && !isMinimized && !phone && <RunLocallyCard status={engineStatus} />}
       </AnimatePresence>
       <AnimatePresence>
         <BenchOverlay
@@ -4051,7 +4229,7 @@ export default function App() {
         So they step up out of its way while it is there, rather than fight it
         for the same six pixels.
       */}
-      {!deskUp && (
+      {overlayUp && (
       <div className={`absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 transition-all duration-200 ${cueBarUp ? 'bottom-24' : 'bottom-6'}`}>
         <button
           onClick={() => setIsMinimized(!isMinimized)}
@@ -4269,7 +4447,7 @@ export default function App() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 30 }}
-            className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black/80 backdrop-blur-xl border border-purple-400/30 rounded-2xl px-5 py-3 shadow-2xl text-xs"
+            className={`absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black/80 backdrop-blur-xl border border-purple-400/30 rounded-2xl px-5 py-3 shadow-2xl text-xs`}
             data-testid="performance-note"
           >
             {perfNote.kept ? (
@@ -4287,7 +4465,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Top Bar ────────────────────────────────────────────── */}
-      {!deskUp && (
+      {overlayUp && (
       <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
         <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
           {/*
@@ -4639,13 +4817,13 @@ export default function App() {
 
       {/* The file input the bench's Image dye button reaches for. It lives
           in the narrow-screen toolbar, which is not rendered under a desk. */}
-      {deskUp && (
+      {(deskUp || phone) && (
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       )}
       {/* The crash report, under a desk: its header has no room for a
           button that is idle nearly always, so the chip says when there is
           news and ⌘K opens the sheet. */}
-      {deskUp && <CrashReportButton floating />}
+      {(deskUp || phone) && <CrashReportButton floating />}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
       {overlaysVisible && <QuickReportDot />}
 
@@ -4677,7 +4855,7 @@ export default function App() {
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
-        {!deskUp && (cued || fading > 0 || previousLook.current) && (
+        {overlayUp && (cued || fading > 0 || previousLook.current) && (
           <CueBar
             cued={cued}
             liveName={liveLookName}
@@ -4704,7 +4882,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && audioData && !isMinimized && !deskUp && (
+      {isActive && audioData && !isMinimized && overlayUp && (
         <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },

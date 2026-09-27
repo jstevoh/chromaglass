@@ -126,6 +126,15 @@ interface LiquidVisualizerProps {
    */
   onAim?: (x: number, y: number) => void;
   /**
+   * Two fingers on the closeup move the camera rather than paint (the phone).
+   *
+   * Given, and only while the closeup is in: a pinch sets the magnification
+   * through this, and the two fingers moving together pan the aim through
+   * `onAim`. Left out, every finger is a hand on the plate, as it is with the
+   * closeup out: two fingers lay two drops.
+   */
+  onPinchZoom?: (zoom: number) => void;
+  /**
    * How much the tool in hand does, 1 being what it always did: the dye it
    * lays, the pressure of a press, the wind of a blow, the drag of a finger,
    * the pull of the magnet (lib/toolAmount.ts). Kept per tool by the app.
@@ -884,6 +893,13 @@ class FluidSimulation {
     refilling to 124% of what had been there.
   */
   private rbSeq = 0;
+  /**
+   * Readbacks landed, for a check to know the mirror is live without asking
+   * the thing it measures. `npm run phone` used to take "the dye changed" as
+   * proof of readbacks, so fingers that laid no dye read as "no readbacks
+   * here" and skipped instead of failing.
+   */
+  get readbacks(): number { return this.rbSeq; }
   /**
    * The dye readback a hand's move must wait for: one copied after its last
    * move reached the plate.
@@ -3798,7 +3814,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, toolAmount = 1,
+  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
@@ -4083,6 +4099,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const activeToolRef = useRef(activeTool);
   const onAimRef = useRef(onAim);
   onAimRef.current = onAim;
+  const onPinchZoomRef = useRef(onPinchZoom);
+  onPinchZoomRef.current = onPinchZoom;
   const toolAmountRef = useRef(toolAmount);
   toolAmountRef.current = Math.max(0.1, Math.min(3, Number.isFinite(toolAmount) ? toolAmount : 1));
   /** An Alt-drag on the closeup camera: where it started, and the aim it moves. */
@@ -4104,6 +4122,32 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * went on pushing the liquid. This is the move since the tool last acted.
    */
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Every finger on the glass after the first (the phone).
+   *
+   * The first finger is the pointer, as it always was: `mousePosRef`, the
+   * button, the stroke and the drop clock above, the magnet, the performance
+   * recorder. Before this a second finger did nothing and moving it moved
+   * nothing; now each one is a hand of its own, with its own place, its own
+   * stroke (so a finger dragged left and one dragged right each streak their
+   * own way) and its own drop clock (so each lays its first drop as it lands).
+   * Keyed by the touch's identifier; emptied when the fingers leave.
+   */
+  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number }>());
+  /** Which touch is the pointer, while one is. */
+  const primaryTouchRef = useRef<number | null>(null);
+  /**
+   * Two fingers on the closeup, moving the camera: where they started, and
+   * the zoom and aim they started from. Held until every finger is up, so
+   * lifting one of the pair does not turn the other into a brush mid-pinch.
+   */
+  const pinchRef = useRef<{
+    d0: number; mx0: number; my0: number; zoom0: number; aimX: number; aimY: number; sent: number;
+    /** The latest span, sent on lift if the frame's throttle held it back. */
+    last: { d: number; mx: number; my: number } | null;
+    /** Whether the pair has moved together far enough to be a pan, not only a pinch. */
+    panned: boolean;
+  } | null>(null);
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(showEpochS());
   const lastBass01Ref = useRef(0); // for beat edge detection
@@ -5761,15 +5805,29 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // the next press, so every press lands a drop at once.
           if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; }
           else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
-          if (isMouseDownRef.current && drainFrameRef.current === 0) {
-            const { x, y } = mousePosRef.current;
+          for (const h of extraHandsRef.current.values()) if (simStep > 0 || h.clock > 0) h.clock++;
+          /*
+            Every hand on the glass: the pointer, then each other finger on a
+            touch screen (extraHandsRef). The same tool at the same Amount for
+            all of them, each at its own place with its own stroke and its own
+            drop clock, which is what three fingers on a real dish do. The
+            pointer's stroke is written back to its ref for the next step; the
+            other fingers' live in their own entries.
+          */
+          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number };
+          const hands: { hand: Hand; primary: boolean }[] = [];
+          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current }, primary: true });
+          for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
+          for (const { hand, primary } of hands) {
+            if (drainFrameRef.current !== 0) break;
+            const { x, y } = hand;
             const af = fluidsRef.current[activeLayerRef.current];
             if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
               const tool = activeToolRef.current;
               const liq = selectedLiquidRef.current;
-              const strokeFrom = strokeLastRef.current ?? { x, y };
+              const strokeFrom = hand.stroke ?? { x, y };
               const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
-              strokeLastRef.current = { x, y };
+              hand.stroke = { x, y };
               const rgb = hexToRgb(liq?.color ?? '#ffffff');
               const heat = liq?.heatAmount ?? 0.05;
               // The Amount set for this tool (1 is what it always did).
@@ -5784,7 +5842,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (activeLayerRef.current === 0 && tool !== 'press' && tool !== 'magnet' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
 
               // Feed the performance recorder (~15 Hz while painting)
-              if (onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
+              if (primary && onManualGestureRef.current && gestureFrameRef.current++ % 4 === 0) {
                 const gmx = mousePosRef.current.x - (lastMousePosRef.current?.x ?? x);
                 const gmy = mousePosRef.current.y - (lastMousePosRef.current?.y ?? y);
                 const gLen = Math.sqrt(gmx * gmx + gmy * gmy) || 1;
@@ -5799,8 +5857,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
 
               if (tool === 'magnet') {
-                // Nothing is laid: the magnet goes where the hand is.
-                magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: showNow() };
+                // Nothing is laid: the magnet goes where the hand is. There
+                // is one magnet, so it follows the first finger only.
+                if (primary) magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: showNow() };
               } else if (tool === 'press') {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
@@ -5819,8 +5878,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   its rim breaking into fingers and shedding a ring of small
                   ones (bubbles.ts, blow). Moving, it is the wind it was.
                 */
+                // One straw (bubbles.ts keeps a single straw bubble), so the
+                // first finger blows it and any other finger is the wind.
                 const still = Math.hypot(strokeDx, strokeDy) < 0.75;
-                if (activeLayerRef.current === 0 && still) {
+                if (activeLayerRef.current === 0 && still && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
                 } else {
                   af.blowAir(x, y, 4, 0.06 * k);
@@ -5926,7 +5987,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // DROP_EVERY steps while it is held, each carrying the dye the
                 // stream would have laid in that time and each landing with its
                 // splash (autoInject's drop reads the height).
-                if (dropClockRef.current % DROP_EVERY === 0) {
+                if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
@@ -5956,6 +6017,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k);
               }
             }
+            if (primary) strokeLastRef.current = hand.stroke;
           }
 
           // ── Automation logic ───────────────────────────────────
@@ -7560,6 +7622,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         phrase: () => ({ ...phraseRef.current, lean: fluidsRef.current[0]?.clockLeanNow ?? 1, dt: fluidsRef.current[0]?.dt ?? 0 }),
         /** Where the pointer is on the plate, in grid cells: where a tool acts. */
         pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
+        /** Every finger on the glass, the pointer first, and whether two of them are the camera (npm run phone). */
+        hands: () => ({
+          hands: [...(isMouseDownRef.current ? [{ ...mousePosRef.current }] : []), ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y }))],
+          pinch: pinchRef.current !== null,
+        }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
         beads: beadsRef.current.beads.length,
@@ -8660,23 +8727,151 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       isMouseDownRef.current = false;
     };
 
+    /*
+      Fingers, each one a hand (extraHandsRef).
+
+      This read `touches[0]` and nothing else, so on a phone a second finger
+      did nothing, and lifting either finger let go of the pointer while the
+      other was still on the glass. Now the first finger down is the pointer,
+      exactly as before (so everything that follows the pointer, the magnet
+      and the performance recorder, still follows one finger), and every other
+      finger is a hand of its own. When the pointer's finger lifts and others
+      are still down, the oldest of them becomes the pointer, so a hand that
+      keeps one finger on the glass keeps the magnet.
+
+      Two fingers on the closeup are the camera instead (onPinchZoom): apart
+      and together is the magnification, both moving is the aim, the way a map
+      moves under two fingers. Only with the closeup in, and only where the app
+      asked for it; everywhere else two fingers are two hands.
+    */
+    const touchCell = (t: Touch) => getTransformedMousePos(t.clientX, t.clientY, drawnRect());
+    /*
+      The fingers on the glass, not on the page. `touches` counts every
+      finger on the screen, so a thumb resting on the dock (a tool, the Amount
+      slider) and one finger landing on the closeup read as a pinch, spanned
+      down to the thumb, and the plate could not be painted until the thumb
+      came off the dock. `targetTouches` is the fingers that began on the
+      canvas.
+    */
+    const pinchSpan = (e: TouchEvent) => {
+      const a = e.targetTouches[0], b = e.targetTouches[1];
+      return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
+    };
+    const letGo = () => {
+      isMouseDownRef.current = false;
+      primaryTouchRef.current = null;
+      extraHandsRef.current.clear();
+    };
+    const applyPinch = (pinch: NonNullable<typeof pinchRef.current>, span: { d: number; mx: number; my: number }) => {
+      onPinchZoomRef.current?.(Math.max(1, Math.min(16, pinch.zoom0 * span.d / pinch.d0)));
+      /*
+        The pan, as the Alt-drag has it (panAim): the plate follows the
+        fingers. Only once they have moved together, a few pixels: an aim
+        takes the camera off Auto (App's aimMacro), and a pinch that only
+        zooms should leave Auto on.
+      */
+      if (!pinch.panned && Math.hypot(span.mx - pinch.mx0, span.my - pinch.my0) < 8) return;
+      pinch.panned = true;
+      const rect = drawnRect();
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 * Math.max(0.0001, macroShotRef.current.zoom);
+      const sx = span.mx - pinch.mx0, sy = -(span.my - pinch.my0);
+      const du = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale;
+      const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
+      onAimRef.current?.(Math.min(1, Math.max(0, pinch.aimX - du)), Math.min(1, Math.max(0, pinch.aimY - dv)));
+    };
     const handleTouchStart = (e: TouchEvent) => {
-      isMouseDownRef.current = true;
-      if (e.touches[0]) {
-        const rect = drawnRect();
-        mousePosRef.current = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
+      if (pinchRef.current) return;
+      /*
+        On the closeup by what the look asks for, not by where the camera
+        has got to: the camera eases in over a second or so after the Zoom
+        button, and gating on its zoom left the first pinch in that second
+        painting two drops instead (npm run phone found it on a slow plate).
+      */
+      const asked = macroZoomOf(settingsRef.current);
+      if (e.targetTouches.length >= 2 && onPinchZoomRef.current && asked > 1.05) {
+        // The second finger of a pair on the closeup: the camera, not a brush.
+        // Whatever the first finger had started is let go of.
+        letGo();
+        const span = pinchSpan(e);
+        const shot = macroShotRef.current;
+        pinchRef.current = { d0: Math.max(10, span.d), mx0: span.mx, my0: span.my, zoom0: asked, aimX: shot.cx, aimY: shot.cy, sent: 0, last: null, panned: false };
+        return;
+      }
+      for (const t of Array.from(e.changedTouches)) {
+        const p = touchCell(t);
+        if (primaryTouchRef.current === null) {
+          primaryTouchRef.current = t.identifier;
+          isMouseDownRef.current = true;
+          // From here, not from where the last finger lifted: the recorder's
+          // first gesture of a touch takes its direction from this.
+          lastMousePosRef.current = { ...p };
+          mousePosRef.current = p;
+        } else if (t.identifier !== primaryTouchRef.current) {
+          extraHandsRef.current.set(t.identifier, { ...p, stroke: null, clock: 0 });
+        }
       }
     };
-    const handleTouchEnd = () => { isMouseDownRef.current = false; };
+    const handleTouchEnd = (e: TouchEvent) => {
+      const pinch = pinchRef.current;
+      if (pinch) {
+        if (e.targetTouches.length === 0) {
+          // The last move a frame's throttle held back, so the camera ends
+          // where the fingers did, as the Alt-drag's mouseup does.
+          if (pinch.last) applyPinch(pinch, pinch.last);
+          pinchRef.current = null;
+        }
+        return;
+      }
+      for (const t of Array.from(e.changedTouches)) {
+        if (t.identifier === primaryTouchRef.current) {
+          const next = extraHandsRef.current.entries().next();
+          if (next.done) {
+            isMouseDownRef.current = false;
+            primaryTouchRef.current = null;
+          } else {
+            // The oldest other finger takes over the pointer, stroke and clock
+            // and all, so it carries on rather than landing a fresh drop.
+            const [id, h] = next.value;
+            extraHandsRef.current.delete(id);
+            primaryTouchRef.current = id;
+            mousePosRef.current = { x: h.x, y: h.y };
+            lastMousePosRef.current = { x: h.x, y: h.y };
+            strokeLastRef.current = h.stroke;
+            dropClockRef.current = h.clock;
+          }
+        } else {
+          extraHandsRef.current.delete(t.identifier);
+        }
+      }
+      if (e.targetTouches.length === 0) letGo();
+    };
     const handleTouchMove = (e: TouchEvent) => {
-      if (!e.touches[0]) return;
-      const rect = drawnRect();
-      const { x, y } = getTransformedMousePos(e.touches[0].clientX, e.touches[0].clientY, rect);
-      mousePosRef.current = { x, y };
+      const pinch = pinchRef.current;
+      if (pinch) {
+        if (e.targetTouches.length < 2) return;
+        pinch.last = pinchSpan(e);
+        const now = performance.now();
+        if (now - pinch.sent < 16) return;   // at most once a frame: each is a settings write
+        pinch.sent = now;
+        applyPinch(pinch, pinch.last);
+        return;
+      }
       const activeFluid = fluidsRef.current[activeLayerRef.current];
-      // Not under the magnet, the finger or the drop, as for the mouse above.
-      if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && activeToolRef.current !== 'dropper' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        activeFluid.applySquish(x, y, 8, 0.005);
+      for (const t of Array.from(e.changedTouches)) {
+        const { x, y } = touchCell(t);
+        if (t.identifier === primaryTouchRef.current) {
+          lastMousePosRef.current = { ...mousePosRef.current };
+          mousePosRef.current = { x, y };
+        } else {
+          const h = extraHandsRef.current.get(t.identifier);
+          if (!h) continue;
+          h.x = x; h.y = y;
+        }
+        // Not under the magnet, the finger or the drop, as for the mouse above.
+        if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && activeToolRef.current !== 'dropper' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
+          activeFluid.applySquish(x, y, 8, 0.005);
+        }
       }
     };
 
@@ -8685,6 +8880,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     window.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('touchstart', handleTouchStart);
     canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('touchcancel', handleTouchEnd);
     canvas.addEventListener('touchmove', handleTouchMove);
 
     /**
@@ -8721,7 +8917,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       window.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('touchstart', handleTouchStart);
       canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
       canvas.removeEventListener('touchmove', handleTouchMove);
+      // The fingers are let go of with their listeners; a mouse button held
+      // through a rebuild is left as it always was, down until its mouseup.
+      if (primaryTouchRef.current !== null) isMouseDownRef.current = false;
+      primaryTouchRef.current = null;
+      extraHandsRef.current.clear();
+      pinchRef.current = null;
       cancelAnimationFrame(animationFrameId);
       // And the frame the projector could ask for goes with it.
       delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
@@ -8783,7 +8986,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     >
       <canvas
         ref={canvasRef}
-        className="w-full h-full cursor-crosshair"
+        // No browser gestures on the glass. A finger on the plate is a hand
+        // in the liquid; left to the browser, two of them zoomed the page, a
+        // drag down pulled the phone's refresh, and a still finger raised the
+        // copy-image callout over the show.
+        className="w-full h-full cursor-crosshair touch-none select-none [-webkit-touch-callout:none]"
         // Letterboxed whenever the box it is shown in is not the shape it was
         // rendered at — with a projector attached, and in the desk's preview.
         style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
