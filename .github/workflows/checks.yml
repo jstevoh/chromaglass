@@ -247,6 +247,14 @@ jobs:
       - name: The iPhone app's remote
         run: npm run applink
 
+      # The remote's Mixer (scripts/remotemix.mjs): the show server and two
+      # browsers, a display and a phone on ?remote=1, every question asked of
+      # the display's settings. No GPU: the display's socket, settings and
+      # fades run on its "needs WebGPU" screen. The phone's step above built
+      # dist/, which the show server serves, so this runs the script alone.
+      - name: The remote's Mixer
+        run: node --experimental-strip-types scripts/remotemix.mjs
+
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
   # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).

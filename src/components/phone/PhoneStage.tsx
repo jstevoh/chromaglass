@@ -255,10 +255,18 @@ export function PhoneStage(p: PhoneStageProps) {
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex flex-col justify-between" data-testid="phone-stage">
       {/* ── Along the top: the look, and the three things a thumb reaches for mid-show ── */}
-      <div className="pointer-events-auto flex items-start justify-between gap-2 px-3" style={{ paddingTop: 'max(10px, env(safe-area-inset-top))' }}>
+      {/*
+        The row itself lets touches through to the plate; only its two
+        buttons take them. The row was a full-width band of touch, so a
+        finger anywhere across the top 65 px between the look and the three
+        buttons landed on nothing: 12% of a 667×375 plate, measured by
+        `npm run phone`'s plate share, which read 50% there with the
+        two-row dock until the band went.
+      */}
+      <div className="pointer-events-none flex items-start justify-between gap-2 px-3" style={{ paddingTop: 'max(10px, env(safe-area-inset-top))' }}>
         <button
           onClick={() => open('looks')}
-          className="flex h-12 min-w-0 max-w-[60%] items-center gap-2 rounded-full border border-border-strong bg-black/55 pl-1.5 pr-3 backdrop-blur-xl active:bg-black/70"
+          className="pointer-events-auto flex h-12 min-w-0 max-w-[60%] items-center gap-2 rounded-full border border-border-strong bg-black/55 pl-1.5 pr-3 backdrop-blur-xl active:bg-black/70"
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
@@ -266,7 +274,7 @@ export function PhoneStage(p: PhoneStageProps) {
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
-        <div className="flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
+        <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
           <button
             onClick={p.onZoom}
             aria-pressed={zoomed}
@@ -357,10 +365,16 @@ export function PhoneStage(p: PhoneStageProps) {
         Finger, Magnet) were off the edge of a 390-pixel phone with nothing
         saying they were there. Five across in portrait, with the bottle in
         hand as the tenth; all ten and the sheets on one row in landscape,
-        where height is what the plate is short of.
+        where height is what the plate is short of. One row only where it
+        fits (wide-land, 800 px and up, in index.css): the ten tools share
+        what the sheets' 264 px leave, 42 px each on a 740 px phone and 35
+        on a 667, under a thumb's 48. Narrower, the ten tools take a row of
+        their own (61 px each at 667) and the sheets the row under it. In
+        landscape every row is the 48 px a thumb needs and no more, and the
+        gaps are 4 px, since the second row costs the plate its height.
       */}
       <div
-        className="pointer-events-auto flex flex-col gap-1.5 border-t border-border bg-black/55 px-2 pt-1.5 backdrop-blur-xl landscape:flex-row landscape:items-center"
+        className="pointer-events-auto flex flex-col gap-1.5 landscape:gap-1 border-t border-border bg-black/55 px-2 pt-1.5 backdrop-blur-xl wide-land:flex-row wide-land:items-center"
         style={{ paddingBottom: 'max(6px, env(safe-area-inset-bottom))' }}
         data-testid="phone-dock"
       >
@@ -380,7 +394,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 aria-pressed={on}
                 aria-label={on ? `${label}, in hand. Tap again for its amount` : label}
                 data-testid={`phone-tool-${id}`}
-                className={`relative flex h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[12px] ${
+                className={`relative flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${
                   on ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'
                 }`}
               >
@@ -397,13 +411,13 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={sheet === 'dye'}
             aria-label={`Dye: ${liquid?.name ?? 'none'}. Choose a bottle and its colour`}
             data-testid="phone-open-dye"
-            className={`flex h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-border-strong bg-active text-text' : 'border-transparent text-text-2 active:bg-active'}`}
+            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-border-strong bg-active text-text' : 'border-transparent text-text-2 active:bg-active'}`}
           >
             <span className="h-5 w-5 rounded-full border-2 border-white/40" style={{ backgroundColor: liquid?.color ?? '#fff' }} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
-        <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:w-[264px] landscape:border-l landscape:border-t-0 landscape:pl-1.5 landscape:pt-0">
+        <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:pt-1 wide-land:w-[264px] wide-land:border-l wide-land:border-t-0 wide-land:pl-1.5 wide-land:pt-0">
           {([
             ['looks', 'Looks', Sparkles],
             ['sound', 'Sound', Music],
