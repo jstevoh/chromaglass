@@ -1110,12 +1110,19 @@ version in the same PR (see the operating rules below).
    byte-identical to before. `npm run mixer` measures it (31 checks, each held red
    against a broken shader). **Owed:** the Mac look in `docs/judging.md` §13 (the film
    between the plates, the LED beam, whether 0–200 % is the right travel).
-2. **The other pictures as rows.** "Any other image input" is not all in: the lumia
-   layer and the gel wheel over the lamp are each still set in their own corner of
-   Settings (the camera already comes in as the film). Each becomes a row with a level and a grade, placed in
-   the stack like the rest. *Check:* `npm run mixer`'s rules (a move changes only
-   where that source is; every control live and only on its own source) extended to
-   each new row.
+2. **The other pictures as rows**, *shipped* (#PR). The lumia and the gel wheel
+   were each still set in their own corner of Settings (the camera already comes in
+   as the film). Each is now a row with its level (Lumia and Gel Wheel, the same
+   settings) and its own grade. With the LED ring they are the lamp's three, the
+   only rows that can go under the front plate, built bottom up into the light the
+   glass is lit by; raised over it, the lumia is a beam screened over the plate and
+   the gel a filter on the lens, which colours what is under it in the stack and
+   leaves black glass black. Every order saved before keeps its picture (the two go
+   in under the front plate, where the shader always drew them), and seven scenes
+   rendered on main and on the change are the same to the byte. Two more pads
+   (Mixer: Raise Gel Wheel, Raise Lumia). `npm run mixer` 44/44, each new check held
+   red against a broken shader. **Owed:** the Mac look in `docs/judging.md` §13 (the
+   gel's 1.5 gain over the lens; the lumia as a beam).
 3. **A blend per row.** Today a row is laid over what is under it (the back plate
    keeps its own blend mode under Multi-Layer Mixer; the LED beam is screened). Screen,
    add, multiply and key per row, which is R3's additive light made a choice. *Check:*

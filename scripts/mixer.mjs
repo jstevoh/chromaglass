@@ -27,11 +27,22 @@
  *      it: each one moved off its rest changes what is drawn (none is a dead
  *      slider), the back plate's leave everything off the back plate alone,
  *      the LED ring's reach glass the back plate does not cover, the logo's
- *      stay inside the logo (so two sources' grades cannot be cross-wired)
+ *      stay inside the logo (so two sources' grades cannot be cross-wired),
+ *      and the gel's and the lumia's do nothing while only the other is on
  *   5. the stack's own rules, without a GPU: a saved order that is garbage or
- *      short comes back as the four, nothing goes under the front plate but
- *      the LED ring, and a pad that raises a source walks it through every
- *      place it can go and back to where it began
+ *      short comes back as the six, nothing goes under the front plate but
+ *      the lamp's three (the LED ring, the gel, the lumia), an order saved
+ *      before the gel and the lumia were rows keeps them in the lamp, and a
+ *      pad that raises a source walks it through every place it can go and
+ *      back to where it began
+ *   6. the gel wheel and the lumia (PLAN.md §11 step 2): in the lamp the gel
+ *      colours the bare glass and the lumia lights it; over the glass the gel
+ *      is a filter on the lens, which colours the dye and leaves black glass
+ *      black, and the lumia a beam, which lays its light over the plate and
+ *      stops lighting the glass from beneath; at level 0 each is nothing,
+ *      wherever it is; and with both at 0, where they sit changes nothing,
+ *      so the rows they push about (the front plate's, the LED ring's) are
+ *      still read where they are
  *
  * Each rule was held to a broken shader when it was written (a beam that
  * draws nothing, a logo that vanishes when lowered, the ring left lighting
@@ -39,7 +50,18 @@
  * contrast made a plain gain, a front plate that fades to black instead of
  * to the lamp): an earlier version of this check passed all of those, since
  * "a different picture" is also what a missing source gives, and each
- * assertion below that asks for the source to be *there* is the answer.
+ * assertion below that asks for the source to be *there* is the answer. The
+ * gel's and the lumia's (6, and the last of 4) were held to twelve more: the
+ * lamp's floor left on the gel over the lens, a lumia beam that draws nothing,
+ * a lumia left lighting the glass as a beam, the two grades swapped, the two
+ * rows' places swapped, the front plate's row left at the old fixed place, a
+ * gel over the lens that draws nothing, the LED lamp drawn only at row 0, the
+ * gel and the lumia over the glass drawn at the top whatever their row, the
+ * gel tinting the whole lamp whatever its row in it, a wheel of one colour,
+ * and a gel over the lens at full density whatever its level. Five of those
+ * passed the first version of section 6, which asked only whether light
+ * arrived and never where a row sat among others lit; each went red once
+ * the checks asked which colour, how much, and under or over what.
  *
  * What it does not say: that the default order is today's picture. That was
  * measured once, when the mixer went in, by rendering four scenes (plain; the
@@ -60,48 +82,71 @@ const check = (name, ok, detail = '') => {
 
 // ── 5. The stack's rules ────────────────────────────────────────────
 {
-  const four = (o) => [...o].sort().join() === [...MIX_MOVERS].sort().join();
+  const HOME = 'led gel lumia front back film mark';
+  const lamp = new Set(['led', 'gel', 'lumia']);
+  const six = (o) => [...o].sort().join() === [...MIX_MOVERS].sort().join();
   const odd = ['', 'nonsense', 'film film film', 'mark, film > led', 42, null, 'back front led film mark', 'led back film mark'];
-  check('a saved order that is garbage, short or repeated comes back as the four',
-    odd.every(o => four(parseMixOrder(o)) && parseMixOrder(o).length === 4),
+  check('a saved order that is garbage, short or repeated comes back as the six',
+    odd.every(o => six(parseMixOrder(o)) && parseMixOrder(o).length === 6),
     odd.map(o => `${JSON.stringify(o)} → ${parseMixOrder(o).join(' ')}`).join(' · '));
-  check('and one it knows keeps its order', parseMixOrder('mark, film > led').join(' ') === 'mark back film led',
+  check('and one it knows keeps its order', parseMixOrder('mark, film > led').join(' ') === 'gel lumia mark back film led',
     parseMixOrder('mark, film > led').join(' '));
-  check('the front plate sits over the LED ring while the ring is the lamp, and at the bottom otherwise',
-    mixStack('led front back film mark').join(' ') === 'led front back film mark'
-    && mixStack('front led back film mark').join(' ') === 'front led back film mark'
-    && mixStack('back front led film mark').join(' ') === 'front back led film mark');
-  check('the film steps under the back plate', moveInMix('led front back film mark', 'film', -1) === 'led front film back mark');
-  const stuck = MIX_MOVERS.filter(m => m !== 'led').map(m => {
+  const kept = [
+    [HOME, HOME],
+    ['gel front lumia back film mark led', 'gel front lumia back film mark led'],
+    ['back front led film mark gel lumia', 'front back led film mark gel lumia'],
+    ['led back front film mark', HOME],
+  ].filter(([o, want]) => mixStack(o).join(' ') !== want);
+  check('the front plate sits over the lamp\'s sources the order puts under it, and over none of anything else',
+    kept.length === 0, kept.map(([o]) => `${o} → ${mixStack(o).join(' ')}`).join(' · '));
+  // Every order saved before the gel and the lumia were rows: they were drawn
+  // after the LED lamp and before the glass, whether the ring was the lamp or a beam.
+  check('an order saved before the gel and the lumia were rows keeps them in the lamp',
+    mixStack('led front back film mark').join(' ') === HOME
+    && mixStack('front led back film mark').join(' ') === 'gel lumia front led back film mark'
+    && mixStack('front back film led mark').join(' ') === 'gel lumia front back film led mark',
+    mixStack('front led back film mark').join(' '));
+  check('the film steps under the back plate', moveInMix(HOME, 'film', -1) === 'led gel lumia front film back mark');
+  const stuck = MIX_MOVERS.filter(m => !lamp.has(m)).map(m => {
     // Walk it all the way down: it must stop just above the front plate.
-    let o = 'led front back film mark';
-    for (let k = 0; k < 6; k++) o = moveInMix(o, m, -1);
+    let o = HOME;
+    for (let k = 0; k < 8; k++) o = moveInMix(o, m, -1);
     const st = mixStack(o);
     return st.indexOf(m) === st.indexOf('front') + 1 ? null : `${m}: ${st.join(' ')}`;
   }).filter(Boolean);
-  check('nothing but the LED ring goes under the front plate', stuck.length === 0, stuck.join(' · '));
-  const ledUp = moveInMix('led front back film mark', 'led', 1);
-  check('the LED ring passes the front plate: the lamp becomes a beam', mixStack(ledUp).join(' ') === 'front led back film mark',
-    mixStack(ledUp).join(' '));
+  check('nothing but the LED ring, the gel and the lumia goes under the front plate', stuck.length === 0, stuck.join(' · '));
+  const passes = ['led', 'gel', 'lumia'].map(m => {
+    // Raised until it is just over the glass: one press past the front plate.
+    // Bounded: a move that stopped moving would otherwise spin until the
+    // shard's timeout, and print nothing.
+    let o = HOME;
+    for (let k = 0; k < 7 && mixStack(o).indexOf(m) < mixStack(o).indexOf('front') - 1; k++) o = moveInMix(o, m, 1);
+    const st = mixStack(moveInMix(o, m, 1));
+    return st.indexOf(m) === st.indexOf('front') + 1 ? null : `${m}: ${st.join(' ')}`;
+  }).filter(Boolean);
+  check('each of the lamp\'s three passes the front plate, out of the lamp', passes.length === 0, passes.join(' · '));
   check('and nothing moves off the top or the bottom',
-    moveInMix('led front back film mark', 'mark', 1) === 'led front back film mark'
-    && moveInMix('led front back film mark', 'led', -1) === 'led front back film mark');
+    moveInMix(HOME, 'mark', 1) === HOME && moveInMix(HOME, 'led', -1) === HOME);
   // Pressed until the order comes back round: every row it can reach, then home.
-  // With the LED ring as the lamp the others have the three rows above the front
-  // plate; the ring has all five, the lamp and four as a beam.
+  // With the lamp's three under the glass the others have the three rows above
+  // the front plate; each of the lamp's three has all seven.
   const walks = MIX_MOVERS.map(m => {
-    const home = 'led front back film mark';
-    let o = home, presses = 0;
+    let o = HOME, presses = 0;
     const rows = new Set();
-    do { o = raiseInMix(o, m); rows.add(mixStack(o).indexOf(m)); presses++; } while (o !== home && presses < 12);
-    const want = m === 'led' ? 5 : 3;
-    return { m, ok: o === home && rows.size === want && presses === want, rows: [...rows].sort().join(''), presses };
+    do { o = raiseInMix(o, m); rows.add(mixStack(o).indexOf(m)); presses++; } while (o !== HOME && presses < 12);
+    const want = lamp.has(m) ? 7 : 3;
+    return { m, ok: o === HOME && rows.size === want && presses === want, rows: [...rows].sort().join(''), presses };
   });
   check('a pad walks a source through every place it can go and back home',
     walks.every(w => w.ok), walks.map(w => `${w.m}: rows ${w.rows} in ${w.presses}`).join(' · '));
+  // Two orders, so that no row's place is the same in both: a place written
+  // into the code rather than read would be right in one of them at most.
   const pos = mixPositions('film mark led back');
-  check('and the shader is told each source\'s place among the four',
-    pos.film === 1 && pos.mark === 2 && pos.led === 3 && pos.back === 4, JSON.stringify(pos));
+  const pos2 = mixPositions('led lumia front gel back film mark');
+  check('and the shader is told each row\'s place among the seven',
+    pos.gel === 0 && pos.lumia === 1 && pos.front === 2 && pos.film === 3 && pos.mark === 4 && pos.led === 5 && pos.back === 6 && pos.top === 6
+    && pos2.led === 0 && pos2.lumia === 1 && pos2.front === 2 && pos2.gel === 3 && pos2.back === 4 && pos2.film === 5 && pos2.mark === 6,
+    `${JSON.stringify(pos)} · ${JSON.stringify(pos2)}`);
 }
 
 // ── The plate ────────────────────────────────────────────────────────
@@ -131,11 +176,11 @@ const shots = await page.evaluate(async (controls) => {
     S,
     def: await shot({}),
     noFilm: await shot({ filmMix: 0 }),
-    filmUnderBack: await shot({ mixOrder: 'led film back mark' }),
+    filmUnderBack: await shot({ mixOrder: 'led gel lumia front film back mark' }),
     noBack: await shot({ backLevel: 0 }),
     noMark: await shot({ markMix: 0 }),
     noMarkNoFilm: await shot({ markMix: 0, filmMix: 0 }),
-    markUnderFilm: await shot({ mixOrder: 'led back mark film' }),
+    markUnderFilm: await shot({ mixOrder: 'led gel lumia front back mark film' }),
     onePlate: await shot({ layerCount: 1 }, { film, mark, backRotation: Math.PI }),
     oneBackOff: await shot({ backLevel: 0 }),
     frontOff: await shot({ frontLevel: 0, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
@@ -148,21 +193,53 @@ const shots = await page.evaluate(async (controls) => {
     frontHue: await shot({ frontHue: 120, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
     markDark: await shot({ markBright: 0 }),
     led: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    ledBeam: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'back led film mark' }, {}),
+    ledBeam: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'gel lumia front back led film mark' }, {}),
     ledLampOff: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, ledLevel: 0 }, {}),
-    ledBeamOff: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'back led film mark', ledLevel: 0 }, {}),
+    ledBeamOff: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'gel lumia front back led film mark', ledLevel: 0 }, {}),
     noLed: await shot({ layerCount: 1, filmMix: 0, markMix: 0 }, {}),
     // The front plate at 0 over a lit lamp: must leave the lamp, not black.
     ledFrontOff: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, frontLevel: 0 }, {}),
+    // The gel wheel and the lumia, one plate and nothing else lit.
+    gelLamp: await shot({ gelWheel: 0.9, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    gelLens: await shot({ gelWheel: 0.9, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
+    gelLensOff: await shot({ gelWheel: 0, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
+    lumiaLamp: await shot({ lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    lumiaBeam: await shot({ lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, {}),
+    lumiaBeamOff: await shot({ lumia: 0, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, {}),
+    // Each alone, with the other's grade moved: it must change nothing.
+    gelOnlyLumiaGraded: await shot({ gelWheel: 0.9, lumiaBright: 0.4, lumiaHue: 90, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    lumiaOnlyGelGraded: await shot({ lumia: 0.9, gelBright: 0.4, gelHue: 90, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    // Half the level of the ones above, for how much a level gives.
+    gelLensHalf: await shot({ gelWheel: 0.3, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
+    gelLensSix: await shot({ gelWheel: 0.6, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
+    lumiaBeamHalf: await shot({ lumia: 0.45, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, {}),
+    // Both lit in the lamp, in the two orders of the pair: the gel colours only what is under it.
+    lampGelUnder: await shot({ gelWheel: 0.9, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    lampGelOver: await shot({ gelWheel: 0.9, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia gel front back film mark' }, {}),
+    // Over the glass, with the film on the wall to be under or over: one plate,
+    // and bare glass on the right where only the film shows.
+    filmAlone: await shot({ layerCount: 1, markMix: 0 }, { film }),
+    gelUnderFilm: await shot({ gelWheel: 0.9, layerCount: 1, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, { film }),
+    gelOverFilm: await shot({ gelWheel: 0.9, layerCount: 1, markMix: 0, mixOrder: 'led lumia front back film gel mark' }, { film }),
+    lumiaUnderFilm: await shot({ lumia: 0.9, layerCount: 1, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, { film }),
+    lumiaOverFilm: await shot({ lumia: 0.9, layerCount: 1, markMix: 0, mixOrder: 'led gel front back film lumia mark' }, { film }),
+    // Both at 0, everything else lit, in pairs of orders that differ only in
+    // where the two sit, and so move the LED ring's row (and the front
+    // plate's) without moving it across the glass.
+    allHome: await shot({ ledPlatform: true, ledMode: 'rainbow' }),
+    allShuffled: await shot({ ledPlatform: true, ledMode: 'rainbow', mixOrder: 'gel lumia led front back film mark' }),
+    allBeamHome: await shot({ ledPlatform: true, ledMode: 'rainbow', mixOrder: 'front back led film mark' }),
+    allBeamShuffled: await shot({ ledPlatform: true, ledMode: 'rainbow', mixOrder: 'front back led gel lumia film mark' }),
     each: {},
   };
   // Every control, moved off its rest, in a scene where its source is on the wall.
+  const lit = { ledPlatform: true, ledMode: 'rainbow', gelWheel: 0.6, lumia: 0.6 };
   for (const c of controls) {
     const moved = c.key.endsWith('Hue') ? 90 : c.none === 1 ? 0.4 : c.max;
-    out.each[c.key] = await shot({ ledPlatform: true, ledMode: 'rainbow', [c.key]: moved });
+    out.each[c.key] = await shot({ ...lit, [c.key]: moved });
   }
-  out.eachRest = await shot({ ledPlatform: true, ledMode: 'rainbow' });
-  out.eachNoBack = await shot({ ledPlatform: true, ledMode: 'rainbow', backLevel: 0 });
+  out.eachRest = await shot(lit);
+  out.eachNoBack = await shot({ ...lit, backLevel: 0 });
   return out;
 }, MIX_CONTROLS.map(c => ({ key: c.key, none: c.none, max: c.max })));
 await close();
@@ -340,6 +417,79 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
     if (c.source === 'mark') { const d = diff(img, shots.eachRest, (x, y) => !inRect(x, y)); if (d.max > 0) stray.push(`${String(c.key)} worst ${d.max} outside the logo`); }
   }
   check('and each of the back plate\'s, the LED ring\'s and the logo\'s only where that source is', stray.length === 0, stray.join(' · '));
+  // The gel and the lumia light the whole lamp, so they have no footprint
+  // either; what can be asked is that neither's grade reaches the other's
+  // picture, which is what two grades cross-wired in the shader would do.
+  const gelAlone = diff(shots.gelOnlyLumiaGraded, shots.gelLamp);
+  const lumiaAlone = diff(shots.lumiaOnlyGelGraded, shots.lumiaLamp);
+  check('and the lumia\'s grade does nothing to the gel, nor the gel\'s to the lumia', gelAlone.max === 0 && lumiaAlone.max === 0,
+    `worst ${gelAlone.max} on the gel alone, ${lumiaAlone.max} on the lumia alone`);
+}
+
+// ── 6. The gel wheel and the lumia ──────────────────────────────────
+{
+  const bareGlass = (x) => x > S * 0.6;
+  const dye = (x) => x < S * 0.45;
+  const tint = diff(shots.gelLamp, shots.noLed, bareGlass);
+  // And in the wheel's own colours, a segment each: the lab holds the wheel
+  // still (gelAngle 0) on the harmony's first four dyes, so the bare glass's
+  // upper right is under one segment (a yellow) and its lower right under
+  // the next (a red). A wheel that lost its segments would be one colour.
+  const meanRgb = (img, x0, x1, y0, y1) => {
+    const m = [0, 0, 0]; let n = 0;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const p = px(img, x, y); m[0] += p[0]; m[1] += p[1]; m[2] += p[2]; n++; }
+    return m.map(v => v / n);
+  };
+  const upper = meanRgb(shots.gelLamp, 90, 120, 10, 50), lower = meanRgb(shots.gelLamp, 90, 120, 78, 118);
+  const gr = (c) => c[1] / Math.max(1, c[0]);
+  check('the gel in the lamp colours the bare glass, a segment of the wheel at a time',
+    tint.mean > 4 && gr(upper) > 0.6 && gr(lower) < 0.1,
+    `${f1(tint.mean)} a channel over no gel; green to red ${gr(upper).toFixed(2)} upper right, ${gr(lower).toFixed(2)} lower right`);
+  const underLum = diff(shots.lampGelUnder, shots.lampGelOver, bareGlass);
+  check('and in the lamp it colours what is under it: the lumia under the gel, or not over it', underLum.mean > 4,
+    `${f1(underLum.mean)} a channel between the two orders on bare glass`);
+  // Over the lens it multiplies: black glass has no light to colour, and a
+  // gel that added light (a beam) or was left in the lamp would light it.
+  const black = diff(shots.gelLens, shots.noLed, bareGlass);
+  const dyed = diff(shots.gelLens, shots.noLed, dye);
+  check('raised over the glass, the gel colours the dye and leaves black glass black', black.max <= 1 && dyed.mean > 4,
+    `worst ${black.max} on bare glass; ${f1(dyed.mean)} a channel on the dye`);
+  const lampLight = diff(shots.lumiaLamp, shots.noLed, bareGlass);
+  check('the lumia in the lamp lights the bare glass', lampLight.mean > 4, `${f1(lampLight.mean)} a channel over no lumia`);
+  const beam = diff(shots.lumiaBeam, shots.noLed, dye);
+  const through = diff(shots.lumiaLamp, shots.noLed, dye);
+  check('raised over the glass, the lumia lays its light over the dye', beam.mean > through.mean + 4,
+    `${f1(beam.mean)} a channel over the dye as a beam, ${f1(through.mean)} through it from the lamp`);
+  // Through clear glass, a beam over the dark lamp is the same light as the
+  // lamp's own; a lumia left in the lamp as well would show there doubled.
+  const once = diff(shots.lumiaBeam, shots.lumiaLamp, bareGlass);
+  check('and stops lighting the glass from beneath', once.max <= 1, `worst ${once.max} on bare glass`);
+  const gel0 = diff(shots.gelLensOff, shots.noLed), lum0 = diff(shots.lumiaBeamOff, shots.noLed);
+  check('over the glass, a gel or a lumia at level 0 is none, exactly', gel0.max === 0 && lum0.max === 0,
+    `worst ${gel0.max} for the gel, ${lum0.max} for the lumia`);
+  // Level 0 alone is the shader's early skip, and would hold for a level that
+  // was full density at any other value: half the level is about half the change.
+  // The gel's is 0.3 against 0.6, where neither picture is near white: the
+  // dye it brightens clips at 0.9 and not at half of it, which read as a
+  // level that gives more than half (0.59 of 0.9 at 0.45).
+  const unclipped = (x, y) => dye(x) && Math.max(...px(shots.gelLensSix, x, y), ...px(shots.gelLensHalf, x, y)) < 250;
+  const gelHalf = diff(shots.gelLensHalf, shots.noLed, unclipped).mean / Math.max(1e-6, diff(shots.gelLensSix, shots.noLed, unclipped).mean);
+  const lumHalf = diff(shots.lumiaBeamHalf, shots.noLed, bareGlass).mean / Math.max(1e-6, diff(shots.lumiaBeam, shots.noLed, bareGlass).mean);
+  check('and half the level is about half of it', gelHalf > 0.4 && gelHalf < 0.6 && lumHalf > 0.4 && lumHalf < 0.6,
+    `the gel's change on the dye ${gelHalf.toFixed(2)} of the full level's, the lumia's on bare glass ${lumHalf.toFixed(2)}`);
+  // Over the glass, a row's place among the others: under the film or over it.
+  const filmShows = (x, y) => bareGlass(x) && (() => { const p = px(shots.filmAlone, x, y); return p[0] + p[1] + p[2] > 60; })();
+  const gelUnder = diff(shots.gelUnderFilm, shots.filmAlone, filmShows);
+  const gelOver = diff(shots.gelOverFilm, shots.filmAlone, filmShows);
+  const redFilm = meanRgb(shots.filmAlone, 90, 120, 78, 118), redGel = meanRgb(shots.gelOverFilm, 90, 120, 78, 118);
+  check('the gel under the film leaves the film alone, and over it colours the film in its own colour',
+    gelUnder.n > 1000 && gelUnder.max <= 1 && gelOver.mean > 8 && gr(redGel) < 0.3 * gr(redFilm),
+    `worst ${gelUnder.max} under over ${gelUnder.n} px; ${f1(gelOver.mean)} a channel over it; green to red under the red segment ${gr(redFilm).toFixed(2)} → ${gr(redGel).toFixed(2)}`);
+  const lumPlace = diff(shots.lumiaUnderFilm, shots.lumiaOverFilm, filmShows);
+  check('and the lumia under the film is not the lumia over it', lumPlace.mean > 3, `${f1(lumPlace.mean)} a channel between them`);
+  const same = diff(shots.allShuffled, shots.allHome), sameBeam = diff(shots.allBeamShuffled, shots.allBeamHome);
+  check('with both at 0, where they sit in the stack changes nothing, though it moves the LED ring\'s row, lamp or beam',
+    same.max === 0 && sameBeam.max === 0, `worst ${same.max} and ${sameBeam.max}`);
 }
 
 const failed = checks.filter(c => !c.ok).length;

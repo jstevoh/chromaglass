@@ -74,7 +74,8 @@ export type MidiAction =
    * source a row up the stack, and from the top back to the lowest row it can
    * have, so one pad walks it through every place it can go.
    */
-  | 'mix-raise-led' | 'mix-raise-back' | 'mix-raise-film' | 'mix-raise-mark';
+  | 'mix-raise-led' | 'mix-raise-back' | 'mix-raise-film' | 'mix-raise-mark'
+  | 'mix-raise-gel' | 'mix-raise-lumia';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -219,6 +220,7 @@ const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
   'tap-tempo', 'tempo-clear', 'bank-next', 'bank-prev',
   // The mixer's order: on a kick it would reshuffle the stack every beat.
   'mix-raise-led', 'mix-raise-back', 'mix-raise-film', 'mix-raise-mark',
+  'mix-raise-gel', 'mix-raise-lumia',
 ]);
 export const triggerable = (a: MidiAction): boolean => !NOT_ON_A_BEAT.has(a);
 
@@ -374,6 +376,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'bank-next': 'Bank +', 'bank-prev': 'Bank \u2212',
   'mix-raise-led': 'Mixer: Raise LED Ring', 'mix-raise-back': 'Mixer: Raise Back Plate',
   'mix-raise-film': 'Mixer: Raise Film', 'mix-raise-mark': 'Mixer: Raise Logo',
+  'mix-raise-gel': 'Mixer: Raise Gel Wheel', 'mix-raise-lumia': 'Mixer: Raise Lumia',
 };
 
 /**
@@ -491,7 +494,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
     The mixer (lib/mixer.ts): each source's level and its four grade controls.
     Learnable because they are what a video mixer's channel strip is, and a
     channel strip is ridden: the film's brightness down as a verse comes in,
-    the LED ring's saturation up for the chorus. Twenty-three of them, which
+    the LED ring's saturation up for the chorus. Thirty-one of them, which
     is what the shift banks are for.
   */
   ...MIX_CONTROLS.map(({ key, label, min, max }) => ({ key, label, min, max })),

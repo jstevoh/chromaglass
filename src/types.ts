@@ -537,9 +537,9 @@ export interface VisualizerSettings {
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
-  lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye, no beat, no dye
+  lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye (or over it, by the Mixer's order), no beat, no dye
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
-  gelWheel: number;           // a rotating four-segment colour gel over the lamp
+  gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
   filmKey: number;            // luminance below which the film is transparent (a black key)
@@ -567,11 +567,14 @@ export interface VisualizerSettings {
   /*
     The mixer (lib/mixer.ts, docs/rig-plan.md R7): the pictures on the wall in
     one stack, in an order the operator picks, each with its own level and
-    grade. The film's and the logo's levels are filmMix and markMix above.
+    grade. The film's and the logo's levels are filmMix and markMix above,
+    the gel wheel's and the lumia's gelWheel and lumia.
 
-    `mixOrder` is the stack, bottom to top, as words: "led front back film
-    mark" is the order the shader always drew them in. The front plate does
-    not move; the LED ring under it is the lamp, and above it is a beam.
+    `mixOrder` is the stack, bottom to top, as words: "led gel lumia front
+    back film mark" is the order the shader always drew them in. The front
+    plate does not move; the LED ring, the gel and the lumia under it are the
+    lamp, and above it the ring and the lumia are beams and the gel a filter
+    on the lens.
 
     Each grade is brightness (a gain), contrast (about mid-grey), saturation
     and hue in degrees, the CSS filter functions' definitions. At 1, 1, 1 and
@@ -586,6 +589,8 @@ export interface VisualizerSettings {
   backBright: number; backContrast: number; backSat: number; backHue: number;
   filmBright: number; filmContrast: number; filmSat: number; filmHue: number;
   markBright: number; markContrast: number; markSat: number; markHue: number;
+  gelBright: number; gelContrast: number; gelSat: number; gelHue: number;
+  lumiaBright: number; lumiaContrast: number; lumiaSat: number; lumiaHue: number;
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
   lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
@@ -891,7 +896,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   markScale: 0.22,
   // The mixer at the values that change nothing: the order the shader always
   // drew in, every level full and every grade skipped.
-  mixOrder: 'led front back film mark',
+  mixOrder: 'led gel lumia front back film mark',
   ledLevel: 1,
   frontLevel: 1,
   backLevel: 1,
@@ -900,6 +905,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   backBright: 1, backContrast: 1, backSat: 1, backHue: 0,
   filmBright: 1, filmContrast: 1, filmSat: 1, filmHue: 0,
   markBright: 1, markContrast: 1, markSat: 1, markHue: 0,
+  gelBright: 1, gelContrast: 1, gelSat: 1, gelHue: 0,
+  lumiaBright: 1, lumiaContrast: 1, lumiaSat: 1, lumiaHue: 0,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
   postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
