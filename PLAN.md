@@ -60,7 +60,7 @@ Where each batch stands, as of 2026-09-27:
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **built** (`npm run lift`), not yet seen on the Mac, and Beat Squeeze found never to have pressed the plate (fix waiting on the owner's eyes); step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
-| 12 | The App Store and Google Play (at the end of this plan) | **Not started**: an iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; first a smoke test of the site on both phones |
+| 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1296,9 +1296,10 @@ forms and a 15 % cut.
 
 1. **Smoke test the site on both phones** *(owner)*: chromaglass.web.app in Safari on
    an iOS 26 iPhone and in Chrome on a recent Android phone. Does the plate start,
-   hold its frame rate, take fingers, hear the mic? Nobody has run it on either;
-   `docs/webgpu-plan.md` still lists the Safari test as open. Whatever breaks here is
-   fixed on the website first, and both apps inherit the fix. *Not started.*
+   hold its frame rate, take fingers, hear the mic? Whatever breaks here is fixed on
+   the website first, and both apps inherit the fix. *iPhone: **passed**, the owner
+   ran the site in Safari on 2026-09-27 ("iPhone works. I tested it"). Android: not
+   yet run.*
 2. **Open both accounts** *(owner)*: Apple Developer Program and Play Console, and
    install Xcode. *Not started.*
 3. **The Android shell** (one PR): a Bubblewrap project, `assetlinks.json` in

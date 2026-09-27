@@ -40,7 +40,7 @@ The spike lives on the branch `spike/webgpu-p0`: `spike/webgpu/` holds the probe
   - **`StageMirror`:** today it `drawImage`s the opener's canvas in its own frame, so it needs its own route. Options: draw in the same task as the render; configure the popup's canvas with the same `GPUDevice` and render into it; or `captureStream` into a `<video>`. Decide in P3.
   - **The recorder:** `captureStream` works (29–52 KB for 1.2 s at 60 fps).
 
-**Still open from P0:** the Safari 26 and Firefox-on-Windows smoke tests (the probe page is the test), and qa's real run time on the macOS runner, once the app runs on WebGPU (P1).
+**Still open from P0:** the Safari 26 smoke test on macOS and the Firefox-on-Windows one (the probe page is the test; Safari on the iPhone passed, run by the owner on the live site on 2026-09-27, PLAN.md §12), and qa's real run time on the macOS runner, once the app runs on WebGPU (P1).
 
 ## P2 results, 2026-09-19
 
