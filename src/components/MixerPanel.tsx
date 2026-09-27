@@ -101,7 +101,12 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
     return (
       <div className="mb-3" role="radiogroup" aria-label={`${MIX_SOURCE_INFO[id].name}'s blend`} data-testid={`${testId}-${id}-blend`}>
         <div className="mb-1 text-[12px] text-text-2">Blend</div>
-        <div className="grid grid-cols-5 gap-1">
+        {/*
+          Five in a row, tight: in the desk's docked Mixer, the width of the
+          rides' column, "Multiply" at the usual spacing was 2 px wider than
+          its fifth (`npm run layout`).
+        */}
+        <div className="grid grid-cols-5 gap-0.5">
           {MIX_BLENDS.map(b => (
             <button
               key={b}
@@ -110,7 +115,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
               onClick={() => onSetting({ [blendKey(id)]: b } as Partial<VisualizerSettings>)}
               title={b === 'own' ? `Its own way in: ${ownIs(id)}` : BLEND_HINT[b]}
               data-testid={`${testId}-${id}-blend-${b}`}
-              className={`rounded-md border text-[12px] transition-colors ${touch ? 'h-12' : 'h-7'} ${
+              className={`min-w-0 rounded-md border text-[12px] tracking-tight transition-colors ${touch ? 'h-12' : 'h-7'} ${
                 now === b ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border text-text-2 hover:bg-hover'
               }`}
             >
