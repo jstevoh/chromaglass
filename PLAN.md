@@ -59,11 +59,11 @@ Where each batch stands, as of 2026-09-27:
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
-| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
+| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
-| 15 | Many plates (rig-plan R1, at the end of this plan) | Picked by Steve 2026-09-27 ("Let's build multi-plate next"); planned in five steps, 15a first; nothing built |
+| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by Steve 2026-09-27 ("Let's build multi-plate next"); planned in five steps, 16a first; nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1268,7 +1268,7 @@ version in the same PR (see the operating rules below).
    The phone's Mix sheet is its own layout (step 1) and is unchanged.
 6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
    each projector's plate is a row, with its own grade at the projector's scope (R2).
-   This is the large one; it waits on R1.
+   This is the large one; it waits on R1, and is §16e.
 
 Found while shipping step 2, not yet done: #189's deploy (main 41ad65e) went red on
 the Mac show shard's `qa` at two checks that passed on the same tree in the PR's run an
@@ -2105,7 +2105,7 @@ machine whose capacity sinks, rung changes in ten minutes bounded.
   the new build against the old show, and the cast hello carries no build version
   (`castProtocol.ts`). Inferred; send the version and warn on a mismatch.
 
-## 15. Many plates: each projector its own source (rig-plan R1)
+## 16. Many plates: each projector its own source (rig-plan R1)
 
 Asked for on 2026-09-27 ("Let's build multi-plate next"), after the Mixer's steps 1–5.
 `docs/rig-plan.md` has the why (a light show was several projectors, each its own
@@ -2132,7 +2132,7 @@ do now. Steve can say otherwise; the ladder is one table.
 
 Each step ships its phone version in the same PR (the rule) and one PR each:
 
-- **15a · The back plate gets its own look.** A look can be sent to the back plate
+- **16a · The back plate gets its own look.** A look can be sent to the back plate
   alone ("Go to Back Plate"): the solver's own settings and the colours it pours
   become the back plate's (`patch.layer(1)` over a per-plate look), while how the
   plate is drawn and lit stays shared. The desk's cue list and the phone's looks sheet
@@ -2140,21 +2140,21 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
   harness on the fold (each solver steps with its own look's settings, the picture's
   settings stay the front's) and the lab rendering two real solvers from two looks
   (the lab holds one solver today). The Mac judges the pair.
-- **15b · A projector picks its source.** A `Surface` gains a source: the whole wall
+- **16b · A projector picks its source.** A `Surface` gains a source: the whole wall
   (today's frame, the default), the front plate alone, the back plate alone, or the
   film. The plate pass draws each source a projector asks for into its own texture
   and the output binds each surface to its own; the cost of a second plate pass is
   measured on the Mac before it ships. Output settings on the desk and the phone.
   Check: `npm run map` for the routing, and `wall` on the Mac reading each surface's
   own picture.
-- **15c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
+- **16c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
   and two feathered edges that overlap sum to one rather than to a bright seam.
   Check: `wall` reads the overlap's brightness against each beam's.
-- **15d · Up to four plates.** `layerCount` to four, the plate's bind group and shader
+- **16d · Up to four plates.** `layerCount` to four, the plate's bind group and shader
   from two layers to N, the ladder's rung per plate as above, the governor told how
   many plates it is carrying. Check: `startup` and the frame time on the Mac with four
   (no stop on the opening, no pipeline built on a frame), and the lab with four.
-- **15e · A row per plate in the Mixer** (the Mixer's step 6): each plate its own row,
+- **16e · A row per plate in the Mixer** (the Mixer's step 6): each plate its own row,
   level and grade, reached from the desk, Settings, the phone and the remote.
 
 Not in this batch: R4 (placing a projector by its centre, zoom and turn) and R5 (a rig
