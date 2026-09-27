@@ -130,7 +130,8 @@ drives the show's clock — 149.5 bpm tapped at 122"), the ear on #195's deploy 
 wall only where the frames stalled past 250 ms — 0 of 10 read within 250 ms"), the
 phone's two-finger Drop on #186's deploy (B 81 against 2/0/0, fine by eye), `qa` on
 #189's deploy with no WebGPU adapter in 10 s, and `startup`'s GPU-start stop at 3.52 s
-against 3.5 on #194. Each wants what §0 asks of the Finger: find whether the check or
+against 3.5 on #194 (that one: see the `startup` item in §0's CI list, fixed by
+telling Chromium's hold on the page apart by the page's own thread). Each wants what §0 asks of the Finger: find whether the check or
 the product is wrong, from the numbers it prints.
 
 The dye's advection now thins
@@ -1448,6 +1449,32 @@ while this batch's plan was going in (#177), and no cause is known yet:
   check's 0.25 s match to it missed and the stop counted as an opening stop. #194
   changes nothing that runs before the device is given (its ladder is built once a
   device and a stage exist); 5fd3636's parent 1d842d1 passed the same shard.
+  **Fixed (this PR):** the moment a stop begins is not what makes it Chromium's.
+  Over 53 open-shard logs of 26-27 September, every opening (the control's and the
+  show's) drew no frame for 1.25 to 4.2 s from about 1.0 to 1.4 s after load, and in
+  every one whose timeline was printed the page's own timers stopped with the frames
+  and no long task of the page's lay in it: Chromium holds the page's whole thread
+  while it starts its GPU, and lets go within a tenth of a second of handing over the
+  adapter or device. The show's own stops leave the page's timers running (the nine
+  second freeze #164 fixed; the stop after the first step #181 fixed). #204's red (run
+  36346188828) was the old rule's matching: a 0.15 s long task let one frame through
+  at 1.41 s, the rule matched that sliver and the 2.58 s rest went to check 4. Now a
+  tick every 100 ms marks the page's thread; any stretch of half a second or more,
+  beginning in the first 3 s and ending before the first step, with no frame, no
+  tick, no long task and no long animation frame is time the thread was held from
+  outside, taken out of check 4's frame gaps and held by 4b to 3.5 s all told. If
+  either kind of entry cannot be seen or the timer runs slow, nothing is taken out.
+  Long animation frames are there because the check-skeptic review found that the
+  page's own JavaScript run after an `await` on a WebGPU promise (all the show's GPU
+  setup) is never a long task: a second of it looked exactly like a held thread. In
+  a cloud session it is a long animation frame, and a renderer stopped from outside
+  (SIGSTOP) is neither. Whether Chromium's own hold on the Mac shows as one is what
+  this PR's first Mac run prints; if it does, the rule needs another instrument. The old "within 0.25 s of the control's stop" and "control plus a second" are
+  gone. Read against the 53 logs: #204's red and 36339282520's split stop (1.28 s
+  then 1.68 s) now count as one held stretch each, 2.57 s and about 3 s; 2 of the 53
+  (4.05 s on 36294600123, 3.75 s on 36338802046, each wholly inside a four-second
+  device request) still go over the 3.5 s cap, as they did before, and #194's 3.52 s
+  would sit at it. *Open:* whether to raise that cap for them, or leave them red.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
