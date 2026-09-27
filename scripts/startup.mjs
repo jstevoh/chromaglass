@@ -256,6 +256,99 @@ async function open(query, looks) {
         GPUDevice.prototype[name] = function (d) { direct.push([performance.now(), d?.label ?? '']); return f.call(this, d); };
       }
       /*
+        The first time the page asked WebGPU for each thing it can do, and
+        how often. A stop that no build of ours was under way for (run
+        36298506575: 2.07 s from 17.17 s, a tenth of a second after the
+        first step) is something else the first frames asked the GPU
+        process for the first time; this is how the next one is named.
+      */
+      const firsts = new Map();
+      window.__startupFirsts = firsts;
+      /*
+        And when the GPU finished each piece of work the page handed it, with
+        what was in it. Through the stop after the first step the page's own
+        timers kept firing (the timeline's rows every quarter second) while
+        frames, heartbeats and steps all waited: the page's thread is free,
+        so the wait is on the GPU. Writing every texel of the show's 75.8 MB
+        of fields on a bare page stopped nothing (0.08 s, run 36304683847),
+        nor did clearing them, nor a first dispatch of every kernel on
+        scraps. So this records each submit's time handed over, its time
+        done (onSubmittedWorkDone after it), and the pipelines it ran with
+        their workgroup counts. It named the stop on its first run (run
+        36305436208): 1.42 s of GPU time on the plate's first draw, 0.03 s
+        on the same draw a few frames later. The render pipelines built
+        ahead now draw once before the show opens (`gpu/kit.ts`, firstDraw),
+        and the same submit took 0.14 s (run 36306162647).
+      */
+      const subs = [];
+      window.__startupSubs = subs;
+      const passOf = new WeakMap(), workOf = new WeakMap(), bufOf = new WeakMap();
+      const note = (enc, label, n) => {
+        let w = workOf.get(enc);
+        if (!w) { w = new Map(); workOf.set(enc, w); }
+        w.set(label, (w.get(label) ?? 0) + n);
+      };
+      for (const [begin, Pass] of [['beginComputePass', globalThis.GPUComputePassEncoder], ['beginRenderPass', globalThis.GPURenderPassEncoder]]) {
+        const b = GPUCommandEncoder.prototype[begin];
+        GPUCommandEncoder.prototype[begin] = function (...a) { const pass = b.apply(this, a); passOf.set(pass, { enc: this, label: '' }); return pass; };
+        const sp = Pass?.prototype?.setPipeline;
+        if (sp) Pass.prototype.setPipeline = function (pl) { const r = passOf.get(this); if (r) r.label = pl?.label || '?'; return sp.call(this, pl); };
+      }
+      const dw = globalThis.GPUComputePassEncoder?.prototype?.dispatchWorkgroups;
+      if (dw) GPUComputePassEncoder.prototype.dispatchWorkgroups = function (x, y = 1, z = 1) { const r = passOf.get(this); if (r) note(r.enc, r.label, x * y * z); return dw.call(this, x, y, z); };
+      const dr = globalThis.GPURenderPassEncoder?.prototype?.draw;
+      if (dr) GPURenderPassEncoder.prototype.draw = function (...a) { const r = passOf.get(this); if (r) note(r.enc, `draw ${r.label}`, 1); return dr.apply(this, a); };
+      const fin = GPUCommandEncoder.prototype.finish;
+      GPUCommandEncoder.prototype.finish = function (...a) { const cb = fin.apply(this, a); bufOf.set(cb, workOf.get(this)); return cb; };
+      const sub = GPUQueue.prototype.submit;
+      GPUQueue.prototype.submit = function (cbs) {
+        const r = sub.call(this, cbs);
+        if (subs.length < 6000) {
+          const work = new Map();
+          for (const cb of cbs ?? []) for (const [k, n] of bufOf.get(cb) ?? []) work.set(k, (work.get(k) ?? 0) + n);
+          const row = [performance.now(), null, [...work]];
+          subs.push(row);
+          this.onSubmittedWorkDone().then(() => { row[1] = performance.now(); }, () => {});
+        }
+        return r;
+      };
+      /*
+        And how much memory the page asked for, and wrote, when. The stop
+        after the first step kept on a warm cache (median 1.15 s over the
+        forty looks' openings, run 36300733762), so it is not a compile:
+        what the first frames make and fill is the next thing to see.
+      */
+      const bytes = [];
+      window.__startupBytes = bytes;
+      const bpp = { rgba32float: 16, rgba32uint: 16, rgba16float: 8, rg32float: 8, r32float: 4, rg16float: 4, r16float: 2, r8unorm: 1 };
+      const texBytes = (d) => {
+        const [w, h = 1, z = 1] = Array.isArray(d.size) ? d.size : [d.size.width, d.size.height ?? 1, d.size.depthOrArrayLayers ?? 1];
+        return w * h * z * (bpp[d.format] ?? 4);
+      };
+      const log = (proto, key, kind, size) => {
+        const f = proto?.[key];
+        if (!f) return;
+        proto[key] = function (...a) { try { bytes.push([performance.now(), kind, size(...a)]); } catch { /* measure only */ } return f.apply(this, a); };
+      };
+      log(GPUDevice.prototype, 'createTexture', 'texture', (d) => texBytes(d));
+      log(GPUDevice.prototype, 'createBuffer', 'buffer', (d) => d.size);
+      log(GPUQueue.prototype, 'writeTexture', 'written', (_, data) => data.byteLength ?? 0);
+      log(GPUQueue.prototype, 'writeBuffer', 'written', (_, __, data, ___, size) => size ?? data.byteLength ?? 0);
+      for (const name of ['GPUDevice', 'GPUQueue', 'GPUCommandEncoder', 'GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPUBuffer', 'GPUCanvasContext', 'GPUTexture']) {
+        const proto = globalThis[name]?.prototype;
+        if (!proto) continue;
+        for (const key of Object.getOwnPropertyNames(proto)) {
+          const d = Object.getOwnPropertyDescriptor(proto, key);
+          if (key === 'constructor' || typeof d?.value !== 'function') continue;
+          const f = d.value, what = `${name.slice(3)}.${key}`;
+          proto[key] = function (...a) {
+            const row = firsts.get(what);
+            if (row) row[1]++; else firsts.set(what, [performance.now(), 1]);
+            return f.apply(this, a);
+          };
+        }
+      }
+      /*
         When the page asked for the GPU and when it had it. The first stop
         seen with the pipelines built ahead (2.08 s from 1.01 s, run
         36255595521) came before any step and before the prepare, with no
@@ -280,7 +373,9 @@ async function open(query, looks) {
       const sample = () => {
         const d = window.chromaglassDebug?.();
         const f = d?.fluids?.[0];
-        rows.push([performance.now() - t0, frames.length, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0]);
+        const made = window.__startupBytes ?? [];
+        rows.push([performance.now() - t0, frames.length, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0,
+          made.filter(([, k]) => k === 'texture').length, made.filter(([, k]) => k === 'written').length, window.__startupFirsts?.get('Queue.submit')?.[1] ?? 0]);
         if (rows.length < 2000) setTimeout(sample, 250);
       };
       setTimeout(sample, 250);
@@ -318,9 +413,20 @@ async function open(query, looks) {
       while (!later() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 100));
       return later();
     });
+    /*
+      Never shorter than the wait above for the plate to be running. On run
+      36306624796 the control's freeze (12.83 s, on a runner whose adapter
+      alone took 4.65 s) ended at 20.0 s, the plate was seen running at about
+      22 s, and the watch, twenty seconds, read the steps to 20.0 s: a stop
+      still going, so the control was "never" moving for good and check 1b
+      failed on the control, the show having been moving from 13.53 s. The
+      opening is read to a moment already seen, not one before it; for the
+      show the builds behind it end later than that anyway, so what it is
+      held to is unchanged.
+    */
     const watch = await page.evaluate(async ([least, past, behindEnd]) => {
       const first = (window.__startupRows.find((r) => r[3] > 0) ?? [null])[0];
-      const until = Math.max(least, first == null ? 0 : first + past, behindEnd == null ? 0 : behindEnd + 1000);
+      const until = Math.max(least, first == null ? 0 : first + past, behindEnd == null ? 0 : behindEnd + 1000, performance.now());
       while (performance.now() < until) await new Promise((r) => setTimeout(r, 100));
       return until;
     }, [WATCH_S * 1000, WATCH_AFTER_STEP_S * 1000, behind ? behind.at + behind.ms : null]);
@@ -426,6 +532,9 @@ async function open(query, looks) {
           for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
           return { gap: gap / 1000, at: at == null ? null : at / 1000, first: ts.length ? ts[0] / 1000 : null };
         })(),
+        bytes: window.__startupBytes.filter(([t]) => t <= now).map(([t, k, n]) => [t / 1000, k, n]),
+        firsts: [...window.__startupFirsts].map(([what, [at, n]]) => [what, at / 1000, n]),
+        subs: window.__startupSubs.filter(([t]) => t <= now).map(([t, d, w]) => [t / 1000, d == null ? null : d / 1000, w]),
         box: (d?.crash?.thisLoad?.() ?? []).map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`),
       };
     }, [watch, MAX_GAP_S]);
@@ -486,6 +595,12 @@ async function openings(ids) {
       // A page each: a second `goto` on one page threw "frame was detached"
       // mid-teardown of the last show.
       const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
+      await page.addInitScript(() => {
+        const frames = [];
+        window.__startupFrames = frames;
+        const tick = (t) => { if (frames.length < 20000) frames.push(t); requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+      });
       try {
         await page.goto(`http://localhost:${PORT}/?debug&asked&gpu=mid&tier=local&look=${id}${engineQuery()}`, { waitUntil: 'load' });
         out.push({ id, ...await page.evaluate(async ([n, secs, cap]) => {
@@ -501,7 +616,13 @@ async function openings(ids) {
           const waitedFor = p?.prepares?.find((x) => x.stage === 'opening')?.keys ?? [];
           const before = new Set(waitedFor);
           const asked = p?.ledger?.asking ? [...p.ledger.asking.keys()] : null;
+          // The longest frame gap from a second before the first step to
+          // the end: the stop after the first step, on a warm cache.
+          const fr = first == null ? [] : window.__startupFrames.filter((t) => t >= first - 1000);
+          let stop = 0;
+          for (let i = 1; i < fr.length; i++) stop = Math.max(stop, fr[i] - fr[i - 1]);
           return {
+            stop: stop / 1000,
             stepped: first != null && at() >= n && performance.now() - first >= secs,
             asked,
             waitedFor,
@@ -531,6 +652,66 @@ const milestones = (o) => {
   return parts.join('; ');
 };
 
+/*
+  Which builds were under way through a stop, and the slowest of each half.
+  Printed on every run, red or green: a stop that one build spans end to end
+  is that build's compile holding the GPU process, and a stop with none under
+  way is the show's own frame. The three deploys that went red on check 4 in
+  a row (2.43, 2.02 and 2.03 s against 2 s, runs 36294600123, 36295658452 and
+  36297416845) each stopped a quarter second after the first step, with the
+  half behind the show started a quarter second before it; which of the two
+  held the frames could not be told from what was printed then.
+*/
+const underWay = (o, gap) => {
+  const all = [...(o.prepared?.builds ?? []).map((x) => ['ahead', ...x]), ...(o.behind?.builds ?? []).map((x) => ['behind', ...x])];
+  const fmt = ([, key, at, ms]) => `${key} ${(ms / 1000).toFixed(2)} s from ${(at / 1000).toFixed(2)} s`;
+  const inGap = gap?.at == null ? [] : all.filter(([, , at, ms]) => at < (gap.at + gap.gap) * 1000 && at + ms > gap.at * 1000);
+  const slowest = (half) => all.filter(([h]) => h === half).sort((x, y) => y[3] - x[3]).slice(0, 4).map(fmt).join(', ') || 'none';
+  // What the page asked of WebGPU for the first time in the second before
+  // the stop began, or during it.
+  const asked = gap?.at == null ? [] : (o.firsts ?? []).filter(([, at]) => at >= gap.at - 1 && at <= gap.at + gap.gap);
+  const mb = (from, to) => {
+    const sum = { texture: [0, 0], buffer: [0, 0], written: [0, 0] };
+    for (const [t, k, n] of o.bytes ?? []) if (t >= from && t <= to) { sum[k][0]++; sum[k][1] += n; }
+    return Object.entries(sum).map(([k, [c, n]]) => `${c} ${k === 'written' ? 'writes' : `${k}s`} (${(n / 2 ** 20).toFixed(1)} MB)`).join(', ');
+  };
+  const step = o.firstStep == null ? null : o.firstStep / 1000;
+  const made = `made and written in the longest frame gap and the second before it: ${gap?.at == null ? 'nothing to say' : mb(gap.at - 1, gap.at + gap.gap)}`
+    + `; in the two seconds from a second before the first step: ${step == null ? 'no step' : mb(step - 1, step + 1)}`
+    + `; before that, all told: ${step == null ? 'no step' : mb(0, step - 1)}`;
+  return `${made}; builds under way in the longest frame gap: ${inGap.length ? inGap.map(fmt).join(', ') : 'none'}; slowest ahead: ${slowest('ahead')}; slowest behind: ${slowest('behind')}`
+    + `; asked of WebGPU for the first time from a second before it: ${asked.length ? asked.map(([w, at]) => `${w} at ${at.toFixed(2)} s`).join(', ') : 'nothing'}`;
+};
+
+/*
+  What the GPU was doing through the stop: each submit from a second before
+  the first step to three after it, and the time the GPU spent on it (from
+  when it was handed over, or when the GPU finished the one before, to when
+  it was done). The page hands the GPU its first ~8 steps in a quarter
+  second, and until the render pipelines drew once ahead it then waited a
+  second or more for any frame; this names the submits the GPU spends
+  longest on, and the pipelines in them, so the next stop of its kind names
+  itself. Printed, not judged: check 4 judges the frames.
+*/
+const gpuTime = (o) => {
+  const step = o.firstStep == null ? null : o.firstStep / 1000;
+  if (step == null || !o.subs?.length) return ['no submits to say'];
+  const win = o.subs.filter(([t]) => t >= step - 1 && t <= step + 3);
+  let prev = 0;
+  const rows = win.map(([t, d, w]) => {
+    const from = Math.max(t, prev);
+    const took = d == null ? null : d - from;
+    if (d != null) prev = Math.max(prev, d);
+    return { t, d, took, w };
+  });
+  const undone = rows.filter((r) => r.d == null).length;
+  const total = rows.reduce((a, r) => a + (r.took ?? 0), 0);
+  const top = (w) => [...w].sort((x, y) => y[1] - x[1]).slice(0, 5).map(([k, n]) => `${k}×${n}`).join(' ') || 'no passes';
+  const slow = [...rows].filter((r) => r.took != null).sort((x, y) => y.took - x.took).slice(0, 8).sort((x, y) => x.t - y.t);
+  return [`${rows.length} submits from a second before the first step to three after (${undone} never done), ${total.toFixed(2)} s of GPU time among them; the longest:`,
+    ...slow.map((r) => `  handed ${r.t.toFixed(2)} s, done ${r.d.toFixed(2)} s, ${r.took.toFixed(2)} s on it: ${top(r.w)}`)];
+};
+
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, cold = null) => {
   // Whether the page's own thread was busy through a gap (a long task
@@ -540,7 +721,7 @@ const timeline = (o, cold = null) => {
     return inGap.length ? inGap.map(([s, d]) => `${(s / 1000).toFixed(2)} s for ${(d / 1000).toFixed(2)} s`).join(', ') : 'none';
   };
   console.log(`     (main-thread long tasks in the longest frame gap: ${busy(o.frames)}${cold ? `; in the stop at the GPU's start: ${busy(cold)}` : ''})`);
-  console.log('       seconds · animation frames · heartbeats · steps · grid');
+  console.log('       seconds · animation frames · heartbeats · steps · grid · textures made · writes · submits');
   for (const r of o.rows) console.log(`       ${r.join('  ')}`);
   for (const line of o.box) console.log(`       ${line}`);
 };
@@ -571,9 +752,12 @@ try {
     + `${p ? `, after ${(p.ms / 1000).toFixed(2)} s building ${p.asked} pipelines ahead` : ''}${o.running ? '' : '; never two steady seconds'}`);
   const secs = (t) => (t == null ? 'never' : `${(t / 1000).toFixed(2)} s`);
   check(`and it is moving for good no later than the old way was (with ${STEADY_SLACK_S} s to spare)`,
-    o.steadyFrom != null && c.steadyFrom != null && o.steadyFrom <= c.steadyFrom + STEADY_SLACK_S * 1000
+    // A control that never ran steadily is no bar at all: its window now
+    // runs to when it was seen running (see the watch), and one that never
+    // was would otherwise hand the show a late one.
+    o.steadyFrom != null && c.running && c.steadyFrom != null && o.steadyFrom <= c.steadyFrom + STEADY_SLACK_S * 1000
       && o.steadyFrom / 1000 <= FIRST_STEP_MAX_S,
-    `from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)} for ?prepare=0`);
+    `from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)} for ?prepare=0${c.running ? '' : ' (never running steadily)'}, read to ${secs(c.watch)}`);
   // What the old way built on its frames, on the same look: each should have
   // been waited for. Names, not a count, so a list that grew elsewhere and
   // lost one of these still fails.
@@ -607,6 +791,18 @@ try {
     coldOk,
     coldAt == null ? 'the control drew no frame before its device, so there is no moment to compare'
       : `${cold ? `${say(cold)}` : `no stop beginning within ${COLD_AT_S} s of ${coldAt.toFixed(2)} s`}, against ${say(c.framesAsking)} before its device (given ${c.given?.toFixed(2)} s) for ?prepare=0; held to ${bound.toFixed(2)} s`);
+  console.log(`     ${underWay(o, o.frames)}`);
+  for (const line of gpuTime(o)) console.log(`     ${line}`);
+  /*
+    The quarter seconds round the first step, on every run, with what the
+    page had made, written and submitted by each: whether the page was still
+    handing the GPU work through the stop after the first step, or had
+    handed it all over before it and was waiting.
+  */
+  if (o.firstStep != null) {
+    console.log('       seconds · animation frames · heartbeats · steps · grid · textures made · writes · submits (round the first step)');
+    for (const r of o.rows.filter((r) => r[0] >= o.firstStep / 1000 - 1 && r[0] <= o.firstStep / 1000 + 3)) console.log(`       ${r.join('  ')}`);
+  }
   if (worst > MAX_GAP_S || !coldOk || process.env.STARTUP_TIMELINE) timeline(o, cold);
 
   // ── Every look, opened on its own ─────────────────────────────────
@@ -627,6 +823,15 @@ try {
   const askedAny = new Set(measured.flatMap((e) => e.asked));
   const unused = own.filter((k) => !askedAny.has(k));
   const waits = measured.map((e) => e.waitedFor.length);
+  /*
+    The same stop on a warm cache: each look's longest frame gap from a
+    second before its first step. Printed, not judged. The cold opening's
+    stop after its first step (1.03 to 2.43 s over thirty-seven runs) is
+    either the first frames' own work, which a warm cache does not take
+    away, or a first use of something that a warm cache has already paid.
+  */
+  const stops = measured.map((e) => e.stop).filter((x) => x != null).sort((a, b) => a - b);
+  if (stops.length) console.log(`  each look opened on a warm cache: longest frame gap from a second before its first step, median ${stops[stops.length >> 1].toFixed(2)} s, longest ${stops[stops.length - 1].toFixed(2)} s (${measured.filter((e) => e.stop === stops[stops.length - 1]).map((e) => e.id).join(', ')}), over ${stops.length}`);
   check(`every look opens on only what the show waited for, and each look's own part is asked for (all ${presetIds.length}, each opened on its own)`,
     each.length === presetIds.length && presetIds.length > 30 && measured.length === each.length && leaky.length === 0 && unused.length === 0,
     `waited for ${waits.length ? `${Math.min(...waits)} to ${Math.max(...waits)}` : 'nothing'} pipelines over ${OPENING_STEPS} steps and ${OPENING_SECONDS} s`
