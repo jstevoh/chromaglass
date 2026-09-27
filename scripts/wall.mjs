@@ -511,13 +511,30 @@ let failed = 0;
         window.__phaseMs = 0;
         window.__mute = false;
         window.__ragged = false;
+        /*
+          The frames the projector's own loop was actually handed, one per
+          refresh (told apart by the refresh's timestamp), counted as they
+          are handed over. Not `__rafs`: a frame put off by `__phaseMs` asks
+          for the next one only when it runs, so a late timer on a busy
+          runner costs the loop a refresh. On #203's first Mac run the wall
+          window refreshed 48.3 times a second at half a refresh behind and
+          its loop was handed 37.8 frames, every one of which asked, and a
+          line holding the asks to the display's rate went red on the
+          harness, not the gate.
+        */
+        window.__delivered = 0;
+        let lastDelivered = null;
+        const handOver = (cb, ts) => {
+          if (ts !== lastDelivered) { lastDelivered = ts; window.__delivered++; }
+          cb(ts);
+        };
         let late = false;
         window.requestAnimationFrame = (cb) => {
           const deliver = (ts) => {
             if (window.__mute) { raf(deliver); return; }
             late = !late;
             const p = window.__phaseMs + (window.__ragged && late ? 12 : 0);
-            if (p > 0) setTimeout(() => cb(ts + p), p); else cb(ts);
+            if (p > 0) setTimeout(() => handOver(cb, ts + p), p); else handOver(cb, ts);
           };
           return raf(deliver);
         };
@@ -584,6 +601,7 @@ let failed = 0;
         frames: window.chromaglassDebug().frames,
         rafs: window.__rafs,
         wallRafs: window.__wall && !window.__wall.closed ? window.__wall.__rafs : 0,
+        wallFrames: window.__wall && !window.__wall.closed ? window.__wall.__delivered : 0,
         asks: window.__asks,
         // Which window's offer each draw came from, and how many offers were
         // turned down (lib/drawGate.ts); absent on a build without the gate.
@@ -607,6 +625,7 @@ let failed = 0;
         drawnCount: b.frames - a.frames,
         hz: (b.rafs - a.rafs) / s,
         wallHz: (b.wallRafs - a.wallRafs) / s,
+        wallFrames: (b.wallFrames - a.wallFrames) / s,
         asks: (b.asks - a.asks) / s,
         askCount: b.asks - a.asks,
         frameMs: d.governor?.frameMs ?? null,
@@ -669,7 +688,9 @@ let failed = 0;
         /*
           Each clock against its own window's refresh: the show's frames
           offered (drawn or turned down) at least 0.8 of the show's rate, and
-          the wall's asks at least 0.8 of the wall's. Not "one turned down a
+          the wall's asks at least 0.8 of the frames the wall's own loop was
+          handed (`__delivered` above, not its display's rate, which the
+          harness's late timers fall short of). Not "one turned down a
           refresh" against the faster display, which is only true when both
           windows get the same number of frames: headless on one display they
           do, but a Mac runner drawing 28 a second with a wall at 40, or a
@@ -678,7 +699,7 @@ let failed = 0;
           review). What it has to catch is one clock that quietly stopped
           offering, and this does.
         */
-        const offered = m.offered ? `the show's frames ${f1(m.offered.frame)} a second against ${f1(m.hz)} Hz, the wall's asks ${f1(m.offered.ask)} against ${f1(m.wallHz)}` : 'this build has no draw gate to ask';
+        const offered = m.offered ? `the show's frames ${f1(m.offered.frame)} a second against ${f1(m.hz)} Hz, the wall's asks ${f1(m.offered.ask)} against the ${f1(m.wallFrames)} frames its loop was handed (its display ${f1(m.wallHz)} Hz)` : 'this build has no draw gate to ask';
         /*
           And every refresh's timestamp believed. A wall whose time origin was
           converted the wrong way, or a clock ahead of this one, falls back to
@@ -690,7 +711,7 @@ let failed = 0;
           check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran`);
         }
         check('  and both clocks were offering, each at its own window\'s rate',
-          m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.offered.ask >= 0.8 * m.wallHz && m.skipped > 0, offered);
+          m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.wallFrames > 10 && m.offered.ask >= 0.8 * m.wallFrames && m.skipped > 0, offered);
       };
       for (const frac of [0, 0.25, 0.5, 0.75]) {
         await wall.evaluate((p) => { window.__phaseMs = p; }, frac * refreshMs);

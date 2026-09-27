@@ -2181,3 +2181,15 @@ machine whose capacity sinks, rung changes in ten minutes bounded.
 - *A deploy mid-show can mix versions:* a projector window opened after a deploy runs
   the new build against the old show, and the cast hello carries no build version
   (`castProtocol.ts`). Inferred; send the version and warn on a mismatch.
+
+### 14l. LiquidVisualizer.tsx is one 9,400-line component
+
+**Suggested 2026-09-27 (a review Steve passed on); measured by line count only.** The
+show's component holds the WebGPU renderer's lifecycle, the frame loop and its gates,
+the pointer, touch and magnet handling, the cast and projector hooks and the debug
+surface, in one file several threads edit at once. Split it into a renderer module
+the loop drives (no React), hooks for the fingers and the wall, and a thin component,
+one piece a PR, each with `lint`, `panel`, `desk`, `phone`, `wall` and the Mac's
+`tools` and `qa` green. Not while the file is under active change in other threads.
+`React.memo` on the panels only where a render count (the one 14f adds) shows a panel
+rendering for props it does not use.
