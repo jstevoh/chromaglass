@@ -62,7 +62,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; the rest not started |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
 | 15 | Many plates (rig-plan R1, at the end of this plan) | Picked by Steve 2026-09-27 ("Let's build multi-plate next"); planned in five steps, 15a first; nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -1387,7 +1387,12 @@ while this batch's plan was going in (#177), and no cause is known yet:
   Not #181's stop (that one sat a quarter second after the first step). Worth
   measuring what the page does while Chromium creates the device (the table shows
   no frames counted between 0.77 s and 3.48 s), and whether 4b should own every
-  stop before the device is given rather than only the first.
+  stop before the device is given rather than only the first. Again on #194's run
+  on 5fd3636 (2026-09-27): 3.52 s from 1.04 s, the device asked at 0.83 s and given
+  at 4.56 s, while the control's stop at the GPU's start began at 1.43 s, so the
+  check's 0.25 s match to it missed and the stop counted as an opening stop. #194
+  changes nothing that runs before the device is given (its ladder is built once a
+  device and a stage exist); 5fd3636's parent 1d842d1 passed the same shard.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
@@ -1810,6 +1815,83 @@ anywhere): a Retina laptop with a 1080p stage starts at the stage's own pixels a
 offers 1024²; a 1x laptop with a 4K stage has a bottom rung with fewer pixels than its
 top. Then `npm run ladder` on the Mac with a stage.
 
+**Shipped** (2026-09-27). With a stage attached the ladder is the stage's
+(`stageLadder`, `lib/platform.ts`): a rung's `dpr` is its share of the projector's own
+width and height, and the laptop's ratio is not read. The show opens at the grid its
+GPU class opens on at every pixel the projector has; above that the grids climb at
+full pixels; at it the pixel rungs come first (0.75, then 0.5 of the stage), then the
+smaller grids at half. `canvasPixelsFor` draws a stage at the rung's share and no
+longer takes the laptop's ratio, so a fixed grid (the governor off), which asks for 1,
+now fills a Retina laptop's projector too. The governor is built again when a wall
+comes or goes, and only when the rungs differ; when the rung it is on is still among
+them (a wall window crossing 1920×1200 gains or loses only 1024²) it stays on it. After
+the GPU runs out of memory on a wall, the ladder is built again under the grid that
+failed and opens at the whole stage, where stepping down would have walked its pixel
+rungs to half the stage for good (`npm run rungs`: out of memory at 512², now 384² at
+1920×1080, walked down 384² at 960×540). The wall window scales with
+`imageSmoothingQuality` 'high', set after every resize because a canvas's new width
+resets it. With no stage the ladder is exactly what it was.
+
+1024² is offered by the stage's *pixels*, not its ratio: at most 1920×1200. The gate
+was measured as a pixel count (1024² held at 1.0 Mpx and fell to 22 fps at 4.1 Mpx,
+with the same step cost), and a projector's ratio stands for its pixels badly: a 4K
+projector at 1x has 8.3 Mpx, and a 1080p one behind 150 % scaling has a ratio of 1.5
+and the same 2.1 Mpx as at 100 %.
+
+`npm run rungs`, 73 of 73 (the old code, bridged to the new `canvasPixelsFor` signature,
+fails every new stage case). Two stage ladders are written out rung by rung, and the
+1024² gate is held at 1920×1200 (offered) and 2560×1440 (not). The Mac's
+`webgpu-smoke` asks the running show which ladder it is on (a rung at 0.75 of the wall
+while it is up, none once it closes) and reads the wall's smoothing across a resize that
+changes the canvas. A Retina laptop (2x) on a 1080p
+wall opened at **960×540** (1280×720 at 1.5x), now at **1920×1080**, on the hosted page
+and locally, for every GPU class. 1024² was not offered (grids 768, 512, 512, 384, 256),
+now at 1920×1080. A 1x laptop on a 4K wall had **8.29 Mpx** on its top rung and its
+bottom one; now 8.29 at the top (768²) and **2.07** at the bottom (256² at 1920×1080),
+and it is no longer offered 1024² at 8.3 Mpx. The canvas sizes a 1080p or 4K wall gets
+were five different ladders from a 1x, 1.25x, 1.5x, 2x and 3x laptop; now one. The old
+assertion that a rung of 1 drew a Retina laptop's wall at 960 of 1920 was this bug
+written down, and is replaced by what a share draws (1920×1080 at 1, 960×540 at 0.5).
+Eighteen no-stage ladders, printed before the change for every tier at 1x to 3x
+(phones included), are a fixture the new ladder matches rung for rung and start for
+start. The mirror's smoothing, read by hand from a wall window opened by the built app
+in a cloud session: 'low' when it opened and 'low' after a resize before, 'high' and
+'high' after; `npm run webgpu` asks the same on the Mac.
+
+*The phone:* no phone version, because a phone has no stage. The wall that follows a
+stage's pixels is the wall window (`StageMirror`), a second window on the same machine
+mirroring the show's canvas; the phone's own controls have no wall button, and a phone
+on a wall goes there through the phone's screen mirroring (AirPlay, Android's cast
+screen), which the page cannot see and which shows the phone's own pixels, or through
+a Chromecast, whose receiver runs its own show at its own pixels with no stage. The
+phone keeps the no-stage ladder, which the fixture holds (its 2.625x and 3x lines).
+
+*Still owed, on the Mac:* whether 1024² holds on a 1080p wall. 2.07 Mpx sits between
+what was measured to hold (1.0) and to fail (4.1), so what `npm run ladder` with a
+stage should show is the canvas at 1920×1080 on the top three rungs, 1440×810 and
+960×540 below them, whatever the laptop's ratio, and 1024² at 1920×1080 at or near 30
+fps at thirty steps. If it does not hold, the gate comes down to what does. And the
+owner's look at a 0.75 rung on a real projector through the 'high' mirror.
+
+*Found along the way, not done:*
+- `npm run ladder` cannot attach a stage. It opens one page, and a wall window opened
+  from it would share that page's device scale factor, so a Retina laptop driving a
+  1x projector cannot be staged in one browser context. A `?stage=1920x1080`
+  diagnostic knob, like `?dpr=`, calling `setStage` would let it measure the wall.
+- A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before. The start
+  rule weighs the GPU class and not the stage's pixels; the governor finds the 0.75
+  rung within seconds, but a wall above 1920×1200 could open there.
+- The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall
+  rather than a pixel ratio, and the bench's `dpr` reads the same number. On a stage it
+  should say so ("of the wall").
+- A wall coming or going builds a new governor, which forgets a step rate it had given
+  up and waits out its settling period again, and forgets rungs a solver that would not
+  start had marked failed (only running out of memory sets the cap it keeps).
+- `PW_WEBGPU=1 npm run phone` went red once in two runs on "spreading them zooms in by
+  as much as they spread" (3.00 times of 3.40): the zoom was read before the pinch's
+  last move landed, on a software plate a few frames a second. Green on the rerun; the
+  phone's code was not touched here.
+
 ### 14d. The beat clock hears a smoothed bass level, not the kick
 
 **Read in the code.** The frame loop feeds `BeatClock.update` with
@@ -1880,7 +1962,12 @@ top of the solver.
 Measured since, by `npm run ears` on the Mac runner (2026-09-27): with the show
 window covered and nothing else drawing, the ear's 16 ms tick read 15 times a
 second, not 60 (inferred: each reading re-renders `App`, and the main thread could
-not take more); the visible app drew 28 frames a second in the same run.
+not take more); the visible app drew 28 frames a second in the same run. On #195's
+deploy (main 6c6d17e) the visible page drew 14 frames in two seconds while the rest
+of the show was still being built behind it, and `npm run ears` went red on a floor
+of twenty frame readings, with the ear doing what it should (the wall's 10 asks all
+read in the page's stalls). The floor now asks that every frame the page drew read
+(#194); how slowly a busy page draws is this item's to fix, not that check's.
 
 *Fix:* the frame loop reads the analyser and the ride's shadow itself; React keeps
 the meters, at about ten updates a second, with the arrays reused. *Measure:* count

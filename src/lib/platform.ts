@@ -20,8 +20,19 @@ export type GpuClass = 'software' | 'weak' | 'mid' | 'strong';
 export interface QualityRung {
   /** Solver edge length. */
   grid: number;
-  /** Canvas pixels per CSS pixel, capped at the device's own ratio. */
+  /**
+   * How many pixels to draw. With no stage, canvas pixels per CSS pixel of
+   * the show window, capped at the device's own ratio. With a stage (a
+   * projector mirroring the canvas), the share of the stage's own width and
+   * height: 1 is every pixel the projector has (PLAN.md §14c, `stageLadder`).
+   */
   dpr: number;
+}
+
+/** A projector's own pixels, as the wall window announces them (`CastDisplay`). */
+export interface StagePixels {
+  width: number;
+  height: number;
 }
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|.*\.local$)/i;
@@ -108,10 +119,24 @@ export function renderScale(): number {
  * rung was not a slower show but a black one, which is what CI found — 1,676
  * frames of nothing over a plate that was simulating perfectly well. The
  * solver it fell back to is gone now, and so is the rung.
+ *
+ * With a stage attached the ladder is the stage's, not the laptop's: see
+ * `stageLadder` below. With none, it is exactly what it was before a stage
+ * had a ladder of its own, which `npm run rungs` holds to a fixture.
  */
-export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: QualityRung[]; start: number } {
+export function qualityLadder(
+  tier: PlatformTier,
+  gpu: GpuClass,
+  // Required, not defaulted: a caller that forgot the stage would compile
+  // and quietly give a projector the laptop's ladder (the check-skeptic).
+  stage: StagePixels | null,
+  gridCap = Number.POSITIVE_INFINITY,
+): { rungs: QualityRung[]; start: number } {
   const dpr = devicePixels();
   if (gpu === 'software') return { rungs: [{ grid: 256, dpr: 1 }], start: 0 };
+  // Where to open, by the hardware's class (see the start, at the end).
+  const wanted = gpu === 'strong' ? 512 : gpu === 'mid' ? 384 : 256;
+  if (stage) return stageLadder(tier, wanted, stage, gridCap);
 
   const rungs: QualityRung[] =
     tier === 'hosted'
@@ -180,10 +205,101 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
 
   // Start one step below the best guess for the hardware so the first seconds
   // are smooth; the governor climbs within ~10 s if the machine has room.
-  const wanted = gpu === 'strong' ? 512 : gpu === 'mid' ? 384 : 256;
   let start = rungs.findIndex((r) => r.grid <= wanted && r.dpr === 1);
   if (start < 0) start = rungs.length - 1;
   return { rungs, start };
+}
+
+/**
+ * The most pixels a stage can have and still be offered 1024².
+ *
+ * The rung's gate was measured on the M4 as a pixel count, whatever it was
+ * written as: 1024² held 32 fps drawing 1280×800 (1.0 Mpx) and fell to 22 at
+ * 2560×1600 (4.1 Mpx), with the solver's step at 25 ms both times, so what
+ * broke it was shading the canvas. On the laptop's own screen the pixel count
+ * and the ratio go together and `dpr <= 1` said it. On a stage they come
+ * apart: a 4K projector has one pixel per pixel and 8.3 Mpx, twice the count
+ * measured to fail, and a 1080p projector behind 150 % Windows scaling has a
+ * ratio of 1.5 and the same 2.1 Mpx as one at 100 %. So the stage is asked by
+ * its pixels. 1920×1200 is the largest of the projectors this is written for
+ * (WUXGA, the other common native size beside 1080p).
+ *
+ * 1080p itself sits between what was measured to hold and what was measured
+ * to fail, twice the one and half the other. It is offered because a rung the
+ * governor can climb into and come back from costs a few seconds, and a rung
+ * that is never offered costs every show on a projector the finest plate this
+ * build has. Whether it holds there is for `npm run ladder` on the Mac once
+ * it can attach a stage, which it cannot yet (PLAN.md §14c).
+ */
+const STAGE_1024_MAX_PX = 1920 * 1200;
+
+/** A stage's pixel rungs: all of it, three quarters, half (linear, so 100 %, 56 % and 25 % of the pixels). */
+const STAGE_SHARES = [1, 0.75, 0.5];
+
+/**
+ * The quality ladder while a projector is mirroring the canvas (PLAN.md §14c).
+ *
+ * Before this, a stage had no ladder of its own. The rungs were the laptop's,
+ * built from the laptop's pixel ratio, and each drew `dpr / devicePx` of the
+ * stage. Read in the code, that goes wrong in opposite directions on the two
+ * laptops that drive projectors. A Retina laptop opened on its `dpr: 1` rung,
+ * which on a 2x screen is half of everything: a 1920×1080 projector started at
+ * 960×540, stretched by the mirror, and at 150 % Windows scaling at 1280×720.
+ * And 1024², written for projectors, was gated on the *laptop* having one pixel
+ * per pixel, so the machines that run most shows never saw it. A 1x laptop on
+ * a 4K projector had the reverse: `dpr / devicePx` was 1 on every rung, every
+ * rung drew all 3840×2160, and the governor had only the grid to give up while
+ * what costs on that wall is shading its pixels.
+ *
+ * The laptop's ratio says nothing about the wall, so a stage's rungs are
+ * shares of the stage, and the laptop's ratio is not read at all. The start is
+ * the grid this class of GPU opens on at every pixel the projector has, as it
+ * was on a 1x laptop, which was the one case the old arithmetic got right: the
+ * wall opens at its own resolution. Above the start the rungs climb in grid at
+ * the stage's full pixels. At the start the pixel rungs come first, 0.75 and
+ * then 0.5 of the stage, and only then the smaller grids at half: a machine
+ * that cannot hold the grid it was expected to hold is short of what drawing
+ * the wall costs, and on a projector that is the pixels. It is the order the
+ * laptop's own 2x ladder already has, pixels given up at 512² before any grid
+ * below it.
+ *
+ * A share below 1 is drawn smaller and scaled up by the wall window, which is
+ * why the mirror's smoothing is set to 'high' there (`CastDisplay`).
+ *
+ * The hosted page keeps its own limits on a stage as it does on a laptop:
+ * nothing above 512², since that is where a first visit on an unknown laptop
+ * starts costing more than it returns.
+ *
+ * `gridCap` is the grid the GPU has run out of memory above (`gridCapRef` in
+ * `LiquidVisualizer`). A stage's ladder is built under it, opening at the
+ * largest grid that fits with the whole stage, rather than walked down to it:
+ * below the opening grid this ladder has only half the stage, so a governor
+ * stepped down past a grid that ran out of memory went 512² at 1, 0.75, 0.5,
+ * marking each failed for good, and left a 1080p wall at 960×540 until a
+ * reload, when all that ran out was the grid (the pre-push review). A laptop
+ * with no stage had 384² at its full pixels to land on.
+ */
+function stageLadder(
+  tier: PlatformTier,
+  wanted: number,
+  stage: StagePixels,
+  gridCap: number,
+): { rungs: QualityRung[]; start: number } {
+  const all = tier === 'hosted'
+    ? [512, 384, 256]
+    : [...(stage.width * stage.height <= STAGE_1024_MAX_PX ? [1024] : []), 768, 512, 384, 256];
+  // Never nothing: the smallest grid stays whatever the cap says, as the
+  // laptop's ladder keeps its bottom rung (only its failing is the screen).
+  const fits = all.filter((g) => g <= gridCap);
+  const grids = fits.length ? fits : [all[all.length - 1]];
+  const open = grids.find((g) => g <= wanted) ?? grids[grids.length - 1];
+  const least = STAGE_SHARES[STAGE_SHARES.length - 1];
+  const rungs: QualityRung[] = [
+    ...grids.filter((g) => g > open).map((grid) => ({ grid, dpr: 1 })),
+    ...STAGE_SHARES.map((dpr) => ({ grid: open, dpr })),
+    ...grids.filter((g) => g < open).map((grid) => ({ grid, dpr: least })),
+  ];
+  return { rungs, start: rungs.findIndex((r) => r.grid === open && r.dpr === 1) };
 }
 
 /**
@@ -205,19 +321,26 @@ export function qualityLadder(tier: PlatformTier, gpu: GpuClass): { rungs: Quali
  * thing to give up — which is the worst shape a quality control can have.
  *
  * With a stage attached a projector is mirroring the canvas, so the stage's
- * own pixels are the target and the rung is a fraction of them; the mirror
+ * own pixels are the target and the rung is a share of them; the mirror
  * shows the real picture and this window a scaled copy.
+ *
+ * That share used to be `dpr / devicePx`, the rung over the *laptop's* ratio,
+ * which is what made a Retina laptop draw a 1080p wall at 960×540 and a 1x
+ * laptop draw a 4K wall at full size on every rung (PLAN.md §14c). A stage's
+ * rungs are shares of the stage now (`stageLadder`), so the share is the
+ * rung's own number and the laptop's ratio is no longer an argument. A
+ * fixed grid (the governor off) asks for 1, which is now the whole stage on
+ * any laptop, where on a Retina one it was half of it.
  */
 export function canvasPixelsFor(
   dpr: number,
-  stagePx: { width: number; height: number } | null,
+  stagePx: StagePixels | null,
   cap: number,
-  devicePx: number,
   windowPx: { width: number; height: number },
 ): { width: number; height: number } {
   const hold = (v: number) => Math.max(1, Math.min(cap, Math.round(v)));
   if (stagePx) {
-    const frac = Math.min(1, dpr / Math.max(devicePx, 1e-6));
+    const frac = Math.min(1, dpr);
     return { width: hold(stagePx.width * frac), height: hold(stagePx.height * frac) };
   }
   return { width: hold(windowPx.width * dpr), height: hold(windowPx.height * dpr) };

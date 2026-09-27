@@ -90,6 +90,26 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
       const h = Math.max(1, Math.round(window.innerHeight * dpr));
       if (w !== lastW || h !== lastH) {
         canvas.width = w; canvas.height = h;
+        /*
+          Scaled the way a picture is scaled, not the way a texture is.
+
+          The show draws this window's pixels at a share of them when the
+          governor has had to give pixels up (PLAN.md §14c: three quarters or
+          half of the stage), and the letterbox scales whatever arrives, so
+          `drawImage` below is enlarging a frame much of the time. A 2D
+          context left alone does that at `imageSmoothingQuality` 'low', the
+          cheapest filter the browser has, and nothing here ever set it.
+          'high' is its best, paid once per frame on one image, and a frame
+          drawn at three quarters and enlarged is exactly the case it exists
+          for. What it looks like on a real projector is for the Mac to say.
+
+          Set here, after the size, because assigning a canvas's width resets
+          its context's state to the defaults, 'low' included: set once at
+          the top, it would have been lost the first time the window went
+          fullscreen.
+        */
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         lastW = w; lastH = h;
         bc?.postMessage({ type: 'stage', width: w, height: h } satisfies CastMessage);
       }
