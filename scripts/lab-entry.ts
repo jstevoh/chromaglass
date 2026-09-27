@@ -4,7 +4,7 @@
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
-import { fillPlateUniforms } from '../src/gpu/plateUniforms';
+import { fillPlateUniforms, magnetsOnPlate } from '../src/gpu/plateUniforms';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
@@ -37,6 +37,8 @@ function halves(data: number[]): ArrayBuffer {
 type Lab = {
   solver: WebGPUFluid; L: number; N: number; time: number; cellClock: number;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
+  /** The magnets the plate was last stepped with, as the app hands them to the picture. */
+  magnets: { x: number; y: number; height: number; strength: number }[];
 };
 let lab: Lab | null = null;
 
@@ -49,7 +51,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, cellClock: 0, dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1) };
+    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1) };
     return { N, L };
   },
   /** A soft disc of dye (absorbances r, g, b; density d) at (x, y) in plate units, radius r. */
@@ -111,6 +113,7 @@ const api = {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
       l.solver.step(p, false);
+      l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
@@ -169,6 +172,7 @@ const api = {
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
     cam: {
+      magnets?: { x: number; y: number; height: number; strength: number }[];
       cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
       /*
         The other pictures the plate composites, for the mixer's check
@@ -207,7 +211,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
