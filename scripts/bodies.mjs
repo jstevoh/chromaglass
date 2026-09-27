@@ -57,9 +57,12 @@
  * which only a drift back toward the oil undoes. 10.3% → 6.5% → 2.0% → 0.14%.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
- * a Linux box's software WebGPU anywhere else (a few minutes there).
+ * a Linux box's software WebGPU anywhere else (about twenty minutes there).
  */
 import { openLab } from './lab.mjs';
+
+// The share of the body cells a stir of 360 steps must move (see ①).
+const MOVED = 0.02;
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -72,6 +75,12 @@ const STEPS = 360;
 const TEAL = [1.1, 0.25, 0.35];
 const AMBER = [0.1, 0.5, 1.5];
 const { page, close } = await openLab();
+// A kernel that fails validation drops the whole step's encoder: the plate
+// then does not move at all, keeps every colour where it was, and would pass
+// the separation checks below on nothing. The lab only prints GPU errors, so
+// they are counted here and fail the run.
+const gpuErrors = [];
+page.on('console', (m) => { if (/gpu error|device lost/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 try {
   // Seven drops and a strip; the oil first, one step so the setting is known
   // to the solver, then the colour laid from where the oil is.
@@ -107,20 +116,36 @@ try {
     }
   }, { N, bodies, TEAL, AMBER });
 
-  // Amber and teal per cell from the red and blue absorbances, and the oil.
+  /*
+    Amber and teal per cell from the red and blue absorbances, and the oil.
+    Each is solved per cell and can come out a little negative where the
+    per-channel limiters and half floats leave a colour that is not an exact
+    mix of the two; summed signed, a leak could cancel against that residue,
+    so the positive parts are summed and the negative parts reported (and
+    held small, or the two-colour reading does not describe the plate).
+    Beside the shares: each colour's concentration in its own liquid (amber
+    per unit of oil deep in the bodies, laid at 1.2; teal per unit of water
+    in open water, laid at 0.8), which catches colour piled on or drained
+    from the rim, the band both shares leave out.
+  */
   const read = () => page.evaluate(async ({ N, TEAL, AMBER }) => {
     const d = await lab.field('dye'); const m = await lab.solver().readChemistry('mix');
     const det = TEAL[0] * AMBER[2] - AMBER[0] * TEAL[2];
-    let amber = 0, teal = 0, amberOut = 0, tealIn = 0, mass = 0, oil = 0;
+    let amber = 0, teal = 0, neg = 0, amberOut = 0, tealIn = 0, mass = 0, oil = 0;
+    let amberBody = 0, cBody = 0, tealWater = 0, wWater = 0;
+    const cs = new Array(N * N);
     for (let i = 0; i < N * N; i++) {
       const R = d[i * 4], B = d[i * 4 + 2];
       const t = (R * AMBER[2] - AMBER[0] * B) / det, a = (TEAL[0] * B - TEAL[2] * R) / det;
+      const ap = Math.max(0, a), tp = Math.max(0, t);
       const c = m.data[i * 4];
-      amber += a; teal += t; mass += d[i * 4 + 3]; oil += c;
-      if (c < 0.05) amberOut += a;
-      if (c > 0.95) tealIn += t;
+      cs[i] = c;
+      amber += ap; teal += tp; neg += Math.max(0, -a) + Math.max(0, -t); mass += d[i * 4 + 3]; oil += c;
+      if (c < 0.05) { amberOut += ap; tealWater += tp; wWater += 1 - c; }
+      if (c > 0.95) { tealIn += tp; amberBody += ap; cBody += c; }
     }
-    return { amber, teal, amberOut: amberOut / amber, tealIn: tealIn / teal, mass, oil };
+    return { amber, teal, neg: neg / (amber + teal), amberOut: amberOut / amber, tealIn: tealIn / teal, mass, oil,
+      amberConc: amberBody / cBody, tealConc: tealWater / wWater, cs };
   }, { N, TEAL, AMBER });
 
   const stir = { oilTension: 0.9, twist: 0.02, maxCurrent: 0.01, currentDamp: 0.97 };
@@ -129,84 +154,126 @@ try {
     const start = await read();
     await page.evaluate(([n, o]) => lab.step(n, o), [STEPS, { ...stir, oilBodies: bodies }]);
     const end = await read();
-    return { start, end };
+    // How much of the plate's body moved: the start's body cells that are
+    // body no longer. A step dropped whole leaves this at nothing.
+    let was = 0, gone = 0;
+    for (let i = 0; i < N * N; i++) if (start.cs[i] > 0.95) { was++; if (end.cs[i] <= 0.95) gone++; }
+    return { start, end, moved: gone / was };
   };
   const off = await arm(0);
   const on = await arm(1);
+  const pct = (v, n = 2) => `${(v * 100).toFixed(n)}%`;
   for (const [name, r] of [['off', off], ['on ', on]]) {
-    console.log(`  ${name}: amber in open water ${(r.start.amberOut * 100).toFixed(2)}% → ${(r.end.amberOut * 100).toFixed(2)}%, `
-      + `teal inside the bodies ${(r.start.tealIn * 100).toFixed(2)}% → ${(r.end.tealIn * 100).toFixed(2)}%, `
-      + `dye ${r.start.mass.toFixed(1)} → ${r.end.mass.toFixed(1)}, oil ${r.start.oil.toFixed(1)} → ${r.end.oil.toFixed(1)}`);
+    console.log(`  ${name}: amber in open water ${pct(r.start.amberOut)} → ${pct(r.end.amberOut)}, `
+      + `teal inside the bodies ${pct(r.start.tealIn)} → ${pct(r.end.tealIn)}, `
+      + `amber per unit of oil ${r.start.amberConc.toFixed(3)} → ${r.end.amberConc.toFixed(3)}, `
+      + `teal per unit of water ${r.start.tealConc.toFixed(3)} → ${r.end.tealConc.toFixed(3)}, `
+      + `dye ${r.start.mass.toFixed(1)} → ${r.end.mass.toFixed(1)}, oil ${r.start.oil.toFixed(1)} → ${r.end.oil.toFixed(1)}, `
+      + `body moved ${pct(r.moved, 1)}, negative residue ${pct(r.end.neg)}`);
   }
+  let oilDiff = 0;
+  for (let i = 0; i < N * N; i++) oilDiff = Math.max(oilDiff, Math.abs(on.end.cs[i] - off.end.cs[i]));
 
   // ── 1 ──
-  check('the oil\'s colour stays out of the open water',
-    on.end.amberOut < 0.005 && off.end.amberOut > 10 * on.end.amberOut,
-    `${(on.end.amberOut * 100).toFixed(2)}% of the amber in open water after the stir, against ${(off.end.amberOut * 100).toFixed(2)}% with it off`);
-  check('and the water\'s colour out of the bodies',
-    on.end.tealIn < 0.001 && off.end.tealIn > 3 * on.end.tealIn,
-    `${(on.end.tealIn * 100).toFixed(2)}% of the teal inside a body, against ${(off.end.tealIn * 100).toFixed(2)}% with it off`);
+  check('the plate moved', on.moved > MOVED && off.moved > MOVED,
+    `${pct(on.moved, 1)} of the body cells were body no longer at the end (${pct(off.moved, 1)} with it off)`);
+  check('and the bodies moved the oil as it moves with them off', oilDiff < 1e-3,
+    `the oil differs by at most ${oilDiff.toExponential(1)} a cell`);
+  check('the oil\'s colour stays out of the open water', on.end.amberOut < 0.005,
+    `${pct(on.end.amberOut)} of the amber in open water after the stir`);
+  check('and the water\'s colour out of the bodies', on.end.tealIn < 0.001,
+    `${pct(on.end.tealIn)} of the teal inside a body`);
+  check('with the setting off, the same stir fails both', off.end.amberOut >= 0.005 && off.end.tealIn >= 0.001,
+    `${pct(off.end.amberOut)} of the amber in open water, ${pct(off.end.tealIn)} of the teal in a body`);
+  check('each colour keeps its strength in its own liquid, rims included',
+    Math.abs(on.end.amberConc / 1.2 - 1) < 0.1 && Math.abs(on.end.tealConc / 0.8 - 1) < 0.1,
+    `amber per unit of oil ${on.end.amberConc.toFixed(3)} (laid at 1.2), teal per unit of water ${on.end.tealConc.toFixed(3)} (0.8)`);
+  check('and the reading holds: the plate is the two colours', on.end.neg < 0.005,
+    `negative residue ${pct(on.end.neg)} of the colour`);
   // ── 2 ──
-  check('no dye is made or lost', Math.abs(on.end.mass / on.start.mass - 1) < 0.01,
-    `${on.start.mass.toFixed(1)} → ${on.end.mass.toFixed(1)}`);
+  check('no dye is made or lost', Math.abs(on.end.mass / on.start.mass - 1) < 0.01
+      && Math.abs(on.end.amber / on.start.amber - 1) < 0.01 && Math.abs(on.end.teal / on.start.teal - 1) < 0.01,
+    `dye ${on.start.mass.toFixed(1)} → ${on.end.mass.toFixed(1)}, amber ${on.start.amber.toFixed(1)} → ${on.end.amber.toFixed(1)}, teal ${on.start.teal.toFixed(1)} → ${on.end.teal.toFixed(1)}`);
   check('and no oil', Math.abs(on.end.oil / on.start.oil - 1) < 0.01,
     `${on.start.oil.toFixed(1)} → ${on.end.oil.toFixed(1)}`);
 
   // ── 3 ──
-  const zero = await page.evaluate(async () => {
+  const made = (bodies) => page.evaluate(async (bodies) => {
     await lab.create(128);
     lab.solver().addMix(0.5, 0.5, 0.2, { oil: 1 });
     lab.dye(0.5, 0.5, 0.3, [0.5, 0.5, 0.5], 1); lab.flush();
-    await lab.step(20, { oilTension: 0.9, oilBodies: 0 });
-    try { await lab.field('oilDye'); return 'made'; } catch { return 'never made'; }
-  });
-  check('at 0 the oil\'s share is never made', zero === 'never made', zero);
+    await lab.step(20, { oilTension: 0.9, oilBodies: bodies });
+    try { await lab.field('oilDye'); return 'made'; } catch (e) {
+      if (/no oilDye field/.test(String(e))) return 'never made';
+      throw e;
+    }
+  }, bodies);
+  const zero = await made(0), one = await made(1);
+  check('at 0 the oil\'s share is never made (and at 1 it is)', zero === 'never made' && one === 'made', `at 0 ${zero}, at 1 ${one}`);
 
   // ── 4 ──
+  // Off the plate's middle line, so a flip of the landing's lookup either
+  // way puts the dab somewhere else; and a third dab across the edge, where
+  // the split is the oil's share of each cell and not a switch.
   const land = await page.evaluate(async () => {
     await lab.create(128, 128);
     const s = lab.solver();
-    s.addMix(0.3, 0.5, 0.15, { oil: 1 });
+    s.addMix(0.3, 0.35, 0.15, { oil: 1 });
     await lab.step(30, { oilTension: 0.9, oilBodies: 1 });
-    const share = async () => { const o = await lab.field('oilDye'); let t = 0; for (let k = 3; k < o.length; k += 4) t += o[k]; return t; };
-    const before = await share();
-    lab.dye(0.3, 0.5, 0.06, [0.5, 0.5, 0.5], 1); lab.flush();
-    const afterOil = await share();
-    lab.dye(0.75, 0.5, 0.06, [0.5, 0.5, 0.5], 1); lab.flush();
-    const afterWater = await share();
+    const sum = async (which) => { const o = await lab.field(which); let t = 0; for (let k = 3; k < o.length; k += 4) t += o[k]; return t; };
+    const disc = (x, y, r) => { const w = new Float64Array(128 * 128);
+      for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
+        const dx = (i + 0.5) / 128 - x, dy = (j + 0.5) / 128 - y; w[i + j * 128] = Math.max(0, 1 - (dx * dx + dy * dy) / (r * r)); }
+      return w; };
+    const dab = (() => { let t = 0; for (const v of disc(0.3, 0.35, 0.06)) t += v; return t; })();
+    const s0 = await sum('oilDye'), t0 = await sum('dye');
+    lab.dye(0.3, 0.35, 0.06, [0.5, 0.5, 0.5], 1); lab.flush();
+    const s1 = await sum('oilDye');
+    lab.dye(0.75, 0.35, 0.06, [0.5, 0.5, 0.5], 1); lab.flush();
+    const s2 = await sum('oilDye'), t2 = await sum('dye');
+    const m = await s.readChemistry('mix');
+    const w = disc(0.45, 0.35, 0.06); let wc = 0, ww = 0;
+    for (let i = 0; i < w.length; i++) { wc += w[i] * Math.max(0, Math.min(1, m.data[i * 4])); ww += w[i]; }
+    lab.dye(0.45, 0.35, 0.06, [0.5, 0.5, 0.5], 1); lab.flush();
+    const s3 = await sum('oilDye'), t3 = await sum('dye');
     await lab.step(30, { oilTension: 0.9, oilBodies: 1 });
-    const settled = await share();
-    const dab = (() => { let t = 0; for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
-      const dx = (i + 0.5) / 128 - 0.3, dy = (j + 0.5) / 128 - 0.5; t += Math.max(0, 1 - (dx * dx + dy * dy) / 0.0036); } return t; })();
-    return { onOil: (afterOil - before) / dab, onWater: (afterWater - afterOil) / dab, kept: (settled - before) / dab };
+    const s4 = await sum('oilDye');
+    return { onOil: (s1 - s0) / dab, onWater: (s2 - s1) / dab, arrived: (t2 - t0) / (2 * dab),
+      edge: (s3 - s2) / (t3 - t2), predicted: wc / ww, kept: (s4 - s0) / (s3 - s0) };
   });
   check('dye poured over a body becomes its colour', land.onOil > 0.95 && land.kept > 0.9,
-    `${(land.onOil * 100).toFixed(1)}% of a dab over the body went to the oil, ${(land.kept * 100).toFixed(1)}% still the oil's 30 steps on`);
-  check('and dye poured on open water stays the water\'s', Math.abs(land.onWater) < 0.01,
-    `${(land.onWater * 100).toFixed(2)}% of a dab on the water went to the oil`);
+    `${pct(land.onOil, 1)} of a dab over the body went to the oil, and of all the oil took ${pct(land.kept, 1)} is still its own 30 steps on`);
+  check('and dye poured on open water stays the water\'s', Math.abs(land.onWater) < 0.01 && Math.abs(land.arrived - 1) < 0.01,
+    `${pct(land.onWater)} of a dab on the water went to the oil; ${pct(land.arrived, 1)} of both dabs reached the plate`);
+  check('and across the edge each cell\'s share goes by the oil in it', Math.abs(land.edge - land.predicted) < 0.02,
+    `${pct(land.edge, 1)} of a dab across the edge went to the oil, ${pct(land.predicted, 1)} predicted from the oil under it`);
 
   // ── 5 ──
   const carry = await page.evaluate(async () => {
     await lab.create(128, 128);
     const s = lab.solver();
-    s.addMix(0.4, 0.5, 0.1, { oil: 1 });
+    s.addMix(0.4, 0.35, 0.1, { oil: 1 });
     await lab.step(1, { oilTension: 0.9, oilBodies: 1 });
-    const cm = async () => { const m = await s.readChemistry('mix'); let t = 0, x = 0;
-      for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) { const c = m.data[(i + j * 128) * 4]; t += c; x += c * (i + 0.5) / 128; } return { t, x: x / t }; };
+    const cm = async () => { const m = await s.readChemistry('mix'); let t = 0, x = 0, y = 0;
+      for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) { const c = m.data[(i + j * 128) * 4]; t += c; x += c * (i + 0.5) / 128; y += c * (j + 0.5) / 128; }
+      return { t, x: x / t, y: y / t }; };
     const a = await cm();
     // Ten drags to the right through the drop's middle, as fingerDrag hands them over.
-    for (let k = 0; k < 10; k++) s.carryMix(0.4 + k * 0.01, 0.5, 0.06, 1, 0, 0.5, 2 / 128);
+    for (let k = 0; k < 10; k++) s.carryMix(0.4 + k * 0.01, 0.35, 0.06, 1, 0, 0.5, 2 / 128);
     const b = await cm();
-    return { moved: b.x - a.x, kept: b.t / a.t };
+    return { moved: b.x - a.x, across: b.y - a.y, kept: b.t / a.t };
   });
-  check('a hand drags the oil the way it went', carry.moved > 0.005,
-    `the oil's middle moved ${carry.moved.toFixed(4)} of the plate to the right`);
-  check('and keeps all of it', Math.abs(carry.kept - 1) < 0.005, `${(carry.kept * 100).toFixed(2)}% of the oil`);
+  // 0.0103 predicted by a CPU copy of the splat's profile and mixCarry.
+  check('a hand drags the oil the way it went', carry.moved > 0.007 && carry.moved < 0.014 && Math.abs(carry.across) < 0.001,
+    `the oil's middle moved ${carry.moved.toFixed(4)} of the plate to the right and ${carry.across.toFixed(4)} across`);
+  check('and keeps all of it', Math.abs(carry.kept - 1) < 0.005, `${pct(carry.kept)} of the oil`);
 
   // ── 6 ──
   // The plate the 41% was measured on, so the two numbers are one
-  // comparison: a 128 grid read at the lab's 192, a flat disc of oil a fifth
-  // of the plate across with dye laid on it as a disc of the same size.
+  // comparison: a 128 grid read at the lab's 192, a flat disc of oil two
+  // fifths of the plate across with dye laid on it as a disc of the same
+  // size. The dye counted is the dye still in the drop (over half oil), so
+  // colour spread out of it and kept on the plate does not pass as kept.
   const drop = await page.evaluate(async () => {
     await lab.create(128);
     const s = lab.solver(); const L = 192;
@@ -219,13 +286,22 @@ try {
     lab.addDye(d);
     s.addMix(0.5, 0.5, 0.2, { oil: 1 });
     lab.flush();
-    const tot = async () => { const f = await lab.field('dye'); let t = 0; for (let k = 3; k < f.length; k += 4) t += f[k]; return t; };
-    const a = await tot();
+    const inDrop = async () => {
+      const f = await lab.field('dye'); const m = await s.readChemistry('mix'); let t = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+        const c = m.data[(Math.floor(i * 128 / L) + Math.floor(j * 128 / L) * 128) * 4];
+        if (c > 0.5) t += f[(i + j * L) * 4 + 3];
+      }
+      return t;
+    };
+    const a = await inDrop();
     await lab.step(120, { oilTension: 0.9, oilBodies: 0 });
-    return (await tot()) / a;
+    return (await inDrop()) / a;
   });
   check('a settled drop keeps its colour with the setting off', drop > 0.8,
-    `${(drop * 100).toFixed(1)}% of its dye after 120 steps (41% before the tension was rebuilt)`);
+    `${pct(drop, 1)} of its dye still in it after 120 steps (41% of the plate's before the tension was rebuilt)`);
+
+  check('no GPU errors', gpuErrors.length === 0, gpuErrors.length ? gpuErrors[0] : 'none');
 } finally {
   await close();
 }

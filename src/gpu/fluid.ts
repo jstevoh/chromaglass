@@ -509,6 +509,13 @@ export class WebGPUFluid {
       ['mixRelax', [RGBA32], open.mix],
       ['mixMu', [RGBA32], open.mix],
       ['mixUpdate', [RGBA32], open.mix],
+      /*
+        The oil's smoothed shape, for its surface tension (mixForce) and
+        Oil Bodies' reach. Waited for only when Oil Bodies opens the show.
+        With Oil Tension alone it runs only where mixForce runs, and
+        mixForce has always been built behind the show (below): the two
+        come ready together, so this adds no wait mixForce did not have.
+      */
       ['mixSmooth', [R32], open.bodies],
       // Oil Bodies: the dye carried as the oil is, and each liquid's colour
       // kept in it. Run once a look with it on has poured oil.
