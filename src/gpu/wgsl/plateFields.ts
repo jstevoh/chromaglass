@@ -33,6 +33,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'mixLevel', type: 'vec4f', note: 'the LED ring, the front plate, the back plate, and the logo while it is under something' },
   { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of seven, 0 the bottom' },
   { name: 'mixPos2', type: 'vec4f', note: 'the rows of the gel wheel, the lumia and the front plate (everything under it is the lamp), and the top row' },
+  { name: 'mixBlend', type: 'vec4f', note: 'the blends of the LED ring, the gel wheel, the lumia and the film: 0 own, 1 screen, 2 add, 3 multiply, 4 key' },
   { name: 'gel0', type: 'vec3f' },
   { name: 'gel1', type: 'vec3f' },
   { name: 'gel2', type: 'vec3f' },
@@ -101,6 +102,8 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'macroLacing', type: 'f32', note: 'dark lacing filaments along dye boundaries' },
   { name: 'macroRelief', type: 'f32', note: 'surface relief: per-pixel normals, specular, occlusion' },
   { name: 'markOn', type: 'f32', note: '1 when there is one loaded' },
+  { name: 'markBlend', type: 'f32', note: 'the logo\'s blend, as mixBlend counts them; the finish reads it too' },
+  { name: 'backBlend', type: 'f32', note: 'the back plate\'s blend, as mixBlend counts them; 0 is blendMode' },
   {
     name: 'particles',
     type: 'f32',

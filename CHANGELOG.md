@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a blend per row in the Mixer
+
+- **Every row but the front plate has a blend**, in its Grade drawer: Own
+  (the way it always came in: the LED ring and the lumia screened as
+  beams, the gel a filter, the film through the dye, the logo by its own
+  transparency, the back plate by its Blend Mode), Screen, Add, Multiply
+  and Key (the row's dark drops out). A row off its own blend says which
+  in its tag. Everything is on Own to start, so every look is the same
+  picture.
+- Six more pads, Mixer: Next Blend for each row, step it along the five.
+  On the desk, in Settings, on the phone's Mix sheet and on the remote.
+- `npm run mixer` holds each blend to its formula, pixel by pixel, on every
+  row, the lamp's three included (60 checks).
+
 ### Added — the gel wheel and the lumia in the Mixer
 
 - **Two more rows in the Mixer**: the gel wheel and the lumia, each with its

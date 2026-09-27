@@ -65,6 +65,8 @@ export interface FinishView {
   markRect: readonly [number, number, number, number];
   /** The mixer's grade on the mark (lib/mixer.ts): brightness, contrast, saturation, hue in radians. */
   markGrade: readonly [number, number, number, number];
+  /** The mixer's blend on the mark (lib/mixer.ts, as the shader counts them). */
+  markBlend: number;
 }
 
 /*
@@ -348,6 +350,7 @@ export class WebGPUPostChain {
     this.pack.set('markOn', view.markOn);
     this.pack.set('markRect', ...view.markRect);
     this.pack.set('markGrade', ...view.markGrade);
+    this.pack.set('markBlend', view.markBlend);
     this.pack.set('resolution', this.size[0], this.size[1]);
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
 

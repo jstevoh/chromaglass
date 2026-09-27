@@ -19,7 +19,7 @@ import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
 import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
-import { mixGrade, mixPositions } from '../lib/mixer';
+import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 
 /** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
 export const LOGICAL_GRID = 192;
@@ -280,6 +280,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     ...mixGrade(s.lumiaBright, s.lumiaContrast, s.lumiaSat, s.lumiaHue),
   ]);
   pack.set('markGrade', ...mixGrade(s.markBright, s.markContrast, s.markSat, s.markHue));
+  // Each row's blend, as the shader counts them (0 its own way in).
+  pack.set('mixBlend', mixBlendIndex(s.ledBlend), mixBlendIndex(s.gelBlend), mixBlendIndex(s.lumiaBlend), mixBlendIndex(s.filmBlend));
+  pack.set('markBlend', mixBlendIndex(s.markBlend));
+  pack.set('backBlend', mixBlendIndex(s.backBlend));
   {
     const k = Math.round(s.kaleidoscope ?? 0);
     pack.set('kaleido', k >= 2 ? Math.min(12, k) : 0);

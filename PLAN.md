@@ -59,7 +59,7 @@ Where each batch stands, as of 2026-09-27:
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
-| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
+| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); none yet judged on the Mac; steps 4–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; the rest not started |
@@ -1183,10 +1183,22 @@ version in the same PR (see the operating rules below).
    (Mixer: Raise Gel Wheel, Raise Lumia). `npm run mixer` 44/44, each new check held
    red against a broken shader. **Owed:** the Mac look in `docs/judging.md` §13 (the
    gel's 1.5 gain over the lens; the lumia as a beam).
-3. **A blend per row.** Today a row is laid over what is under it (the back plate
-   keeps its own blend mode under Multi-Layer Mixer; the LED beam is screened). Screen,
-   add, multiply and key per row, which is R3's additive light made a choice. *Check:*
-   each blend against its formula on known colours in the lab.
+3. **A blend per row**, *shipped* (#193). Every row but the front plate keeps the
+   way it always came in as Own (the beams screened, the gel a filter, the film
+   through the dye, the logo by its alpha, the back plate by its Blend Mode) and can
+   be set to Screen, Add, Multiply or Key instead, in its Grade drawer; a row off
+   Own says which in its tag. R3's additive light made a choice. Everything starts
+   on Own, and the seven scenes of step 2 render the same to the byte. Six pads
+   (Mixer: Next Blend, per row). `npm run mixer` 60/60: each blend on each row,
+   the lamp's three included, is its formula pixel by pixel (within 1 step of 255,
+   the nearest other formula 4 to 42 steps away); the logo's clear margin stays
+   clear; on paper the back plate is still lit as a photograph and blended after;
+   the post chain's finish is told the logo's blend; and the checks were held red
+   against seventeen broken shaders. Key keys at Film Key on the film and at its
+   default elsewhere. `npm run phone` presses every row's blend and holds each
+   row's name whole beside its tag. **Owed:** the Mac look in `docs/judging.md` §13
+   (the key's edge on a real film; Add over a bright plate). The front plate has no
+   blend: it is the glass the rest is laid on.
 4. **Crossfade a row.** A level ridden by hand is a fade; a row's own fade time and a
    cut/fade pad, so a film can come in over two bars from a pad. *Check:* a node
    harness on the fade curve, and the film table (no hard cuts).
@@ -1197,6 +1209,27 @@ version in the same PR (see the operating rules below).
 6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
    each projector's plate is a row, with its own grade at the projector's scope (R2).
    This is the large one; it waits on R1.
+
+Found while shipping step 2, not yet done: #189's deploy (main 41ad65e) went red on
+the Mac show shard's `qa` at two checks that passed on the same tree in the PR's run an
+hour before: "the plate, not the hole, takes the pointer" (the cursor over a DIV at the
+desk's preview) and "the run completed" (`__cgFrame` returned null in the look-fade
+colour section), with "requestAdapter did not answer in 10s" in the console. Neither
+touches the Mixer; the second looks like the adapter going away under the run. Worth a
+`qa` guard that says "no frame" rather than throwing, so the run goes on to the checks
+after it. And #193's first show shard died before any test ran: the runner could not
+resolve github.com at checkout.
+
+Found while building step 3, not yet done: the logo darkens what is under it by up to
+8 steps of 255 in the pixel or two where its card meets its clear margin, on its own
+way in as much as any blend, because its texture is filtered with its colour not
+premultiplied by its alpha (`npm run mixer` stays two pixels clear of that edge).
+Premultiplying on upload would take it out. And once, in a cloud session,
+`npm run phone`'s "spreading them zooms in by as much as they spread" read 4.00× →
+5.60× (1.40 times, 3.40 wanted): the zoom followed the first of six finger moves
+(50 → 70 px) and none after. It passed on the next run (3.40) and on every run before;
+the Mix sheet is shut by then. Worth reading whether a touchMove can be dropped while
+the page is busy.
 
 Found while building step 1, small and not yet done: the remote's Mixer has no check
 of its own (`npm run phone` drives the phone layout, not `?remote=1`), and on landscape

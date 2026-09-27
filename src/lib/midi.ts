@@ -75,7 +75,14 @@ export type MidiAction =
    * have, so one pad walks it through every place it can go.
    */
   | 'mix-raise-led' | 'mix-raise-back' | 'mix-raise-film' | 'mix-raise-mark'
-  | 'mix-raise-gel' | 'mix-raise-lumia';
+  | 'mix-raise-gel' | 'mix-raise-lumia'
+  /**
+   * A row's blend, on pads (lib/mixer.ts, nextBlend): each press steps it
+   * along own, screen, add, multiply, key and round to own again, so one pad
+   * can take a film from through the dye to keyed over it between songs.
+   */
+  | 'mix-blend-led' | 'mix-blend-gel' | 'mix-blend-lumia'
+  | 'mix-blend-back' | 'mix-blend-film' | 'mix-blend-mark';
 
 export type MidiTarget =
   /** A numeric setting, the control's full travel mapped onto min..max. */
@@ -221,6 +228,9 @@ const NOT_ON_A_BEAT: ReadonlySet<MidiAction> = new Set<MidiAction>([
   // The mixer's order: on a kick it would reshuffle the stack every beat.
   'mix-raise-led', 'mix-raise-back', 'mix-raise-film', 'mix-raise-mark',
   'mix-raise-gel', 'mix-raise-lumia',
+  // And its blends: on a kick the row would flicker through all five.
+  'mix-blend-led', 'mix-blend-gel', 'mix-blend-lumia',
+  'mix-blend-back', 'mix-blend-film', 'mix-blend-mark',
 ]);
 export const triggerable = (a: MidiAction): boolean => !NOT_ON_A_BEAT.has(a);
 
@@ -377,6 +387,9 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'mix-raise-led': 'Mixer: Raise LED Ring', 'mix-raise-back': 'Mixer: Raise Back Plate',
   'mix-raise-film': 'Mixer: Raise Film', 'mix-raise-mark': 'Mixer: Raise Logo',
   'mix-raise-gel': 'Mixer: Raise Gel Wheel', 'mix-raise-lumia': 'Mixer: Raise Lumia',
+  'mix-blend-led': 'Mixer: Next Blend, LED Ring', 'mix-blend-gel': 'Mixer: Next Blend, Gel Wheel',
+  'mix-blend-lumia': 'Mixer: Next Blend, Lumia', 'mix-blend-back': 'Mixer: Next Blend, Back Plate',
+  'mix-blend-film': 'Mixer: Next Blend, Film', 'mix-blend-mark': 'Mixer: Next Blend, Logo',
 };
 
 /**
@@ -495,7 +508,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
     Learnable because they are what a video mixer's channel strip is, and a
     channel strip is ridden: the film's brightness down as a verse comes in,
     the LED ring's saturation up for the chorus. Thirty-one of them, which
-    is what the shift banks are for.
+    is what the shift banks are for. The rows' blends are not here: each is
+    a choice of five, not a fader, so it is stepped by its Mixer: Next Blend
+    pad (mix-blend-*) the way the order is walked by the raise pads.
   */
   ...MIX_CONTROLS.map(({ key, label, min, max }) => ({ key, label, min, max })),
 ];
