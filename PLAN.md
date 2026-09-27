@@ -86,6 +86,18 @@ Whether to bracket it (Δ within the two idle readings ± the allowance) is a de
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
 
+*Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
+wall" went red on a run that does not touch the output.** #184's tools shard (Accent
+the One, default 0, which leaves every kick's weight at exactly 1) read 0.040 → 0.046
+at a gain of 2.2, a lift of 1.15 against the 1.25 it asks (it usually reads about 1.5;
+main's deploy one commit earlier passed it). Not the flash guard: the bracket turns it
+off, and with it off the loop resets its gain to 1 at once (`LiquidVisualizer`, where
+the guard's reading comes back null). The plain frame was unusually dark (0.040,
+against 0.164 for the same plate earlier in the run), so a guess, unmeasured: most of
+its light was in a few bright cells that a 2.2 gain clips at white, which lifts the
+mean far less than the grade. If so, the check should read cells the gain cannot clip
+(below 1/2.2 before the grade) rather than the whole frame's mean.
+
 The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
 backtrace, in `macCormack`), with a gathering cell held to the most its upstream
