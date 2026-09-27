@@ -40,6 +40,7 @@ import { PatchBay } from '../lib/sceneMap';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
+import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -572,6 +573,8 @@ export interface VisualizerRender {
 /** What the song's shape tracker has heard, for the app to read (`songShape` on the handle). */
 export interface SongShapeReport {
   now: SongShapeState;
+  /** Where the beats fall and which is the one (`lib/barGrid.ts`). */
+  bar: BarNow;
   /** The last few events, oldest first; `seq` counts every event since the plate started. */
   events: (SongEvent & { seq: number })[];
 }
@@ -4243,6 +4246,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
+  /*
+    The bar (lib/barGrid.ts): where the beats fall and which of them is the
+    one, heard from the same readings on the same clock as the song's shape,
+    so Accent the One can weigh each kick's press by its place in the bar.
+  */
+  const barGridRef = useRef(new BarGrid());
+  const accentRef = useRef(new Accent());
   const soundBindingsRef = useRef(soundBindings);
   soundBindingsRef.current = soundBindings;
   const onSoundTriggerRef = useRef(onSoundTrigger);
@@ -4745,7 +4755,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fluid.injectImage(flipped);
     },
     kicks: () => kickCountRef.current,
-    songShape: () => ({ now: { ...songShapeRef.current.now }, events: songEventsRef.current.slice() }),
+    songShape: () => ({ now: { ...songShapeRef.current.now }, bar: { ...barGridRef.current.now }, events: songEventsRef.current.slice() }),
     pace: (sample) => { paceTargetRef.current = { activity: sample.activity, dim: sample.dim }; },
     pour: (gust = 0.8) => {
       const energy = Math.min(1, audioDataRef.current?.energy ?? 0);
@@ -5412,6 +5422,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
+          barGridRef.current.update(heard, songClockRef.current);
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
@@ -6602,18 +6613,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const kickStep = kickRef.current.kick && simStep === 0;
+            /*
+              Accent the One (lib/barGrid.ts): this kick's weight by where it
+              falls in the bar, the one pressed hardest, two and four let go.
+              Asked of every kick, whatever the setting, so the one after a
+              fill is known when the setting comes up; at 0 it is exactly 1,
+              and so are kicks the bar grid is unsure of. A *predicted* kick
+              fires beatLead ahead of what is heard, so the beat it means is
+              that far on along the readings' clock the grid keeps; a kick
+              fired from a heard onset (all of them with Beat Prediction at 0,
+              and those before the clock locks or after it loses the lock)
+              fires as it is heard and means the beat now. Shifting those too
+              put them 80 ms past their beat at the default lead: at 140 bpm
+              103 of 109 kicks fell off the beat and weighed 0 at full accent,
+              so turning Accent up in detection-only mode all but stopped the
+              squeeze (measured with the real grid on the club songs).
+            */
+            const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
+            const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
             if (R > 0 && kickStep) {
               // Twice what it was: at full, with the band playing, the rock
               // showed on 7 looks of 24 (npm run controls). A ride at full
               // should be unmistakable.
-              rock.vx += Math.cos(rock.phase) * bass01 * 14 * R;
-              rock.vy += Math.sin(rock.phase) * bass01 * 14 * R;
+              rock.vx += Math.cos(rock.phase) * bass01 * 14 * R * accent;
+              rock.vy += Math.sin(rock.phase) * bass01 * 14 * R * accent;
               rock.phase += 2.4;   // successive kicks go different ways
             }
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
             const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
-            if (squeezeAmt > 0 && kickStep && isActiveRef.current && drainFrameRef.current === 0) {
+            if (squeezeAmt > 0 && kickStep && accent > 0 && isActiveRef.current && drainFrameRef.current === 0) {
               const leadPlate = fluidsRef.current[0];
               if (leadPlate) {
                 const cx = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
@@ -6621,12 +6650,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Three nested discs make a rough dome, so the dye spreads
                 // from the middle instead of only at one hard ring.
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
-                const a = 0.0024 * squeezeAmt * bass01;
+                const a = 0.0024 * squeezeAmt * bass01 * accent;
                 const fg = currentSettings.fingering ?? 0;
                 leadPlate.applySquish(cx, cy, 40, a, fg, true);
                 leadPlate.applySquish(cx, cy, 27, a, fg);
                 leadPlate.applySquish(cx, cy, 15, a, fg);
-                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01);
+                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
             const w = 2 * Math.PI * 0.9, z = 0.22;
@@ -7449,6 +7478,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // starts again at zero: its history and references belong to the song
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
+      // The bar too, for the same reason: its beats are on the old clock.
+      barGridRef.current.reset();
+      accentRef.current.reset();
       // And the events it heard go with it: they are stamped on the old clock,
       // and a poll after a render would otherwise read the film's drops as
       // the song's.

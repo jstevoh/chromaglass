@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (Follow the Song; `npm run pacing`), not yet filmed; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **built** (Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 4, 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -85,6 +85,18 @@ bracket its comment describes ("a Finger that makes dye still has to beat both")
 Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
+
+*Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
+wall" went red on a run that does not touch the output.** #184's tools shard (Accent
+the One, default 0, which leaves every kick's weight at exactly 1) read 0.040 → 0.046
+at a gain of 2.2, a lift of 1.15 against the 1.25 it asks (it usually reads about 1.5;
+main's deploy one commit earlier passed it). Not the flash guard: the bracket turns it
+off, and with it off the loop resets its gain to 1 at once (`LiquidVisualizer`, where
+the guard's reading comes back null). The plain frame was unusually dark (0.040,
+against 0.164 for the same plate earlier in the run), so a guess, unmeasured: most of
+its light was in a few bright cells that a 2.2 gain clips at white, which lifts the
+mean far less than the grade. If so, the check should read cells the gain cannot clip
+(below 1/2.2 before the grade) rather than the whole frame's mean.
 
 The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
@@ -899,9 +911,87 @@ The steps, most visible first. Each is one PR with its own check, and every step
    performer pick downbeats, every other bar or fills only, vary the depth a little as a
    hand does, and pull a hand-played press onto the predicted beat. Needs a real
    downbeat, which #155 does not have yet.
+   *Built 2026-09-27* (**Accent the One**, `beatAccent`, 0 to 1, default 0): a bar grid
+   (`lib/barGrid.ts`) hears the beats from the readings' onsets and which is the one
+   from the harmony moving, the backbeat and the kick, the evidence kept beat by beat
+   across the song and only trusted past a mark a bar-less loop never reaches. Each
+   kick's squeeze and rock are then weighed by its place: the one at 1.25, three at
+   0.4, two, four and the "and" let go at full, the one after a fill at 1.5. Where the
+   grid knows only the half bar (the backbeat, not yet which strong beat is the one),
+   one and three keep their press and two and four lose it; where it knows nothing,
+   every kick is 1. Settings → Show, MIDI, the desks, the remote, a sequence's
+   stages, and the phone's Sound sheet with a line saying what the grid hears. The
+   squeeze's weighting weighs nothing until Beat Squeeze reaches the plate (step 4's
+   found items: its press has never laid a cell); the rock's works today.
+   *Check:* `npm run downbeat` (90): on eight synthesised songs, a real beat within
+   70 ms on every tick of every groove, at the song's tempo within 2 % on 1326 of 1326
+   ticks; no kick but the one ever called the one (0 of 528, 519 of them placed); the
+   one known for 78 % of the groove's ones (rock songs 75 to 100 %, four on the floor
+   49 to 88 % on sixteen-bar sections, where the half bar carries the rest: two and
+   four softened 98 %); every kick weighed exactly what its place says (the one 1.25
+   on 159 kicks, three 0.4 on 155), the one after a fill 1.5 on 32 of 32 fills (12 club,
+   20 rock); a pulse and three loops with no bar (118, 126, 132) never placed, on a beat
+   they do hear; the same at 30 fps, 20 dB down and on the page's clock (every
+   estimate the same); fuzzed onset streams never name a tempo outside 69 to 185 bpm
+   and always return; an estimate's median 0.5 ms, 99th percentile 0.5 ms; the accent
+   at 0 leaves every kick at exactly 1, 933 of which the accent at 1 moves. The sure
+   mark is 2.2 (it was 2.6, set over a loop whose bass played a pickup into every one,
+   a bar cue; without it the loops reach 1.65 at worst). Mended on the way: the
+   tempo's refinement between bins was unbounded on a flank (393 bpm named in a song
+   at 128; a fuzzed stream hung the render loop), and the bins moved with the clock's
+   rounding. Not yet seen on the plate: the app's frames cannot be read in a cloud
+   session.
+   *Found while building it, not yet done:*
+   - **The rest of the step is not built.** The one (and the one after a fill) is; the
+     other accents the step asks for are not: *every other bar* (the grid knows the bar,
+     not yet the pair of bars), *fills only* (the fill is heard, and could be the only
+     press), *a hand's variation* (the depth varied a little from press to press), and
+     *a hand-played press pulled onto the predicted beat*.
+   - **Above about 148 bpm on four on the floor the grid hears half tempo** (75 to 87
+     bpm) and is almost never sure of the one (0 of 172 estimates at 160, 31 of 184 at
+     150). It fails safe, every kick 1, but no accent reaches DnB or fast techno; the
+     check's songs stop at 140.
+   - **Four on the floor's one is slow to come.** With the kick on every beat and a
+     chord a bar, only the chord tells the one from three: on sixteen-bar sections
+     the grid is sure of it 49 % of the time at 90 bpm, 82 to 88 % faster (a third of
+     the time on the eight-bar sections the check had first). A crash on the one and
+     the phrase's changes are evidence the grid does not use yet; the bass line's
+     pickup it hears only as the harmony moving (a loop with one reached a t of 2.6
+     on it alone).
+   - **The sure mark rests on three synthesised loops.** 2.2 stands a third over their
+     worst (1.65). A real bar-less track (a DJ tool, a techno loop with a drifting
+     pad) may reach further; a recorded one on the shelf would say.
+   - **Half tempo, now and then.** Club 140 names 70 bpm on 2 of its 181 settled
+     ticks (the check holds 95 %); the weighting toward 120 is an octave and a bit
+     wide, and 140 is near where its double and half weigh alike.
+   - **A new song after a gap finds its one late**: bar 14 of its groove, against
+     bar 7 heard alone. The old grid is held four seconds before it is let go, and
+     the new one then gathers from nothing.
+   - **No recorded song has been counted.** Nothing on the shelf has a beat; a
+     CC-licensed rock track and a dance track with known bars would let the check
+     hear real ones.
+   - **Sound learn's "Each bar" still counts from the clock's lock**, the one a
+     quarter of the time; it could fire on the grid's one instead.
+   - **The beat clock fires on through a fill on its own prediction**, which hides the
+     fill from the accent's "after a fill" in the app (the check hears the kicks
+     themselves).
 4. **Press smooth, lift into fingers** (roadmap G). A squeeze gives a smooth ring and a
    lift breaks into fingers; today both finger. *Check:* finger count round the ring,
    low on press and high on lift, in the lab.
+   *Found, not yet done:*
+   - **Beat Squeeze has never pressed the plate.** Its centre is `GRID_SIZE / 2` plus
+     a random fraction of 30 cells (`DICE.music.centred()`, and `Math.random()` before
+     the seeded dice), never rounded, so every cell index `squishDisc` reports is
+     fractional, and a write to a Float32Array at a fractional index is silently
+     dropped. Found checking that a kick's press lifts: it lays no cells at all. So
+     the rhythm plate every Fillmore description promises (README, CHANGELOG's Beat
+     squeeze entry, the kick's sunburst) has been the plate rock alone, and Accent the
+     One's weighting of the squeeze weighs nothing until it is fixed; its weighting of
+     the rock works. The fix is one `Math.round` on each of `cx`, `cy` (or in
+     `squishDisc`), but it turns on a press every look with Beat Squeeze up has never
+     had (Fillmore East among them), so it waits for the owner's eyes rather than
+     going out overnight. With it, a check: a kick with Beat Squeeze at 1 thins the
+     lead plate's film, which nothing asks today.
 5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
    with the ferrofluid phase as the precedent. The biggest difference in every frame,
    and the largest piece of work here; prototype in the lab first.
@@ -1061,7 +1151,8 @@ and look link are not. The order from here, as of 2026-09-26:
    (`docs/judging.md` §13). Steps 2 and 5 are small and independent; step 3 is the
    next that changes what a show can do.
 
-Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
+Batch 10's step 3 (accents) is built (Accent the One, `npm run downbeat`) and waits on
+the owner's eyes on a real GPU. Batch 3 (#163) and the startup
 freeze (#164) have shipped.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
 pick them up from `docs/roadmap.md` now that step 1 is in.

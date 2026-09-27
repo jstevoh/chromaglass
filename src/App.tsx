@@ -5,6 +5,7 @@ import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
+import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
@@ -691,6 +692,8 @@ export default function App() {
     needs to glance at it.
   */
   const [songLine, setSongLine] = useState('');
+  /** What the bar grid knows (lib/barGrid.ts barLine), for Accent the One on the phone. */
+  const [barKnown, setBarKnown] = useState('');
   /** The last song-shape event the sequencer has been handed, by its number. */
   const songCueSeqRef = useRef(0);
   useEffect(() => {
@@ -698,6 +701,8 @@ export default function App() {
       const report = visualizerRef.current?.songShape();
       const next = report ? songShapeLine(report.now) : '';
       setSongLine(prev => (prev === next ? prev : next));
+      const bar = report ? barLine(report.bar) : '';
+      setBarKnown(prev => (prev === bar ? prev : bar));
     }, 250);
     return () => clearInterval(timer);
   }, []);
@@ -4247,6 +4252,9 @@ export default function App() {
             }}
             songFollow={settings.songFollow ?? 0}
             onSongFollow={(v) => updateSettings({ songFollow: v })}
+            beatAccent={settings.beatAccent ?? 0}
+            onBeatAccent={(v) => updateSettings({ beatAccent: v })}
+            barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded }}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}

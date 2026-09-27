@@ -84,6 +84,7 @@ const SECTION_OF: Record<string, string> = {
   turbulenceScale: 'look',
   plateRock: 'look',
   beatSqueeze: 'show',
+  beatAccent: 'show',
   fingering: 'show',
   beads: 'show',
   beadDrops: 'show',

@@ -574,6 +574,7 @@ export default function RemoteControl() {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Accent the One" field="beatAccent" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             Only while a maze is on the plate, as the macro dials are only
             there with the closeup on: the phone is a surface for the show,

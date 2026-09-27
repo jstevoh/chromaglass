@@ -140,6 +140,14 @@ export interface PhoneStageProps {
   songFollow: number;
   onSongFollow: (v: number) => void;
   /*
+    Accent the One (lib/barGrid.ts): the kick's press by its place in the
+    bar, on the Sound sheet under Follow the Song, with what the bar grid
+    knows printed under it, since the setting waits on that.
+  */
+  beatAccent: number;
+  onBeatAccent: (v: number) => void;
+  barLine: string;
+  /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
     draw, at the phone's sizes, so the order and the grades are one thumb
     away like everything else here.
@@ -559,6 +567,15 @@ export function PhoneStage(p: PhoneStageProps) {
                 {p.show.running
                   ? 'The show holds still through a build and throws its big move on the drop.'
                   : 'Moves a light show with the song: start one from Play.'}
+              </p>
+            </div>
+          )}
+          {p.audioSource !== 'none' && (
+            <div className="mt-3">
+              <Slider label="Accent the one" value={p.beatAccent} min={0} max={1} step={0.01} onChange={p.onBeatAccent}
+                display={`${Math.round(p.beatAccent * 100)}%`} touch testId="phone-beat-accent" midiKey="setting:beatAccent" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-beat-accent-says">
+                {p.barLine ? `${p.barLine}.` : 'Listening for the beat.'}
               </p>
             </div>
           )}

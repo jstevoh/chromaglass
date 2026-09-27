@@ -592,6 +592,16 @@ export interface VisualizerSettings {
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
   beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
+  /**
+   * Accent the One: how far the kick's press (Beat Squeeze) and push (Plate
+   * Rock) follow the kick's place in the bar, as a projectionist plays a
+   * rhythm plate: the one pressed hardest, three lighter, two, four and the
+   * "and" let go (lib/barGrid.ts). 0 is every kick alike, as it always was;
+   * wherever the bar is not yet known, every kick is alike too. The
+   * squeeze's share weighs nothing until Beat Squeeze's press reaches the
+   * plate (PLAN §10 step 4); the rock's is live.
+   */
+  beatAccent: number;
   backgroundLoop: number;     // the layers behind the lead run slower and calmer, a background loop the live plate plays over
   kaleidoscope: number;       // mirror the plate into 2..12 folds (0 = off), the four-fold dish of the reference stills
   /**
@@ -828,6 +838,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerScaleVariety: 0.5,
   hueJourney: 3,
   beatSqueeze: 0.5,
+  beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,
   kaleidoSpin: 0.02,        // the rate that used to be baked into the shader
