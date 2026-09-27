@@ -405,6 +405,37 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
+## 17. The Mac app, on the Mac and on a projector
+
+The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
+server in one Electron app. CI opens the packed app on its Mac runner and
+measures it (`npm run desktop`): offline, a lit plate, OSC, a projector with
+no click (a stand-in second screen), and quitting. What only a real Mac with
+a real projector can say. Get it from Actions → *Mac app* → *Run workflow*,
+or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
+
+- Wi-Fi off before opening it: the show opens and plays, and the music
+  shelf plays its songs;
+- the plate at 60 fps against the same look in Chrome (`?debug`'s
+  `frameMs`): the app is the same Chromium, so a difference is a finding;
+- a projector plugged in *before* opening: the show is on it in full screen
+  with no title bar and no click. Unplug and plug back in: it comes back.
+  Settings → Wall → Ask: the chip is back, and Auto again sends it;
+- the laptop window covered by another app, and minimised: the wall keeps
+  moving, and the sound still moves it;
+- Show → Show Server Details…: the phone's address works, the key is the same
+  after quitting and reopening, and a phone linked before the restart
+  relinks by itself;
+- OSC from Resolume or TouchDesigner to UDP 9000, and Art-Net if the rig is
+  there;
+- the MIDI controller: works with no prompt;
+- the lid closed with the projector as the only screen: the show stays up;
+- the projector's full screen is macOS's own. With System Settings → Desktop
+  & Dock → "Displays have separate Spaces" off, a full-screen window takes
+  every display, so the laptop's screen may go black too. Say which it is on
+  your Mac; if it does, the app should use a borderless window over the
+  projector's screen instead.
+
 ---
 
 ## 16. The Magnet pulls a pool out in fingers

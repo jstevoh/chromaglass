@@ -57,6 +57,12 @@ function useFullscreen() {
     document.addEventListener('fullscreenchange', change);
     window.addEventListener('keydown', key);
     window.addEventListener('message', message);
+    // Full screen may have come between the first render and this listener:
+    // the Mac app puts the window there as soon as it has loaded
+    // (desktop/main.js), and a missed change left the click hint on the wall
+    // over a window already in full screen (seen once in three runs of
+    // `npm run desktop`).
+    change();
     return () => {
       document.removeEventListener('fullscreenchange', change);
       window.removeEventListener('keydown', key);

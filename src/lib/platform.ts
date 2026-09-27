@@ -62,6 +62,17 @@ export function detectTier(): PlatformTier {
   return 'hosted';
 }
 
+/**
+ * The Mac app (`desktop/`, PLAN.md §13): Electron, with the show server
+ * inside it, which says so from its preload. The tier above reads it as
+ * `native`; this is for the few places where the app can do what a browser
+ * will not, such as opening the projector window with no click.
+ */
+export function isDesktopApp(): boolean {
+  const w = window as unknown as { __CHROMAGLASS_NATIVE__?: { shell?: unknown } };
+  return w.__CHROMAGLASS_NATIVE__?.shell === 'desktop';
+}
+
 /** The device's pixel ratio, held to a sane range. */
 export const devicePixels = (): number => Math.max(1, Math.min(3, window.devicePixelRatio || 1));
 
