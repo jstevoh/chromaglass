@@ -15,6 +15,7 @@
 
 import type { VisualizerSettings } from '../types';
 import type { CastMessage } from './castProtocol';
+import { relayFromUrl, relaySocketUrl } from './appLink';
 
 /** WebSocket path the relay listens on. */
 export const REMOTE_WS_PATH = '/remote-ws';
@@ -166,8 +167,15 @@ export type RemoteMessage =
    */
   | { type: 'liquid'; id: string };
 
-/** Build the ws:// URL for the relay from the page's own origin. */
+/**
+ * Build the ws:// URL for the relay: the one this page was pointed at with
+ * `?relay=` (the iPhone app, whose own origin has no relay behind it; see
+ * `lib/appLink.ts`), or else the page's own origin, which is the show server
+ * that served it.
+ */
 export function remoteSocketUrl(): string {
+  const relay = relayFromUrl();
+  if (relay) return relaySocketUrl(relay, REMOTE_WS_PATH);
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${window.location.host}${REMOTE_WS_PATH}`;
 }

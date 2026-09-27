@@ -1,0 +1,10 @@
+{
+  "appId": "app.chromaglass",
+  "appName": "ChromaGlass",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#000000",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

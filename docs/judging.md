@@ -378,6 +378,26 @@ in the lab). Worth looking at:
 ?set=fingering=0      the press as a plain round squeeze, no fingers at all
 ```
 
+## 16. The iPhone app, and switching it to the laptop's remote
+
+The app (PLAN.md §12) is the website's build inside a Capacitor shell. It has
+never run on a phone: CI only compiles it for the simulator. On the Mac, with
+Xcode 26 and the iPhone plugged in, `npm run ios` builds the site, copies it
+into the app and opens Xcode; pick the phone, sign with your Apple ID (a free
+one is enough for your own phone) and press Run. Worth looking at:
+
+- the plate as it played in Safari: same looks, fingers, frame rate. The app
+  starts on the website's quality ladder (512² at most), not the laptop's;
+- the microphone: Sound → Mic asks once, the plate hears the room, and music
+  still comes out of the speaker, not the earpiece, while the mic is on;
+- the screen does not dim or lock mid-set, and the status bar stays hidden;
+- More › Laptop remote, with `npm run remote` running on the laptop: paste
+  the Phone line it printed (or type the laptop's address and the key). iOS
+  asks once to find devices on the local network; say yes. The remote
+  should say Linked and drive the laptop's show. Play here goes back to the
+  plate; More › Laptop remote again goes straight back to the same laptop;
+- Record: known not to save yet (PLAN §12 step 5).
+
 ---
 
 ## Reading the frame time while you do it

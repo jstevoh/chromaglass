@@ -9,6 +9,8 @@
  * (`governor.ts`) measures the real frame rate and moves from there.
  */
 
+import { isPhoneApp } from './appLink';
+
 export type PlatformTier = 'hosted' | 'local' | 'native';
 
 /** A coarse read of the GPU, from its adapter — `classifyAdapter` in `gpu/device.ts`. */
@@ -38,6 +40,13 @@ export function detectTier(): PlatformTier {
   if (forced === 'hosted' || forced === 'local' || forced === 'native') return forced;
   const w = window as unknown as { __CHROMAGLASS_NATIVE__?: unknown; __TAURI__?: unknown };
   if (w.__CHROMAGLASS_NATIVE__ || w.__TAURI__ || /Electron/i.test(navigator.userAgent)) return 'native';
+  // The iPhone app (lib/appLink.ts) draws its pages from capacitor://localhost,
+  // and "localhost" would read as a laptop serving its own show and get the
+  // full ladder, up to 1024² at three device pixels, on a phone. It gets the
+  // website's ladder instead: that is what the owner ran on the iPhone in
+  // Safari (PLAN.md §12 step 1), and the phone's heat and battery over a set
+  // are still to be measured before it is offered more.
+  if (isPhoneApp()) return 'hosted';
   if (PRIVATE_HOST.test(window.location.hostname)) return 'local';
   return 'hosted';
 }

@@ -12,6 +12,8 @@ import { PIN_RANGE } from '../lib/deskPins';
 import { MixerPanel } from './MixerPanel';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
+import { isPhoneApp, relayFromUrl } from '../lib/appLink';
+import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -117,7 +119,18 @@ function tiltOf(e: ReactPointerEvent): { dx: number; dy: number } | null {
   return { dx: tx / 90, dy: -ty / 90 };
 }
 
-export default function RemoteControl() {
+/**
+ * In the iPhone app with no laptop chosen yet, ask for one first: the app's
+ * own origin has no relay behind it, so connecting there would only spin on
+ * "Finding laptop" (`lib/appLink.ts`).
+ */
+export default function RemoteRoot() {
+  const inApp = isPhoneApp();
+  if (inApp && !relayFromUrl()) return <LaptopLinkForm />;
+  return <RemoteControl inApp={inApp} />;
+}
+
+function RemoteControl({ inApp }: { inApp: boolean }) {
   const [state, setState] = useState<RemoteState | null>(null);
   /**
    * While a finger is on a slider, the phone trusts its own value: state
@@ -505,6 +518,7 @@ export default function RemoteControl() {
         overscrollBehavior: 'none',
       }}
     >
+      {inApp && <AppModeBar />}
       {/* Status */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0a0a0a]/95 px-5 py-4 backdrop-blur">
         <div>
@@ -515,7 +529,7 @@ export default function RemoteControl() {
         </div>
         <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
           {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-          {status === 'denied' && <span className="ml-2 text-red-300">Wrong show key — open the address the show server printed, key included</span>}
+          {status === 'denied' && <span className="ml-2 text-red-300">{inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key — open the address the show server printed, key included'}</span>}
           {connected ? 'Linked' : status === 'connecting' ? 'Finding laptop' : 'Offline'}
         </div>
       </header>

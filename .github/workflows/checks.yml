@@ -236,6 +236,11 @@ jobs:
       # tools shard below.
       - name: The phone
         run: npm run phone
+      # The iPhone app as the laptop's remote (src/lib/appLink.ts): a real
+      # relay, a stand-in laptop and the app's page from another origin. No
+      # plate needed, so it runs here rather than on a Mac.
+      - name: The iPhone app's remote
+        run: npm run applink
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU

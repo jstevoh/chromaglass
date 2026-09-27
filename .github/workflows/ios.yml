@@ -1,0 +1,55 @@
+name: iPhone app
+
+# Builds the iPhone app (PLAN.md §12) for the simulator, unsigned, so a change
+# that breaks the Xcode project goes red on its PR rather than on the owner's
+# Mac. It proves the app compiles and bundles today's build, not how it plays:
+# the plate on a real phone is judged by hand (docs/judging.md).
+#
+# Its own workflow, not a job in checks.yml: deploy.yml calls checks.yml, and
+# the website should not wait on, or be stopped by, the app's build. It runs
+# only when something the app is made from changes.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/lib/appLink.ts'
+      - 'src/main.tsx'
+      - '.github/workflows/ios.yml'
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: iPhone app (simulator build)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The app asks for iOS 26 (the first with WebGPU in WKWebView), which
+      # needs Xcode 26's SDK. Take the newest Xcode 26 the image has, and say
+      # so plainly if it has none rather than failing inside xcodebuild.
+      - name: Xcode 26
+        run: |
+          xc=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$xc" ]; then echo "No Xcode 26 on this image:"; ls -d /Applications/Xcode*.app; exit 1; fi
+          sudo xcode-select -s "$xc/Contents/Developer"
+          xcodebuild -version
+      - name: Build the site into the app
+        run: npm run build && npx cap sync ios
+      - name: Build the app
+        run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App
+          -configuration Debug -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build
