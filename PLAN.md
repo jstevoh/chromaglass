@@ -1289,7 +1289,7 @@ did not stop it, so the later moves seem not to reach the pinch at all (inferred
 measured): the touch listeners' cleanup drops the pinch, and a plate rebuilt mid-pinch
 would do exactly this.
 
-Found while building step 1, both **done** (#PRG): the remote's Mixer had no check of
+Found while building step 1, both **done** (#198): the remote's Mixer had no check of
 its own (`npm run phone` drives the phone layout, not `?remote=1`); `npm run remotemix`
 now starts the show server with a display and a phone on the remote and asks the
 display's own settings that the phone lists its rows in its order, moves the stack by
