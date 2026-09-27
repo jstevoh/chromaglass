@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the gel wheel and the lumia in the Mixer
+
+- **Two more rows in the Mixer**: the gel wheel and the lumia, each with its
+  level (Gel Wheel and Lumia, the same settings as under Lamp) and its own
+  brightness, contrast, saturation and hue. Under the front plate they are
+  the lamp, as they always were; raised above it, the lumia is a beam of its
+  own screened over the plate, and the gel a filter on the lens that colours
+  everything under it in the stack and leaves black glass black. Every look
+  and every saved order is the same picture as before.
+- Two more pads, Mixer: Raise Gel Wheel and Mixer: Raise Lumia. On the
+  desk, in Settings, on the phone's Mix sheet and on the remote.
+- `npm run mixer` measures the new rows (44 checks, each new one held red
+  against a broken shader).
+
 ### Fixed — Beat Squeeze presses the plate
 
 - **Beat Squeeze has never pressed the plate, and now does.** Its press

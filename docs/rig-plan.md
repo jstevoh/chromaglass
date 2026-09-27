@@ -160,7 +160,10 @@ the display pass now lays sources in at three places (under the front plate,
 between the plates, over both) by walking the stack. The front plate does not
 move; only the LED ring passes it, from the lamp under the glass to a beam of
 its own. At the default order and grades the picture is identical to before to
-the bit; `npm run mixer` measures the rest. What is still R1's: a row per
+the bit; `npm run mixer` measures the rest. The gel wheel and the lumia
+followed as rows of their own (PLAN.md §11 step 2): with the LED ring they
+are the lamp's three, the only rows that can go under the front plate, and
+above it the lumia is a beam and the gel a filter on the lens. What is still R1's: a row per
 projector, once there is more than one live plate.
 
 ## Order, and why

@@ -3,7 +3,7 @@ import { ArrowUp, ArrowDown, ChevronDown, RotateCcw } from 'lucide-react';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { Slider } from './ui';
 import {
-  MIX_SOURCE_INFO, MIX_GRADES, MIX_CONTROLS, gradeKey, gradeLabel, mixStack, moveInMix,
+  MIX_SOURCE_INFO, MIX_GRADES, MIX_CONTROLS, MIX_LAMP, gradeKey, gradeLabel, mixStack, moveInMix,
   type MixSource, type MixMover,
 } from '../lib/mixer';
 import { PIN_RANGE } from '../lib/deskPins';
@@ -25,8 +25,14 @@ import { readSetting } from '../lib/readout';
  * one row at a time, because four more sliders on every row is a page.
  *
  * Nothing here decides anything: the order's rules (the front plate stays,
- * only the LED ring passes it) are `moveInMix`'s, so an arrow that cannot
+ * only the lamp's sources pass it) are `moveInMix`'s, so an arrow that cannot
  * move a row is disabled rather than pressed and ignored.
+ *
+ * The three that can be the lamp wear a tag saying which side of the glass
+ * they are on, because the same row is a different thing on each: the LED
+ * ring and the lumia are the lamp under it and a beam over it, and the gel
+ * is over the lamp or over the lens. Without the tag a move past the front
+ * plate reads as a nudge, and it is the biggest change an arrow makes.
  */
 export interface MixerPanelProps {
   settings: VisualizerSettings;
@@ -51,6 +57,8 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
   const canMove = (id: MixSource, dir: 1 | -1) =>
     id !== 'front' && moveInMix(settings.mixOrder, id, dir) !== mixStack(settings.mixOrder).join(' ');
   const s = settings as unknown as Record<string, number>;
+  const lampish = (id: MixSource) => (MIX_LAMP as readonly string[]).includes(id);
+  const ownKey = (key: keyof VisualizerSettings) => MIX_CONTROLS.some(c => c.key === key);
 
   /** Why a row has nothing on the wall right now, or null when it does. */
   const absent = (id: MixSource): { why: string; fix?: { label: string; patch: Partial<VisualizerSettings> } } | null => {
@@ -86,7 +94,13 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
             testId={`${testId}-${String(key)}`}
           />
         </div>
-        {chips && <div className="pt-0.5">{chips(key)}</div>}
+        {/*
+          Pin chips only on the mixer's own controls. A row whose level is a
+          setting with a slider of its own elsewhere in Settings (Film Mix,
+          Logo Opacity, Gel Wheel, Lumia) keeps its pin there: two chips for
+          one setting on one sheet is a control drawn twice (`npm run layout`).
+        */}
+        {chips && ownKey(key) && <div className="pt-0.5">{chips(key)}</div>}
       </div>
     );
   };
@@ -101,7 +115,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
         disabled={!ok}
         aria-label={`${name} ${dir > 0 ? 'up' : 'down'} the stack`}
         title={id === 'front' ? 'The front plate is the glass the lamp shines through; the rest stack on it'
-          : ok ? `Move ${name} ${dir > 0 ? 'up' : 'down'}` : dir < 0 && id !== 'led' ? 'Only the LED ring goes under the front plate' : undefined}
+          : ok ? `Move ${name} ${dir > 0 ? 'up' : 'down'}` : dir < 0 && !lampish(id) ? 'Only the LED ring, the gel and the lumia go under the front plate' : undefined}
         data-testid={`${testId}-${id}-${dir > 0 ? 'up' : 'down'}`}
         className={`flex items-center justify-center rounded-md text-text-2 transition-colors disabled:opacity-25 enabled:hover:bg-hover enabled:active:bg-active ${
           touch ? 'h-12 w-12' : 'h-7 w-7'
@@ -115,13 +129,14 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
   return (
     <div className="flex flex-col gap-1.5" data-testid={testId}>
       <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} leading-snug text-muted`}>
-        Top of the list is on top on the wall. The LED ring under the front plate is its lamp; above it, a beam of its own.
+        Top of the list is on top on the wall. What is under the front plate is its lamp; the LED ring and the lumia above it are beams, the gel a filter on the lens.
       </p>
       {rows.map(id => {
         const info = MIX_SOURCE_INFO[id];
         const off = absent(id);
         const isOpen = open === id;
-        const role = id === 'led' ? (stack.indexOf('led') < stack.indexOf('front') ? 'lamp' : 'beam') : null;
+        const under = stack.indexOf(id) < stack.indexOf('front');
+        const role = !lampish(id) ? null : under ? 'lamp' : id === 'gel' ? 'lens' : 'beam';
         const graded = MIX_GRADES.some(g => {
           const c = MIX_CONTROLS.find(m => m.key === gradeKey(id, g));
           return c && s[String(c.key)] !== undefined && s[String(c.key)] !== c.none;

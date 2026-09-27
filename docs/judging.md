@@ -303,6 +303,13 @@ you would use, or should the beam go over the film too by default?); and
 whether 0–200% is the right travel for brightness, contrast and
 saturation on a projector, or too much at the top.
 
+The gel wheel and the lumia are rows too (PLAN.md §11 step 2). Two more
+things to look at: the gel raised over the front plate, a filter on the lens
+that multiplies the picture by its colour at the same density as over the
+lamp (is 1.5 the right gain there, or does it burn the dye out?), and the
+lumia raised over the front plate, a beam screened over the dye (does it
+read as a second projector, or as fog?).
+
 ## 14. Oil & Water as two bodies
 
 Oil & Water now pours oil as bodies that keep their own colour (Oil Bodies,

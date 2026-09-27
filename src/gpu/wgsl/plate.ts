@@ -1484,15 +1484,17 @@ struct FsOut {
 /*
   The mixer's stack (lib/mixer.ts).
 
-  Four sources can move: the LED ring (mixPos.x), the back plate (.y),
-  the film (.z) and the logo (.w), each told its row in the stack of
-  five, 0 at the bottom. The front plate cannot move; it is the glass the lamp
-  shines through, and it has whichever of rows 0 and 1 is left.
+  Six sources can move: the LED ring (mixPos.x), the back plate (.y),
+  the film (.z) and the logo (.w), the gel wheel (mixPos2.x) and the lumia
+  (mixPos2.y), each told its row in the stack of seven, 0 at the bottom. The
+  front plate cannot move; it is the glass the lamp shines through, at row
+  mixPos2.z, and every row under it is the lamp.
 
   Everything is still drawn in one pass, so an order is a matter of *where in
   this pass* a source is laid in, and there are three places:
 
-    - under the front plate, as the lamp: only the LED ring can be there, at 0;
+    - under the front plate, as the lamp: only the LED ring, the gel and the
+      lumia can be there, built bottom up into the light the glass is lit by;
     - between the front plate and the back plate: whatever sits below the back
       plate, laid in before it, and so under the hot-spot, the droplets and the
       bubbles too, which belong to the glass;
@@ -1501,10 +1503,11 @@ struct FsOut {
       it always was, so it stays over the post chain's effects and out of the
       dimmer, which is what a title over the show wants.
 
-  At the order the shader always had (the ring 0, the front plate 1, the back
-  plate 2, the film 3, the logo 4) the first two places are empty and the film
-  is laid in where it always was, with the same arithmetic, so the picture
-  does not change.
+  At the order the shader always had (the ring, the gel and the lumia the lamp
+  in that order, then the front plate, the back plate, the film and the logo)
+  the lamp is built in the order it always was and the second place is empty,
+  and the film is laid in where it always was, with the same arithmetic, so
+  the picture does not change.
 */
 fn mixLevelled(under: vec3f, over: vec3f, level: f32) -> vec3f {
   // Not mix(a, b, 1): a compiler is free to write that as a + (b - a) * 1,
@@ -1524,6 +1527,34 @@ fn ledLight(uv: vec2f) -> vec3f {
   return lc * bevel;
 }
 
+/** The gel wheel's colour at uv: four segments turning, graded, soft where one meets the next. */
+fn gelColor(uv: vec2f) -> vec3f {
+  let aspect = U.resolution.x / max(1.0, U.resolution.y);
+  let gc = (uv - 0.5) * vec2f(aspect, 1.0);
+  let ga = fract(atan2(gc.y, gc.x) / (2.0 * PI) + U.gelAngle);
+  let seg = ga * 4.0;
+  let gi = i32(floor(seg));
+  let gf = fract(seg);
+  var g0 = U.gel3;
+  var g1 = U.gel0;
+  if (gi == 0) { g0 = U.gel0; g1 = U.gel1; }
+  else if (gi == 1) { g0 = U.gel1; g1 = U.gel2; }
+  else if (gi == 2) { g0 = U.gel2; g1 = U.gel3; }
+  return gradeMix(mix(g0, g1, smoothstep(0.86, 1.0, gf)), U.mixGrade[4]);
+}
+
+/** The lumia's light at uv: Wilfred's slow folded sheets, in two of the look's dyes, graded. */
+fn lumiaLight(uv: vec2f) -> vec3f {
+  let aspect = U.resolution.x / max(1.0, U.resolution.y);
+  let lp = uv * vec2f(aspect, 1.0) * 1.35;
+  let lt = U.time * 0.035;
+  let h = fbm3(lp + vec2f(lt * 0.7, -lt * 0.4)) * 0.6 + fbm3(lp * 2.1 - vec2f(lt * 0.3, lt * 0.5)) * 0.4;
+  let sheet = pow(abs(sin(h * 9.42 + lt)), 3.0);
+  let veil = 0.25 + 0.75 * fbm3(lp * 0.6 + vec2f(lt * 0.2, lt * 0.15));
+  let lcol = gradeMix(mix(U.lumiaA, U.lumiaB, smoothstep(0.25, 0.75, fbm3(lp * 0.7 + lt))), U.mixGrade[5]);
+  return lcol * (0.12 + 0.9 * sheet) * veil;
+}
+
 /** The film projector's frame, through the dye it lands on, as it always was; graded first. */
 fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
   if (U.filmOn == 0 || U.filmMix <= 0.001) { return color; }
@@ -1535,21 +1566,51 @@ fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
   return mix(color, color * 0.35 + tinted * 0.95, key * U.filmMix);
 }
 
+/** Light laid over light: screened, so it adds and cannot clip past white. */
+fn screenOver(c: vec3f, light: vec3f) -> vec3f {
+  return 1.0 - (1.0 - c) * (1.0 - clamp(light, vec3f(0.0), vec3f(1.0)));
+}
+
 /**
- * The movers whose place is in [lo, hi), laid over color bottom first.
- * The LED ring at 0 is the lamp, drawn under the glass, so it is not a beam here.
+ * The rows under the front plate, bottom up: the lamp the glass is lit by.
+ * The LED ring replaces what is under it by its level, as the platform always
+ * did; the gel colours what is under it, with a floor so that a gel over a
+ * dark lamp still shows its colour, as a gel over a dim bulb does; the lumia
+ * adds its light.
+ */
+fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
+  var c = bg;
+  for (var p = 0; p < 7; p++) {
+    let fp = f32(p);
+    if (fp >= U.mixPos2.z) { break; }
+    if (U.ledPlatform != 0 && U.mixPos.x == fp) { c = mixLevelled(c, ledLight(uv), U.mixLevel.x); }
+    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) { c = mix(c, max(c, vec3f(0.10)) * gelColor(uv) * 1.5, U.gelWheel); }
+    if (U.lumia > 0.001 && U.mixPos2.y == fp) { c += lumiaLight(uv) * U.lumia; }
+  }
+  return c;
+}
+
+/**
+ * The movers whose place is in [lo, hi), laid over color bottom first. Only
+ * ever asked for rows above the front plate: the rows under it are the lamp
+ * (mixLamp), not beams.
+ *
+ * Above the glass the LED ring and the lumia are beams of their own, screened
+ * over what is under them. The gel is a filter in front of the lens: it
+ * multiplies what is under it by its colour, at the same 1.5 the lamp's gel
+ * has so that it is the same density of gel in either place, but with no
+ * floor, since a filter over black glass has no light to colour.
  */
 fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
   var c = color;
-  for (var p = 0; p < 5; p++) {
+  for (var p = 0; p < 7; p++) {
     let fp = f32(p);
     if (fp < lo || fp >= hi) { continue; }
-    if (U.ledPlatform != 0 && U.mixPos.x == fp && fp > 0.5) {
-      // A beam of its own: light added to light, screened so it cannot clip.
-      c = 1.0 - (1.0 - c) * (1.0 - clamp(ledLight(uv) * U.mixLevel.x, vec3f(0.0), vec3f(1.0)));
-    }
+    if (U.ledPlatform != 0 && U.mixPos.x == fp) { c = screenOver(c, ledLight(uv) * U.mixLevel.x); }
+    if (U.gelWheel > 0.001 && U.mixPos2.x == fp) { c = mix(c, c * gelColor(uv) * 1.5, U.gelWheel); }
+    if (U.lumia > 0.001 && U.mixPos2.y == fp) { c = screenOver(c, lumiaLight(uv) * U.lumia); }
     if (U.mixPos.z == fp) { c = filmOver(c, uv, fluid0, normal0); }
-    if (U.mixPos.w == fp && fp < 3.5) { c = markLayer(c, uvScreen, U.mixLevel.w, markTex); }
+    if (U.mixPos.w == fp && fp < U.mixPos2.w) { c = markLayer(c, uvScreen, U.mixLevel.w, markTex); }
   }
   return c;
 }
@@ -1604,36 +1665,10 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   var auxN = vec2f(0.0);
   var auxH = 0.0;
   var auxB = 0.0;
-  // The LED ring is the lamp while it is at the bottom of the mixer's stack;
-  // anywhere higher it is a beam (mixSourcesAt) and the glass is lit plain.
-  if (U.ledPlatform != 0 && U.mixPos.x < 0.5) {
-    bgColor = mixLevelled(bgColor, ledLight(uv), U.mixLevel.x);
-  }
-
-  if (U.gelWheel > 0.001) {
-    let gc = (uv - 0.5) * vec2f(aspect, 1.0);
-    let ga = fract(atan2(gc.y, gc.x) / (2.0 * PI) + U.gelAngle);
-    let seg = ga * 4.0;
-    let gi = i32(floor(seg));
-    let gf = fract(seg);
-    var g0 = U.gel3;
-    var g1 = U.gel0;
-    if (gi == 0) { g0 = U.gel0; g1 = U.gel1; }
-    else if (gi == 1) { g0 = U.gel1; g1 = U.gel2; }
-    else if (gi == 2) { g0 = U.gel2; g1 = U.gel3; }
-    let gel = mix(g0, g1, smoothstep(0.86, 1.0, gf));
-    bgColor = mix(bgColor, max(bgColor, vec3f(0.10)) * gel * 1.5, U.gelWheel);
-  }
-
-  if (U.lumia > 0.001) {
-    let lp = uv * vec2f(aspect, 1.0) * 1.35;
-    let lt = U.time * 0.035;
-    let h = fbm3(lp + vec2f(lt * 0.7, -lt * 0.4)) * 0.6 + fbm3(lp * 2.1 - vec2f(lt * 0.3, lt * 0.5)) * 0.4;
-    let sheet = pow(abs(sin(h * 9.42 + lt)), 3.0);
-    let veil = 0.25 + 0.75 * fbm3(lp * 0.6 + vec2f(lt * 0.2, lt * 0.15));
-    let lcol = mix(U.lumiaA, U.lumiaB, smoothstep(0.25, 0.75, fbm3(lp * 0.7 + lt)));
-    bgColor += lcol * (0.12 + 0.9 * sheet) * veil * U.lumia;
-  }
+  // The lamp: whichever of the LED ring, the gel and the lumia the mixer's
+  // stack has under the front plate, bottom up. Anything of the three that is
+  // higher is laid over the glass (mixSourcesAt), and the glass is lit without it.
+  bgColor = mixLamp(bgColor, uv);
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2035,7 +2070,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   auxN *= U.mixLevel.y;
   auxH *= U.mixLevel.y;
   // Whatever the operator put below the back plate, in order.
-  outColor = mixSourcesAt(outColor, 0.0, U.mixPos.y, uv, uvScreen, fluid0, normal0);
+  outColor = mixSourcesAt(outColor, U.mixPos2.z + 1.0, U.mixPos.y, uv, uvScreen, fluid0, normal0);
 
   // ── Layer 1 (if present) ──────────────────────────────────────────
   if (U.layerCount > 1) {
@@ -2492,7 +2527,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   }
 
   // ── Over both plates: the film projector, and whatever else the mixer put there ──
-  outColor = mixSourcesAt(outColor, U.mixPos.y + 1.0, 5.0, uv, uvScreen, fluid0, normal0);
+  outColor = mixSourcesAt(outColor, U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────
   if (U.lampWarmth > 0.001) {
