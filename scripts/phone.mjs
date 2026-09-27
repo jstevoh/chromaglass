@@ -144,7 +144,7 @@ try {
     await ctx.close();
   }
 
-  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
+  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['the breakpoint', 800, 360, 0.5], ['under the breakpoint', 799, 360, 0.5], ['a small landscape', 740, 360, 0.5], ['the smallest landscape', 667, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
     const { ctx, page } = await phonePage(w, h);
     const up = await visible(page, 'phone-stage');
     check(`${label} ${w}×${h}: the phone layout is up`, up);
@@ -160,6 +160,38 @@ try {
     check(`${label}: each is 48 px or more`, small.length === 0,
       small.length ? small.map(id => { const b = boxes[DOCK.indexOf(id)]; return `${id} ${Math.round(b.width)}×${Math.round(b.height)}`; }).join(', ')
         : `smallest ${Math.round(Math.min(...boxes.filter(Boolean).map(b => Math.min(b.width, b.height))))} px`);
+    /*
+      One row where it fits, two where it does not: a landscape phone 800 px
+      wide or more has the tools and the sheets side by side, since height is
+      what the plate is short of there, and a narrower one has the sheets
+      under the tools (where one row put the tools at 42 px on a 740 and 35
+      on a 667). Portrait is always two. Read from where the Dye and the
+      Looks buttons sit, the last tool and the first sheet.
+    */
+    if (boxes[9] && boxes[10]) {
+      const oneRow = Math.abs(boxes[9].y + boxes[9].height / 2 - (boxes[10].y + boxes[10].height / 2)) < 8;
+      const wantOne = w > h && w >= 800;
+      check(`${label}: the dock is ${wantOne ? 'one row' : 'two rows'}`, oneRow === wantOne,
+        `the tools' row at ${Math.round(boxes[9].y)}, the sheets' at ${Math.round(boxes[10].y)}`);
+    }
+    /*
+      The strip across the top between the look and the three buttons is the
+      plate's: the row that holds them once took every touch across it, 65 px
+      deep. Asked at the middle of the gap, where a finger lands, and not only
+      through the plate's share, which read 50% at 740 and 667 with the band
+      back and so could not tell.
+    */
+    const gap = await page.evaluate(() => {
+      const look = document.querySelector('[data-testid="phone-look-button"]')?.getBoundingClientRect();
+      const right = ['phone-zoom', 'phone-play', 'phone-hide']
+        .map(id => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect()).filter(Boolean);
+      if (!look || !right.length) return null;
+      const x = (look.right + Math.min(...right.map(r => r.left))) / 2;
+      const y = look.top + look.height / 2;
+      return { x: Math.round(x), y: Math.round(y), plate: !!document.elementFromPoint(x, y)?.closest('[data-testid="plate-frame"]') };
+    });
+    check(`${label}: a finger between the look and the buttons at the top lands on the plate`, !!gap?.plate,
+      gap ? `(${gap.x}, ${gap.y})` : 'the look button or the three buttons are missing');
     const covered = await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"]' });
     check(`${label}: nothing covers a control`, covered.length === 0, covered.slice(0, 4).join('; '));
     const leg = await legibility(page);
