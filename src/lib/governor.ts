@@ -82,6 +82,9 @@ export const STEP_RATES = [60, 30];
  */
 export type PostLevel = 0 | 1 | 2;
 
+/** How many fed intervals the governor keeps for a harness: two seconds at 240 Hz and some. */
+const FED_LOG = 600;
+
 export class QualityGovernor {
   private index: number;
   private readonly start: number;
@@ -173,6 +176,18 @@ export class QualityGovernor {
     return this.emaFrame;
   }
 
+  /**
+   * Every interval it has been fed, counted, and the last `FED_LOG` of them,
+   * for `npm run wall`. The average above cannot say what it was fed: it
+   * rises fast and falls slowly, starts at 16.7 ms and goes back there on
+   * every change of rung, so one reading of it passed a governor fed half a
+   * refresh as often as one run in four, and failed a working one right
+   * after a reset (the check-skeptic's model of #203's Mac run). The
+   * harness takes the median of what was fed over its own window instead.
+   */
+  fedCount = 0;
+  readonly fedLog: number[] = [];
+
   /** The post chain's level. Back to 0 whenever no heavy pass is on: there is nothing to spare. */
   get postLevel(): PostLevel {
     return this.heavyPost ? this.post : 0;
@@ -209,6 +224,9 @@ export class QualityGovernor {
   sample(frameS: number, workMs: number, now: number, held = false, gpuMs = 0): boolean {
     let frameMs = frameS * 1000;
     if (frameMs <= 0) return false;
+    this.fedCount++;
+    this.fedLog.push(frameMs);
+    if (this.fedLog.length > FED_LOG) this.fedLog.splice(0, this.fedLog.length - FED_LOG);
     // Pinned: still average the frame, so the readout and the debug surface
     // report what this rung actually costs, but never move off it.
     if (this.pinned) {

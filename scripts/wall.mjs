@@ -618,6 +618,7 @@ let failed = 0;
         // turned down (lib/drawGate.ts); absent on a build without the gate.
         gate: window.chromaglassDebug().drawGate?.drawn ?? null,
         skipped: window.chromaglassDebug().drawGate?.skipped ?? null,
+        fedCount: window.chromaglassDebug().governor?.fedCount ?? null,
         t: performance.now(),
       });
       const a = read();
@@ -625,6 +626,15 @@ let failed = 0;
       const b = read();
       const s = (b.t - a.t) / 1000;
       const d = window.chromaglassDebug();
+      // What the governor was fed in this window: its log's last entries, as
+      // many as it counted, and their median (see the governor line below).
+      const fedN = a.fedCount !== null && b.fedCount !== null ? b.fedCount - a.fedCount : null;
+      const fedLog = d.governor?.fedLog ?? null;
+      let fedMedian = null;
+      if (fedN && fedLog && fedN <= fedLog.length) {
+        const w = fedLog.slice(fedLog.length - fedN).sort((x, y) => x - y);
+        fedMedian = w[Math.floor(w.length / 2)];
+      }
       return {
         gate: a.gate && b.gate ? { frame: (b.gate.frame - a.gate.frame) / s, ask: (b.gate.ask - a.gate.ask) / s } : null,
         skipped: a.skipped && b.skipped ? (b.skipped.frame - a.skipped.frame + b.skipped.ask - a.skipped.ask) / s : null,
@@ -641,6 +651,8 @@ let failed = 0;
         asks: (b.asks - a.asks) / s,
         askCount: b.asks - a.asks,
         frameMs: d.governor?.frameMs ?? null,
+        fedN,
+        fedMedian,
         fallbacks: d.drawGate?.stampFallbacks ?? null,
         engine: d.engine,
       };
@@ -730,8 +742,18 @@ let failed = 0;
           m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.wallServable > 10 && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0, offered);
       };
       for (const frac of [0, 0.25, 0.5, 0.75]) {
-        await wall.evaluate((p) => { window.__phaseMs = p; }, frac * refreshMs);
-        await show.waitForTimeout(500);
+        /*
+          The phase is a fraction of the refresh the windows are keeping now,
+          measured just before it is set, not of the one the show kept alone
+          at the start: the Mac runner's rate moves by a third within a run
+          (42.7 alone, then 57.3 on #203's), which made "half a refresh" two
+          thirds of one and "three quarters" a whole one, where nothing can
+          double (the check-skeptic, 2026-09-27).
+        */
+        const pre = await measure(500);
+        const phaseMs = frac * 1000 / Math.max(1, pre.hz, pre.wallHz);
+        await wall.evaluate((p) => { window.__phaseMs = p; }, phaseMs);
+        await show.waitForTimeout(300);
         const m = await measure(2000);
         judge(m, frac === 0 ? 'on its own clock' : `${frac} of a refresh behind`);
         /*
@@ -745,23 +767,30 @@ let failed = 0;
           failure; with none (a container with no WebGPU) there is nothing to
           feed, and it says so.
 
-          The interval is the one both windows' frames kept in these same two
-          seconds (the faster of the two, as the gate draws on the faster),
-          not the one the show kept alone at the start of the run. That was
-          the first version, and on #203's Mac run (2026-09-27) it went red on
-          a gate doing its job: the show alone drew 42.7 a second (27.2 ms),
-          then the machine got quicker, both windows ran at 53.8 and 57.3 a
-          second, and the governor was fed 19.0 ms, a whole refresh of the
-          faster one (17.5 ms), against a bar of 0.8 of a moment that had
-          passed. The broken case is still far below it: two clocks
-          interleaving evenly at those rates feed the governor about 9 ms,
-          under the 14.0 ms bar.
+          What it was fed is read from the governor's own log of intervals
+          over these two seconds, as a median, and held to 0.9 of the faster
+          window's refresh in the same two seconds, with the governor fed on
+          at least four of five draws. Not from its average, which is what
+          the first two versions read. The first held that average to what
+          the show was fed alone at the start of the run, and went red on a
+          working gate when the Mac got faster in between (#203: 27.2 ms
+          alone, 19.0 fed later with both windows at 53.8 and 57.3 a second).
+          The second held it to this window's refresh, and the check-skeptic
+          showed why neither could work: the average rises fast and falls
+          slowly and resets to 16.7 ms on a rung change, so a single reading
+          of it passed a governor fed half a refresh in up to half the runs
+          and failed a working one read just after a reset. The median of
+          the intervals themselves is neither. And the phase it is judged at
+          is checked to be near half a refresh now, not only named that.
         */
         if (frac === 0.5) {
-          const refresh = m.hz > 0 || m.wallHz > 0 ? 1000 / Math.max(m.hz, m.wallHz) : null;
+          const faster = Math.max(m.hz, m.wallHz);
+          const refresh = faster > 0 ? 1000 / faster : null;
+          const at = phaseMs * faster / 1000;
           if (m.frameMs !== null && refresh !== null) {
-            check('  and the governor is fed a whole refresh of the faster window, not half of it', m.frameMs >= 0.8 * refresh,
-              `${f1(m.frameMs)} ms against a ${f1(refresh)} ms refresh (the windows ${f1(m.hz)} and ${f1(m.wallHz)} a second in the same two seconds; the show alone was fed ${alone.frameMs === null ? 'nothing' : `${f1(alone.frameMs)} ms`})`);
+            check('  and the governor is fed a whole refresh of the faster window, not half of it',
+              m.fedMedian !== null && m.fedN >= 0.8 * m.drawnCount && m.fedMedian >= 0.9 * refresh && at >= 0.35 && at <= 0.65,
+              `median ${f1(m.fedMedian)} ms fed over ${m.fedN ?? '-'} intervals for ${m.drawnCount} draws, against a ${f1(refresh)} ms refresh (the windows ${f1(m.hz)} and ${f1(m.wallHz)} a second), at ${at.toFixed(2)} of a refresh behind`);
           } else if (alone.engine) {
             check('  and the governor is fed a whole refresh of the faster window, not half of it', false,
               `a renderer came up (${alone.engine}) and there is no governor to read`);
