@@ -237,10 +237,14 @@ export class PipelineCache {
   async prepareRender(name: string, make: RenderRecipe): Promise<boolean> {
     if (this.render.has(name)) return true;
     try {
-      const p = await this.device.createRenderPipelineAsync({ label: name, ...make((code) => this.module(code, name)) });
+      // The sources it is made of, for the scraps its first draw binds.
+      const codes = new Set<string>();
+      const desc = make((code) => { codes.add(code); return this.module(code, name); });
+      const p = await this.device.createRenderPipelineAsync({ label: name, ...desc });
       if (this.render.has(name)) return true;
       this.render.set(name, p);
       if (this.ledger) this.ledger.ahead++;
+      await firstDraw(this.device, p, desc, [...codes]);
       return true;
     } catch { return false; /* built on the frame instead */ }
   }
@@ -304,45 +308,99 @@ export class PipelineCache {
   does not like is a first run that did not happen, not a GPU error for the
   loop's error count, and the frame still runs it as it always did.
 */
-interface Scraps { uniform: GPUBuffer; storage: GPUBuffer; sampler: GPUSampler; tex: Map<string, GPUTexture> }
+interface Scraps { uniform: GPUBuffer; storage: GPUBuffer; vertex: GPUBuffer; sampler: GPUSampler; tex: Map<string, GPUTexture> }
 const scrapsByDevice = new WeakMap<GPUDevice, Scraps>();
 
-async function firstUse(device: GPUDevice, pipeline: GPUComputePipeline, code: string): Promise<void> {
+function scrapsOf(device: GPUDevice): Scraps {
   let s = scrapsByDevice.get(device);
   if (!s) {
     s = {
       uniform: device.createBuffer({ label: 'first use', size: 4096, usage: GPUBufferUsage.UNIFORM }),
       storage: device.createBuffer({ label: 'first use', size: 65536, usage: GPUBufferUsage.STORAGE }),
+      vertex: device.createBuffer({ label: 'first use', size: 65536, usage: GPUBufferUsage.VERTEX }),
       sampler: device.createSampler({ label: 'first use', magFilter: 'linear', minFilter: 'linear' }),
       tex: new Map(),
     };
     scrapsByDevice.set(device, s);
   }
-  const scraps = s;
-  const tex = (format: GPUTextureFormat, usage: number) => {
-    const key = `${format}/${usage}`;
-    let t = scraps.tex.get(key);
-    if (!t) { t = device.createTexture({ label: 'first use', size: [1, 1], format, usage }); scraps.tex.set(key, t); }
-    return t;
-  };
+  return s;
+}
+
+function scrapTexture(device: GPUDevice, format: GPUTextureFormat, usage: number): GPUTexture {
+  const scraps = scrapsOf(device);
+  const key = `${format}/${usage}`;
+  let t = scraps.tex.get(key);
+  if (!t) { t = device.createTexture({ label: 'first use', size: [1, 1], format, usage }); scraps.tex.set(key, t); }
+  return t;
+}
+
+/** A bind group entry of scraps for each binding the sources declare. */
+function scrapEntries(device: GPUDevice, codes: string[], stage: number): GPUBindGroupEntry[] {
+  const scraps = scrapsOf(device);
+  const byBinding = new Map<number, GPUBindGroupLayoutEntry>();
+  for (const code of codes) for (const e of layoutEntries(code, stage)) if (!byBinding.has(e.binding)) byBinding.set(e.binding, e);
+  return [...byBinding.values()].map((e) => {
+    if (e.buffer) return { binding: e.binding, resource: { buffer: e.buffer.type === 'uniform' ? scraps.uniform : scraps.storage } };
+    if (e.sampler) return { binding: e.binding, resource: scraps.sampler };
+    if (e.storageTexture) return { binding: e.binding, resource: scrapTexture(device, e.storageTexture.format, GPUTextureUsage.STORAGE_BINDING).createView() };
+    const kind = e.texture?.sampleType;
+    const format: GPUTextureFormat = kind === 'uint' ? 'rgba32uint' : kind === 'sint' ? 'rgba32sint' : 'rgba16float';
+    return { binding: e.binding, resource: scrapTexture(device, format, GPUTextureUsage.TEXTURE_BINDING).createView({ dimension: e.texture?.viewDimension ?? '2d' }) };
+  });
+}
+
+async function firstUse(device: GPUDevice, pipeline: GPUComputePipeline, code: string): Promise<void> {
   device.pushErrorScope('validation');
   try {
-    const entries: GPUBindGroupEntry[] = layoutEntries(code).map((e) => {
-      if (e.buffer) return { binding: e.binding, resource: { buffer: e.buffer.type === 'uniform' ? scraps.uniform : scraps.storage } };
-      if (e.sampler) return { binding: e.binding, resource: scraps.sampler };
-      if (e.storageTexture) return { binding: e.binding, resource: tex(e.storageTexture.format, GPUTextureUsage.STORAGE_BINDING).createView() };
-      const kind = e.texture?.sampleType;
-      const format: GPUTextureFormat = kind === 'uint' ? 'rgba32uint' : kind === 'sint' ? 'rgba32sint' : 'rgba16float';
-      return { binding: e.binding, resource: tex(format, GPUTextureUsage.TEXTURE_BINDING).createView({ dimension: e.texture?.viewDimension ?? '2d' }) };
-    });
     const enc = device.createCommandEncoder({ label: 'first use' });
     const pass = enc.beginComputePass({ label: 'first use' });
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, device.createBindGroup({ label: 'first use', layout: pipeline.getBindGroupLayout(0), entries }));
+    pass.setBindGroup(0, device.createBindGroup({ label: 'first use', layout: pipeline.getBindGroupLayout(0), entries: scrapEntries(device, [code], GPUShaderStage.COMPUTE) }));
     pass.dispatchWorkgroups(1);
     pass.end();
     device.queue.submit([enc.finish()]);
   } catch { /* no first run; the frame's is the first */ } finally {
+    await device.popErrorScope().catch(() => null);
+  }
+  await device.queue.onSubmittedWorkDone().catch(() => undefined);
+}
+
+/*
+  And a render pipeline's first draw, the same way: one triangle into a
+  one-texel target of each format it draws to, on scraps.
+
+  What was measured: with every compute pipeline built ahead and run once
+  (above), the stop after the first step was still there (1.27 s, run
+  36304243400). Timing each submit the GPU was handed round the first step
+  (run 36305436208) put 1.42 s of the GPU's time on one of them: the
+  plate's first draw, the two packs, the two derive passes and the display
+  into the canvas. The same submit a few frames later took 0.03 s. The
+  submits either side of it, the solver's, took a few hundredths. So the
+  cost is the plate's render pipelines' first draw on this device, and it
+  is paid here instead, behind the starting frame, where no frame is owed.
+*/
+async function firstDraw(device: GPUDevice, pipeline: GPURenderPipeline, desc: GPURenderPipelineDescriptor, codes: string[]): Promise<void> {
+  // A depth buffer or several samples would want scraps of their own; no
+  // pipeline built ahead has either today, and one that does is drawn
+  // first on the frame, as before.
+  if (desc.depthStencil || (desc.multisample?.count ?? 1) > 1) return;
+  const targets = [...(desc.fragment?.targets ?? [])];
+  device.pushErrorScope('validation');
+  try {
+    const enc = device.createCommandEncoder({ label: 'first use' });
+    const pass = enc.beginRenderPass({
+      label: 'first use',
+      colorAttachments: targets.map((t) => (t ? {
+        view: scrapTexture(device, t.format, GPUTextureUsage.RENDER_ATTACHMENT).createView(), loadOp: 'clear' as GPULoadOp, storeOp: 'store' as GPUStoreOp,
+      } : null)),
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, device.createBindGroup({ label: 'first use', layout: pipeline.getBindGroupLayout(0), entries: scrapEntries(device, codes, GPUShaderStage.FRAGMENT) }));
+    [...(desc.vertex.buffers ?? [])].forEach((b, i) => { if (b) pass.setVertexBuffer(i, scrapsOf(device).vertex); });
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([enc.finish()]);
+  } catch { /* no first draw; the frame's is the first */ } finally {
     await device.popErrorScope().catch(() => null);
   }
   await device.queue.onSubmittedWorkDone().catch(() => undefined);
