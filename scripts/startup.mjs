@@ -510,6 +510,12 @@ async function openings(ids) {
       // A page each: a second `goto` on one page threw "frame was detached"
       // mid-teardown of the last show.
       const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
+      await page.addInitScript(() => {
+        const frames = [];
+        window.__startupFrames = frames;
+        const tick = (t) => { if (frames.length < 20000) frames.push(t); requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+      });
       try {
         await page.goto(`http://localhost:${PORT}/?debug&asked&gpu=mid&tier=local&look=${id}${engineQuery()}`, { waitUntil: 'load' });
         out.push({ id, ...await page.evaluate(async ([n, secs, cap]) => {
@@ -525,7 +531,13 @@ async function openings(ids) {
           const waitedFor = p?.prepares?.find((x) => x.stage === 'opening')?.keys ?? [];
           const before = new Set(waitedFor);
           const asked = p?.ledger?.asking ? [...p.ledger.asking.keys()] : null;
+          // The longest frame gap from a second before the first step to
+          // the end: the stop after the first step, on a warm cache.
+          const fr = first == null ? [] : window.__startupFrames.filter((t) => t >= first - 1000);
+          let stop = 0;
+          for (let i = 1; i < fr.length; i++) stop = Math.max(stop, fr[i] - fr[i - 1]);
           return {
+            stop: stop / 1000,
             stepped: first != null && at() >= n && performance.now() - first >= secs,
             asked,
             waitedFor,
@@ -736,6 +748,15 @@ try {
   const askedAny = new Set(measured.flatMap((e) => e.asked));
   const unused = own.filter((k) => !askedAny.has(k));
   const waits = measured.map((e) => e.waitedFor.length);
+  /*
+    The same stop on a warm cache: each look's longest frame gap from a
+    second before its first step. Printed, not judged. The cold opening's
+    stop after its first step (1.03 to 2.43 s over thirty-seven runs) is
+    either the first frames' own work, which a warm cache does not take
+    away, or a first use of something that a warm cache has already paid.
+  */
+  const stops = measured.map((e) => e.stop).filter((x) => x != null).sort((a, b) => a - b);
+  if (stops.length) console.log(`  each look opened on a warm cache: longest frame gap from a second before its first step, median ${stops[stops.length >> 1].toFixed(2)} s, longest ${stops[stops.length - 1].toFixed(2)} s (${measured.filter((e) => e.stop === stops[stops.length - 1]).map((e) => e.id).join(', ')}), over ${stops.length}`);
   check(`every look opens on only what the show waited for, and each look's own part is asked for (all ${presetIds.length}, each opened on its own)`,
     each.length === presetIds.length && presetIds.length > 30 && measured.length === each.length && leaky.length === 0 && unused.length === 0,
     `waited for ${waits.length ? `${Math.min(...waits)} to ${Math.max(...waits)}` : 'nothing'} pipelines over ${OPENING_STEPS} steps and ${OPENING_SECONDS} s`
