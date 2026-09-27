@@ -169,12 +169,13 @@ function song({ kicks = true, snares = true, hats = true, stopAt = Infinity, aft
  * the beat clock stepped on it, and the engine. `clock` false leaves the
  * engine with no beat at all, so every trigger is a heard one.
  *
- * The clock is fed the kick's level, where the live show feeds it the hook's
- * smoothed bass: both rise on the kick and fall between, which is all the
- * clock reads. What the engine takes from it is only its period, its next
- * beat and whether it is locked, which is the same whatever it was fed.
+ * The clock is fed the analyser's kick onset on the frame it is heard, as
+ * the live loop feeds it, at the show's own Beat Prediction (0.7) unless a
+ * case says otherwise. It used to be fed the kick's level at a trust of 1,
+ * where the show fed it the smoothed bass at 0.7, so the lead this printed
+ * was a path the show never took (PLAN 14d).
  */
-function play(readings, bindings, { clock = true, trust = 1, lead = LEAD_MS, stopped = () => false } = {}) {
+function play(readings, bindings, { clock = true, trust = DEFAULT_SETTINGS.beatPrediction, lead = LEAD_MS, stopped = () => false } = {}) {
   const engine = new SoundLearn();
   const beat = new BeatClock();
   const fires = [];
@@ -184,7 +185,10 @@ function play(readings, bindings, { clock = true, trust = 1, lead = LEAD_MS, sto
     const reading = stopped(now) ? null : r;
     let view = null;
     if (clock) {
-      beat.update(now, reading ? reading.kick : 0, trust, lead);
+      // `hit`, where the live loop watches the onset's time move: every
+      // frame here has its own reading, so none goes by unread and the two
+      // are the same kicks (`npm run kicks` holds the live rule).
+      beat.update(now, reading?.onsets.kick.hit ? now : null, trust, lead);
       view = { period: beat.period, nextBeat: beat.nextBeat, locked: beat.isLocked(now, trust), leadMs: lead };
       if (view.locked && lockedAt === null) lockedAt = now;
     }
