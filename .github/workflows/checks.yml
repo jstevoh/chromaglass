@@ -326,6 +326,9 @@ jobs:
       # Oil Bodies: amber oil on teal water stays two colours while the drops
       # round, merge and turn; poured dye lands in the liquid under it, a
       # hand drags the oil, nothing is made or lost, and at 0 nothing runs.
+      # Twelve seconds on Metal (#179's run, 17/17), where software WebGPU
+      # takes some twenty minutes; the plate shard ran 8:45 with it in, well
+      # inside its fifteen.
       - name: Oil and water as bodies
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run bodies
