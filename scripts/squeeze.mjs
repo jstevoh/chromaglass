@@ -13,8 +13,8 @@
  * So this counts it, in the app itself, with the band playing: the cells
  * the lead plate's kick strokes lay (`pressedCells.kick`, counted as the
  * stroke reports them, whole cells only, since a fractional one is the bug)
- * against the kicks the show heard over the same seconds, on Fillmore East,
- * 1969. And the control: the same seconds with Beat Squeeze at 0, where the
+ * against the show's kicks over the same seconds, on Fillmore East, 1969,
+ * on a beat tapped in (why tapped, below). And the control: the same seconds with Beat Squeeze at 0, where the
  * kicks go on and nothing is pressed, which says the count is the squeeze's
  * and not something else a kick does.
  *
@@ -80,12 +80,45 @@ try {
   // Settle into the look and let the band start before counting anything.
   await page.waitForTimeout(8000);
   /*
-    A window of at least `ms`, held open until the band has kicked six times
-    or 45 s have passed. The simulated band plays a song with sections: on
-    the Mac's first run it kicked 9 times in the first 12 s and not once in
-    the next 12 (a breakdown), and the control, which needs kicks to show
-    that at 0 they press nothing, had none to ask about. Counting to a
-    number of kicks asks the same thing whatever section the song is in.
+    The beat, tapped in at 130 bpm, four taps a beat apart (the Tap Tempo
+    action, as a pad or the Tap button sends it). Not the band's 122: a
+    clock that locked onto the band by ear would also beat every 492 ms, so
+    only a tempo the band does not play says the taps are what drive it.
+
+    Why not the kicks the show hears: it hears too few of them to count on.
+    The band plays four on the floor at 122 bpm, two kicks a second, and on
+    the Mac the show heard 6 in 12 s on one run and 3 in 45 s on the next
+    (the #190 deploy, on main, where this failed with every other line
+    green), and 6 in 42 s with Beat Squeeze at 0, so it is the ear, not the
+    press: the plate stepped at the same rate either way (898 steps in 45 s,
+    805 in 42 s). What the show hears of a band is the ear's question and
+    PLAN has it; this check asks what the squeeze does with a kick, and a
+    tapped tempo gives it one on every beat, the way a projectionist on a
+    tap button or a desk's clock does. The band still plays, so each kick
+    presses as hard as the bass it lands on, as in a show.
+  */
+  // The taps' own times, since a busy page runs a timer late: the period
+  // the clock should take is the mean of the intervals as tapped.
+  const tapped = await page.evaluate(() => new Promise((resolve) => {
+    const at = [];
+    const tap = () => {
+      at.push(performance.now());
+      window.chromaglassAction('tap-tempo');
+      if (at.length < 4) setTimeout(tap, 60000 / 130); else resolve((at[3] - at[0]) / 3);
+    };
+    tap();
+  }));
+  // The clock the kicks come from, read after the taps have reached the loop:
+  // driven from outside, it takes the tapped period and is sure of it.
+  const beat = () => page.evaluate(() => window.chromaglassDebug().beat);
+  /*
+    A window of at least `ms`, held open until the show has kicked six times
+    or 45 s have passed. Written when the kicks were the ones heard from the
+    band, whose song has sections: on the Mac's first run it kicked 9 times
+    in the first 12 s and not once in the next 12 (a breakdown), and the
+    control, which needs kicks to show that at 0 they press nothing, had
+    none to ask about. On the tapped beat a 12 s window holds about two
+    dozen (26 at 130 bpm); the hold stays as the floor under a plate that stalls.
   */
   const window_ = async (ms) => {
     const a = await read();
@@ -116,6 +149,7 @@ try {
     return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0;
   }, null, { timeout: 10_000 }).catch(() => {});
   const off = await window_(12000);
+  const clock = await beat();
   console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
 
   if (errors.length) {
@@ -126,9 +160,10 @@ try {
     /*
       Each kick lays three nested discs (radii 40, 27 and 15 at GRID_SCALE),
       a few thousand cells, but only on a kick that lands on a plate step
-      with the plate active and not draining, so not every kick heard is a
-      kick pressed. Asked: kicks were heard, the squeeze pressed on them (at
-      least a thousand cells a kick heard, which one fractional disc could
+      with the plate active and not draining, and with bass under it (the
+      amount is the bass, and a break has none), so not every kick is a kick
+      pressed. Asked: the show kicked, the squeeze pressed on it (at least a
+      thousand cells a kick, which one fractional disc could
       never reach, since it lays none).
     */
     const perKick = on.cells / Math.max(1, on.kicks);
@@ -138,7 +173,15 @@ try {
     check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
       on.squeeze === 0.9 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
-    check('with the band playing, the show hears kicks', on.kicks >= 5, `${on.kicks} in ${on.seconds.toFixed(0)} s`);
+    // At the tapped 130 bpm the clock beats every 462 ms (as tapped), and still does
+    // after both windows: tapped, the tempo stays until it is cleared. (Its
+    // confidence is not asked: driven it is set to 1 each frame and then
+    // loses 0.02 on any frame 3 s past the last onset heard, so it reads
+    // 0.98 as often as 1 while the tap is driving perfectly well.)
+    check('the tapped beat drives the show\'s clock, the band playing under it',
+      Math.abs(clock.period - tapped) < 2 && Math.abs(tapped - 60000 / 122) > 15,
+      `a beat every ${clock.period.toFixed(1)} ms, tapped ${tapped.toFixed(1)} ms apart (${(60000 / tapped).toFixed(1)} bpm; the band plays 122, 492 ms)`);
+    check('and the show kicks on it', on.kicks >= 5, `${on.kicks} in ${on.seconds.toFixed(0)} s`);
     /*
       And pressed as deep as a kick at this look's squeeze: each cell 0.0024
       × 0.9 × the bass (/70, capped at 1) × the accent (1 at Accent 0), so
