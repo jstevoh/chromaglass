@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **built** (Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 4, 6 and 7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **built** (`npm run lift`), not yet seen on the Mac, and Beat Squeeze found never to have pressed the plate (fix waiting on the owner's eyes); step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -911,7 +911,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    performer pick downbeats, every other bar or fills only, vary the depth a little as a
    hand does, and pull a hand-played press onto the predicted beat. Needs a real
    downbeat, which #155 does not have yet.
-   *Built 2026-09-27* (**Accent the One**, `beatAccent`, 0 to 1, default 0): a bar grid
+   *Shipped 2026-09-27* (#184, **Accent the One**, `beatAccent`, 0 to 1, default 0): a bar grid
    (`lib/barGrid.ts`) hears the beats from the readings' onsets and which is the one
    from the harmony moving, the backbeat and the kick, the evidence kept beat by beat
    across the song and only trusted past a mark a bar-less loop never reaches. Each
@@ -978,7 +978,28 @@ The steps, most visible first. Each is one PR with its own check, and every step
 4. **Press smooth, lift into fingers** (roadmap G). A squeeze gives a smooth ring and a
    lift breaks into fingers; today both finger. *Check:* finger count round the ring,
    low on press and high on lift, in the lab.
-   *Found, not yet done:*
+   *Built 2026-09-27* (lib/squish.ts): a press is round by construction (the film thins
+   evenly, the centre clears, the dye stands up in a round rim), and remembers itself;
+   150 ms after it lets go the glass comes up for a second and a bit, and the spokes the
+   press used to draw on the way down now come in from the rim, the gap opening along
+   them and the liquid drawn back toward the centre, as deep as the press went (a tap a
+   tenth of the way down lifts a third as hard a step as a held hand, and on the plate
+   that is a faint ripple at the spokes, too faint to count fingers). Each press lifts
+   on its own: two fingers on the phone, one let go while the other holds, and the one
+   let go lifts where it was; the pad's held press keeps pressing while held still.
+   Fingering 0 is today's plate
+   exactly; a drop's splash keeps its fingers on the way down, drawn exactly as before.
+   On the phone Fingering is on the Press tool's own Amount. *Check:* `npm run lift`:
+   held, the film under the palm has no angular structure (contrast 0.000, the stroke
+   drawn before 0.041, in spokes at its own angles); let go, at the default look's gap
+   spring, the dye round the rim goes up and down 0.073 of its level in 15 fingers,
+   sitting at the lift's spokes (correlation 0.92, 0.16 for the spokes turned a few
+   degrees), and at the fastest look's 0.078 in 10; the gap's spring alone makes 0.0026
+   of it at the spokes against the lift's 0.067; a one-frame tap lifts at 0.004. The
+   lift brings the glass back to rest and never past it: the shader caps an opening
+   there (uncapped, 0.081 against a rest of 0.030). 25 checks. Waiting on the owner's
+   eyes on a real GPU (judging.md 15).
+   *Found while building it, not yet done:*
    - **Beat Squeeze has never pressed the plate.** Its centre is `GRID_SIZE / 2` plus
      a random fraction of 30 cells (`DICE.music.centred()`, and `Math.random()` before
      the seeded dice), never rounded, so every cell index `squishDisc` reports is
@@ -991,7 +1012,44 @@ The steps, most visible first. Each is one PR with its own check, and every step
      `squishDisc`), but it turns on a press every look with Beat Squeeze up has never
      had (Fillmore East among them), so it waits for the owner's eyes rather than
      going out overnight. With it, a check: a kick with Beat Squeeze at 1 thins the
-     lead plate's film, which nothing asks today.
+     lead plate's film, which nothing asks today. The press and its lift are wired
+     for it already (a kick is its own presser in `PressLifts`; until then a press at a
+     fraction of a cell is not remembered).
+   - **The lab's glass is forty times springier than the app's.** BASE's `gapSpring`
+     is 0.02 a step; the app derives it from dt and Plate Spring, 0.00048 at the
+     default look (the glass half way back in about 24 s), 0.0080 at the fastest look
+     (Lacing Run), 0.00005 at the slowest (Lumia). A lab check that presses or lifts
+     measures a glass no look has unless it passes the look's spring (`npm run lift`
+     does now); the others that touch the gap (`straw`, `physics`) should be read with
+     that in mind, and a lib function shared by the app and the lab would keep them
+     from drifting apart. The spring is not all of it: the app's dt (0.00107 at the
+     default look, against the lab's 0.004) and its gap memory (0.99665 a step, where
+     the lab's forgets dh/dt at once) differ too. With all three, the lab's held press
+     drove the dye out of the whole ring before any lift (its mean 0.069 against the
+     0.5 laid), so `lift` passes the spring only; whether the app's plate empties a
+     press's ring like that is for the Mac.
+   - **At the default look a press stays down for tens of seconds.** Half way back in
+     about 24 s is a long time for a hand on glass; worth judging on the Mac whether
+     the glass should come up faster by default (Plate Spring).
+   - **The Fillmore East sequence's Sunburst stage leans on Beat Squeeze** (1.0, with
+     Fingering 1.0): until the squeeze reaches the plate, the stage's sunburst comes
+     only from a hand on the Press. Its description now says the dish is rocked.
+   - **Stroke centres are not checked to be whole cells anywhere.** Every caller of
+     `applySquish` rounds (or passes whole numbers) by habit; `squishDisc` could
+     round, or throw in development, so the next fractional caller is not silent.
+   - **The fingers are drawn, not grown.** The lift lays spokes from the CPU as the
+     press did; the solver's own squeeze flow is still symmetric in the sign of dh/dt.
+     An instability in `squeezeUpdate` keyed on a rising gap would let the fingers'
+     spacing come from the film's thickness, as roadmap G asks.
+   - **A pressed disc comes out octagonal in the lab** (an even press on an even
+     plate): some grid direction in the squeeze solve, cause not yet looked for.
+   - **The lab's finished picture of an off-centre point is not at that point.** A
+     ring drawn round the press's cell in `lab.render` found none of its fingers
+     (correlation −0.06 against −0.97 in the dye, and no flip or transpose above 0.23),
+     so the plate shader's dish and lens framing moves it; a check that reads the
+     picture off the centre needs that map first.
+   - **Fingering had no way onto the phone** before this (now on the Press tool's
+     Amount); the other Show-sheet plate controls (Beads, Cells, Lacing) still have none.
 5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
    with the ferrofluid phase as the precedent. The biggest difference in every frame,
    and the largest piece of work here; prototype in the lab first.

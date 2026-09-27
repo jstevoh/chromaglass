@@ -546,7 +546,7 @@ export interface VisualizerSettings {
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
   filmImpact: number;         // master depth over every mapping, read from the film instead of the room
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
-  fingering: number;          // a press breaks into radial fingers (Saffman–Taylor) instead of a smooth ring
+  fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
   /*
     How far the beads go from dark-rimmed rings to drops (PLAN.md batch 3):

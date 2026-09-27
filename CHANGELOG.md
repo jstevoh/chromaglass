@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — a press goes down round and lifts into fingers
+
+- **Fingering** now works the way two plates of glass do. A press (the
+  Press tool, a finger on the phone, the pad, a person standing still)
+  goes down round, the dye standing up in a clean rim; as the glass lifts,
+  that rim breaks into radial fingers drawn back toward the centre. Two
+  hands lift each on their own. Fingering 0 is unchanged, and so is a
+  drop's splash. On the phone, Fingering sits on the Press tool's Amount.
+- Found on the way: **Beat Squeeze has never pressed the plate.** Its press
+  lands a fraction of a cell off the grid and lays nothing; the kick's
+  plate rock still works. Written into the plan to fix with an eye on it.
+- `npm run lift` measures one gesture in the lab: round while held, fingers
+  once let go, at the spokes' own angles, none for the same press lifted
+  by the glass's spring alone, at the default look's glass and the
+  fastest look's, and the glass never lifted past where it rests: the
+  solver now caps a lift's opening there.
+
 ### Added — the show counts the bar
 
 - **Accent the One.** Beat Squeeze and Plate Rock can now follow the bar

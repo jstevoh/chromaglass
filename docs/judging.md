@@ -338,6 +338,28 @@ not yet timed on a real GPU. `npm run stages` (or `?stages`) times each stage;
 
 ---
 
+## 15. A press goes down round and lifts into fingers
+
+Fingering used to draw its spokes while the glass went down; now the press
+goes down round and the spokes come as it lifts (`npm run lift` measures it
+in the lab). Worth looking at:
+
+- the Press tool held on Fillmore East, 1969, then let go: a round disc with
+  a bright rim while held, and fingers running in from the rim over about a
+  second once the hand is off;
+- two fingers on the phone with the Press, one let go while the other
+  holds: the one let go should lift into fingers where it was;
+- Beat Squeeze is not here to judge: it has never reached the plate (PLAN
+  §10 step 4, a fix waiting for your eyes). What the Fillmore does on a kick
+  now is its plate rock alone;
+- Crowd Plate with someone standing still and then walking off.
+
+```
+?set=fingering=0      the press as a plain round squeeze, no fingers at all
+```
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real

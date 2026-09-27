@@ -237,6 +237,8 @@ export default function RemoteControl() {
   const padLastSend = useRef(new Map<number, number>());
   const padTouches = useRef(new Map<number, { x: number; y: number }>());
   const [padTouchCount, setPadTouchCount] = useState(0);
+  /** Each held press's last pressure, so a finger held still can keep pressing. */
+  const padPressAmount = useRef(new Map<number, number>());
   const padPoint = (e: ReactPointerEvent) => {
     const r = padRef.current!.getBoundingClientRect();
     // Normalised, y up — the plate's own coordinates.
@@ -246,7 +248,7 @@ export default function RemoteControl() {
                    from?: { x: number; y: number }) => {
     const amount = pressureOf(e);
     if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
-    else if (kind === 'press') send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
+    else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount }); }
     else if (kind === 'finger') {
       // A finger mixes by moving, so the stroke's own direction is the whole
       // gesture: where the touch was last, against where it is now. A tap
@@ -284,8 +286,33 @@ export default function RemoteControl() {
   const onPadUp = (e: ReactPointerEvent) => {
     padTouches.current.delete(e.pointerId);
     padLastSend.current.delete(e.pointerId);
+    padPressAmount.current.delete(e.pointerId);
     setPadTouchCount(padTouches.current.size);
   };
+  /*
+    A press held still keeps pressing. The pad sends on pointer down and on
+    moves, and a finger held still on a tablet moves not at all, so the plate
+    heard nothing after the first touch. That was only a press that stopped
+    pressing; now that a press lifts into fingers once it has paused for
+    150 ms (lib/squish.ts), it was fingers under a finger still down. So
+    while a press is held it is sent again every 50 ms, from where it was
+    last, at its last pressure.
+  */
+  useEffect(() => {
+    if (padTool !== 'press' || padTouchCount === 0) return;
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      // Only pointers that pressed: a pen's barrel button or a right-button
+      // drop lands in the pad's touches too, and must not start pressing.
+      for (const [pid, amount] of padPressAmount.current) {
+        const p = padTouches.current.get(pid);
+        if (!p || now - (padLastSend.current.get(pid) ?? 0) < 50) continue;
+        padLastSend.current.set(pid, now);
+        send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
+      }
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [padTool, padTouchCount, padLayer, send]);
   const chooseColor = (hex: string) => { setPadColor(hex); send({ type: 'dye', color: hex }); setPadTool('drop'); };
   const chooseLiquid = (id: string) => { setPadLiquid(id); send({ type: 'liquid', id }); setPadTool('drop'); };
   const toggleFull = async () => {

@@ -4254,6 +4254,8 @@ export default function App() {
             onSongFollow={(v) => updateSettings({ songFollow: v })}
             beatAccent={settings.beatAccent ?? 0}
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
+            fingering={settings.fingering ?? 0}
+            onFingering={(v) => updateSettings({ fingering: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded }}

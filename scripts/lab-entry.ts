@@ -11,6 +11,7 @@ import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/deta
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
+import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -102,6 +103,32 @@ const api = {
       for (let c = 0; c < 4; c++) velAdd[k + c] += v[c] * f;
     }
   },
+  /**
+   * A press, a lift or a splash, laid exactly as the app lays one
+   * (lib/squish.ts): at grid cell (x, y) of the logical L × L plate, over
+   * `radius` cells. The app's plate is 192 cells, the lab's L by default, so
+   * a press the app makes at radius 30 × GRID_SCALE is radius 45 here too.
+   */
+  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0) {
+    const { L, velAdd, mul } = lab!;
+    squishDisc(L, x, y, radius, amount, fingering, stroke, pile, (idx, gap, vx, vy, m) => {
+      velAdd[idx * 4] += vx; velAdd[idx * 4 + 1] += vy; velAdd[idx * 4 + 3] += gap; mul[idx] *= m;
+    });
+  },
+  /**
+   * What a stroke would lay, without laying it: the gap delta cell by cell
+   * (L × L). `npm run lift` holds the plate's picture against this, so it
+   * asks whether the fingers are where the spokes are, not only whether
+   * there are fingers somewhere.
+   */
+  strokeGap(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0) {
+    const { L } = lab!;
+    const out = new Float32Array(L * L);
+    squishDisc(L, x, y, radius, amount, fingering, stroke, pile, (idx, gap) => { out[idx] += gap; });
+    return Array.from(out);
+  },
+  /** The press's memory, as the plate keeps it: `npm run lift` presses and lets go through this. */
+  PressLift,
   flush(dt = BASE.dt) {
     const l = lab!;
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);

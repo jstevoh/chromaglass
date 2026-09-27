@@ -146,6 +146,14 @@ export interface PhoneStageProps {
   */
   beatAccent: number;
   onBeatAccent: (v: number) => void;
+  /**
+   * Fingering, on the Press tool's own Amount panel: how far the glass
+   * breaks into fingers as it lifts (lib/squish.ts). The desk has it on the
+   * Show sheet; on the phone it sits where a finger already is when it
+   * presses, so pressing and trying the lift is one reach.
+   */
+  fingering: number;
+  onFingering: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -321,6 +329,20 @@ export function PhoneStage(p: PhoneStageProps) {
             touch
             testId="phone-amount-slider"
           />
+          {p.tool === 'press' && (
+            <Slider
+              label="Press · fingers as it lifts"
+              value={p.fingering}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={p.onFingering}
+              display={`${Math.round(p.fingering * 100)}%`}
+              touch
+              testId="phone-press-fingering"
+              midiKey="setting:fingering"
+            />
+          )}
         </div>
       )}
 
