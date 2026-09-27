@@ -1192,6 +1192,15 @@ while this batch's plan was going in (#177), and no cause is known yet:
   a tenth of 300. It asks the gain against what was there, on a hand path drawn at
   random each run, so a run whose best spot starts full reads low; worth reading
   the gain's spread over the last runs before touching its tenth.
+- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else": on #189 (the Mixer's gel
+  and lumia rows, whose default picture renders the same to the byte as main's), 16.3
+  past its drift at the hand's left/right mirror cell against an allowance of 16.1.
+  The cell's drift climbed drop by drop (3.2, 5.9, 18.3, 49.5) and its change with it
+  (5.0, 10.0, 46.8, 78.4): a region starting to move by itself mid-run, the case the
+  check's own comment says it gives up. Over the seven Mac runs before it the same
+  line read 2.1 to 9.1 against allowances of 8.3 to 36.4, at most 63 % of it. Worth
+  asking whether a drop's drift should be read on both sides of the drop, so that a
+  region starting up is in the drift and not only in the change.
 
 ## Not doing
 
