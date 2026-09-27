@@ -19,7 +19,7 @@ import {
   builtInSequences, loadUserSequences, saveUserSequences, lerpSettings,
 } from '../lib/sequencer';
 import {
-  PACE_NEUTRAL, FROM_DARK_BELOW, ScenePlayer, type PaceMoment, type PaceSample,
+  PACE_NEUTRAL, FROM_DARK_BELOW, ScenePlayer, type PaceMoment, type PaceSample, type SongCue,
 } from '../lib/scenePacing';
 import { stream } from '../lib/rng';
 
@@ -68,6 +68,13 @@ export interface UseShowSequencerArgs {
   pace?: (sample: PaceSample) => boolean | void;
   /** A scene's swell opening: pour, press, the next dyes, or the drain in the dark. */
   moment?: (kind: PaceMoment) => void;
+  /**
+   * What the song's shape has heard since the last call (`lib/songShape.ts`):
+   * its drops, builds and breakdowns, the section and how far into a build.
+   * Asked once a tick; a paced scene follows it by the Follow the Song
+   * setting. Null when nothing is listening.
+   */
+  songCue?: () => SongCue | null;
 }
 
 interface Run {
@@ -378,8 +385,13 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
         deepens or flattens the scene as it moves, and 0 hands back exactly
         today's plate.
       */
-      const pacing = pacingOf(a.getSettings().pacing);
-      const { sample, moments } = run.scene.tick(elapsed, pacing);
+      const settings = a.getSettings();
+      const pacing = pacingOf(settings.pacing);
+      // And the song: its drops open the swells, its builds and breakdowns
+      // hold them (Follow the Song, lib/scenePacing.ts). Asked every tick so
+      // nothing heard piles up for the next.
+      const cue = a.songCue?.() ?? null;
+      const { sample, moments } = run.scene.tick(elapsed, pacing, cue, pacingOf(settings.songFollow));
       for (const k of moments) a.moment?.(k);
       sendPace(sample);
 

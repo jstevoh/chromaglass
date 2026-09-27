@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the show follows the song
+
+- **Follow the Song.** With a paced sequence running (Light Show Night),
+  its scenes now play to the song: the big move lands on the drop, the
+  plate holds still and winds up through a build, and settles low through
+  a breakdown. At 0, the default, a sequence plays exactly as before.
+  In Settings under Pacing, on the remote, on MIDI and on the phone's
+  Sound sheet.
+- **A light show from the phone.** The Play sheet's Light show tile starts
+  and stops Light Show Night.
+- `npm run pacing` plays it against five synthesised songs: motion follows
+  the loudness over twenty-second windows (0.36, the one live show filmed
+  0.40) and not at the beat (0.05).
+
 ### Added — the show hears the song's shape
 
 - **Builds, drops and breakdowns, live.** The show now hears a song's

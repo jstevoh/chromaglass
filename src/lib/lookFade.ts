@@ -48,7 +48,7 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   'dimmer',
   // The set's shape, not a look's: a pad laying a new look mid-set must not
   // flatten the scenes the sequence is playing.
-  'pacing',
+  'pacing', 'songFollow',
   'markMix', 'markX', 'markY', 'markScale',
   'filmMix', 'filmKey',
   // The mixer (lib/mixer.ts) is the operator's desk, like the logo and the

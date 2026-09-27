@@ -692,6 +692,7 @@ export default function RemoteControl() {
               {state.sequencer.running && (
                 <div className="mt-4">
                   <Slider label="Pacing" field="pacing" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('pacing') as number | undefined} {...sliderProps} connected={connected} />
+                  <Slider label="Follow the Song" field="songFollow" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('songFollow') as number | undefined} {...sliderProps} connected={connected} />
                 </div>
               )}
             </div>

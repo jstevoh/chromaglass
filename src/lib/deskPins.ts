@@ -137,6 +137,7 @@ const SECTION_OF: Record<string, string> = {
   phaseDisplace: 'physics',
   oilBodies: 'physics',
   pacing: 'automation',
+  songFollow: 'automation',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
 };

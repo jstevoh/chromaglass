@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **built** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (Follow the Song; `npm run pacing`), not yet filmed; step 5, oil and water as bodies, **built** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -792,9 +792,45 @@ The steps, most visible first. Each is one PR with its own check, and every step
    gap between songs heard as quiet, and nothing at all on the shelf's ambient tracks.
    A build needs the beat to have come in first (the kick hitting four times in four
    seconds): before that rule the shelf's swells read as builds two or three times a
-   minute. *Still to do* (the second half, next): Pacing choosing its
-   swells from these events, which is where the motion-against-loudness target is
-   measured.
+   minute.
+   *Followed* (the second half): **Follow the Song** (`songFollow`, 0 to 1, default 0)
+   plays a paced scene to what is heard. A drop opens a swell on its own tick with the
+   stage's opening move, up to half again bigger, and takes out the planned swell it
+   replaces; through a build and a breakdown the planned swells wait (up to 24 s), the
+   plate winds up with the build and settles lower in a breakdown. At 0 the scene is
+   bit for bit the scene with no song, and at Pacing 0 the plate is today's. It is on
+   the desk's Pacing section, the remote, MIDI (Follow the Song), and the phone (the
+   Sound sheet, beside the song's line; the Play sheet gained a Light show tile, since
+   Pacing had no way onto the phone before). `npm run pacing` plays Light Show Night
+   against five synthesised club songs through the real analyser and tracker: motion
+   against loudness over 20 s windows 0.34 to 0.40 at Follow 1 (Follow 0 on the same
+   songs −0.17 to −0.02; the one live show 0.40), and at the beat (a two-second
+   running mean taken out of each) 0.05. Each drop is held to the rule: over four
+   nights, and three awkward songs on one long scene (a breakdown the beat returns
+   out of, one the song ends in, a 32 s build), 62 drops opened a swell of the
+   stage's opening move at the promised gain, the plate reaching 0.90 of its top at
+   worst within 2 s, and 18 were let go, 12 in a dark ending and 6 within 4 s of a
+   swell. 26 planned swells came due in holds and none fired there; each arrived
+   within half a second of its hold ending (5) or of the 24 s cap (4). With Pacing
+   pulled to 0 mid-scene through a breakdown, build and drop, the scene that comes
+   back is the one with no song, tick for tick. The app builds the cue with
+   `songCueFrom` (scenePacing.ts), the function the check plays and tests.
+   Found on the way:
+   - A drop in a scene's dark ending is let go (12 of Light Show Night's 60 in the
+     check, one in five): the light is going down and the next scene comes up with its own move.
+     A show following a song might rather cut the dark short on a drop and come up
+     with it; worth judging on the Mac with a real track.
+   - Over 1 s windows the proxy's motion-against-loudness reads 0.26 to 0.29, the top
+     of the footage's range at the beat, because the proxy has no beat-level motion of
+     its own and a second's mean is mostly the section. The plate's own motion adds
+     that noise; `film.yml` with a song playing is what measures it.
+   - The swells run at 3.2 a minute following the song, against 2.4 without;
+     inside the footage's 1.6 to 3.7, near its top.
+   - The tracker hears the beat coming back after a breakdown as a drop (0.75 on the
+     check's verse after a breakdown), so the scene throws its big move there too.
+     Right for a club track; a band coming back from a quiet verse may want less.
+   - A scene that comes up out of the dark while the song builds holds its opening
+     move until the build ends: it comes up lit and still. Worth judging on the Mac.
    Found on the way, not yet fixed:
    - A build is recognised about halfway in, not at its start (a short one later: the
      club song's four-bar second build at 65 %): the hats leave before the riser has

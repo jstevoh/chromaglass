@@ -23,6 +23,8 @@
  *                 controls (half in landscape)
  *   the sheets    each opens, stays on screen, and closes from above it
  *   the mixer     its stack top first, arrows a thumb's size, and they move it
+ *   the show      Light Show Night from the Play sheet, and Follow the Song on
+ *                 the Sound sheet beside the song's line
  *   clean screen  hides everything, and a still finger brings it back
  *   tilt          the phone's lean read into Gravity and Tilt Direction, from
  *                 where it was held, the same for the same turn whichever
@@ -311,6 +313,60 @@ try {
       check('the Sound sheet has the song\'s line only while there is sound', !songBefore && /^(Listening for builds, drops and breakdowns\.|The song: (drop|build \d+%|breakdown))$/.test(line),
         `${songBefore ? `${songBefore}; ` : ''}"${line}"`);
       if (!wasOn) await tap(page, 'phone-sound-band');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
+        The show from the phone: the Play sheet's Light show tile starts Light
+        Show Night and says so, and stops it again; and on the Sound sheet,
+        with sound on, Follow the Song is a thumb's slider that says what it
+        does to the show that is running. The slider is moved from the
+        keyboard (End: all the way) and read back from what it prints, which
+        is the setting's own value.
+      */
+      await tap(page, 'phone-open-play');
+      await tap(page, 'phone-show');
+      const showOn = (await page.getByTestId('phone-show').first().getAttribute('aria-pressed')) === 'true';
+      const showSays = (await visible(page, 'phone-show-says')) ? (await page.getByTestId('phone-show-says').innerText()).trim() : '';
+      check('the Play sheet starts Light Show Night from a tile, and says so', showOn && /Light Show Night/.test(showSays), `pressed ${showOn}, "${showSays}"`);
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      /*
+        Where it sits, measured rather than taken on trust: with no sound it
+        is not there at all (there is no song to follow, and the song's line
+        is gone with it, which is how this knows the sound is off); with the
+        Band on, its top is below the song's line and it ends above Sound
+        Drive's top, so it reads as the song line's control and not as a
+        second Sound Drive. The first version asked only for a slider 200 px
+        wide somewhere on the sheet, which a slider moved under Sound Drive,
+        or shown with the sound off, passed.
+      */
+      await tap(page, 'phone-open-sound');
+      const bandWas = await bandOn();
+      if (bandWas) { await tap(page, 'phone-sound-band'); await page.waitForTimeout(300); }
+      const silentShows = !(await bandOn()) && !(await visible(page, 'phone-song-shape')) ? await visible(page, 'phone-song-follow') : null;
+      await tap(page, 'phone-sound-band');
+      await page.waitForTimeout(300);
+      const follow = await box(page, 'phone-song-follow');
+      const songLine = await box(page, 'phone-song-shape');
+      const drive = await box(page, 'phone-sound-drive');
+      const between = !!follow && !!songLine && !!drive
+        && follow.y >= songLine.y + songLine.height - 0.5 && follow.y + follow.height <= drive.y + 0.5;
+      const followSays = (await visible(page, 'phone-song-follow-says')) ? (await page.getByTestId('phone-song-follow-says').innerText()).trim() : '';
+      await page.getByTestId('phone-song-follow').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(200);
+      const followAt = (await page.getByTestId('phone-song-follow').innerText()).match(/(\d+)%/)?.[1];
+      const px = b => (b ? `${Math.round(b.y)}–${Math.round(b.y + b.height)}` : 'missing');
+      check('Follow the Song is only there with sound on, sits between the song\'s line and Sound Drive, says what it does to the show, and goes to 100 %',
+        silentShows === false && between && follow.width >= 200 && /drop/.test(followSays) && followAt === '100',
+        `with no sound ${silentShows === null ? 'the sound would not go off' : silentShows ? 'shown' : 'hidden'}; song line ${px(songLine)}, Follow ${px(follow)}, Sound Drive ${px(drive)} px; `
+        + `${follow ? `${Math.round(follow.width)} px wide` : 'missing'}, "${followSays}", at ${followAt ?? '?'} %`);
+      await page.keyboard.press('Home');
+      if (!bandWas) await tap(page, 'phone-sound-band');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await tap(page, 'phone-open-play');
+      await tap(page, 'phone-show');
+      const showOff = (await page.getByTestId('phone-show').first().getAttribute('aria-pressed')) === 'false';
+      check('and the tile stops it', showOff, '');
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       // A look from the Looks sheet is the look named at the top.
