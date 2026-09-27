@@ -14,7 +14,7 @@
  * pattern the liquid made itself would point any way it liked.
  *
  * The dye has nothing that removes that pattern once it is there. Its
- * diffusion does (the implicit Laplacian takes 8a/(1+8a) of it a step), but
+ * diffusion does (the implicit Laplacian takes about 8a/(1+8a) of it a step), but
  * eleven of the looks have none and the slow ones with a little take a few
  * percent; and the advection only takes 2d² of it a step for a step of d
  * cells, which at these looks' pace is a few millionths. So what the

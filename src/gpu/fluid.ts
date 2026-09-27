@@ -1167,9 +1167,10 @@ export class WebGPUFluid {
     stage('advect dye', (pass) => this.macCormack(pass, this.dye, this.velForced, disp, 'dye'));
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Jacobi above already removes 8a/(1+8a)
-      of it a step: all of it that matters in the looks with strong
-      diffusion, none in the eleven with none (Red Cabbage, Classic,
+      GRID_DAMP a step in every look. Jacobi above removes about 8a/(1+8a)
+      of it a step (what a converged solve would; four sweeps take less at
+      large a, about 9% at 1024² and a ≈ 10, still above GRID_DAMP): most
+      of it in the looks with strong diffusion, none in the eleven with none (Red Cabbage, Classic,
       Fillmore, Oil & Water, Agate, the ferrofluids…), and a few percent in
       the slow ones with a little (Galaxy at 512², 3%). So this takes only
       what the diffusion leaves short, and is not run at all where it leaves

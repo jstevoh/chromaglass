@@ -167,7 +167,10 @@ look with no diffusion (Diffusion Rate at 0), at 2.8x and above:
 whether the lattice is gone, including on dye that has sat still for a minute;
 and whether the finest diagonal wisps look softer than they did (texture four
 cells across keeps 81% over a second, so a slow softening of the very finest
-diagonal detail is the price, if there is one to see).
+diagonal detail is the price, if there is one to see). And the cost: the pass
+is new work on every step of those looks, not yet timed on a real GPU.
+`npm run stages` (or `?stages`) times each stage, `dye grid` among them; its
+milliseconds on Red Cabbage at your usual grid are the number to report.
 
 ---
 

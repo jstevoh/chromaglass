@@ -2272,7 +2272,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     patterns at any angle; only the grid makes one locked to its diagonals.
 
     Nothing in the dye's step removes that pattern once it is there. The
-    diffusion would (Jacobi takes 8a/(1+8a) of it a step), but a quarter of
+    diffusion would (Jacobi takes about 8a/(1+8a) of it a step), but a quarter of
     the looks have none. MacCormack takes 2d² of it for a step of d cells,
     and Red Cabbage moves about a two-thousandth of a cell a step. So the
     little the presses and the wide-stencil projection leave at grid scale
@@ -2297,8 +2297,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     And the result is held to the range of its eight neighbours and itself.
     A filter this sharp rings like any other: a hard diagonal edge is a
     staircase, the staircase is a checkerboard one cell wide, and taking it
-    out left a ripple beside the edge 8% of its height at a second and 11%
-    at ten (the Gibbs overshoot of any sharp cutoff). Held to its
+    out left a ring past the edge 12.9% of its height after five seconds
+    (`npm run grating`'s disc with the clamp taken out; the Gibbs overshoot
+    of any sharp cutoff). Held to its
     neighbours, a cell can soften toward them but never pass them, so the
     ring is gone (0.003% of the edge) and the checkerboard, whose every cell
     sits inside its neighbours' range, goes as fast as before. The clamp is
