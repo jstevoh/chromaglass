@@ -61,6 +61,7 @@ Where each batch stands, as of 2026-09-27:
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **built** (`npm run lift`), not yet seen on the Mac, and Beat Squeeze found never to have pressed the plate (fix waiting on the owner's eyes); step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: video out through Syphon, Spout and NDI, OSC control, Ableton Link, video in; the OBS bridge first, the desktop app for the proper route; nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1326,3 +1327,67 @@ forms and a 15 % cut.
 
 The phone layout (#173) is what both apps show, so the operating rule that every
 feature ships its phone version is what keeps them whole.
+
+## 13. ChromaGlass in popular VJ software
+
+Asked on 2026-09-27: "Integrate into popular VJ software." It came up alongside
+"have we reached the point where we need to grow beyond the web?" The answer to that
+(project files, `beyond-web/beyond-web.md`) was *not yet for the show itself*.
+Handing video to another app was the one place a page cannot go. Nothing is built.
+
+**What integration means here.** A VJ app (Resolume Arena and Avenue, VDMX,
+TouchDesigner, MadMapper, Millumin, OBS) meets ChromaGlass in four ways, and each one
+takes a different route:
+
+| | What it is | Route | Needs |
+|---|---|---|---|
+| **Video out** | The plate as a live layer in the VJ app | Syphon on macOS (Resolume, VDMX, MadMapper, Millumin, TouchDesigner, OBS), Spout on Windows (Resolume, TouchDesigner, OBS), NDI across a network (all of them) | A page cannot publish a GPU texture. **Today:** OBS captures the projector window and sends it out through its Syphon or NDI plugin. **Properly:** the desktop app (step 4) |
+| **Control in** | The VJ app or its controller plays ChromaGlass | OSC, which the show server already hears on UDP 9000 (`server/remote-server.js`, `oscToMessage`: `/chromaglass/setting/<key>`, `/action/<name>`, `/preset/<id>`, `/blow`, `/drop`, `/press`, `/tilt`, `/dye`) | The web app plus `npm run show`. Written up and templated, not built again |
+| **Tempo** | One beat shared by everything | Ableton Link, which Resolume, VDMX and TouchDesigner all speak. MIDI clock already comes in (`src/lib/midi.ts`) | A page cannot join Link. The show server can |
+| **Video in** | A VJ app's output as a ChromaGlass source | Syphon, Spout or NDI, arriving as a camera | **Today:** any virtual camera (OBS Virtual Camera, NDI Webcam Input), picked like a camera. **Properly:** the desktop app |
+
+**Not doing: a plugin inside the VJ app.** FFGL (Resolume) and ISF (VDMX, MadMapper)
+run OpenGL fragment shaders inside the host. The plate is dozens of WebGPU compute
+passes a frame, with a pressure solve, which means porting the solver back to GLSL.
+That is the native rewrite `beyond-web.md` argues against. Streaming the plate into
+the host gives the VJ the same layer without it.
+
+**Running order.** Steps marked *(owner)* need Steve's Mac and a VJ app on it.
+
+1. **The OBS bridge, proven** *(owner, then one docs PR)*: the projector window
+   captured in OBS and sent through Syphon into Resolume or VDMX, and through NDI to
+   a second machine. Measure the delay against the plate's own frame, and write up
+   the steps in `docs/` as the way to do it today. *Not started.*
+2. **Control, written up** (one PR): the OSC address space documented where a VJ
+   finds it (the show server's page and `docs/`), plus a starter Resolume OSC map and
+   a TouchDesigner OSC Out example that play presets, actions and settings. *Not
+   started.*
+3. **ChromaGlass talks back and keeps time** (one PR, in the show server): OSC *out*
+   for the plate's colour, the sound bands and the beat, the way Art-Net out already
+   sends the colour to the lighting (`server/artnet.js`), so a VJ app's effects can
+   follow the plate. And Ableton Link in, feeding the beat clock the way MIDI clock
+   does. *Not started.*
+4. **The desktop app, with video out** (one PR for the app, one for each route): an
+   Electron app on the Mac that bundles the web build and the show server
+   (`beyond-web.md` step 3). It publishes the plate as a Syphon server, then as NDI,
+   then as Spout on Windows, from Electron's offscreen shared texture, with no
+   readback. `detectTier()` already reads Electron as the `native` tier. *Not started.*
+5. **Video in from a VJ app, natively** (one PR): Syphon and NDI arrive as a Mixer
+   source (§11), not through a virtual camera. *Not started.*
+
+Steps 1–3 need nothing beyond the web and the show server that exist today. Steps 4
+and 5 are where ChromaGlass gets a desktop app. The phone rule applies to anything
+with a control: a Link or OSC-out switch is reachable from the phone's More sheet.
+
+**Found along the way** (from the same beyond-the-web review, for a gig with no
+network):
+
+- `public/sw.js` caches files as they are fetched, and loads the page from the
+  network first, so parts of the app nobody opened, and the music shelf, are
+  missing offline. Cache the whole build ahead of time, and add a check that loads
+  the app with the network off.
+- Record keeps the whole take in memory until it stops (`src/hooks/useRecorder.ts`).
+  That's fine for a song and risky for a set. In Chrome, write to a file as it
+  records (File System Access).
+- The popup projector has only been used with one projector. Run two before rig R1
+  counts on it.
