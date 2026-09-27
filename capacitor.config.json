@@ -6,5 +6,12 @@
     "contentInset": "never",
     "backgroundColor": "#000000",
     "limitsNavigationsToAppBoundDomains": false
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.2"
+      }
+    }
   }
 }
