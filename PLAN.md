@@ -844,8 +844,8 @@ phones narrower than about 800 px the dock's tools fall under the 48 px target (
 770 px before the Mix button took a slot; `npm run phone` holds 812×375), so a two-row
 landscape dock is owed for the smallest phones.
 
-Two Mac checks went red once each on commits that did not touch them, while this
-batch's plan was going in (#177), and neither cause is known yet:
+Three Mac checks went red once each on commits that did not touch them, one per run,
+while this batch's plan was going in (#177), and no cause is known yet:
 
 - `npm run phone`, "two fingers holding Drop lay dye under both": A 62 against B
   181, 0.34 of each other where the check asks 0.4 (0.63–0.99 over the nine other
@@ -855,6 +855,11 @@ batch's plan was going in (#177), and neither cause is known yet:
   DROP_EVERY steps with a splash.
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
+- `npm run startup`, "no stop in the opening, or while the rest was built behind
+  it": the longest wait for a frame was 2.05 s against its 2 s limit (heartbeats and
+  steps 1.89 s), just after the first step while the remaining pipelines build
+  behind it; main's deploy of the same code read 1.70 s. Before touching the limit,
+  read the spread over the last runs (the `steward` skill's rule for a margin).
 
 ## Not doing
 
