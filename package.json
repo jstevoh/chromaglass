@@ -133,6 +133,7 @@
     "shelf": "npm run build && esbuild scripts/shelf.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/shelf.mjs && node node_modules/.cache/shelf.mjs",
     "gig": "npm run build && esbuild scripts/gig.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/gig.mjs && node node_modules/.cache/gig.mjs",
     "rolls": "npm run build && esbuild scripts/rolls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/rolls.mjs && node node_modules/.cache/rolls.mjs",
+    "bottles": "npm run build && node scripts/bottles.mjs",
     "fingers": "node scripts/fingers.mjs",
     "desktop": "npm run build && node scripts/desktop.mjs",
     "app": "npm run build && npm --prefix desktop start",
