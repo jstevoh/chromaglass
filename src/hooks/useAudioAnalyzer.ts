@@ -4,6 +4,7 @@ import { SoundLevels, smoothLevels } from '../lib/soundLevels';
 import {
   AudioFeatures, ANALYSER_FFT_SIZE, ANALYSER_SMOOTHING, type AudioReading,
 } from '../lib/audioFeatures';
+import { EarClock, onWallAsk } from '../lib/earClock';
 
 export interface AudioData {
   frequencyData: Uint8Array;
@@ -37,7 +38,35 @@ export interface AudioData {
   samples (PLAN.md §6). This hook owns the AnalyserNode, the frame loop and the
   React state, and nothing else: what it computes is what it computed before
   the move, step for step, and `npm run render` holds the offline side to it.
+
+  What changed since is *who asks* for a reading (lib/earClock.ts, PLAN.md
+  §14a): the window's own frames first, as always, then the projector's frame
+  asks and a worker's timer while those frames have stopped, so the show keeps
+  hearing while its window is hidden behind the wall.
 */
+
+/**
+ * The worker's timer, as source rather than a file: a blob needs no chunk
+ * fetched, so it starts on a venue with no internet as well (PLAN.md §14h),
+ * and it is four lines.
+ */
+const TICK_WORKER = 'let t=null;onmessage=e=>{clearInterval(t);t=e.data>0?setInterval(()=>postMessage(0),e.data):null;};';
+const TICK_MS = 16;
+
+export interface Ear {
+  /** The show's analysis is running and hearing. */
+  audioData: AudioData | null;
+  /**
+   * Listening, but nothing is arriving: the audio context is suspended or
+   * interrupted (a phone call on iOS, a page that has not been touched yet),
+   * or no reading has landed for half a second. The desk and the phone say so,
+   * because a plate that has gone deaf still moves and nobody can tell by
+   * looking at it.
+   */
+  deaf: boolean;
+  /** For `?debug` and `npm run ears`: readings by who offered them, and the context's state. */
+  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; state: string; deaf: boolean } | null;
+}
 
 export function useAudioAnalyzer(
   stream: MediaStream | null,
@@ -46,8 +75,13 @@ export function useAudioAnalyzer(
   bassBoost: number = 1.0,
   autoCalibrate: boolean = true,
   calibrateNonce: number = 0,
-) {
+): Ear {
   const [audioData, setAudioData] = useState<AudioData | null>(null);
+  const [deaf, setDeaf] = useState(false);
+  const deafRef = useRef(false);
+  const earRef = useRef<EarClock | null>(null);
+  const tickerRef = useRef<Worker | null>(null);
+  const unlistenRef = useRef<(() => void) | null>(null);
   // Live trims are read from refs inside the analysis loop: rebuilding the
   // AudioContext every time a slider moves would glitch the audio and throw
   // away the room calibration mid-song.
@@ -60,11 +94,20 @@ export function useAudioAnalyzer(
 
   const stopAudio = useCallback(() => {
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = null;
+    onWallAsk(null);
+    tickerRef.current?.terminate();
+    tickerRef.current = null;
+    unlistenRef.current?.();
+    unlistenRef.current = null;
+    earRef.current = null;
     if (audioContextRef.current) audioContextRef.current.close();
     audioContextRef.current = null;
     analyzerRef.current = null;
     sourceRef.current = null;
     setAudioData(null);
+    deafRef.current = false;
+    setDeaf(false);
   }, []);
 
   const startAudio = useCallback(async () => {
@@ -110,6 +153,8 @@ export function useAudioAnalyzer(
       // recalibrate button) starts it fresh along with the room tracker.
       const features = new AudioFeatures();
 
+      const ear = new EarClock();
+      earRef.current = ear;
       const update = () => {
         const analyser = analyzerRef.current;
         if (!analyser) return;
@@ -156,11 +201,81 @@ export function useAudioAnalyzer(
           calibration,
           features: reading,
         }));
-
-        animationFrameRef.current = requestAnimationFrame(update);
+        if (deafRef.current && audioContext.state === 'running') { deafRef.current = false; setDeaf(false); }
       };
 
-      update();
+      /*
+        The three ways in (lib/earClock.ts). The frame loop is the one that ran
+        alone before; the other two only read while it has stopped.
+      */
+      const frame = () => {
+        if (earRef.current !== ear) return;
+        if (ear.offer('frame', performance.now())) update();
+        animationFrameRef.current = requestAnimationFrame(frame);
+      };
+      onWallAsk((now) => { if (earRef.current === ear && ear.offer('ask', now)) update(); });
+      try {
+        const url = URL.createObjectURL(new Blob([TICK_WORKER], { type: 'text/javascript' }));
+        const ticker = new Worker(url);
+        URL.revokeObjectURL(url);
+        ticker.onmessage = () => {
+          if (earRef.current !== ear) return;
+          const now = performance.now();
+          if (ear.offer('tick', now)) update();
+        };
+        ticker.postMessage(TICK_MS);
+        tickerRef.current = ticker;
+      } catch { /* no workers: the frames and the wall's asks still read */ }
+      // `npm run ears` stops the tick for its control (the ear as it was)
+      // and reaches the context to suspend it. Only under ?debug.
+      if (new URLSearchParams(window.location.search).has('debug')) {
+        const w = window as unknown as { __earTick?: (on: boolean) => void; __earContext?: AudioContext };
+        w.__earTick = (on) => tickerRef.current?.postMessage(on ? TICK_MS : 0);
+        w.__earContext = audioContext;
+      }
+
+      /*
+        A context that is not running hears nothing, and the analyser hands
+        back the same silence every read, which looks like a quiet room rather
+        than a fault. Chrome starts one suspended on a page nobody has touched
+        (a remembered microphone at load), iOS interrupts one for a phone call.
+        Ask for it back when it stops, and again on the next touch, which is
+        the gesture Chrome's autoplay rule waits for (a mouse's press, a finger's
+        lift).
+      */
+      const revive = () => { if (audioContext.state !== 'running' && audioContext.state !== 'closed') void audioContext.resume().catch(() => {}); };
+      // A finger's pointerdown does not count as a gesture for this (the spec
+      // grants it on the finger's lift), a mouse's does: listen for all of them.
+      const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'keydown'] as const;
+      audioContext.addEventListener('statechange', revive);
+      for (const g of GESTURES) window.addEventListener(g, revive, true);
+      unlistenRef.current = () => {
+        audioContext.removeEventListener('statechange', revive);
+        for (const g of GESTURES) window.removeEventListener(g, revive, true);
+      };
+      revive();
+
+      /*
+        The watchdog, on a clock of its own. Not on the worker's tick: while
+        the tick runs it reads whenever nothing else does, so the ear it was
+        watching could never be stale, and if the tick died the watchdog died
+        with it (check-skeptic found both). A page timer is held to about one
+        a second while the window is hidden, which is often enough to say
+        "not hearing" and is only read on a desk someone is looking at.
+      */
+      let staleRun = 0;
+      const watch = window.setInterval(() => {
+        if (earRef.current !== ear) return;
+        // Stale twice running, so a visible window coming out of one long task
+        // does not flash "not hearing" for the frame before it reads again.
+        staleRun = ear.stale(performance.now()) ? staleRun + 1 : 0;
+        const deafNow = audioContext.state !== 'running' || staleRun >= 2;
+        if (deafNow !== deafRef.current) { deafRef.current = deafNow; setDeaf(deafNow); }
+      }, 250);
+      const unlisten = unlistenRef.current;
+      unlistenRef.current = () => { unlisten?.(); window.clearInterval(watch); };
+
+      frame();
     } catch (error) {
       console.error('Error accessing audio source:', error);
     }
@@ -175,5 +290,12 @@ export function useAudioAnalyzer(
     return () => { stopAudio(); };
   }, [isActive, startAudio, stopAudio]);
 
-  return audioData;
+  const debug = useCallback(() => {
+    const ear = earRef.current;
+    const ctx = audioContextRef.current;
+    if (!ear || !ctx) return null;
+    return { reads: { ...ear.reads }, state: ctx.state, deaf: deafRef.current };
+  }, []);
+
+  return { audioData, deaf: deaf && isActive, debug };
 }

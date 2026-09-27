@@ -62,7 +62,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; nothing built |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d); nothing built |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; the rest not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -88,6 +88,17 @@ bracket its comment describes ("a Finger that makes dye still has to beat both")
 Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
+
+*Found 2026-09-27, not yet done:* **the mirror check's "and nowhere else" goes red at
+exactly its limit on changes that cannot move a pixel.** #191 (PLAN.md only) read
+"Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
+against an allowance of 11.1, at the tool's mirror through the centre
+(`scripts/mirror.mjs`, the Mac plate shard). It has been red at its limit on other
+branches that do not touch the plate. Either the mirror echo it was written to catch
+comes back now and then, or the allowance is drawn from a drift reading that is
+sometimes as large as the echo; which of the two is the first thing to settle, from
+the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
+of these costs the owner a by-hand re-run.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -1489,11 +1500,43 @@ on the projector, or switches to Ableton, the wall keeps moving on the last read
 it had, which may be the top of a kick, and stops hearing the music. This is the one
 item here that can quietly ruin a whole set.
 
-*Fix:* read the analyser inside the frame the projector already drives (`render()`),
-or on a timer as the dimmer does, and show "deaf" on the desk and the phone if no
-reading has landed for half a second. *Measure:* a two-window check (the show, then
-the projector brought to front) with a fake microphone: the level must keep changing
-while the show window is behind.
+**Shipped** (asked "Do #1 now", 2026-09-27). `lib/earClock.ts` decides who reads:
+the window's own frames always, as before; the projector's frame ask
+(`__chromaglassFrame` calls `wallAsked`) only while those frames have stopped for
+50 ms, so the plate hears once per frame the wall draws; and a worker's 16 ms tick
+only while neither is coming (covered with no wall, which is still a show on a
+network display or the phone). Taking the frames first keeps one reading per drawn
+frame, which matters because the level smoothing is per reading. A watchdog on its
+own timer calls the ear deaf when the audio context is not running or nothing has
+been read for half a second; the desk's sound line then starts "not hearing" and the
+phone's Sound dot turns amber with a line in its sheet. A suspended context is asked
+back on its `statechange` and on the next touch or key (Chrome starts one suspended
+on a page nobody has touched; iOS interrupts one for a call). Whether a finger's
+lift wakes it on the iPhone is not yet tried. The stall before the wall or the tick
+may read is one and a half of the window's own frame gap (50–250 ms), so a visible
+window at 15 fps or 240 Hz reads exactly its frames, as before.
+
+`npm run ears` (19 checks, no GPU needed; on the Mac's `open` shard) measures it. A
+headless window is never hidden, so it withholds the show's animation frames itself.
+Covered, with the wall asking: 38 distinct levels in two seconds, one reading per
+frame asked for (120 over 121); with no wall, 38 on the tick; the control on the
+same page (frames withheld, no ask, the tick stopped, the ear as it was before)
+holds **one** level and is called deaf. A build whose ear reads on frames alone went
+red on all three "keeps hearing" lines. Visible with the wall asking, only the frames
+read (122 frame, 0 ask).
+
+*Still owed:* the owner's look on the Mac, covering the show window with another app
+for thirty seconds and reading `chromaglassCastState().ear.reads` before and after
+(about sixty ticks a second with no wall, and the desk not saying "not hearing").
+The worker's tick is chosen because a hidden page's own timers are held to about one
+a second; that is Chrome's documented behaviour and cannot be shown headless.
+
+*Found along the way, not done:* the look fade, the dimmer, the drift glides and the
+simulated band run on the page's own timers (`showInterval`, `simulatedMusic.ts`),
+moved there so a covered window would not freeze them. A hidden page's timers are
+held to about one a second (much less after five minutes hidden), so a Go fired from
+a MIDI pad while the show window is covered steps through its crossfade a second at a
+time instead of gliding. The same worker tick could drive them.
 
 ### 14b. With the wall up, the plate may draw twice a refresh and the governor cannot see it
 

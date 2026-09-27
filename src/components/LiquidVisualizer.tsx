@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
+import { wallAsked } from '../lib/earClock';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
@@ -7741,6 +7742,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const now = performance.now();
       if (now - lastExternalFrame < 6) return;     // this interval already has a frame
       lastExternalFrame = now;
+      // The ear reads on the wall's clock: with this window covered its own
+      // frames have stopped, and so, until PLAN.md §14a, had its hearing
+      // (lib/earClock.ts). The reading goes through React like every other,
+      // so it lands on the next frame, the same one-frame lag as a visible
+      // show's (PLAN.md §14f). It reads only while this window's frames are
+      // missing, so a visible show hears as it did.
+      wallAsked(now);
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       render();
     };
@@ -7759,6 +7767,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         frames: framesDrawnRef.current,
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
+        /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
+        heard: audioDataRef.current ? { volume: audioDataRef.current.volume, energy: audioDataRef.current.energy } : null,
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */

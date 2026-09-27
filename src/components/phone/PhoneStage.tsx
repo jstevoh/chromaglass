@@ -121,6 +121,8 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
+  deaf: boolean;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
     the filmed shows (lib/scenePacing.ts), started and stopped from a tile on
@@ -416,7 +418,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <Icon size={18} />
               <span>{label}</span>
               {name === 'play' && (p.evolving || p.tilt.on) && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-accent" />}
-              {name === 'sound' && p.audioSource !== 'none' && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-ok" />}
+              {name === 'sound' && p.audioSource !== 'none' && <span className={`absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full ${p.deaf ? 'bg-warn' : 'bg-ok'}`} data-testid="phone-sound-dot" data-deaf={p.deaf ? 'true' : undefined} />}
               {name === 'more' && p.recording.on && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-live" />}
             </button>
           ))}
@@ -576,6 +578,11 @@ export function PhoneStage(p: PhoneStageProps) {
             while something is being listened to, since with no sound there is
             no song to have a shape.
           */}
+          {p.audioSource !== 'none' && p.deaf && (
+            <p className="mt-3 text-[13px] leading-snug text-warn" role="status" data-testid="phone-sound-deaf">
+              Not hearing anything: the sound has stopped arriving. Tap the plate to wake it, or pick the source again.
+            </p>
+          )}
           {p.audioSource !== 'none' && (
             <p className="mt-3 text-[13px] leading-snug text-muted" data-testid="phone-song-shape">
               {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
