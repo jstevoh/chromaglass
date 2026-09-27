@@ -57,7 +57,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (with the phone's fingers as magnets), not yet judged on the Mac; 9f–9j open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
@@ -714,6 +714,38 @@ What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
   does.
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
   white table clips (32 % of the frame blown); no visible pulse on the kick.
+- **9e. The magnet stands it up** (this PR). Reported: "doesn't make spikes or fingers.
+  It's just a big blob that gets pulled around by the magnet." The magnet's pull held a
+  gathered pool round, and a full pool is stable in the maze's physics, so nothing
+  broke it. Now a magnet brought up close (the Magnet tool; no look's own magnet is
+  near enough) stands the pool up into Rosensweig spikes: the solver draws the liquid
+  into a ring-packed field of domes round the magnet (`src/gpu/wgsl/spikes.ts`, wells
+  in `phaseMu`), under a maze field the dipoles' repulsion rises across its reach, so
+  the pool's outline breaks up rather than rounding, and the plate draws each dome as a peak with a star
+  of light and a white point on it. On the phone every finger holding the Magnet is a
+  magnet (up to four). `npm run spikes` measures it; numbers in the PR.
+
+Open, from building 9e (in the order to do them):
+
+- **9f. Colour between the domes.** Where the pool parts, the gaps show a thin amber
+  film of ferrofluid or dye-less water, not the bright dye the references have
+  between their domes: the dye was pushed out when the pool gathered. Either let the
+  dye flow back into the gaps with the water, or draw the thin film clearer.
+- **9g. Domes at the lab's grid.** On 256² a spike's pitch is ten cells and a dome is
+  four or five across, so much of each is edge and grey. The app runs 384² and up
+  where they are sharper; the Mac should judge whether 256 (the software rung and
+  some phones) needs a coarser pitch.
+- **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
+  between dye cells are thin and even; ours still thicken where the maze coarsens.
+- **9i. Fingers past the spikes.** A pool bigger than the spikes' reach (0.28 of the
+  plate in radius) neither parts nor fingers at its far edge under the Magnet in four
+  seconds: between glass the layer cannot thin in the middle with nowhere to go, and
+  the stronger repulsion alone did not push its edge out. The references' sunflower
+  (a labyrinth inside, radial fingers round it) needs the edge to go unstable under a
+  close magnet: a stronger radial term at the rim, or the maze force scaled up there.
+- **9j. Spikes that follow the music.** A real ferrofluid speaker's spikes jump on the
+  kick. The spikes now answer the magnet's field, so the maze's audio breathing
+  could drive their height too.
 
 ### 10. Playing like a show
 

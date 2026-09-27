@@ -9,7 +9,7 @@ import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
-import { fillPlateUniforms } from '../gpu/plateUniforms';
+import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
@@ -774,6 +774,12 @@ class FluidSimulation {
   plateAngle = 0;
   /** The last step's parameters as the solver was given them, for the harness to replay in the lab. */
   lastStep: GpuStepParams | null = null;
+  /**
+   * The other fingers holding the magnet on a touch screen, in plate
+   * coordinates, set by the show each frame (magnetFor) and handed to the
+   * solver with the first finger's magnet (GpuStepParams.extraMagnets).
+   */
+  extraMagnets: readonly { x: number; y: number }[] = [];
   /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
   viewHalfW = 0.33;
   viewHalfH = 0.21;
@@ -3204,6 +3210,7 @@ class FluidSimulation {
       // Held further away for a bigger look, which is what spreads the pull.
       magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
+      extraMagnets: this.extraMagnets,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
@@ -3777,6 +3784,8 @@ interface FrameView {
   harmony: number[];
   /** Where the lamp and its second have wandered to, under the plate. */
   lamp: { x: number; y: number; x2: number; y2: number };
+  /** The magnets the lead plate was last stepped with: what stands the ferrofluid up into spikes. */
+  magnets: readonly { x: number; y: number; height: number; strength: number }[];
   gelAngle: number;
   kaleidoPhase: number;
   /** The second plate's throw: how magnified, and how far it has drifted. */
@@ -4187,7 +4196,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * own way) and its own drop clock (so each lays its first drop as it lands).
    * Keyed by the touch's identifier; emptied when the fingers leave.
    */
-  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number }>());
+  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number }>());
   /** Which touch is the pointer, while one is. */
   const primaryTouchRef = useRef<number | null>(null);
   /**
@@ -5280,6 +5289,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
         const now = showNow();
+        const lead = fluidsRef.current[0];
+        if (lead) lead.extraMagnets = [];
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
         const lookX = look.magnetX ?? 0.5, lookY = look.magnetY ?? 0.5;
@@ -5340,6 +5351,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
         }
         lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
+        // The other fingers' magnets, while the first is held (see the hands
+        // loop): each finger that held one within the same quarter second.
+        if (lead) {
+          const extras: { x: number; y: number }[] = [];
+          if (held) {
+            for (const h of extraHandsRef.current.values()) {
+              if (extras.length < 3 && h.magnetAt !== undefined && now - h.magnetAt < 250) {
+                extras.push({ x: Math.max(0.05, Math.min(0.95, h.x / GRID_SIZE)), y: Math.max(0.05, Math.min(0.95, h.y / GRID_SIZE)) });
+              }
+            }
+          }
+          lead.extraMagnets = extras;
+        }
         return Object.assign(magnetStepRef.current, look, {
           magnetX: Math.max(0.05, Math.min(0.95, mx)),
           magnetY: Math.max(0.05, Math.min(0.95, my)),
@@ -5891,7 +5915,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             pointer's stroke is written back to its ref for the next step; the
             other fingers' live in their own entries.
           */
-          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number };
+          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number };
           const hands: { hand: Hand; primary: boolean }[] = [];
           if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
@@ -5934,9 +5958,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
 
               if (tool === 'magnet') {
-                // Nothing is laid: the magnet goes where the hand is. There
-                // is one magnet, so it follows the first finger only.
+                /*
+                  Nothing is laid: the magnet goes where the hand is. On a
+                  touch screen every finger holds one (up to four), which is
+                  what a hand does with a few small magnets under a dish:
+                  each stands its own hedgehog of spikes and the pool between
+                  them is pulled apart into fingers. The first finger's is the
+                  magnet the rest of the show knows (magnetFor, the harness);
+                  the others are noted on their own hands and go to the solver
+                  with it.
+                */
                 if (primary) magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: showNow() };
+                else hand.magnetAt = showNow();
               } else if (tool === 'press') {
                 // A hand on the top glass: the film thins under the palm and
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
@@ -7284,6 +7317,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           rotations: rotationAnglesRef.current,
           harmony: harmonyRef.current,
           lamp: lampRef.current,
+          magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
           gelAngle: gelAngleRef.current,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
@@ -7716,6 +7750,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** Where the pointer is on the plate, in grid cells: where a tool acts. */
         pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
         /** Every finger on the glass, the pointer first, and whether two of them are the camera (npm run phone). */
+        /**
+         * Every magnet the lead plate was last stepped with (the fingers'
+         * too), as the plate draws their spikes. Here beside `hands` rather
+         * than with the stage's own hooks, so the phone check can ask it
+         * wherever the plate steps, software WebGPU included.
+         */
+        magnets: () => magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
         hands: () => ({
           hands: [...(isMouseDownRef.current ? [{ ...mousePosRef.current }] : []), ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y }))],
           pinch: pinchRef.current !== null,

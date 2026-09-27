@@ -543,6 +543,53 @@ try {
 
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
 
+      /*
+        Two fingers holding the Magnet are two magnets, each under its own
+        finger: the solver is stepped with both (each raises its own spikes,
+        npm run spikes measures that on the GPU), and the plate is told of
+        both. Read from the step the lead plate was last given, so a second
+        finger that only moved the first magnet, or was dropped on the way to
+        the solver, fails here.
+      */
+      await tap(page, 'phone-tool-magnet');
+      await touch('touchStart', [{ ...A, id: 1 }]);
+      await touch('touchStart', [{ ...A, id: 1 }, { ...B, id: 2 }]);
+      await settle(400);
+      const magnets = () => page.evaluate(() => {
+        if (typeof window.chromaglassDebug().magnets !== 'function') throw new Error('chromaglassDebug().magnets is gone');
+        return window.chromaglassDebug().magnets();
+      });
+      const mags = await magnets();
+      // What the lead plate was stepped with, for the detail when this fails.
+      const stepped = await page.evaluate(() => {
+        const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep;
+        return st ? `stepped with strength ${(+st.magnetStrength).toFixed(2)}, ${st.extraMagnets?.length ?? 0} more` : 'no step yet';
+      });
+      // And lifting the second leaves the first's alone: the control, so a
+      // second magnet that is really the first one counted twice fails.
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ ...B, id: 2 }] });
+      await settle(400);
+      const left = await magnets();
+      await touch('touchEnd', [{ ...A, id: 1 }]);
+      await settle(400);
+      const under = (m, r) => !!m && !!r && Math.abs(m.x * n - r.x) <= 1.5 && Math.abs(m.y * n - r.y) <= 1.5;
+      const at = (ms) => ms.map(m => `(${(m.x * n).toFixed(1)}, ${(m.y * n).toFixed(1)})`).join(' ');
+      /*
+        Asked where the plate runs at speed, as the dye is (the same
+        readbacks gate): a held magnet counts as let go a quarter second
+        after the hand last moved it (magnetFor), and software WebGPU steps
+        the whole app slower than that, so there it was stepped with no
+        magnet at all (strength 0) however the fingers were read.
+      */
+      if (rb1 - rb0 >= 3 || NEED_GPU) {
+        check('two fingers holding the Magnet are two magnets, each under its finger, and lifting one leaves one',
+          mags.length === 2 && under(mags[0], ref.A) && under(mags[1], ref.B) && left.length === 1 && under(left[0], ref.A),
+          `${at(mags)} against cells ${fmt([ref.A, ref.B])}; with the second lifted ${at(left)}; ${stepped}`);
+      } else {
+        console.log(` --   the plate steps too slowly here for a held magnet (${stepped}): two fingers as two magnets are not asked (the Mac shard asks them)`);
+      }
+      await tap(page, 'phone-tool-dropper');
+
       // The closeup: two fingers are the camera.
       await tap(page, 'phone-zoom');
       // Hold, so the closeup stays put between the reference and the check.

@@ -318,6 +318,12 @@ jobs:
       - name: The ferrofluid maze's detail
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run maze
+      # The magnet held close stands the ferrofluid up: the pool parts into
+      # lit domes and its outline stops being a blob's; a look's own far
+      # magnet leaves it whole; a second finger raises domes of its own.
+      - name: The ferrofluid's spikes
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run spikes
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye

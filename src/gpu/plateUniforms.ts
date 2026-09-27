@@ -17,6 +17,7 @@
 import { hexToRgb, PALETTE_RGB } from '../constants';
 import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
+import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
 import { mixGrade, mixPositions } from '../lib/mixer';
 
@@ -53,6 +54,12 @@ export interface PlateView {
   harmony: number[];
   /** Where the lamp and its second have wandered to, under the plate. */
   lamp: { x: number; y: number; x2: number; y2: number };
+  /**
+   * The magnets under the glass, as the lead plate was last stepped with them
+   * (fluid uv, and the solver's own height and strength): what raises the
+   * ferrofluid's spikes. Up to four; none when absent.
+   */
+  magnets?: readonly { x: number; y: number; height: number; strength: number }[];
   gelAngle: number;
   /** Where the mirror rig has turned to, accumulated on the CPU. */
   kaleidoPhase: number;
@@ -281,6 +288,11 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const lamp = view.lamp;
     pack.set('lamp', lamp.x, lamp.y, 0.55, clamp01(s.lampHotspot ?? 0));
     pack.set('lamp2', lamp.x2, lamp.y2, 0.45, clamp01(s.secondLamp ?? 0));
+    const mags = new Array<number>(16).fill(0);
+    (view.magnets ?? []).slice(0, 4).forEach((m, k) => {
+      mags[k * 4] = m.x; mags[k * 4 + 1] = m.y; mags[k * 4 + 2] = Math.max(0.02, m.height); mags[k * 4 + 3] = Math.max(0, m.strength);
+    });
+    pack.set('magnets', ...mags);
     pack.set('lightPlay', clamp01(s.lightPlay ?? 0));
     pack.set('iridescence', clamp01(s.iridescence ?? 0));
   }
@@ -399,4 +411,15 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   // Into the chain's half floats nothing; into the camera's 8-bit texture
   // still a dither, or a dark ramp bands before the camera sees it.
   pack.set('finishInMain', !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0);
+}
+
+/**
+ * The magnets under the lead plate as its last step had them, for the plate
+ * to draw the spikes they raise (plate.ts, spikeAt): the one in the step and
+ * the other fingers', at its height and strength. None with the magnet off.
+ */
+export function magnetsOnPlate(p: GpuStepParams | null): { x: number; y: number; height: number; strength: number }[] {
+  if (!p || p.magnetStrength <= 0.0001) return [];
+  const one = { x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength };
+  return [one, ...(p.extraMagnets ?? []).slice(0, 3).map((m) => ({ ...one, x: m.x, y: m.y }))];
 }
