@@ -91,6 +91,7 @@
     "tools": "npm run build && node scripts/tools.mjs",
     "take": "npm run build && node scripts/take.mjs",
     "wgsl": "node scripts/wgsl.mjs",
+    "deploygate": "bash scripts/deploygate.sh",
     "physics": "node scripts/physics.mjs",
     "bodies": "node scripts/bodies.mjs",
     "microscope": "node scripts/microscope.mjs",
@@ -131,7 +132,8 @@
     "closeup": "npm run build && esbuild scripts/closeup.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/closeup.mjs && node node_modules/.cache/closeup.mjs",
     "shelf": "npm run build && esbuild scripts/shelf.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/shelf.mjs && node node_modules/.cache/shelf.mjs",
     "gig": "npm run build && esbuild scripts/gig.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/gig.mjs && node node_modules/.cache/gig.mjs",
-    "rolls": "npm run build && esbuild scripts/rolls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/rolls.mjs && node node_modules/.cache/rolls.mjs"
+    "rolls": "npm run build && esbuild scripts/rolls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/rolls.mjs && node node_modules/.cache/rolls.mjs",
+    "fingers": "node scripts/fingers.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

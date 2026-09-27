@@ -25,7 +25,7 @@ owner's eyes on a real GPU.
 
 | Where | Can verify | Cannot |
 |---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `ferrodye`, `ferropour`, `particles`, `derive`, `mixer`), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
+| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrodye`, `ferropour`, `particles`, `derive`, `mixer`), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
 | CI, macOS runner (Metal) | Everything | — |
 | The owner's machine | How it looks at 60 fps | — |
 
@@ -38,7 +38,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | You touched | Run before pushing |
 |---|---|
 | anything | `npm run lint` (typecheck) |
-| `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
+| `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `fingers`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
 | `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
@@ -52,6 +52,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`) | `applink`, `remotemix`; the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
+| `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
@@ -65,6 +66,11 @@ deploy:
 - **Measure** (ubuntu, ~1 min): typecheck and the node harnesses.
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is.
+- A deploy skips the checks when main's new tree is the exact tree its PR's
+  `Checks` run passed on (the PR's head contained main when it merged;
+  `scripts/deploygate.sh`). Otherwise the deploy runs them in full. So bring
+  `main` into a PR and let it go green before merging, rather than merging a
+  head that is behind.
 - Superseded PR runs are cancelled. `gallery.yml` (every preset photographed),
   `controls.yml` (every control measured) and `film.yml` (every look filmed and
   measured against real shows: swells, calm, black, sync by section) run by hand.
