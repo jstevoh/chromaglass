@@ -1178,6 +1178,15 @@ while this batch's plan was going in (#177), and no cause is known yet:
   DROP_EVERY steps with a splash.
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
+- `npm run startup`, the same check, a second kind of stop: on #186's run on 1f627f3
+  (2026-09-27) the frames stopped 2.22 s from 1.34 s, *before* the device was given
+  (asked at 0.53 s, given at 3.50 s; the first step at 13.61 s), where the check
+  names the stop at the GPU's start as a separate 0.30 s from 1.04 s. The same app
+  passed the shard on the commit before (40dee25; only a check script differed).
+  Not #181's stop (that one sat a quarter second after the first step). Worth
+  measuring what the page does while Chromium creates the device (the table shows
+  no frames counted between 0.77 s and 3.48 s), and whether 4b should own every
+  stop before the device is given rather than only the first.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
