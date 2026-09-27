@@ -51,6 +51,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   // First, so the sheet opens on it: what a show is run with, whatever the look.
   { id: 'master', name: 'Master', category: 'live',
     terms: 'master house lights dimmer blackout black out flash limit strobe photosensitive epilepsy safety speed pace tempo of the plate' },
+  /*
+    The mixer (lib/mixer.ts, docs/rig-plan.md R7): every picture on the wall
+    in one stack, in an order, each with its level and grade. Live, beside
+    Master, because it is ridden during a show; the desks and the phone open
+    the same panel.
+  */
+  { id: 'mixer', name: 'Mixer', category: 'live',
+    terms: 'mixer video mixer stack order layers layer order bring forward send back led ring platform film video logo mark front plate back plate brightness contrast saturation hue grade proc amp colour correction opacity level' },
   { id: 'audio-input', name: 'Sound', category: 'inputs',
     terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song' },
   { id: 'audio-mappings', name: 'Sound Mappings', category: 'inputs',
@@ -162,8 +170,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'mark', name: 'Logo & Titles', category: 'stage',
     terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
-  { id: 'layers', name: 'Multi-Layer Mixer', category: 'stage',
-    terms: 'layer blend mode screen multiply overlay exclusion count mixer led platform' },
+  { id: 'layers', name: 'Plates & LED', category: 'stage',
+    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick' },
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];

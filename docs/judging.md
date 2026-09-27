@@ -288,6 +288,21 @@ is new work on every step of those looks, not yet timed on a real GPU.
 `npm run stages` (or `?stages`) times each stage, `dye grid` among them; its
 milliseconds on Red Cabbage at your usual grid are the number to report.
 
+## 13. The Mixer
+
+The Mixer (the Perform desk's Mixer button, Settings → Mixer, the phone's
+Mix button) orders the LED ring, both plates, the film and the logo, and
+grades each. The lab measures that each move changes only where that
+source is and that each grade does what it says (`npm run mixer`); it
+cannot say whether the choices are the useful ones. Three things to look
+at, with a film and a logo loaded on a two-plate look: the film moved
+under the back plate (does it read as the film *between* the glasses, or
+just as a dimmer film?); the LED ring raised above the front plate (a beam
+screened over the plate, the plate lit by the plain lamp: is that a look
+you would use, or should the beam go over the film too by default?); and
+whether 0–200% is the right travel for brightness, contrast and
+saturation on a projector, or too much at the top.
+
 ---
 
 ## Reading the frame time while you do it

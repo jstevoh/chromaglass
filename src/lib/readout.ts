@@ -18,6 +18,7 @@
 
 import type { VisualizerSettings } from '../types';
 import { curveOf, travelOf } from './midi';
+import { MIX_CONTROLS } from './mixer';
 
 /** The settings a number reads better on than a percentage. */
 const UNITS: Record<string, (v: number) => string> = {
@@ -26,6 +27,17 @@ const UNITS: Record<string, (v: number) => string> = {
   macroHold:  v => `${v.toFixed(1)}s`,
   beatLead:   v => `${Math.round(v)} ms`,
   gelSpeed:   v => `${v.toFixed(2)} rpm`,
+  /*
+    The mixer's grades read as a photo editor's do: brightness, contrast and
+    saturation as a share of the source's own (100% is untouched, and a share
+    of the travel would have called that 50%), the hue as a turn in degrees.
+  */
+  ...Object.fromEntries(MIX_CONTROLS.filter(c => !String(c.key).endsWith('Level')).map(c => [
+    String(c.key),
+    String(c.key).endsWith('Hue')
+      ? (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}°`
+      : (v: number) => `${Math.round(v * 100)}%`,
+  ])),
 };
 
 /**

@@ -998,16 +998,56 @@ fn hashFinish(p: vec2f) -> f32 {
   return fract(q.x * q.y);
 }
 
-fn finishLight(color: vec3f, uvScreen: vec2f, markTex: texture_2d<f32>) -> vec3f {
-  var outColor = color * U.dimmer;
-  if (U.markOn > 0.001) {
-    let m = (uvScreen - U.markRect.xy) / max(U.markRect.zw, vec2f(1e-4)) * 0.5 + 0.5;
-    if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
-      let mark = tex2(markTex, vec2f(m.x, 1.0 - m.y));
-      outColor = mix(outColor, mark.rgb, mark.a * U.markOn);
-    }
+/*
+  The mixer's grade (lib/mixer.ts): brightness, contrast, saturation and hue,
+  the four a video proc amp has, applied to one source's picture before it is
+  laid over what is under it. The formulas are the CSS filter functions', in
+  that order: brightness a gain, contrast about mid-grey, saturation and hue
+  the Rec. 709 matrices the filter spec gives. Unlike the filters, nothing is
+  clamped to 1 on the way: the plate carries light above 1 into the camera and
+  the post chain, and a grade that clipped it would flatten a highlight the
+  source had not asked to lose. Below 0 is clamped, since there is no light
+  darker than none.
+
+  Skipped at 1, 1, 1 and 0, rather than run as an identity. (x - 0.5) * 1 +
+  0.5 is not x in the last bit, and "a look made before the mixer is the same
+  picture" is meant to the bit.
+*/
+fn gradeMix(c: vec3f, g: vec4f) -> vec3f {
+  if (g.x == 1.0 && g.y == 1.0 && g.z == 1.0 && g.w == 0.0) { return c; }
+  var o = c * g.x;
+  o = (o - 0.5) * g.y + 0.5;
+  o = mix(vec3f(dot(o, vec3f(0.2126, 0.7152, 0.0722))), o, g.z);
+  if (g.w != 0.0) {
+    let k = cos(g.w);
+    let n = sin(g.w);
+    o = vec3f(
+      dot(o, vec3f(0.213 + k * 0.787 - n * 0.213, 0.715 - k * 0.715 - n * 0.715, 0.072 - k * 0.072 + n * 0.928)),
+      dot(o, vec3f(0.213 - k * 0.213 + n * 0.143, 0.715 + k * 0.285 + n * 0.140, 0.072 - k * 0.072 - n * 0.283)),
+      dot(o, vec3f(0.213 - k * 0.213 - n * 0.787, 0.715 - k * 0.715 + n * 0.715, 0.072 + k * 0.928 + n * 0.072)));
   }
-  return outColor;
+  return max(o, vec3f(0.0));
+}
+
+/*
+  The logo, laid over a picture at level. The finish lays it over the
+  finished frame when it is at the top of the mixer's stack, as it always
+  was; the display pass lays it in lower down when the operator has moved it
+  under the film or a plate, which is a slide in the stack rather than a
+  title over the show (lib/mixer.ts).
+*/
+fn markLayer(color: vec3f, uvScreen: vec2f, level: f32, markTex: texture_2d<f32>) -> vec3f {
+  if (level <= 0.001) { return color; }
+  let m = (uvScreen - U.markRect.xy) / max(U.markRect.zw, vec2f(1e-4)) * 0.5 + 0.5;
+  if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
+    let mark = tex2(markTex, vec2f(m.x, 1.0 - m.y));
+    return mix(color, gradeMix(mark.rgb, U.markGrade), mark.a * level);
+  }
+  return color;
+}
+
+fn finishLight(color: vec3f, uvScreen: vec2f, markTex: texture_2d<f32>) -> vec3f {
+  return markLayer(color * U.dimmer, uvScreen, U.markOn, markTex);
 }
 
 fn ditherOut(outColor: vec3f, fragGl: vec2f) -> vec4f {
@@ -1399,6 +1439,79 @@ struct FsOut {
   @location(1) aux: vec4f,     // for the camera: normal.xy (biased), dye height, bubble mask
 };
 
+/*
+  The mixer's stack (lib/mixer.ts).
+
+  Four sources can move: the LED ring (mixPos.x), the back plate (.y),
+  the film (.z) and the logo (.w), each told its row in the stack of
+  five, 0 at the bottom. The front plate cannot move; it is the glass the lamp
+  shines through, and it has whichever of rows 0 and 1 is left.
+
+  Everything is still drawn in one pass, so an order is a matter of *where in
+  this pass* a source is laid in, and there are three places:
+
+    - under the front plate, as the lamp: only the LED ring can be there, at 0;
+    - between the front plate and the back plate: whatever sits below the back
+      plate, laid in before it, and so under the hot-spot, the droplets and the
+      bubbles too, which belong to the glass;
+    - over both plates, where the film always went: whatever sits above the
+      back plate, in order. The logo at the very top is left to the finish, as
+      it always was, so it stays over the post chain's effects and out of the
+      dimmer, which is what a title over the show wants.
+
+  At the order the shader always had (the ring 0, the front plate 1, the back
+  plate 2, the film 3, the logo 4) the first two places are empty and the film
+  is laid in where it always was, with the same arithmetic, so the picture
+  does not change.
+*/
+fn mixLevelled(under: vec3f, over: vec3f, level: f32) -> vec3f {
+  // Not mix(a, b, 1): a compiler is free to write that as a + (b - a) * 1,
+  // which is not b in the last bit.
+  if (level >= 1.0) { return over; }
+  return mix(under, over, level);
+}
+
+/** The LED platform's light at uv: its wheel of colour, graded, and the bevel toward its rim. */
+fn ledLight(uv: vec2f) -> vec3f {
+  let centered = (uv - 0.5) * U.resolution;
+  let t = fract(atan2(centered.y, centered.x) / (2.0 * PI) + 0.5 + U.ledAngle);
+  let lc = gradeMix(ledColor(t), U.mixGrade[0]);
+  let dist = length(centered);
+  let maxR = max(U.resolution.x, U.resolution.y) * 0.8;
+  let bevel = 1.0 - smoothstep(maxR * 0.5, maxR, dist) * 0.8;
+  return lc * bevel;
+}
+
+/** The film projector's frame, through the dye it lands on, as it always was; graded first. */
+fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
+  if (U.filmOn == 0 || U.filmMix <= 0.001) { return color; }
+  let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
+  let filmC = gradeMix(tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb, U.mixGrade[3]);
+  let fl = dot(filmC, vec3f(0.299, 0.587, 0.114));
+  let key = smoothstep(U.filmKey, U.filmKey + 0.18, fl);
+  let tinted = filmC * mix(vec3f(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
+  return mix(color, color * 0.35 + tinted * 0.95, key * U.filmMix);
+}
+
+/**
+ * The movers whose place is in [lo, hi), laid over color bottom first.
+ * The LED ring at 0 is the lamp, drawn under the glass, so it is not a beam here.
+ */
+fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
+  var c = color;
+  for (var p = 0; p < 5; p++) {
+    let fp = f32(p);
+    if (fp < lo || fp >= hi) { continue; }
+    if (U.ledPlatform != 0 && U.mixPos.x == fp && fp > 0.5) {
+      // A beam of its own: light added to light, screened so it cannot clip.
+      c = 1.0 - (1.0 - c) * (1.0 - clamp(ledLight(uv) * U.mixLevel.x, vec3f(0.0), vec3f(1.0)));
+    }
+    if (U.mixPos.z == fp) { c = filmOver(c, uv, fluid0, normal0); }
+    if (U.mixPos.w == fp && fp < 3.5) { c = markLayer(c, uvScreen, U.mixLevel.w, markTex); }
+  }
+  return c;
+}
+
 @fragment fn fs(in: VsOut) -> FsOut {
   var uv = in.uv;
   let darkBlend = U.darkBlend != 0;
@@ -1449,14 +1562,10 @@ struct FsOut {
   var auxN = vec2f(0.0);
   var auxH = 0.0;
   var auxB = 0.0;
-  if (U.ledPlatform != 0) {
-    let centered = (uv - 0.5) * U.resolution;
-    let t = fract(atan2(centered.y, centered.x) / (2.0 * PI) + 0.5 + U.ledAngle);
-    let lc = ledColor(t);
-    let dist = length(centered);
-    let maxR = max(U.resolution.x, U.resolution.y) * 0.8;
-    let bevel = 1.0 - smoothstep(maxR * 0.5, maxR, dist) * 0.8;
-    bgColor = lc * bevel;
+  // The LED ring is the lamp while it is at the bottom of the mixer's stack;
+  // anywhere higher it is a beam (mixSourcesAt) and the glass is lit plain.
+  if (U.ledPlatform != 0 && U.mixPos.x < 0.5) {
+    bgColor = mixLevelled(bgColor, ledLight(uv), U.mixLevel.x);
   }
 
   if (U.gelWheel > 0.001) {
@@ -1827,6 +1936,16 @@ struct FsOut {
     outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
   }
 
+  // ── The mixer: the front plate's grade and level ─────────────────
+  // Its level fades the plate back to the bare lamp under it.
+  outColor = mixLevelled(bgColor, gradeMix(outColor, U.mixGrade[1]), U.mixLevel.y);
+  // And takes its lens with it: the camera pass refracts through, and
+  // focuses on, what these say is on the glass, and a plate faded out is not.
+  auxN *= U.mixLevel.y;
+  auxH *= U.mixLevel.y;
+  // Whatever the operator put below the back plate, in order.
+  outColor = mixSourcesAt(outColor, 0.0, U.mixPos.y, uv, uvScreen, fluid0, normal0);
+
   // ── Layer 1 (if present) ──────────────────────────────────────────
   if (U.layerCount > 1) {
     let c1 = cos(-U.rotation1);
@@ -1884,6 +2003,9 @@ struct FsOut {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
       fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof), macroAmt);
     }
+
+    // The mixer's grade and level for the back plate, on its own picture.
+    fluid1 = vec4f(gradeMix(fluid1.rgb, U.mixGrade[2]), fluid1.a * U.mixLevel.z);
 
     if (U.photo > 0.5) {
       let lit1 = pow(fluid1.rgb, vec3f(1.0 + 0.9 * fluid1.a)) * mix(outColor, vec3f(1.0), 0.22 * smoothstep(0.1, 0.6, fluid1.a)) * (1.0 + 0.2 * fluid1.a);
@@ -2278,15 +2400,8 @@ struct FsOut {
     outColor += vec3f(0.95, 0.8, 0.55) * rims * 0.16 * U.dishSpread;
   }
 
-  // ── Film projector ───────────────────────────────────────────────
-  if (U.filmOn != 0 && U.filmMix > 0.001) {
-    let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
-    let filmC = tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb;
-    let fl = dot(filmC, vec3f(0.299, 0.587, 0.114));
-    let key = smoothstep(U.filmKey, U.filmKey + 0.18, fl);
-    let tinted = filmC * mix(vec3f(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
-    outColor = mix(outColor, outColor * 0.35 + tinted * 0.95, key * U.filmMix);
-  }
+  // ── Over both plates: the film projector, and whatever else the mixer put there ──
+  outColor = mixSourcesAt(outColor, U.mixPos.y + 1.0, 5.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────
   if (U.lampWarmth > 0.001) {

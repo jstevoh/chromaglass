@@ -18,6 +18,7 @@ import { hexToRgb, PALETTE_RGB } from '../constants';
 import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
 import { PER_CELL, SPLAT_SCALE } from './particles';
+import { mixGrade, mixPositions } from '../lib/mixer';
 
 /** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
 export const LOGICAL_GRID = 192;
@@ -242,8 +243,33 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   const dimmerNow = clamp01(s.dimmer ?? 1) * view.dimmerGain;
   pack.set('dimmer', dimmerNow);
   pack.set('lampWarmth', clamp01(s.lampWarmth ?? 0));
-  pack.set('markOn', markOn);
+  /*
+    The mixer (lib/mixer.ts): where each source sits in the stack, how much of
+    it there is, and its grade.
+
+    The logo at the top of the stack is the finish's, over the finished frame
+    as it always was, and `markOn` carries it there (the post chain's finish
+    reads it back from this pack). Anywhere lower it is laid in by the display
+    pass, and `markOn` is 0 so the finish does not lay it in a second time.
+  */
+  const pos = mixPositions(s.mixOrder);
+  const markTop = pos.mark === 4;
+  pack.set('markOn', markTop ? markOn : 0);
   pack.set('markRect', markRect[0], markRect[1], markRect[2], markRect[3]);
+  pack.set('mixPos', pos.led, pos.back, pos.film, pos.mark);
+  // Not clamp01 alone: it passes NaN (a `?set=backLevel=x`), and mix() by
+  // NaN is the whole plate gone.
+  const level = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? clamp01(v) : 1);
+  pack.set('mixLevel',
+    level(s.ledLevel), level(s.frontLevel), level(s.backLevel),
+    markTop ? 0 : markOn);
+  pack.setAll('mixGrade', [
+    ...mixGrade(s.ledBright, s.ledContrast, s.ledSat, s.ledHue),
+    ...mixGrade(s.frontBright, s.frontContrast, s.frontSat, s.frontHue),
+    ...mixGrade(s.backBright, s.backContrast, s.backSat, s.backHue),
+    ...mixGrade(s.filmBright, s.filmContrast, s.filmSat, s.filmHue),
+  ]);
+  pack.set('markGrade', ...mixGrade(s.markBright, s.markContrast, s.markSat, s.markHue));
   {
     const k = Math.round(s.kaleidoscope ?? 0);
     pack.set('kaleido', k >= 2 ? Math.min(12, k) : 0);

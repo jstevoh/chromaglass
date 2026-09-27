@@ -84,6 +84,7 @@ import { CrashReportButton, QuickReportDot, openCrashReport } from './components
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
+import { raiseInMix, type MixMover } from './lib/mixer';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -2634,6 +2635,15 @@ export default function App() {
     const next = allPresets[(i + dir + allPresets.length) % allPresets.length];
     cuePreset(next.id);
   };
+  /*
+    The mixer's order, a row up (lib/mixer.ts). From the state being updated,
+    not the render's settings, so two pads pressed within one frame both land.
+    The drift never touches the mixer, so there is no anchor to move.
+  */
+  const raiseMix = (id: MixMover) => {
+    setSettings(prev => ({ ...prev, mixOrder: raiseInMix(prev.mixOrder, id) }));
+    setDocDirty(true);
+  };
   const runActionRef = useRef<((a: MidiAction) => void) | null>(null);
   const runAction = (a: MidiAction) => {
     switch (a) {
@@ -2675,6 +2685,10 @@ export default function App() {
       case 'tempo-clear':     clearTempo(); break;
       case 'bank-next':       midiRef.current?.stepBank(1); break;
       case 'bank-prev':       midiRef.current?.stepBank(-1); break;
+      case 'mix-raise-led':   raiseMix('led'); break;
+      case 'mix-raise-back':  raiseMix('back'); break;
+      case 'mix-raise-film':  raiseMix('film'); break;
+      case 'mix-raise-mark':  raiseMix('mark'); break;
       // Every action, or `tsc` names the one that is missing. A pad wired to
       // an action nobody wrote a case for is a dead pad, and silent.
       default: unhandled('an action', a);
@@ -2722,7 +2736,9 @@ export default function App() {
     cuedPresetId: cued?.id ?? null,
     cuedName: cued?.name ?? null,
     fadeSeconds,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds]);
+    filmLoaded: filmSource !== 'none',
+    markLoaded,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -4181,6 +4197,7 @@ export default function App() {
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
+            mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded }}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
@@ -4678,6 +4695,8 @@ export default function App() {
           onFade={setFadeSeconds}
           settings={settings}
           onSetting={updateSettings}
+          hasFilm={filmSource !== 'none'}
+          hasMark={markLoaded}
           ccFor={ccFor}
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
