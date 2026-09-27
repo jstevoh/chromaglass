@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-27:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **built** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 3, 4, 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -825,7 +825,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
 5. **Oil and water that stay apart** (roadmap §I). Liquids as bodies with interfaces,
    with the ferrofluid phase as the precedent. The biggest difference in every frame,
    and the largest piece of work here; prototype in the lab first.
-   *Built 2026-09-27 for oil and water* (Oil Bodies, on in Oil & Water): the oil
+   *Shipped 2026-09-27 for oil and water* (#179, Oil Bodies, on in Oil & Water): the oil
    carries its own share of the dye, so amber oil on teal water stays two colours
    as the drops round, merge and are dragged. *Check:* `npm run bodies`. Waiting on
    the owner's eyes on a real GPU (judging.md 14).
