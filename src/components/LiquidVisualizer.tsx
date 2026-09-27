@@ -41,7 +41,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, PressLifts, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -856,10 +856,20 @@ class FluidSimulation {
    * run where the finger was.
    */
   readonly pressLift = new PressLifts();
+  /** Cells each presser's strokes have pressed on this plate (a kick's are Beat Squeeze's), and how deep, summed over those cells. */
+  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0 };
+  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0 };
+  /**
+   * Beat Squeeze's kicks, given back (lib/squish.ts `KickRelease`): each
+   * kick's press is held a moment and then let go over a third of a second,
+   * or the lead plate's middle goes to the floor a few seconds into a song.
+   * Public for `npm run squeeze`, which reads how many release steps it laid.
+   */
+  readonly kickRelease = new KickRelease();
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -1716,7 +1726,7 @@ class FluidSimulation {
     this.mul.fill(1);
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
-    this.pressLift.forget(); this.lastLift = null;
+    this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null;
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
@@ -2275,6 +2285,17 @@ class FluidSimulation {
    */
   applySquish(x: number, y: number, radius: number, amount: number, fingering = 0, pileTips = false, stroke: Exclude<Stroke, 'lift'> = 'press', who: Presser = 'hand') {
     radius = Math.round(radius * GRID_SCALE);
+    /*
+      A press lands on a whole cell. Beat Squeeze's centre was the middle of
+      the plate plus a fraction of thirty cells, never rounded, so every cell
+      index its disc reported was a fraction too, and a write to a typed
+      array at a fractional index is dropped without a word: the rhythm
+      plate never pressed, from the day it was written until #185 found it
+      (PLAN §10 step 4). Rounded here, for every caller, and in squishDisc
+      too, so the lab and the checks draw the same disc.
+    */
+    x = Math.round(x);
+    y = Math.round(y);
     // The first moments of a press shove the dye out to its front, where it
     // piles up as a bright rim (the reference's bright finger ends, round
     // now on a press, at the fingers' tips on a splash). Counted per press
@@ -2289,15 +2310,19 @@ class FluidSimulation {
     this.squishLastAt = nowMs;
     if (pileTips && this.stepIndex !== this.squishLastStep) { this.squishLastStep = this.stepIndex; this.squishSteps++; }
     const pile = pileTips && fingering > 0 && this.squishSteps <= 45 ? 0.02 * fingering * Math.min(1, amount * 250) : 0;
-    /*
-      Only a press at a whole cell is remembered. Beat Squeeze's centre is a
-      fraction of a cell (PLAN §10 step 4), so its stroke lays nothing; left
-      in, its memory ran a lift of some seventy steps after every kick that
-      walked the disc, laid nothing either, and marked the plate dirty for a
-      full upload each step (pre-push review).
-    */
-    if (pileTips && stroke === 'press' && Number.isInteger(x) && Number.isInteger(y)) this.pressLift.press(who, x, y, radius, amount, fingering, nowMs);
-    squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, this.squishCell);
+    if (pileTips && stroke === 'press') this.pressLift.press(who, x, y, radius, amount, fingering, nowMs);
+    // Counted by who pressed, whole cells that close the gap only (a
+    // fractional one is dropped by the arrays, and a cell pressed by nothing
+    // is no press), with the depth laid there, so `npm run squeeze` can ask
+    // whether a kick's press reached the plate at all, and whether the kick's
+    // release gave back what it took.
+    let laid = 0, depth = 0;
+    squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, (idx, g, vx, vy, m) => {
+      if (Number.isInteger(idx) && g < 0) { laid++; depth -= g; }
+      this.squishCell(idx, g, vx, vy, m);
+    });
+    this.pressedCells[who] += laid;
+    this.pressedDepth[who] += depth;
   }
 
   /**
@@ -2318,6 +2343,24 @@ class FluidSimulation {
       });
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
+    // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
+    // no dye, only the gap given back, which the shader never opens past rest.
+    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
+  }
+
+  /**
+   * Beat Squeeze's kick: the top glass pressed over three nested discs (a
+   * rough dome, so the dye spreads from the middle instead of only at one
+   * hard ring), remembered for the lift like a hand's press, and let go a
+   * moment later (`kickRelease`). `amount` is each disc's press.
+   */
+  pressKick(x: number, y: number, amount: number, fingering: number): void {
+    x = Math.round(x);
+    y = Math.round(y);
+    this.applySquish(x, y, 40, amount, fingering, true, 'press', 'kick');
+    this.applySquish(x, y, 27, amount, fingering, false, 'press', 'kick');
+    this.applySquish(x, y, 15, amount, fingering, false, 'press', 'kick');
+    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount);
   }
 
   /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
@@ -6638,14 +6681,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (leadPlate) {
                 const cx = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
                 const cy = GRID_SIZE / 2 + DICE.music.centred() * 30 * GRID_SCALE;
-                // Three nested discs make a rough dome, so the dye spreads
-                // from the middle instead of only at one hard ring.
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
+                // (Whatever showed then was not the press, which never landed
+                // until the centre was rounded, PLAN §10 step 4.) Pressed and
+                // let go: `pressKick`.
                 const a = 0.0024 * squeezeAmt * bass01 * accent;
-                const fg = currentSettings.fingering ?? 0;
-                leadPlate.applySquish(cx, cy, 40, a, fg, true, 'press', 'kick');
-                leadPlate.applySquish(cx, cy, 27, a, fg);
-                leadPlate.applySquish(cx, cy, 15, a, fg);
+                leadPlate.pressKick(cx, cy, a, currentSettings.fingering ?? 0);
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }

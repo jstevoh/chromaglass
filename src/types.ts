@@ -597,9 +597,7 @@ export interface VisualizerSettings {
    * Rock) follow the kick's place in the bar, as a projectionist plays a
    * rhythm plate: the one pressed hardest, three lighter, two, four and the
    * "and" let go (lib/barGrid.ts). 0 is every kick alike, as it always was;
-   * wherever the bar is not yet known, every kick is alike too. The
-   * squeeze's share weighs nothing until Beat Squeeze's press reaches the
-   * plate (PLAN §10 step 4); the rock's is live.
+   * wherever the bar is not yet known, every kick is alike too.
    */
   beatAccent: number;
   backgroundLoop: number;     // the layers behind the lead run slower and calmer, a background loop the live plate plays over

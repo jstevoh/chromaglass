@@ -71,7 +71,7 @@ console.log('The strokes, as drawn\n');
 {
   const out = 'node_modules/.cache/lift-squish.mjs';
   await build({ entryPoints: ['src/lib/squish.ts'], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-  const { squishDisc, spokesAt, PressLift, PressLifts, RELEASE_MS, LIFT_SECONDS } = await import(`../${out}`);
+  const { squishDisc, spokesAt, PressLift, PressLifts, RELEASE_MS, LIFT_SECONDS, KickRelease, KICK_HOLD, KICK_RELEASE } = await import(`../${out}`);
   /*
     Off the diagonal: a press at (96, 96) could not tell x from y, and a lift
     laid transposed (the check-skeptic's swap of x and y in PressLift) passed
@@ -312,6 +312,137 @@ console.log('The strokes, as drawn\n');
     }
   }
   check('a drop\'s splash is drawn exactly as before, fingers on the way down', diff === 0 && n > 5000, `${diff} of ${n} cells differ`);
+
+  /*
+    Beat Squeeze's press, on a whole cell. Its centre was the middle of the
+    plate plus a fraction of thirty cells and was never rounded, so every
+    index its disc reported was a fraction, and the plate's typed arrays
+    dropped every write: from the day the rhythm plate was written until
+    #185 found it, a kick pressed nothing (PLAN §10 step 4). The stroke now
+    lands on the nearest cell, whatever it is given. Asked of the kick's own
+    three discs at a spread of fractional centres: every index whole, and
+    the very cells the rounded centre lays; and every write the stroke
+    reports kept by a Float32Array, as the plate keeps them. With the
+    rounding taken out of squishDisc the first reads 319,800 fractional and
+    the second keeps 0 of 319,800 (check-skeptic ran both), which is what
+    the plate did on every kick.
+  */
+  {
+    const S = 256;
+    let fractional = 0, whole = 0, differ = 0, kept = 0, laid = 0;
+    for (let k = 0; k < 40; k++) {
+      const fx = S / 2 + Math.sin(k * 1.7) * 30 + 0.13 + (k % 7) * 0.11, fy = S / 2 + Math.cos(k * 2.3) * 30 + 0.29;
+      for (const r of [40, 27, 15]) {
+        const got = new Map(), want = new Map();
+        squishDisc(S, fx, fy, r, 0.0024, 0.85, 'press', 0, (idx, gap) => { got.set(idx, gap); if (Number.isInteger(idx)) whole++; else fractional++; });
+        squishDisc(S, Math.round(fx), Math.round(fy), r, 0.0024, 0.85, 'press', 0, (idx, gap) => want.set(idx, gap));
+        for (const [idx, gap] of want) if (got.get(idx) !== gap) differ++;
+        if (got.size !== want.size) differ++;
+        // Every write the stroke makes, made the way the plate makes them.
+        const plate = new Float32Array(S * S);
+        for (const idx of got.keys()) { plate[idx] += 1; laid++; }
+        for (const v of plate) if (v !== 0) kept++;
+      }
+    }
+    check('a kick\'s press lands on whole cells, the very ones its rounded centre lays', fractional === 0 && whole > 100000 && differ === 0,
+      `${whole} cells whole, ${fractional} fractional, ${differ} different`);
+    check('and the plate keeps every write it makes', laid > 100000 && kept === laid, `${kept} of ${laid} writes kept`);
+  }
+
+  /*
+    And the kick lets go. With the press landing, a kick pressed and never
+    released: the only thing bringing the glass back up was the gap's
+    spring, half way back in about 24 s on the default look and 50 on the
+    Fillmore, against a band kicking twice a second, and the lead plate's
+    middle went to the floor a few seconds into a song. `KickRelease` holds
+    each kick a moment and gives its gap back over a third of a second.
+
+    Asked on a plate that does what the shader's squeezeUpdate does with the
+    deltas (a press closes the gap down to the floor, 0.004; an opening
+    stops at rest, 0.030; then the spring), laid as the app's `pressKick`
+    lays them, through the same squishDisc and KickRelease: the three discs
+    at 40, 27 and 15 cells at GRID_SCALE (60, 41 and 23 on the app's plate of
+    192) about a centre up to thirty cells at GRID_SCALE off the middle
+    (`npm run squeeze` asks the app's own glue), each pressed 0.0024 × squeeze × bass, the
+    Fillmore's squeeze (0.9) at a bass of 0.7, kicks at 140 bpm (closer than
+    a hold and a release, so they overlap), for 40 s, then a second of no
+    kicks. On three glasses: none at all (only the release can bring it
+    back), the Fillmore's and the default look's. The control is the same
+    kicks with no release, which must floor, or the question was never asked;
+    and every kick must still show, read under its own centre a tenth of a
+    second after it lands (held, before the release starts), or a release
+    that gave everything back at once would pass. Read about the plate's
+    middle instead, a kick far off it shows only its outer disc
+    there and some kicks read a dip of 0.001, as if they had barely pressed.
+  */
+  {
+    const S = 192, REST = 0.03, FLOOR = 0.004;
+    // The app's plate: 192 cells, GRID_SCALE 1.5, so the kick's discs are 60, 41 and 23 cells and its centre wanders 45.
+    const RADII = [40, 27, 15].map((r) => Math.round(r * 1.5)), SPREAD = 30 * 1.5;
+    const kickShow = (spring, release, stepsPerSecond = 60) => {
+      const dt = 1 / stepsPerSecond;
+      const gap = new Float64Array(S * S).fill(REST), dg = new Float64Array(S * S);
+      const rel = new KickRelease();
+      const cell = (idx, g) => { dg[idx] += g; };
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+      const every = 60 / 140, a = 0.0024 * 0.9 * 0.7;
+      const steps = Math.round(41 * stepsPerSecond);
+      let nextKick = 0, dips = [], pendingDip = -1, pressed = 0, at = [0, 0];
+      const disc = (r, cx = S / 2, cy = S / 2) => { let sum = 0, n = 0, floored = 0; for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { if (Math.hypot(x - cx, y - cy) >= r) continue; n++; sum += gap[x + y * S]; if (gap[x + y * S] < 1.5 * FLOOR) floored++; } return { mean: sum / n, floored: floored / n }; };
+      for (let st = 0; st < steps; st++) {
+        const t = st * dt;
+        if (t < 40 && t >= nextKick) {
+          nextKick += every;
+          const cx = Math.round(S / 2 + rnd() * SPREAD), cy = Math.round(S / 2 + rnd() * SPREAD);
+          for (const r of RADII) squishDisc(S, cx, cy, r, a, 0.85, 'press', 0, (idx, g) => { cell(idx, g); if (g) pressed++; });
+          if (release) rel.kick(cx, cy, RADII, a);
+          pendingDip = Math.round(0.1 * stepsPerSecond); at = [cx, cy];
+        }
+        if (release) rel.step(S, dt, cell);
+        for (let k = 0; k < S * S; k++) {
+          let g = gap[k];
+          if (dg[k] !== 0) { const d = dg[k]; let g2 = Math.max(FLOOR, g + d); if (d > 0) g2 = Math.min(g2, Math.max(g, REST)); g = g2; dg[k] = 0; }
+          gap[k] = g + (REST - g) * spring;
+        }
+        if (pendingDip >= 0 && pendingDip-- === 0) dips.push(disc(8, at[0], at[1]).mean);
+      }
+      let far = 0; for (let k = 0; k < S * S; k++) far = Math.max(far, Math.abs(gap[k] - REST));
+      return { end: disc(RADII[0]), far, dips, pressed, left: rel.size, steps: rel.steps };
+    };
+    const glasses = [['no spring at all', 0], ['the Fillmore\'s glass', 0.00023], ['the default look\'s glass', 0.00048]];
+    const say = (r) => `${(100 * r.end.floored).toFixed(0)} % of the pressed disc on the floor, its mean ${r.end.mean.toFixed(4)}`;
+    const control = kickShow(0.00023, false);
+    check('pressed on every kick and never let go, the lead plate\'s middle goes to the floor', control.end.floored > 0.5 && control.pressed > 100000,
+      `on the Fillmore's glass after 40 s at 140 bpm: ${say(control)}`);
+    for (const [name, spring] of glasses) {
+      const r = kickShow(spring, true);
+      const shallowest = Math.max(...r.dips), deepest = Math.min(...r.dips);
+      check(`let go, it breathes: every kick presses and the plate comes back to rest, on ${name}`,
+        r.end.floored === 0 && Math.abs(r.end.mean - REST) < 1e-4 && r.far < 1e-4 && r.left === 0 && r.dips.length > 80 && shallowest < REST - 0.003 && deepest > 0.02,
+        `${say(r)}, farthest cell ${r.far.toExponential(1)} from rest; a tenth of a second after each of ${r.dips.length} kicks the film under it at ${deepest.toFixed(4)}–${shallowest.toFixed(4)}`);
+    }
+    // The governor: half the steps, each twice as long, the same release in seconds.
+    // A release counted in steps also gives everything back at half the rate,
+    // only over twice the time, so the plate alone cannot tell (check-skeptic:
+    // a step-counted release passed the rest of this line with 1,880 steps at
+    // either rate). Its steps can: a third of a second at half the rate is
+    // about half as many.
+    const half = kickShow(0.00023, true, 30), full = kickShow(0.00023, true);
+    check('and at half the step rate the same (the release is counted in seconds, not steps)',
+      half.end.floored === 0 && half.far < 1e-4 && Math.max(...half.dips) < REST - 0.003 && half.steps < 0.7 * full.steps,
+      `${say(half)}; ${half.steps} release steps against ${full.steps} at the full rate`);
+    // The hold: nothing given back before KICK_HOLD, all of it by KICK_HOLD + KICK_RELEASE.
+    {
+      const one = new KickRelease();
+      one.kick(96, 96, [15], 0.001);
+      let before = 0, total = 0, t = 0;
+      while (one.size && t < 2) { t += 1 / 60; one.step(S, 1 / 60, (idx, g) => { if (idx === 96 + 96 * S) { total += g; if (t <= KICK_HOLD) before += g; } }); }
+      check('a kick is held for the lift\'s pause, then given back in full over a third of a second, no more than it pressed',
+        before === 0 && Math.abs(total - 0.001) < 1e-12 && t > KICK_HOLD + KICK_RELEASE - 1 / 60 && t < KICK_HOLD + KICK_RELEASE + 2 / 60,
+        `${before} back while held; ${total.toExponential(3)} of 1.000e-3 back by ${(t * 1000).toFixed(0)} ms`);
+    }
+  }
 }
 
 // ── The plate, in the lab ───────────────────────────────────────────
@@ -327,9 +458,9 @@ console.log('\nThe plate, in the lab\n');
       then a second and a half of letting go, measured at the end. The press
       remembers itself through the same PressLift the plate keeps. Off the
       diagonal, so a lift laid transposed lands somewhere else. The
-      one-frame press is a tap: a kick's size and depth, though the beat
-      squeeze itself lays nothing yet (its centre is a fraction of a cell,
-      PLAN §10 step 4), so this asks what a short press lifts into.
+      one-frame press is a tap: a kick's size and depth, so this asks what
+      a kick's press lifts into (a kick's own release, which gives the gap
+      back alongside, is asked above, in the strokes).
 
       Each ring is read from the dye, in the plate's own cells: the finished
       picture frames an off-centre point through the plate shader's dish and
@@ -553,8 +684,8 @@ console.log('\nThe plate, in the lab\n');
       (the square root of its depth; the node half reads 32 %), and the cap
       lets it open no more than the tenth it pressed. On the plate that is a
       faint ripple at the spokes, 0.004 against a held press's 0.073, too
-      faint for the finger counter: what a kick's squeeze would lift into, if
-      Beat Squeeze pressed (PLAN §10 step 4). Asked for what it is: at the
+      faint for the finger counter: what a kick's squeeze lifts into (PLAN
+      §10 step 4). Asked for what it is: at the
       spokes, above what the tap left while held, and a small part of a held
       press's lift.
     */
