@@ -744,13 +744,26 @@ let failed = 0;
           a second) is judged too. No governor with a renderer up is a
           failure; with none (a container with no WebGPU) there is nothing to
           feed, and it says so.
+
+          The interval is the one both windows' frames kept in these same two
+          seconds (the faster of the two, as the gate draws on the faster),
+          not the one the show kept alone at the start of the run. That was
+          the first version, and on #203's Mac run (2026-09-27) it went red on
+          a gate doing its job: the show alone drew 42.7 a second (27.2 ms),
+          then the machine got quicker, both windows ran at 53.8 and 57.3 a
+          second, and the governor was fed 19.0 ms, a whole refresh of the
+          faster one (17.5 ms), against a bar of 0.8 of a moment that had
+          passed. The broken case is still far below it: two clocks
+          interleaving evenly at those rates feed the governor about 9 ms,
+          under the 14.0 ms bar.
         */
         if (frac === 0.5) {
-          if (m.frameMs !== null && alone.frameMs !== null) {
-            check('  and the governor is fed what the show fed it on its own, not half of it', m.frameMs >= 0.8 * alone.frameMs,
-              `${f1(m.frameMs)} ms against ${f1(alone.frameMs)} ms with the wall's asks held`);
+          const refresh = m.hz > 0 || m.wallHz > 0 ? 1000 / Math.max(m.hz, m.wallHz) : null;
+          if (m.frameMs !== null && refresh !== null) {
+            check('  and the governor is fed a whole refresh of the faster window, not half of it', m.frameMs >= 0.8 * refresh,
+              `${f1(m.frameMs)} ms against a ${f1(refresh)} ms refresh (the windows ${f1(m.hz)} and ${f1(m.wallHz)} a second in the same two seconds; the show alone was fed ${alone.frameMs === null ? 'nothing' : `${f1(alone.frameMs)} ms`})`);
           } else if (alone.engine) {
-            check('  and the governor is fed what the show fed it on its own, not half of it', false,
+            check('  and the governor is fed a whole refresh of the faster window, not half of it', false,
               `a renderer came up (${alone.engine}) and there is no governor to read`);
           } else {
             console.log('  (the governor\'s interval not judged: there is no governor, because no renderer came up)');
