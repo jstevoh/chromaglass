@@ -66,6 +66,13 @@ export interface MixerPanelProps {
   onFade?: (id: MixSource) => void;
   /** The rows fading now, and which way, so a running fade's button is lit. */
   fading?: Partial<Record<MixSource, FadeWay>>;
+  /**
+   * The look the back plate is on when it has one of its own (PLAN.md
+   * §16a), named under the Back Plate row, so the row says whose liquid it
+   * is carrying and not only how bright. Undefined where the panel cannot
+   * know (the remote), and then the row says nothing about it.
+   */
+  backLook?: string | null;
   testId?: string;
 }
 
@@ -79,7 +86,7 @@ const BLEND_HINT: Record<Exclude<MixBlend, 'own'>, string> = {
 
 const SPEC = (key: keyof VisualizerSettings) => PIN_RANGE.get(String(key)) ?? { min: 0, max: 1 };
 
-export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = false, chips, onFade, fading = {}, testId = 'mixer' }: MixerPanelProps) {
+export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = false, chips, onFade, fading = {}, backLook, testId = 'mixer' }: MixerPanelProps) {
   const [open, setOpen] = useState<MixSource | null>(null);
   const stack = mixStack(settings.mixOrder);
   const rows = [...stack].reverse();
@@ -130,7 +137,9 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
   /** Why a row has nothing on the wall right now, or null when it does. */
   const absent = (id: MixSource): { why: string; fix?: { label: string; patch: Partial<VisualizerSettings> } } | null => {
     if (id === 'led' && !settings.ledPlatform) return { why: 'Off in this look.', fix: { label: 'Turn on', patch: { ledPlatform: true } } };
-    if (id === 'back' && (settings.layerCount ?? 1) < 2) return { why: 'This look has one plate.', fix: { label: 'Add it', patch: { layerCount: 2 } } };
+    // A back plate with a look of its own is on the stage whatever the look's
+    // plate count says (App raises it for the visualizer), so it is not absent.
+    if (id === 'back' && (settings.layerCount ?? 1) < 2 && !backLook) return { why: 'This look has one plate.', fix: { label: 'Add it', patch: { layerCount: 2 } } };
     if (id === 'film' && !hasFilm) return { why: 'No film loaded. Settings → Film loads a reel, a window or the camera.' };
     if (id === 'mark' && !hasMark) return { why: 'No logo loaded. Settings → Logo & Titles loads one.' };
     return null;
@@ -283,6 +292,11 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
               {id !== 'front' && arrow(id, 1)}
               {id !== 'front' && arrow(id, -1)}
             </div>
+            {id === 'back' && backLook !== undefined && !off && (
+              <div className="truncate px-1 pb-1 text-[12px] text-dim" data-testid={`${testId}-back-look`}>
+                {backLook ? `On ${backLook}` : 'Follows the front'}
+              </div>
+            )}
             {off ? (
               <div className="flex items-center justify-between gap-2 px-1 pb-1.5">
                 <span className="text-[12px] leading-snug text-dim">{off.why}</span>

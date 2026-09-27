@@ -64,7 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
-| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
+| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#PRC, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
@@ -3053,6 +3053,35 @@ do now. The owner can say otherwise; the ladder is one table.
 
 Each step ships its phone version in the same PR (the rule) and one PR each:
 
+- **16a · The back plate gets its own look. Shipped (#PRC).** A look can be sent to the
+  back plate alone: To Back Plate under Go on the desk, a Whole plate / Back plate
+  switch at the top of the phone's looks sheet (it goes back to Whole plate once a look
+  is sent), and two MIDI actions (Go to Back Plate, Back Plate Follows Front). The
+  back plate's solver steps with the look's own settings (every `PER_LAYER` key,
+  folded in as plate 1's base in `PatchBay.fold`, so the look's patches still ride
+  it), faded like a Go (`lib/backLook.ts`). It pours the look's dyes, styles and
+  liquids at every automatic pour and a hand's, and a handover lays the look on it.
+  How the plates are drawn and lit stays the front's. A Go or a cut on the front
+  leaves a back plate with its own look alone; Follow the front fades it back, keeping
+  the plate on the stage until it lands. The Mixer's Back Plate row names the look,
+  and the layer pickers offer the back plate while it has one. Check: `npm run
+  backplate` (33, in Measure; red under sixteen mutations) and a phone check (the
+  switch, the names, the front untouched). The lab with two solvers moves to 16d,
+  where the lab has to hold N of them; the Mac judges the pair (`docs/judging.md`).
+  Found while building it, not done:
+  - *A render lets the back look go.* A render lays its look on both plates from its
+    seed, so the back plate follows the front from the render's start, and after it.
+    Rendering a show with a back look would mean carrying the back look into the
+    render's recipe.
+  - *Cast and network displays show the front's twin.* `CastState` carries the
+    settings, not the back look, so a receiver's second plate is the front's.
+  - *The remote has no To Back Plate*, and its Mixer's back row names nothing.
+  - *Back undoes the last front Go only*, and a set list's cue-next counts from the
+    live item, not from a look sent to the back. Both are as intended for now; say so
+    in the Guide or change them when the set list learns about plates.
+  - *On a one-plate front look, Follow the front drops the plate when the fade lands*
+    (a cut of the back plate's picture at the end rather than the start). Fading
+    `backLevel` out with it would make that a fade.
 - **16a · The back plate gets its own look.** A look can be sent to the back plate
   alone ("Go to Back Plate"): the solver's own settings and the colours it pours
   become the back plate's (`patch.layer(1)` over a per-plate look), while how the
