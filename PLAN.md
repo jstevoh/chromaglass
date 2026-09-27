@@ -1304,7 +1304,12 @@ while this batch's plan was going in (#177), and no cause is known yet:
   Not #181's stop (that one sat a quarter second after the first step). Worth
   measuring what the page does while Chromium creates the device (the table shows
   no frames counted between 0.77 s and 3.48 s), and whether 4b should own every
-  stop before the device is given rather than only the first.
+  stop before the device is given rather than only the first. Again on #194's run
+  on 5fd3636 (2026-09-27): 3.52 s from 1.04 s, the device asked at 0.83 s and given
+  at 4.56 s, while the control's stop at the GPU's start began at 1.43 s, so the
+  check's 0.25 s match to it missed and the stop counted as an opening stop. #194
+  changes nothing that runs before the device is given (its ladder is built once a
+  device and a stage exist); 5fd3636's parent 1d842d1 passed the same shard.
 - `npm run startup`, "no stop in the opening, or while the rest was built behind
   it": **fixed in #181.** It was not a flake and not the deploys: every Mac run since
   #164 (37 of them, PR and deploy alike, medians 1.37 and 1.39 s) stopped the frames
@@ -1840,7 +1845,12 @@ top of the solver.
 Measured since, by `npm run ears` on the Mac runner (2026-09-27): with the show
 window covered and nothing else drawing, the ear's 16 ms tick read 15 times a
 second, not 60 (inferred: each reading re-renders `App`, and the main thread could
-not take more); the visible app drew 28 frames a second in the same run.
+not take more); the visible app drew 28 frames a second in the same run. On #195's
+deploy (main 6c6d17e) the visible page drew 14 frames in two seconds while the rest
+of the show was still being built behind it, and `npm run ears` went red on a floor
+of twenty frame readings, with the ear doing what it should (the wall's 10 asks all
+read in the page's stalls). The floor now asks that every frame the page drew read
+(#194); how slowly a busy page draws is this item's to fix, not that check's.
 
 *Fix:* the frame loop reads the analyser and the ride's shadow itself; React keeps
 the meters, at about ten updates a second, with the arrays reused. *Measure:* count
