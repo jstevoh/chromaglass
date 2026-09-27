@@ -1177,6 +1177,15 @@ while this batch's plan was going in (#177), and no cause is known yet:
   fingers' cells moved between picking and holding, and it read 0.0 on the next
   run. Look next at the held Drop's drops (`dropHeight`), which land every
   DROP_EVERY steps with a splash.
+  **Again on #186's deploy (5831ff7, 2026-09-27 12:34Z), where it stopped the
+  deploy:** A 234 against B 81, 0.35, the mirrors clear (0/0/0 and 2/0/0), the
+  fingers 0.0 cells from where they were picked; the same shard passed on all four
+  of #186's own runs. It is not one finger: the first time A was the low one, this
+  time B. With two failures now at 0.34–0.35 and nine to thirteen
+  passes at 0.63–0.99, the split is bimodal, which reads like one finger's drops
+  landing a beat later than the other's in the window, not noise round a mean.
+  (#186 changed where a press lands; the held Drop's splash lands on whole cells
+  already, so it lays the same as before.)
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
 - `npm run startup`, the same check, a second kind of stop: on #186's run on 1f627f3
