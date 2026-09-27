@@ -59,6 +59,7 @@ Where each batch stands, as of 2026-09-27:
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; steps 3–7 not started |
+| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); not yet judged on the Mac; steps 2–6 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -833,6 +834,71 @@ Small things that ride along with the steps: drops with a coloured rim lined up 
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
 event, and one big organiser over a field of small drops at about a 10:1 size range.
 
+### 11. The mixer
+
+`src/lib/mixer.ts`, `src/components/MixerPanel.tsx`, the display pass in
+`src/gpu/wgsl/plate.ts`; the design is [docs/rig-plan.md](docs/rig-plan.md) R7.
+
+Asked for directly on 2026-09-27: "a video mixer control available from the top level
+but also in the settings, that can move the order of layers (LED spinning, video,
+picture, any other image input) and control brightness, contrast and the other photo
+and video standards on each." With it, a standing rule: every feature ships its phone
+version in the same PR (see the operating rules below).
+
+1. **The sources there are, in one stack**, *shipped* (#176). The LED ring, the front
+   and back plates, the film and the logo, top of the list on top on the wall; the
+   front plate fixed, and only the LED ring passing it (the lamp under the glass, or a
+   beam over it). Each row has a level and a grade (brightness, contrast, saturation,
+   hue). On the Perform desk (docked beside the plate, no scrim), in Settings → Mixer,
+   on the phone's Mix sheet and on the remote; every control MIDI-learnable and
+   pinnable, four pads to walk a source up the stack. At the defaults the picture is
+   byte-identical to before. `npm run mixer` measures it (31 checks, each held red
+   against a broken shader). **Owed:** the Mac look in `docs/judging.md` §13 (the film
+   between the plates, the LED beam, whether 0–200 % is the right travel).
+2. **The other pictures as rows.** "Any other image input" is not all in: the lumia
+   layer and the gel wheel over the lamp are each still set in their own corner of
+   Settings (the camera already comes in as the film). Each becomes a row with a level and a grade, placed in
+   the stack like the rest. *Check:* `npm run mixer`'s rules (a move changes only
+   where that source is; every control live and only on its own source) extended to
+   each new row.
+3. **A blend per row.** Today a row is laid over what is under it (the back plate
+   keeps its own blend mode under Multi-Layer Mixer; the LED beam is screened). Screen,
+   add, multiply and key per row, which is R3's additive light made a choice. *Check:*
+   each blend against its formula on known colours in the lab.
+4. **Crossfade a row.** A level ridden by hand is a fade; a row's own fade time and a
+   cut/fade pad, so a film can come in over two bars from a pad. *Check:* a node
+   harness on the fade curve, and the film table (no hard cuts).
+5. **The mixer on a narrow desk.** At 1024 px the docked sheet covers half the plate.
+   A compact layout (the level column only, the grade opening over it) when the window
+   is narrow. *Check:* layout at 1024/1280/1440, the plate at least two-thirds
+   uncovered.
+6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
+   each projector's plate is a row, with its own grade at the projector's scope (R2).
+   This is the large one; it waits on R1.
+
+Found while building step 1, small and not yet done: the remote's Mixer has no check
+of its own (`npm run phone` drives the phone layout, not `?remote=1`), and on landscape
+phones narrower than about 800 px the dock's tools fall under the 48 px target (about
+770 px before the Mix button took a slot; `npm run phone` holds 812×375), so a two-row
+landscape dock is owed for the smallest phones.
+
+Three Mac checks went red once each on commits that did not touch them, one per run,
+while this batch's plan was going in (#177), and no cause is known yet:
+
+- `npm run phone`, "two fingers holding Drop lay dye under both": A 62 against B
+  181, 0.34 of each other where the check asks 0.4 (0.63–0.99 over the nine other
+  runs that have it). Not the plate coasting: the line now prints how far the
+  fingers' cells moved between picking and holding, and it read 0.0 on the next
+  run. Look next at the held Drop's drops (`dropHeight`), which land every
+  DROP_EVERY steps with a splash.
+- `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
+  run after, where every other shard passed.
+- `npm run startup`, "no stop in the opening, or while the rest was built behind
+  it": the longest wait for a frame was 2.05 s against its 2 s limit (heartbeats and
+  steps 1.89 s), just after the first step while the remaining pipelines build
+  behind it; main's deploy of the same code read 1.70 s. Before touching the limit,
+  read the spread over the last runs (the `steward` skill's rule for a margin).
+
 ## Not doing
 
 - **Kaleidoscope, tiling, tunnel, halftone, posterize, solarize.** Warps of a picture.
@@ -853,6 +919,9 @@ and look link are not. The order from here, as of 2026-09-26:
 2. **The rest of batch 5**: the look link and the shutter are independent of
    everything else and can be built while the Mac is judging a look.
 3. ~~Batch 9c, the dye rides the ferrofluid~~: shipped in #168.
+4. **Batch 11, the mixer**: step 1 shipped in #176 and waits on its Mac look
+   (`docs/judging.md` §13). Steps 2 and 5 are small and independent; step 3 is the
+   next that changes what a show can do.
 
 Batch 10's step 3 (accents) waits on a real downbeat. Batch 3 (#163) and the startup
 freeze (#164) have shipped.
@@ -869,3 +938,7 @@ pick them up from `docs/roadmap.md` now that step 1 is in.
   and files.
 - Every new setting is MIDI-learnable, reachable from the phone, and defaults to the
   current behaviour so a preset made today still looks the same tomorrow.
+- Every feature ships its phone version in the same PR, not after (Steve, 2026-09-27).
+- This plan is kept current: every PR that ships a batch step marks it shipped here,
+  and anything found along the way that should be fixed or added goes in as an item,
+  in the batch it belongs to or a new one (Steve, 2026-09-27).

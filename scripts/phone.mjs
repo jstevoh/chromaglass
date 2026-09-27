@@ -494,6 +494,20 @@ try {
       await touch('touchStart', [{ ...DA, id: 1 }]);
       await touch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(1200);
+      /*
+        Where the fingers are on the plate while they hold, not where the same
+        pixels were when the places were picked, and how far apart the two
+        are. Asked after a Mac run read A 62 against B 181 (0.34 of each
+        other; 0.63 to 0.99 on every other run), on the theory that the plate
+        was still coasting (rotationSpeed 0 only turns its motor off, and the
+        same pixel lands on a different cell from run to run). The first run
+        that printed it read 0.0 cells: the resting angle differs between
+        runs, not within one, so coasting was not that failure's cause, which
+        is still open (PLAN.md, batch 11). Measuring at the held cells is
+        right either way, and the drift in the line says which it was next
+        time.
+      */
+      const held = (await hands()).hands;
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
       const after = await snap();
@@ -508,7 +522,8 @@ try {
           for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < R) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
           return sum;
         };
-        const fingers = [ref.DA, ref.DB];
+        const fingers = held.length === 2 ? held : [ref.DA, ref.DB];
+        const drift = held.length === 2 ? Math.max(...held.map((h, i) => Math.hypot(h.x - [ref.DA, ref.DB][i].x, h.y - [ref.DA, ref.DB][i].y))) : NaN;
         const rows = fingers.map(p => {
           const laid = disk(p);
           const elsewhere = controlsOf(p).filter(clearOf(fingers)).map(disk);
@@ -518,7 +533,7 @@ try {
           && Math.min(rows[0].laid, rows[1].laid) > 0.4 * Math.max(rows[0].laid, rows[1].laid);
         check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
           rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
-            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)}; ${rb1 - rb0} readbacks`);
+            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); ${rb1 - rb0} readbacks`);
       } else if (NEED_GPU) {
         check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
       } else {
