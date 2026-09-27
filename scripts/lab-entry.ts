@@ -12,6 +12,7 @@ import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
 import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
+import { fingerCarry, blowCarry } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -184,6 +185,8 @@ const api = {
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
+  /** What a hand's Finger and Blow carry of the ferrofluid, as the app works it out (lib/handCarry.ts). */
+  fingerCarry, blowCarry,
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */

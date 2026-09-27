@@ -189,6 +189,8 @@ export interface PlateSolver {
   readonly oilCover?: number;
   /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
   carryMix?(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void;
+  /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */
+  carryPhase?(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number, outward?: boolean): void;
   addRxn?(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void;
   addLiesegang?(x: number, y: number, radius: number, amount?: number): void;
   readonly chemistryLive?: { rxn: boolean; lies: boolean };
