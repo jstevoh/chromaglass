@@ -220,7 +220,7 @@ export class PipelineCache {
    * mid-way) is left for the frame to build the old way, which is also where
    * its error is reported the way every other one is.
    */
-  async prepareCompute(name: string, code: string, entryPoint = 'main'): Promise<boolean> {
+  async prepareCompute(name: string, code: string, entryPoint = 'main', use = false): Promise<boolean> {
     const bySource = this.computeSlot(name, entryPoint);
     if (bySource.has(code)) return true;
     try {
@@ -228,13 +228,13 @@ export class PipelineCache {
       if (bySource.has(code)) return true;
       bySource.set(code, p);
       if (this.ledger) this.ledger.ahead++;
-      await firstUse(this.device, p, code);
+      if (use) await firstUse(this.device, p, code);
       return true;
     } catch { return false; /* built on the frame instead (above) */ }
   }
 
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
-  async prepareRender(name: string, make: RenderRecipe): Promise<boolean> {
+  async prepareRender(name: string, make: RenderRecipe, use = false): Promise<boolean> {
     if (this.render.has(name)) return true;
     try {
       // The sources it is made of, for the scraps its first draw binds.
@@ -244,19 +244,20 @@ export class PipelineCache {
       if (this.render.has(name)) return true;
       this.render.set(name, p);
       if (this.ledger) this.ledger.ahead++;
-      await firstDraw(this.device, p, desc, [...codes]);
+      if (use) await firstDraw(this.device, p, desc, [...codes]);
       return true;
     } catch { return false; /* built on the frame instead */ }
   }
 
   /** `prepareCompute`, handed over to be asked for later (see `Prep`). */
   computePrep(name: string, code: string, later = false): Prep {
-    return { key: `${this.scope}/${name}`, later, build: () => this.prepareCompute(name, code) };
+    // Used once ahead only when the show opens with it: see firstUse.
+    return { key: `${this.scope}/${name}`, later, build: () => this.prepareCompute(name, code, 'main', !later) };
   }
 
   /** `prepareRender`, handed over to be asked for later (see `Prep`). */
   renderPrep(name: string, make: RenderRecipe, later = false): Prep {
-    return { key: `${this.scope}/${name}`, later, build: () => this.prepareRender(name, make) };
+    return { key: `${this.scope}/${name}`, later, build: () => this.prepareRender(name, make, !later) };
   }
 
   private computeSlot(name: string, entryPoint: string): Map<string, GPUComputePipeline> {
@@ -317,6 +318,18 @@ export class PipelineCache {
   solver submits still cost a few tenths of a second more than later ones
   (downsample 0.32 s, upsampleDelta 0.40 s on run 36306162647), which is
   PLAN.md's next item on this.
+
+  Only for what the show opens with (`Prep.later` false), which is all its
+  first frames use. The half built behind the show is not used ahead: each
+  first draw holds the GPU for as long as it holds it, and paying all of
+  them behind a running show at a fixed moment would stop its frames there
+  instead. Inferred from, not proven by, run 36307168222: the render made
+  right after a replaced device
+  (whose later half was still being built and drawn once) left the live
+  loop 4 frames in half a second where every other run had 15 to 30
+  (`npm run qa`, render-app's "the live loop draws again after every
+  render"). A pipeline of the later half pays its first use on the frame
+  that first asks for it, as it did before.
 
   Inside an error scope: a scrap the shader does not like is a first use
   that did not happen, not a GPU error for the loop's error count, and the

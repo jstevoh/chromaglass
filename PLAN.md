@@ -962,7 +962,9 @@ while this batch's plan was going in (#177), and no cause is known yet:
   few frames later 0.03 s. Not a compile (warm openings stopped as long), not the
   canvas, not the fields' memory (a bare page writing all 75.8 MB stopped 0.08 s),
   not the builds behind the show. Each render pipeline built ahead now draws once
-  behind the starting frame (`gpu/kit.ts`, firstDraw): the plate's first draw took
+  behind the starting frame (`gpu/kit.ts`, firstDraw; only the half the show opens
+  with, since the half built behind a running show would pay the same cost under
+  it): the plate's first draw took
   0.14 s, the opening's longest wait for a frame fell to 0.82 s (not at the first
   step), and the forty warm openings' median stop from 1.08 s to 0.12 s. The 2 s
   limit is unchanged. `npm run startup` now prints the submits the GPU spent longest
