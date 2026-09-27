@@ -893,6 +893,13 @@ class FluidSimulation {
   */
   private rbSeq = 0;
   /**
+   * Readbacks landed, for a check to know the mirror is live without asking
+   * the thing it measures. `npm run phone` used to take "the dye changed" as
+   * proof of readbacks, so fingers that laid no dye read as "no readbacks
+   * here" and skipped instead of failing.
+   */
+  get readbacks(): number { return this.rbSeq; }
+  /**
    * The dye readback a hand's move must wait for: one copied after its last
    * move reached the plate.
    *
@@ -4133,7 +4140,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * the zoom and aim they started from. Held until every finger is up, so
    * lifting one of the pair does not turn the other into a brush mid-pinch.
    */
-  const pinchRef = useRef<{ d0: number; mx0: number; my0: number; zoom0: number; aimX: number; aimY: number; sent: number } | null>(null);
+  const pinchRef = useRef<{
+    d0: number; mx0: number; my0: number; zoom0: number; aimX: number; aimY: number; sent: number;
+    /** The latest span, sent on lift if the frame's throttle held it back. */
+    last: { d: number; mx: number; my: number } | null;
+    /** Whether the pair has moved together far enough to be a pan, not only a pinch. */
+    panned: boolean;
+  } | null>(null);
   const simulationTimeRef = useRef(0);
   const lastTimeRef = useRef(showEpochS());
   const lastBass01Ref = useRef(0); // for beat edge detection
@@ -8734,14 +8747,40 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       asked for it; everywhere else two fingers are two hands.
     */
     const touchCell = (t: Touch) => getTransformedMousePos(t.clientX, t.clientY, drawnRect());
+    /*
+      The fingers on the glass, not on the page. `touches` counts every
+      finger on the screen, so a thumb resting on the dock (a tool, the Amount
+      slider) and one finger landing on the closeup read as a pinch, spanned
+      down to the thumb, and the plate could not be painted until the thumb
+      came off the dock. `targetTouches` is the fingers that began on the
+      canvas.
+    */
     const pinchSpan = (e: TouchEvent) => {
-      const a = e.touches[0], b = e.touches[1];
+      const a = e.targetTouches[0], b = e.targetTouches[1];
       return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
     };
     const letGo = () => {
       isMouseDownRef.current = false;
       primaryTouchRef.current = null;
       extraHandsRef.current.clear();
+    };
+    const applyPinch = (pinch: NonNullable<typeof pinchRef.current>, span: { d: number; mx: number; my: number }) => {
+      onPinchZoomRef.current?.(Math.max(1, Math.min(16, pinch.zoom0 * span.d / pinch.d0)));
+      /*
+        The pan, as the Alt-drag has it (panAim): the plate follows the
+        fingers. Only once they have moved together, a few pixels: an aim
+        takes the camera off Auto (App's aimMacro), and a pinch that only
+        zooms should leave Auto on.
+      */
+      if (!pinch.panned && Math.hypot(span.mx - pinch.mx0, span.my - pinch.my0) < 8) return;
+      pinch.panned = true;
+      const rect = drawnRect();
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 * Math.max(0.0001, macroShotRef.current.zoom);
+      const sx = span.mx - pinch.mx0, sy = -(span.my - pinch.my0);
+      const du = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale;
+      const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
+      onAimRef.current?.(Math.min(1, Math.max(0, pinch.aimX - du)), Math.min(1, Math.max(0, pinch.aimY - dv)));
     };
     const handleTouchStart = (e: TouchEvent) => {
       if (pinchRef.current) return;
@@ -8752,13 +8791,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         painting two drops instead (npm run phone found it on a slow plate).
       */
       const asked = macroZoomOf(settingsRef.current);
-      if (e.touches.length >= 2 && onPinchZoomRef.current && asked > 1.05) {
+      if (e.targetTouches.length >= 2 && onPinchZoomRef.current && asked > 1.05) {
         // The second finger of a pair on the closeup: the camera, not a brush.
         // Whatever the first finger had started is let go of.
         letGo();
         const span = pinchSpan(e);
         const shot = macroShotRef.current;
-        pinchRef.current = { d0: Math.max(10, span.d), mx0: span.mx, my0: span.my, zoom0: asked, aimX: shot.cx, aimY: shot.cy, sent: 0 };
+        pinchRef.current = { d0: Math.max(10, span.d), mx0: span.mx, my0: span.my, zoom0: asked, aimX: shot.cx, aimY: shot.cy, sent: 0, last: null, panned: false };
         return;
       }
       for (const t of Array.from(e.changedTouches)) {
@@ -8766,7 +8805,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (primaryTouchRef.current === null) {
           primaryTouchRef.current = t.identifier;
           isMouseDownRef.current = true;
-          lastMousePosRef.current = { ...mousePosRef.current };
+          // From here, not from where the last finger lifted: the recorder's
+          // first gesture of a touch takes its direction from this.
+          lastMousePosRef.current = { ...p };
           mousePosRef.current = p;
         } else if (t.identifier !== primaryTouchRef.current) {
           extraHandsRef.current.set(t.identifier, { ...p, stroke: null, clock: 0 });
@@ -8774,8 +8815,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
     const handleTouchEnd = (e: TouchEvent) => {
-      if (pinchRef.current) {
-        if (e.touches.length === 0) pinchRef.current = null;
+      const pinch = pinchRef.current;
+      if (pinch) {
+        if (e.targetTouches.length === 0) {
+          // The last move a frame's throttle held back, so the camera ends
+          // where the fingers did, as the Alt-drag's mouseup does.
+          if (pinch.last) applyPinch(pinch, pinch.last);
+          pinchRef.current = null;
+        }
         return;
       }
       for (const t of Array.from(e.changedTouches)) {
@@ -8799,25 +8846,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           extraHandsRef.current.delete(t.identifier);
         }
       }
-      if (e.touches.length === 0) letGo();
+      if (e.targetTouches.length === 0) letGo();
     };
     const handleTouchMove = (e: TouchEvent) => {
       const pinch = pinchRef.current;
       if (pinch) {
-        if (e.touches.length < 2) return;
-        const span = pinchSpan(e);
+        if (e.targetTouches.length < 2) return;
+        pinch.last = pinchSpan(e);
         const now = performance.now();
         if (now - pinch.sent < 16) return;   // at most once a frame: each is a settings write
         pinch.sent = now;
-        onPinchZoomRef.current?.(Math.max(1, Math.min(16, pinch.zoom0 * span.d / pinch.d0)));
-        // The pan, as the Alt-drag has it (panAim): the plate follows the fingers.
-        const rect = drawnRect();
-        const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-        const scale = Math.max(rect.width, rect.height) * 1.5 * Math.max(0.0001, macroShotRef.current.zoom);
-        const sx = span.mx - pinch.mx0, sy = -(span.my - pinch.my0);
-        const du = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale;
-        const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
-        onAimRef.current?.(Math.min(1, Math.max(0, pinch.aimX - du)), Math.min(1, Math.max(0, pinch.aimY - dv)));
+        applyPinch(pinch, pinch.last);
         return;
       }
       const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -8882,7 +8921,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
       canvas.removeEventListener('touchmove', handleTouchMove);
-      letGo();
+      // The fingers are let go of with their listeners; a mouse button held
+      // through a rebuild is left as it always was, down until its mouseup.
+      if (primaryTouchRef.current !== null) isMouseDownRef.current = false;
+      primaryTouchRef.current = null;
+      extraHandsRef.current.clear();
       pinchRef.current = null;
       cancelAnimationFrame(animationFrameId);
       // And the frame the projector could ask for goes with it.

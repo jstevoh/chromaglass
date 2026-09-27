@@ -2529,25 +2529,40 @@ export default function App() {
     Tilt writes the look's own Gravity and Tilt Direction while it is on
     (lib/phone.ts), so what it moves is what the faders move and a look
     saved mid-tilt keeps the tilt it was saved with. Turning it off puts back
-    what they were, unless a new look has come in since: then that look's
-    are the ones to keep, and what Tilt last wrote is taken back to flat.
+    the look's own two values: the ones from before Tilt, or, if a new look
+    has come in since, that look's (Tilt's next reading has already written
+    over them by the time it is turned off, so they are taken from the look
+    as it arrives).
   */
   const tiltWas = useRef<{ plateUpright: number; tiltDirection: number } | null>(null);
   const tilt = useDeviceTilt(({ upright, direction }) => updateSettings({ plateUpright: upright, tiltDirection: direction }));
   const toggleTilt = useCallback(async () => {
-    if (tilt.on) {
-      tilt.stop();
-      const was = tiltWas.current;
-      tiltWas.current = null;
-      updateSettings(was ?? { plateUpright: DEFAULT_SETTINGS.plateUpright, tiltDirection: DEFAULT_SETTINGS.tiltDirection });
-      return;
-    }
+    if (tilt.on) { tilt.stop(); return; }
     const cur = settingsRef.current;
     tiltWas.current = { plateUpright: cur.plateUpright ?? 0, tiltDirection: cur.tiltDirection ?? 180 };
     if (!(await tilt.start())) tiltWas.current = null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tilt.on, tilt.start, tilt.stop]);
-  useEffect(() => { tiltWas.current = null; }, [pinnedPresetId]);
+  // However Tilt ended (the toggle, or the hook finding no sensor), the look
+  // gets its own two values back.
+  useEffect(() => {
+    if (tilt.on || !tiltWas.current) return;
+    updateSettings(tiltWas.current);
+    tiltWas.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tilt.on]);
+  useEffect(() => {
+    if (!tiltWas.current) return;
+    const look = allPresets.find(p => p.id === pinnedPresetId)?.settings;
+    tiltWas.current = {
+      plateUpright: look?.plateUpright ?? DEFAULT_SETTINGS.plateUpright,
+      tiltDirection: look?.tiltDirection ?? DEFAULT_SETTINGS.tiltDirection,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinnedPresetId]);
+  // The Tilt toggle is on the phone's Play sheet and nowhere else, so leaving
+  // the phone layout ("Full layout", a resize) must not leave the plate
+  // following the hand with no way to stop it.
+  useEffect(() => { if (!phone && tilt.on) tilt.stop(); }, [phone, tilt.on, tilt.stop]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -4155,7 +4170,7 @@ export default function App() {
             onZoom={() => runAction('macro-toggle')}
             camera={settings.macroCamera ?? 'hold'}
             onCamera={(c) => updateSettings({ macroCamera: c })}
-            tilt={{ supported: tilt.supported, on: tilt.on, refused: tilt.refused, onToggle: () => { void toggleTilt(); } }}
+            tilt={{ supported: tilt.supported, on: tilt.on, refused: tilt.refused, silent: tilt.silent, onToggle: () => { void toggleTilt(); } }}
             audioSource={audioSource}
             onAudioSource={(src) => { void handleSourceChange(src); }}
             onMusicFile={() => musicInputRef.current?.click()}

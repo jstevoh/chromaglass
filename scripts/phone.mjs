@@ -29,7 +29,8 @@
  *   fingers       two fingers on the plate are two hands, each where it is,
  *                 and lifting the first leaves the second painting; on the
  *                 closeup two fingers are the camera and pinch the zoom
- *   dye           (Metal only) two fingers holding Drop lay dye at both
+ *   dye           (Metal only) two fingers holding Drop lay dye at both, and
+ *                 not at their mirrors
  *
  * The last two need the plate running. A runner with no WebGPU shows the
  * "needs WebGPU" screen instead and attaches no hands, so there they are
@@ -74,7 +75,10 @@ const check = (name, ok, detail = '') => {
   const shake = at(48, 2);
   check('a hand\'s tremble (3°) does not tip it', shake.upright === 0, `upright ${shake.upright}`);
   const toward = at(65, 0), away = at(25, 0);
-  check('top edge raised 20°, it runs to the bottom', toward.upright > 0.4 && toward.upright < 1 && toward.direction === 180, `upright ${toward.upright}, direction ${toward.direction}°`);
+  // 20° is 15° past the dead zone of a 30° ramp: exactly half upright. The
+  // three checks below compare against this one, so a band here ("more than
+  // 0.4") let a wrong scale through all four.
+  check('top edge raised 20°, it runs to the bottom, half upright', Math.abs(toward.upright - 0.5) < 0.011 && toward.direction === 180, `upright ${toward.upright}, direction ${toward.direction}°`);
   check('lowered 20°, to the top, just as hard', away.direction === 0 && away.upright === toward.upright, `upright ${away.upright}, direction ${away.direction}°`);
   const side = at(45, 20);
   check('right edge dipped 20°, to the right, just as hard again', side.direction === 90 && side.upright === toward.upright, `upright ${side.upright}, direction ${side.direction}°`);
@@ -156,28 +160,81 @@ try {
     const leg = await legibility(page);
     check(`${label}: nothing is too small or faint to read`, leg.tiny.length === 0 && leg.small.length === 0 && leg.faint.length === 0,
       [...leg.tiny, ...leg.small, ...leg.faint].slice(0, 5).join(', '));
-    const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth - innerWidth, document.documentElement.scrollHeight - innerHeight));
-    check(`${label}: nothing spills off the screen`, overflow <= 1, `${overflow} px`);
+    /*
+      Off the screen, element by element. The page's scroll size cannot say:
+      every phone control sits in a fixed box under an overflow-hidden root,
+      and fixed boxes add nothing to it, so a dock 1200 px wide on a 390 px
+      screen measured 0 px of overflow. Anything visible in the phone's stage
+      whose box leaves the screen, and that no scrolling or clipping ancestor
+      inside the stage holds in, is spilling.
+    */
+    const spills = await page.evaluate(() => {
+      const stage = document.querySelector('[data-testid="phone-stage"]');
+      const out = [];
+      for (const el of stage ? stage.querySelectorAll('*') : []) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) continue;
+        if (r.left >= -1 && r.top >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1) continue;
+        let held = false;
+        for (let p = el.parentElement; p && p !== stage.parentElement; p = p.parentElement) {
+          const ps = getComputedStyle(p);
+          if (/auto|scroll|hidden|clip/.test(ps.overflowX + ps.overflowY)) {
+            const pr = p.getBoundingClientRect();
+            if (pr.left >= -1 && pr.top >= -1 && pr.right <= innerWidth + 1 && pr.bottom <= innerHeight + 1) { held = true; break; }
+          }
+        }
+        if (!held) out.push(`${el.dataset.testid || el.tagName.toLowerCase()} ${Math.round(r.left)},${Math.round(r.top)}–${Math.round(r.right)},${Math.round(r.bottom)}`);
+      }
+      return out;
+    });
+    check(`${label}: nothing spills off the screen`, spills.length === 0, spills.length ? spills.slice(0, 4).join('; ') : 'every box on screen or held in');
 
-    // The plate: what the top bar and the dock leave of it.
-    const top = await box(page, 'phone-look-button');
-    const dock = await box(page, 'phone-dock');
-    const share = (dock.y - (top.y + top.height)) / h;
-    check(`${label}: the plate keeps ${Math.round(plateShare * 100)}% of the screen or more`, share >= plateShare, `${Math.round(share * 100)}% between the top bar and the dock`);
+    /*
+      The plate: how much of the screen a finger lands on it. Sampled on a
+      grid with elementFromPoint, counting the points whose top element is
+      the plate's own frame (its canvas, or the "needs WebGPU" screen on a
+      runner without it), and asked only once the canvas is known to fill the
+      screen. The first draft measured the gap between the look button and
+      the dock, which a plate squeezed to a strip, or hidden, passed at 72%.
+    */
+    const plate = await page.evaluate(() => {
+      const c = document.getElementById('liquid-canvas')?.getBoundingClientRect();
+      const fills = !!c && c.left <= 1 && c.top <= 1 && c.right >= innerWidth - 1 && c.bottom >= innerHeight - 1;
+      let on = 0, all = 0;
+      for (let i = 0; i < 20; i++) for (let j = 0; j < 40; j++) {
+        const el = document.elementFromPoint((i + 0.5) * innerWidth / 20, (j + 0.5) * innerHeight / 40);
+        all++;
+        if (el?.closest('[data-testid="plate-frame"]')) on++;
+      }
+      return { fills, share: on / all };
+    });
+    check(`${label}: the plate fills the screen and keeps ${Math.round(plateShare * 100)}% of it or more`, plate.fills && plate.share >= plateShare,
+      `${plate.fills ? 'canvas fills the screen' : 'canvas does NOT fill the screen'}; ${Math.round(plate.share * 100)}% of 800 points land on the plate`);
 
     // Each tool picks up; the one in hand opens its Amount.
+    // Drop starts in hand, so it goes last: counted first, it was in hand
+    // before its tap, and the tap opened its Amount instead.
+    const pressed = async (t) => (await page.getByTestId(`phone-tool-${t}`).getAttribute('aria-pressed')) === 'true';
     let picked = 0;
-    for (const t of TOOLS) {
+    const missed = [];
+    for (const t of [...TOOLS.slice(1), TOOLS[0]]) {
+      const was = await pressed(t);
       await tap(page, `phone-tool-${t}`);
-      if ((await page.getByTestId(`phone-tool-${t}`).getAttribute('aria-pressed')) === 'true') picked++;
+      if (!was && (await pressed(t))) picked++; else missed.push(`${t}${was ? ' (already in hand)' : ''}`);
     }
-    check(`${label}: a tap on each tool puts it in hand`, picked === TOOLS.length, `${picked} of ${TOOLS.length}`);
+    check(`${label}: a tap on each tool puts it in hand`, picked === TOOLS.length, `${picked} of ${TOOLS.length}${missed.length ? `; not: ${missed.join(', ')}` : ''}`);
+    await tap(page, 'phone-tool-magnet');
     await tap(page, 'phone-tool-magnet');
     const amountUp = await visible(page, 'phone-amount');
     if (amountUp) await shot(page, `${label.replace(/ /g, '-')}-amount`);
     check(`${label}: a second tap on it opens its Amount`, amountUp);
     await tap(page, 'phone-tool-magnet');
-    check(`${label}: and a third closes it`, !(await visible(page, 'phone-amount')));
+    // Closed, with the dock still up and Magnet still in hand: "not visible"
+    // alone was also what a tap that took the whole stage down would read.
+    check(`${label}: and a third closes it, leaving Magnet in hand`,
+      !(await visible(page, 'phone-amount')) && (await visible(page, 'phone-dock')) && (await pressed('magnet')));
     await tap(page, 'phone-tool-dropper');
 
     // The sheets: each opens, fits, and closes from above it.
@@ -197,7 +254,7 @@ try {
         inner ? `${Math.round(inner.height)} of ${h} px${coveredIn.length ? `; ${coveredIn.slice(0, 3).join('; ')}` : ''}` : 'no panel');
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
       await page.waitForTimeout(250);
-      check(`${label}: and a tap above it closes it`, !(await visible(page, `phone-sheet-${s}`)));
+      check(`${label}: and a tap above it closes it, back to the dock`, !(await visible(page, `phone-sheet-${s}`)) && (await visible(page, 'phone-dock')));
     }
 
     if (label === 'portrait') {
@@ -226,14 +283,27 @@ try {
         !!target && fadingName === target.name && named === target.name, `picked "${target?.name}", top says "${fadingName}" fading and "${named}" after`);
 
       // Clean screen, and a still finger to bring it back.
+      // Painting is a moving finger, so a drag over a second leaves the
+      // screen clean; only the still one is asked for the controls. Without
+      // the drag, any touch at all bringing them back would pass.
       await tap(page, 'phone-hide');
       const gone = !(await visible(page, 'phone-stage')) || !(await visible(page, 'phone-dock'));
       const cdp = await ctx.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: w / 2 - 50, y: h / 2 }] });
+      for (let i = 1; i <= 10; i++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: w / 2 - 50 + 10 * i, y: h / 2 }] });
+        await page.waitForTimeout(100);
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: w / 2 + 50, y: h / 2 }] });
+      await page.waitForTimeout(400);
+      const stillGone = !(await visible(page, 'phone-dock'));
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: w / 2, y: h / 2 }] });
       await page.waitForTimeout(1000);
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ x: w / 2, y: h / 2 }] });
       await page.waitForTimeout(400);
-      check('Clean screen hides the controls, and a still finger brings them back', gone && (await visible(page, 'phone-dock')), gone ? '' : 'nothing was hidden');
+      check('Clean screen hides the controls, a painting finger leaves them hidden, and a still finger brings them back',
+        gone && stillGone && (await visible(page, 'phone-dock')),
+        !gone ? 'nothing was hidden' : !stillGone ? 'a drag brought them back' : '');
 
       // "Full layout" is the laptop's, for the visit.
       await tap(page, 'phone-open-more');
@@ -266,7 +336,13 @@ try {
 
       // A still dish, so a cell under a finger stays that cell: the classic
       // look turns, and the plate's cells turn with it under the screen.
-      await page.evaluate(() => window.chromaglassSettings?.({ rotationSpeed: 0, plateRock: 0, beatSqueeze: 0, audioImpact: 0 }));
+      // Not `?.`: a renamed hook would leave the plate turning and the
+      // check measuring a moving dish, silently.
+      const settings = (patch) => page.evaluate((p) => {
+        if (typeof window.chromaglassSettings !== 'function') throw new Error('window.chromaglassSettings is gone');
+        window.chromaglassSettings(p);
+      }, patch);
+      await settings({ rotationSpeed: 0, plateRock: 0, beatSqueeze: 0, audioImpact: 0 });
       await settle(1500);
       // Where one finger alone lands, at each place: what two fingers are held to.
       const alone = async (p) => {
@@ -278,7 +354,15 @@ try {
         return h;
       };
       const A2 = { x: A.x + 60, y: A.y }, B2 = { x: B.x - 60, y: B.y };
-      const ref = { A: await alone(A), B: await alone(B), A2: await alone(A2), B2: await alone(B2) };
+      /*
+        The dye's two fingers, both in the top half and at different heights.
+        A and B above sit nearly point-mirrored through the plate's middle, so
+        dye laid at one finger also filled the disk at the other's mirror: a
+        solver that drew every drop mirrored, or transposed, measured the same
+        as a right one.
+      */
+      const DA = { x: 110, y: 300 }, DB = { x: 290, y: 370 };
+      const ref = { A: await alone(A), B: await alone(B), A2: await alone(A2), B2: await alone(B2), DA: await alone(DA), DB: await alone(DB) };
       const same = (h, r) => !!h && !!r && Math.abs(h.x - r.x) <= 1 && Math.abs(h.y - r.y) <= 1;
       const fmt = (hs) => hs.map(h => `(${h.x}, ${h.y})`).join(' ');
 
@@ -303,42 +387,104 @@ try {
       await settle(150);
       check('and lifting it too lets go', (await hands()).hands.length === 0);
 
-      // Dye at both fingers. Only where the plate reads back: the software
-      // adapter gives the app none, and its copy of the dye never moves. So
-      // a copy that has not changed across a second of two fingers dropping
-      // dye is no readbacks, not no dye: reported, and required on the Mac.
-      await page.evaluate(() => window.chromaglassSettings?.({ turbulenceScale: 0, rainDrip: 0, glassSmear: 0, bubbles: 0, beads: 0 }));
-      await page.evaluate(() => window.chromaglassAction?.('clear'));
+      /*
+        Dye at both fingers, and not anywhere a wrong hand would put it.
+
+        Asked only where the plate reads back, and whether it does is asked
+        of the readback count, not of the dye: the first draft took "the dye
+        changed" as proof of readbacks, so fingers that laid nothing read as
+        "no readbacks here" and skipped. Now a live mirror with no dye under
+        a finger fails.
+
+        And the dye is held against where it should not be: for each finger,
+        the same disk at its point mirror, its transpose and its two flips,
+        wherever those are clear of both fingers. A plate risen everywhere,
+        or a drop drawn at the wrong cell, fills those as well; a finger's
+        own dye must be three times any of them.
+      */
+      await settings({ turbulenceScale: 0, rainDrip: 0, glassSmear: 0, bubbles: 0, beads: 0 });
+      await page.evaluate(() => {
+        if (typeof window.chromaglassAction !== 'function') throw new Error('window.chromaglassAction is gone');
+        window.chromaglassAction('clear');
+      });
       await settle(2500);
       const snap = () => page.evaluate(() => [...window.chromaglassDebug().fluids[0].readDensity]);
+      const readbacks = () => page.evaluate(() => window.chromaglassDebug().fluids[0].readbacks ?? -1);
+      const rb0 = await readbacks();
       const before = await snap();
-      await touch('touchStart', [{ ...A, id: 1 }]);
-      await touch('touchStart', [{ ...A, id: 1 }, { ...B, id: 2 }]);
+      await touch('touchStart', [{ ...DA, id: 1 }]);
+      await touch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(1200);
-      await touch('touchEnd', [{ ...A, id: 1 }, { ...B, id: 2 }]);
+      await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
       const after = await snap();
+      const rb1 = await readbacks();
       const n = await page.evaluate(() => window.chromaglassDebug().gridSize);
-      const live = after.some((v, i) => v !== before[i]);
-      if (live) {
-        const laid = [ref.A, ref.B].map(p => {
+      if (rb0 < 0) {
+        check('the plate counts its readbacks, so the dye check knows it can look', false, 'fluids[0].readbacks is gone');
+      } else if (rb1 - rb0 >= 3) {
+        const R = 0.06 * n;
+        const disk = (c) => {
           let sum = 0;
-          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - p.x, y - p.y) / n < 0.06) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < R) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
           return sum;
+        };
+        const fingers = [ref.DA, ref.DB];
+        const clear = (c) => fingers.every(f => Math.hypot(c.x - f.x, c.y - f.y) > 2.5 * R);
+        const rows = fingers.map(p => {
+          const laid = disk(p);
+          const elsewhere = [
+            { x: n - 1 - p.x, y: n - 1 - p.y }, { x: p.y, y: p.x },
+            { x: n - 1 - p.x, y: p.y }, { x: p.x, y: n - 1 - p.y },
+          ].filter(clear).map(disk);
+          return { laid, elsewhere, worst: Math.max(0, ...elsewhere) };
         });
-        check('two fingers holding Drop lay dye under both', laid[0] > 5 && laid[1] > 5 && Math.min(...laid) > 0.4 * Math.max(...laid),
-          laid.map(v => v.toFixed(0)).join(' and '));
+        const ok = rows.every(r => r.laid > 5 && r.elsewhere.length >= 2 && r.laid > 3 * r.worst)
+          && Math.min(rows[0].laid, rows[1].laid) > 0.4 * Math.max(rows[0].laid, rows[1].laid);
+        check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
+          rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
+            + `; ${rb1 - rb0} readbacks`);
       } else if (NEED_GPU) {
-        check('the plate reads back, so the dye can be measured', false, 'its copy of the dye did not change');
+        check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
       } else {
-        console.log(' --   no readbacks from the plate here: the dye under both fingers is not measured (the Mac shard measures it)');
+        console.log(` --   no readbacks from the plate here (${rb1 - rb0} in two seconds): the dye under both fingers is not measured (the Mac shard measures it)`);
       }
 
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
 
       // The closeup: two fingers are the camera.
       await tap(page, 'phone-zoom');
+      // Hold, so the closeup stays put between the reference and the check.
+      await tap(page, 'phone-camera-hold');
       await settle(600);
+      // A thumb resting on the dock is not half a pinch: one finger on the
+      // closeup with a thumb on a tool still paints (the page's touches
+      // counted the thumb, and the plate zoomed toward the dock instead).
+      const dockAt = await box(page, 'phone-tool-spray');
+      const thumb = { x: dockAt.x + dockAt.width / 2, y: dockAt.y + dockAt.height / 2, id: 5 };
+      // Where that finger lands alone, once the closeup has come to rest:
+      // the zoom eases in after the tap, so two readings a moment apart must
+      // agree before either is the reference.
+      let plateFinger = await alone({ x: 200, y: 400 });
+      for (let i = 0; i < 12; i++) {
+        await settle(250);
+        const again = await alone({ x: 200, y: 400 });
+        if (same(again, plateFinger)) break;
+        plateFinger = again;
+      }
+      await touch('touchStart', [thumb]);
+      await touch('touchStart', [thumb, { x: 200, y: 400, id: 6 }]);
+      await settle(120);
+      const withThumb = await hands();
+      await touch('touchEnd', [thumb, { x: 200, y: 400, id: 6 }]);
+      await settle(150);
+      // The one hand is the plate finger's, not the thumb's: "one hand, no
+      // pinch" alone was also what reading the thumb as the hand gave.
+      check('on the closeup, a thumb on the dock and a finger on the plate is that finger\'s hand, not a pinch',
+        !withThumb.pinch && withThumb.hands.length === 1 && same(withThumb.hands[0], plateFinger),
+        `${JSON.stringify(withThumb)} against ${fmt([plateFinger].filter(Boolean))}`);
+      // Auto, so a pinch that only zooms can be seen to leave the camera on it.
+      await tap(page, 'phone-camera-auto');
       const z0 = await page.evaluate(() => window.chromaglassDebug().settings.macroZoom ?? 1);
       await touch('touchStart', [{ x: 170, y: 420, id: 1 }]);
       await touch('touchStart', [{ x: 170, y: 420, id: 1 }, { x: 220, y: 420, id: 2 }]);
@@ -351,7 +497,14 @@ try {
       }
       await settle(300);
       const z1 = await page.evaluate(() => window.chromaglassDebug().settings.macroZoom ?? 1);
-      check('and spreading them zooms in', z1 > z0 * 1.5, `${z0.toFixed(2)}× → ${z1.toFixed(2)}× for fingers 50 → 170 px apart`);
+      // The pinch law: the zoom scales with the fingers' span, 50 → 170 px
+      // is 3.4 times, up to the closeup's limit of 16. "More than 1.5 times"
+      // also passed a square root or a zoom clamped to a constant.
+      const want = Math.min(170 / 50, 16 / z0);
+      check('and spreading them zooms in by as much as they spread', Math.abs(z1 / z0 - want) < 0.1,
+        `${z0.toFixed(2)}× → ${z1.toFixed(2)}× (${(z1 / z0).toFixed(2)} times, ${want.toFixed(2)} wanted) for fingers 50 → 170 px apart`);
+      const cam = await page.evaluate(() => window.chromaglassDebug().settings.macroCamera);
+      check('and a pinch that only zooms leaves the camera on Auto', cam === 'auto', `camera ${cam}`);
       await touch('touchEnd', [{ x: 110, y: 420, id: 1 }, { x: 280, y: 420, id: 2 }]);
       await settle(150);
       check('and when they lift, nothing is left painting', (await hands()).hands.length === 0 && !(await hands()).pinch);

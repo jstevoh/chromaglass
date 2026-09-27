@@ -106,7 +106,7 @@ export interface PhoneStageProps {
   camera: 'hold' | 'follow' | 'auto';
   onCamera: (c: 'hold' | 'follow' | 'auto') => void;
   // Tilt
-  tilt: { supported: boolean; on: boolean; refused: boolean; onToggle: () => void };
+  tilt: { supported: boolean; on: boolean; refused: boolean; silent: boolean; onToggle: () => void };
   // Sound
   audioSource: AudioSource;
   onAudioSource: (s: AudioSource) => void;
@@ -528,6 +528,7 @@ export function PhoneStage(p: PhoneStageProps) {
             )}
           </div>
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
+          {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
             <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}

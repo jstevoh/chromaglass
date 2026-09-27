@@ -19,6 +19,13 @@ export function useDeviceTilt(onTilt: (t: { upright: number; direction: number }
   const supported = typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
   const [on, setOn] = useState(false);
   const [refused, setRefused] = useState(false);
+  /*
+    A browser can have DeviceOrientationEvent and no sensor behind it: a
+    laptop's Chrome does. Tilt there read "Tilting" and did nothing, so if
+    no reading arrives within a second and a half of starting, it turns
+    itself off and says the device has none.
+  */
+  const [silent, setSilent] = useState(false);
   const onTiltRef = useRef(onTilt);
   onTiltRef.current = onTilt;
 
@@ -31,6 +38,7 @@ export function useDeviceTilt(onTilt: (t: { upright: number; direction: number }
       } catch { setRefused(true); return false; }
     }
     setRefused(false);
+    setSilent(false);
     setOn(true);
     return true;
   }, [supported]);
@@ -41,9 +49,12 @@ export function useDeviceTilt(onTilt: (t: { upright: number; direction: number }
     let level: { beta: number; gamma: number } | null = null;
     let levelAngle: number | null = null;
     let sent = { upright: -1, direction: -1, at: 0 };
+    let heard = false;
+    const deaf = setTimeout(() => { if (!heard) { setSilent(true); setOn(false); } }, 1500);
     const angleNow = () => (screen.orientation?.angle ?? (window as unknown as { orientation?: number }).orientation ?? 0);
     const read = (e: DeviceOrientationEvent) => {
       if (e.beta == null || e.gamma == null) return;
+      heard = true;
       const angle = angleNow();
       const here = { beta: e.beta, gamma: e.gamma };
       // Level is where the hand is when Tilt comes on, and again whenever
@@ -59,8 +70,8 @@ export function useDeviceTilt(onTilt: (t: { upright: number; direction: number }
       onTiltRef.current(t);
     };
     window.addEventListener('deviceorientation', read);
-    return () => window.removeEventListener('deviceorientation', read);
+    return () => { clearTimeout(deaf); window.removeEventListener('deviceorientation', read); };
   }, [on]);
 
-  return { supported, on, refused, start, stop };
+  return { supported, on, refused, silent, start, stop };
 }
