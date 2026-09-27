@@ -28,10 +28,11 @@ export const PLATE_FIELDS: Field[] = [
     hue in radians; the mark's is its own field because the finish reads it,
     and the finish is shared text with the post chain's, which names it the same.
   */
-  { name: 'mixGrade', type: 'vec4f', count: 4, note: 'the LED ring, the front plate, the back plate, the film' },
+  { name: 'mixGrade', type: 'vec4f', count: 6, note: 'the LED ring, the front plate, the back plate, the film, the gel wheel, the lumia' },
   { name: 'markGrade', type: 'vec4f', note: 'the logo' },
   { name: 'mixLevel', type: 'vec4f', note: 'the LED ring, the front plate, the back plate, and the logo while it is under something' },
-  { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of five, 0 the bottom (the LED ring there is the lamp)' },
+  { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of seven, 0 the bottom' },
+  { name: 'mixPos2', type: 'vec4f', note: 'the rows of the gel wheel, the lumia and the front plate (everything under it is the lamp), and the top row' },
   { name: 'gel0', type: 'vec3f' },
   { name: 'gel1', type: 'vec3f' },
   { name: 'gel2', type: 'vec3f' },
@@ -70,7 +71,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'finishInMain', type: 'i32' },
   { name: 'flowRate', type: 'f32', note: 'plate-uv per unit of cellClock per unit of velocity, for advecting procedural detail' },
   { name: 'gelAngle', type: 'f32' },
-  { name: 'gelWheel', type: 'f32', note: 'rotating four-segment gel over the lamp' },
+  { name: 'gelWheel', type: 'f32', note: 'rotating four-segment gel over the lamp, or over the lens (the mixer order)' },
   { name: 'glossiness', type: 'f32', note: 'specular intensity, 0 = flat backlit dye' },
   { name: 'gooey', type: 'f32' },
   { name: 'grainMix', type: 'f32', note: 'crossfade between the two phases' },

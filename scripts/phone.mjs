@@ -297,16 +297,16 @@ try {
       await tap(page, 'phone-open-mix');
       const rowsOf = () => page.$$eval('[data-testid="phone-sheet-mix"] [data-row]', els => els.map(e => e.getAttribute('data-row')).join(' '));
       const before = await rowsOf();
-      const arrows = await Promise.all(['led', 'back', 'film', 'mark'].flatMap(id => [box(page, `phone-mixer-${id}-up`), box(page, `phone-mixer-${id}-down`)]));
+      const arrows = await Promise.all(['led', 'gel', 'lumia', 'back', 'film', 'mark'].flatMap(id => [box(page, `phone-mixer-${id}-up`), box(page, `phone-mixer-${id}-down`)]));
       const smallest = Math.min(...arrows.map(b => (b ? Math.min(b.width, b.height) : 0)));
       check('portrait: the Mixer lists the stack top first, with every arrow 48 px or more',
-        before === 'mark film back front led' && smallest >= 48, `${before}; smallest arrow ${Math.round(smallest)} px`);
+        before === 'mark film back front lumia gel led' && smallest >= 48, `${before}; smallest arrow ${Math.round(smallest)} px`);
       await tap(page, 'phone-mixer-film-down');
       const after = await rowsOf();
       await tap(page, 'phone-mixer-back-open');
       const graded = await visible(page, 'phone-mixer-back-grade');
       check('portrait: and a tap moves the film under the back plate, and opens a row\'s grade',
-        after === 'mark back film front led' && graded, `${after}; grade ${graded ? 'open' : 'not open'}`);
+        after === 'mark back film front lumia gel led' && graded, `${after}; grade ${graded ? 'open' : 'not open'}`);
       // And back up, so the rest of the run plays the default stack.
       await tap(page, 'phone-mixer-film-up');
       const back = await rowsOf();

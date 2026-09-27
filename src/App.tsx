@@ -2727,6 +2727,8 @@ export default function App() {
       case 'mix-raise-back':  raiseMix('back'); break;
       case 'mix-raise-film':  raiseMix('film'); break;
       case 'mix-raise-mark':  raiseMix('mark'); break;
+      case 'mix-raise-gel':   raiseMix('gel'); break;
+      case 'mix-raise-lumia': raiseMix('lumia'); break;
       // Every action, or `tsc` names the one that is missing. A pad wired to
       // an action nobody wrote a case for is a dead pad, and silent.
       default: unhandled('an action', a);

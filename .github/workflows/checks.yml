@@ -363,7 +363,8 @@ jobs:
       # The mixer: each source moved lands only where that source is (the
       # film under the back plate, the logo under the film), the LED ring
       # passes the front plate from lamp to beam, every grade does what its
-      # name says, and every one of the 23 controls changes the picture.
+      # name says, and every one of the 31 controls changes the picture; the
+      # gel wheel and the lumia in the lamp, over the lens and among the rest.
       - name: The mixer's order and grades
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run mixer

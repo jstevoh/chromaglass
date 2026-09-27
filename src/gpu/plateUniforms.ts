@@ -260,10 +260,11 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pass, and `markOn` is 0 so the finish does not lay it in a second time.
   */
   const pos = mixPositions(s.mixOrder);
-  const markTop = pos.mark === 4;
+  const markTop = pos.mark === pos.top;
   pack.set('markOn', markTop ? markOn : 0);
   pack.set('markRect', markRect[0], markRect[1], markRect[2], markRect[3]);
   pack.set('mixPos', pos.led, pos.back, pos.film, pos.mark);
+  pack.set('mixPos2', pos.gel, pos.lumia, pos.front, pos.top);
   // Not clamp01 alone: it passes NaN (a `?set=backLevel=x`), and mix() by
   // NaN is the whole plate gone.
   const level = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? clamp01(v) : 1);
@@ -275,6 +276,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     ...mixGrade(s.frontBright, s.frontContrast, s.frontSat, s.frontHue),
     ...mixGrade(s.backBright, s.backContrast, s.backSat, s.backHue),
     ...mixGrade(s.filmBright, s.filmContrast, s.filmSat, s.filmHue),
+    ...mixGrade(s.gelBright, s.gelContrast, s.gelSat, s.gelHue),
+    ...mixGrade(s.lumiaBright, s.lumiaContrast, s.lumiaSat, s.lumiaHue),
   ]);
   pack.set('markGrade', ...mixGrade(s.markBright, s.markContrast, s.markSat, s.markHue));
   {
