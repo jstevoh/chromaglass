@@ -118,6 +118,8 @@ export interface PhoneStageProps {
   onTrack: (t: Track) => void;
   soundDrive: number;
   onSoundDrive: (v: number) => void;
+  /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
+  songLine: string;
   // The rest
   onSettings: () => void;
   onSongs: () => void;
@@ -511,6 +513,17 @@ export function PhoneStage(p: PhoneStageProps) {
                 </button>
               ))}
             </div>
+          )}
+          {/*
+            What the show hears of the song's shape, the same word the desk's
+            status line carries: its builds, drops and breakdowns, live. Only
+            while something is being listened to, since with no sound there is
+            no song to have a shape.
+          */}
+          {p.audioSource !== 'none' && (
+            <p className="mt-3 text-[13px] leading-snug text-muted" data-testid="phone-song-shape">
+              {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
+            </p>
           )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}

@@ -44,7 +44,7 @@ Each batch is one PR: build, test in the sandbox, merge, deploy, then a GPU look
 the Mac before the next one starts. Order is by what lifts everything else first,
 and by what would otherwise force a rebase later.
 
-Where each batch stands, as of 2026-09-26:
+Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
@@ -58,7 +58,7 @@ Where each batch stands, as of 2026-09-26:
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168) |
-| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; steps 2–7 not started |
+| 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`), Pacing not yet following it; steps 3–7 not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -776,6 +776,33 @@ The steps, most visible first. Each is one PR with its own check, and every step
    breakdown events that choose which swell step 1 fires and how big. *Target:* a drop
    reported within one bar, none in a steady section, and motion against loudness near
    0 at the beat and positive over 20 s. *Check:* synthesised songs with known builds.
+   *Heard* (the first half, this PR): `src/lib/songShape.ts` listens to the bands in
+   decibels (new on each reading, `AudioReading.db`, because the 0..1 values are fitted
+   to the last twelve seconds and a long breakdown reads as loud as the drop by its
+   end) and reports builds, drops and breakdowns live, with a section, a slow
+   intensity and a rising-or-falling action. The desk's status line and the phone's
+   Sound sheet show it, and sound learn can bind a trigger to each drop, build or
+   breakdown. `npm run shape` (in Measure) plays it songs from
+   `scripts/arrangement.mjs` whose sections are known to the sample: every drop heard
+   within one bar (median 0.03, latest 0.57, the latter a build that keeps its kick),
+   none anywhere else, builds before their drops, breakdowns within four bars, nothing
+   in two minutes of four on the floor or of a rock beat with sixteen fills, the same
+   at 30 fps and 20 dB down. *Still to do* (the second half, next): Pacing choosing its
+   swells from these events, which is where the motion-against-loudness target is
+   measured.
+   Found on the way, not yet fixed:
+   - A build is recognised about halfway in, not at its start: the hats leave before
+     the riser has climbed far, so the top end falls before it rises. A build that
+     starts by taking the beat away is heard as a breakdown for its first bars. Onset
+     density (a snare roll doubling) would catch it earlier.
+   - The kick onset reads a fast snare roll's 200 Hz body as kicks: in the club song's
+     build, 32nd-note snares fired `kick` three to five times a half-second. Sound learn
+     on the kick fires through every build.
+   - Nothing on the shelf has a beat: its four tracks are ambient, so the tracker is
+     measured on synthesised songs only, and on the shelf only for not inventing drops
+     (at most 0.8 a minute; `rainy-days` hears 2.8 builds a minute in its swells). A
+     CC-licensed dance track with known sections on the shelf would let the check hear
+     real drops.
 3. **Choose the accents.** Beat squeeze and plate rock fire on every kick. Let the
    performer pick downbeats, every other bar or fills only, vary the depth a little as a
    hand does, and pull a hand-played press onto the predicted beat. Needs a real

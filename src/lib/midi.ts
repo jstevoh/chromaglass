@@ -14,6 +14,7 @@ import type { VisualizerSettings } from '../types';
 // file through esbuild but a strip-types harness may load it directly, and
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
+import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
 
 /** Where a message comes from: a controller or a note, on a channel (0–15). */
 export interface MidiSource {
@@ -111,9 +112,15 @@ export interface MidiBinding {
  * treats as one is wherever the clock happened to lock. Stated rather than
  * guessed at, because a guess ("the loudest kick is the one") is right for
  * some songs and wrong for the rest, and wrong looks like a bug.
+ *
+ * `drop`, `build` and `breakdown` are the song's shape (`songShape.ts`), and
+ * are triggers only too: a drop is a moment, heard when it lands, a bar or
+ * less after it (never predicted: nothing in a song says when its drop is
+ * coming except the build, which is exactly what a performer bound to the
+ * build is there to answer).
  */
-export type MusicSource = SourceName | 'beat' | 'bar';
-export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', 'bar'];
+export type MusicSource = SourceName | 'beat' | 'bar' | SongEventKind;
+export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', 'bar', ...SONG_EVENTS];
 /** The sources a mapping can follow: everything with a level. */
 export const MAPPABLE_SOURCES: readonly SourceName[] = SOURCE_NAMES;
 
@@ -127,6 +134,7 @@ export const MUSIC_SOURCE_LABELS: Record<MusicSource, string> = {
   level: 'Level', kick: 'Kick', bass: 'Bass', snare: 'Snare', hats: 'Hats',
   ...Object.fromEntries(BAND_SOURCES.map((b, i) => [b, `Band ${i + 1} · ${hz(BAND_EDGES_HZ[i])}–${hz(BAND_EDGES_HZ[i + 1])} Hz`])) as Record<typeof BAND_SOURCES[number], string>,
   beat: 'Every beat', bar: 'Every bar',
+  build: 'Each build', drop: 'Each drop', breakdown: 'Each breakdown',
 };
 
 /**

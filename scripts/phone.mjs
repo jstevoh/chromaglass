@@ -265,6 +265,27 @@ try {
       check('a bottle picked in the Dye sheet is the one in the dock', /ink/i.test(dyeLabel), `dock says "${dyeLabel}"`);
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
+      /*
+        The song's shape on the Sound sheet: nothing while nothing is heard,
+        and a line once something is (the Band). Whether the line then says
+        "drop" at a drop is `npm run shape`'s to measure, on the tracker
+        itself; here it is that the phone has the line at all, and only while
+        there is sound to have a shape.
+      */
+      await tap(page, 'phone-open-sound');
+      // The page may already be listening to the Band; start from nothing.
+      const bandOn = async () => (await page.getByTestId('phone-sound-band').first().getAttribute('aria-pressed')) === 'true';
+      const wasOn = await bandOn();
+      if (wasOn) { await tap(page, 'phone-sound-band'); await page.waitForTimeout(400); }
+      const before = (await bandOn()) ? 'the band would not stop' : (await visible(page, 'phone-song-shape')) ? 'shown with no sound' : '';
+      await tap(page, 'phone-sound-band');
+      await page.waitForTimeout(400);
+      const line = (await visible(page, 'phone-song-shape')) ? (await page.getByTestId('phone-song-shape').innerText()).trim() : '';
+      check('the Sound sheet says what it hears of the song, once there is sound', !before && /^(Listening for builds|The song: )/.test(line),
+        `${before ? `${before}; ` : ''}"${line}"`);
+      if (!wasOn) await tap(page, 'phone-sound-band');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
       // A look from the Looks sheet is the look named at the top.
       await tap(page, 'phone-open-looks');
       const target = await page.evaluate(() => {

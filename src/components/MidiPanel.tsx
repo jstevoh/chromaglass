@@ -45,6 +45,13 @@ const soundLabel = (b: SoundBinding): string =>
  * Said on the button rather than hidden, so a control that cannot follow the
  * music does not look like one that was forgotten.
  */
+/** What a trigger on the song's shape does, said where it is bound (`songShape.ts`). */
+const SONG_EVENT_SAYS: Record<'drop' | 'build' | 'breakdown', string> = {
+  drop: 'Fires when the beat comes back in after two bars or more without it, or a build lets go: heard within a bar of the drop.',
+  build: 'Fires when the song starts winding up: a riser, a snare roll, the top end climbing for bars on end. Usually halfway into the build.',
+  breakdown: 'Fires when the beat has been gone for two bars or more while the music plays on.',
+};
+
 function whyNotMusic(target: MidiTarget): string | null {
   if (target.kind === 'setting') return soundMappable(target.key) ? null : 'This one sets how hard a source drives the plate, so the music cannot ride it';
   if (target.kind === 'action') return triggerable(target.action) ? null : 'Not on a beat: pressed on every hit it would toggle twice a second';
@@ -113,6 +120,8 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
           ? `Follows the level: with ${name} at full, ${label} moves ${depthLabel(depth)} of its travel. Sound Impact is its master.`
           : source === 'beat' || source === 'bar'
             ? `Fires on ${source === 'beat' ? 'every beat' : 'every fourth beat'} of the beat clock, once it has locked to the music.`
+            : source === 'drop' || source === 'build' || source === 'breakdown'
+              ? SONG_EVENT_SAYS[source]
             : `Fires on each ${source === 'level' ? 'new sound in the level' : `hit of ${name}`}, on the beat when the beat clock has it, a Beat Lead ahead of the sound.`}
       </p>
     </div>

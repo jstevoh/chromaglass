@@ -4,6 +4,7 @@ import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
+import { songShapeLine } from './lib/songShape';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
@@ -680,6 +681,22 @@ export default function App() {
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
+  /*
+    The song's shape in a word, for the desk's status line and the phone's
+    Sound sheet (lib/songShape.ts): "drop", "build 40%", "breakdown", or
+    nothing while the song simply plays. Sampled four times a second like the
+    tempo label, because the render loop owns the tracker and the UI only
+    needs to glance at it.
+  */
+  const [songLine, setSongLine] = useState('');
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const report = visualizerRef.current?.songShape();
+      const next = report ? songShapeLine(report.now) : '';
+      setSongLine(prev => (prev === next ? prev : next));
+    }, 250);
+    return () => clearInterval(timer);
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3340,7 +3357,7 @@ export default function App() {
   }), [openSettingsAt]);
 
   const deskAudioLine = audioSource === 'none' ? 'silent'
-    : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}`;
+    : `${audioSource === 'simulated' ? 'band' : audioSource}${audioData ? ` ${Math.round(Math.min(100, audioData.volume))}%` : ''}${songLine ? ` · ${songLine}` : ''}`;
 
   /** The dyes on the desk's tray: the bottles that are colours, not behaviours. */
   const trayDyes = useMemo(() => liquidTypes.filter(l => !l.behaviour).map(l => l.color), [liquidTypes]);
@@ -4180,6 +4197,7 @@ export default function App() {
             onToggleMusic={toggleMusic}
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
+            songLine={audioSource === 'none' ? '' : songLine}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
