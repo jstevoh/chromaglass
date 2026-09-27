@@ -53,6 +53,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
+| `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
@@ -66,6 +67,11 @@ deploy:
 - **Measure** (ubuntu, ~1 min): typecheck and the node harnesses.
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is.
+- A deploy skips the checks when main's new tree is the exact tree its PR's
+  `Checks` run passed on (the PR's head contained main when it merged;
+  `scripts/deploygate.sh`). Otherwise the deploy runs them in full. So bring
+  `main` into a PR and let it go green before merging, rather than merging a
+  head that is behind.
 - Superseded PR runs are cancelled. `gallery.yml` (every preset photographed),
   `controls.yml` (every control measured) and `film.yml` (every look filmed and
   measured against real shows: swells, calm, black, sync by section) run by hand.
