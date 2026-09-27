@@ -508,6 +508,17 @@ export interface VisualizerSettings {
    * since it belongs to the set rather than to any one look.
    */
   pacing: number;
+  /**
+   * How far a paced scene follows the song's shape (`lib/songShape.ts`,
+   * `lib/scenePacing.ts`, PLAN.md §10 step 2): a drop opens the scene's big
+   * swell there and then, a build holds the planned swells back and winds the
+   * plate up, a breakdown holds them and lets the plate settle. It rides on
+   * Pacing: with Pacing at 0 there is no scene to shape.
+   *
+   * 0 is the scene exactly as planned from the seed, which is how every set
+   * played before this existed. A room setting, like Pacing.
+   */
+  songFollow: number;
   automateRate: number;
 
   // Audio visual impact (0 = silent visuals, 1 = maximum reaction)
@@ -800,6 +811,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // in between.
   surge: 0.55,
   pacing: 0,
+  songFollow: 0,
   automateRate: 0.12,
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments

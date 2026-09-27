@@ -44,6 +44,8 @@
  * night.
  */
 
+import type { SongEvent, SongShapeState } from './songShape.ts';
+
 /** The events a scene can open a swell with. The same moves a pad or a song's action makes. */
 export type PaceMoment = 'pour' | 'burst' | 'dyes' | 'drain';
 
@@ -68,6 +70,12 @@ export interface Swell {
   /** Seconds to arrive, and the time constant it falls away on. */
   attack: number;
   decay: number;
+  /** How far over a planned swell's top this one goes (1, or more for a drop). */
+  gain?: number;
+  /** Opened by the song's drop rather than by the plan. */
+  song?: boolean;
+  /** Where the envelope starts its attack from (0, or for a drop wherever the scene already stood). */
+  from?: number;
 }
 
 export interface ScenePlan {
@@ -79,6 +87,10 @@ export interface ScenePlan {
   fadeOut: number;
   /** When the drain fires, if the stage asked for one at its dark ending. */
   drainAt: number | null;
+  /** The stage's own opening move (the first it lists, a pour by default): what a drop opens with. */
+  opening: PaceMoment;
+  /** The mean gap between swells this plan was made with, seconds. */
+  gap: number;
 }
 
 export interface PaceSample {
@@ -89,6 +101,114 @@ export interface PaceSample {
 }
 
 export const PACE_NEUTRAL: Readonly<PaceSample> = Object.freeze({ activity: 1, dim: 1 });
+
+/*
+  Following the song (PLAN §10, step 2, the second half).
+
+  A scene planned from the seed puts its big moment wherever the dice put it,
+  and a song puts its own somewhere else: the pour lands in the middle of a
+  build and the drop, eight seconds later, gets a plate still settling from
+  it. A projectionist does the opposite. They hold still through the build,
+  winding the plate up a little as it climbs, throw the big move on the drop,
+  and let the dish rest through a breakdown. `songShape.ts` now hears those
+  three things live, and with **Follow the Song** up (the `songFollow`
+  setting, 0 to 1) a scene is played to them:
+
+    - a **drop** opens a swell there and then, with the stage's own opening
+      move (a pour unless the stage lists another first), bigger than a
+      planned one by up to half again with the drop's strength, and the
+      planned swell nearest after it is taken out, because the drop was it;
+    - through a **build** the planned swells wait (up to HOLD_MAX seconds, so
+      a build the tracker never hears the end of does not hold the scene for
+      ever) and the plate's pace climbs toward today's with the build;
+    - through a **breakdown** the planned swells wait too, the plate's swells
+      fall away sooner and the light settles a little lower than a rest's.
+
+  A drop in a stage's dark ending is let go: the light is on its way down and
+  the next scene comes up out of the dark with its own opening move. Nor does
+  a drop open a swell within DROP_AFTER seconds of the last one: two big
+  moves a breath apart are one mess, and the tracker's own drops are six
+  seconds apart at least.
+
+  At Follow 0 nothing here happens, bit for bit, and it all rides on Pacing:
+  with Pacing at 0 there is no scene for the song to shape, and the plate is
+  today's. `npm run pacing` holds both, and measures what following does to
+  the thing the footage says a show does: motion against loudness near 0 at
+  the beat and about 0.4 over twenty-second windows.
+*/
+
+/** What the song is doing, for the scene's light and pace: each 0..1, already scaled by Follow. */
+export interface SongMood {
+  /** How far through a build (the tracker's tension). */
+  tension: number;
+  /** 1 in a breakdown. */
+  breakdown: number;
+}
+export const NO_MOOD: Readonly<SongMood> = Object.freeze({ tension: 0, breakdown: 0 });
+
+/** What the sequencer hands a scene of the song each tick (from `songShape.ts`). */
+export interface SongCue {
+  /** Drops, builds and breakdowns heard since the last tick. */
+  events: readonly { kind: 'build' | 'drop' | 'breakdown'; strength: number }[];
+  section: 'quiet' | 'steady' | 'build' | 'breakdown';
+  tension: number;
+}
+
+/*
+  The cue, from what the tracker reports. The plate owns the tracker and keeps
+  its last sixteen events, each numbered; the sequencer asks four times a
+  second. So a tick takes the events numbered past the last one it was handed,
+  and of those only the ones heard in the last CUE_STALE seconds of the song:
+  a sequencer that was paused, or held in Design, does not ask, and the drop
+  it missed is history by the time it asks again, not a pour to throw now.
+  The number moves past a stale event too, so it is never handed over later.
+
+  Here rather than inline in App.tsx because the review found the check
+  building its own copy of the cue with neither filter: App's version could be
+  deleted and `npm run pacing` stayed green. Now the app and the check call
+  this one function, the check asserts both filters on it directly, and the
+  wiring grep holds the app to calling it.
+*/
+export const CUE_STALE = 1.5;
+
+/** What the plate reports of the song's shape (`songShape` on the visualizer's handle). */
+export interface SongReport {
+  now: Pick<SongShapeState, 'section' | 'tension' | 'time'>;
+  events: readonly (SongEvent & { seq: number })[];
+}
+
+/** The cue for this tick from the report, and the number of the last event now seen. */
+export function songCueFrom(report: SongReport | null | undefined, lastSeq: number): { cue: SongCue | null; seq: number } {
+  if (!report) return { cue: null, seq: lastSeq };
+  const events = report.events.filter(e => e.seq > lastSeq && report.now.time - e.at <= CUE_STALE);
+  const seq = report.events.reduce((m, e) => Math.max(m, e.seq), lastSeq);
+  return { cue: { events, section: report.now.section, tension: report.now.tension }, seq };
+}
+
+/*
+  The numbers. BUILD_WIND: a build at its top has the plate back to 0.7 of
+  the way from rest to today's pace, so the climb is seen and the drop's
+  swell is still the biggest thing in the scene (a planned swell's top is 1.8
+  at full Pacing, a drop's at full strength 0.2 + 1.6 × 1.5 = 2.6: the plate's
+  own step clamp keeps the solver where it was at 1.8).
+  BREAKDOWN_HUSH and _DIM: through a breakdown a swell's envelope is cut to a
+  fifth and the rest's light a further fifth down, which at full Pacing is the
+  light at 0.58 against a rest's 0.72, a settling rather than a fade. DROP_GAIN:
+  a drop of full strength goes half again over a planned swell's top.
+  HOLD_MAX: twenty-four seconds, which is sixteen bars at 160 bpm or a long
+  build at 128; past it the plan plays on. DROP_ATTACK/DECAY: a drop arrives
+  in 0.6 s, not the planned 1.5–3, because it is on a beat, and falls away
+  over 4–7 s like a planned one.
+*/
+const BUILD_WIND = 0.7;
+const BREAKDOWN_HUSH = 0.8;
+const BREAKDOWN_DIM = 0.2;
+const DROP_GAIN = 0.5;
+const HOLD_MAX = 24;
+const DROP_AFTER = 4;
+const DROP_ATTACK = 0.6;
+/** A held swell is moved on this far each tick: a little over the sequencer's quarter second, so it is never due. */
+const HOLD_STEP = 0.3;
 
 /*
   The numbers, and where each comes from.
@@ -158,7 +278,7 @@ export function planScene(
 ): ScenePlan {
   const p = clamp(pacing, 0, 1);
   const T = Math.max(1, seconds);
-  if (p <= 0.001) return { seconds: T, swells: [], fadeIn: 0, fadeOut: 0, drainAt: null };
+  if (p <= 0.001) return { seconds: T, swells: [], fadeIn: 0, fadeOut: 0, drainAt: null, opening: 'pour', gap: Infinity };
 
   const endDark = opts.pace?.endDark ?? p >= 0.5;
   const fadeOut = endDark ? clamp(T / 3, FADE_OUT[0], Math.min(FADE_OUT[1], T / 2)) : 0;
@@ -227,32 +347,38 @@ export function planScene(
     prev = kind;
     t += spacing * (0.6 + 0.8 * rand());
   }
-  return { seconds: T, swells, fadeIn, fadeOut, drainAt };
+  return { seconds: T, swells, fadeIn, fadeOut, drainAt, opening: kinds[0], gap };
 }
 
 /** How far into a swell's envelope `dt` seconds after it opened: up smoothly, down exponentially. */
 function envelope(s: Swell, dt: number): number {
   if (dt < 0) return 0;
-  if (dt < s.attack) return smooth(dt / s.attack);
-  return Math.exp(-(dt - s.attack) / s.decay);
+  const g = s.gain ?? 1;
+  if (dt < s.attack) { const f = s.from ?? 0; return f + (g - f) * smooth(dt / s.attack); }
+  return g * Math.exp(-(dt - s.attack) / s.decay);
 }
 
 /**
  * Where the scene is `t` seconds in, at Pacing `pacing` (read live, so a
  * stage that glides the dial glides the depth of its scene too).
  */
-export function sampleScene(plan: ScenePlan, t: number, pacing: number): PaceSample {
+export function sampleScene(plan: ScenePlan, t: number, pacing: number, mood: SongMood = NO_MOOD): PaceSample {
   const p = clamp(pacing, 0, 1);
   if (p <= 0.001) return { ...PACE_NEUTRAL };
   let env = 0;
   for (const s of plan.swells) env = Math.max(env, envelope(s, t - s.at));
+  // A breakdown lets the swells fall away sooner and holds the plate low.
+  env *= 1 - BREAKDOWN_HUSH * clamp(mood.breakdown, 0, 1);
 
   const rest = 1 - (1 - REST_AT_FULL) * p;
   const peak = 1 + PEAK_OVER * p;
   let activity = rest + (peak - rest) * env;
+  // A build winds the plate up toward today's pace as it climbs, and no
+  // further: the swell over today's pace is the drop's.
+  activity = Math.max(activity, rest + (1 - rest) * BUILD_WIND * clamp(mood.tension, 0, 1));
 
-  const restDim = 1 - (1 - REST_DIM_AT_FULL) * p;
-  let dim = restDim + (1 - restDim) * env;
+  const restDim = (1 - (1 - REST_DIM_AT_FULL) * p) * (1 - BREAKDOWN_DIM * clamp(mood.breakdown, 0, 1));
+  let dim = Math.min(1, restDim + (1 - restDim) * env);
 
   // Up out of black, and down into it, on smoothsteps: a crossfade's shape,
   // never a step, which is the "no hard cuts" row of the yardstick.
@@ -334,7 +460,7 @@ export function cursorAt(plan: ScenePlan, elapsed: number): SceneCursor {
 }
 
 /** One tick: the moments now due (in order) and the scene's sample. Moves `cur` on. */
-export function stepScene(plan: ScenePlan, cur: SceneCursor, elapsed: number, pacing: number): { sample: PaceSample; moments: PaceMoment[] } {
+export function stepScene(plan: ScenePlan, cur: SceneCursor, elapsed: number, pacing: number, mood: SongMood = NO_MOOD): { sample: PaceSample; moments: PaceMoment[] } {
   const moments: PaceMoment[] = [];
   if (pacing <= 0.001) { cur.lastElapsed = elapsed; return { sample: { ...PACE_NEUTRAL }, moments }; }
   if (elapsed + 0.01 < cur.lastElapsed) Object.assign(cur, cursorAt(plan, elapsed));
@@ -347,7 +473,7 @@ export function stepScene(plan: ScenePlan, cur: SceneCursor, elapsed: number, pa
     if (elapsed - plan.drainAt <= STALE_MOMENT) moments.push('drain');
   }
   cur.lastElapsed = elapsed;
-  return { sample: sampleScene(plan, elapsed, pacing), moments };
+  return { sample: sampleScene(plan, elapsed, pacing, mood), moments };
 }
 
 /*
@@ -410,14 +536,33 @@ export class ScenePlayer {
 
   /** Entering the stage, at the Pacing it is going to; `fromDark` when the light is down as it enters. */
   enter(pacing: number, fromDark: boolean): this {
+    this.holdFrom = null;
+    this.wound = 0;
+    this.droppedAt = null;
     this.plan = this.make(pacing, fromDark);
     this.cursor = freshCursor();
     this.planFrom = 0;
     return this;
   }
 
-  /** One tick, `elapsed` seconds into the stage, at the Pacing in force now. */
-  tick(elapsed: number, pacing: number): { sample: PaceSample; moments: PaceMoment[] } {
+  /** When the song began holding the swells back (a build or a breakdown), seconds into the plan in force. */
+  private holdFrom: number | null = null;
+  /** Drops that opened a swell, and drops let go (in a dark ending, or a breath after a swell): counted for `npm run pacing`. */
+  dropsOpened = 0;
+  dropsLetGo = 0;
+  /** How far the last build had wound the plate (its tension × Follow), carried into the drop's attack. */
+  private wound = 0;
+  /** When the last drop opened its swell, seconds into the plan in force. */
+  private droppedAt: number | null = null;
+
+  /**
+   * One tick, `elapsed` seconds into the stage, at the Pacing in force now.
+   * `song` is what the song's shape heard since the last tick, and `follow`
+   * how far the scene follows it (the Follow the Song setting): see
+   * "Following the song" above. With either missing or 0 this is the scene
+   * exactly as planned.
+   */
+  tick(elapsed: number, pacing: number, song: SongCue | null = null, follow = 0): { sample: PaceSample; moments: PaceMoment[] } {
     if (!this.plan && pacing > 0.001) {
       // Pacing came up mid-stage: plan from here, with nothing owed from before.
       this.plan = this.make(pacing, false);
@@ -437,6 +582,87 @@ export class ScenePlayer {
       this.cursor = freshCursor();
     }
     if (!this.plan) return { sample: { ...PACE_NEUTRAL }, moments: [] };
-    return stepScene(this.plan, this.cursor, elapsed - this.planFrom, pacing);
+    const local = elapsed - this.planFrom;
+    const f = clamp(follow, 0, 1);
+    let mood: SongMood = NO_MOOD;
+    if (song && f > 0.001 && pacing > 0.001) {
+      const holding = song.section === 'build' || song.section === 'breakdown';
+      if (!holding || (this.holdFrom !== null && local < this.holdFrom)) this.holdFrom = holding ? local : null;
+      else if (this.holdFrom === null) this.holdFrom = local;
+      if (holding && this.holdFrom !== null && local - this.holdFrom < HOLD_MAX) this.hold(local);
+      for (const e of song.events) if (e.kind === 'drop') this.drop(local, clamp(e.strength, 0, 1), f);
+      /*
+        The wind-up is carried into the drop. The tracker says "steady" on the
+        drop's own frame, and the drop's swell starts from nothing, so taken
+        as it stands the plate fell from the build's pace to the rest's for a
+        tick just as the pour landed: measured at Pacing 0.7 through a 16 s
+        build, 0.83 to 0.44 and back up to 1.07 a quarter second later, the
+        clock visibly slowing on the downbeat before it surged. So the build's
+        wind holds under the drop and gives way over its attack.
+      */
+      if (song.section === 'build') this.wound = clamp(song.tension, 0, 1) * f;
+      let tension = song.section === 'build' ? this.wound : 0;
+      if (this.droppedAt !== null && local - this.droppedAt < DROP_ATTACK) {
+        tension = Math.max(tension, this.wound * (1 - (local - this.droppedAt) / DROP_ATTACK));
+      } else if (song.section !== 'build') this.wound = 0;
+      mood = { tension, breakdown: song.section === 'breakdown' ? f : 0 };
+    } else { this.holdFrom = null; this.wound = 0; this.droppedAt = null; }
+    return stepScene(this.plan, this.cursor, local, pacing, mood);
+  }
+
+  /*
+    Three paths worth knowing. A breakdown running straight into a build is
+    one hold, so HOLD_MAX (24 s) can run out inside the build and a planned
+    swell fire before the drop; that is the cap doing its job on a long
+    stretch without a drop. A stage change starts the hold's count again, as
+    it starts a new plan. And a locate backwards within a stage replays the
+    plan as the song left it: its drops' swells where they were put, the
+    planned swells they replaced gone.
+
+    Hold the plan's next swell back while the song winds up or breaks down:
+    one due on this tick is moved on to the next, and any others due with it
+    are let go, so that when the hold ends one swell arrives and not a
+    pile-up. Past the scene's last moment for a swell (its dark ending), a
+    held swell is let go too.
+  */
+  private hold(local: number): void {
+    const plan = this.plan!;
+    const next = local + HOLD_STEP;
+    const lastAt = plan.seconds - plan.fadeOut - MARGIN;
+    let kept = false;
+    plan.swells = plan.swells.filter((sw, i) => {
+      if (i < this.cursor.nextSwell || sw.song || sw.at > next) return true;
+      if (kept || next > lastAt) return false;
+      kept = true;
+      sw.at = next;
+      return true;
+    });
+  }
+
+  /*
+    The drop: a swell now, with the stage's own opening move, and the planned
+    swell nearest after it taken out (a held one is always there, since a
+    hold keeps it one tick ahead). Let go in a dark ending, or a breath after
+    the last swell.
+  */
+  private drop(local: number, strength: number, f: number): void {
+    const plan = this.plan!;
+    if (plan.fadeOut > 0 && local >= plan.seconds - plan.fadeOut) { this.dropsLetGo++; this.wound = 0; return; }
+    const fired = plan.swells.slice(0, this.cursor.nextSwell);
+    const prev = fired.length ? fired[fired.length - 1] : null;
+    if (prev && local - prev.at < DROP_AFTER) { this.dropsLetGo++; this.wound = 0; return; }
+    const window = Number.isFinite(plan.gap) ? plan.gap * 0.6 : 0;
+    plan.swells = plan.swells.filter((sw, i) => i < this.cursor.nextSwell || sw.at > local + window);
+    // It rises from wherever the scene stands, not from nothing: a drop that
+    // lands while a planned swell is still falling away took the pace down
+    // with that swell for a tick before its own attack caught up.
+    let now = 0;
+    for (const sw of plan.swells) now = Math.max(now, envelope(sw, local - sw.at));
+    plan.swells.splice(this.cursor.nextSwell, 0, {
+      at: local, kind: plan.opening, attack: DROP_ATTACK, decay: 4 + 3 * strength, gain: 1 + DROP_GAIN * strength * f, song: true, from: now,
+    });
+    this.holdFrom = null;
+    this.droppedAt = local;
+    this.dropsOpened++;
   }
 }

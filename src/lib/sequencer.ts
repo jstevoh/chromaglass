@@ -110,6 +110,10 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   // How much a stage plays as a scene: swells, rests, a dark ending. A set can
   // open flat and grow into its shape, or a stage can hold still for a song.
   ['pacing', 0.05],
+  // How far a stage's scene follows the song's drops, builds and breakdowns:
+  // a set can hand its scenes to the song through a DJ's stretch and take
+  // them back for a band that plays without a drop in it.
+  ['songFollow', 0.05],
 ];
 
 /** The numeric fields a stage may glide; everything else switches at stage entry. */

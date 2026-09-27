@@ -5,6 +5,7 @@ import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
+import { songCueFrom } from './lib/scenePacing';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
@@ -690,6 +691,8 @@ export default function App() {
     needs to glance at it.
   */
   const [songLine, setSongLine] = useState('');
+  /** The last song-shape event the sequencer has been handed, by its number. */
+  const songCueSeqRef = useRef(0);
   useEffect(() => {
     const timer = setInterval(() => {
       const report = visualizerRef.current?.songShape();
@@ -2085,6 +2088,19 @@ export default function App() {
     // and the moments that open its swells, which are the same moves a song
     // show's actions make.
     pace: (sample) => { const v = visualizerRef.current; if (!v) return false; v.pace(sample); return true; },
+    songCue: () => {
+      /*
+        Only what is new since the last tick, and only what was heard in the
+        last second and a half of the song: a sequencer that was paused or held
+        in Design does not ask, and the drop it missed is history by the time
+        it asks again, not a pour to throw now. `songCueFrom` is the function
+        `npm run pacing` plays the songs through and checks both rules on, so
+        this is the cue it measured.
+      */
+      const { cue, seq } = songCueFrom(visualizerRef.current?.songShape(), songCueSeqRef.current);
+      songCueSeqRef.current = seq;
+      return cue;
+    },
     moment: (kind) => {
       const v = visualizerRef.current;
       switch (kind) {
@@ -4214,6 +4230,23 @@ export default function App() {
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
             songLine={audioSource === 'none' ? '' : songLine}
+            show={{
+              running: sequencer.status.running,
+              paused: !!sequencer.status.sequenceId && !sequencer.status.running,
+              name: sequencer.status.name,
+              // Scenes only when Pacing is up: a sequence that never sets it
+              // plays its stages as it always did, with no rests or dark.
+              scenes: (settings.pacing ?? 0) > 0,
+              // Stop what runs, resume what is paused, and otherwise start the
+              // paced night: a paused set is the performer's, not the tile's to replace.
+              onToggle: () => {
+                if (sequencer.status.running) sequencer.stop();
+                else if (sequencer.status.sequenceId) sequencer.play();
+                else sequencer.play('light-show-night');
+              },
+            }}
+            songFollow={settings.songFollow ?? 0}
+            onSongFollow={(v) => updateSettings({ songFollow: v })}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded }}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}

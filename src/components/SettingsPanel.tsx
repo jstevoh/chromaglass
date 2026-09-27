@@ -3103,6 +3103,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ pacing: v })}
           settingKey="pacing"
         />
+        {/*
+          Follow the Song lives under Pacing because it shapes Pacing's
+          scenes: the drops open the big swells, builds and breakdowns hold
+          them back (lib/scenePacing.ts). With Pacing at 0 there is no scene,
+          so it is dimmed there rather than hidden: the pair reads as one.
+        */}
+        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-50'}>
+          <Slider
+            label="Follow the Song"
+            value={settings.songFollow ?? 0}
+            min={0}
+            max={1.0}
+            step={0.05}
+            onChange={(v: number) => onUpdate({ songFollow: v })}
+            settingKey="songFollow"
+          />
+        </div>
       </section>
 
       {/* Mixer Section */}

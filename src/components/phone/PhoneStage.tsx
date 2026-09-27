@@ -3,7 +3,7 @@ import {
   Droplet, SprayCan, Paintbrush, FlaskConical, Slash, Wind, Hand, Fingerprint, Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Sparkles, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
-  Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical,
+  Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
 } from 'lucide-react';
 import { Slider } from '../ui';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -121,6 +121,24 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /*
+    The show from the phone: Light Show Night, the paced sequence played like
+    the filmed shows (lib/scenePacing.ts), started and stopped from a tile on
+    the Play sheet; and how far its scenes follow the song (Follow the Song,
+    lib/scenePacing.ts "Following the song"), beside the song's line on the
+    Sound sheet, where the thing it follows is named.
+  */
+  show: {
+    running: boolean;
+    /** A sequence is loaded and paused: the tile resumes it rather than replacing it. */
+    paused: boolean;
+    name: string | null;
+    /** The running sequence plays its stages as scenes (Pacing up), so the scene wording is true of it. */
+    scenes: boolean;
+    onToggle: () => void;
+  };
+  songFollow: number;
+  onSongFollow: (v: number) => void;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
     draw, at the phone's sizes, so the order and the grades are one thumb
@@ -533,6 +551,17 @@ export function PhoneStage(p: PhoneStageProps) {
               {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
             </p>
           )}
+          {p.audioSource !== 'none' && (
+            <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
+              <Slider label="Follow the song" value={p.songFollow} min={0} max={1} step={0.01} onChange={p.onSongFollow}
+                display={`${Math.round(p.songFollow * 100)}%`} touch testId="phone-song-follow" midiKey="setting:songFollow" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim" data-testid="phone-song-follow-says">
+                {p.show.running
+                  ? 'The show holds still through a build and throws its big move on the drop.'
+                  : 'Moves a light show with the song: start one from Play.'}
+              </p>
+            </div>
+          )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
@@ -544,10 +573,16 @@ export function PhoneStage(p: PhoneStageProps) {
         <PhoneSheet title="Play" onClose={close} testId="phone-sheet-play">
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Sparkles} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
+            <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
             )}
           </div>
+          {(p.show.running || p.show.paused) && (
+            <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
+              {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
+            </p>
+          )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}

@@ -245,7 +245,7 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
  */
 // Pacing is not a master, but like them the patch bay does not ride it:
 // see NOT_A_TARGET in sceneMap.ts.
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing']);
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow']);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
 
@@ -481,6 +481,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.
   { key: 'pacing',          label: 'Pacing',           min: 0, max: 1 },
+  // How far those scenes follow the song's builds and drops. A knob for the
+  // same reason: a DJ set wants the scenes on the drops, a band that plays
+  // through its changes may want them planned.
+  { key: 'songFollow',      label: 'Follow the Song',  min: 0, max: 1 },
   /*
     The mixer (lib/mixer.ts): each source's level and its four grade controls.
     Learnable because they are what a video mixer's channel strip is, and a

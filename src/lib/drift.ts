@@ -61,6 +61,8 @@ const CALIBRATION = new Set([
   // The set's shape, not the look's (lib/scenePacing.ts): a nudge across its
   // half would switch a sequence's dark endings on or off mid-set.
   'pacing',
+  // How the set follows the song, not what the look is (lib/scenePacing.ts).
+  'songFollow',
 ]);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',

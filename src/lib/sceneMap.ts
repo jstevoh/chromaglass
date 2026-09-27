@@ -57,7 +57,8 @@ import { PINNABLE, onStep } from './deskPins';
   sixty-hertz wobble across the half that turns on dark endings would move it
   under a plan made when the stage was entered.
 */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing']);
+// Follow the Song the same: the sequencer reads it from the app's settings.
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow']);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
   !String(s.key).startsWith('scene') && !NOT_A_TARGET.has(String(s.key)));
