@@ -1524,6 +1524,12 @@ freeze (#164) have shipped.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
 pick them up from `docs/roadmap.md` now that step 1 is in.
 
+**This file is too big to read whole** (about 150 KB, 38k tokens; 2026-09-27). Every
+session told to read it carried it in context for the rest of its life, and the
+shipped batches are most of it. CLAUDE.md now says to read one section. The fix is to
+move shipped batches to `docs/plan-shipped.md`, keeping a line each here, in a PR of its
+own when few branches are editing this file (every open branch touches it).
+
 ## Operating rules
 
 - A sandbox has no GPU worth the name, so a WebGPU fallback adapter classifies as

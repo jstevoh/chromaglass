@@ -4,9 +4,11 @@ A liquid light show: a WebGPU fluid solver (`src/gpu/`, shaders in `src/gpu/wgsl
 drawn as a projected plate, played from a Perform desk, built on a Design desk,
 driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 
-Read `docs/roadmap.md` (engine) and `PLAN.md` (the plate's running order) before
-starting anything that is not a bug fix. `docs/judging.md` lists what needs the
-owner's eyes on a real GPU.
+Before starting anything that is not a bug fix, read the part of `docs/roadmap.md`
+(engine) and `PLAN.md` (the plate's running order) that the work touches: `grep -n
+'^##' PLAN.md` for the map, then `sed -n` the section. Not the whole file: `PLAN.md`
+is about 38k tokens, and see "Keeping a session small" for why that matters.
+`docs/judging.md` lists what needs the owner's eyes on a real GPU.
 
 ## How work is done here
 
@@ -20,6 +22,23 @@ owner's eyes on a real GPU.
   obvious thing. Short code, long reasons.
 - **Commit messages** say what was wrong, what changed and what it measured.
   No model names in commits, PRs or code.
+
+## Keeping a session small
+
+A session sends its whole context again on every step, so what it read hours ago it
+pays for on every tool call since. Measured 2026-09-27 on the busiest threads: about
+70% of their usage was that re-reading, at 200–380k tokens of context each, and the
+weekly limit stood at 74% with five days left.
+
+- Read the section, not the file. Pipe long output (`npm run check`, a `git diff` of
+  `PLAN.md`, job logs) through `tail` or `grep FAIL`; a long log or a wide search
+  goes to a subagent that returns only the lines that matter.
+- Open the one picture the question needs, not every contact sheet a run wrote.
+- Waiting on CI, the PR subscription wakes the session when the suite completes. Set
+  one fallback check-in, not a chain of half-hourly ones: each wake re-reads the whole
+  context even when all it finds is "still running".
+- When a PR has merged and the next piece is unrelated, say so in the closing reply,
+  so it starts in a new thread instead of inheriting this one's context.
 
 ## What can be verified where
 
