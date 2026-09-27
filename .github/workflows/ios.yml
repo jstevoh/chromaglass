@@ -38,11 +38,12 @@ jobs:
           cache: npm
       - run: npm ci
       # The app asks for iOS 26 (the first with WebGPU in WKWebView), which
-      # needs Xcode 26's SDK. Take the newest Xcode 26 the image has, and say
-      # so plainly if it has none rather than failing inside xcodebuild.
+      # needs Xcode 26's SDK. Take the newest released Xcode 26 the image has
+      # (sort -V ranks a beta after its release, so betas are left out), and
+      # say so plainly if it has none rather than failing inside xcodebuild.
       - name: Xcode 26
         run: |
-          xc=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          xc=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
           if [ -z "$xc" ]; then echo "No Xcode 26 on this image:"; ls -d /Applications/Xcode*.app; exit 1; fi
           sudo xcode-select -s "$xc/Contents/Developer"
           xcodebuild -version

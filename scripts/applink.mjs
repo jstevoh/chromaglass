@@ -40,7 +40,7 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import { launchChromium } from './chromium.mjs';
 import { parseLaptopAddress, relaySocketUrl, remoteHref } from '../src/lib/appLink';
 import { detectTier } from '../src/lib/platform';
@@ -48,6 +48,8 @@ import { DEFAULT_SETTINGS } from '../src/types';
 
 const APP_PORT = Number(process.env.APPLINK_PORT ?? 4191);
 const RELAY_PORT = APP_PORT + 1;
+/** A host a crafted link might name as the relay. */
+const STRANGER_PORT = APP_PORT + 2;
 const KEY = '4321';
 const HEADED = process.argv.includes('--head');
 
@@ -206,7 +208,6 @@ await part('linked', async () => {
   const key = await page.getByTestId('laptop-key').inputValue();
   check('Change laptop opens the form with the last laptop filled in', addr === RELAY && key === KEY, `${addr} / ${key}`);
   await page.getByTestId('laptop-address').fill(PRINTED);
-  await page.getByTestId('laptop-key').fill('');
   await page.getByTestId('laptop-connect').tap();
   await page.waitForURL(/relay=/);
   const pasted = new URL(page.url());
@@ -225,16 +226,56 @@ await part('linked', async () => {
   await ctx.close();
 });
 
-// Wrong key, and the way out the message names.
+// The next show: the server picks a new key every start (unless SHOW_KEY
+// pins it), so the remembered one is refused. The message names the way
+// out, and pasting the new Phone line has to win over the remembered key.
 await part('wrong key', async () => {
   const { ctx, page } = await phone({ app: true });
-  await page.goto(`${APP}${remoteHref({ relay: RELAY, key: '0000' })}`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.evaluate((relay) => localStorage.setItem('chromaglass-laptop', JSON.stringify({ relay, key: '0000' })), RELAY);
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await until(page, () => visible(page, 'phone-stage'), 20_000);
+  await page.getByTestId('phone-open-more').tap();
+  await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
+  await page.getByTestId('phone-laptop-remote').tap();
+  await page.waitForURL(/relay=/, { timeout: 10_000 });
   const said = await until(page, () => page.getByText(/Wrong show key: tap Change laptop/).isVisible().catch(() => false));
-  check('a wrong key is refused, and says how to fix it', said);
+  check('last show\'s key is refused, and says how to fix it', said);
   check('and does not say Linked', !(await linked(page)));
   await page.getByTestId('app-change-laptop').tap();
   check('Change laptop there opens the form', await until(page, () => visible(page, 'laptop-link')));
+  check('with last show\'s key still in it', (await page.getByTestId('laptop-key').inputValue()) === '0000');
+  await page.getByTestId('laptop-address').fill(PRINTED);
+  check('pasting this show\'s Phone line puts its key in the key field', (await page.getByTestId('laptop-key').inputValue()) === KEY, await page.getByTestId('laptop-key').inputValue());
+  // Return on the phone's keyboard, not the button: the form submits.
+  await page.getByTestId('laptop-address').press('Enter');
+  await page.waitForURL(/relay=/, { timeout: 10_000 });
+  check('and Return connects with it', new URL(page.url()).searchParams.get('key') === KEY && (await until(page, () => linked(page))), new URL(page.url()).search);
   await ctx.close();
+});
+
+// A relay named in the address is followed by the app's remote and nothing
+// else. The laptop's display learns the show key from its own server and then
+// opens its socket; if it followed ?relay=, one crafted link opened on the
+// laptop would hand the key and the show to whatever host the link named.
+await part('only the app follows ?relay=', async () => {
+  const stranger = new WebSocketServer({ port: STRANGER_PORT });
+  const strangerHeard = [];
+  stranger.on('connection', (ws) => { strangerHeard.push('connected'); ws.on('message', (m) => strangerHeard.push(String(m).slice(0, 80))); });
+  try {
+    const bait = `relay=${encodeURIComponent(`http://127.0.0.1:${STRANGER_PORT}`)}`;
+    const { ctx, page, sockets } = await phone({ app: false });
+    await page.goto(`http://127.0.0.1:${RELAY_PORT}/?${bait}&dpr=0.35`, { waitUntil: 'load' });
+    const home = await until(page, async () => sockets.some((s) => s.startsWith(`ws://127.0.0.1:${RELAY_PORT}/`)), 15_000);
+    check('the laptop\'s display, sent a link naming another relay, opens its socket at home', home, sockets.join(', '));
+    await page.goto(`${PRINTED}&${bait}`, { waitUntil: 'load' });
+    check('a browser\'s remote with the same link still links at home', await until(page, () => linked(page)));
+    await page.waitForTimeout(1000);
+    check('and the named host heard nothing from either', strangerHeard.length === 0, strangerHeard.slice(0, 3).join(' | '));
+    await ctx.close();
+  } finally {
+    stranger.close();
+  }
 });
 
 // The website, unchanged.

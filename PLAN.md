@@ -1493,10 +1493,14 @@ forms and a 15 % cut.
    carries it as `?relay=` and connects there, since the app's own origin has
    no relay (`src/lib/appLink.ts`). Play here goes back to the plate. Only in
    the app: the website's https page cannot open a plain ws:// socket to a
-   laptop. `npm run applink` (Measure) checks it on a real relay with a
-   stand-in laptop and the page on another origin. ***Built***, not yet on a
+   laptop. Only the app's remote follows `?relay=`: review found that the
+   laptop's display followed it too, so a crafted link opened on the laptop
+   handed its show key and the show to any host it named; fixed before
+   merge. `npm run applink` (Measure) checks all of it on a real relay with a
+   stand-in laptop, the page on another origin and a stranger's host. ***Built***, not yet on a
    phone. Open: the iPad in the app gets the full layout, which has no Laptop
-   remote button yet; a QR code on the laptop that opens the app straight
+   remote button yet, and neither does a phone that took More › Full layout
+   (until the app is reopened); a QR code on the laptop that opens the app straight
    into its remote (a `chromaglass://` link) would save the typing.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*

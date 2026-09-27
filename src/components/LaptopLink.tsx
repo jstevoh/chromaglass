@@ -29,7 +29,8 @@ export function LaptopLinkForm() {
   };
 
   return (
-    <div
+    <form
+      onSubmit={(e) => { e.preventDefault(); connect(); }}
       className="min-h-screen bg-[#0a0a0a] px-5 text-white"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}
       data-testid="laptop-link"
@@ -45,13 +46,22 @@ export function LaptopLinkForm() {
       <input
         id="laptop-address"
         value={address}
-        onChange={(e) => { setAddress(e.target.value); setError(null); }}
+        onChange={(e) => {
+          // A pasted Phone line carries the key the server printed this time;
+          // it replaces the remembered one, which the server has since
+          // changed unless SHOW_KEY pins it (server/remote-server.js).
+          const text = e.target.value;
+          setAddress(text);
+          const pasted = parseLaptopAddress(text);
+          if (pasted?.key) setKey(pasted.key);
+          setError(null);
+        }}
         placeholder="http://192.168.1.20:3000/?remote=1&key=1234"
         inputMode="url"
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-3 font-mono text-[14px] text-white placeholder:text-white/25"
+        className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-3 font-mono text-[16px] text-white placeholder:text-white/25"
         data-testid="laptop-address"
       />
       <label className="mt-4 block text-[11px] font-bold uppercase tracking-[0.2em] text-white/60" htmlFor="laptop-key">Show key</label>
@@ -60,21 +70,23 @@ export function LaptopLinkForm() {
         value={key}
         onChange={(e) => { setKey(e.target.value); setError(null); }}
         placeholder="1234"
-        inputMode="numeric"
-        className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-3 font-mono text-[14px] text-white placeholder:text-white/25"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-3 font-mono text-[16px] text-white placeholder:text-white/25"
         data-testid="laptop-key"
       />
       {error && <p className="mt-3 text-[13px] text-red-300" data-testid="laptop-error">{error}</p>}
 
       <div className="mt-6 flex gap-3">
-        <button onClick={connect} className="flex-1 rounded-full bg-white px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-black" data-testid="laptop-connect">
+        <button type="submit" className="flex-1 rounded-full bg-white px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-black" data-testid="laptop-connect">
           Connect
         </button>
-        <button onClick={goPlay} className="flex items-center gap-2 rounded-full border border-white/20 px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-white/80" data-testid="app-play-here">
+        <button type="button" onClick={goPlay} className="flex items-center gap-2 rounded-full border border-white/20 px-4 py-3 text-[13px] font-bold uppercase tracking-widest text-white/80" data-testid="app-play-here">
           <Droplets size={15} /> Play here
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -86,10 +98,10 @@ export function LaptopLinkForm() {
 export function AppModeBar() {
   return (
     <div className="flex items-center justify-end gap-2 border-b border-white/10 px-5 py-2" data-testid="app-mode-bar">
-      <a href="/?remote=1" className="rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/60" data-testid="app-change-laptop">
+      <a href="/?remote=1" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60" data-testid="app-change-laptop">
         Change laptop
       </a>
-      <button onClick={goPlay} className="flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/90" data-testid="app-play-here">
+      <button onClick={goPlay} className="flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/90" data-testid="app-play-here">
         <Droplets size={12} /> Play here
       </button>
     </div>

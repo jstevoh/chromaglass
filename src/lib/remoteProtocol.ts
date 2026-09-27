@@ -15,7 +15,7 @@
 
 import type { VisualizerSettings } from '../types';
 import type { CastMessage } from './castProtocol';
-import { relayFromUrl, relaySocketUrl } from './appLink';
+import { isPhoneApp, relayFromUrl, relaySocketUrl } from './appLink';
 
 /** WebSocket path the relay listens on. */
 export const REMOTE_WS_PATH = '/remote-ws';
@@ -177,13 +177,20 @@ export type RemoteMessage =
   | { type: 'liquid'; id: string };
 
 /**
- * Build the ws:// URL for the relay: the one this page was pointed at with
- * `?relay=` (the iPhone app, whose own origin has no relay behind it; see
- * `lib/appLink.ts`), or else the page's own origin, which is the show server
- * that served it.
+ * Build the ws:// URL for the relay: the page's own origin, which is the show
+ * server that served it, or, for the iPhone app's remote only, the laptop the
+ * app was pointed at with `?relay=` (its own origin has no relay behind it;
+ * see `lib/appLink.ts`).
+ *
+ * Only that one case follows `?relay=`. The laptop's display and a network
+ * display learn the show key from their own origin and then open this
+ * socket, so if they followed a relay named in the address, one crafted link
+ * opened on the laptop would hand its key, and the show, to whatever host
+ * the link named (found in review, and checked by `npm run applink`). A
+ * controller outside the app has no reason to go anywhere but home either.
  */
-export function remoteSocketUrl(): string {
-  const relay = relayFromUrl();
+export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror'): string {
+  const relay = role === 'controller' && isPhoneApp() ? relayFromUrl() : null;
   if (relay) return relaySocketUrl(relay, REMOTE_WS_PATH);
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${window.location.host}${REMOTE_WS_PATH}`;
