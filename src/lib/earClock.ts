@@ -21,8 +21,9 @@
  *          while the window is visible nothing about how the show hears has
  *          changed, reading for reading.
  *   ask    the projector window asking the show for a frame. Taken only while
- *          the show's own frames have stopped, so the plate hears once per
- *          frame the wall draws, in step with it.
+ *          the show's own frames have stopped (see EAR_STALL_MS: at once when
+ *          the page says it is hidden, after a quarter second when it does
+ *          not), so the plate hears once per frame the wall draws.
  *   tick   a worker's timer, about sixty a second. Taken only while neither of
  *          the others is coming: the show hidden with no wall asking, which is
  *          still a show if a network display or the phone is drawing it, and
@@ -50,22 +51,25 @@
 export type EarDriver = 'frame' | 'ask' | 'tick';
 
 /**
- * How long the show's own frames may be missing before anything else reads:
- * three frames at 60 Hz, or one and a half of the window's own frame gap if
- * that is longer, up to a quarter of a second. Long enough that a frame late
- * by a long task does not hand the ear to the wall for one reading and back,
- * short enough that the wall's first frames after the show is covered are
- * already heard.
+ * How long the show's own frames may be missing before anything else reads.
  *
- * Relative, not a fixed 50 ms, because a visible window on a phone or a tired
- * laptop can draw at 15 fps, 67 ms apart: with a fixed stall the tick read
- * between every two frames there, which near doubled the readings and so the
- * speed of the per-reading smoothing on exactly the machines that could least
- * afford the extra renders (the pre-push review measured 55 readings where
- * there used to be 30).
+ * While the page says it is hidden (`document.hidden`: Chrome marks a window
+ * hidden when another covers it, as well as a background tab or a minimised
+ * window), three frames at 60 Hz: the frames are not coming back, so the
+ * wall's first frames after the show is covered are heard.
+ *
+ * While it says it is visible, a quarter of a second. A visible window's
+ * frames arrive, just not on time: a phone at 15 fps is 67 ms apart, and the
+ * Mac runner's app, busy, drew 28 a second with gaps well past 50 ms. A stall
+ * measured from the frames alone let the tick read between them there (11
+ * extra readings in two seconds on the runner; 55 where there used to be 30
+ * at 15 fps in the pre-push review), which speeds up the per-reading
+ * smoothing on the machines least able to afford the renders. A visible page
+ * whose frames have stopped for a quarter second (a window manager that stops
+ * them without saying so) still hears, a quarter second late.
  */
 export const EAR_STALL_MS = 50;
-export const EAR_STALL_MAX_MS = 250;
+export const EAR_STALL_VISIBLE_MS = 250;
 
 /**
  * Two readings from *different* drivers closer than this are one. It stops a
@@ -85,21 +89,16 @@ export class EarClock {
   /** When a reading was last taken, by anyone, and by whom. */
   lastRead = -Infinity;
   private lastDriver: EarDriver | null = null;
-  /** The window's own last frame-to-frame gap, ms (0 until two frames have come). */
-  private frameGap = 0;
   /** Readings taken, by who offered them. For the check and `?debug`. */
   readonly reads: Record<EarDriver, number> = { frame: 0, ask: 0, tick: 0 };
 
-  /** Whether the reading `driver` offers at `now` (ms) should be taken; counts it if so. */
-  offer(driver: EarDriver, now: number): boolean {
-    if (driver === 'frame') {
-      // A gap over a second is the window coming back from being covered, not
-      // its frame rate.
-      const gap = now - this.offered.frame;
-      if (gap > 0 && gap < 1000) this.frameGap = gap;
-    }
+  /**
+   * Whether the reading `driver` offers at `now` (ms) should be taken; counts
+   * it if so. `hidden` is the page's `document.hidden` at the time.
+   */
+  offer(driver: EarDriver, now: number, hidden = false): boolean {
     this.offered[driver] = now;
-    const stall = this.stallMs();
+    const stall = hidden ? EAR_STALL_MS : EAR_STALL_VISIBLE_MS;
     let take: boolean;
     if (driver === 'frame') take = true;
     else if (driver === 'ask') take = now - this.offered.frame > stall;
@@ -111,14 +110,6 @@ export class EarClock {
       this.lastDriver = driver;
     }
     return take;
-  }
-
-  /** How long the frames may be missing before the others read, at the frame rate last seen. */
-  stallMs(): number {
-    // One frame seen and no rate yet: the longest wait, so the first gap of a
-    // slow window is not read into (no frames at all never waits: see offer).
-    if (this.frameGap === 0) return EAR_STALL_MAX_MS;
-    return Math.min(EAR_STALL_MAX_MS, Math.max(EAR_STALL_MS, 1.5 * this.frameGap));
   }
 
   /** Whether nothing has been heard for `EAR_DEAF_MS` at `now`. */

@@ -213,7 +213,7 @@ export function useAudioAnalyzer(
         if (ear.offer('frame', performance.now())) update();
         animationFrameRef.current = requestAnimationFrame(frame);
       };
-      onWallAsk((now) => { if (earRef.current === ear && ear.offer('ask', now)) update(); });
+      onWallAsk((now) => { if (earRef.current === ear && ear.offer('ask', now, document.hidden)) update(); });
       try {
         const url = URL.createObjectURL(new Blob([TICK_WORKER], { type: 'text/javascript' }));
         const ticker = new Worker(url);
@@ -221,7 +221,7 @@ export function useAudioAnalyzer(
         ticker.onmessage = () => {
           if (earRef.current !== ear) return;
           const now = performance.now();
-          if (ear.offer('tick', now)) update();
+          if (ear.offer('tick', now, document.hidden)) update();
         };
         ticker.postMessage(TICK_MS);
         tickerRef.current = ticker;

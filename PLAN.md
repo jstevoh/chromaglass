@@ -1512,11 +1512,14 @@ been read for half a second; the desk's sound line then starts "not hearing" and
 phone's Sound dot turns amber with a line in its sheet. A suspended context is asked
 back on its `statechange` and on the next touch or key (Chrome starts one suspended
 on a page nobody has touched; iOS interrupts one for a call). Whether a finger's
-lift wakes it on the iPhone is not yet tried. The stall before the wall or the tick
-may read is one and a half of the window's own frame gap (50–250 ms), so a visible
-window at 15 fps or 240 Hz reads exactly its frames, as before.
+lift wakes it on the iPhone is not yet tried. The wall and the tick read 50 ms after the
+frames stop while the page says it is hidden (Chrome says so of a covered window),
+and only after a quarter second while it says it is visible, so a visible window at
+15 fps, 240 Hz or with ragged frames reads exactly its frames, as before. (A stall
+measured from the frames alone went red on the Mac runner's first run: its busy app
+drew 28 frames a second, and the tick read between them.)
 
-`npm run ears` (19 checks, no GPU needed; on the Mac's `open` shard) measures it. A
+`npm run ears` (21 checks, no GPU needed; on the Mac's `open` shard) measures it. A
 headless window is never hidden, so it withholds the show's animation frames itself.
 Covered, with the wall asking: 38 distinct levels in two seconds, one reading per
 frame asked for (120 over 121); with no wall, 38 on the tick; the control on the
@@ -1634,6 +1637,11 @@ the plate reads the sound one frame late. A MIDI CC goes through an animation fr
 avoids exactly this elsewhere ("a re-render of the whole shell sixty times a
 second"). On a weaker laptop that is dropped frames and garbage-collection hitches on
 top of the solver.
+
+Measured since, by `npm run ears` on the Mac runner (2026-09-27): with the show
+window covered and nothing else drawing, the ear's 16 ms tick read 15 times a
+second, not 60 (inferred: each reading re-renders `App`, and the main thread could
+not take more); the visible app drew 28 frames a second in the same run.
 
 *Fix:* the frame loop reads the analyser and the ride's shadow itself; React keeps
 the meters, at about ten updates a second, with the arrays reused. *Measure:* count

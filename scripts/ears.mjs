@@ -83,7 +83,9 @@ const check = (name, ok, detail = '') => {
   add('frame', 3000, 4000, 1000 / 60, 0.5);   // uncovered again, the wall gone
   events.sort((a, b) => a.t - b.t);
   const taken = { frame: [], ask: [], tick: [] };
-  for (const e of events) if (ear.offer(e.driver, e.t)) taken[e.driver].push(e.t);
+  // Covered from 1000 to 3000: the page says hidden, as Chrome's does.
+  const hidden = (t) => t >= 1000 && t < 3000;
+  for (const e of events) if (ear.offer(e.driver, e.t, hidden(e.t))) taken[e.driver].push(e.t);
   const within = (arr, a, b) => arr.filter(t => t >= a && t < b).length;
   const frames1 = events.filter(e => e.driver === 'frame' && e.t < 1000).length;
   check('visible, every frame reads and nothing else does',
@@ -121,42 +123,59 @@ const check = (name, ok, detail = '') => {
 */
 {
   const ear = new EarClock();
-  for (let t = 0; t < 500; t += 1000 / 60) ear.offer('ask', t);
+  for (let t = 0; t < 500; t += 1000 / 60) ear.offer('ask', t, true);
   const lastAsk = ear.lastRead;
-  const tookFrame = ear.offer('frame', lastAsk + 1.5);
-  const nextFrame = ear.offer('frame', lastAsk + 1.5 + 1000 / 60);
+  const tookFrame = ear.offer('frame', lastAsk + 1.5, false);
+  const nextFrame = ear.offer('frame', lastAsk + 1.5 + 1000 / 60, false);
   check('an ask and a frame 1.5 ms apart are one reading, and the next frame reads',
     !tookFrame && nextFrame, `the frame 1.5 ms after the ask ${tookFrame ? 'read too' : 'did not read'}; the one after ${nextFrame ? 'did' : 'did not'}`);
 }
 
 /*
-  A visible window hears exactly as it did, whatever its frame rate. Slow: a
-  phone or a tired laptop at 15 fps, frames 67 ms apart, with the tick running
-  all along; a fixed 50 ms stall let the tick read between every two frames
-  (the pre-push review: 55 readings where there used to be 30). Fast: 240 Hz,
-  4.2 ms apart with half a millisecond of jitter; a gap applied to every
-  reading dropped three frames in ten. Both are changes to the per-reading
-  smoothing, so the look, on the machines that differ most from the Mac.
+  A visible window hears exactly as it did, whatever its frames do. Slow: a
+  phone or a tired laptop at 15 fps, 67 ms apart. Ragged: the Mac runner's
+  app drew 28 a second with gaps well past 50 ms, and a stall measured from
+  the frames let the tick read between them (11 extra readings in two
+  seconds; this check's first run on the Mac). Fast: 240 Hz, 4.2 ms apart
+  with half a millisecond of jitter, where a gap on every reading dropped
+  three frames in ten. Each is a change to the per-reading smoothing, so to
+  the look, on the machines least like the one it was tuned on.
 */
 {
-  const run = (fps, jitter) => {
+  const run = (gapMs) => {
     const ear = new EarClock();
     const events = [];
     let seed = 7;
     const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    for (let t = 0; t < 2000; t += 1000 / fps) events.push({ driver: 'frame', t: t + (rand() - 0.5) * 2 * jitter });
+    for (let t = 0; t < 2000; t += gapMs(rand)) events.push({ driver: 'frame', t });
     for (let t = 3.1; t < 2000; t += 16) events.push({ driver: 'tick', t });
+    for (let t = 7.3; t < 2000; t += 1000 / 60) events.push({ driver: 'ask', t });
     events.sort((a, b) => a.t - b.t);
-    const took = { frame: 0, tick: 0 };
-    for (const e of events) if (ear.offer(e.driver, e.t)) took[e.driver]++;
+    const took = { frame: 0, tick: 0, ask: 0 };
+    for (const e of events) if (ear.offer(e.driver, e.t, false)) took[e.driver]++;
     return { offered: events.filter(e => e.driver === 'frame').length, ...took };
   };
-  const slow = run(15, 0);
-  check('visible at 15 fps, every frame reads and the tick never does',
-    slow.frame === slow.offered && slow.tick === 0, `${slow.frame} of ${slow.offered} frames, ${slow.tick} ticks`);
-  const fast = run(240, 0.5);
-  check('visible at 240 Hz with jitter, every frame reads',
-    fast.frame === fast.offered && fast.tick === 0, `${fast.frame} of ${fast.offered} frames, ${fast.tick} ticks`);
+  const cases = [
+    ['at 15 fps', () => 1000 / 15],
+    ['ragged, 20 to 200 ms apart', (r) => 20 + 180 * r()],
+    ['at 240 Hz with jitter', (r) => 1000 / 240 + (r() - 0.5)],
+  ];
+  for (const [name, gap] of cases) {
+    const r = run(gap);
+    check(`visible ${name}, with the wall asking and the tick running, every frame reads and nothing else`,
+      r.frame === r.offered && r.tick === 0 && r.ask === 0, `${r.frame} of ${r.offered} frames, ${r.ask} asks, ${r.tick} ticks`);
+  }
+  /*
+    And a visible page whose frames have simply stopped, as a window manager
+    can do to a covered window without the page being told it is hidden: it
+    still hears, a quarter of a second late.
+  */
+  const ear = new EarClock();
+  for (let t = 0; t < 500; t += 1000 / 60) ear.offer('frame', t, false);
+  let firstTick = null;
+  for (let t = 503; t < 1500; t += 16) if (ear.offer('tick', t, false) && firstTick === null) firstTick = t;
+  check('visible but its frames stopped, the tick reads within a third of a second',
+    firstTick !== null && firstTick - 500 <= 330, `${firstTick === null ? 'never' : `${(firstTick - 500).toFixed(0)} ms`} after the last frame`);
 }
 
 // ── The app ────────────────────────────────────────────────────────────
@@ -196,6 +215,10 @@ try {
     const held = new Map();
     let nextId = 1e9;
     window.__covered = false;
+    // And the page says what a covered one says: hidden. Chrome marks a window
+    // another covers as hidden; the ear listens to that (lib/earClock.ts).
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__covered });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (window.__covered ? 'hidden' : 'visible') });
     window.requestAnimationFrame = (cb) => {
       if (!window.__covered) return raf(cb);
       const id = nextId++;
@@ -241,11 +264,20 @@ try {
     return { lv, d: delta(a, b), drawn: fb - fa, ear: b };
   };
 
+  /*
+    How many readings make "hearing": more than ten a second. Not sixty: on the
+    Mac runner the app is busy, and every reading re-renders the whole of App
+    (PLAN.md §14f), so its own frames came 28 a second and the tick's readings
+    15 a second on the first run there, against 60 in a cloud session with no
+    plate. The claim is that the readings keep coming and the level keeps
+    moving, not how fast this machine can take them; the level's own count
+    (ten distinct in two seconds) is what says the band is being heard.
+  */
   // Let the band start and the room calibrate.
   await page.waitForTimeout(4000);
   const v1 = await watch(2000);
   check('visible, the band is heard on the frames alone',
-    v1.lv.size >= 10 && v1.d.frame > 40 && v1.d.ask === 0 && v1.d.tick === 0,
+    v1.lv.size >= 10 && v1.d.frame > 20 && v1.d.ask === 0 && v1.d.tick === 0,
     `${v1.lv.size} distinct levels in 2 s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick; context ${v1.ear.state}`);
 
   /*
@@ -269,7 +301,7 @@ try {
   await page.waitForTimeout(300);
   const v2 = await watch(2000);
   check('visible with the wall asking too, still only the frames read',
-    v2.d.frame > 40 && v2.d.ask === 0 && v2.d.tick === 0,
+    v2.d.frame > 20 && v2.d.ask === 0 && v2.d.tick === 0,
     `readings ${v2.d.frame} frame, ${v2.d.ask} ask, ${v2.d.tick} tick`);
 
   // Covered, the wall still asking.
@@ -285,7 +317,7 @@ try {
     is an ask the ear missed.
   */
   check('and it hears on the wall\'s asks, one a frame, not on its own frames or the tick',
-    v3.d.ask > 40 && v3.d.frame === 0 && v3.d.tick === 0 && Math.abs(v3.d.ask - v3.drawn) <= 2,
+    v3.d.ask > 20 && v3.d.frame === 0 && v3.d.tick === 0 && Math.abs(v3.d.ask - v3.drawn) <= 2,
     `readings ${v3.d.ask} ask, ${v3.d.frame} frame, ${v3.d.tick} tick, over ${v3.drawn} frames asked for`);
   await wall.close();
 
@@ -293,7 +325,7 @@ try {
   await page.waitForTimeout(300);
   const v4 = await watch(2000);
   check('covered with no wall, the worker\'s tick keeps the ear going',
-    v4.lv.size >= 10 && v4.d.tick > 40 && v4.d.ask === 0 && v4.d.frame === 0,
+    v4.lv.size >= 10 && v4.d.tick > 20 && v4.d.ask === 0 && v4.d.frame === 0,
     `${v4.lv.size} distinct levels in 2 s; readings ${v4.d.tick} tick, ${v4.d.ask} ask, ${v4.d.frame} frame`);
 
   /*
@@ -324,7 +356,7 @@ try {
   await page.waitForTimeout(300);
   const v5 = await watch(2000);
   check('uncovered, the frames read again and the tick stands back',
-    v5.d.frame > 40 && v5.d.tick === 0 && v5.d.ask === 0, `readings ${v5.d.frame} frame, ${v5.d.ask} ask, ${v5.d.tick} tick`);
+    v5.d.frame > 20 && v5.d.tick === 0 && v5.d.ask === 0, `readings ${v5.d.frame} frame, ${v5.d.ask} ask, ${v5.d.tick} tick`);
 
   // Deaf: the context suspended.
   const line = () => page.evaluate(() => document.body.innerText.includes('not hearing'));
