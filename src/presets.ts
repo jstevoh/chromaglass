@@ -2016,6 +2016,11 @@ export const PRESETS: Preset[] = [
       // The black pushes the colour aside and packs it along its edges, as in
       // Colored I and II (npm run ferrodye): full, because it is the look.
       phaseDisplace: 1,
+      // Poured over the whole plate (PRESET_PHASE_POUR, npm run ferropour),
+      // the maze fills it, and this is how fine it fills it: Ferro Maze's
+      // value, for the same reasons (npm run maze measures it; on the
+      // hosted 512² it is still above the twelve-cell floor).
+      mazeDetail: 0.5,
       beatSqueeze: 0.4,
       lampHotspot: 0.3,
       secondLamp: 0.2,
