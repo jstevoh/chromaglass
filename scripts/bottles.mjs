@@ -137,12 +137,14 @@ try {
     const f = window.chromaglassDebug().fluids[0];
     const g = f?.gpu;
     if (!g) return false;
-    window.__bottleLog ??= { phase: [], oil: [], dye: [], push: [], vy: 0, vabs: 0 };
+    window.__bottleLog ??= { phase: [], oil: [], dye: [], push: [], press: [], squeeze: 0, vy: 0, vabs: 0 };
     const L = f.size;
     if (!f.__bottleSpied) {
       f.__bottleSpied = true;
       const addDensity = f.addDensity.bind(f);
       f.addDensity = (x, y, amount, ...rest) => { window.__bottleLog.dye.push({ x: x / L, y: y / L, a: Math.max(0, amount) }); return addDensity(x, y, amount, ...rest); };
+      const squeezeOut = f.squeezeOut.bind(f);
+      f.squeezeOut = (...a) => { window.__bottleLog.squeeze++; return squeezeOut(...a); };
       const addVelocity = f.addVelocity.bind(f);
       f.addVelocity = (x, y, vx, vy) => {
         const l = window.__bottleLog; const v = Math.hypot(vx, vy);
@@ -157,6 +159,8 @@ try {
       g.addPhase = (x, y, r, a) => { window.__bottleLog.phase.push({ x, y, a }); return addPhase(x, y, r, a); };
       const addMix = g.addMix.bind(g);
       g.addMix = (x, y, r, what) => { if ((what?.oil ?? 0) > 0) window.__bottleLog.oil.push({ x, y, a: what.oil }); return addMix(x, y, r, what); };
+      const pressMix = g.pressMix.bind(g);
+      g.pressMix = (x, y, r, outer, take) => { window.__bottleLog.press.push({ x, y, r, outer, a: take }); return pressMix(x, y, r, outer, take); };
     }
     window.__soapNear = (pts, rad) => {
       const s = window.chromaglassDebug().fluids[0].liquid.soap; let t = 0;
@@ -174,7 +178,7 @@ try {
   };
   const reset = async () => {
     await install();
-    await page.evaluate(() => { const l = window.__bottleLog; l.phase = []; l.oil = []; l.dye = []; l.push = []; l.vy = 0; l.vabs = 0; });
+    await page.evaluate(() => { const l = window.__bottleLog; l.phase = []; l.oil = []; l.dye = []; l.push = []; l.press = []; l.squeeze = 0; l.vy = 0; l.vabs = 0; });
   };
 
   /*
@@ -345,6 +349,97 @@ try {
   check('a replayed Pour pushes out from where it lands, not down the plate',
     push.vabs > 0 && Math.abs(push.vy) < 0.1 * push.vabs,
     `net push down the plate ${push.vy.toFixed(2)} of ${push.vabs.toFixed(2)} in all`);
+
+  /*
+    The Press moves the oil with its colour (PLAN 15d). Its move is squeezeOut,
+    once a dye reading while the palm is down; the oil's half is pressMix,
+    through pressOil (src/lib/pressRing.ts), which `npm run pressoil` measures
+    on the solver with the app's own arguments, the colour's half beside it.
+    What only the app can show is that the Press reaches it and moves oil:
+
+      - on a cleared plate, a clear oil body laid where the palm will be (no
+        colour, the case the oil's own once-a-reading gate is for), held with
+        the mouse: the oil under the palm falls, the ring round it gains, the
+        total holds; the calls land under the palm, at the app's palm (30
+        cells at 128, 0.234 of the plate), never at its mirror, and no more
+        often than the dye mirror was read, plus one;
+      - eight presses replayed through performGesture in one go, with no
+        reading between them: exactly one reaches the oil;
+      - with Oil Bodies off, the Press still presses (squeezeOut runs) and
+        never touches the oil.
+
+    Whether the Press still clears the dye into a ring is `npm run tools`.
+  */
+  const oilAt = (at) => page.evaluate(async ({ at }) => {
+    const r = await window.chromaglassDebug().fluids[0].gpu.readChemistry('mix');
+    if (!r) return null;
+    const n = Math.round(Math.sqrt(r.data.length / 4)), R = 30 / 128;
+    let palm = 0, ring = 0, all = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const v = r.data[(x + y * n) * 4], d = Math.hypot((x + 0.5) / n - at[0], (y + 0.5) / n - at[1]);
+      all += v; if (d < 0.8 * R) palm += v; else if (d > R && d < 1.7 * R) ring += v;
+    }
+    return { palm, ring, all };
+  }, { at });
+  const hold = async (on) => {
+    const v = on ? 1 : 0;
+    await page.evaluate((v) => window.chromaglassSettings({ oilBodies: v }), v);
+    // The setting reaches the plate a render and a step later: wait until the plate holds it.
+    for (let k = 0; k < 40 && (await page.evaluate(() => window.chromaglassDebug().fluids[0].lastSettings?.oilBodies)) !== v; k++) await settle(50);
+    const holds = await page.evaluate(() => window.chromaglassDebug().fluids[0].lastSettings?.oilBodies);
+    await clear();
+    await pickTool('press');
+    await page.mouse.move(...screen(...AT));
+    await settle(200);
+    const at = await page.evaluate(() => { const p = window.chromaglassDebug().pointer(); return [p.x / p.grid, p.y / p.grid]; });
+    // A clear body under where the palm will go, smaller than the palm, so its ring is water.
+    await page.evaluate((a) => window.chromaglassDebug().fluids[0].gpu.addMix(a[0], a[1], 0.18, { oil: 1 }), at);
+    await settle(300);
+    await reset();
+    const before = await oilAt(at);
+    const read0 = await page.evaluate(() => window.chromaglassDebug().fluids[0].gpu.rbDyeLanded);
+    await page.mouse.down();
+    await settle(1500);
+    await page.mouse.up();
+    const read1 = await page.evaluate(() => window.chromaglassDebug().fluids[0].gpu.rbDyeLanded);
+    await settle(200);
+    const after = await oilAt(at);
+    const byMouse = await page.evaluate(() => window.__bottleLog.press.length);
+    const squeezed = await page.evaluate(() => window.__bottleLog.squeeze);
+    // Until the plate is ready to move again (its mirror current, the oil's gate open), then all eight at once.
+    for (let k = 0; k < 40; k++) {
+      const ready = await page.evaluate(() => { const f = window.chromaglassDebug().fluids[0]; return f.dyeMirrorCurrent() && f.gpu.rbDyeLanded >= f.oilPressAfter; });
+      if (ready) break;
+      await settle(50);
+    }
+    await page.evaluate((a) => { for (let k = 0; k < 8; k++) window.chromaglassDebug().gesture({ tool: 'press', x: a[0], y: a[1], layer: 0 }); }, AT);
+    await settle(300);
+    const calls = await page.evaluate(({ at, AT, byMouse }) => {
+      const l = window.__bottleLog.press;
+      const near = (c, p) => Math.hypot(c.x - p[0], c.y - p[1]) < 0.03;
+      const mouse = l.slice(0, byMouse), replay = l.slice(byMouse);
+      const mirror = mouse.filter((c) => near(c, [1 - at[0], 1 - at[1]])).length + replay.filter((c) => near(c, [1 - AT[0], 1 - AT[1]])).length;
+      const placed = mouse.filter((c) => near(c, at)).length + replay.filter((c) => near(c, AT)).length;
+      const palm = mouse.length ? Math.max(...mouse.map((c) => Math.abs(c.r / (30 / 128) - 1))) : 1;
+      return { n: l.length, mouse: mouse.length, replay: replay.length, placed, mirror, palm,
+        same: window.chromaglassDebug().fluids[0].gpu === window.__bottleGpu };
+    }, { at, AT, byMouse });
+    return { ...calls, holds, squeezed, readings: read1 - read0, before, after };
+  };
+  await bottle('oil');
+  const pOn = await hold(true);
+  const pOff = await hold(false);
+  const b = pOn.before, a = pOn.after;
+  console.log(`     Press, Oil Bodies on: ${pOn.mouse} oil presses held over ${pOn.readings} readings and ${pOn.replay} of 8 replayed, ${pOn.placed} of ${pOn.n} under the palm, ${pOn.mirror} at its mirror; oil under the palm ${b?.palm.toFixed(1)} → ${a?.palm.toFixed(1)}, ring ${b?.ring.toFixed(1)} → ${a?.ring.toFixed(1)}, all ${b?.all.toFixed(1)} → ${a?.all.toFixed(1)}; off: ${pOff.n} oil presses in ${pOff.squeezed} presses`);
+  check('the Press moves the oil with Oil Bodies on: out from under the palm onto the ring, and keeps it',
+    pOn.same && pOn.holds === 1 && b && a && b.palm > 10 && a.palm < 0.7 * b.palm && a.ring - b.ring > 0.5 * (b.palm - a.palm) && Math.abs(a.all / b.all - 1) < 0.05,
+    b && a ? `under the palm ${b.palm.toFixed(1)} → ${a.palm.toFixed(1)}, ring ${b.ring.toFixed(1)} → ${a.ring.toFixed(1)}, all ${b.all.toFixed(1)} → ${a.all.toFixed(1)}${same(pOn)}` : 'no oil read back');
+  check('where the hand is, at the app\'s palm, never at its mirror, once a reading',
+    pOn.mouse >= 3 && pOn.mouse <= pOn.readings + 1 && pOn.placed === pOn.n && pOn.mirror === 0 && pOn.palm < 0.02,
+    `${pOn.mouse} held over ${pOn.readings} readings, ${pOn.placed} of ${pOn.n} under the palm, ${pOn.mirror} at the mirror, palm off 0.234 by ${(100 * pOn.palm).toFixed(1)}%`);
+  check('and eight replayed presses with no reading between them move it once', pOn.replay === 1, `${pOn.replay} of 8`);
+  check('and not at all with Oil Bodies off, while the Press still presses', pOff.same && pOff.holds === 0 && pOff.squeezed >= 3 && pOff.n === 0,
+    `${pOff.n} oil presses in ${pOff.squeezed} presses, the plate holding Oil Bodies at ${pOff.holds}${same(pOff)}`);
 } finally {
   await browser.close();
   stop();

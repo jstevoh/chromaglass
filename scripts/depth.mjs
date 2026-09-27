@@ -128,7 +128,24 @@ try {
 
   // A plate that is not being poured on or evolved, so what moves is the flow
   // already there and not the next drop landing.
-  const set = (o) => page.evaluate((s) => Object.assign(window.chromaglassDebug().settings, s), o);
+  /*
+    Through the app's own setter, as every other harness does, not by
+    writing into the object the debug hook hands back.
+
+    That object is a snapshot of React's state. Writing into it reaches the
+    solver only until the next thing that sets the settings (the
+    automation's tick among them), which builds its settings from React's
+    state, where none of this is, and throws it away. #158 (never merged,
+    folded in with PLAN 15d) put a run of 0.0300 at the centre and the rim
+    down to that. The wait below would now fail on it, saying the plate
+    never stepped with the curve, rather than read a flat plate; this takes
+    away that way for the curve to be lost at all. No fallback: a build
+    without the setter fails here, not later as a flat dome.
+  */
+  const set = (o) => page.evaluate((s) => {
+    if (typeof window.chromaglassSettings !== 'function') throw new Error('window.chromaglassSettings is missing: the app has no settings hook to set the curve through');
+    window.chromaglassSettings(s);
+  }, o);
 
   /*
     Wait for the plate to have *stepped* with a shape, not for a clock.

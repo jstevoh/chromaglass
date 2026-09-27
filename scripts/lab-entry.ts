@@ -12,6 +12,7 @@ import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
 import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
+import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -184,6 +185,15 @@ const api = {
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
+  /** The oil's half of a press, through the app's own function (squeezeOut): mirror cells, N across. */
+  pressOil(cx: number, cy: number, R: number, N: number, take: number) { pressOil(lab!.solver, cx, cy, R, N, take); },
+  pressRing: PRESS_RING,
+  /** The dye's half of a press, as squeezeOut runs it on a mirror (rgba, N x N): what it takes and where it lands. */
+  pressDye(dye: number[], N: number, cx: number, cy: number, R: number, take: number) {
+    const out = { mul: new Float32Array(N * N).fill(1), density: new Float32Array(N * N), densityR: new Float32Array(N * N), densityG: new Float32Array(N * N), densityB: new Float32Array(N * N) };
+    const moved = pressDye(dye, N, cx, cy, R, take, out);
+    return { moved, mul: Array.from(out.mul), density: Array.from(out.density) };
+  },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
