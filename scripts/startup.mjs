@@ -272,10 +272,13 @@ async function open(query, looks) {
         so the wait is on the GPU. Writing every texel of the show's 75.8 MB
         of fields on a bare page stopped nothing (0.08 s, run 36304683847),
         nor did clearing them, nor a first dispatch of every kernel on
-        scraps. So which of the first steps' submits the GPU takes the second
-        over is the next thing to see: each submit's time handed over, its
-        time done (onSubmittedWorkDone after it), and the pipelines it ran
-        with their workgroup counts.
+        scraps. So this records each submit's time handed over, its time
+        done (onSubmittedWorkDone after it), and the pipelines it ran with
+        their workgroup counts. It named the stop on its first run (run
+        36305436208): 1.42 s of GPU time on the plate's first draw, 0.03 s
+        on the same draw a few frames later. The render pipelines built
+        ahead now draw once before the show opens (`gpu/kit.ts`, firstDraw),
+        and the same submit took 0.14 s (run 36306162647).
       */
       const subs = [];
       window.__startupSubs = subs;
@@ -328,14 +331,6 @@ async function open(query, looks) {
         proto[key] = function (...a) { try { bytes.push([performance.now(), kind, size(...a)]); } catch { /* measure only */ } return f.apply(this, a); };
       };
       log(GPUDevice.prototype, 'createTexture', 'texture', (d) => texBytes(d));
-      // What each texture was, so a bare page can make the same (see replay).
-      const made = [];
-      window.__startupMade = made;
-      const ct = GPUDevice.prototype.createTexture;
-      GPUDevice.prototype.createTexture = function (d) {
-        try { made.push([performance.now(), { size: Array.isArray(d.size) ? [...d.size] : { ...d.size }, format: d.format, usage: d.usage, dimension: d.dimension, mipLevelCount: d.mipLevelCount }]); } catch { /* measure only */ }
-        return ct.call(this, d);
-      };
       log(GPUDevice.prototype, 'createBuffer', 'buffer', (d) => d.size);
       log(GPUQueue.prototype, 'writeTexture', 'written', (_, data) => data.byteLength ?? 0);
       log(GPUQueue.prototype, 'writeBuffer', 'written', (_, __, data, ___, size) => size ?? data.byteLength ?? 0);
@@ -526,7 +521,6 @@ async function open(query, looks) {
           for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
           return { gap: gap / 1000, at: at == null ? null : at / 1000, first: ts.length ? ts[0] / 1000 : null };
         })(),
-        made: window.__startupMade.filter(([t]) => t <= now).map(([t, d]) => [t / 1000, d]),
         bytes: window.__startupBytes.filter(([t]) => t <= now).map(([t, k, n]) => [t / 1000, k, n]),
         firsts: [...window.__startupFirsts].map(([what, [at, n]]) => [what, at / 1000, n]),
         subs: window.__startupSubs.filter(([t]) => t <= now).map(([t, d, w]) => [t / 1000, d == null ? null : d / 1000, w]),
@@ -634,143 +628,6 @@ async function openings(ids) {
   return out;
 }
 
-/**
- * A bare WebGPU canvas on a cold cache, in a browser of its own: no app, no
- * pipeline, a clear every frame. Printed, not judged: it is the bar for the
- * stop that follows the show's first step (see where it is printed).
- */
-async function bare() {
-  const cache = coldCache();
-  const browser = await launchChromium(chromium);
-  try {
-    const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-    await page.route(`http://localhost:${PORT}/bare`, (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><body style="margin:0;background:#000"><canvas width="1060" height="700"></canvas></body>' }));
-    await page.goto(`http://localhost:${PORT}/bare`, { waitUntil: 'load' });
-    return { cache, ...await page.evaluate(async () => {
-      const frames = [];
-      let presenting = false;
-      const tick = (t) => { frames.push(t); requestAnimationFrame(tick); };
-      requestAnimationFrame(tick);
-      const adapter = await navigator.gpu.requestAdapter();
-      const device = await adapter.requestDevice();
-      const given = performance.now();
-      // Three seconds of the page's own frames first, so the stop at the
-      // GPU's start (4b) is over and cannot be taken for this one.
-      await new Promise((r) => setTimeout(r, 3000));
-      const context = document.querySelector('canvas').getContext('webgpu');
-      context.configure({
-        device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode: 'opaque',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
-      });
-      const first = performance.now();
-      const draw = () => {
-        const enc = device.createCommandEncoder();
-        enc.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.1, g: 0, b: 0.2, a: 1 } }] }).end();
-        device.queue.submit([enc.finish()]);
-        if (presenting) requestAnimationFrame(draw);
-      };
-      presenting = true;
-      draw();
-      await new Promise((r) => setTimeout(r, 5000));
-      presenting = false;
-      const now = performance.now();
-      const after = [first, ...frames.filter((t) => t > first), now];
-      let gap = 0, at = null;
-      for (let i = 1; i < after.length; i++) if (after[i] - after[i - 1] > gap) { gap = after[i] - after[i - 1]; at = after[i - 1]; }
-      return { given: given / 1000, first: first / 1000, gap: gap / 1000, at: at / 1000 };
-    }) };
-  } finally { await browser.close(); }
-}
-
-/**
- * The textures the show made round its first step, made again by a bare
- * page on a cold cache, in a browser of its own, while it draws a clear
- * every frame; each is then cleared once, as its first use. Printed, not
- * judged: the bar for the stop after the first step (see where it is
- * printed).
- */
-async function replay(descs) {
-  const cache = coldCache();
-  const browser = await launchChromium(chromium);
-  try {
-    const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-    await page.route(`http://localhost:${PORT}/bare`, (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><body style="margin:0;background:#000"><canvas width="1060" height="700"></canvas></body>' }));
-    await page.goto(`http://localhost:${PORT}/bare`, { waitUntil: 'load' });
-    return { cache, ...await page.evaluate(async (descs) => {
-      const frames = [];
-      const tick = (t) => { frames.push(t); requestAnimationFrame(tick); };
-      requestAnimationFrame(tick);
-      const adapter = await navigator.gpu.requestAdapter();
-      const device = await adapter.requestDevice();
-      const context = document.querySelector('canvas').getContext('webgpu');
-      context.configure({ device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode: 'opaque' });
-      let presenting = true;
-      const draw = () => {
-        const enc = device.createCommandEncoder();
-        enc.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.1, g: 0, b: 0.2, a: 1 } }] }).end();
-        device.queue.submit([enc.finish()]);
-        if (presenting) requestAnimationFrame(draw);
-      };
-      draw();
-      // Past the stop at the GPU's start and the canvas's first frame.
-      await new Promise((r) => setTimeout(r, 4000));
-      const t0 = performance.now();
-      const enc = device.createCommandEncoder();
-      let made = 0, cleared = 0;
-      const textures = [];
-      for (const d of descs) {
-        // One entry per descriptor, null where it could not be made, so the
-        // writes below find each texture at its descriptor's index.
-        textures.push(null);
-        try {
-          const tex = device.createTexture({ ...d, usage: d.usage | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST });
-          textures[textures.length - 1] = tex;
-          made++;
-          if ((d.dimension ?? '2d') === '2d') {
-            enc.beginRenderPass({ colorAttachments: [{ view: tex.createView({ baseMipLevel: 0, mipLevelCount: 1, baseArrayLayer: 0, arrayLayerCount: 1 }), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }] }).end();
-            cleared++;
-          }
-        } catch { /* a format that cannot be drawn to: made, not cleared */ }
-      }
-      device.queue.submit([enc.finish()]);
-      /*
-        And then written through, every texel. A clear of a fresh texture
-        can be a flag in its compression metadata and touch no memory at
-        all; the show's first steps write every texel of every field. The
-        clears alone stopped nothing (0.07 and 0.13 s, runs 36303170127 and
-        36304243400); if this does, the stop is the runner putting memory
-        under 75.8 MB of fields the first time they are written.
-      */
-      await new Promise((r) => setTimeout(r, 3000));
-      const t1 = performance.now();
-      const bpp = { rgba32float: 16, rgba32uint: 16, rgba32sint: 16, rgba16float: 8, rg32float: 8, r32float: 4, rg16float: 4, r16float: 2, r8unorm: 1 };
-      let written = 0;
-      for (const [i, d] of descs.entries()) {
-        const [w, h = 1, z = 1] = Array.isArray(d.size) ? d.size : [d.size.width, d.size.height ?? 1, d.size.depthOrArrayLayers ?? 1];
-        const b = bpp[d.format] ?? 4;
-        try {
-          const tex = textures[i];
-          if (!tex || (d.dimension ?? '2d') !== '2d') continue;
-          const data = new Uint8Array(w * h * b).fill(1);
-          for (let layer = 0; layer < z; layer++) device.queue.writeTexture({ texture: tex, origin: [0, 0, layer] }, data, { bytesPerRow: w * b, rowsPerImage: h }, [w, h, 1]);
-          written += w * h * b * z;
-        } catch { /* not writable this way */ }
-      }
-      await new Promise((r) => setTimeout(r, 4000));
-      presenting = false;
-      const now = performance.now();
-      const longest = (from, to) => {
-        const ts = [from, ...frames.filter((t) => t > from && t < to), to];
-        let gap = 0, at = null;
-        for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > gap) { gap = ts[i] - ts[i - 1]; at = ts[i - 1]; }
-        return { gap: gap / 1000, at: at / 1000 };
-      };
-      const c = longest(t0, t1), w = longest(t1, now);
-      return { made, cleared, at0: t0 / 1000, gap: c.gap, at: c.at, at1: t1 / 1000, wgap: w.gap, wat: w.at, written };
-    }, descs) };
-  } finally { await browser.close(); }
-}
-
 /** When the device came and the pipelines were built, against load. */
 const milestones = (o) => {
   const at = (t) => (t == null ? 'never' : `${t.toFixed(2)} s`);
@@ -820,8 +677,10 @@ const underWay = (o, gap) => {
   the first step to three after it, and the time the GPU spent on it (from
   when it was handed over, or when the GPU finished the one before, to when
   it was done). The page hands the GPU its first ~8 steps in a quarter
-  second and then waits a second for any frame; this names the submits the
-  GPU spent that second on, and the pipelines in them. Printed, not judged.
+  second, and until the render pipelines drew once ahead it then waited a
+  second or more for any frame; this names the submits the GPU spends
+  longest on, and the pipelines in them, so the next stop of its kind names
+  itself. Printed, not judged: check 4 judges the frames.
 */
 const gpuTime = (o) => {
   const step = o.firstStep == null ? null : o.firstStep / 1000;
@@ -865,20 +724,6 @@ try {
     + ` first step at ${c.firstStep == null ? 'never' : `${(c.firstStep / 1000).toFixed(2)} s`}`);
   console.log(`     ${milestones(c)}`);
   if (process.env.STARTUP_TIMELINE) timeline(c);
-
-  /*
-    The bar for the stop after the first step. The show's canvas is drawn
-    by WebGPU for the first time at its first step; until then the page
-    shows the starting frame. On 2ec45a6's Mac run the first frame to ask
-    for the canvas's texture did so at 13.85 s, the stop began at 13.97 s,
-    and nothing the page asked WebGPU for in between was asked for the
-    first time. Whether a bare canvas's first WebGPU frame stops a cold
-    Mac for as long says whether that stop is Chromium's or the show's.
-  */
-  const bb = await bare().catch((err) => ({ error: String(err).split('\n')[0] }));
-  console.log(bb.error ? `  a bare WebGPU canvas: could not be opened (${bb.error})`
-    : `  a bare WebGPU canvas (shader cache ${bb.cache}): device given ${bb.given.toFixed(2)} s, first drawn ${bb.first.toFixed(2)} s;`
-      + ` its longest wait for a frame after that ${bb.gap.toFixed(2)} s from ${bb.at.toFixed(2)} s`);
 
   // ── The show as it ships ──────────────────────────────────────────
   const o = await open('', presetIds);
@@ -945,22 +790,6 @@ try {
     for (const r of o.rows.filter((r) => r[0] >= o.firstStep / 1000 - 1 && r[0] <= o.firstStep / 1000 + 3)) console.log(`       ${r.join('  ')}`);
   }
   if (worst > MAX_GAP_S || !coldOk || process.env.STARTUP_TIMELINE) timeline(o, cold);
-
-  /*
-    The stop after the first step, made again without the show. Round its
-    first step the show makes seventy-three textures (75.8 MB) in a quarter
-    second and hands the GPU its first frames, then the page waits 1.0 to
-    2.4 s for a frame (run 36302471171: everything submitted by 12.58 s,
-    nothing new until 13.93 s), cold or warm (median 1.2 to 1.35 s over the
-    forty warm openings). A bare page makes the same textures and clears
-    each once: if it stops as long, the stop is what this runner charges
-    for that memory, not the show's frames.
-  */
-  const descs = (o.made ?? []).filter(([t]) => o.firstStep != null && t >= o.firstStep / 1000 - 1 && t <= o.firstStep / 1000 + 1).map(([, d]) => d);
-  const rp = descs.length ? await replay(descs).catch((err) => ({ error: String(err).split('\n')[0] })) : { error: 'no textures made round the first step' };
-  console.log(rp.error ? `  the show's textures on a bare page: could not be made (${rp.error})`
-    : `  the show's ${rp.made} textures made again on a bare page (shader cache ${rp.cache}), ${rp.cleared} cleared once: longest wait for a frame after ${rp.gap.toFixed(2)} s from ${rp.at.toFixed(2)} s (made at ${rp.at0.toFixed(2)} s);`
-      + ` then every texel written (${(rp.written / 2 ** 20).toFixed(1)} MB at ${rp.at1.toFixed(2)} s): longest wait for a frame after ${rp.wgap.toFixed(2)} s from ${rp.wat.toFixed(2)} s`);
 
   // ── Every look, opened on its own ─────────────────────────────────
   const each = await openings(presetIds);

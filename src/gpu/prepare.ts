@@ -148,70 +148,6 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   return done;
 }
 
-/*
-  WebGPU's own pipelines, which no list of ours names. The browser builds a
-  few pipelines of its own, inside the GPU process, the first time a page
-  asks for what they do: turning a pass's timestamps into nanoseconds when a
-  query set is resolved (every frame here, where the device has
-  'timestamp-query': `GpuProfiler`), and drawing a page's picture into a
-  texture for `copyExternalImageToTexture` (the beads' mask and the mark, on
-  the frames they change). Neither goes through `createComputePipeline` or
-  `createRenderPipeline`, so `npm run startup`'s count at WebGPU never saw
-  them, and on a cold Metal cache each is a full compile on the frame.
-
-  What was reported: `npm run startup` on CI's Mac found every opening
-  stopping for 1.0 to 2.4 s a quarter second after the first step, over all
-  thirty-seven runs since #164, and the three deploys of #177 to #179 went red
-  on it against its 2 s limit while their PR runs passed at 1.3 to 1.5 s.
-  Holding the pipelines built behind the show until it drew steadily moved
-  them five seconds later and left the stop exactly where it was (2.07 s, no
-  build of ours under way, run 36298506575): it is the show's own first
-  frames. These two are what those frames ask the GPU for that nothing built
-  ahead. Each is done here once on a scrap of a texture, in turn with the
-  rest, and timed like them.
-*/
-function webgpuPrep(device: GPUDevice): Prep[] {
-  const done = () => device.queue.onSubmittedWorkDone().then(() => true, () => false);
-  const preps: Prep[] = [];
-  if (device.features.has('timestamp-query')) {
-    preps.push({
-      key: 'webgpu/timestamps', later: false, build: async () => {
-        try {
-          const querySet = device.createQuerySet({ label: 'warm timestamps', type: 'timestamp', count: 2 });
-          const buf = device.createBuffer({ label: 'warm timestamps', size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
-          const enc = device.createCommandEncoder({ label: 'warm timestamps' });
-          enc.beginComputePass({ timestampWrites: { querySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } }).end();
-          enc.resolveQuerySet(querySet, 0, 2, buf, 0);
-          device.queue.submit([enc.finish()]);
-          const ok = await done();
-          querySet.destroy(); buf.destroy();
-          return ok;
-        } catch { return false; }
-      },
-    });
-  }
-  if (typeof OffscreenCanvas === 'function') {
-    preps.push({
-      key: 'webgpu/copyExternalImage', later: false, build: async () => {
-        try {
-          const source = new OffscreenCanvas(1, 1);
-          source.getContext('2d')?.fillRect(0, 0, 1, 1);
-          // The format and usage `WebGPUPlate.setSource` copies into.
-          const texture = device.createTexture({
-            label: 'warm copy', size: [1, 1], format: 'rgba8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-          });
-          device.queue.copyExternalImageToTexture({ source }, { texture }, [1, 1]);
-          const ok = await done();
-          texture.destroy();
-          return ok;
-        } catch { return false; }
-      },
-    });
-  }
-  return preps;
-}
-
 /**
  * Builds what the show opens with and returns when it is done; then goes on
  * building the rest behind the show, which is under way by then.
@@ -226,7 +162,6 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),
     ...WebGPUPostChain.prepare(device, format, open),
-    ...webgpuPrep(device),
   ];
   const opening = await buildInTurn(device, 'opening', builds.filter((b) => !b.later));
   // Nobody waits on it, so nobody would hear it fail: the builds cannot

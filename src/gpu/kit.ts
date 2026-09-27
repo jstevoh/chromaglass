@@ -282,31 +282,45 @@ export class PipelineCache {
 }
 
 /*
-  A compute pipeline's first dispatch, done once, ahead, on scraps.
+  A pipeline's first use, done once, ahead, on scraps.
 
   What was reported: every opening of the show on CI's Mac stopped drawing
   for 1.0 to 2.4 s a quarter second after its first step (`npm run
-  startup`, over thirty-seven runs; three deploys in a row went red on its
-  2 s limit). Every pipeline the first steps use was built ahead, and none
-  on the frame. The stop is there on a warm shader cache as well (each of
-  the forty looks opened warm: median 0.92 to 1.35 s over four runs), so it
-  is not a compile. A bare page's first WebGPU frame does not stop (0.07 s),
-  nor does one making the seventy-three textures the show makes then and
-  clearing each (0.07 s, run 36303170127). And the page is not busy: by a
-  quarter second after the first step it has made its textures and handed
-  over its first eight steps at the usual eight hundred writes a step, and
-  then waits, frames and all, until the GPU process gives it the next frame.
-  What those first steps do that no later step does is run each of some
-  fifty pipelines for the first time on this device, and a first run costs
-  something a later one does not: on this runner, inferred to be most of a
-  second and a half for the lot.
+  startup`, over thirty-seven runs since the opening was built ahead; three
+  deploys in a row went red on its 2 s limit). Every pipeline the first
+  steps use was built ahead, and none on the frame. It was not a compile
+  (each of the forty looks opened on a warm cache stopped too, median 0.92
+  to 1.35 s over four runs), nor the canvas's first frame (a bare page's
+  stopped 0.07 s), nor the memory under the fields (a bare page making the
+  show's seventy-three textures, 75.8 MB, and writing every texel stopped
+  0.08 s, run 36304683847), nor the pipelines still building behind the
+  show (held until it was drawing steadily, it still stopped 2.07 s, run
+  36298506575). The page's own timers kept firing through it: the wait was
+  on the GPU.
 
-  So a pipeline built ahead is also run once here, one workgroup on
-  one-texel scraps of the kinds its shader declares, while the starting
-  frame is up and in turn with the rest, so the show's first steps find
-  every one of them already run. Inside an error scope: a scrap the shader
-  does not like is a first run that did not happen, not a GPU error for the
-  loop's error count, and the frame still runs it as it always did.
+  Timing each submit the GPU was handed (run 36305436208) named it: 1.42 s
+  of the GPU's time on one submit, the plate's first draw (the two packs,
+  the two derive passes and the display into the canvas), where the same
+  submit a few frames later took 0.03 s. The first draw with a render
+  pipeline on this device costs something every later one does not.
+
+  So a pipeline built ahead is also used once here, while the starting
+  frame is up and in turn with the rest: a compute pipeline dispatches one
+  workgroup, a render pipeline draws one triangle into a one-texel target of
+  each format it draws to, each on one-texel scraps of the kinds its shader
+  declares. With the draws (run 36306162647) the plate's first draw took the
+  GPU 0.14 s, the longest wait for a frame in the opening was 0.82 s and
+  not at the first step at all, and the forty warm openings' stops fell from
+  a median of 1.08 s to 0.12 s. The dispatches alone had not moved the stop
+  (1.27 s, run 36304243400). They are kept, cheap behind the starting
+  frame, though what they save has not been measured on its own; the first
+  solver submits still cost a few tenths of a second more than later ones
+  (downsample 0.32 s, upsampleDelta 0.40 s on run 36306162647), which is
+  PLAN.md's next item on this.
+
+  Inside an error scope: a scrap the shader does not like is a first use
+  that did not happen, not a GPU error for the loop's error count, and the
+  frame still uses it as it always did.
 */
 interface Scraps { uniform: GPUBuffer; storage: GPUBuffer; vertex: GPUBuffer; sampler: GPUSampler; tex: Map<string, GPUTexture> }
 const scrapsByDevice = new WeakMap<GPUDevice, Scraps>();
@@ -365,20 +379,7 @@ async function firstUse(device: GPUDevice, pipeline: GPUComputePipeline, code: s
   await device.queue.onSubmittedWorkDone().catch(() => undefined);
 }
 
-/*
-  And a render pipeline's first draw, the same way: one triangle into a
-  one-texel target of each format it draws to, on scraps.
-
-  What was measured: with every compute pipeline built ahead and run once
-  (above), the stop after the first step was still there (1.27 s, run
-  36304243400). Timing each submit the GPU was handed round the first step
-  (run 36305436208) put 1.42 s of the GPU's time on one of them: the
-  plate's first draw, the two packs, the two derive passes and the display
-  into the canvas. The same submit a few frames later took 0.03 s. The
-  submits either side of it, the solver's, took a few hundredths. So the
-  cost is the plate's render pipelines' first draw on this device, and it
-  is paid here instead, behind the starting frame, where no frame is owed.
-*/
+/** A render pipeline's first draw: see above. */
 async function firstDraw(device: GPUDevice, pipeline: GPURenderPipeline, desc: GPURenderPipelineDescriptor, codes: string[]): Promise<void> {
   // A depth buffer or several samples would want scraps of their own; no
   // pipeline built ahead has either today, and one that does is drawn
