@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
-import { wallAsked } from '../lib/earClock';
+import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
@@ -4286,7 +4286,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * every frame should. A plate stepping on ten readings a second (the ear's
    * React state) would hear a new one on about one frame in six.
    */
-  const hearingRef = useRef({ frames: 0, fresh: 0, last: null as AudioData | null });
+  const hearingRef = useRef({ frames: 0, fresh: 0, ownFrame: 0, last: null as AudioData | null });
+  /** The animation frame the plate is drawing (its timestamp), null for a frame the wall asked for. */
+  const plateTsRef = useRef<number | null>(null);
   const settingsRef = useRef(settings);
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
@@ -5382,6 +5384,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         animationFrameId = requestAnimationFrame(render);
         return;
       }
+      // The ear reads for this frame first, if its own loop has not yet
+      // (lib/earClock.ts plateFrame, PLAN.md §14f), so the frame hears itself.
+      plateTsRef.current = ts ?? null;
+      if (ts !== undefined) plateFrame(ts);
       draw();
     };
     /** One frame, guarded; whichever window asked for it has already been let through the gate. */
@@ -5441,6 +5447,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const h = hearingRef.current;
         h.frames++;
         if (audioDataRef.current !== h.last) { h.fresh++; h.last = audioDataRef.current; }
+        // Taken on this very frame, not the one before (the order of two loops).
+        if (plateTsRef.current !== null && audioDataRef.current?.frameTs === plateTsRef.current) h.ownFrame++;
       }
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
@@ -7987,14 +7995,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (!drawGate.offer('ask', refreshStamp(ts, now))) return;   // this refresh already has a frame
       // The ear reads on the wall's clock: with this window covered its own
       // frames have stopped, and so, until PLAN.md §14a, had its hearing
-      // (lib/earClock.ts). The reading goes through React like every other,
-      // so it lands on the next frame, the same one-frame lag as a visible
-      // show's (PLAN.md §14f). It reads only while this window's frames are
+      // (lib/earClock.ts). The plate asks for the reading at the top of the
+      // frame (`hear`, PLAN.md §14f), so this frame hears it; it used to go
+      // through React and land a frame later. It reads only while this window's frames are
       // missing, so a visible show hears as it did. And only for an ask the
       // gate let through: the ear takes one reading per drawn frame (its
       // smoothing is per reading), so an ask that draws nothing hears
       // nothing either.
       wallAsked(now);
+      plateTsRef.current = null;
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       draw();
     };
@@ -8017,8 +8026,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
         heard: audioDataRef.current ? { volume: audioDataRef.current.volume, energy: audioDataRef.current.energy } : null,
-        /** Live frames drawn, and how many of them read a reading the frame before had not (§14f). */
-        hearing: { frames: hearingRef.current.frames, fresh: hearingRef.current.fresh },
+        /** Live frames drawn, how many read a reading the frame before had not, and how many a reading taken on that same frame (§14f). */
+        hearing: { frames: hearingRef.current.frames, fresh: hearingRef.current.fresh, ownFrame: hearingRef.current.ownFrame },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */

@@ -1033,6 +1033,7 @@ export default function App() {
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const shownEngineStatus = useRef<EngineStatus | null>(null);
   const engineStatusRef = useRef<EngineStatus | null>(null);
   // ── The grid sweep ──
   // Walks the solver down every grid and reports where a frame's time went on
@@ -3675,10 +3676,13 @@ export default function App() {
           // The live reading goes in a ref (the settings panel polls it while
           // open); the shell only re-renders when the engine itself changed.
           engineStatusRef.current = next;
-          setEngineStatus((prev) =>
-            prev && prev.label === next.label && prev.steppedDown === next.steppedDown &&
-            prev.gpuUnavailable === next.gpuUnavailable ? prev : next,
-          );
+          // Compared against what was last set, for the reason the tempo
+          // label is: this arrives once a second, and an updater handing back
+          // the old value still renders the App (PLAN.md §14f).
+          const shown = shownEngineStatus.current;
+          if (shown && shown.label === next.label && shown.steppedDown === next.steppedDown && shown.gpuUnavailable === next.gpuUnavailable) return;
+          shownEngineStatus.current = next;
+          setEngineStatus(next);
         }}
       />
 
