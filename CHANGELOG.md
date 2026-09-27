@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the show hears the song's shape
+
+- **Builds, drops and breakdowns, live.** The show now hears a song's
+  sections as it plays, on songs it has never heard: a build (a riser, a
+  snare roll, the top end climbing for bars), a drop (the beat back after two
+  bars or more without it, or a build letting go), a breakdown (the beat gone
+  while the music plays on). The desk's status line and the phone's Sound
+  sheet say which.
+- **Sound learn can bind to them.** Each drop, Each build and Each breakdown
+  join the music sources in the MIDI panel: bind the drop to the next preset,
+  a pour or a dye.
+- `npm run shape` measures it on synthesised songs whose sections are known
+  to the sample: every drop within a bar (median 0.03 bar), nothing in two
+  minutes of steady groove with drum fills, nothing on the app's own ambient
+  music, and a two-second gap between songs heard as the gap it is.
+
 ### Added — oil and water as bodies
 
 - **Oil Bodies.** The oil and the water each keep their own colour: amber

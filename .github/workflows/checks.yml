@@ -95,6 +95,17 @@ jobs:
       - name: Sound learn
         run: npm run learn
 
+      # The song's shape (PLAN.md §10, step 2): builds, drops and breakdowns
+      # heard live. Synthesised songs whose sections are known to the sample
+      # (four on the floor at 90 to 140 bpm, 20 dB down, a build that keeps
+      # its kick, a rock song with fills): every drop within a bar and none
+      # anywhere else, builds before their drops, breakdowns within four bars,
+      # nothing at all in two minutes of groove, the same at 30 fps, triggers
+      # bound to each fire once per event; then the shelf, decoded by the
+      # ffmpeg installed above, held to at most a drop a minute.
+      - name: The song's shape
+        run: npm run shape
+
       # Pacing (PLAN.md §10, step 1): a running sequence's stages played as
       # scenes. At Pacing 0 every built-in sequence hands the plate exactly 1
       # and 1 and fires nothing; "Light Show Night", measured with the

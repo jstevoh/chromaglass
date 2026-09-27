@@ -160,6 +160,17 @@ export interface AudioReading {
   bands: number[];
   /** One per name in SOURCE_NAMES. */
   onsets: Record<SourceName, OnsetState>;
+  /**
+   * Each source's own level in decibels, as the analyser gives them (dBFS,
+   * digital silence parked at -140), one per name in SOURCE_NAMES.
+   *
+   * The 0..1 values above are fitted to each source's recent range, which is
+   * what a control wants and exactly what the song's shape cannot use: a
+   * ceiling that falls over twelve seconds reads a breakdown's pad, after a
+   * while, as loud as the drop was. `songShape.ts` reads these instead and
+   * keeps its own references, over the length of a song.
+   */
+  db: number[];
 }
 
 /** A reading's value for a source name, so a binding can be stored as a string. */
@@ -563,6 +574,7 @@ export class AudioFeatures {
       level: values[0], kick: values[1], bass: values[2], snare: values[3], hats: values[4],
       bands: values.slice(SOUND_SOURCES.length),
       onsets,
+      db: Array.from(this.levelDb.subarray(0, SOURCE_NAMES.length)),
     };
   }
 }

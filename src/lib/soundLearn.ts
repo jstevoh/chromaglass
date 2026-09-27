@@ -60,7 +60,8 @@
  * synthesised song, and the render loop drives it with the live one.
  */
 
-import type { AudioReading, SourceName } from './audioFeatures.ts';
+import { SOURCE_NAMES, type AudioReading, type SourceName } from './audioFeatures.ts';
+import type { SongEvent } from './songShape.ts';
 import { isMapping, triggerable, type MidiAction, type MusicSource, type SoundBinding } from './midi.ts';
 import type { SceneMapping } from '../types';
 
@@ -117,7 +118,10 @@ interface SourceState {
   pending: number[];
 }
 
-const isNamed = (s: MusicSource): s is SourceName => s !== 'beat' && s !== 'bar';
+// A source the analyser measures, as against one the beat clock or the song's
+// shape keeps: asked of the list of names, so the next kind of source added to
+// MusicSource is not taken for a band by a list here that forgot it.
+const isNamed = (s: MusicSource): s is SourceName => (SOURCE_NAMES as readonly string[]).includes(s);
 
 export class SoundLearn {
   private sources = new Map<SourceName, SourceState>();
@@ -164,10 +168,12 @@ export class SoundLearn {
    *
    * `reading` is the analyser's reading for this frame, or null when there is
    * no music to hear (no input, or the show paused). `clock` is the beat
-   * clock, or null where there is none. Only triggers are looked at; mappings
-   * are the patch bay's.
+   * clock, or null where there is none. `song` is what the song's shape
+   * heard on this frame (`songShape.ts`): its builds, drops and breakdowns
+   * fire the triggers bound to them, once each, as heard. Only triggers are
+   * looked at; mappings are the patch bay's.
    */
-  step(now: number, reading: AudioReading | null, clock: ClockView | null, bindings: readonly SoundBinding[] | undefined): SoundFire[] {
+  step(now: number, reading: AudioReading | null, clock: ClockView | null, bindings: readonly SoundBinding[] | undefined, song: readonly SongEvent[] = []): SoundFire[] {
     const fired: SoundFire[] = [];
     if (!reading) { this.reset(); return fired; }
     const triggers = bindings ? bindings.filter(b => !isMapping(b)) : [];
@@ -178,6 +184,9 @@ export class SoundLearn {
     const fire = (source: MusicSource, predicted: boolean) => {
       for (const b of triggers) if (b.source === source) fired.push({ binding: b, at: now, predicted });
     };
+
+    // The song's shape: a moment each, fired as heard, never predicted.
+    for (const e of song) fire(e.kind, false);
 
     // How loud the music has been lately, for the prediction's "is anything
     // playing" test. Kept for half a beat (a quarter second with no beat).
