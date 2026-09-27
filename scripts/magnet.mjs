@@ -267,6 +267,20 @@ try {
     if (!best || g.gain > best.gain) best = g;
   }
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
+  /*
+    Printed, not judged: the hand's path, and how far the place the drag
+    gathered most (anywhere on the plate) lies from it. The one miss in 74
+    runs from 2026-09-25 to 27 (deploy 36269575619, a commit that touched
+    nothing the magnet runs through) gathered +183 at 0.72,0.32 with the
+    solver's magnet held at 0.56,0.27 the whole hold, and nothing within
+    0.12 of any point the hand had been; that log did not say where the hand
+    had been, so whether the liquid was carried off the path, or gathered
+    where the path was not, could not be told. The next one will say.
+  */
+  if (gathered && trail.length) {
+    const off = Math.min(...trail.map(p => Math.hypot(p.x - gathered.x, p.y - gathered.y)));
+    console.log(`     the hand's path: ${trail.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')}; where it gathered most is ${off.toFixed(2)} from it`);
+  }
   console.log(`     along the hand's ${trail.length} positions, the drag gathered most at ` +
     (best ? `${best.at.x.toFixed(2)},${best.at.y.toFixed(2)}: ${best.d0.toFixed(0)} → ${best.d1.toFixed(0)}, against ${best.i0.toFixed(0)} → ${best.i1.toFixed(0)} left alone` : 'nowhere'));
   /*

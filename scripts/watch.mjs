@@ -943,6 +943,22 @@ async function selftest() {
   check('C at 1.5 s: that and 4.1–6.0 s; A: none', fz.length === 2 && near(fz[1].from, 4.1) && near(fz[1].to, 6) && !fzA.length,
     `C: ${show(fz)}; A: ${show(fzA)}`);
 
+  // A blip, as the recorder's encoder makes one in a still picture (see
+  // freezes()): still from 1.0 to 7.0 s at 10 samples a second but for three
+  // samples at 3.0 s decaying from 0.15%. With blipSeconds it is one
+  // stillness; without, it is split where the blip is. A burst of four
+  // samples (0.4 s) at 0.3 s of blip allowed still ends it, and so does
+  // motion that goes on.
+  const made = (fn) => ({ rate: 10, rows: Array.from({ length: 90 }, (_, k) => ({ t: k / 10, motion: fn(k / 10) })) });
+  const blip = { '3.0': 0.15, '3.1': 0.08, '3.2': 0.03 };
+  const B1 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : blip[t.toFixed(1)] ?? 0.01);
+  const B2 = made(t => t < 1 - 1e-9 || t > 7 - 1e-9 ? 0.9 : t > 2.95 && t < 3.35 ? 0.2 : 0.01);
+  const b1 = freezes(B1, { below: 0.025, blipSeconds: 0.5 }), b0 = freezes(B1, { below: 0.025 }), b2 = freezes(B2, { below: 0.025, blipSeconds: 0.3 });
+  check('a codec blip inside a stillness does not split it, when asked; four samples of motion do',
+    b1.length === 1 && near(b1[0].from, 0.9) && near(b1[0].to, 7) && b0.length === 2 && near(b0[0].to, 3) && near(b0[1].from, 3.2)
+      && b2.length === 2 && near(b2[0].to, 3) && near(b2[1].from, 3.3),
+    `blip allowed: ${show(b1)}; not: ${show(b0)}; a 0.4 s burst at 0.3 s allowed: ${show(b2)}`);
+
   // D's answers come from how it was made. Where a number depends on the
   // motion's exact size (rise, decay, peak, calm, half-life), the answer is
   // the same measure worked out on D's raw frames before the codec, by a
@@ -1027,8 +1043,20 @@ export async function watchVideo(input, options = {}) {
  * picture through a lossy codec measured 0.000 to 0.002 in the self-test. The
  * slowest moving plate is orders above that. A bar near the slow plate would
  * call a calm look a freeze.
+ *
+ * `blipSeconds`: how long a change may last inside a stillness and not end
+ * it, if the picture is still again straight after. Off (0) unless asked.
+ * A still canvas recorded as the app records it (captureStream, MediaRecorder,
+ * VP9 at 12 Mbps) does not stay still in the file: the encoder re-sends the
+ * picture now and then, and the decoded frame changes by 0.14–0.15% for one
+ * sample, then 0.07–0.08%, then 0.02–0.03%, and is back under 0.02% in about
+ * a third of a second; about 1.7 s into the stillness, and again later
+ * (measured in Chromium with a plate-like canvas stopped for six seconds,
+ * three takes, while chasing `npm run moving`'s late freezes). Real motion
+ * starting again goes on. The same stretch through the codec was split in
+ * two by that blip whenever the bar for still sat under 0.15%.
  */
-export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2 } = {}) {
+export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds = 0 } = {}) {
   const out = [];
   let start = -1;
   const rows = r.rows;
@@ -1036,6 +1064,14 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2 } = {}) {
     const quiet = k < rows.length && rows[k].motion < below;
     if (quiet && start < 0) start = k;
     if (!quiet && start >= 0) {
+      // A blip: motion in samples covering no more than blipSeconds (each
+      // sample stands for 1/rate), then still again.
+      // The stretch carries on through it, from the first quiet sample after.
+      if (blipSeconds > 0 && k < rows.length) {
+        let j = k;
+        while (j < rows.length && rows[j].motion >= below && rows[j].t - rows[k].t + 1 / r.rate <= blipSeconds + 1e-9) j++;
+        if (j < rows.length && rows[j].motion < below) { k = j; continue; }
+      }
       // From the last sample before the stillness to the first that moved
       // again (or the end of the clip): a picture still from 0.0 until it
       // changes at 2.0 is two seconds still, not the 1.9 between the first

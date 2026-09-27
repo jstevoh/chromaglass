@@ -70,7 +70,7 @@ try {
   const snap = (keep) => page.evaluate((keep) => {
     const d = window.chromaglassDebug();
     const f = d.fluids?.[0];
-    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity) };
+    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1 };
     return d.pointer();
   }, keep);
   /**
@@ -136,11 +136,37 @@ try {
   // The same two seconds with the pointer swept back and forth over the pool, no button.
   for (let i = 0; i < 40; i++) { await page.mouse.move(...screen(A[0] + 0.06 * Math.sin(i / 3), A[1] + 0.04 * Math.cos(i / 4))); await settle(50); }
   await snap('hover');
-  const i0 = await measure('idle0', at), i1 = await measure('idle1', at), hv = await measure('hover', at);
-  const idleMove = Math.abs(i1.disc - i0.disc), hoverMove = Math.abs(hv.disc - i1.disc);
+  /*
+    The pool left alone again for two seconds after, the pointer resting
+    where the sweep ended.
+
+    Judged per solver step, against the larger of the two windows left alone.
+    It was judged against the two seconds before only, as a total, and went
+    red once in 75 runs (deploy 36270301147, a commit that changed only
+    PLAN.md): 192 → 174 hovering against 195 → 192 left alone. Across those
+    75 runs the hover window lost more than the window before it in 56, which
+    a pointer that does nothing should not do half the time, let alone three
+    quarters. Two reasons, neither the hand: the sweep's forty moves take
+    longer than their forty fifty-millisecond waits (every move is a round
+    trip to the browser), so the hover window is the longer one; and a single
+    two-second window of a settling pool is a noisy control (the idle change
+    ranged from 3 to over 20 in those runs), and the allowance is twice it,
+    so a quiet one shrank the bar under an ordinary hover. So each window is
+    counted in the solver steps it spanned (stepIndex, read with the dye),
+    and the plate's own rate is the larger of before and after.
+  */
+  await settle(2000);
+  await snap('idle2');
+  const i0 = await measure('idle0', at), i1 = await measure('idle1', at), hv = await measure('hover', at), i2 = await measure('idle2', at);
+  const stepsAt = await page.evaluate(() => ['idle0', 'idle1', 'hover', 'idle2'].map(k => window.__toolSnaps[k].step));
+  const span = (a, b) => stepsAt[b] - stepsAt[a];
+  const stepsOk = stepsAt.every(n => n >= 0) && span(0, 1) > 0 && span(1, 2) > 0 && span(2, 3) > 0;
+  const idleRate = Math.max(Math.abs(i1.disc - i0.disc) / Math.max(1, span(0, 1)), Math.abs(i2.disc - hv.disc) / Math.max(1, span(2, 3)));
+  const hoverMove = Math.abs(hv.disc - i1.disc), idleMove = idleRate * span(1, 2);
   check('moving over the plate with no button down leaves it alone',
-    hoverMove <= Math.max(2, 2 * idleMove) + 0.05 * i1.disc,
-    `dye under the pointer ${i1.disc.toFixed(0)} → ${hv.disc.toFixed(0)} hovering, ${i0.disc.toFixed(0)} → ${i1.disc.toFixed(0)} left alone`);
+    stepsOk && hoverMove <= Math.max(2, 2 * idleMove) + 0.05 * i1.disc,
+    !stepsOk ? `the plate did not step through every window (steps ${stepsAt.join(', ')})`
+      : `dye under the pointer ${i1.disc.toFixed(0)} → ${hv.disc.toFixed(0)} hovering over ${span(1, 2)} steps; left alone ${i0.disc.toFixed(0)} → ${i1.disc.toFixed(0)} over ${span(0, 1)} before and ${hv.disc.toFixed(0)} → ${i2.disc.toFixed(0)} over ${span(2, 3)} after, ${idleMove.toFixed(1)} at that rate over the hover's steps`);
 
   // ── The pouring tools ───────────────────────────────────────────
   const laid = {};

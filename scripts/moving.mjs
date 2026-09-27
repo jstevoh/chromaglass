@@ -195,7 +195,34 @@ check('the film tells a frozen plate from a moving one', inside.length >= 20 && 
 // (A floor for the Mac's codec returning exactly the same frame: then the
 // frozen stretch reads zero, and twice zero would find nothing.)
 const below = Math.max(2 * frozenP90, 0.005);
-const found = freezes(r, { below, minSeconds: 2 })
+/*
+  And a blip of up to half a second does not end a stillness (freezes()'s
+  blipSeconds). This check went red in 9 of 58 runs over 2026-09-25 to 27,
+  on branches and on main alike, and in 8 of them the plate had stopped on
+  time (last step within 0.1 s of the key) while the film found the freeze
+  late or short: still only from 1.3 to 1.9 s after the plate stopped
+  (seven runs, PR #173's among them: "stood 12.9–16.9 s, found 14.4–16.9
+  s"), or split at 15.1 s into pieces under two seconds (one). Seven of
+  those eight had a frozen 90th percentile under 0.035%, and when it was
+  0.035% or more the lag averaged 0.14 s against 0.71 s under it.
+
+  The film was right that the picture changed. The recorder's encoder
+  re-sends a still picture now and then, and the frame decoded there differs
+  by about 0.15% for one sample, decaying under 0.03% within 0.3 s; about
+  1.7 s into the stillness, then again (reproduced in Chromium: a plate-like
+  canvas recorded as the app records, stopped for six seconds, three takes
+  out of three; see freezes()). A blip is three samples in thirty, so the
+  90th percentile does not see it and the bar sits under it, unless the
+  frozen plate's own grain lifts the bar over 0.15% on its own (the runs
+  that passed). Half a second, not the 0.3 s measured: a blip decaying a
+  sample slower still ends well inside it, and the thaw, which goes on,
+  never does.
+
+  The ninth run (36281532848) is not this and stays red: the plate took
+  steps through the whole freeze ("last step 16.8 s"), and the first check
+  above says so.
+*/
+const found = freezes(r, { below, minSeconds: 2, blipSeconds: 0.5 })
   .map(f => ({ ...f, from: Math.max(f.from, r.rows[0].t + 2) }))   // the recorder's own start-up is not the plate
   .filter(f => f.to - f.from >= 2 - 1e-9);
 const control = found.filter(f => f.from < resumed && f.to > stopped);

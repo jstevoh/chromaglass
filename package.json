@@ -58,6 +58,7 @@
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "crash": "npm run build && node scripts/crash.mjs",
     "watch": "node scripts/watch.mjs",
+    "codecblip": "node scripts/codecblip.mjs",
     "moving": "npm run build && node scripts/moving.mjs",
     "film": "npm run build && esbuild scripts/film.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/film.mjs && node node_modules/.cache/film.mjs",
     "report-worker": "node scripts/report-worker.mjs",
