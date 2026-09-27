@@ -369,6 +369,42 @@ try {
       check('and the tile stops it', showOff, '');
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
+      /*
+        Accent the One (lib/barGrid.ts) on the Sound sheet, measured the same
+        way: not there with no sound (nothing to count the bar from); with
+        the Band on, under Follow the Song's line and above Sound Drive; it
+        prints what the bar grid knows, since the setting waits on that; and
+        it goes to 100 % through the setting and back.
+      */
+      await tap(page, 'phone-open-sound');
+      const bandBefore = await bandOn();
+      if (bandBefore) { await tap(page, 'phone-sound-band'); await page.waitForTimeout(300); }
+      const accentSilent = !(await bandOn()) ? await visible(page, 'phone-beat-accent') : null;
+      await tap(page, 'phone-sound-band');
+      await page.waitForTimeout(300);
+      const accent = await box(page, 'phone-beat-accent');
+      const followLine = await box(page, 'phone-song-follow-says');
+      const driveBox = await box(page, 'phone-sound-drive');
+      const placed = !!accent && !!followLine && !!driveBox
+        && accent.y >= followLine.y + followLine.height - 0.5 && accent.y + accent.height <= driveBox.y + 0.5;
+      const accentSays = (await visible(page, 'phone-beat-accent-says')) ? (await page.getByTestId('phone-beat-accent-says').innerText()).trim() : '';
+      await page.getByTestId('phone-beat-accent').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(200);
+      const accentAt = (await page.getByTestId('phone-beat-accent').innerText()).match(/(\d+)%/)?.[1];
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(200);
+      // The figure is drawn from the app's settings (App.tsx beatAccent), not
+      // the slider's own state, so it reading 100 and then 0 is the setting.
+      const accentBack = (await page.getByTestId('phone-beat-accent').innerText()).match(/(\d+)%/)?.[1];
+      const pxA = b => (b ? `${Math.round(b.y)}–${Math.round(b.y + b.height)}` : 'missing');
+      check('Accent the One is only there with sound on, sits under Follow the Song and above Sound Drive, says what it hears of the bar, and goes to 100 % and back',
+        accentSilent === false && placed && accent.width >= 200 && /^(Counting the one|Hearing the backbeat, not yet the one|Hearing the beat, not yet the bar|Listening for the beat)\.$/.test(accentSays)
+        && accentAt === '100' && accentBack === '0',
+        `with no sound ${accentSilent === null ? 'the sound would not go off' : accentSilent ? 'shown' : 'hidden'}; Follow's line ${pxA(followLine)}, Accent ${pxA(accent)}, Sound Drive ${pxA(driveBox)} px; "${accentSays}", at ${accentAt ?? '?'} % then ${accentBack ?? '?'} %`);
+      if (!bandBefore) await tap(page, 'phone-sound-band');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
       // A look from the Looks sheet is the look named at the top.
       await tap(page, 'phone-open-looks');
       const target = await page.evaluate(() => {

@@ -106,6 +106,19 @@ jobs:
       - name: The song's shape
         run: npm run shape
 
+      # The one (PLAN.md §10, step 3): the beats and which of them is the one,
+      # on eight synthesised songs whose bars are known (four on the floor
+      # and a rock beat, a chord a bar or every two), 20 dB down, at 30 fps,
+      # and after a gap into a new tempo: a real beat named within 70 ms at
+      # the song's tempo, no kick but the one ever called the one, every kick
+      # weighed exactly what its place says; a pulse and three loops with no
+      # bar never placed, on a beat they do hear; fuzzed onset streams never
+      # naming a tempo outside the range nor hanging (a child process with a
+      # deadline); an estimate's median and 99th percentile cost; and the
+      # accent at 0 leaving every kick at exactly 1. About a minute and a half.
+      - name: The one
+        run: npm run downbeat
+
       # Pacing (PLAN.md §10, step 1): a running sequence's stages played as
       # scenes. At Pacing 0 every built-in sequence hands the plate exactly 1
       # and 1 and fires nothing; "Light Show Night", measured with the

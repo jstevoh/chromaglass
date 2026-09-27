@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the show counts the bar
+
+- **Accent the One.** Beat Squeeze and Plate Rock can now follow the bar
+  the way a projectionist plays a rhythm plate: the one pressed hardest,
+  three lighter, two and four left to the plate, and the one after a
+  drummer's fill harder still. The show counts the bar from the music as
+  it plays; until it is sure, and at 0 (the default), every kick lands
+  alike. In Settings → Show, on MIDI, the desks, the remote and the phone's
+  Sound sheet, which says what it hears of the bar. For now it shows in the
+  rock: Beat Squeeze's own press has never reached the plate (found this
+  night, in the plan to fix), so its share weighs nothing yet.
+- `npm run downbeat` counts eight synthesised songs whose bars are known:
+  never a wrong one (0 of 528 other kicks), the one known for 78 % of the
+  groove's ones (rock 75 to 100 %, four on the floor 49 to 88 %, the half bar
+  the rest), every kick weighed exactly what its place says, three loops with
+  no bar never placed, and no tempo named outside 69 to 185 bpm on songs or
+  fuzzed onset streams.
+
 ### Added — the show follows the song
 
 - **Follow the Song.** With a paced sequence running (Light Show Night),

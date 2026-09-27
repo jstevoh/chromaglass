@@ -407,6 +407,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
+  // A knob: a verse wants every kick, a chorus the one.
+  { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },
   { key: 'fingering',       label: 'Fingering',        min: 0, max: 1 },
   { key: 'beads',           label: 'Oil Beads',        min: 0, max: 1 },
   { key: 'beadDrops',       label: 'Bead Drops',       min: 0, max: 1 },

@@ -36,6 +36,7 @@
     "bands": "node --experimental-strip-types scripts/bands.mjs",
     "pacing": "esbuild scripts/pacing.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/pacing.mjs && node node_modules/.cache/pacing.mjs",
     "shape": "esbuild scripts/shape.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/shape.mjs && node node_modules/.cache/shape.mjs",
+    "downbeat": "esbuild scripts/downbeat.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/downbeat.mjs && node node_modules/.cache/downbeat.mjs",
     "learn": "esbuild scripts/learn.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/learn.mjs && node node_modules/.cache/learn.mjs",
     "render": "node --experimental-strip-types scripts/render.mjs",
     "render-lab": "node scripts/render-lab.mjs",

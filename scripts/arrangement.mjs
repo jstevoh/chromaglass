@@ -5,7 +5,8 @@
  *
  * Not a check of its own. `npm run shape` imports it to ask whether the show
  * hears builds, drops and breakdowns; the downbeats and fills it knows are for
- * the downbeat tracker still to come (PLAN.md §10 step 3). The
+ * `npm run downbeat`, which asks whether the bar grid finds the one
+ * (PLAN.md §10 step 3). The
  * drums are the recipe `npm run bands` and `npm run learn` already use (a
  * 60→50 Hz kick, a snare of a 200 Hz body and high-passed noise, three-pole
  * hats), so what the analyser was tuned on is what it hears here; what this
@@ -28,10 +29,13 @@
  *              build and its drop, so the beat slams back out of silence.
  *
  * Two styles. `club` is four on the floor. `band` plays a rock kick (one,
- * three and the "and" of three). Both play fills: over the last two beats of
- * every fourth bar of the groove (`band`) or every eighth (`club`), the kick
- * and the backbeat stop and a run of sixteenths on the snare, getting harder,
- * ends on two toms. The thing a drummer does before a chorus, and the thing a
+ * three and the "and" of three). A third, `loop`, is `club` with nothing to
+ * tell one beat of the bar from another: no backbeat, no crash, no fills, no
+ * bass pickup into the one (with `chordBars` large, no chord change either),
+ * the case where no one could say which beat is the one. Both of the others
+ * play fills: over the last two beats of every fourth bar of the groove
+ * (`band`) or every eighth (`club`), the kick and the backbeat stop and a run
+ * of sixteenths on the snare, getting harder, ends on two toms. The thing a drummer does before a chorus, and the thing a
  * detector must not call a build, a drop or a breakdown: the low end leaves
  * for two beats and comes back, and the top end climbs for two beats. A fill
  * that left the kick in (as this one did at first, a single beat where there
@@ -153,15 +157,16 @@ const CHORDS = [
  * so a change is heard as a change and not as a click. Written into `out`
  * between `t0` and `t1` at `gain` (a function of time, for fades).
  */
-function padSpan(out, t0, t1, bar, firstBar, gain) {
+function padSpan(out, t0, t1, bar, firstBar, gain, chordBars = 1) {
   const s0 = Math.max(0, Math.round(t0 * SR)), s1 = Math.min(out.length, Math.round(t1 * SR));
   for (let i = s0; i < s1; i++) {
     const t = i / SR;
     const k = Math.floor((t - firstBar) / bar);
-    const chord = CHORDS[((k % 4) + 4) % 4];
+    const at = (kk) => CHORDS[((Math.floor(kk / chordBars) % 4) + 4) % 4];
+    const chord = at(k);
     const into = t - firstBar - k * bar;
     const x = Math.min(1, into / (bar / 16));
-    const prev = CHORDS[(((k - 1) % 4) + 4) % 4];
+    const prev = at(k - 1);
     let s = 0;
     for (const f of chord.notes) for (const d of [0.998, 1.002]) for (let h = 1; h <= 4; h++) s += x * Math.sin(2 * Math.PI * f * d * h * t) / h;
     if (x < 1) for (const f of prev.notes) for (const d of [0.998, 1.002]) for (let h = 1; h <= 4; h++) s += (1 - x) * Math.sin(2 * Math.PI * f * d * h * t) / h;
@@ -197,7 +202,11 @@ const DITHER = 1.6e-5;
  *   gainDb    the whole song this much quieter or louder;
  *   seed      the humanising and the noise;
  *   buildKick a club build that keeps its kick (some do), for the case
- *             where the low end does not leave at all.
+ *             where the low end does not leave at all;
+ *   chordBars how many bars each chord lasts (1 by default, and the songs
+ *             are then the same to the sample as before it existed). At 2
+ *             half the bar lines have no harmonic change on them, which is
+ *             most pop music, and the downbeat finder's harder case.
  *
  * Returns the samples and the truth:
  *
@@ -208,7 +217,7 @@ const DITHER = 1.6e-5;
  *   returns   where the kick comes back after two bars or more without it:
  *             the moments a light show would call a drop.
  */
-export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed = 1, buildKick = false }) {
+export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed = 1, buildKick = false, chordBars = 1 }) {
   const rand = rng(seed);
   const beat = 60 / bpm, bar = beat * 4;
   const lead = beat;                              // a beat of silence before the song starts
@@ -228,14 +237,14 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
     const padGain = kind === 'outro'
       ? (x) => Math.max(0, 1 - (x - start) / (end - start))
       : kind === 'intro' ? (x) => Math.min(1, (x - start) / 2) * 0.8 : () => (kind === 'drop' || kind === 'chorus' ? 1.1 : 1);
-    if (kind !== 'silence') padSpan(out, start, end, bar, lead, padGain);
+    if (kind !== 'silence') padSpan(out, start, end, bar, lead, padGain, chordBars);
     if (kind === 'build') riser(out, start, end, rand);
 
     for (let b = 0; b < sec.bars; b++) {
       const barAt = start + b * bar;
-      const chord = CHORDS[Math.round((barAt - lead) / bar) % 4];
+      const chord = CHORDS[Math.floor(Math.round((barAt - lead) / bar) / chordBars) % 4];
       truth.downbeats.push(barAt);
-      const fillBar = (kind === 'verse' || kind === 'chorus' || kind === 'drop') && b % (style === 'band' ? 4 : 8) === (style === 'band' ? 3 : 7);
+      const fillBar = style !== 'loop' && (kind === 'verse' || kind === 'chorus' || kind === 'drop') && b % (style === 'band' ? 4 : 8) === (style === 'band' ? 3 : 7);
       if (fillBar) truth.fills.push(barAt + 2 * beat);
       for (let q = 0; q < 4; q++) {
         const at = barAt + q * beat;
@@ -243,7 +252,7 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
         const inFill = fillBar && q >= 2;
         const grooving = kind === 'verse' || kind === 'drop' || kind === 'chorus';
         // Kick.
-        const kickHere = grooving && !inFill && (style === 'club' ? true : q === 0 || q === 2)
+        const kickHere = grooving && !inFill && (style !== 'band' ? true : q === 0 || q === 2)
           || (kind === 'build' && buildKick);
         const kicks = [];
         if (kickHere) kicks.push(at);
@@ -256,9 +265,9 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
           kick(out, kt, (0.8 + 0.2 * rand()) * loud);
         }
         // Crash on the one of a drop, and on every fourth bar of a chorus.
-        if (q === 0 && ((kind === 'drop' && b === 0) || (kind === 'chorus' && b % 4 === 0))) crash(out, at + jitter(), 0.9, rand);
+        if (style !== 'loop' && q === 0 && ((kind === 'drop' && b === 0) || (kind === 'chorus' && b % 4 === 0))) crash(out, at + jitter(), 0.9, rand);
         // Snare: the backbeat, or the build's roll.
-        if (grooving && !inFill && (q === 1 || q === 3)) snare(out, at + jitter(), (0.75 + 0.25 * rand()) * loud, rand);
+        if (grooving && !inFill && style !== 'loop' && (q === 1 || q === 3)) snare(out, at + jitter(), (0.75 + 0.25 * rand()) * loud, rand);
         if (kind === 'build') {
           const u = b / sec.bars;
           const per = u < 0.25 ? 1 : u < 0.5 ? 2 : u < 0.75 ? 4 : 8;
@@ -276,8 +285,17 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
         // a quiet one on each beat in an intro or breakdown.
         if (grooving) for (let e = 0; e < 2; e++) hat(out, at + e * beat / 2 + jitter(), (0.5 + 0.3 * rand()) * loud, rand, e === 1 && (kind === 'drop' || kind === 'chorus'));
         else if (kind === 'breakdown' || kind === 'intro') hat(out, at + jitter(), 0.25 + 0.1 * rand(), rand);
-        // Bass: the chord's root on every eighth, in the groove only.
-        if (grooving) for (let e = 0; e < 2; e++) bassNote(out, at + e * beat / 2 + jitter(), beat / 2 * 0.9, chord.root * (e === 1 && q === 3 ? 2 : 1), (0.8 + 0.2 * rand()) * loud);
+        // Bass: the chord's root on every eighth, in the groove only, and the
+        // octave on the "and" of four, the pickup into the next bar's one.
+        // Not in `loop`: a pickup once a bar is a bar line anyone can hear,
+        // and the loop is the case with none. It was there at first, and the
+        // bar grid heard it: under a sure mark of 1 the loop at 126 was sure
+        // on 91 ticks of 216, every one at the same place, and its paired t
+        // reached 2.62 where without the pickup it reaches 1.51; the grid's
+        // sure mark had been set over what was a bar cue. The same `rand()`
+        // calls either way, so `club` and `band` are the same to the sample
+        // (measured: not one sample differs).
+        if (grooving) for (let e = 0; e < 2; e++) bassNote(out, at + e * beat / 2 + jitter(), beat / 2 * 0.9, chord.root * (e === 1 && q === 3 && style !== 'loop' ? 2 : 1), (0.8 + 0.2 * rand()) * loud);
       }
     }
     t = end;
