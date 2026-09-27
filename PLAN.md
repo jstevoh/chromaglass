@@ -1247,6 +1247,19 @@ touches the Mixer; the second looks like the adapter going away under the run. W
 after it. And #193's first show shard died before any test ran: the runner could not
 resolve github.com at checkout.
 
+Found while shipping step 4, not yet done: #195's deploy (main 6c6d17e) went red on
+two Mac checks that passed on the same tree in its PR run and again in #196's run
+right after, so step 4 went live only with #196. `npm run ears` on the open shard:
+"visible with the wall asking too" drew 14 frames in 2 s where it asks more than 20
+(35 in #196's run); every reading was in the right place, so the floor counted the
+runner's frame rate, not the ear, and the "Gaps in the plan" thread has a fix on #194.
+`npm run squeeze` on the show shard: "the tapped beat drives the show's clock" read a
+beat every 396.6 ms against 401.4 ms tapped (2 ms allowed), with the plate stepping
+255 times in 12 s where it steps about 320; the Mixer's fades only read the tempo. The
+tempo the taps set is the plain mean of their gaps, so something moved the clock off it
+after the taps; worth reading whether the clock falls back to the heard beat when a
+frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
+
 Found while building step 4. Changed here, for Steve to confirm: Back reverts the
 look and whatever of the room the change itself moved (Lucky's roll of the
 microphone's Sensitivity and Bass Boost), but no longer the room's settings the hand
@@ -1276,11 +1289,22 @@ did not stop it, so the later moves seem not to reach the pinch at all (inferred
 measured): the touch listeners' cleanup drops the pinch, and a plate rebuilt mid-pinch
 would do exactly this.
 
-Found while building step 1, small and not yet done: the remote's Mixer has no check
-of its own (`npm run phone` drives the phone layout, not `?remote=1`), and on landscape
-phones narrower than about 800 px the dock's tools fall under the 48 px target (about
-770 px before the Mix button took a slot; `npm run phone` holds 812×375), so a two-row
-landscape dock is owed for the smallest phones.
+Found while building step 1, both **done** (#198): the remote's Mixer had no check of
+its own (`npm run phone` drives the phone layout, not `?remote=1`); `npm run remotemix`
+now starts the show server with a display and a phone on the remote and asks the
+display's own settings that the phone lists its rows in its order, moves the stack by
+the stack's rule, sets a blend and a level, walks a take down over the fade time set on
+the display and back, and takes another row with its own button (12 checks, in the
+Measure job; the order asked is one set on the display, since a remote that never read
+it drew the default and agreed). And on landscape phones narrower than about 800 px the dock's
+tools fell under the 48 px target (42 px at 740×360, 35 at 667×375): there the dock is
+now two rows, the ten tools over the five sheets, at 48 px and 4 px gaps, and one row
+from 800 up. The second row cost the plate its height (48% of a 667×375 screen, under
+the half a landscape plate is held to) until the top row, a full-width band of touch
+between the look and the three buttons, let touches through to the plate: 60% there
+now, and 79% at 844×390 (was 65%). `npm run phone` holds 800×360, 799×360, 740×360 and
+667×375, asks which sizes get one row and that a finger in the top gap lands on the
+plate (243 checks, was 177).
 
 Three Mac checks went red once each on commits that did not touch them, one per run,
 while this batch's plan was going in (#177), and no cause is known yet:
