@@ -966,7 +966,11 @@ while this batch's plan was going in (#177), and no cause is known yet:
   0.14 s, the opening's longest wait for a frame fell to 0.82 s (not at the first
   step), and the forty warm openings' median stop from 1.08 s to 0.12 s. The 2 s
   limit is unchanged. `npm run startup` now prints the submits the GPU spent longest
-  on round the first step, so the next stop of this kind names itself.
+  on round the first step, so the next stop of this kind names itself. Found on the
+  way: on a slow runner the control's own freeze ended right at its twenty-second
+  watch, so it read as never moving and check 1b failed on the control; the opening
+  is now read at least to when the plate was seen running, and 1b asks the control
+  to have run steadily at all.
 - Still owed from that hunt: the solver's first submits cost a few tenths of a second
   more than later ones even with every compute pipeline dispatched once ahead on
   scraps (downsample 0.32 s, upsampleDelta 0.40 s, run 36306162647). Worth finding

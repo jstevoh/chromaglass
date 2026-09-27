@@ -413,9 +413,20 @@ async function open(query, looks) {
       while (!later() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 100));
       return later();
     });
+    /*
+      Never shorter than the wait above for the plate to be running. On run
+      36306624796 the control's freeze (12.83 s, on a runner whose adapter
+      alone took 4.65 s) ended at 20.0 s, the plate was seen running at about
+      22 s, and the watch, twenty seconds, read the steps to 20.0 s: a stop
+      still going, so the control was "never" moving for good and check 1b
+      failed on the control, the show having been moving from 13.53 s. The
+      opening is read to a moment already seen, not one before it; for the
+      show the builds behind it end later than that anyway, so what it is
+      held to is unchanged.
+    */
     const watch = await page.evaluate(async ([least, past, behindEnd]) => {
       const first = (window.__startupRows.find((r) => r[3] > 0) ?? [null])[0];
-      const until = Math.max(least, first == null ? 0 : first + past, behindEnd == null ? 0 : behindEnd + 1000);
+      const until = Math.max(least, first == null ? 0 : first + past, behindEnd == null ? 0 : behindEnd + 1000, performance.now());
       while (performance.now() < until) await new Promise((r) => setTimeout(r, 100));
       return until;
     }, [WATCH_S * 1000, WATCH_AFTER_STEP_S * 1000, behind ? behind.at + behind.ms : null]);
@@ -741,9 +752,12 @@ try {
     + `${p ? `, after ${(p.ms / 1000).toFixed(2)} s building ${p.asked} pipelines ahead` : ''}${o.running ? '' : '; never two steady seconds'}`);
   const secs = (t) => (t == null ? 'never' : `${(t / 1000).toFixed(2)} s`);
   check(`and it is moving for good no later than the old way was (with ${STEADY_SLACK_S} s to spare)`,
-    o.steadyFrom != null && c.steadyFrom != null && o.steadyFrom <= c.steadyFrom + STEADY_SLACK_S * 1000
+    // A control that never ran steadily is no bar at all: its window now
+    // runs to when it was seen running (see the watch), and one that never
+    // was would otherwise hand the show a late one.
+    o.steadyFrom != null && c.running && c.steadyFrom != null && o.steadyFrom <= c.steadyFrom + STEADY_SLACK_S * 1000
       && o.steadyFrom / 1000 <= FIRST_STEP_MAX_S,
-    `from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)} for ?prepare=0`);
+    `from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)} for ?prepare=0${c.running ? '' : ' (never running steadily)'}, read to ${secs(c.watch)}`);
   // What the old way built on its frames, on the same look: each should have
   // been waited for. Names, not a count, so a list that grew elsewhere and
   // lost one of these still fails.
