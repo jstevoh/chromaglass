@@ -307,15 +307,22 @@ try {
     /*
       When the page's frames actually came, so the check can tell a tick
       that read between ordinary frames (wrong: a second clock) from one that
-      read in a stall past a quarter second (what the tick is for). Every
-      callback in one frame lands within a millisecond, so one stamp a frame.
+      read in a stall past a quarter second (what the tick is for). One stamp
+      a frame, told apart by the frame's own timestamp, which every callback
+      of one frame is given. Not by the callbacks' own times: the page has
+      several loops (the ear's, the show's render, the ride), and the render
+      alone took 3 to 9 ms a frame in a cloud session and up to 153 ms with
+      software WebGPU, so "within a millisecond" stamped one frame twice and
+      the frame count below could double on a working clock (the check
+      skeptic's control: 119 frames read of "238 drawn").
     */
     window.__rafTimes = [];
+    let lastTs = null;
     const stamp = (cb) => (ts) => {
-      const now = performance.now();
-      const a = window.__rafTimes;
-      if (!a.length || now - a[a.length - 1] > 1) {
-        a.push(now);
+      if (ts !== lastTs) {
+        lastTs = ts;
+        const a = window.__rafTimes;
+        a.push(performance.now());
         if (a.length > 4000) a.splice(0, 2000);
       }
       cb(ts);
@@ -400,10 +407,16 @@ try {
       if (gap <= 250) misplaced++;
     }
     const counted = { ask: recent.filter(r => r.driver === 'ask').length, tick: recent.filter(r => r.driver === 'tick').length };
-    const stamped = stamps.filter(t => t > t0 && t <= t1).length;
+    const inWindow = stamps.filter(t => t > t0 && t <= t1);
+    const stamped = inWindow.length;
+    // The frames the clock was right to pass over: one whose frame came less
+    // than EAR_MIN_GAP_MS (4) after an ask's or a tick's reading, which the
+    // clock takes as the same reading. Each such frame by name, not one per
+    // off-frame reading: a reading far from any frame excuses nothing.
+    const excused = inWindow.filter(t => recent.some(r => r.at <= t && t - r.at < 4)).length;
     return {
-      misplaced, closest, n: recent.length, stamped,
-      honest: counted.ask === d.ask && counted.tick === d.tick && stamped >= d.frame - 1,
+      misplaced, closest, n: recent.length, stamped, excused,
+      honest: counted.ask === d.ask && counted.tick === d.tick && stamped >= d.frame,
     };
   }, [t0, t1, d]);
   const watch = async (ms) => {
@@ -414,6 +427,23 @@ try {
     return { lv, d, drawn: b.frames - a.frames, ear: b.ear, at: await placed(a.now, b.now, d) };
   };
   const inStalls = (v) => v.at.honest && v.at.misplaced === 0;
+  /*
+    "The frames read" as the feature, not as the runner's frame rate. This
+    was `more than 20 frame readings in 2 s`, and on #195's deploy (main
+    6c6d17e) it went red on the Mac at 14: that page drew 14 frames in the
+    two seconds, still building pipelines behind the show (`npm run
+    startup`: the rest is built from about 19 s to 43 s, and this runs
+    inside that), and the wall's 10 asks all read in its stalls, more than
+    250 ms after a frame, as the clock is written to. Nothing was wrong with
+    the ear; the floor measured how fast that runner drew. So: every frame
+    the page drew read, but for a frame that came within EAR_MIN_GAP_MS of
+    an ask's or a tick's reading (`excused` above, each one named). No slack
+    for the window's edges: a snapshot is its own task and cannot fall
+    between one frame's callbacks. And at least ten frames, so a page that
+    barely drew cannot pass on nothing.
+  */
+  const everyFrame = (v) => v.at.stamped >= 10 && v.d.frame >= v.at.stamped - v.at.excused;
+  const frameNote = (v) => ` (of ${v.at.stamped} frames the page drew${v.at.excused ? `, ${v.at.excused} of them within 4 ms of another reading` : ''})`;
   const stallNote = (v) => `; ${v.at.n ? `${v.at.misplaced} of ${v.at.n} read within 250 ms of a frame (closest ${v.at.closest.toFixed(0)} ms)` : 'none read off a frame'}` +
     `${v.at.honest ? '' : `; the record does not agree (${v.at.stamped} frames stamped)`}`;
 
@@ -430,8 +460,8 @@ try {
   await page.waitForTimeout(4000);
   const v1 = await watch(2000);
   check('visible, the band is heard on the frames alone (the tick only where its frames stalled past 250 ms)',
-    v1.lv.size >= 10 && v1.d.frame > 20 && v1.d.ask === 0 && inStalls(v1),
-    `${v1.lv.size} distinct levels in 2 s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick; context ${v1.ear.state}${stallNote(v1)}`);
+    v1.lv.size >= 10 && everyFrame(v1) && v1.d.ask === 0 && inStalls(v1),
+    `${v1.lv.size} distinct levels in 2 s; readings ${v1.d.frame} frame, ${v1.d.ask} ask, ${v1.d.tick} tick${frameNote(v1)}; context ${v1.ear.state}${stallNote(v1)}`);
 
   /*
     The wall: a second window asking for frames on its own animation frames,
@@ -454,8 +484,8 @@ try {
   await page.waitForTimeout(300);
   const v2 = await watch(2000);
   check('visible with the wall asking too, still only the frames read (the wall only where the frames stalled past 250 ms)',
-    v2.d.frame > 20 && inStalls(v2),
-    `readings ${v2.d.frame} frame, ${v2.d.ask} ask, ${v2.d.tick} tick${stallNote(v2)}`);
+    everyFrame(v2) && inStalls(v2),
+    `readings ${v2.d.frame} frame, ${v2.d.ask} ask, ${v2.d.tick} tick${frameNote(v2)}${stallNote(v2)}`);
 
   // Covered, the wall still asking.
   await page.evaluate(() => { window.__covered = true; });

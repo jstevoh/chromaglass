@@ -108,6 +108,8 @@ npm run build
 npm run remote
 ```
 
+In the **iPhone app** (`npm run ios` on a Mac with Xcode; PLAN.md §12) the phone plays the show itself, and More › **Laptop remote** turns it into this remote: paste the Phone address `npm run remote` printed, or type the laptop's address and key. The app remembers the laptop, and **Play here** switches back.
+
 The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true&key=…`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
 
 ## On stage

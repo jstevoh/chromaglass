@@ -2,6 +2,7 @@ import {StrictMode, Component, lazy, Suspense, useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client';
 import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
+import { isPhoneApp } from './lib/appLink';
 
 // The black box, first: whatever goes wrong from here on has a line
 // (docs/crash-plan.md).
@@ -17,8 +18,10 @@ const Root = params.has('remote')
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only
-// on a built site: the dev server's modules must never be cached.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// on a built site: the dev server's modules must never be cached. Not in the
+// iPhone app, whose files are already on the phone (lib/appLink.ts): a worker
+// there would only be a second copy that can go stale.
+if (import.meta.env.PROD && 'serviceWorker' in navigator && !isPhoneApp()) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => { /* http on a LAN address: no worker, no harm */ }); });
 }
 

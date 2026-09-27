@@ -49,6 +49,8 @@
     "qa": "npm run build && node scripts/qa.mjs",
     "layout": "npm run build && node scripts/layout.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
+    "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
+    "ios": "npm run build && npx cap sync ios && npx cap open ios",
     "check": "node scripts/check.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "update": "git pull origin main && npm install && npm run build",
@@ -144,6 +146,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
