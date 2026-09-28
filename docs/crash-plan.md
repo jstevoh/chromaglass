@@ -262,3 +262,35 @@ has a GPU that presents.
 On a machine with no WebGPU that can present (a Linux runner, this container),
 the checks in 3 and 4 and the screenshot half of 2 say so and skip. A fatal
 written by hand stands in to prove the button.
+
+## Found 2026-09-28, not done
+
+From a reading of the code, not from a report.
+
+- **The report Worker's limits are cheaper to get round than they look**
+  (`server/report-worker.js`). The hourly limit is per full address (`rl:<ip>:<hour>`),
+  so an IPv6 client that rotates its address has none: 30 reports of 4 MB per address
+  per hour. Each report is two KV writes, and on the free plan's 1,000 writes a day about
+  500 junk posts make every later report that day fail with a 500. The R2 objects never
+  expire; only the KV index has its 40-day TTL. `digestDays` does one KV `get` per
+  report, so a window of more than about a thousand reports is over the per-call limit,
+  and `/digest` and the cron fail on exactly the day there are most crashes to read.
+  **Do:** the limit per /64 on IPv6; a body cap near what a report is (10 kB and a JPEG
+  of up to 150 kB, above: 1 MB rather than 4); an R2 lifecycle rule beside the KV TTL; a
+  per-day aggregate written with each report, which the digest reads instead of every
+  record. **Measure:** `npm run report-worker`: a rotating /64 is limited, a 1.5 MB body
+  refused, a digest over 2,000 reports answers.
+- **A report's stack cannot be read back to the code.** The build writes no source
+  maps, and the engine's chunk is named after its first module, `castProtocol-*.js`, so
+  a GPU crash reads as a fault in "castProtocol" and `App-*.js:1:NNNNN` points nowhere.
+  **Do:** `build.sourcemap: 'hidden'`, the maps kept as a deploy artifact and not
+  served, and the chunk named `engine`; the `crash-triage` skill maps a frame through
+  them (`PLAN.md` 19d).
+- **`npm run crash` can be green on a Mac that never drew.** "A machine with no WebGPU
+  that can present" (above) is decided by a 20 s wait with `.catch(() => false)`, and the
+  exit counts only FAILs, so a Mac runner that comes up with no adapter (`PLAN.md` §0
+  records one) passes the tools shard having skipped the screenshot half of 2, and 3 and
+  4. **Do:** `CRASH_GPU=1` on the shard, turning those skips into FAILs as `PHONE_GPU`
+  and `SQUEEZE_GPU` do (`PLAN.md` 19c).
+- **The fingerprint Worker has none of this Worker's guards**: any origin, no limit, and
+  a paid API behind it (`PLAN.md` 14o).
