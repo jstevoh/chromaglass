@@ -575,6 +575,11 @@ export class WebGPUFluid {
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
       ['mixCarry', [RGBA32], false],
+      // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
+      // its first steps, only a Finger or a Blow does, so like mixCarry it is
+      // built behind the show; waited for at the open, `npm run startup`
+      // fails it as asked for by none.
+      ['phaseCarry', [R32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
       ['rxnStep', [RGBA32], open.reaction],
@@ -1870,14 +1875,53 @@ export class WebGPUFluid {
    * units. Only the oil moves; the soap and the acidity stay where they are.
    */
   carryMix(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void {
+    this.runMixCarry(radius, take, [x, y, radius, take, ux * hop, uy * hop, 0, 0]);
+  }
+
+  /**
+   * The Press's oil (squeezeOut in LiquidVisualizer, through pressOil in
+   * src/lib/pressRing.ts): the same share of every cell under the palm,
+   * put down on the ring from the palm's rim to `outer`, where the dye goes.
+   * The same kernel as carryMix in its other mode (mixCarry says how it
+   * lands and why it keeps what would land off the plate).
+   */
+  pressMix(x: number, y: number, radius: number, outer: number, take: number): void {
+    if (!(outer > radius)) return;
+    this.runMixCarry(radius, take, [x, y, radius, take, 0, 0, outer, 1]);
+  }
+
+  private runMixCarry(radius: number, take: number, args: number[]): void {
     if (!this.mix || !this.mixLive || !(radius > 0) || !(take > 0)) return;
     const m = this.mix;
     const enc = this.device.createCommandEncoder({ label: 'carry mix' });
     const pass = enc.beginComputePass({ label: 'carry mix' });
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', [x, y, radius, take, ux * hop, uy * hop, 0, 0]));
+    this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', args));
     m.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  /**
+   * Carry the ferrofluid along a gesture (the Finger, a directed blow) or
+   * straight out from its middle (a puff): taken from each cell under the
+   * hand in proportion to how near its middle the cell is, and put down a
+   * hop away (phaseCarry). In plate units; the direction need not be unit
+   * length for a stroke and is ignored for a puff. Only with ferrofluid on
+   * the plate.
+   */
+  carryPhase(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number, outward = false): void {
+    if (!this.phaseLive || !(radius > 0) || !(take > 0) || !(hop > 0)) return;
+    const len = Math.hypot(ux, uy);
+    if (!outward && !(len > 1e-6)) return;
+    const enc = this.device.createCommandEncoder({ label: 'carry phase' });
+    const pass = enc.beginComputePass({ label: 'carry phase' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'phaseCarry', this.phase.write, [this.phase.read],
+      this.arg('phase carry', [x, y, radius, Math.min(1, take), outward ? 0 : ux / len, outward ? 0 : uy / len, hop, outward ? 1 : 0]));
+    this.phase.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
   }

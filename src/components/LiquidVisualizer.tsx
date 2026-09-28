@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked } from '../lib/earClock';
@@ -50,6 +51,7 @@ import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
+import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -250,6 +252,16 @@ const BLOW_SWIRL = 0.55;
   and because the roll is the part that survives the projection.
 */
 const FINGER_SWIRL = 0.8;
+/*
+  A moving Blow on the ferrofluid (PLAN.md §9n) pushes along the way the hand
+  last went, for this long after it last moved. Long enough to cover a
+  frame's later sim steps (the stroke is nothing on those) and a frame or two
+  at 20 fps where the pointer reported no move; short enough that a hand that
+  stops and holds is a puff, opening a hole, within a tenth of a second or so
+  of stopping, which reads as at once.
+*/
+const BLOW_DIR_HOLD_MS = 150;
+type BlowDir = { x: number; y: number; at: number };
 /*
   Oil Bodies' pours (the onDeposit hook): a body is this many times the
   bottle's own radius (Oil's is 2, so about a tenth of the plate across
@@ -1023,6 +1035,8 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
+  /** The Press's oil, once a dye reading (squeezeOut). */
+  private oilPressAfter = 0;
   /*
     A move not yet handed to the GPU. The reading to wait for was counted
     from the move, two copies on, on the grounds that the deltas go across at
@@ -1197,7 +1211,7 @@ class FluidSimulation {
     this.gpu = gpu;
     gpu.clear();
     // Its readings count from nothing again, and whatever was pending went with the last solver.
-    this.dyeMoveAfter = 0; this.dyeMovePending = false;
+    this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
     this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
@@ -1372,46 +1386,28 @@ class FluidSimulation {
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
-    const dye = this.gpu.rbDyeView;
     const N = this.size;
     const R = Math.max(2, radius);
-    const rOut = R * 1.7;
-    const disc: number[] = [], ring: number[] = [];
-    const yl = Math.max(0, Math.floor(cy - rOut)), yh = Math.min(N - 1, Math.ceil(cy + rOut));
-    const xl = Math.max(0, Math.floor(cx - rOut)), xh = Math.min(N - 1, Math.ceil(cx + rOut));
-    for (let y = yl; y <= yh; y++) {
-      for (let x = xl; x <= xh; x++) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d <= R) disc.push(x + y * N);
-        else if (d <= rOut) ring.push(x + y * N);
-      }
+    // How much of what is under the palm goes, this press (pressRing.ts).
+    const take = pressTake(amount);
+    /*
+      With Oil Bodies the oil goes with its colour (PLAN 15d): the same share
+      of every cell, landed on the same cell of the ring as the colour it
+      carried (pressMix; pressDye below is the same map on the CPU). Without
+      it a press drew a body's colour out into the water and left the oil
+      where it was, colourless. Before the dye's own early return, so a body
+      the old fault already left clear can still be pressed out, and on its
+      own clock, once a dye reading as the dye's is: with no colour under the
+      palm the dye never marks its move pending, so without this the oil
+      would be pressed every step at a share sized for one press a reading.
+    */
+    if ((this.lastSettings?.oilBodies ?? 0) > 0.001 && this.gpu.rbDyeLanded >= this.oilPressAfter) {
+      pressOil(this.gpu, cx, cy, R, N, take);
+      this.oilPressAfter = this.gpu.rbDyeIssued + 1;
     }
-    if (disc.length === 0 || ring.length === 0) return;
-
-    let mass = 0, aR = 0, aG = 0, aB = 0;
-    // How much of what is under the palm goes, this press. A share rather
-    // than all of it: a hand squeezes the film thin, it does not scrape it.
-    // Once per current reading now (see dyeMoveAfter), a few frames apart, so a
-    // bigger share each time for the same press.
-    const take = Math.max(0, Math.min(0.6, amount * 48));
-    for (const i of disc) {
-      const i4 = i * 4;
-      const v = dye[i4 + 3];
-      if (!(v > 1e-5)) continue;
-      mass += v * take; aR += dye[i4] * take; aG += dye[i4 + 1] * take; aB += dye[i4 + 2] * take;
-    }
-    if (!(mass > 1e-4)) return;
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    if (!(pressDye(this.gpu.rbDyeView, N, cx, cy, R, take, out) > 1e-4)) return;
     this.dirty = true;
-    // Out of the disc, through the multiplicative channel that exists for dye
-    // being taken away...
-    for (const i of disc) this.mul[i] *= 1 - take;
-    // ...and into the ring, in the mirror's own log space so the colour that
-    // arrives is the colour that left.
-    const w = 1 / ring.length;
-    for (const i of ring) {
-      this.density[i] += mass * w;
-      this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
-    }
     this.dyeMoved();
   }
 
@@ -2500,7 +2496,7 @@ class FluidSimulation {
    * that refuse each other are briefly one liquid and stay mixed after the
    * finger has gone.
    */
-  fingerDrag(x: number, y: number, radius: number, strength: number, dx: number, dy: number): void {
+  fingerDrag(x: number, y: number, radius: number, strength: number, dx: number, dy: number, phase = true): void {
     const r = Math.round(radius * GRID_SCALE);
     const r2 = r * r;
     const len = Math.hypot(dx, dy);
@@ -2563,6 +2559,17 @@ class FluidSimulation {
       const L = this.size;
       this.gpu.carryMix(x / L, y / L, r / L, ux, uy, Math.min(0.75, strength * 8), Math.max(1, Math.round(r * 0.45)) / L);
     }
+    /*
+      And the ferrofluid, the same take and the same hop, when the colour
+      went: it rode the flow alone and stayed where it was under a Finger
+      (asked: "Shouldn't blowing and finger also move around the
+      ferrofluid?"; PLAN.md §9n, `npm run ferrohands`). A hand's Finger
+      only (phase): the automation's evolve stroke drags a finger too, and
+      on a ferro look it would pull tongues out of the pools unasked, as
+      the automation's breath would (see blowPhase).
+    */
+    const fc = carried && phase && this.gpu?.carryPhase ? fingerCarry(x, y, radius, strength, dx, dy, this.size) : null;
+    if (fc) this.gpu!.carryPhase!(fc.x, fc.y, fc.r, fc.ux, fc.uy, fc.take, fc.hop, fc.outward);
     // And the chemistry under it is averaged, which is the mixing.
     this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
   }
@@ -2644,6 +2651,24 @@ class FluidSimulation {
         }
       }
     }
+  }
+
+  /**
+   * A hand's Blow on the ferrofluid (PLAN.md §9n): held still it opens a
+   * hole, moved it pushes the ferrofluid along (blowCarry). Its own method,
+   * called where a hand blows, and not inside blowAir: blowAir is also the
+   * pour event's burst, the automation's breath and every bubble's pop,
+   * and a pour-sized carry would punch a hole a fifth of the plate across
+   * in a ferro look (and take 220 times the tool's puff to run).
+   *
+   * The push blowAir and blowDirected add barely moves it: it lasts one
+   * step before the solver's speed clamp cuts it back (phaseCarry, in the
+   * solver's shaders, has the numbers).
+   */
+  blowPhase(x: number, y: number, radius: number, strength: number, dx: number, dy: number): void {
+    if (!this.gpu?.carryPhase) return;
+    const c = blowCarry(x, y, radius, strength, dx, dy, this.size);
+    this.gpu.carryPhase(c.x, c.y, c.r, c.ux, c.uy, c.take, c.hop, c.outward);
   }
 
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false) {
@@ -4288,6 +4313,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * went on pushing the liquid. This is the move since the tool last acted.
    */
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
+  // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
+  const blowDirRef = useRef<BlowDir | undefined>(undefined);
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -4299,7 +4326,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * own way) and its own drop clock (so each lays its first drop as it lands).
    * Keyed by the touch's identifier; emptied when the fingers leave.
    */
-  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number }>());
+  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number; blowDir?: BlowDir }>());
   /** Which touch is the pointer, while one is. */
   const primaryTouchRef = useRef<number | null>(null);
   /**
@@ -4533,8 +4560,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
-        if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
-        else af.blowAir(x, y, 4, 0.06 * amt);
+        if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
+          af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+          af.blowPhase(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+        } else {
+          af.blowAir(x, y, 4, 0.06 * amt);
+          af.blowPhase(x, y, 4, 0.06 * amt, 0, 0);
+        }
         if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
         }
@@ -6080,7 +6112,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // ── Manual injection ───────────────────────────────────
           // The dropper's clock runs while it is held and starts again at 0 on
           // the next press, so every press lands a drop at once.
-          if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; }
+          if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; blowDirRef.current = undefined; }
           else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
           for (const h of extraHandsRef.current.values()) if (simStep > 0 || h.clock > 0) h.clock++;
           /*
@@ -6091,9 +6123,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             pointer's stroke is written back to its ref for the next step; the
             other fingers' live in their own entries.
           */
-          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number };
+          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number; blowDir?: BlowDir };
           const hands: { hand: Hand; primary: boolean }[] = [];
-          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current }, primary: true });
+          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
           for (const { hand, primary } of hands) {
             if (drainFrameRef.current !== 0) break;
@@ -6167,6 +6199,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // One straw (bubbles.ts keeps a single straw bubble), so the
                 // first finger blows it and any other finger is the wind.
                 const still = Math.hypot(strokeDx, strokeDy) < 0.75;
+                /*
+                  And the ferrofluid, held or moved, straw or wind (PLAN.md
+                  §9n). Moved, it pushes along the way the hand last went
+                  (BlowDir): the stroke is nothing on every step after a
+                  frame's first, and on a frame the pointer did not move, and
+                  read afresh each step a slow drag swept then puffed then
+                  swept, leaving a trench of holes and not a pushed tongue.
+                */
+                const now = performance.now();
+                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now };
+                const going = hand.blowDir && now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
+                af.blowPhase(x, y, 4, 0.06 * k, going ? going.x : 0, going ? going.y : 0);
                 if (activeLayerRef.current === 0 && still && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
                 } else {
@@ -6316,7 +6360,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k);
               }
             }
-            if (primary) strokeLastRef.current = hand.stroke;
+            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; }
           }
 
           // ── Automation logic ───────────────────────────────────
@@ -6480,7 +6524,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (stroke) {
               const af = fluidsRef.current[0];
               if (af) {
-                af.fingerDrag(stroke.x, stroke.y, 7, 0.07, stroke.dx * 3, stroke.dy * 3);
+                af.fingerDrag(stroke.x, stroke.y, 7, 0.07, stroke.dx * 3, stroke.dy * 3, false);
                 if ((currentSettings.bubbles ?? 0) > 0) {
                   beadsRef.current.disturb(stroke.x, stroke.y, 9 * GRID_SCALE, 0.18);
                 }

@@ -1896,6 +1896,66 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The ferrofluid carried by a hand (carryPhase): the Finger drags it along
+    its stroke and Blow pushes it away, as they carry the dye (carryDye in
+    the app) and the oil (mixCarry). Asked by the owner: "Shouldn't blowing
+    and finger also move around the ferrofluid?" Barely. Both tools add
+    velocity, and the ferrofluid rides the flow as the dye does, but the
+    push is small (a Finger's moves the liquid about a tenth of a cell a
+    step) and it lasts one step: the speed clamp (MAX_SPEED in fluid.ts,
+    which the plate's flow already sits at) cuts it back to an idle plate's
+    speed at the end of the step it was added in. Measured by the thread
+    that went over every tool on every liquid: a Finger dragged 30 cells
+    across a pool moved its middle 0.2 of a cell, dye and ferrofluid alike.
+    So the dye has been moved by hand, a take and a put, since the Finger
+    was built (carryDye), and the oil with it; the ferrofluid never was.
+
+    Each cell under the hand gives up its share (more near the middle) and
+    that share lands a hop away: along the stroke for the Finger and a
+    directed blow, straight out from the middle for a puff (A.b.w), which
+    opens a hole in a pool as air blown down on a thin layer does. The
+    landing cell is found by gathering: every cell asks which of its
+    neighbours within a hop send to it, each sender to exactly one whole
+    cell, so what leaves one cell arrives in one other and nothing is made
+    or lost. A cell that would send off the plate keeps its share.
+
+    A.a = (x, y, radius, take), A.b = (the direction, the hop, radial), all
+    in plate units.
+  */
+  phaseCarry: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn took(q: vec2i) -> f32 { return A.a.w * max(0.0, 1.0 - length((vec2f(q) + 0.5) / S.n - A.a.xy) / A.a.z); }
+fn inPlate(q: vec2i) -> bool { return q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n); }
+// Where cell q's share lands, in whole cells, so each sender has one.
+fn dest(q: vec2i) -> vec2i {
+  var d = A.b.xy;
+  if (A.b.w > 0.5) {
+    let o = (vec2f(q) + 0.5) / S.n - A.a.xy;
+    d = select(vec2f(0.0), o / max(length(o), 1e-6), length(o) > 0.5 / S.n);
+  }
+  let to = q + vec2i(round(d * A.b.z * S.n));
+  return select(q, to, inPlate(to));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let c = textureLoad(src, p, 0).r;
+  // Nothing reaches a cell further than a hop past the hand's rim.
+  if (length(uvOf(id) - A.a.xy) > A.a.z + A.b.z + 2.0 / S.n) {
+    textureStore(dst, p, vec4f(c, 0.0, 0.0, 0.0));
+    return;
+  }
+  var v = c * (1.0 - took(p));
+  let R = i32(ceil(A.b.z * S.n)) + 1;
+  for (var j = -R; j <= R; j++) { for (var i = -R; i <= R; i++) {
+    let q = p + vec2i(i, j);
+    if (inPlate(q) && all(dest(q) == p)) { v += textureLoad(src, q, 0).r * took(q); }
+  } }
+  textureStore(dst, p, vec4f(v, 0.0, 0.0, 0.0));
+}`,
+
+  /*
     Oil Bodies: the oil dragged by a hand, as the dye is (carryMix, and
     carryDye in the app). The dye's carry is a take and a put, on the CPU,
     through the deltas; the oil lives only here, so its carry is here, the
@@ -1907,21 +1967,75 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     left the oil where it was, colourless.
 
     A.a = (x, y, radius, take), A.b.xy = the hop, all in plate units.
+
+    A.b.w = 1 is the Press's carry instead (PLAN 15d, pressMix): A.b.z is
+    the outer edge of the ring squeezeOut lands the dye on (R to 1.7R). The
+    Press moved the colour and left the oil, so with Oil Bodies a press drew
+    a body's colour out into the water and the body stayed where it was,
+    colourless: the Finger's fault before this kernel, on the other tool.
+
+    The oil and the dye go the same way, cell for cell. The dye's take is
+    flat across the palm (the same share of every cell), so the oil's is
+    too, not the Finger's cone: a cone took a third of the dye's share
+    averaged over the palm, and two thirds of the colour a press moved still
+    left without its oil. And both are laid on the ring R to 1.7R area for
+    area: a point s from the middle lands at sqrt(R^2 + s^2 K),
+    K = (O^2 - R^2) / R^2, which carries the disc onto the ring with a
+    constant stretch of K, so every ring cell receives 1 / K of the cell it
+    maps back to. The dye's half (pressDye, src/lib/pressRing.ts) is the same
+    map on the CPU; it used to spread what it took evenly round the whole
+    ring, so a palm half over a body put half the body's colour in the water
+    on the far side while the oil went out on its own. A first cut here that
+    hopped each point straight out by 0.7R landed a fifth of the oil back
+    under the palm, where no dye goes.
+
+    Only what has somewhere to go is taken. The app's palm is big (a
+    quarter of the plate across, R = 45 cells of 192), so from most places a
+    person presses, part of its ring is off the plate, and a gather cannot
+    receive at a cell that is not there: the oil taken for it was lost, 5%
+    of what a press moved at (0.3, 0.4), 27% at (0.15, 0.5). So a cell whose
+    landing point is off the plate keeps its oil (and its colour, in
+    pressDye), which the receiving side sees the same way because it asks
+    the same took() of the cell it gathers from.
   */
   mixCarry: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
-fn took(uv: vec2f) -> f32 { return A.a.w * max(0.0, 1.0 - length(uv - A.a.xy) / A.a.z); }
+// The Press's K: the ring's area over the palm's.
+fn stretch() -> f32 { return (A.b.z * A.b.z - A.a.z * A.a.z) / (A.a.z * A.a.z); }
+fn took(uv: vec2f) -> f32 {
+  let rel = uv - A.a.xy;
+  let d = length(rel);
+  if (A.b.w < 0.5) { return A.a.w * max(0.0, 1.0 - d / A.a.z); }
+  if (d >= A.a.z) { return 0.0; }
+  let to = A.a.xy + rel * sqrt(A.a.z * A.a.z + d * d * stretch()) / max(d, 1e-6);
+  if (any(to < vec2f(0.0)) || any(to >= vec2f(1.0))) { return 0.0; }
+  return A.a.w;
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let uv = uvOf(id);
   let m = textureLoad(src, p, 0);
-  let back = uv - A.b.xy;
+  var back = uv - A.b.xy;
+  var keep = 1.0;
+  if (A.b.w > 0.5) {
+    // Only the ring receives, from the point of the palm that maps onto it
+    // (pressDye in src/lib/pressRing.ts lands the colour by the same map). At
+    // r = R a fused multiply-add can leave r*r - R*R a hair below zero: max().
+    let rel = uv - A.a.xy;
+    let r = length(rel);
+    let R = A.a.z;
+    keep = 0.0;
+    if (r >= R && r < A.b.z) {
+      back = A.a.xy + rel * sqrt(max(0.0, r * r - R * R) / stretch()) / r;
+      keep = 1.0 / stretch();
+    }
+  }
   let q = vec2i(floor(back * S.n));
   var got = 0.0;
-  if (q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n)) {
-    got = textureLoad(src, q, 0).r * took((vec2f(q) + 0.5) / S.n);
+  if (keep > 0.0 && q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n)) {
+    got = textureLoad(src, q, 0).r * took((vec2f(q) + 0.5) / S.n) * keep;
   }
   textureStore(dst, p, vec4f(m.r * (1.0 - took(uv)) + got, m.gba));
 }`,

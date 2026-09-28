@@ -335,6 +335,11 @@ jobs:
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run lift
+      # A press moves the oil out from under the palm with its colour, onto the
+      # ring the dye lands on, and keeps all of it (PLAN §15d).
+      - name: The press moves the oil
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run pressoil
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
@@ -382,6 +387,11 @@ jobs:
       - name: The ferrofluid's fingers
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingers
+      # The Finger and Blow carry the ferrofluid, as they carry the dye; the
+      # tools' push alone (all they did before) leaves it where it was.
+      - name: The hands move the ferrofluid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run ferrohands
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
