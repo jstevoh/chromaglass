@@ -655,11 +655,23 @@ let failed = 0;
       // of time: the short end (25th percentile) of the gaps between
       // consecutive refreshes it was handed (see `__rafTs`), and the shorter
       // of the two windows', as the gate draws on the faster.
+      /*
+        The shortest gap that recurs (three within 1.5 ms of it), not a
+        percentile: a percentile jumps to two refreshes once fewer than that
+        share of a window's gaps are single ones (about 34 of 60 refreshes
+        handed, dropped in pairs), and the draw cost below, 0.7 of it, then
+        cost 1.4 of a real refresh, where a gate that doubles is held to one
+        draw a refresh by the thread and nothing can see it (the
+        check-skeptic, 2026-09-28). Recurring, so one stray short gap is not
+        read as the display; the 25th percentile when nothing recurs.
+      */
       const refreshGap = (ts, from) => {
         const g = [];
         for (let i = 1; i < ts.length; i++) if (ts[i - 1] >= from) g.push(ts[i] - ts[i - 1]);
         g.sort((x, y) => x - y);
-        return g.length >= 5 ? g[Math.floor(g.length / 4)] : null;
+        if (g.length < 5) return null;
+        const recurs = g.find((x) => x >= 4.2 && g.filter((y) => Math.abs(y - x) <= 1.5).length >= 3);
+        return recurs ?? g[Math.floor(g.length / 4)];
       };
       const showGap = refreshGap(window.__rafTs, showTs0);
       const wallGap = wallW ? refreshGap(wallW.__rafTs, wallTs0) : null;
@@ -668,8 +680,7 @@ let failed = 0;
       /*
         The refreshes served: every refresh either window was handed in
         these seconds, on this window's clock (the wall's timestamps moved
-        by the two time origins) and counted once where both windows were
-        handed the same one. Every draw the gate lets through is one
+        by the two time origins), counted in slots as below. Every draw the gate lets through is one
         window's frame or one ask, and each of those follows a refresh this
         count saw (the count loops run first, on the untouched clock), so a
         gate that draws once a refresh draws no more than this, whatever the
@@ -682,14 +693,29 @@ let failed = 0;
         eats the thread costs both windows their refreshes, and this count
         falls with it.
       */
+      /*
+        Counted as the gate spaces its draws, not by matching the two
+        windows' timestamps: the wall's refreshes at the time its frames are
+        handed over (`__phaseMs` late, as the gate sees them), and one slot
+        for each run of refreshes less than 0.6 of a refresh after the slot
+        began. Matching the timestamps (the first version of this) read a
+        working gate as doubling at three quarters of a refresh behind: when
+        a long task drops one refresh for both windows, the show's next frame
+        comes 1.25 of a refresh after the last draw and draws, and that
+        refresh's ask 0.75 later draws too, a slot the matched count never
+        had (the check-skeptic's model: 1.09 to 1.21 times at 10 to 30 % of
+        refreshes dropped, where the Mac drops 10 to 30 %). A gate drawing
+        twice within 0.6 of a refresh is still counted against one slot.
+      */
       const toHere = wallW ? wallW.performance.timeOrigin - performance.timeOrigin : 0;
+      const lag = wallW ? wallW.__phaseMs ?? 0 : 0;
       const both = [
         ...window.__rafTs.filter((t) => t > showTs0),
-        ...(wallW ? wallW.__rafTs.filter((t) => t > wallTs0).map((t) => t + toHere) : []),
+        ...(wallW ? wallW.__rafTs.filter((t) => t > wallTs0).map((t) => t + toHere + lag) : []),
       ].sort((x, y) => x - y);
-      const same = Math.min(3, 0.25 * (refreshMs ?? 16.7));
+      const apart = 0.6 * (refreshMs ?? 1000 / 60);
       const served = [];
-      for (const t of both) if (!served.length || t - served[served.length - 1] > same) served.push(t);
+      for (const t of both) if (!served.length || t - served[served.length - 1] >= apart) served.push(t);
       const servedGaps = served.slice(1).map((t, i) => t - served[i]).sort((x, y) => x - y);
       // What the governor was fed in this window: its log's last entries, as
       // many as it counted, and their median (see the governor line below).
@@ -774,19 +800,17 @@ let failed = 0;
         console.log(`  wall ${label.padEnd(30)} ${f1(m.drawn)} drawn/s${m.gate ? ` (${f1(m.gate.frame)} on the show's frames, ${f1(m.gate.ask)} on asks, ${f1(m.skipped)} turned down)` : ''}, displays ${f1(m.hz)} and ${f1(m.wallHz)} Hz, ${f1(m.asks)} asks/s, governor fed ${f1(m.frameMs)} ms`);
         /*
           Held to the refreshes served (see `served` in measure), and those
-          checked to be one display's: were the two windows' refreshes not
-          matched up (a time origin read wrong, or two displays), the count
-          would be the sum of both and the ceiling twice what it should be,
-          so that is red here rather than a ceiling nothing reaches. A
-          display rate with no gaps to measure it from is said so.
+          checked to be no more than one display's, so a count gone wrong
+          (a time origin read wrong, a lag not applied) is red here rather
+          than a ceiling nothing reaches. A display rate with no gaps to
+          measure it from is said so.
 
-          1.05 and not the 1.1 the display's rate had: a gate drawing once a
-          served refresh read 1.00 to 1.01 of them here at every phase, and a
-          gate stamping offers when they run, with 11.6 ms draws, 1.14 (67.6
-          drawn for 59.2 served) in one run and 1.11 (65.9 for 59.5) in the
-          next, which 1.1 would call a pass. On #203's Mac run the gate drew
-          51.5 to 55.4 a second with the windows handed 50.5 to 56.4 each,
-          so at most one draw a served refresh there too.
+          1.05 and not the 1.1 the display's rate had: the gate read 1.00 to
+          1.01 of the slots here at every phase, and a gate stamping offers
+          when they run, with 11.6 ms draws, 1.11 to 1.20 over four runs
+          (65.9 drawn for 59.5 in one), which 1.1 would call a pass. A cloud
+          session drops no refreshes, so the Mac's `tools` shard is the first
+          to count slots on a machine that does.
         */
         const oneDisplay = m.servedHz <= 1.05 * display;
         check(`both windows animating, the wall ${label}: at most 1.05 times the refreshes served, one display's`,
