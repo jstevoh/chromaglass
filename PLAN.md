@@ -62,7 +62,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes; nothing built in the plate. 20a–20f open |
 
@@ -2171,6 +2171,40 @@ read in the page's stalls). The floor now asks that every frame the page drew re
 the meters, at about ten updates a second, with the arrays reused. *Measure:* count
 `App` renders a second under `?debug` in `npm run desk` with a stream running (12 or
 fewer), and stamp the reading's time against the frame's.
+
+**Shipped, the sound's half (2026-09-27).** Measured first under `?debug` with the
+simulated band: the App rendered 69.8–70.3 times a second against 60 readings, and
+with no sound at all 5 times a second, every one of those a poll (the layer badges,
+the tempo label, the song's shape, the timecode, and where a plate draws the engine
+status) setting a value it already had, which React renders the App to find out
+whenever anything else is pending. Now the ear keeps every reading in a ref the
+moment it makes it (`Ear.live`), tells React ten times a second (`EAR_VIEW_MS`), and
+hands every reading to listeners on its own clock (`Ear.onReading`), which the cast's
+audio feed uses so it keeps its 30 a second behind the wall. The plate asks for the
+reading at the top of each frame (`hear`), and its frame first offers the ear that
+frame (`plateFrame`), so the frame hears a reading taken on itself whichever of the
+two loops runs first. The polls compare against what they last set. `npm run
+renders`, on the Perform desk: React told 10.0 times a second, the App rendering
+11.0 (those and the desk's "live for" clock), every commit on the page the same,
+laptop and phone; the old ear 69.9–70.6, red. The ear tells React on a 100 ms
+schedule, not 100 ms after the last time: readings come on frames, and "the first
+frame past 100 ms" fell to 7.5 a second at 15 frames a second (by the rule; a slow
+Mac draws 24 to 42), where the schedule keeps 10.0 down to 10. A quiet page renders
+its clock and nothing else, 1.0 a second (the old engine-status pattern 1.3–1.7,
+red). A frozen view (0.0 told), a dead render counter and a dead commit counter are
+red too. On the Mac `open` shard (#211's first run) the plate heard a reading taken
+on its own frame on every frame it drew (95 of 95 and 126 of 126 laptop, 72 of 72
+and 93 of 93 phone), with React told 9.9–10.3 a second at 24 to 42 frames a second
+and the App rendering 10.9–11.6. The ear's reading for the plate's frame runs
+guarded, so a throw in it costs that frame its reading, not the plate its loop.
+
+Still open here: the MIDI half. A fader still re-renders the App once a frame while
+it moves (`rideSetting`: the ride drains into `setSettings` on an animation frame), by
+design so the desk shows the value; reading the ride's shadow in the frame loop and
+showing the desk's value at ten a second is the same split, not yet done. And the
+reading's two byte arrays are still new each reading (about 60 KB a second), not
+reused: a listener may hold an older reading, so reusing them needs the readers
+checked first.
 
 ### 14g. A knocked cable: the audio interface and the projector do not come back
 
