@@ -64,7 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
-| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d); 18a picked first, not started |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2598,6 +2598,61 @@ its frame rate live. "Free" means no new passes or texture reads.
   the Mac, because it changes how every look moves and every tool feels. Measured by
   a new lab check (a press's ring radius against the volume displaced; a drag's
   displacement against the drag time ρh²/12μ; dye conserved with the carries off).
+
+- **Shipped, first part (Thin Gap, off in every look, 2026-09-28):** the setting
+  `thinGap` (a switch) and `gapThickness` (water to glycerine, log in viscosity) on the
+  sheet, the desks, MIDI and the remote. With it on: implicit gap drag 12ν/h² in place
+  of the clamp (a 0.2 m plate, the rest gap 6 mm); the step's forces and the lasting
+  current read as terminal speeds at the rest gap and fed in before the solve, the
+  stirring included; a variable-coefficient multigrid with M = h·c (h³/12μ once the
+  drag dominates) and face coefficients built in series along each coarse row; the rim
+  held at p = 0; the press as the gap's own change, not the squeeze memory's rate; no
+  self-advection, second projection, squeeze sweeps or `squeezeVelBuf`; a hand's push
+  imposed along its direction rather than added; the dye moved across faces as an
+  amount (`bodyAdvect`), since a backtrace made dye under a press (332 → 656). The thin
+  solve keeps its pressure in its own buffer and hands the advections c·P for their
+  Rhie–Chow faces. `npm run thingap` measures it against the old solver (16 checks).
+  Judged on the Mac: docs/judging.md §19.
+- **Left for later PRs, each its own thread (the shortcuts this one keeps, named):**
+  - **18a-2, forces that are forces.** The look's stirring (`forcesB`: turbulence,
+    spin, tension, drip, air) and every other force are still the old per-step
+    velocities, read as terminal speeds at the rest gap. Each should become a force
+    with its own physics (the stirring a declared "hand stir" dial), and the grates
+    thread's Saffman–Taylor item needs this first.
+  - **18a-3, tools as solids.** A hand's push is imposed along its direction (a
+    penalised solid in the limit where the solid wins), not a disc moving at the hand's
+    velocity (Brinkman), and the hand-written carries (`carryDye`, `carryMix`,
+    `fingerCarry`, `pressDye`, `pressMix`, `blowDye`, `blowOil`, `blowCarry`) still run
+    on top of the flow, so with Thin Gap on the colour is moved twice. Retire them one
+    at a time against `finger`, `wind`, `pressoil`, `ferrohands`, `tools`.
+  - **18a-4, the current into the field.** The lasting current (`cur`) is fed into the
+    thin solve as a force, but it still has its own solver on the M grid; its forces
+    (rock, twist, buoyancy, centre gravity) belong in the main field, and then the
+    current's solver and its 0.4 ms go.
+  - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
+    step, so the displaced volume leaves in one step, faster than the dye's face
+    fluxes may carry it (0.45 of a cell a step). The app's Press lays its dent a step
+    at a time (`lib/squish.ts`), and `npm run thingap` presses over ten steps; the
+    glass should close over the press's own time wherever a dent is laid, and
+    `gapMemory` then has no job in a thin gap.
+  - **18a-6, inertia for water.** The velocity's self-advection is dropped. The reduced
+    Reynolds number Re·h/L is under 0.1 for oils and near 2 for water in the plate's
+    6 mm middle, so water in a deep gap has more inertia than this keeps. Measure it on
+    Water looks and bring back a cheap advection if it shows.
+  - **18a-7, the rim follows the dish.** The open rim is the plate's inscribed circle;
+    with Dish Spread (two dishes) or a round-dish vignette each dish has its own edge,
+    and the solver does not know it.
+  - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
+    which leaves a small checkerboard at a floored dent's edge; the advections'
+    Rhie–Chow faces are given c·P, exact only where the drag is even; and the face
+    fluxes' upwinding squares off a ring under a fast radial flow (the pressed rings in
+    the picture). A staggered grid takes all three, and `dampGrid`'s job.
+  - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
+  - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
+    Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
+    against it; measure whether any look shows it, and drop it for the time if not.
+  - **18a-11, the cost measured.** The saving above is an estimate; measure the step
+    with Thin Gap on and off on the Mac (`?debug`, docs/judging.md §19).
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
