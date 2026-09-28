@@ -63,7 +63,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac), not yet judged on the Mac; 15b, 15e, 15f open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2249,12 +2249,49 @@ would carry every field alike. It changes how every tool feels, so it goes to St
 first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
 these numbers.
 
-### 15c. Blow's wind erases colour rather than pushing it
+### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
-A moving Blow multiplies the dye under it by 0.8 every step, which clears it, and
-its push is the one-step push of 15b. `npm run tools` checks "Blow clears dye from
-under it", so the check asserts the eraser. Whether wind should push the colour
-aside instead is a question for Steve, taken with 15b.
+A moving Blow multiplied the dye under it by 0.8 every step, which cleared it, and
+its push is the one-step push of 15b. So did a second finger's Blow on the phone, a
+Blow on a plate that is not the lead, and every remote hand's (a directed blow
+thinned 15% a step at its middle). Now a hand's Blow that is not the straw is the
+wind (`blowWind`): it carries the colour the way the hand went, a take and a put as
+the Finger's carry, with the ferrofluid's numbers (`blowCarry`), so the colour and
+the ferrofluid go the same way. Held still (a puff that is not the straw) it blows
+the colour out from under it onto the Press's ring. With Oil Bodies the oil goes
+with its colour, along (`carryMix`) or onto the same ring (`pressOil`), cell for
+cell. Measured in the lab (`npm run wind`, 30 readings of a Blow drawn a sixth of
+the plate from a pool's middle): the old eraser kept 78.7% of the pool (a remote
+hand's directed one the same) and moved its middle 1.05% of the plate backwards; the
+wind keeps 100.0% and moves it 1.06% the wind's way (2.71% for a remote hand's wider
+one). `npm run tools` on the Mac now draws a Blow across a pool through the real
+pointer and asks that the stroke ran as the wind (the pointer's Blow counts its
+straw and wind steps and what the wind carried, `blowSteps` in `chromaglassDebug`),
+that the colour goes along and that it is kept.
+
+The straw is now chosen by whether the hand has moved in the last 150 ms (the
+clock the ferrofluid's wind already used), not by whether it moved this step. Asked
+per step, a drag blew the straw on every step after a frame's first and on every
+frame the pointer did not report a move, so a drag left a string of straw bubbles
+and ran the wind a step a frame at best. The show's own puffs (a pour's burst, the
+automation's breath, a bubble's pop) still clear the dye under them, as their look.
+
+### 15f. Found with 15c
+
+- The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and
+  a carry with no colour under it never marks the mirror spent. So a Finger over a
+  body with no colour under it carries the oil every step at a share sized for one
+  carry a reading. The Press (15d) and now the Blow keep the oil on its own clock
+  (`oilPressAfter`); the Finger should too.
+- The Press's ring (`pressDye`) keeps 99.4% of a pool of colour a puff blows out over
+  30 readings, not all of it: a nearest-cell gather does not tile a small ring
+  exactly, and the counted stretch that makes a flat plate exact does not on an
+  uneven one. Small next to the 21% the eraser lost, but a ring that splits each
+  palm cell exactly among the cells that read it would keep all of it.
+- A remote hand's Blow (performGesture: the phone as the laptop's remote, a pen, OSC,
+  a replayed take) goes through the same `blowWind`, but no check drives it through
+  the app: `npm run wind` runs the functions it calls, and `npm run tools` only the
+  mouse. A gesture sent through the remote's link in `tools` would close it.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 

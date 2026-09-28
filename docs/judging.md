@@ -466,6 +466,23 @@ On Oil & Water (Oil Bodies on):
 
 ---
 
+## 19. Blow's wind (PLAN 15c)
+
+The Blow drawn across the plate used to wipe a trail out of the colour. Now it
+pushes the colour along and keeps it. On Classic, with a pool laid:
+
+- draw the Blow slowly through the pool: a tongue of colour should be pushed ahead
+  of the hand and pile up where it stopped, with no dark trail behind it;
+- stop and hold: the straw's bubble should start within a tenth of a second, and a
+  drag should no longer leave a string of small straw bubbles behind it;
+- on the phone, hold one finger (the straw) and drag a second across the colour: the
+  second pushes it; hold the second still and it should blow a small clear ring;
+- on Oil & Water, blow across a body: the oil and its colour should go together.
+
+Say if the wind now reads as too strong or too weak next to the Finger.
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real
