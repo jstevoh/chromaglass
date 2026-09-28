@@ -511,7 +511,27 @@ let failed = 0;
       */
       window.__holding = 0;
       window.__held = 0;
-      const count = () => { window.__rafs++; if (window.__holding > 0) window.__held++; raf(count); };
+      /*
+        `__rafTs`: each refresh's own timestamp, the last 600, so the harness
+        can take the display's refresh from the gaps between them. Not
+        the rate of `__rafs`: on a busy Mac runner a window is handed 41 to
+        54 of a 60 Hz display's refreshes a second, so the rate reads the
+        display as slower than it is, while the gate, drawing on whichever
+        window's frame comes first, still fills nearly every refresh. #211's
+        run drew 52.6 a second against a window rate of 47.2 and went red on
+        the ceiling, with the gate drawing once a refresh (2026-09-27).
+        A dropped refresh leaves a gap of two, never a shorter one, so the
+        refresh is the short end of the gaps: their 25th percentile, not
+        their median, which a window handed fewer than half its refreshes
+        (the draws costing 0.7 of one, below) reads as twice the refresh.
+      */
+      window.__rafTs = [];
+      const count = (ts) => {
+        window.__rafs++;
+        if (window.__holding > 0) window.__held++;
+        if (typeof ts === 'number') { window.__rafTs.push(ts); if (window.__rafTs.length > 600) window.__rafTs.splice(0, 100); }
+        raf(count);
+      };
       raf(count);
       if (new URLSearchParams(location.search).has('cast')) {
         // The projector: its animation frames, `__phaseMs` behind (a display
@@ -622,10 +642,27 @@ let failed = 0;
         t: performance.now(),
       });
       const a = read();
+      const showTs0 = window.__rafTs.length ? window.__rafTs[window.__rafTs.length - 1] : -Infinity;
+      const wallW = window.__wall && !window.__wall.closed ? window.__wall : null;
+      const wallTs0 = wallW && wallW.__rafTs.length ? wallW.__rafTs[wallW.__rafTs.length - 1] : -Infinity;
       await new Promise((r) => setTimeout(r, ms));
       const b = read();
       const s = (b.t - a.t) / 1000;
       const d = window.chromaglassDebug();
+      // The display's refresh, from each window's own frames in this window
+      // of time: the short end (25th percentile) of the gaps between
+      // consecutive refreshes it was handed (see `__rafTs`), and the shorter
+      // of the two windows', as the gate draws on the faster.
+      const refreshGap = (ts, from) => {
+        const g = [];
+        for (let i = 1; i < ts.length; i++) if (ts[i - 1] >= from) g.push(ts[i] - ts[i - 1]);
+        g.sort((x, y) => x - y);
+        return g.length >= 5 ? g[Math.floor(g.length / 4)] : null;
+      };
+      const showGap = refreshGap(window.__rafTs, showTs0);
+      const wallGap = wallW ? refreshGap(wallW.__rafTs, wallTs0) : null;
+      const gaps = [showGap, wallGap].filter((x) => x !== null && x > 0);
+      const refreshMs = gaps.length ? Math.min(...gaps) : null;
       // What the governor was fed in this window: its log's last entries, as
       // many as it counted, and their median (see the governor line below).
       const fedN = a.fedCount !== null && b.fedCount !== null ? b.fedCount - a.fedCount : null;
@@ -651,6 +688,7 @@ let failed = 0;
         asks: (b.asks - a.asks) / s,
         askCount: b.asks - a.asks,
         frameMs: d.governor?.frameMs ?? null,
+        refreshMs,
         fedN,
         fedMedian,
         fallbacks: d.drawGate?.stampFallbacks ?? null,
@@ -700,10 +738,13 @@ let failed = 0;
       /** The lines every phase is held to: a ceiling, a floor, and both clocks offering. */
       const judge = (m, label, { floor = true } = {}) => {
         const faster = Math.max(m.hz, m.wallHz);
+        // The display's rate, from the gaps between refreshes, which a busy
+        // machine's dropped frames do not lower (see `__rafTs`).
+        const display = m.refreshMs ? 1000 / m.refreshMs : faster;
         console.log(`  wall ${label.padEnd(30)} ${f1(m.drawn)} drawn/s${m.gate ? ` (${f1(m.gate.frame)} on the show's frames, ${f1(m.gate.ask)} on asks, ${f1(m.skipped)} turned down)` : ''}, displays ${f1(m.hz)} and ${f1(m.wallHz)} Hz, ${f1(m.asks)} asks/s, governor fed ${f1(m.frameMs)} ms`);
         check(`both windows animating, the wall ${label}: at most 1.1 times one display's refresh`,
-          m.drawn <= 1.1 * faster && m.asks > 10,
-          `${f1(m.drawn)} drawn a second against ${f1(faster)} Hz (${f1(m.drawn / Math.max(1, faster))}x), ${f1(m.asks)} asks a second`);
+          m.drawn <= 1.1 * display && m.asks > 10,
+          `${f1(m.drawn)} drawn a second against a ${f1(display)} Hz refresh (${f1(m.drawn / Math.max(1, display))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second), ${f1(m.asks)} asks a second`);
         if (floor) {
           const least = 0.9 * Math.min(faster, alone.drawn);
           check('  and at least 0.9 times what the show drew on its own', m.drawn >= least,
@@ -751,7 +792,7 @@ let failed = 0;
           double (the check-skeptic, 2026-09-27).
         */
         const pre = await measure(500);
-        const phaseMs = frac * 1000 / Math.max(1, pre.hz, pre.wallHz);
+        const phaseMs = frac * (pre.refreshMs ?? 1000 / Math.max(1, pre.hz, pre.wallHz));
         await wall.evaluate((p) => { window.__phaseMs = p; }, phaseMs);
         await show.waitForTimeout(300);
         const m = await measure(2000);
@@ -784,13 +825,12 @@ let failed = 0;
           is checked to be near half a refresh now, not only named that.
         */
         if (frac === 0.5) {
-          const faster = Math.max(m.hz, m.wallHz);
-          const refresh = faster > 0 ? 1000 / faster : null;
-          const at = phaseMs * faster / 1000;
+          const refresh = m.refreshMs;
+          const at = refresh ? phaseMs / refresh : 0;
           if (m.frameMs !== null && refresh !== null) {
             check('  and the governor is fed a whole refresh of the faster window, not half of it',
               m.fedMedian !== null && m.fedN >= 0.8 * m.drawnCount && m.fedMedian >= 0.9 * refresh && at >= 0.35 && at <= 0.65,
-              `median ${f1(m.fedMedian)} ms fed over ${m.fedN ?? '-'} intervals for ${m.drawnCount} draws, against a ${f1(refresh)} ms refresh (the windows ${f1(m.hz)} and ${f1(m.wallHz)} a second), at ${at.toFixed(2)} of a refresh behind`);
+              `median ${f1(m.fedMedian)} ms fed over ${m.fedN ?? '-'} intervals for ${m.drawnCount} draws, against a ${f1(refresh)} ms refresh (the windows handed ${f1(m.hz)} and ${f1(m.wallHz)} a second), at ${at.toFixed(2)} of a refresh behind`);
           } else if (alone.engine) {
             check('  and the governor is fed a whole refresh of the faster window, not half of it', false,
               `a renderer came up (${alone.engine}) and there is no governor to read`);
