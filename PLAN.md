@@ -1949,11 +1949,18 @@ Counted, not photographed, so the app half runs in a cloud session with no GPU a
 there the loop is started by the projector's first ask and runs on the show's frames
 from then on, and there is no governor to read.
 
-*Still owed:* the Mac runner's numbers with a renderer up, where the governor's
-interval is judged in the app too, against what the show fed it with the wall's asks
-held (a governor missing with a renderer up is a failure; the cloud session has no
-renderer, and says so); and the owner's look with a real projector on its own
-display. And stepping down under a wall at all: it is new behaviour, from 14b and
+On the Mac runner, with a renderer up (#203's run on a9ba205), each window was
+handed 50.5 to 56.4 of a 60 Hz display's refreshes a second, and the gate drew
+51.5 to 55.4. The governor was fed a median 17.0 ms at half a refresh behind. The
+display's rate misleads there, so the wall's ceiling and the governor's bar are no
+longer taken from it. Each draw is held to the refreshes either window was handed,
+counted once where both got the same one: at most 1.05 of them. The governor's median
+is held to 0.9 of the median gap between them. The check-skeptic's controls on this
+tree: the gate stamped when its callback ran, with 11.6 ms draws, 67.6 and 65.9 drawn for
+59.2 and 59.5 served (1.14 and 1.11, red); it passed the display's ceiling at 65.8. A gate that never turns
+anything down: 1.2 to 2.0 times (red); the gate: 1.00 to 1.01.
+
+*Still owed:* the owner's look with a real projector on its own display. And stepping down under a wall at all: it is new behaviour, from 14b and
 14c together (the governor fed real intervals now, and a ladder built from the stage),
 and nobody has seen it happen on the Mac.
 
