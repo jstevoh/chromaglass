@@ -444,6 +444,24 @@ the carry in the lab). Worth looking at, on Magnet Garden or Ferro Paint:
 - the same on the phone, with a finger on Finger or Blow; a finger on the
   Magnet is still a magnet.
 
+## 18. The Press on oil (PLAN 15d)
+
+A press used to push the colour out of an oil body and leave the oil where it was,
+clear, with a ring of the body's colour in the water round it. Now the oil goes with
+its colour, out onto the same ring, and the colour goes straight out from where it was
+under the palm instead of evenly round the whole ring.
+
+On Oil & Water (Oil Bodies on):
+
+- press and hold on a body: the body should thin under the palm and its colour and
+  its oil go out together, the ring amber where the body was, teal where the water was;
+- press with the palm half over a body's edge: the oil and its colour should go out
+  on the body's side only, and the water's side stay the water's colour;
+- press near a corner: nothing should vanish at the edge;
+- on Classic (no Oil Bodies), a press should still clear a ring the way it did, now
+  going straight out: a stripe under the palm should come out as a stripe, not a smear
+  round the whole ring. Say if the old even ring looked better.
+
 ---
 
 ## 18. The Mac app, on the Mac and on a projector

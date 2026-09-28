@@ -3,6 +3,7 @@ import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked } from '../lib/earClock';
+import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
@@ -51,6 +52,7 @@ import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
+import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -1034,6 +1036,8 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
+  /** The Press's oil, once a dye reading (squeezeOut). */
+  private oilPressAfter = 0;
   /*
     A move not yet handed to the GPU. The reading to wait for was counted
     from the move, two copies on, on the grounds that the deltas go across at
@@ -1208,7 +1212,7 @@ class FluidSimulation {
     this.gpu = gpu;
     gpu.clear();
     // Its readings count from nothing again, and whatever was pending went with the last solver.
-    this.dyeMoveAfter = 0; this.dyeMovePending = false;
+    this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
     this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
@@ -1383,46 +1387,28 @@ class FluidSimulation {
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
-    const dye = this.gpu.rbDyeView;
     const N = this.size;
     const R = Math.max(2, radius);
-    const rOut = R * 1.7;
-    const disc: number[] = [], ring: number[] = [];
-    const yl = Math.max(0, Math.floor(cy - rOut)), yh = Math.min(N - 1, Math.ceil(cy + rOut));
-    const xl = Math.max(0, Math.floor(cx - rOut)), xh = Math.min(N - 1, Math.ceil(cx + rOut));
-    for (let y = yl; y <= yh; y++) {
-      for (let x = xl; x <= xh; x++) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d <= R) disc.push(x + y * N);
-        else if (d <= rOut) ring.push(x + y * N);
-      }
+    // How much of what is under the palm goes, this press (pressRing.ts).
+    const take = pressTake(amount);
+    /*
+      With Oil Bodies the oil goes with its colour (PLAN 15d): the same share
+      of every cell, landed on the same cell of the ring as the colour it
+      carried (pressMix; pressDye below is the same map on the CPU). Without
+      it a press drew a body's colour out into the water and left the oil
+      where it was, colourless. Before the dye's own early return, so a body
+      the old fault already left clear can still be pressed out, and on its
+      own clock, once a dye reading as the dye's is: with no colour under the
+      palm the dye never marks its move pending, so without this the oil
+      would be pressed every step at a share sized for one press a reading.
+    */
+    if ((this.lastSettings?.oilBodies ?? 0) > 0.001 && this.gpu.rbDyeLanded >= this.oilPressAfter) {
+      pressOil(this.gpu, cx, cy, R, N, take);
+      this.oilPressAfter = this.gpu.rbDyeIssued + 1;
     }
-    if (disc.length === 0 || ring.length === 0) return;
-
-    let mass = 0, aR = 0, aG = 0, aB = 0;
-    // How much of what is under the palm goes, this press. A share rather
-    // than all of it: a hand squeezes the film thin, it does not scrape it.
-    // Once per current reading now (see dyeMoveAfter), a few frames apart, so a
-    // bigger share each time for the same press.
-    const take = Math.max(0, Math.min(0.6, amount * 48));
-    for (const i of disc) {
-      const i4 = i * 4;
-      const v = dye[i4 + 3];
-      if (!(v > 1e-5)) continue;
-      mass += v * take; aR += dye[i4] * take; aG += dye[i4 + 1] * take; aB += dye[i4 + 2] * take;
-    }
-    if (!(mass > 1e-4)) return;
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    if (!(pressDye(this.gpu.rbDyeView, N, cx, cy, R, take, out) > 1e-4)) return;
     this.dirty = true;
-    // Out of the disc, through the multiplicative channel that exists for dye
-    // being taken away...
-    for (const i of disc) this.mul[i] *= 1 - take;
-    // ...and into the ring, in the mirror's own log space so the colour that
-    // arrives is the colour that left.
-    const w = 1 / ring.length;
-    for (const i of ring) {
-      this.density[i] += mass * w;
-      this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
-    }
     this.dyeMoved();
   }
 
@@ -5347,8 +5333,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let animationFrameId = 0;
     let renderer: PlateRenderer | null = null;
 
-    /** When the projector last asked for a frame; see __chromaglassFrame below. */
-    let lastExternalFrame = 0;
+    /*
+      Which offers of a frame are drawn, from either window (PLAN.md §14b,
+      lib/drawGate.ts). The projector window asks for a frame on every one of
+      its refreshes (see __chromaglassFrame below) and this window's own
+      animation frames keep coming while it is visible, so with the wall up
+      there are two clocks. The gate stamps every draw, whichever of them
+      asked, and turns down any offer that comes within 0.6 of a refresh of
+      the last one: one draw a refresh, not one per clock.
+    */
+    const drawGate = new DrawGate();
     /*
       The loop, guarded.
 
@@ -5371,7 +5365,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let stepDownFrames = 0;
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
-    const render = () => {
+    /*
+      This window's own animation frame. Offered to the gate first: while the
+      projector is asking too, a frame that lands just after one the
+      projector's ask drew is turned down, and the next is asked for at once,
+      so this window's clock keeps ticking (and keeps being measured) whether
+      or not it draws. With no projector asking, every frame is drawn, as it
+      always was.
+
+      Offered at `ts`, the time its refresh began, not the time this callback
+      got to run (lib/drawGate.ts says why at length: a callback that waited
+      behind the projector's draw in the same refresh looked like the next
+      refresh's once a draw cost more than 0.6 of one). Called with nothing
+      when the renderer starts the loop, and then it is now.
+    */
+    const render = (ts?: number) => {
+      if (renderingRef.current) return;
+      if (!drawGate.offer('frame', refreshStamp(ts, performance.now()))) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+      draw();
+    };
+    /** One frame, guarded; whichever window asked for it has already been let through the gate. */
+    const draw = () => {
       // A song render is drawing the frames (`renderApiRef` below): the
       // browser's frame is not one of them.
       if (renderingRef.current) return;
@@ -7623,6 +7641,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // Governor: judge this frame. A rung change takes effect through the
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
+      //
+      // `frameS` is the interval since the last frame this loop *drew*, and
+      // only frames the draw gate let through get here (PLAN.md §14b). Before
+      // the gate, with the wall up, the show's frames and the projector's asks
+      // interleaved, so the governor was fed two half-intervals for every
+      // refresh: two clocks each managing thirty read as one holding sixty,
+      // and it never stepped down while the wall was up.
       if (frameS > 0 && governorRef.current && !rendering) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
@@ -7944,24 +7969,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       stops.
 
       So the window that *is* visible drives. The projector runs its own rAF
-      and calls this; the guard is what keeps that from becoming a second
-      clock when both windows are up, because a frame already drawn this
-      display interval is not drawn again.
+      and calls this; the draw gate is what keeps that from becoming a second
+      clock when both windows are up (PLAN.md §14b, lib/drawGate.ts).
+
+      The guard here used to compare an ask only with the projector's
+      previous ask, 6 ms back. The show's own frames never set it, so with
+      both windows visible on two displays' clocks every ask drew a second
+      frame in the show's refresh: `npm run wall` measured 119.1 to 120.2
+      draws a second against a 60 Hz display, with the projector's clock at
+      every phase it tried. Now every draw is stamped whichever window asked, and
+      an offer within 0.6 of a refresh of the last draw is turned down, an
+      ask here or one of this window's own frames in `render` above, but only
+      while both clocks are running. With this window covered its own frames
+      have stopped, the wall's clock is the only one, and every ask draws,
+      however ragged a busy machine makes them.
+
+      `ts` is the time the projector's refresh began, already on this
+      window's clock (CastDisplay converts it), so that an ask waiting behind
+      this window's draw in the same refresh is still seen as that refresh's.
+      An ask without one (a harness, a projector window from an older build)
+      is offered at the time it ran, as before.
     */
-    (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+    (window as unknown as { __chromaglassFrame?: (ts?: number) => void }).__chromaglassFrame = (ts?: number) => {
       if (renderingRef.current) return;             // a render is drawing; the wall mirrors its frames
       const now = performance.now();
-      if (now - lastExternalFrame < 6) return;     // this interval already has a frame
-      lastExternalFrame = now;
+      if (!drawGate.offer('ask', refreshStamp(ts, now))) return;   // this refresh already has a frame
       // The ear reads on the wall's clock: with this window covered its own
       // frames have stopped, and so, until PLAN.md §14a, had its hearing
       // (lib/earClock.ts). The reading goes through React like every other,
       // so it lands on the next frame, the same one-frame lag as a visible
       // show's (PLAN.md §14f). It reads only while this window's frames are
-      // missing, so a visible show hears as it did.
+      // missing, so a visible show hears as it did. And only for an ask the
+      // gate let through: the ear takes one reading per drawn frame (its
+      // smoothing is per reading), so an ask that draws nothing hears
+      // nothing either.
       wallAsked(now);
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      render();
+      draw();
     };
 
     // ── What `?debug` shows ───────────────────────────────────────────
@@ -7976,6 +8020,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
+        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
