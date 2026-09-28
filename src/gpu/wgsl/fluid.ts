@@ -1896,6 +1896,66 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The ferrofluid carried by a hand (carryPhase): the Finger drags it along
+    its stroke and Blow pushes it away, as they carry the dye (carryDye in
+    the app) and the oil (mixCarry). Asked by the owner: "Shouldn't blowing
+    and finger also move around the ferrofluid?" Barely. Both tools add
+    velocity, and the ferrofluid rides the flow as the dye does, but the
+    push is small (a Finger's moves the liquid about a tenth of a cell a
+    step) and it lasts one step: the speed clamp (MAX_SPEED in fluid.ts,
+    which the plate's flow already sits at) cuts it back to an idle plate's
+    speed at the end of the step it was added in. Measured by the thread
+    that went over every tool on every liquid: a Finger dragged 30 cells
+    across a pool moved its middle 0.2 of a cell, dye and ferrofluid alike.
+    So the dye has been moved by hand, a take and a put, since the Finger
+    was built (carryDye), and the oil with it; the ferrofluid never was.
+
+    Each cell under the hand gives up its share (more near the middle) and
+    that share lands a hop away: along the stroke for the Finger and a
+    directed blow, straight out from the middle for a puff (A.b.w), which
+    opens a hole in a pool as air blown down on a thin layer does. The
+    landing cell is found by gathering: every cell asks which of its
+    neighbours within a hop send to it, each sender to exactly one whole
+    cell, so what leaves one cell arrives in one other and nothing is made
+    or lost. A cell that would send off the plate keeps its share.
+
+    A.a = (x, y, radius, take), A.b = (the direction, the hop, radial), all
+    in plate units.
+  */
+  phaseCarry: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn took(q: vec2i) -> f32 { return A.a.w * max(0.0, 1.0 - length((vec2f(q) + 0.5) / S.n - A.a.xy) / A.a.z); }
+fn inPlate(q: vec2i) -> bool { return q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n); }
+// Where cell q's share lands, in whole cells, so each sender has one.
+fn dest(q: vec2i) -> vec2i {
+  var d = A.b.xy;
+  if (A.b.w > 0.5) {
+    let o = (vec2f(q) + 0.5) / S.n - A.a.xy;
+    d = select(vec2f(0.0), o / max(length(o), 1e-6), length(o) > 0.5 / S.n);
+  }
+  let to = q + vec2i(round(d * A.b.z * S.n));
+  return select(q, to, inPlate(to));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let c = textureLoad(src, p, 0).r;
+  // Nothing reaches a cell further than a hop past the hand's rim.
+  if (length(uvOf(id) - A.a.xy) > A.a.z + A.b.z + 2.0 / S.n) {
+    textureStore(dst, p, vec4f(c, 0.0, 0.0, 0.0));
+    return;
+  }
+  var v = c * (1.0 - took(p));
+  let R = i32(ceil(A.b.z * S.n)) + 1;
+  for (var j = -R; j <= R; j++) { for (var i = -R; i <= R; i++) {
+    let q = p + vec2i(i, j);
+    if (inPlate(q) && all(dest(q) == p)) { v += textureLoad(src, q, 0).r * took(q); }
+  } }
+  textureStore(dst, p, vec4f(v, 0.0, 0.0, 0.0));
+}`,
+
+  /*
     Oil Bodies: the oil dragged by a hand, as the dye is (carryMix, and
     carryDye in the app). The dye's carry is a take and a put, on the CPU,
     through the deltas; the oil lives only here, so its carry is here, the
