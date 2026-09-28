@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeH
 import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
-import { wallAsked } from '../lib/earClock';
+import { wallAsked, plateFrame } from '../lib/earClock';
+import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
@@ -62,7 +63,16 @@ const HAND_MOVING = 0.06;
 
 
 interface LiquidVisualizerProps {
+  /** The sound as React last saw it (ten times a second from the room's ear; every frame from a render). */
   audioData: AudioData | null;
+  /**
+   * The sound now, asked for at the top of each frame (PLAN.md §14f). The
+   * room's ear makes a reading every frame but tells React only ten times a
+   * second, so a plate that read only `audioData` would move in steps. A
+   * plate without one (the cast receiver, whose sound arrives as messages)
+   * reads `audioData`.
+   */
+  hear?: () => AudioData | null;
   settings: VisualizerSettings;
   seedCount?: number;
   /**
@@ -3982,7 +3992,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
@@ -4261,6 +4271,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The sound the app is handing over, for a render to give back to when it ends. */
   const audioDataPropRef = useRef(audioData);
   audioDataPropRef.current = audioData;
+  const hearRef = useRef(hear);
+  hearRef.current = hear;
+  /*
+    The sound the live show hears now: the app's ear asked directly, else the
+    prop. It used to be the prop alone, copied into `audioDataRef` by an
+    effect after each render, so the plate heard every reading one frame late
+    (the frame that made it had already drawn by the time the render that
+    carried it committed), and the whole App re-rendered once per reading to
+    deliver it. Asked at the top of the frame, it is this frame's reading.
+  */
+  const liveHeard = () => (hearRef.current ? hearRef.current() : audioDataPropRef.current);
+  /**
+   * The live frames, and how many of them heard a reading the frame before
+   * had not, for `npm run renders`: with the ear reading once a frame, nearly
+   * every frame should. A plate stepping on ten readings a second (the ear's
+   * React state) would hear a new one on about one frame in six.
+   */
+  const hearingRef = useRef({ frames: 0, fresh: 0, ownFrame: 0, last: null as AudioData | null });
+  /** The animation frame the plate is drawing (its timestamp), null for a frame the wall asked for. */
+  const plateTsRef = useRef<number | null>(null);
   const settingsRef = useRef(settings);
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
@@ -5212,7 +5242,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     applyGesture: (g) => performGesture(g),
   }));
 
-  useEffect(() => { audioDataRef.current = audioData; }, [audioData]);
+  // Outside a render: a harness's `pour` between frames reads the ref too.
+  useEffect(() => { if (!renderingRef.current) audioDataRef.current = liveHeard(); }, [audioData]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   /**
@@ -5309,8 +5340,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let animationFrameId = 0;
     let renderer: PlateRenderer | null = null;
 
-    /** When the projector last asked for a frame; see __chromaglassFrame below. */
-    let lastExternalFrame = 0;
+    /*
+      Which offers of a frame are drawn, from either window (PLAN.md §14b,
+      lib/drawGate.ts). The projector window asks for a frame on every one of
+      its refreshes (see __chromaglassFrame below) and this window's own
+      animation frames keep coming while it is visible, so with the wall up
+      there are two clocks. The gate stamps every draw, whichever of them
+      asked, and turns down any offer that comes within 0.6 of a refresh of
+      the last one: one draw a refresh, not one per clock.
+    */
+    const drawGate = new DrawGate();
     /*
       The loop, guarded.
 
@@ -5333,7 +5372,40 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let stepDownFrames = 0;
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
-    const render = () => {
+    /*
+      This window's own animation frame. Offered to the gate first: while the
+      projector is asking too, a frame that lands just after one the
+      projector's ask drew is turned down, and the next is asked for at once,
+      so this window's clock keeps ticking (and keeps being measured) whether
+      or not it draws. With no projector asking, every frame is drawn, as it
+      always was.
+
+      Offered at `ts`, the time its refresh began, not the time this callback
+      got to run (lib/drawGate.ts says why at length: a callback that waited
+      behind the projector's draw in the same refresh looked like the next
+      refresh's once a draw cost more than 0.6 of one). Called with nothing
+      when the renderer starts the loop, and then it is now.
+    */
+    const render = (ts?: number) => {
+      if (renderingRef.current) return;
+      if (!drawGate.offer('frame', refreshStamp(ts, performance.now()))) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+      // The ear reads for this frame first, if its own loop has not yet
+      // (lib/earClock.ts plateFrame, PLAN.md §14f), so the frame hears itself.
+      plateTsRef.current = ts ?? null;
+      // Guarded: the whole ear reads here now, and a throw in it must cost
+      // this frame its fresh reading, never the loop its re-arm (draw's own
+      // guard below is what keeps the plate going).
+      if (ts !== undefined) {
+        try { plateFrame(ts); } catch (err) { console.error('ChromaGlass: the ear threw reading for the plate\'s frame', err); }
+      }
+      draw();
+    };
+    /** One frame, guarded; whichever window asked for it has already been let through the gate. */
+    const draw = () => {
       // A song render is drawing the frames (`renderApiRef` below): the
       // browser's frame is not one of them.
       if (renderingRef.current) return;
@@ -5383,6 +5455,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const rendering = renderingRef.current;
       const stepRate = rendering?.stepRate ?? PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60;
       const simStepS = 1 / stepRate;
+      // A render sets the frame's reading itself (`step`); the live show asks.
+      if (!rendering) {
+        audioDataRef.current = liveHeard();
+        const h = hearingRef.current;
+        h.frames++;
+        if (audioDataRef.current !== h.last) { h.fresh++; h.last = audioDataRef.current; }
+        // Taken on this very frame, not the one before (the order of two loops).
+        if (plateTsRef.current !== null && audioDataRef.current?.frameTs === plateTsRef.current) h.ownFrame++;
+      }
       const currentAudioData = audioDataRef.current;
       // ── The room, on the settings ─────────────────────────────
       // A scene mapping is a feature, a setting and a depth, the same shape
@@ -7585,6 +7666,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // Governor: judge this frame. A rung change takes effect through the
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
+      //
+      // `frameS` is the interval since the last frame this loop *drew*, and
+      // only frames the draw gate let through get here (PLAN.md §14b). Before
+      // the gate, with the wall up, the show's frames and the projector's asks
+      // interleaved, so the governor was fed two half-intervals for every
+      // refresh: two clocks each managing thirty read as one holding sixty,
+      // and it never stepped down while the wall was up.
       if (frameS > 0 && governorRef.current && !rendering) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
@@ -7883,7 +7971,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // room's: built again, as at the start (see `begin`).
         probe?.dispose();
         probe = null;
-        audioDataRef.current = audioDataPropRef.current;
+        audioDataRef.current = liveHeard();
         setStaged(stageRef.current !== null);
         // The loop first, so that a resize which throws on a half-dead
         // device still leaves the show drawing (its guard handles the rest).
@@ -7906,24 +7994,45 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       stops.
 
       So the window that *is* visible drives. The projector runs its own rAF
-      and calls this; the guard is what keeps that from becoming a second
-      clock when both windows are up, because a frame already drawn this
-      display interval is not drawn again.
+      and calls this; the draw gate is what keeps that from becoming a second
+      clock when both windows are up (PLAN.md §14b, lib/drawGate.ts).
+
+      The guard here used to compare an ask only with the projector's
+      previous ask, 6 ms back. The show's own frames never set it, so with
+      both windows visible on two displays' clocks every ask drew a second
+      frame in the show's refresh: `npm run wall` measured 119.1 to 120.2
+      draws a second against a 60 Hz display, with the projector's clock at
+      every phase it tried. Now every draw is stamped whichever window asked, and
+      an offer within 0.6 of a refresh of the last draw is turned down, an
+      ask here or one of this window's own frames in `render` above, but only
+      while both clocks are running. With this window covered its own frames
+      have stopped, the wall's clock is the only one, and every ask draws,
+      however ragged a busy machine makes them.
+
+      `ts` is the time the projector's refresh began, already on this
+      window's clock (CastDisplay converts it), so that an ask waiting behind
+      this window's draw in the same refresh is still seen as that refresh's.
+      An ask without one (a harness, a projector window from an older build)
+      is offered at the time it ran, as before.
     */
-    (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+    (window as unknown as { __chromaglassFrame?: (ts?: number) => void }).__chromaglassFrame = (ts?: number) => {
       if (renderingRef.current) return;             // a render is drawing; the wall mirrors its frames
       const now = performance.now();
-      if (now - lastExternalFrame < 6) return;     // this interval already has a frame
-      lastExternalFrame = now;
+      if (!drawGate.offer('ask', refreshStamp(ts, now))) return;   // this refresh already has a frame
       // The ear reads on the wall's clock: with this window covered its own
       // frames have stopped, and so, until PLAN.md §14a, had its hearing
-      // (lib/earClock.ts). The reading goes through React like every other,
-      // so it lands on the next frame, the same one-frame lag as a visible
-      // show's (PLAN.md §14f). It reads only while this window's frames are
-      // missing, so a visible show hears as it did.
+      // (lib/earClock.ts). The plate asks for the reading at the top of the
+      // frame (`hear`, PLAN.md §14f), so this frame hears it; it used to go
+      // through React and land a frame later. It reads only while this
+      // window's frames are
+      // missing, so a visible show hears as it did. And only for an ask the
+      // gate let through: the ear takes one reading per drawn frame (its
+      // smoothing is per reading), so an ask that draws nothing hears
+      // nothing either.
       wallAsked(now);
+      plateTsRef.current = null;
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      render();
+      draw();
     };
 
     // ── What `?debug` shows ───────────────────────────────────────────
@@ -7938,10 +8047,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
+        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
         heard: audioDataRef.current ? { volume: audioDataRef.current.volume, energy: audioDataRef.current.energy } : null,
+        /** Live frames drawn, how many read a reading the frame before had not, and how many a reading taken on that same frame (§14f). */
+        hearing: { frames: hearingRef.current.frames, fresh: hearingRef.current.fresh, ownFrame: hearingRef.current.ownFrame },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -9342,7 +9455,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (renderingRef.current) {
         renderingRef.current = null;
         trackReadbacks(false);
-        audioDataRef.current = audioDataPropRef.current;
+        audioDataRef.current = liveHeard();
         setStaged(stageRef.current !== null);
       }
       renderApiRef.current = null;
