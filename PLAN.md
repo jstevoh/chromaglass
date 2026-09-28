@@ -1499,7 +1499,13 @@ while this batch's plan was going in (#177), and no cause is known yet:
   read as the page's own, and a renderer stopped from outside for 2 s read as held.
   *Still open:* a continuation of something the check does not wrap (an `import()`)
   would look held; the 4.5 s cap is the backstop. The long animation frames stay
-  printed with where their rendering began, in case they can tell later. The old "within 0.25 s of the control's stop" and "control plus a second" are
+  printed with where their rendering began, in case they can tell later. On this
+  PR's green run (36364179427) the show's hold at the GPU's start, a 2.08 s frame
+  gap that check 4 alone would have failed, was taken out as held (2.05 s). *Open:*
+  the control's hold on the same run (3.82 s from 1.05 s, inside its device
+  request) read neither held nor the page's own; the control is not judged, and a
+  miss there can only make the show red, never pass it, but the opening line now
+  prints what 4b made of each page's wait so the next runs say why. The old "within 0.25 s of the control's stop" and "control plus a second" are
   gone. Read against the 53 logs: #204's red and 36339282520's split stop (1.28 s
   then 1.68 s) now count as one held stretch each, 2.57 s and about 3 s; 2 of the 53
   (4.05 s on 36294600123, 3.75 s on 36338802046, each wholly inside a four-second

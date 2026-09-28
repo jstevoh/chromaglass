@@ -834,6 +834,19 @@ const milestones = (o) => {
   if (b?.at != null) parts.push(`the rest behind it from ${at(b.at / 1000)} to ${at((b.at + b.ms) / 1000)}`);
   parts.push(`first step ${at(o.firstStep == null ? null : o.firstStep / 1000)}`);
   parts.push(`longest wait for a frame before it ${say(o.framesBefore)}`);
+  /*
+    And what 4b made of that wait, on both pages. On 36364179427 the show's
+    hold (2.08 s from 1.03 s) was taken out as held, and the control's
+    (3.82 s from 1.05 s, inside its device request) was neither held nor
+    set aside, with nothing printed to say why. Only the show's is judged;
+    this says, on the control too, whether a long task lay in the wait and
+    how the page's timer ran before the first step.
+  */
+  const f = o.framesBefore;
+  const inIt = f?.at == null ? [] : o.long.filter(([st, d]) => st < (f.at + f.gap) * 1000 && st + d > f.at * 1000);
+  parts.push(`held ${o.held.length ? o.held.map(([a, n]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s`).join(', ') : 'none'}`
+    + `, long tasks in that wait ${inIt.length ? inIt.map(([st, d]) => `${(d / 1000).toFixed(2)} s from ${(st / 1000).toFixed(2)} s`).join(', ') : 'none'}`
+    + `, the page's timer every ${o.heldSeen.tickMedian == null ? 'never' : `${o.heldSeen.tickMedian.toFixed(0)} ms`} before the first step`);
   return parts.join('; ');
 };
 
