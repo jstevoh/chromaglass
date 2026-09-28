@@ -52,6 +52,7 @@ import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
+import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -1044,6 +1045,8 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
+  /** The Press's oil, once a dye reading (squeezeOut). */
+  private oilPressAfter = 0;
   /*
     A move not yet handed to the GPU. The reading to wait for was counted
     from the move, two copies on, on the grounds that the deltas go across at
@@ -1218,7 +1221,7 @@ class FluidSimulation {
     this.gpu = gpu;
     gpu.clear();
     // Its readings count from nothing again, and whatever was pending went with the last solver.
-    this.dyeMoveAfter = 0; this.dyeMovePending = false;
+    this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
     this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
@@ -1393,46 +1396,28 @@ class FluidSimulation {
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
-    const dye = this.gpu.rbDyeView;
     const N = this.size;
     const R = Math.max(2, radius);
-    const rOut = R * 1.7;
-    const disc: number[] = [], ring: number[] = [];
-    const yl = Math.max(0, Math.floor(cy - rOut)), yh = Math.min(N - 1, Math.ceil(cy + rOut));
-    const xl = Math.max(0, Math.floor(cx - rOut)), xh = Math.min(N - 1, Math.ceil(cx + rOut));
-    for (let y = yl; y <= yh; y++) {
-      for (let x = xl; x <= xh; x++) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d <= R) disc.push(x + y * N);
-        else if (d <= rOut) ring.push(x + y * N);
-      }
+    // How much of what is under the palm goes, this press (pressRing.ts).
+    const take = pressTake(amount);
+    /*
+      With Oil Bodies the oil goes with its colour (PLAN 15d): the same share
+      of every cell, landed on the same cell of the ring as the colour it
+      carried (pressMix; pressDye below is the same map on the CPU). Without
+      it a press drew a body's colour out into the water and left the oil
+      where it was, colourless. Before the dye's own early return, so a body
+      the old fault already left clear can still be pressed out, and on its
+      own clock, once a dye reading as the dye's is: with no colour under the
+      palm the dye never marks its move pending, so without this the oil
+      would be pressed every step at a share sized for one press a reading.
+    */
+    if ((this.lastSettings?.oilBodies ?? 0) > 0.001 && this.gpu.rbDyeLanded >= this.oilPressAfter) {
+      pressOil(this.gpu, cx, cy, R, N, take);
+      this.oilPressAfter = this.gpu.rbDyeIssued + 1;
     }
-    if (disc.length === 0 || ring.length === 0) return;
-
-    let mass = 0, aR = 0, aG = 0, aB = 0;
-    // How much of what is under the palm goes, this press. A share rather
-    // than all of it: a hand squeezes the film thin, it does not scrape it.
-    // Once per current reading now (see dyeMoveAfter), a few frames apart, so a
-    // bigger share each time for the same press.
-    const take = Math.max(0, Math.min(0.6, amount * 48));
-    for (const i of disc) {
-      const i4 = i * 4;
-      const v = dye[i4 + 3];
-      if (!(v > 1e-5)) continue;
-      mass += v * take; aR += dye[i4] * take; aG += dye[i4 + 1] * take; aB += dye[i4 + 2] * take;
-    }
-    if (!(mass > 1e-4)) return;
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    if (!(pressDye(this.gpu.rbDyeView, N, cx, cy, R, take, out) > 1e-4)) return;
     this.dirty = true;
-    // Out of the disc, through the multiplicative channel that exists for dye
-    // being taken away...
-    for (const i of disc) this.mul[i] *= 1 - take;
-    // ...and into the ring, in the mirror's own log space so the colour that
-    // arrives is the colour that left.
-    const w = 1 / ring.length;
-    for (const i of ring) {
-      this.density[i] += mass * w;
-      this.densityR[i] += aR * w; this.densityG[i] += aG * w; this.densityB[i] += aB * w;
-    }
     this.dyeMoved();
   }
 
@@ -8061,7 +8046,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // frames have stopped, and so, until PLAN.md §14a, had its hearing
       // (lib/earClock.ts). The plate asks for the reading at the top of the
       // frame (`hear`, PLAN.md §14f), so this frame hears it; it used to go
-      // through React and land a frame later. It reads only while this window's frames are
+      // through React and land a frame later. It reads only while this
+      // window's frames are
       // missing, so a visible show hears as it did. And only for an ask the
       // gate let through: the ear takes one reading per drawn frame (its
       // smoothing is per reading), so an ask that draws nothing hears

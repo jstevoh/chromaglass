@@ -19,8 +19,9 @@
  *   flip        the picture reverses inside the quad while the quad stays put
  *   grade       gain lifts what is on the wall, and gamma is not gain
  *   one clock   with the projector window open and both windows animating,
- *               the plate draws at most 1.1 times one display's refresh and
- *               at least 0.9 of what the show drew alone, at every phase
+ *               the plate draws at most once for each refresh either window
+ *               was handed (1.05 times them) and at least 0.9 of what the
+ *               show drew alone, at every phase
  *               between the two clocks, and with draws that hold the thread
  *               for 0.7 of a refresh; covered, every ask the projector makes
  *               draws, however raggedly (PLAN.md §14b; lib/drawGate.ts in
@@ -467,8 +468,9 @@ let failed = 0;
   including the ones past 0.6 of a refresh where gating the asks alone would
   still have drawn twice.
 
-  Each phase is held to a ceiling and a floor: at most 1.1 times one
-  display's refresh, and at least 0.9 times what the show drew on its own
+  Each phase is held to a ceiling and a floor: at most 1.05 times the
+  refreshes either window was handed (one draw a refresh, however many the
+  machine dropped), and at least 0.9 times what the show drew on its own
   (or the display's refresh, if that is lower). A gate that froze the plate,
   or turned down one frame in two, passed the ceiling alone in review. And
   both clocks have to have been offering: the gate turns down about one
@@ -653,16 +655,68 @@ let failed = 0;
       // of time: the short end (25th percentile) of the gaps between
       // consecutive refreshes it was handed (see `__rafTs`), and the shorter
       // of the two windows', as the gate draws on the faster.
+      /*
+        The shortest gap that recurs (three within 1.5 ms of it), not a
+        percentile: a percentile jumps to two refreshes once fewer than that
+        share of a window's gaps are single ones (about 34 of 60 refreshes
+        handed, dropped in pairs), and the draw cost below, 0.7 of it, then
+        cost 1.4 of a real refresh, where a gate that doubles is held to one
+        draw a refresh by the thread and nothing can see it (the
+        check-skeptic, 2026-09-28). Recurring, so one stray short gap is not
+        read as the display; the 25th percentile when nothing recurs.
+      */
       const refreshGap = (ts, from) => {
         const g = [];
         for (let i = 1; i < ts.length; i++) if (ts[i - 1] >= from) g.push(ts[i] - ts[i - 1]);
         g.sort((x, y) => x - y);
-        return g.length >= 5 ? g[Math.floor(g.length / 4)] : null;
+        if (g.length < 5) return null;
+        const recurs = g.find((x) => x >= 4.2 && g.filter((y) => Math.abs(y - x) <= 1.5).length >= 3);
+        return recurs ?? g[Math.floor(g.length / 4)];
       };
       const showGap = refreshGap(window.__rafTs, showTs0);
       const wallGap = wallW ? refreshGap(wallW.__rafTs, wallTs0) : null;
       const gaps = [showGap, wallGap].filter((x) => x !== null && x > 0);
       const refreshMs = gaps.length ? Math.min(...gaps) : null;
+      /*
+        The refreshes served: every refresh either window was handed in
+        these seconds, on this window's clock (the wall's timestamps moved
+        by the two time origins), counted in slots as below. Every draw the gate lets through is one
+        window's frame or one ask, and each of those follows a refresh this
+        count saw (the count loops run first, on the untouched clock), so a
+        gate that draws once a refresh draws no more than this, whatever the
+        machine drops. The display's rate cannot say that: the check-skeptic
+        showed (2026-09-27) that a gate stamping offers when they run drew
+        65.8 a second with 11.7 ms draws, windows handed 52.9 and 51.9,
+        under 1.1 times a 60.2 Hz display, and that once a draw costs most
+        of a refresh any doubling gate is held under that ceiling by the
+        thread itself. Both windows share a thread, so a doubling gate that
+        eats the thread costs both windows their refreshes, and this count
+        falls with it.
+      */
+      /*
+        Counted as the gate spaces its draws, not by matching the two
+        windows' timestamps: the wall's refreshes at the time its frames are
+        handed over (`__phaseMs` late, as the gate sees them), and one slot
+        for each run of refreshes less than 0.6 of a refresh after the slot
+        began. Matching the timestamps (the first version of this) read a
+        working gate as doubling at three quarters of a refresh behind: when
+        a long task drops one refresh for both windows, the show's next frame
+        comes 1.25 of a refresh after the last draw and draws, and that
+        refresh's ask 0.75 later draws too, a slot the matched count never
+        had (the check-skeptic's model: 1.09 to 1.21 times at 10 to 30 % of
+        refreshes dropped, where the Mac drops 10 to 30 %). A gate drawing
+        twice within 0.6 of a refresh is still counted against one slot.
+      */
+      const toHere = wallW ? wallW.performance.timeOrigin - performance.timeOrigin : 0;
+      const lag = wallW ? wallW.__phaseMs ?? 0 : 0;
+      const both = [
+        ...window.__rafTs.filter((t) => t > showTs0),
+        ...(wallW ? wallW.__rafTs.filter((t) => t > wallTs0).map((t) => t + toHere + lag) : []),
+      ].sort((x, y) => x - y);
+      const apart = 0.6 * (refreshMs ?? 1000 / 60);
+      const served = [];
+      for (const t of both) if (!served.length || t - served[served.length - 1] >= apart) served.push(t);
+      const servedGaps = served.slice(1).map((t, i) => t - served[i]).sort((x, y) => x - y);
       // What the governor was fed in this window: its log's last entries, as
       // many as it counted, and their median (see the governor line below).
       const fedN = a.fedCount !== null && b.fedCount !== null ? b.fedCount - a.fedCount : null;
@@ -689,6 +743,8 @@ let failed = 0;
         askCount: b.asks - a.asks,
         frameMs: d.governor?.frameMs ?? null,
         refreshMs,
+        servedHz: served.length / s,
+        servedGapMs: servedGaps.length >= 5 ? servedGaps[servedGaps.length >> 1] : null,
         fedN,
         fedMedian,
         fallbacks: d.drawGate?.stampFallbacks ?? null,
@@ -742,9 +798,24 @@ let failed = 0;
         // machine's dropped frames do not lower (see `__rafTs`).
         const display = m.refreshMs ? 1000 / m.refreshMs : faster;
         console.log(`  wall ${label.padEnd(30)} ${f1(m.drawn)} drawn/s${m.gate ? ` (${f1(m.gate.frame)} on the show's frames, ${f1(m.gate.ask)} on asks, ${f1(m.skipped)} turned down)` : ''}, displays ${f1(m.hz)} and ${f1(m.wallHz)} Hz, ${f1(m.asks)} asks/s, governor fed ${f1(m.frameMs)} ms`);
-        check(`both windows animating, the wall ${label}: at most 1.1 times one display's refresh`,
-          m.drawn <= 1.1 * display && m.asks > 10,
-          `${f1(m.drawn)} drawn a second against a ${f1(display)} Hz refresh (${f1(m.drawn / Math.max(1, display))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second), ${f1(m.asks)} asks a second`);
+        /*
+          Held to the refreshes served (see `served` in measure), and those
+          checked to be no more than one display's, so a count gone wrong
+          (a time origin read wrong, a lag not applied) is red here rather
+          than a ceiling nothing reaches. A display rate with no gaps to
+          measure it from is said so.
+
+          1.05 and not the 1.1 the display's rate had: the gate read 1.00 to
+          1.01 of the slots here at every phase, and a gate stamping offers
+          when they run, with 11.6 ms draws, 1.11 to 1.20 over four runs
+          (65.9 drawn for 59.5 in one), which 1.1 would call a pass. A cloud
+          session drops no refreshes, so the Mac's `tools` shard is the first
+          to count slots on a machine that does.
+        */
+        const oneDisplay = m.servedHz <= 1.05 * display;
+        check(`both windows animating, the wall ${label}: at most 1.05 times the refreshes served, one display's`,
+          m.drawn <= 1.05 * m.servedHz && oneDisplay && m.asks > 10,
+          `${f1(m.drawn)} drawn a second against ${f1(m.servedHz)} refreshes served (${f1(m.drawn / Math.max(1, m.servedHz))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second, the display ${f1(display)} Hz${m.refreshMs ? '' : ' by rate, no gaps to measure'}${oneDisplay ? '' : ', so the served count is not one display\'s'}), ${f1(m.asks)} asks a second`);
         if (floor) {
           const least = 0.9 * Math.min(faster, alone.drawn);
           check('  and at least 0.9 times what the show drew on its own', m.drawn >= least,
@@ -827,10 +898,19 @@ let failed = 0;
         if (frac === 0.5) {
           const refresh = m.refreshMs;
           const at = refresh ? phaseMs / refresh : 0;
+          /*
+            The bar is the median gap between refreshes served, not the
+            display's refresh: a gate that draws once a served refresh is fed
+            those gaps, and a doubling gate on a thread it has saturated is
+            served one refresh in two (its bar about two refreshes) while it
+            is fed about one draw's cost, which on a Mac drawing at 0.9 of a
+            refresh cleared 0.9 of the display's refresh (the check-skeptic).
+          */
+          const bar = m.servedGapMs ?? refresh;
           if (m.frameMs !== null && refresh !== null) {
             check('  and the governor is fed a whole refresh of the faster window, not half of it',
-              m.fedMedian !== null && m.fedN >= 0.8 * m.drawnCount && m.fedMedian >= 0.9 * refresh && at >= 0.35 && at <= 0.65,
-              `median ${f1(m.fedMedian)} ms fed over ${m.fedN ?? '-'} intervals for ${m.drawnCount} draws, against a ${f1(refresh)} ms refresh (the windows handed ${f1(m.hz)} and ${f1(m.wallHz)} a second), at ${at.toFixed(2)} of a refresh behind`);
+              m.fedMedian !== null && m.fedN >= 0.8 * m.drawnCount && m.fedMedian >= 0.9 * bar && at >= 0.35 && at <= 0.65,
+              `median ${f1(m.fedMedian)} ms fed over ${m.fedN ?? '-'} intervals for ${m.drawnCount} draws, against a median ${f1(bar)} ms between refreshes served (the display's ${f1(refresh)} ms; the windows handed ${f1(m.hz)} and ${f1(m.wallHz)} a second), at ${at.toFixed(2)} of a refresh behind`);
           } else if (alone.engine) {
             check('  and the governor is fed a whole refresh of the faster window, not half of it', false,
               `a renderer came up (${alone.engine}) and there is no governor to read`);
@@ -845,10 +925,17 @@ let failed = 0;
         thread held for 0.7 more drops frames for reasons that are not the
         gate's. The frozen and halving gates are the phases' floors to catch.
       */
+      /*
+        0.7 of the display's refresh measured now, from the gaps: not of the
+        rate the show kept alone at the start, which on #203's Mac run was
+        42.7 a second and made each draw cost 0.98 of a real refresh, where
+        the thread alone holds any gate under the ceiling (the check-skeptic).
+      */
       await wall.evaluate(() => { window.__phaseMs = 0; });
-      await show.evaluate((ms) => { window.__drawCostMs = ms; }, 0.7 * refreshMs);
+      const drawRefresh = (await measure(500)).refreshMs ?? refreshMs;
+      await show.evaluate((ms) => { window.__drawCostMs = ms; }, 0.7 * drawRefresh);
       await show.waitForTimeout(500);
-      judge(await measure(2000), `on its own clock, ${f1(0.7 * refreshMs)} ms draws`, { floor: false });
+      judge(await measure(2000), `on its own clock, ${f1(0.7 * drawRefresh)} ms draws`, { floor: false });
       await show.evaluate(() => { window.__drawCostMs = 0; });
       // Covered: the show's own frames stop; every ask the wall makes draws,
       // handed over raggedly.
