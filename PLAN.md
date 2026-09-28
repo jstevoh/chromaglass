@@ -134,6 +134,24 @@ phone's two-finger Drop on #186's deploy (B 81 against 2/0/0, fine by eye), `qa`
 against 3.5 on #194. Each wants what §0 asks of the Finger: find whether the check or
 the product is wrong, from the numbers it prints.
 
+*Read 2026-09-28, on #216's show shard, a docs-only tree:* "the tapped beat drives the
+show's clock" read a beat every 401.7 ms against 404.1 ms tapped, its second red, after
+#195's 396.6 against 401.4; the runs of #203 and #211 on the same code read 405.8
+against 405.8 and 403.2 against 403.2. The clock is not the suspect §11 names:
+`setExternal` is handed the tap's reading right before `update` on every frame, with the
+same `now`, so every frame ends on the tempo source's own period, and nothing in the
+check clears the tap (only Tempo: Listen Again does). The two numbers come from two
+stopwatches. The check stamps each tap in the page just before `chromaglassAction('tap-tempo')`, and the app stamps it again
+inside `tapTempo`, so a pause between the two stamps (a collection, or the first call
+into `runAction` on a busy runner) lands in one and not the other. Both reds read the
+app's mean shorter, which is what a late first stamp does, by 14.4 and 7.2 ms over the
+three gaps, where the check allows 6. This is read in the code, not run. *Proposed:*
+`chromaglassDebug()` returns the tempo source's reading. The check then asks that the
+clock's period is that period to within 0.5 ms (the feature: the tap drives the clock).
+Separately, allowing for dispatch, it asks that the app's taps are the harness's
+(a tap dropped or doubled moves the mean by a third or more). The `check-skeptic` holds
+both halves red.
+
 The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
 backtrace, in `macCormack`), with a gathering cell held to the most its upstream
