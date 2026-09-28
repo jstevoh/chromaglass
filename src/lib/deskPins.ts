@@ -140,6 +140,9 @@ const SECTION_OF: Record<string, string> = {
   oilBodies: 'physics',
   pacing: 'automation',
   songFollow: 'automation',
+  spinRpm: 'layers',
+  spinAuto: 'layers',
+  spinBeats: 'layers',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
   // And each row's fade time (lib/mixFade.ts), beside its strip.

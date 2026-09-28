@@ -70,6 +70,11 @@ jobs:
       - name: The desk
         run: npm run desk
 
+      # The spinning dish's CPU half: the liquid's lag behind the glass, Auto
+      # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §21).
+      - name: The turntable
+        run: npm run turntable
+
       # The two lists that have to agree about what a control is: the settings
       # panel's own markup, and the registry the desks pin from.
       - name: The panel
@@ -350,6 +355,12 @@ jobs:
       - name: The press moves the oil
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run pressoil
+      # A spun dish drags its liquid round through the gap, harder where the
+      # gap is tight, flings the heavy dye out and draws the oil in; with
+      # nothing spinning the flow is a still plate's to the bit (PLAN §21).
+      - name: The spinning dish
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run dish
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.

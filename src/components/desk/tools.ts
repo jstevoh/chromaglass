@@ -10,10 +10,12 @@
  * the only one that changes what the liquid *is* rather than where. Magnet
  * holds the magnet under the glass where the pointer is, which is how the
  * ferrofluid is moved by hand; on a look with no ferrofluid it has nothing to
- * pull.
+ * pull. Spin turns the dish under the hand (PLAN §21): drag round the middle
+ * and the glass goes round with the pointer, let go and it coasts, hold still
+ * and it stops; the liquid follows the glass as a real liquid does.
  */
 export const DESK_TOOLS = [
   ['dropper', 'Drop', 'D'], ['spray', 'Spray', 'S'], ['splatter', 'Splat', 'X'],
   ['pour', 'Pour', 'O'], ['streak', 'Streak', 'K'], ['blow', 'Blow', 'W'], ['press', 'Press', 'P'],
-  ['finger', 'Finger', 'G'], ['magnet', 'Magnet', 'M'],
+  ['finger', 'Finger', 'G'], ['magnet', 'Magnet', 'M'], ['spin', 'Spin', 'N'],
 ] as const;
