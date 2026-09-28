@@ -307,6 +307,14 @@ try {
         `${under0.disc.toFixed(0)} → ${under1.disc.toFixed(0)} under it`);
       // Moved to the rim, not made: what was under it and round it, against the plate left alone.
       const was = under0.disc + under0.ring, now = under1.disc + under1.ring;
+      /*
+        And the whole plate, on the record. This judges what is under the
+        bubble and round it, so dye carried in from further out reads as made
+        (CI: 480 -> 1092 against +47 left alone, failing a deploy). The plate's
+        total says which it was, so the next failure shows moved or made
+        (from #158, folded in with PLAN 15d).
+      */
+      console.log(`     the plate as a whole ${a.total.toFixed(0)} → ${b.total.toFixed(0)} across the blow, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} left alone`);
       check('and pushes it out to the rim rather than making more', now - was - idle < 0.5 * was + 5 + 3 * Math.abs(idle),
         `${was.toFixed(0)} → ${now.toFixed(0)} under it and round it, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} left alone`);
     } else {

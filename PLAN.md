@@ -62,8 +62,8 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws), not yet run on the Mac with a renderer, so the governor's half is judged in arithmetic only |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15b–15e open, the ferrofluid's under 9n |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1517,6 +1517,21 @@ while this batch's plan was going in (#177), and no cause is known yet:
   line read 2.1 to 9.1 against allowances of 8.3 to 36.4, at most 63 % of it. Worth
   asking whether a drop's drift should be read on both sides of the drop, so that a
   region starting up is in the drift and not only in the change.
+- `phone.mjs`, "portrait: set to one bar in the drawer, the same take lands in about
+  half the time": on #210 (the Press; no mixer or phone code) it landed where it
+  should (0 at 1944 ms against two bars' 3849 ms; #201's run 1936 against 3838) and
+  went red on "with a jump", whose size the line did not print (it does now). The fade is stepped by
+  a 16 ms show interval against the show clock and the slider shows React's state,
+  so a main thread that stalls on a busy Mac runner moves the level a stall's worth
+  at once, and at one bar the allowance per 80 ms sample (0.106) is half two bars'.
+  Worth printing the largest step and its gap first, then asking whether the walk
+  should stamp the level with the show's time rather than the harness's.
+- `bottles.mjs`, "an Oil Pour lays the dye a Water Pour does per push": red once on
+  #210 (9.05 against 10.22; #201: 9.17 against 9.29). Water's ratio moved, not
+  Oil's: the mouse's stir is a push with no dye once a move event, the Pour's once a
+  step, so the ratio read how many steps the runner fitted into each move. **Fixed
+  in #210:** only the hand's own Pour counts (pushes made in the task that laid its
+  dye, nothing through autoInject); the detail line prints what was left out.
 
 ## Not doing
 
@@ -2311,6 +2326,17 @@ fifth of the plate across every step. Checked by `npm run bottles` on the Mac (t
 The app does not step on software WebGPU, so this check cannot run in a cloud
 session.
 
+Open: the Splat line's "following the hand" went red once on #203's Mac run (29
+pours on the stroke, 0 at the mirror, the order wrong), on a path that change
+does not reach (with no wall open nothing is gated). The line compares the
+first quarter of the pours with the last along the stroke, and a Splat throws
+its droplet up to 27 cells from the hand on a stroke 29 cells long. Modelled
+with the hand's steps evenly spread, that comparison reads a working Splat as
+not following on 0.07 % of strokes of 29 pours. So the likelier cause is steps
+bunched by a stall on the runner, which leaves the two quarters near one point.
+Judge each pour against where the hand was on that step (log the pointer with
+the pour), not by the order of scattered droplets.
+
 ### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 
 Every liquid rides one velocity field, which is held to `MAX_SPEED` 0.002
@@ -2345,10 +2371,48 @@ aside instead is a question for Steve, taken with 15b.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
-`squeezeOut` carries the dye into a ring and nothing else. With Oil Bodies on, a
-press takes the oil's colour out of its body, which is what the Finger did before
-`carryMix`. The ferrofluid under a palm doesn't move either. Wanted: the same ring
-for the oil (a radial `carryMix`) and for the phase.
+`squeezeOut` carried the dye into a ring and nothing else. With Oil Bodies on, a
+press took the oil's colour out of its body, which is what the Finger did before
+`carryMix`. The ferrofluid under a palm doesn't move either.
+
+**The oil: shipped.** A press takes the oil the way it takes the dye, the same share
+of every cell under the palm, and puts it down on the dye's ring (the palm's rim to
+1.7 palms out), area for area (`pressMix`, the other mode of `mixCarry`); the dye's
+half (`pressDye`) now lands each cell's colour by the same map, straight out, where it
+used to spread it evenly round the whole ring, which put half of a palm-edge press's
+colour in the water across the ring from its oil. Both live in `src/lib/pressRing.ts`,
+which the app and the lab share. What would land off the plate is not taken, oil or
+colour. The oil is pressed once a dye reading on its own clock, so a clear body is
+pressed at the dye's rate. `npm run pressoil` (lab, with the app's own palm, a quarter
+of the plate across) 11/11: the oil kept to 0.4% of what moved in the middle, off it
+and in a corner; every palm cell at exactly 0.4^6; the ring gaining what the palm lost
+band by band; one press of each half on a body's edge landing the same amounts in the
+same cells (the old even ring: 454 of 908 on the far side, in the water); each palm
+cell giving up the same share of colour as of oil; and in a corner all the colour
+taken landing (780.0 of 780.0), none taken from the 2225 palm cells with nowhere to go. A first
+cut with the Finger's cone and a hop lost 27% of the oil moved in a corner and landed a
+fifth of it back under the palm. `npm run bottles` (Mac) asks that the app's Press,
+held and replayed, reaches it, and only with Oil Bodies on. The phone's Press is the
+same `squeezeOut`. The straight-out dye is a change of look on every plate: to be
+judged on the Mac (`docs/judging.md` §18). The only app check of the dye ring's shape
+is `npm run press`, which is not in CI and sets its settings by writing into the
+debug hook's copy (the pattern `depth` had); worth bringing into the tools shard.
+
+*Open:* **the ferrofluid.** Waits on 9n (Blow and Finger moving the ferrofluid, the
+ferrofluid thread), which builds on `phaseCarry`'s radial mode; a press wants a flat
+take out to the palm's rim on it, as the oil's has.
+
+*Found 2026-09-27, not done:* **a press can still make dye.** The dye's half of
+`squeezeOut` takes a share of the disc as a GPU multiply and puts into the ring the
+share the CPU mirror read, a frame or more earlier. The squeeze film is pushing the
+dye out meanwhile, so the ring can get more than the disc gave (#158: 90 → 285
+against −12 on one deploy). #158 subtracted the mirror's amounts instead; that is not
+adopted: bilinearly spread over the finer grid it clamps at zero along every thread
+finer than a mirror cell, so it makes dye a new way and erases threads the multiply
+kept 40% of, a change of look. The fix that makes both halves see the same dye is to
+do the dye's move on the GPU too, as the oil's now is (the map is the same one). #158's other two pieces are
+in: `depth` sets its curve through the app's setter, and `tools` prints the whole
+plate across the Blow.
 
 ### 15e. The liquids' own forces are measured only on a stand-in plate
 
@@ -2358,3 +2422,48 @@ the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured. A
 minor, in `performGesture`: a remote Finger is half as strong as the mouse's, and a
 remote Blow never makes a straw bubble.
 
+
+## 17. Hear the set ahead, from files
+
+Not started. Came out of asking what a streaming service's API could add
+(2026-09-27): the one idea worth having was the show knowing each song before it
+plays, and it needs no service at all, only the files.
+
+Live, the show can only react. A song map (sections, energy, pitch) is made by
+recording the song's first play (`ListenRecorder` in `src/lib/songMap.ts`, from
+`useMusicIntelligence.ts`) and is cached by ISRC for the next time, so the first
+time a song is played at a gig, nothing is known ahead of the note that is sounding.
+Only the film render reads a song ahead: `src/lib/songTrack.ts` decodes the whole
+file and works out every frame's bands and kicks before drawing (§6).
+
+The idea is that the live show does what the render does, for a whole set:
+
+- **Load the set as files.** Drop a folder or a playlist of files (bought FLAC or
+  MP3; store downloads such as Qobuz's carry no DRM) onto the desk, or the Mac app
+  (§13). Each song is decoded and analysed before the show, through the same code
+  the render uses, and its song map is ready before its first note.
+- **The show plays the files itself**, so it knows which song is on and where in it,
+  to the sample, with no fingerprint service (`fingerprint.ts`) and no guessing at the
+  gap between songs (`songBoundary.ts`). Offline at the venue, which is §14h.
+- **Anticipate, don't react.** With every kick and section known ahead, a song show
+  (`songShows.ts`) can fire an action a bar or two *before* a drop or on the last
+  beat of a song, not after it: start a pour ahead of the build, black on the last
+  hit, pick the next look from what the next song will do.
+- **From the files' own tags:** the ISRC, so per-song looks attach exactly
+  (`songRef.ts`), with MusicBrainz for files that lack one; embedded cover art as a
+  source of the song's dyes; ReplayGain (or a loudness measured during the analysis)
+  so a quiet record and a loud master drive the plate the same amount without
+  recalibrating (`audioCalibration.ts`).
+- **When something else is the player** (a DJ, a phone), the show carries on as it
+  does today, through the mic or the interface.
+
+**Open questions:** how much a whole set's analysis costs up front (a ten-minute song
+decodes to about 230 MB of float before it is cut down, `songMap.ts`), so it wants a
+worker and one song at a time; and whether anticipation is a new *when* for song
+shows ("n beats before section") or a new kind of action. The phone gets the set
+list, the now-playing song and the song shows' next cue, the same as the desk.
+
+**Not doing:** a streaming service's API for this. Qobuz's API terms (researched
+2026-09-27) forbid earning anything around the service and indexing its catalogue,
+and a consumer subscription is for personal listening, so a stream at a gig is
+outside its terms whatever the app does. Files the performer owns carry none of that.
