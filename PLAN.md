@@ -1461,15 +1461,22 @@ while this batch's plan was going in (#177), and no cause is known yet:
   at 1.41 s, the rule matched that sliver and the 2.58 s rest went to check 4. Now a
   tick every 100 ms marks the page's thread; any stretch of half a second or more,
   beginning in the first 3 s and ending before the first step, with no frame, no
-  tick, no long task and no long animation frame is time the thread was held from
-  outside, taken out of check 4's frame gaps and held by 4b to 4.5 s all told. If
-  either kind of entry cannot be seen or the timer runs slow, nothing is taken out.
-  Long animation frames are there because the check-skeptic review found that the
-  page's own JavaScript run after an `await` on a WebGPU promise (all the show's GPU
-  setup) is never a long task: a second of it looked exactly like a held thread. In
-  a cloud session it is a long animation frame, and a renderer stopped from outside
-  (SIGSTOP) is neither. Whether Chromium's own hold on the Mac shows as one is what
-  this PR's first Mac run prints; if it does, the rule needs another instrument. The old "within 0.25 s of the control's stop" and "control plus a second" are
+  tick and no long task, and not begun where a promise the page awaits had just
+  settled, is time the thread was held from outside, taken out of check 4's frame
+  gaps and held by 4b to 4.5 s all told. If long tasks cannot be seen or the timer
+  runs slow, nothing is taken out. The settled promises are there because the
+  check-skeptic review found that the page's own JavaScript run after an `await` on
+  a WebGPU promise (all the show's GPU setup) is never a long task: a second of it
+  looked exactly like a held thread. Long animation frames were tried first and
+  fail on the Mac: Chromium's own hold was one too (2.94 s from 1.01 s, run
+  36353565837). What does tell is that the page's code after an await begins the
+  moment its promise settles, and Chromium's hold begins with the adapter or device
+  still pending. In a cloud session (`ci-flakes/startup-lab/probe7.mjs`) a second
+  of busy code after awaiting requestDevice, a pipeline, fetch and work done each
+  read as the page's own, and a renderer stopped from outside for 2 s read as held.
+  *Still open:* a continuation of something the check does not wrap (an `import()`)
+  would look held; the 4.5 s cap is the backstop. The long animation frames stay
+  printed with where their rendering began, in case they can tell later. The old "within 0.25 s of the control's stop" and "control plus a second" are
   gone. Read against the 53 logs: #204's red and 36339282520's split stop (1.28 s
   then 1.68 s) now count as one held stretch each, 2.57 s and about 3 s; 2 of the 53
   (4.05 s on 36294600123, 3.75 s on 36338802046, each wholly inside a four-second

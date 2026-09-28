@@ -458,8 +458,9 @@ jobs:
       # opens with is built before it opens and the rest behind it, none is
       # built on a frame, no two frames are more than two seconds apart but
       # for the time Chromium holds the page's whole thread while it starts
-      # its GPU (no frame, timer, long task or long animation frame of the
-      # page's, in the first three seconds; held to 4.5 s), and the plate
+      # its GPU (no frame, timer or long task of the page's, not begun where
+      # a promise it awaits settled, in the first three seconds; held to
+      # 4.5 s), and the plate
       # moves for good no later than it did the old way. On a shard
       # of its own, because it empties the Mac's shader cache, and one after
       # another check would find it warm; depth, first on the tools shard,
