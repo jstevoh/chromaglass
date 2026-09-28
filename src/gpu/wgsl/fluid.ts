@@ -1969,7 +1969,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     A.a = (x, y, radius, take), A.b.xy = the hop, all in plate units.
 
     A.b.w = 1 is the Press's carry instead (PLAN 15d, pressMix): A.b.z is
-    the outer edge of the ring squeezeOut lands the dye on (R to 1.7R). The
+    the outer edge of the ring squeezeOut lands the dye on (R to 1.7R), and
+    A.b.x, when above zero, the share a ring cell receives, counted on the
+    CPU as the colour's is (a small palm's ring, a puff's, does not tile:
+    the formula's 1 / K lost 3.3% of the oil it moved, PLAN 15c). The
     Press moved the colour and left the oil, so with Oil Bodies a press drew
     a body's colour out into the water and the body stayed where it was,
     colourless: the Finger's fault before this kernel, on the other tool.
@@ -2029,7 +2032,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     keep = 0.0;
     if (r >= R && r < A.b.z) {
       back = A.a.xy + rel * sqrt(max(0.0, r * r - R * R) / stretch()) / r;
-      keep = 1.0 / stretch();
+      // What a ring cell gets of the palm cell it reads: counted on the CPU
+      // (A.b.x, pressShare), as the colour's is, or 1 / K from the formula.
+      keep = select(1.0 / stretch(), A.b.x, A.b.x > 0.0);
     }
   }
   let q = vec2i(floor(back * S.n));

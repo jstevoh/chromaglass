@@ -31,6 +31,7 @@ import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
+import { pressShare } from '../lib/pressRing';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 
@@ -1884,10 +1885,21 @@ export class WebGPUFluid {
    * put down on the ring from the palm's rim to `outer`, where the dye goes.
    * The same kernel as carryMix in its other mode (mixCarry says how it
    * lands and why it keeps what would land off the plate).
+   *
+   * What a ring cell receives of the palm cell it reads is counted here, on
+   * the kernel's own grid, as the colour's is counted on the mirror's
+   * (pressShare, lib/pressRing.ts), rather than the formula's 1 / K, which a
+   * small palm's ring does not tile: a puff six cells across (the Blow held
+   * still off the straw, PLAN.md 15c) lost 3.3% of the oil it moved on a
+   * Mac. Counted on the mirror's grid and handed to a finer solver, it made
+   * oil instead (+0.7% of a press, `npm run pressoil`): the two grids have
+   * different cells, so each counts its own.
    */
   pressMix(x: number, y: number, radius: number, outer: number, take: number): void {
     if (!(outer > radius)) return;
-    this.runMixCarry(radius, take, [x, y, radius, take, 0, 0, outer, 1]);
+    const n = this.N;
+    const share = pressShare(n, x * n - 0.5, y * n - 0.5, radius * n, outer / radius);
+    this.runMixCarry(radius, take, [x, y, radius, take, share, 0, outer, 1]);
   }
 
   private runMixCarry(radius: number, take: number, args: number[]): void {

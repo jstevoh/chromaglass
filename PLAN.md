@@ -2269,6 +2269,14 @@ pointer and asks that the stroke ran as the wind (the pointer's Blow counts its
 straw and wind steps and what the wind carried, `blowSteps` in `chromaglassDebug`),
 that the colour goes along and that it is kept.
 
+A held puff lands the oil on the Press's ring, and the ring's kernel worked out what
+each ring cell gets from the formula (1 / K), which a small palm's ring does not tile:
+a puff six cells across lost 3.3% of the oil it moved on the Mac (`npm run wind` went
+red on it). The kernel is now handed the share counted on its own grid, as the
+colour's is counted on the mirror's (`pressShare`), and the Press's own oil, which
+lost up to 1% of a press the same way, now keeps all of it (`npm run pressoil`:
+32768.0 → 32768.0 in the middle, off it and in a corner).
+
 The straw is now chosen by whether the hand has moved in the last 150 ms (the
 clock the ferrofluid's wind already used), not by whether it moved this step. Asked
 per step, a drag blew the straw on every step after a frame's first and on every

@@ -47,10 +47,15 @@
  *      against the other's, summed, under 10% of what moved for the wind
  *      (the dye scatters to the nearest cell ahead and the oil's kernel
  *      gathers from the one behind, which round alike along an axis but
- *      not always on a slant) and 5% for the puff (the Press's ring, as
- *      `npm run pressoil` holds the Press to). None of the oil made or lost,
- *      to 3% of what moved (the puff's ring gathers from the nearest cell,
- *      which does not tile exactly: pressoil allows the Press 1%).
+ *      not always on a slant) and 1% for the puff (the Press's ring: the
+ *      oil's kernel counts its ring's share on its own grid as the colour's
+ *      is counted on the mirror's, pressShare, so on one grid the two land
+ *      the same amounts; with the formula's 1 / K they were 0.09 apart of
+ *      5.83 on a Mac). None of the oil made or lost, to 3% of
+ *      what moved: a ring six cells in is exact only on an even palm, and
+ *      the puff's sits on the oil's edge, where it loses what its colour
+ *      loses (1.9%; with the formula's 1 / K, 3.3% on a Mac, which is how
+ *      this went red and found it).
  *
  * Not measured here: the app itself. This runs the functions the app calls,
  * not the app, so an app that went back to erasing passes it (checked:
@@ -186,7 +191,7 @@ try {
     `under it ${puff.before.inside.toFixed(1)} → ${puff.after.inside.toFixed(1)} (push alone ${got['puff push'].before.inside.toFixed(1)} → ${got['puff push'].after.inside.toFixed(1)}), ${pct(kept(puff))} kept, the old eraser ${pct(kept(got['puff erase']))}`);
   const lands = (o, tol) => o.moved > 0.5 && o.oilIn > 0.3 * o.moved && o.dyeIn > 0.3 * o.moved && o.apart < tol * o.moved && Math.abs(o.oilTotal[1] - o.oilTotal[0]) < 0.03 * o.moved;
   check('with Oil Bodies the oil goes where its colour goes, along, on a slant and held still',
-    lands(oil.wind, 0.1) && lands(oil.slant, 0.1) && lands(oil.puff, 0.05),
+    lands(oil.wind, 0.1) && lands(oil.slant, 0.1) && lands(oil.puff, 0.01),
     Object.entries(oil).map(([n, o]) => `${n} ${o.apart.toFixed(2)} apart of ${o.moved.toFixed(2)} moved`).join(', '));
 } finally {
   await close();
