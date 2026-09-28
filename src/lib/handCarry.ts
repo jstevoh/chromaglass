@@ -133,6 +133,13 @@ export const remoteBlowRadius = (amt: number, directed: boolean): number => dire
   its colour rather than left colourless. Moving, the oil goes along with
   its colour through carryMix, as under the Finger.
 
+  This is a shortcut, and it is named as one (PLAN.md 15g). Air on a thin
+  layer drags its surface with a shear stress and presses a dimple under the
+  jet, and the colour rides the flow that makes; it is not taken and put
+  down. The carry stands in for that flow because the plate's flow forgets a
+  tool's push within the step (15b). When a tool's force reaches a flow
+  that remembers it, this goes, and `npm run wind` asks the same of the flow.
+
   `x`, `y` and `radius` are in cells of the N-cell mirror, as the tools
   have them; `dx`, `dy` of zero is held still. Returns the dye moved; the
   caller marks the mirror spent (dyeMoved) when it is more than nothing.

@@ -63,7 +63,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac), not yet judged on the Mac; 15b, 15e, 15f open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2275,6 +2275,46 @@ per step, a drag blew the straw on every step after a frame's first and on every
 frame the pointer did not report a move, so a drag left a string of straw bubbles
 and ran the wind a step a frame at best. The show's own puffs (a pour's burst, the
 automation's breath, a bubble's pop) still clear the dye under them, as their look.
+
+### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
+
+The owner's standing rule (2026-09-28): build from the chemistry and physics of the
+liquids, not from a picture of their result. 15c is a shortcut by that rule, and so
+are the carries it copied. The wind moves the colour, the oil and the ferrofluid
+directly, a take from under the hand and a put a hop ahead (`blowDye`, `blowOil`,
+`blowCarry`), because the flow cannot carry them: a tool's push is cut back to idle
+at the end of the step it was added in (15b). The Finger (`carryDye`, `carryMix`,
+`fingerCarry`) and the Press (`pressDye`, `pressMix`) do the same. It keeps the
+colour and moves it the right way, and it is not what air on a liquid does.
+
+What air blown on a thin layer does, and what the plate would need:
+
+- **Shear.** Air moving over the surface drags it with a tangential stress, about
+  tau = 1/2 rho_air C_f U^2 along the jet (C_f a few thousandths for a wall jet).
+  In a layer this thin the flow is viscous (lubrication), so the stress drives a
+  Couette profile: the surface moves at tau h / mu and the depth-mean at
+  tau h / (2 mu), in proportion to the depth. A deep pool moves more than a thin
+  film under the same breath, and a thick oil (glycerine) less than water. The
+  plate's depth-mean velocity should take tau h / (2 mu) as a force that lasts as
+  long as the breath does, not a disc of velocity that the clamp removes.
+- **Pressure.** Where the jet meets the surface it presses a dimple, about
+  1/2 rho_air U^2 at the stagnation point, which pushes liquid out from under the
+  nozzle (a Poiseuille flow, -h^2 grad p / (3 mu) depth-mean). That is a held
+  puff's ring, and it is the Press's physics at a smaller pressure: it belongs in
+  the gap field the Press already squeezes (`squeeze`, `applySquish`), not in a
+  ring map.
+- **The film.** The layer's thickness moves with its own flow,
+  dh/dt + div(h u) = 0: it thins where the air hits and piles up in a bow wave
+  where the wind stops. Colour, oil and ferrofluid are then carried by that one
+  flow, conserved by the advection, and the carries can go.
+
+Depends on 15b: the tool's force has to reach a flow that remembers it (the lasting
+current `cur`, or the clamp lifted for forced flow), which changes how every tool
+feels, so it goes to the owner first. When it lands, `npm run wind` is the check:
+with the carries deleted, the colour kept and moved along by the flow alone, and the
+oil with it, against the same bars. Then the same for the Finger (a solid dragged
+through the layer: no-slip on the finger, the wake behind it) and the Press
+(squeeze flow from the gap, which the solver half models already).
 
 ### 15f. Found with 15c
 
