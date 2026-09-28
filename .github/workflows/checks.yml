@@ -271,6 +271,16 @@ jobs:
       # dist/, which the show server serves, so this runs the script alone.
       - name: The remote's Mixer
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
+      # §14f): with the band playing the App renders at most five times a
+      # second more than the ear tells it (ten), and the plate still hears a
+      # new reading nearly every frame; on a quiet page, at most one and a
+      # half. On a laptop page and a phone.
+      # The counts need no GPU; the plate's own line (a new reading nearly
+      # every frame) needs a plate that draws and is held on the Mac's open
+      # shard below. On the dist/ the phone's step built, like the Mixer.
+      - name: The sound's renders
+        run: node scripts/renders.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -335,6 +345,11 @@ jobs:
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run lift
+      # A press moves the oil out from under the palm with its colour, onto the
+      # ring the dye lands on, and keeps all of it (PLAN §15d).
+      - name: The press moves the oil
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run pressoil
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
@@ -479,6 +494,12 @@ jobs:
       - name: The ear behind the wall
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node --experimental-strip-types scripts/ears.mjs
+      # The plate hears a new reading nearly every frame while the App renders
+      # ten times a second (scripts/renders.mjs, PLAN.md §14f): the line the
+      # Measure job skips, because there no plate draws. About forty seconds.
+      - name: The sound's renders, with a plate
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/renders.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a

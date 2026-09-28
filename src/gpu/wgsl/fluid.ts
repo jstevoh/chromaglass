@@ -1967,21 +1967,75 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     left the oil where it was, colourless.
 
     A.a = (x, y, radius, take), A.b.xy = the hop, all in plate units.
+
+    A.b.w = 1 is the Press's carry instead (PLAN 15d, pressMix): A.b.z is
+    the outer edge of the ring squeezeOut lands the dye on (R to 1.7R). The
+    Press moved the colour and left the oil, so with Oil Bodies a press drew
+    a body's colour out into the water and the body stayed where it was,
+    colourless: the Finger's fault before this kernel, on the other tool.
+
+    The oil and the dye go the same way, cell for cell. The dye's take is
+    flat across the palm (the same share of every cell), so the oil's is
+    too, not the Finger's cone: a cone took a third of the dye's share
+    averaged over the palm, and two thirds of the colour a press moved still
+    left without its oil. And both are laid on the ring R to 1.7R area for
+    area: a point s from the middle lands at sqrt(R^2 + s^2 K),
+    K = (O^2 - R^2) / R^2, which carries the disc onto the ring with a
+    constant stretch of K, so every ring cell receives 1 / K of the cell it
+    maps back to. The dye's half (pressDye, src/lib/pressRing.ts) is the same
+    map on the CPU; it used to spread what it took evenly round the whole
+    ring, so a palm half over a body put half the body's colour in the water
+    on the far side while the oil went out on its own. A first cut here that
+    hopped each point straight out by 0.7R landed a fifth of the oil back
+    under the palm, where no dye goes.
+
+    Only what has somewhere to go is taken. The app's palm is big (a
+    quarter of the plate across, R = 45 cells of 192), so from most places a
+    person presses, part of its ring is off the plate, and a gather cannot
+    receive at a cell that is not there: the oil taken for it was lost, 5%
+    of what a press moved at (0.3, 0.4), 27% at (0.15, 0.5). So a cell whose
+    landing point is off the plate keeps its oil (and its colour, in
+    pressDye), which the receiving side sees the same way because it asks
+    the same took() of the cell it gathers from.
   */
   mixCarry: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
-fn took(uv: vec2f) -> f32 { return A.a.w * max(0.0, 1.0 - length(uv - A.a.xy) / A.a.z); }
+// The Press's K: the ring's area over the palm's.
+fn stretch() -> f32 { return (A.b.z * A.b.z - A.a.z * A.a.z) / (A.a.z * A.a.z); }
+fn took(uv: vec2f) -> f32 {
+  let rel = uv - A.a.xy;
+  let d = length(rel);
+  if (A.b.w < 0.5) { return A.a.w * max(0.0, 1.0 - d / A.a.z); }
+  if (d >= A.a.z) { return 0.0; }
+  let to = A.a.xy + rel * sqrt(A.a.z * A.a.z + d * d * stretch()) / max(d, 1e-6);
+  if (any(to < vec2f(0.0)) || any(to >= vec2f(1.0))) { return 0.0; }
+  return A.a.w;
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let uv = uvOf(id);
   let m = textureLoad(src, p, 0);
-  let back = uv - A.b.xy;
+  var back = uv - A.b.xy;
+  var keep = 1.0;
+  if (A.b.w > 0.5) {
+    // Only the ring receives, from the point of the palm that maps onto it
+    // (pressDye in src/lib/pressRing.ts lands the colour by the same map). At
+    // r = R a fused multiply-add can leave r*r - R*R a hair below zero: max().
+    let rel = uv - A.a.xy;
+    let r = length(rel);
+    let R = A.a.z;
+    keep = 0.0;
+    if (r >= R && r < A.b.z) {
+      back = A.a.xy + rel * sqrt(max(0.0, r * r - R * R) / stretch()) / r;
+      keep = 1.0 / stretch();
+    }
+  }
   let q = vec2i(floor(back * S.n));
   var got = 0.0;
-  if (q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n)) {
-    got = textureLoad(src, q, 0).r * took((vec2f(q) + 0.5) / S.n);
+  if (keep > 0.0 && q.x >= 0 && q.y >= 0 && q.x < i32(S.n) && q.y < i32(S.n)) {
+    got = textureLoad(src, q, 0).r * took((vec2f(q) + 0.5) / S.n) * keep;
   }
   textureStore(dst, p, vec4f(m.r * (1.0 - took(uv)) + got, m.gba));
 }`,
