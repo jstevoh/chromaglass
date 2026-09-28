@@ -2691,10 +2691,11 @@ read in the code.**
   about four times a second while a song plays; `getLiveEngineStatus` is passed inline,
   so Settings' 1 s tick is re-armed by every App render and does not tick while the App
   renders fast.
-- *For 14f's sound half (#211):* `useSongChange` samples at the App's render rate (no
-  dependency list), the cast's audio feed runs only when `audioData` changes, and
-  `useMusicIntelligence` reads `audioRef` in its loops. Once the App stops rendering on
-  every reading, each needs a reading source of its own.
+- *After 14f's sound half (#211):* the cast's feed now listens to the ear itself, but
+  `useSongChange` still has no dependency list, so the song-gap detector is sampled at
+  the App's render rate, now about 11 a second (it was about 70). A tenth of a second
+  may be fine enough for a gap between songs; if it is not, it wants the ear's
+  `onReading`, as the cast's feed has.
 
 *Measure:* `npm run desk` and `npm run layout` for the frame after Esc and after a
 switch (the frame is the hole; a click on the preview reaches the plate); a node check
