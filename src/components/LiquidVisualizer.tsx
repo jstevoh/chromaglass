@@ -3,6 +3,7 @@ import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked } from '../lib/earClock';
+import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
@@ -5345,8 +5346,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let animationFrameId = 0;
     let renderer: PlateRenderer | null = null;
 
-    /** When the projector last asked for a frame; see __chromaglassFrame below. */
-    let lastExternalFrame = 0;
+    /*
+      Which offers of a frame are drawn, from either window (PLAN.md §14b,
+      lib/drawGate.ts). The projector window asks for a frame on every one of
+      its refreshes (see __chromaglassFrame below) and this window's own
+      animation frames keep coming while it is visible, so with the wall up
+      there are two clocks. The gate stamps every draw, whichever of them
+      asked, and turns down any offer that comes within 0.6 of a refresh of
+      the last one: one draw a refresh, not one per clock.
+    */
+    const drawGate = new DrawGate();
     /*
       The loop, guarded.
 
@@ -5369,7 +5378,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let stepDownFrames = 0;
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
-    const render = () => {
+    /*
+      This window's own animation frame. Offered to the gate first: while the
+      projector is asking too, a frame that lands just after one the
+      projector's ask drew is turned down, and the next is asked for at once,
+      so this window's clock keeps ticking (and keeps being measured) whether
+      or not it draws. With no projector asking, every frame is drawn, as it
+      always was.
+
+      Offered at `ts`, the time its refresh began, not the time this callback
+      got to run (lib/drawGate.ts says why at length: a callback that waited
+      behind the projector's draw in the same refresh looked like the next
+      refresh's once a draw cost more than 0.6 of one). Called with nothing
+      when the renderer starts the loop, and then it is now.
+    */
+    const render = (ts?: number) => {
+      if (renderingRef.current) return;
+      if (!drawGate.offer('frame', refreshStamp(ts, performance.now()))) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+      draw();
+    };
+    /** One frame, guarded; whichever window asked for it has already been let through the gate. */
+    const draw = () => {
       // A song render is drawing the frames (`renderApiRef` below): the
       // browser's frame is not one of them.
       if (renderingRef.current) return;
@@ -7621,6 +7654,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // Governor: judge this frame. A rung change takes effect through the
       // engine block on the next frame, which reallocates the solver and
       // resizes the canvas as needed.
+      //
+      // `frameS` is the interval since the last frame this loop *drew*, and
+      // only frames the draw gate let through get here (PLAN.md §14b). Before
+      // the gate, with the wall up, the show's frames and the projector's asks
+      // interleaved, so the governor was fed two half-intervals for every
+      // refresh: two clocks each managing thirty read as one holding sixty,
+      // and it never stepped down while the wall was up.
       if (frameS > 0 && governorRef.current && !rendering) {
         // No heavy post pass exists yet (feedback and slit-scan will be the first).
         governorRef.current.heavyPost = false;
@@ -7942,24 +7982,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       stops.
 
       So the window that *is* visible drives. The projector runs its own rAF
-      and calls this; the guard is what keeps that from becoming a second
-      clock when both windows are up, because a frame already drawn this
-      display interval is not drawn again.
+      and calls this; the draw gate is what keeps that from becoming a second
+      clock when both windows are up (PLAN.md §14b, lib/drawGate.ts).
+
+      The guard here used to compare an ask only with the projector's
+      previous ask, 6 ms back. The show's own frames never set it, so with
+      both windows visible on two displays' clocks every ask drew a second
+      frame in the show's refresh: `npm run wall` measured 119.1 to 120.2
+      draws a second against a 60 Hz display, with the projector's clock at
+      every phase it tried. Now every draw is stamped whichever window asked, and
+      an offer within 0.6 of a refresh of the last draw is turned down, an
+      ask here or one of this window's own frames in `render` above, but only
+      while both clocks are running. With this window covered its own frames
+      have stopped, the wall's clock is the only one, and every ask draws,
+      however ragged a busy machine makes them.
+
+      `ts` is the time the projector's refresh began, already on this
+      window's clock (CastDisplay converts it), so that an ask waiting behind
+      this window's draw in the same refresh is still seen as that refresh's.
+      An ask without one (a harness, a projector window from an older build)
+      is offered at the time it ran, as before.
     */
-    (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame = () => {
+    (window as unknown as { __chromaglassFrame?: (ts?: number) => void }).__chromaglassFrame = (ts?: number) => {
       if (renderingRef.current) return;             // a render is drawing; the wall mirrors its frames
       const now = performance.now();
-      if (now - lastExternalFrame < 6) return;     // this interval already has a frame
-      lastExternalFrame = now;
+      if (!drawGate.offer('ask', refreshStamp(ts, now))) return;   // this refresh already has a frame
       // The ear reads on the wall's clock: with this window covered its own
       // frames have stopped, and so, until PLAN.md §14a, had its hearing
       // (lib/earClock.ts). The reading goes through React like every other,
       // so it lands on the next frame, the same one-frame lag as a visible
       // show's (PLAN.md §14f). It reads only while this window's frames are
-      // missing, so a visible show hears as it did.
+      // missing, so a visible show hears as it did. And only for an ask the
+      // gate let through: the ear takes one reading per drawn frame (its
+      // smoothing is per reading), so an ask that draws nothing hears
+      // nothing either.
       wallAsked(now);
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      render();
+      draw();
     };
 
     // ── What `?debug` shows ───────────────────────────────────────────
@@ -7974,6 +8033,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
+        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */

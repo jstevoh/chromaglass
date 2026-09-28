@@ -62,7 +62,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
 | 19 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 19a–19d open |
 
@@ -1887,6 +1887,110 @@ between real draws. *Measure:* extend `npm run wall` with the mirror popup and b
 windows animating: frames drawn a second no more than about 1.1 times one display's
 refresh.
 
+**Shipped** (2026-09-27). `lib/drawGate.ts` stamps every draw, the show's own frame
+or the projector's ask, and turns down any offer within 0.6 of a refresh of the last
+draw. The refresh is the median of the faster clock's own recent gaps (each window's
+offers, drawn or not, so the gate's own skipping cannot talk it down), never shorter
+than 240 Hz's and with no slow bound (a first bound at 30 Hz let two clocks at 20 a
+second both through, 40.0 draws a second, tried), 60 Hz until measured. Three changes
+from the fix as written, each found red first:
+
+- *The show's own frames are gated too*, while the projector is asking. With the asks
+  alone gated, a projector more than 0.6 of a refresh behind still doubles (its ask
+  draws, and the show's next frame lands 0.4 of a refresh later), which is 40 % of
+  the phases a drifting projector passes through: 120 draws a second in the
+  arithmetic where the gate draws 60, and 113.6 in the app at ¾ of a refresh.
+- *Nothing is gated unless both clocks are running*, so with no wall every one of the
+  show's frames draws, and with the show covered every ask draws, however ragged a
+  busy machine makes them. A gate on the asks alone drew 61 of 121 covered asks
+  handed over alternately on time and 12 ms late, each missing one a frame the wall
+  shows twice.
+- *Every offer carries its refresh's own time*, not the time its callback ran: the
+  show's frames their `requestAnimationFrame` timestamp, the projector's asks its own,
+  moved onto the show's clock by the two windows' `timeOrigin`s (`CastDisplay`), and
+  the time now for an ask with none. Both windows share one main thread, so when both
+  clocks land in one refresh the second callback runs after the first one's draw; the
+  first version stamped with `performance.now()` there, and once a draw cost more than
+  0.6 of a refresh the second looked like the next refresh's and drew too (found in
+  review: 87 a second at 60 Hz with 10.5 ms draws), and the governor was fed the draw's
+  own cost as the interval.
+
+Only let-through frames reach the loop, so the governor's `frameS` is the interval
+between real draws; an ask that is turned down does not offer the ear a reading either
+(one reading per drawn frame, 14a).
+
+`npm run wall` measures it twice, and holds every rate to a floor as well as a
+ceiling (a gate that froze the plate, or turned down one frame in two, passed the
+ceilings alone in review). In arithmetic (node, one main thread with a draw cost):
+laptop and projector at 60/60, 60/59.94, 120/60, 60/120, 60/50, and a busy 28/28 and
+20/20 Hz, twenty phases each, with and without 2 ms of jitter, with free draws and
+with draws of 0.7 of a refresh: between 0.99 and 1.02 times the faster display at
+every phase (27.7 to 28.3 on 28/28, 59.7 to 60.3 on 60/60); the old guard 1.25 to 2.0
+times it on the same clocks (120 on 60/60, 180 on 120/60); the gate stamped with when
+its callback ran 80.0 on 60/60 and 156.0 on 120/60 once draws cost 0.7 of a refresh;
+the median interval fed to the governor a whole refresh (16.7 ms; the old guard 0 to
+11.7, stamped when run 11.7); covered, every ask of a 30, 60 and 120 Hz projector
+draws, and every one of asks 20 to 200 ms apart.
+
+In the app: the real projector window (`?cast=true`), both windows animating, the
+projector's frames handed to it 0, ¼, ½ and ¾ of a refresh late to stand in for a
+second display's clock. On this tree, one run each:
+
+| | before (the old guard) | the first gate (stamped when run) | after |
+|---|---|---|---|
+| the four phases, draws a second | 120.0, 120.1, 120.2, 119.1 (2.0×) | 59.7 to 60.4 | 59.9, 60.3, 59.8, 59.8 (1.0×) |
+| draws of 11.7 ms, both on one refresh | 72.3 (2.0× the 36.1 the held thread managed) | 68.7 (1.3×) | 60.0 (1.0×) |
+| covered, projector's frames ragged | 61 of 121 asks drawn | 120 of 120 | 120 of 120 |
+
+With every phase: at least 0.9 times what the show drew alone (a gate turning
+everything down drew 0.0, one at 1.3 of a refresh 29.9 to 39.9, against 53.8), and
+about one offer turned down a refresh (59.8 to 60.3 a second), which is what says both
+clocks were running. `npm run ears` 26/26 (123 asks read over 123 frames asked for).
+Counted, not photographed, so the app half runs in a cloud session with no GPU at all:
+there the loop is started by the projector's first ask and runs on the show's frames
+from then on, and there is no governor to read.
+
+On the Mac runner, with a renderer up (#203's run on a9ba205), each window was
+handed 50.5 to 56.4 of a 60 Hz display's refreshes a second, the gate drew 51.5 to
+55.4, and the governor was fed a median 17.0 ms at half a refresh behind. The
+display's rate misleads there, so the wall's ceiling and the governor's bar are no
+longer taken from it. They are taken from the refreshes either window was handed,
+counted in slots as the gate spaces its draws: the wall's refreshes at the time its
+frames are handed over, and a new slot only 0.6 of a refresh after the last began.
+Draws are held to 1.05 of the slots, and the governor's median to 0.9 of the median
+gap between them. Matching the two windows' timestamps instead (tried first) reads a
+working gate as doubling at ¾ of a refresh behind whenever both windows miss a
+refresh, which a busy Mac does: two reviewers modelled 1.03 to 1.2 times at 3 to 30 %
+of refreshes missed. Controls on this tree, in a cloud session: the gate stamped when
+its callback ran, with 11.6 ms draws, 68.6 and 71.4 drawn for 59.8 and 59.5 slots
+(1.15 and 1.20, red; it passed the display's ceiling at 65.8). A gate that never
+turns anything down: 1.2 to 2.0 times (red). The gate: 1.00 to 1.01 at every line,
+also with a 22 ms long task every 150 ms. The cloud drops no refreshes, so how the
+slot count reads a Mac that does is still owed to the Mac's `tools` shard.
+
+*Still owed:* the owner's look with a real projector on its own display. And stepping down under a wall at all: it is new behaviour, from 14b and
+14c together (the governor fed real intervals now, and a ladder built from the stage),
+and nobody has seen it happen on the Mac.
+
+*Found along the way, not done:*
+
+- *A 120 Hz laptop with a 60 Hz projector draws 120 a second.* The gate works to the
+  faster display so that neither window gets fewer frames than it would alone, which
+  keeps the desk at 120 on a ProMotion screen; but every draw carries the mirror
+  copy, and the wall shows only every other one. Pacing to the projector while the
+  show window is not what the audience is watching would halve that work. Measure:
+  the arithmetic case 120/60 with the draws counted against the wall's refresh.
+- *The wall's older "asking for one draws one" line cannot fail on the ask.* It asks
+  thirty times with the show's own frames running and counts every frame drawn, so
+  the show's own clock alone passes it (and did before this: 60 a second is over its
+  twenty in half a second). The new "covered, every ask the wall makes draws" line is
+  the one that measures an ask; the older one should be run covered, as that one is.
+- *The full app on software WebGPU loses its device every few seconds* in a cloud
+  session ("A valid external Instance reference no longer exists", after about sixty
+  frames, then some six seconds to recover), which is why the app's pixel checks
+  cannot run there even with `PW_WEBGPU=1`, not only its readbacks. Worth knowing
+  before anyone tries to make them.
+
 ### 14c. The projector's resolution comes from the laptop's pixel ratio
 
 **Read in the code.** `qualityLadder` builds its rungs from `devicePixels()`, the
@@ -2199,6 +2303,18 @@ machine whose capacity sinks, rung changes in ten minutes bounded.
   the new build against the old show, and the cast hello carries no build version
   (`castProtocol.ts`). Inferred; send the version and warn on a mismatch.
 
+### 14l. LiquidVisualizer.tsx is one 9,400-line component
+
+**Suggested 2026-09-27 (a review the owner passed on); measured by line count only.** The
+show's component holds the WebGPU renderer's lifecycle, the frame loop and its gates,
+the pointer, touch and magnet handling, the cast and projector hooks and the debug
+surface, in one file several threads edit at once. Split it into a renderer module
+the loop drives (no React), hooks for the fingers and the wall, and a thin component,
+one piece a PR, each with `lint`, `panel`, `desk`, `phone`, `wall` and the Mac's
+`tools` and `qa` green. Not while the file is under active change in other threads.
+`React.memo` on the panels only where a render count (the one 14f adds) shows a panel
+rendering for props it does not use.
+
 ## 15. Every tool on every liquid
 
 Asked 2026-09-27 ("Shouldn't blowing and finger also move around the ferrofluid?",
@@ -2224,6 +2340,17 @@ per hand. So a Pour of Oil is a held Dropper's worth of oil bodies, not a body a
 fifth of the plate across every step. Checked by `npm run bottles` on the Mac (tools shard).
 The app does not step on software WebGPU, so this check cannot run in a cloud
 session.
+
+Open: the Splat line's "following the hand" went red once on #203's Mac run (29
+pours on the stroke, 0 at the mirror, the order wrong), on a path that change
+does not reach (with no wall open nothing is gated). The line compares the
+first quarter of the pours with the last along the stroke, and a Splat throws
+its droplet up to 27 cells from the hand on a stroke 29 cells long. Modelled
+with the hand's steps evenly spread, that comparison reads a working Splat as
+not following on 0.07 % of strokes of 29 pours. So the likelier cause is steps
+bunched by a stall on the runner, which leaves the two quarters near one point.
+Judge each pour against where the hand was on that step (log the pointer with
+the pour), not by the order of scattered droplets.
 
 ### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 

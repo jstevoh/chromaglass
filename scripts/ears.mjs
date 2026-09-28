@@ -475,8 +475,9 @@ try {
     page.evaluate(() => { window.open('about:blank', 'wall', 'popup,width=480,height=270'); }),
   ]);
   await wall.evaluate(() => {
-    const ask = () => {
-      try { const o = window.opener; if (o && !o.closed) o.__chromaglassFrame?.(); } catch { /* gone */ }
+    // With its refresh's time on the show's clock, as CastDisplay asks (PLAN.md §14b).
+    const ask = (ts) => {
+      try { const o = window.opener; if (o && !o.closed) o.__chromaglassFrame?.(ts + performance.timeOrigin - o.performance.timeOrigin); } catch { /* gone */ }
       requestAnimationFrame(ask);
     };
     requestAnimationFrame(ask);
@@ -495,7 +496,7 @@ try {
     v3.lv.size >= 10, `${v3.lv.size} distinct levels in 2 s`);
   /*
     One reading per ask the show answered. `frames` counts passes through the
-    loop, and every ask that reads calls `render()` once, so the two have to
+    loop, and every ask that reads calls `draw()` once, so the two have to
     match both ways: more readings than asks answered is a second clock, fewer
     is an ask the ear missed.
   */
