@@ -446,6 +446,18 @@ the carry in the lab). Worth looking at, on Magnet Garden or Ferro Paint:
 - the same on the phone, with a finger on Finger or Blow; a finger on the
   Magnet is still a magnet.
 
+## 18. Colour between the domes
+
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
+
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
+
 ---
 
 ## Reading the frame time while you do it

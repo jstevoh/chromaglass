@@ -57,7 +57,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; 9f–9h, 9j, 9k–9m and 9o–9r open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -786,10 +786,30 @@ What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
 
 Open, from building 9e (in the order to do them):
 
-- **9f. Colour between the domes.** Where the pool parts, the gaps show a thin amber
-  film of ferrofluid or dye-less water, not the bright dye the references have
-  between their domes: the dye was pushed out when the pool gathered. Either let the
-  dye flow back into the gaps with the water, or draw the thin film clearer.
+- **9f. Colour between the domes** (**shipped**, this PR, `npm run domes`). Where the
+  pool parted, the gaps showed a thin amber film, not the bright dye the references
+  have between their domes. Two causes, measured on Magnet Garden at 384². The maze's
+  flow destroyed the dye under the backtrace advect (6% of the plate's dye gone, the
+  gaps left with 3% of theirs): now the dye crosses faces wherever the maze flows
+  (bodyAdvect, conserved), a numerical loss removed, and the gaps draw in the dye's
+  own colour. And the domes stand shoulder to shoulder (16% of the plate near the
+  magnet under half full): that is 9t, the physics the model lacks. A pull eased
+  while the hand is still opened the gaps to 41%, but it was a look-driven tuning
+  and was dropped under the physics rule. The phone's finger magnets get the same.
+  Judging notes: docs/judging.md §18.
+- **9t. Domes that stand up out of the layer** (found building 9f). The ferrofluid is
+  a plan-view layer capped at full (phaseRelax, and the double well's minimum at 1),
+  so a pool the magnet pulls together can only spread sideways, and the domes pack.
+  A real Rosensweig peak rises many layer depths out of the pool and draws the
+  liquid from the valleys into it, which is why the references show dry, coloured
+  gaps. The fix is physical: let the column under a spike hold more than full, as
+  high as the magnetic pressure against surface tension and gravity holds it, with
+  the double well and the relax pass following that height; then SPIKE_PULL's 0.5,
+  itself a tuning standing in for this, can go back toward the plain Kelvin force.
+  A first try (the relax cap raised under the spikes alone) stood the domes at only
+  1.4, because the double well still pins the layer at 1
+  (/mnt/project-files/handoff/ferrofluid-9f/taller-domes-tried.patch). `npm run
+  domes` should then ask for a third of the plate near the magnet open again.
 - **9g. Domes at the lab's grid.** On 256² a spike's pitch is ten cells and a dome is
   four or five across, so much of each is edge and grey. The app runs 384² and up
   where they are sharper; the Mac should judge whether 256 (the software rung and
