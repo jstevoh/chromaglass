@@ -1875,13 +1875,29 @@ export class WebGPUFluid {
    * units. Only the oil moves; the soap and the acidity stay where they are.
    */
   carryMix(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void {
+    this.runMixCarry(radius, take, [x, y, radius, take, ux * hop, uy * hop, 0, 0]);
+  }
+
+  /**
+   * The Press's oil (squeezeOut in LiquidVisualizer, through pressOil in
+   * src/lib/pressRing.ts): the same share of every cell under the palm,
+   * put down on the ring from the palm's rim to `outer`, where the dye goes.
+   * The same kernel as carryMix in its other mode (mixCarry says how it
+   * lands and why it keeps what would land off the plate).
+   */
+  pressMix(x: number, y: number, radius: number, outer: number, take: number): void {
+    if (!(outer > radius)) return;
+    this.runMixCarry(radius, take, [x, y, radius, take, 0, 0, outer, 1]);
+  }
+
+  private runMixCarry(radius: number, take: number, args: number[]): void {
     if (!this.mix || !this.mixLive || !(radius > 0) || !(take > 0)) return;
     const m = this.mix;
     const enc = this.device.createCommandEncoder({ label: 'carry mix' });
     const pass = enc.beginComputePass({ label: 'carry mix' });
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', [x, y, radius, take, ux * hop, uy * hop, 0, 0]));
+    this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', args));
     m.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
