@@ -24,6 +24,7 @@
  */
 
 import { SPIKES_WGSL } from './spikes';
+import { thinGapKernels } from './thinGap';
 
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
@@ -406,6 +407,20 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z
+  /*
+    With the plate a thin gap (A.a.x = 1, PLAN §18a) a hand's velocity is
+    imposed rather than added.
+
+    Added was right while the velocity lasted one step: each frame's push
+    was the whole of the liquid's motion, and the clamp took it back. With
+    the drag time as the plate's memory, a Finger held still in its stroke
+    adds the same push every frame, and added it would run the liquid up to
+    sixty times the hand's own speed in a second of water. A hand in the
+    liquid is a solid moving through it: the liquid it touches moves with
+    it and no faster (Brinkman's penalised solid, in the limit where the
+    solid wins). So along the push the liquid is brought up to the push and
+    not past it, and across it keeps what it had.
+  */
   deltaVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
@@ -415,7 +430,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let v = textureLoad(vel, p, 0);
   let a = textureLoad(addT, p, 0);
-  textureStore(dst, p, safeVel(vec4f(v.xy + a.xy, v.z + a.z, 0.0)));
+  var u = v.xy + a.xy;
+  let s = length(a.xy);
+  if (A.a.x > 0.5 && s > 0.0) {
+    let dir = a.xy / s;
+    u = v.xy + dir * max(0.0, s - dot(v.xy, dir));
+  }
+  textureStore(dst, p, safeVel(vec4f(u, v.z + a.z, 0.0)));
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -2972,6 +2993,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.b.x) || id.y >= u32(A.b.y)) { return; }
   textureStore(dst, vec2i(id.xy), A.a);
 }`,
+  // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
+  ...thinGapKernels(HEAD, W),
 };
 
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */

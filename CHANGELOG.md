@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the plate as a thin gap (Thin Gap, PLAN §18a)
+
+- **Thin Gap** (Settings → Squish Plate, off in every look) solves the flow
+  between the two glasses as a Hele-Shaw cell: drag from the gap, 12ν/h², in
+  place of the speed clamp; a pressure solve in which a tight gap carries
+  less (mobility h³/12μ, a variable-coefficient multigrid); and an open rim,
+  so a press's liquid leaves across the dish's edge instead of a uniform sink.
+  **Thickness** sets the liquid, water to glycerine. On MIDI, the desks, the
+  phone's settings and the remote.
+- With it on, the dye crosses cell faces as an amount (the way Oil Bodies
+  already move it), so a press pushes the colour out and back without making
+  or losing any, and the look's lasting current goes into the solve with the
+  other forces, so it conserves liquid too.
+- `npm run thingap` (16 checks, on every PR): a push fades at 12ν/h² (to
+  1.4% of the rate), four times as fast where the glass is pressed to half
+  the gap (3.99×), and the thin liquid travels ×2.82 where the drag says
+  ×2.82; a hand held pushing moves water at its own speed (0.489 against
+  0.5, where adding the pushes would reach 25.6); a press moves a ring of
+  dye out by 100% of what the displaced volume predicts and back to 3% of it
+  when the glass lifts, keeping every drop round the press and under it (the
+  old solver: 331%, and 85% of the dye under the press lost after); a
+  pressed disc carries what Darcy says to 5% for water (a mobility without
+  the drag would be 27% high); ∇·(hu) is 0.0004 of the flux for water and
+  0.0042 for glycerine against the old solver's 0.028.
+
 ### Changed — the phone's dock on small landscape phones, and the top of the plate
 
 - **Under 800 px wide in landscape the dock is two rows**, the ten tools
