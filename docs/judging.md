@@ -476,7 +476,8 @@ turns it on for a page load.
 On Classic, then Oil & Water, then a look with a Plate Shape:
 
 - turn it on: the plate should keep moving the way the look moves, not freeze or
-  race. Say if the look's stirring now reads as too strong or too weak;
+  race. The first time in a show it takes a few seconds to switch (its pipelines are
+  built then, off the frame), and there should be no stop while it does. Say if the look's stirring now reads as too strong or too weak;
 - Finger through the colour at Thickness 0 (water), 0.45 (the default, a light oil)
   and 1 (glycerine): in water the liquid should keep sliding for a second or two
   after the finger stops; at 1 it should stop the moment the finger does;

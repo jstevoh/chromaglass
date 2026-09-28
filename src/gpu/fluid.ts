@@ -82,6 +82,8 @@ const MG_SWEEPS = 2;
 const MG_COARSE_SWEEPS = 16;
 /** The Thickness a thin gap runs at when a look does not set one: a light oil (PLAN §18a). */
 export const THIN_GAP_THICKNESS = 0.45;
+/** The thin gap's kernels (wgsl/thinGap.ts), built when it is first turned on. */
+const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient'];
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
 /*
@@ -470,6 +472,9 @@ export class WebGPUFluid {
   private hsPrev: GPUTexture | null = null;
   private hsMob: GPUBuffer | null = null;
   private hsP: GPUBuffer | null = null;
+  /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
+  private hsReady = false;
+  private hsBuilding: Promise<void> | null = null;
   private hsMobC: GPUBuffer[] = [];
   private hsFaceC: GPUBuffer[] = [];
   /** The gap as the last thin step left it, a cell at a time: its change is the press (hsDivergence). */
@@ -663,8 +668,6 @@ export class WebGPUFluid {
       ['airExclude', [dye], false],
       ['depositChem', [dye], false],
       ['drainVel', [VEL], false],
-      // The thin gap's snapshot of the velocity (PLAN §18a): off by default, so built behind.
-      ['scaleDye', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
     // the pressure solve and the squeeze, which every step runs.
@@ -677,14 +680,8 @@ export class WebGPUFluid {
     const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
     for (const [name, formats, now] of byFormat) for (const f of formats) add(`${name}:${f}`, kernel(name, f), now);
     for (const [name, f] of byName) add(name, kernel(name, f), true);
-    /*
-      The thin gap's kernels (PLAN §18a), keyed as hsRun asks for them. Thin
-      Gap is off in every look, so none is in any opening: built behind the
-      show, ready long before anyone turns it on.
-    */
-    for (const name of ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient']) {
-      add(`${name}:thin`, kernel(name, 'rgba16float'), false);
-    }
+    // The thin gap's kernels are not here: they are built when it is first
+    // turned on (prepareThinGap), so no show pays for them at its opening.
     // The splats' deltas brought up to the grid, every step.
     for (const f of [RGBA32, R32] as GPUTextureFormat[]) add(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f), true);
     // A tool, a pour: the splats, always into the full-float deltas. And the
@@ -2424,7 +2421,38 @@ export class WebGPUFluid {
    * needs the multigrid's levels, which every grid the ladder builds has.
    */
   private thinGapOn(p: GpuStepParams): boolean {
-    return (p.thinGap ?? 0) > 0.5 && this.mg.length > 0;
+    const want = (p.thinGap ?? 0) > 0.5 && this.mg.length > 0;
+    if (want && !this.hsReady) { void this.prepareThinGap(); return false; }
+    return want;
+  }
+
+  /**
+   * The thin gap's pipelines, built off the frame one at a time, the first
+   * time it is asked for; the plate runs the old way until they are in.
+   *
+   * Not in \`prepare\`'s list, not even behind the show. Behind the show a
+   * compile costs the frames it takes (gpu/prepare.ts): the page draws
+   * between compiles, not during them, so every pipeline there is paid for
+   * by every show's first seconds, and on a slow runner the WebGPU smoke's
+   * "the stage starts" (thirty frames in thirty seconds) went red with these
+   * twelve added (run 36367898896: 31 frames drawn by 37 s after load, where
+   * another PR's green run that hour had drawn 852; that runner was slow
+   * all round, so how much was these twelve is not known). Thin Gap is off
+   * in every look, so a show that never turns it on should not pay for it;
+   * one that does runs the old way for as long as the twelve compiles take
+   * (about three seconds at prepare.ts's 0.23 s each on CI's Mac), rather
+   * than stopping on the frame to build them.
+   */
+  prepareThinGap(): Promise<void> {
+    if (!this.hsBuilding) {
+      this.hsBuilding = (async () => {
+        for (const name of THIN_GAP_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, kernel(name, 'rgba16float'));
+        // The snapshot before the forces, and the copy the dye rides, both into the velocity's format.
+        await this.pipelines.prepareCompute(`scaleDye:${VEL}`, kernel('scaleDye', VEL));
+        this.hsReady = true;
+      })();
+    }
+    return this.hsBuilding;
   }
 
   /** The thin-gap solver's storage, made once; returns the velocity snapshot. */
