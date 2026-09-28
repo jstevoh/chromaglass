@@ -41,7 +41,7 @@ struct Sim {
   turbScale: f32,
   spin: f32,
   tension: f32,
-  fingering: f32,
+  free9: f32,          // was the fingering push's strength (forcesB)
   vibI: f32,
   vibF: f32,
   drip: f32,
@@ -1425,9 +1425,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     after the projection (fingering, tension, the drip) are not projected
     at all — so the plate made dye wherever they spread it, and destroyed
     it wherever they gathered it. The Finger showed it worst: its carry
-    makes steep edges, the fingering push runs along the dye's own
-    gradient, and where the push ran outward the plate gained forty to
-    sixty per cent of what it held (npm run tools, 592 -> 899; in the lab,
+    makes steep edges, the fingering push (taken out since; see forcesB)
+    ran along the dye's own gradient, and where the push ran outward the
+    plate gained forty to sixty per cent of what it held (npm run tools, 592 -> 899; in the lab,
     the Finger's own path under the fingering push, 636 -> 756 against 687
     left alone). The patch's size is the Jacobian of the backtrace,
     1 - disp * div(v) to first order, taken here as its exponential so it
@@ -1435,13 +1435,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     single step so one bad texel of velocity cannot empty or flood a cell.
 
     And a gathering flow may thicken a cell only up to the most dye the
-    cells it came from held. The fingering push is a push up the gradient
-    where its noise is negative, and carried conservatively that is
+    cells it came from held. The fingering push was a push up the gradient
+    where its noise was negative, and carried conservatively that is
     diffusion run backwards: in the lab a plate whose densest cell was 1.0
     grew a speck at the ceiling (6.0) inside five seconds. Held to its
-    neighbourhood it cannot make a new peak, and what the hold keeps out is
-    lost, as the ceiling's own cap loses it: 3 per cent in that window,
-    where the backtrace alone lost 5.
+    neighbourhood it could not make a new peak, and what the hold kept out
+    was lost, as the ceiling's own cap loses it: 3 per cent in that window,
+    where the backtrace alone lost 5. Over ten seconds of forty pools that
+    loss came to more than half the plate, which is why the push was taken
+    out rather than carried (forcesB). The hold stays for what is left
+    that gathers: tension, the drip, a press.
   */
   if (A.a.y > 0.5) {
     let vR = textureLoad(vel, clampP(q + vec2i(1, 0), S.n), 0).x;
@@ -1514,16 +1517,49 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.xy - vec2f(cdx, cdy) * (S.tension * 0.8) * d * (1.0 + n * 2.0), v.z, v.w);
   }
 
-  if (S.fingering > 0.0 && d >= 0.05) {
-    let gx = (bilerpN(dye, uv + eL, S.n).a - bilerpN(dye, uv - eL, S.n).a) * 0.5;
-    let gy = (bilerpN(dye, uv + eL.yx, S.n).a - bilerpN(dye, uv - eL.yx, S.n).a) * 0.5;
-    let g2 = gx * gx + gy * gy;
-    if (g2 > 0.005) {
-      let g = sqrt(g2);
-      let n = snoise(p * 0.02 + vec2f(0.0, S.time * 0.05));
-      v = vec4f(v.xy - (vec2f(gx, gy) / g) * (n * S.fingering * g * 4.0), v.z, v.w);
-    }
-  }
+  /*
+    There was a fingering push here, and it is gone on purpose.
+
+    It pushed the dye along its own gradient by a slow noise, out where the
+    noise was positive and back where it was negative, everywhere there was
+    dye and a slope: a look's Polarity set how hard. Reported (Classic,
+    2026-09-27): a grating over the dye, stripes three to eight cells across
+    at every angle, and a quarter of an hour in, red dots in a lattice ten
+    cells apart with labyrinths between them. Where the noise was negative
+    the push was diffusion run backwards, which grows the shortest waves it
+    can see fastest (the gradient was taken a logical cell either side, so
+    waves of about four of those): a spinodal pattern in every pool, not
+    fingers. \`npm run grating\` §5, Classic's own step on forty pools for ten
+    seconds, the worst channel's share of variance in waves 2.6 to 16 texels
+    across (the 512 grid the dye is drawn on), in parts of 10,000: 52 as
+    laid, 107 without the push and 2518 with it; and the plate kept 97% of
+    its dye without it and 41% with it (the advection's hold and cap threw
+    away what the push piled up: the
+    Finger's "adds none" reds, where the plate alone lost dye, so a stroke
+    that stopped the loss read as adding it).
+
+    Tried before taking it out, on the same plate in a first look (alpha
+    only, waves 2.6 to 8 texels, where the push read 1895 against 32 without
+    it): carried as a flux
+    (keeps the dye, grows the pattern three times as fast), pushing only
+    outward (still rippled: the push is kept in the velocity the next step
+    carries on, so up a ripple's side and back is a wave), along the contours
+    instead of across them (worse), and only at a pool's edge (clean at ten
+    seconds; at thirty, a comb of teeth two to four cells across along every
+    edge and holes drawn into pools, texture there five times the plate's own).
+
+    None of those is the thing itself. Viscous fingering (Saffman-Taylor) is
+    a thinner liquid driven into a thicker one through the thin gap between
+    two glasses, whose drag is 12 mu / b^2: unstable where it displaces,
+    steadied at short waves by the surface tension across the edge, which
+    sets the fingers' width. Its fingers come from something driving the
+    flow, a lift, a press, a pour, and a still plate grows none. This push
+    had no driver but a noise and no width but the gradient's reach. PLAN §0
+    has the model that does it properly: a viscosity per liquid, the gap's
+    drag, and a pressure solve weighted by both. Until then the only fingers
+    are the ones a lift draws (lib/squish.ts), which is a shortcut of its own
+    and in the same plan item.
+  */
 
   if (S.vibI > 0.0005 && d > 0.05) {
     let f = S.vibF * 0.5;

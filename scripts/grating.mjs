@@ -34,6 +34,10 @@
  *      exactly; a hard disc's edge as hard, with no ring beside it; a soft
  *      blob; diagonal texture four and six cells across
  *   4. dye is made or lost only by the limiter's clamp, and by little
+ *   5. (a later report, not the checkerboard) no push grows a spinodal
+ *      grating of stripes, dots and labyrinths in the pools, and the plate
+ *      keeps its dye: the old fingering push, put back in a lab of its own,
+ *      is the control (the comment above section 5 says why)
  *
  * Every measure is taken in all four of the dye's channels and the worst one
  * judged: the grating is colour (blue and white over violet), so a pass that
@@ -45,6 +49,7 @@
  * Metal and the lab both give full float, so this is measured on that.
  */
 import { openLab } from './lab.mjs';
+import { readFileSync } from 'node:fs';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -295,6 +300,214 @@ try {
 } finally {
   await close();
 }
+
+// ── 5. No push grows a grating in the pools ───────────────────────
+/*
+  Reported next (Classic, 2026-09-27): stripes three to eight cells across at
+  every angle, and a quarter of an hour in, red dots in a lattice ten cells
+  apart with labyrinths between them. Not the checkerboard above: that is
+  locked to the grid's diagonals, and this pointed anywhere. It was the
+  fingering push in forcesB (gone now; the comment where it was says why),
+  which pushed the dye up its own gradient wherever its noise was negative:
+  diffusion run backwards, which grows a spinodal pattern in every pool, at
+  about four logical cells (ten texels at 512) and the waves near it.
+
+  Asked on Classic's step as the app ran it when the report was saved (no
+  diffusion; the glass smear and evaporation left out, neither a source of
+  grid-scale texture), on the app's geometry: a 512 grid under the 192-cell
+  logical plate, which is what set the pattern's size. Forty pools, stirred
+  once, then ten seconds, read at five and at ten. Measured as the share of
+  the dye's variance in waves 2.6 to 16 texels across (the reported 3 to 8
+  and 10, and the push's four logical cells), each of the dye's four channels
+  on its own and the worst one judged: the report was coloured dots, and a
+  push in colour alone (the tension force next door has the same shape)
+  would leave the density flat. Read from the solver's own texture
+  (lab.field reads the 192-cell plate, coarser than the pattern).
+
+    as it is      the step as it ships
+    control       the old push put back (a lab built with it) at Classic's
+                  strength then, 0.165: it must grow the grating
+    weak control  the same at a quarter of it: a push too weak to saturate
+                  in ten seconds must still read as growing, or the check
+                  only sees a plate the push has already wrecked
+
+  What a spinodal pattern does that the stirring does not is grow
+  exponentially, so the as-is plate is asked for a rate as well as a level.
+  The stirring's own share grows too, because it draws the pools' edges out
+  sharper (a one-texel edge on these pools reads about nine times what they
+  are laid with), but along with the stretching, not by compounding: in the
+  run this was written against it went 52 laid, 75 at five seconds, 107 at
+  ten, so 1.4 times over the second five seconds. The weak control, a
+  quarter of the push, went 238 to 819 over the same five, 3.4 times. The
+  gates sit between those and are drawn against the weak control where they
+  can be, so a lab that runs a little hotter or cooler (Metal against
+  SwiftShader) moves both sides together:
+
+    rate    from five seconds to ten, under twice, and under the weak
+            control's own growth over one and a half
+    level   under four times what the pools were laid with, and under a
+            third of the weak control at ten seconds (the old push: 2518)
+
+  And the dye kept, both ways: the push lost 57% of the plate in ten
+  seconds, which was the Finger's "adds none" red (the plate alone lost dye,
+  so a stroke that stopped the loss read as adding it), and backward
+  diffusion carried conservatively makes dye up to the 6.0 ceiling. The step
+  as it is loses a little of the worst channel here, 2.6% (the advection's
+  limiter and hold; not traced further than that); the weak control 11%,
+  the old push 59%. So within 5% either way. The lab has no evaporation.
+*/
+const oldPush = (strength) => ({
+  name: `old-fingering-push-${strength}`,
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]fluid\.ts$/ }, (args) => {
+      const src = readFileSync(args.path, 'utf8');
+      const at = '  /*\n    There was a fingering push here, and it is gone on purpose.';
+      if (!src.includes(at)) throw new Error('grating: the control could not find where the fingering push was in fluid.ts');
+      // The push as it shipped until it was taken out.
+      const push = `  if (d >= 0.05) {
+    let gx = (bilerpN(dye, uv + eL, S.n).a - bilerpN(dye, uv - eL, S.n).a) * 0.5;
+    let gy = (bilerpN(dye, uv + eL.yx, S.n).a - bilerpN(dye, uv - eL.yx, S.n).a) * 0.5;
+    let g2 = gx * gx + gy * gy;
+    if (g2 > 0.005) {
+      let g = sqrt(g2);
+      let n = snoise(p * 0.02 + vec2f(0.0, S.time * 0.05));
+      v = vec4f(v.xy - (vec2f(gx, gy) / g) * (n * ${strength.toFixed(5)} * g * 4.0), v.z, v.w);
+    }
+  }
+`;
+      return { contents: src.replace(at, push + at), loader: 'ts' };
+    });
+  },
+});
+const CLASSIC = {
+  dt: 0.000674, visc: 1.5, nu: 0.00015, diff: 0, buoyancy: 0.4, gravity: 0.006, advection: 0.35,
+  sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, spin: 0.013, immiscibility: 0.02296,
+  phaseSharp: 0.35, phaseTension: 0.18, gapSpring: 0.0003, gapMemory: 0.998, platePressure: 0.25,
+  vibIntensity: 0.0048, vibFrequency: 0.288, drip: 0.15, currentDamp: 0.988, currentBuoy: 0.12, currentGrav: 0.03,
+  twist: 0.24, meanDensity: 0.38, maxCurrent: 16.7, gravityReach: 0.21,
+};
+const FN = 512, HALF = 300, LO = 2.6, HI = 16;
+/*
+  The share of a field's variance in waves `lo` to `hi` texels across: a 2D
+  FFT (radix 2, rows then columns) of the field less its mean, summed by the
+  wave's length. Parts in ten thousand. Run in the page, on each channel, so
+  the fields never cross to node. (A sine 5.12 texels across reads 10,000;
+  one of 8.2 reads 439 against the old 2.6 to 8 band's edge; white noise about
+  4,200 of the 2.6 to 8 band.)
+*/
+const band = (a, N, lo, hi) => {
+  const re = Float64Array.from(a), im = new Float64Array(N * N);
+  let mean = 0; for (const v of a) mean += v; mean /= a.length;
+  for (let k = 0; k < re.length; k++) re[k] -= mean;
+  const fft = (off, stride) => {
+    for (let i = 1, j = 0; i < N; i++) {
+      let bit = N >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+      if (i < j) { const p = off + i * stride, q = off + j * stride; [re[p], re[q]] = [re[q], re[p]]; [im[p], im[q]] = [im[q], im[p]]; }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+      const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < N; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const p = off + (i + k) * stride, q = off + (i + k + len / 2) * stride;
+          const tr = re[q] * cr - im[q] * ci, ti = re[q] * ci + im[q] * cr;
+          re[q] = re[p] - tr; im[q] = im[p] - ti; re[p] += tr; im[p] += ti;
+          const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+        }
+      }
+    }
+  };
+  for (let y = 0; y < N; y++) fft(y * N, 1);
+  for (let x = 0; x < N; x++) fft(x, N);
+  let inBand = 0, all = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const fx = (x < N / 2 ? x : x - N) / N, fy = (y < N / 2 ? y : y - N) / N;
+    const k = Math.hypot(fx, fy);
+    if (k === 0) continue;
+    const p = re[y * N + x] ** 2 + im[y * N + x] ** 2;
+    all += p;
+    if (1 / k >= lo && 1 / k < hi) inBand += p;
+  }
+  if (!(all > 0)) throw new Error('grating: a flat field has no spectrum to read');
+  return inBand / all * 1e4;
+};
+const pools = (page) => page.evaluate(async ([N, half, over, lo, hi, bandSrc]) => {
+  const band = eval(`(${bandSrc})`);
+  await lab.create(N, 192);
+  let s = 12345; const r = () => (s = s * 16807 % 2147483647) / 2147483647;
+  const cols = [[0.1, 1.2, 1.0], [1.3, 0.2, 0.3], [0.3, 1.1, 0.1], [1.0, 1.0, 0.1], [0.2, 0.4, 1.3]];
+  for (let k = 0; k < 40; k++) lab.dye(r(), r(), 0.03 + r() * 0.1, cols[k % 5], 0.6 + r() * 1.2);
+  for (let k = 0; k < 20; k++) lab.vel(r(), r(), 0.05 + r() * 0.1, [(r() - 0.5) * 3, (r() - 0.5) * 3, 0, 0]);
+  lab.flush(over.dt);
+  const sv = lab.solver(), dev = sv.device;
+  const format = sv.dye.read.format;
+  // The four channels as the solver holds them, every texel.
+  const channels = async () => {
+    const f32 = format === 'rgba32float';
+    const bytesPerRow = N * (f32 ? 16 : 8);
+    const buf = dev.createBuffer({ size: bytesPerRow * N, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = dev.createCommandEncoder();
+    enc.copyTextureToBuffer({ texture: sv.dye.read }, { buffer: buf, bytesPerRow }, [N, N]);
+    dev.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const raw = buf.getMappedRange().slice(0); buf.unmap(); buf.destroy();
+    const half16 = (x) => {
+      const e = (x >> 10) & 31, m = x & 1023, sg = x & 0x8000 ? -1 : 1;
+      if (e === 31) return m ? NaN : sg * Infinity;
+      return sg * (e ? (1 + m / 1024) * 2 ** (e - 15) : m / 1024 * 2 ** -14);
+    };
+    const src = f32 ? new Float32Array(raw) : new Uint16Array(raw);
+    const out = [0, 1, 2, 3].map(() => new Float64Array(N * N));
+    for (let k = 0; k < N * N; k++) for (let c = 0; c < 4; c++) {
+      const v = f32 ? src[k * 4 + c] : half16(src[k * 4 + c]);
+      if (!Number.isFinite(v)) throw new Error(`grating: the dye went non-finite (${v}) at texel ${k}`);
+      out[c][k] = v;
+    }
+    return out;
+  };
+  const read = (ch) => ({ band: ch.map((a) => band(a, N, lo, hi)), total: ch.map((a) => a.reduce((t, v) => t + v, 0)) });
+  const at0 = await channels();
+  await lab.step(half, over);
+  const mid = read(await channels());
+  await lab.step(half, over);
+  const at10 = await channels();
+  let moved = 0;
+  for (let k = 0; k < N * N; k++) moved = Math.max(moved, Math.abs(at10[3][k] - at0[3][k]));
+  return { format, start: read(at0), mid, end: read(at10), moved };
+}, [FN, HALF, CLASSIC, LO, HI, band.toString()]);
+// The worst channel's reading, and each channel's dye kept, from one run.
+const measure = (r) => ({
+  format: r.format,
+  moved: r.moved,
+  start: Math.max(...r.start.band), mid: Math.max(...r.mid.band), end: Math.max(...r.end.band),
+  kept: r.end.total.map((t, c) => t / r.start.total[c]),
+});
+const runs = {};
+for (const [name, plugins] of [['asIs', []], ['old', [oldPush(0.16485)]], ['weak', [oldPush(0.16485 / 4)]]]) {
+  const l = await openLab({ plugins, tag: plugins.length ? plugins[0].name.replace(/\./g, '_') : '' });
+  try { runs[name] = measure(await pools(l.page)); } finally { await l.close(); }
+}
+const { asIs, old, weak } = runs;
+const g = (m) => `${m.start.toFixed(0)} laid, ${m.mid.toFixed(0)} at 5 s, ${m.end.toFixed(0)} at 10 s; dye kept ${m.kept.map((k) => `${(k * 100).toFixed(1)}%`).join(' ')}`;
+console.log(`   (dye ${asIs.format}; worst channel, variance in waves ${LO} to ${HI} texels, parts in 10,000)`);
+console.log(`   as it is:     ${g(asIs)}`);
+console.log(`   control:      ${g(old)}`);
+console.log(`   weak control: ${g(weak)}`);
+check('the plate moved (the as-is run is not a still field that nothing could grow on)', asIs.moved > 0.1,
+  `largest change in density ${asIs.moved.toFixed(2)}`);
+check('the control: the old fingering push grows the reported grating', old.end > 10 * asIs.end,
+  `${(old.end / asIs.end).toFixed(0)}x what the step as it is leaves after ten seconds`);
+check('and at a quarter of its strength, still growing where it started', weak.end > 1.5 * weak.mid && weak.end > 2 * asIs.end,
+  `${weak.mid.toFixed(0)} at 5 s to ${weak.end.toFixed(0)} at 10 s, against ${asIs.end.toFixed(0)} as it is`);
+const growth = (m) => m.end / m.mid;
+check('Classic\'s step grows no grating: not compounding from five seconds to ten',
+  growth(asIs) < 2 && growth(asIs) < growth(weak) / 1.5,
+  `${asIs.mid.toFixed(0)} to ${asIs.end.toFixed(0)}, ${growth(asIs).toFixed(2)}x (the weak control: ${growth(weak).toFixed(2)}x)`);
+check('and no pattern left at the level the push leaves', asIs.end < 4 * asIs.start && asIs.end < weak.end / 3,
+  `${asIs.end.toFixed(0)} against ${asIs.start.toFixed(0)} laid and ${weak.end.toFixed(0)} for the weak control (the old push: ${old.end.toFixed(0)})`);
+const worstKept = asIs.kept.reduce((w, k) => (Math.abs(k - 1) > Math.abs(w - 1) ? k : w), 1);
+check('and keeps the plate\'s dye, neither losing nor making it', Math.abs(worstKept - 1) < 0.05,
+  `worst channel ${(worstKept * 100).toFixed(1)}% of what was laid (the weak control: ${(Math.min(...weak.kept) * 100).toFixed(1)}%, the old push: ${(Math.min(...old.kept) * 100).toFixed(1)}%)`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} failed` : `\nall ${checks.length} ok`);

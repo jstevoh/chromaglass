@@ -113,7 +113,6 @@ export interface GpuStepParams {
   gapMemory: number;
   /** How hard the hand is on the glass: scales the press's push on the flow. */
   platePressure: number;
-  fingering: number;
   vibIntensity: number;
   vibFrequency: number;
   drip: number;         // rainDrip (0 = off)

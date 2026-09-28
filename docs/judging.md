@@ -464,6 +464,24 @@ On Oil & Water (Oil Bodies on):
   going straight out: a stripe under the palm should come out as a stripe, not a smear
   round the whole ring. Say if the old even ring looked better.
 
+## 19. The fingering push taken out (PLAN §0)
+
+Classic drew stripes a few cells across over its pools, and after a while red dots
+in a lattice with labyrinths between them. It was a push, set by Polarity, that
+moved the dye along its own slope by a slow noise, and ran diffusion backwards
+through the inside of every pool. It is gone, on every look.
+
+On Classic, and on Velvet Underground on the iPhone (where it drew a fine
+crosshatch pinned to the grid), and one other look with Polarity up and Blob
+Surface Tension low (which made the push strongest):
+
+- leave it for ten minutes or more: no stripes, dots or labyrinths inside the
+  pools, and the plate should hold its dye rather than thin out;
+- watch a pool's edge: the slow pushing out and drawing back the push added is
+  gone. Say whether you miss it; real fingering, from a lift or a pour, is the
+  plan's next step for it, not a noise;
+- the Finger through a pool: it should carry the dye and not seem to add any.
+
 ---
 
 ## Reading the frame time while you do it
