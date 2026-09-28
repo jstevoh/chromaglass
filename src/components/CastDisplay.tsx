@@ -154,13 +154,23 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
 
       This window is the one that is definitely visible, so it asks. The show
       ignores the ask if it has already drawn this interval, so with both
-      windows up there is still one clock and nothing tears.
+      windows up there is still one clock and nothing tears (PLAN.md §14b,
+      lib/drawGate.ts).
+
+      The ask carries the time this window's refresh began, on the show's
+      clock. Both windows share one main thread, so an ask can wait behind
+      the show's own draw in the same refresh; stamped with the time it got
+      to run, a draw that cost more than 0.6 of a refresh made it look like
+      the next refresh's and the plate drew twice. The animation frame's
+      timestamp is on this window's clock, which starts when this window
+      opened; the difference of the two windows' `timeOrigin`s moves it onto
+      the show's.
     */
     let tick = 0;
-    const ask = () => {
+    const ask = (ts: number) => {
       try {
-        const o = window.opener as (Window & { __chromaglassFrame?: () => void }) | null;
-        if (o && !o.closed) o.__chromaglassFrame?.();
+        const o = window.opener as (Window & { __chromaglassFrame?: (ts?: number) => void }) | null;
+        if (o && !o.closed) o.__chromaglassFrame?.(ts + performance.timeOrigin - o.performance.timeOrigin);
       } catch { /* the show window is gone, or cross-origin */ }
       tick = requestAnimationFrame(ask);
     };
