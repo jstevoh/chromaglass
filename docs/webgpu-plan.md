@@ -650,6 +650,80 @@ cutover, when the honest numbers are the only ones left.
 
 **P4 is done** but for the harness work that belongs to P5.
 
+## H2c — what the multigrid costs in dispatches, read 2026-09-28
+
+*Counted from the code on 2026-09-28, not timed.* H2's figures above ("about 101
+dispatches", 48 of them pressure) are from before the multigrid (`physics-plan.md`,
+"The projection"). Two V-cycles (`MG_CYCLES`), two sweeps each way per level and sixteen
+at the coarsest (`MG_COARSE_SWEEPS`), in each of the step's two projections, make a
+step, per layer:
+
+| Grid | Levels | Projection dispatches | The rest of the step | A step |
+|---|---|---|---|---|
+| 256², 384² | 6 | 398 | ~43 | ~441 |
+| 512², 768² | 7 | 442 | ~43 | ~485 |
+| 1024² | 8 | 486 | ~43 | ~529 |
+
+The multigrid bought incompressibility at every scale "for about the same arithmetic",
+and the arithmetic is the same; the dispatches are not. 172 to 216 of them a step run on
+levels of 256 cells or fewer, 32 of those the sixteen coarsest sweeps on a 4² or 6²
+grid, where a dispatch is nearly all overhead. At the ~7 µs a dispatch this plan
+measured, the ~390 added are about 2.7 ms a step a layer. That is an estimate:
+`npm run stages` (project 1 and project 2) is what says.
+
+On the CPU, per dispatch, `arg()` makes a `Float32Array(8)` and a slice and calls
+`writeBuffer`, even for arguments that never change (`pressure ${parity}`, `mg smooth
+${level} ${parity}`): about 455 writes and 900 small allocations a step a layer, some
+55,000 writes a second with two layers at 60 steps. And `kernel()` runs `replaceAll` over
+a 4 to 10 KB source to make its map key. One argument name carries two values in a step
+(`'current grid'`, written by the current and by the solve); harmless while the kernels
+read only `.y`, a trap for the next one that reads `.x`.
+
+What to try, largest saving first:
+
+1. **The coarse levels in one workgroup.** Every level of 32² or less (b and p together
+   are 8 KB of workgroup memory) solved in one single-workgroup dispatch, with
+   `workgroupBarrier` between sweeps: about 256 fewer dispatches at 512² (172 to 216
+   counting 16² and less only).
+2. **A warm start and one V-cycle** (the warm start is `evaluation-2026-09.md`'s):
+   about 218 fewer, judged by `pressureSelfTest`'s residual, not by eye.
+3. **`mgZero` folded into the first sweep** of a level, as a zero guess: 28 fewer.
+4. **Constant arguments written once**, when they are made, and `kernel(name, format)`
+   cached with its pipeline: about 440 fewer `writeBuffer` calls and 880 fewer
+   allocations a step.
+5. **First-order velocity.** The CPU solver's own comment says MacCormack "costs a third
+   of the step on a field nobody sees directly", and it transports velocity first
+   order; the GPU still runs MacCormack on it (`advect velocity`). Two full-grid passes.
+6. **No aux target while the camera is off.** The display writes its second attachment
+   every frame (`plate.ts`); a one-target variant saves 4 bytes a pixel a frame, about
+   16 MB a frame at 2560×1600, on the pass the evaluation says keeps Retina out of
+   reach.
+7. **Readback straight into the ring.** Each field goes texture → `rbStaging` → ring
+   slot, 1.18 MB of copying a layer a frame, and the downsample and the staging copy
+   run even when both slots are busy, which is when the GPU is behind (`fluid.ts`).
+   Look for a free slot first.
+8. **Air only where there are bubbles.** Every layer makes an rgba16float air pair
+   (4 MiB at 512²) and clears it with a render pass every step, background layers that
+   never get a bubble included; and since the list is set once a frame while `which`
+   flips every step, a frame of several steps lands its whole rate in the first.
+9. **Pack only after a step.** `packDye` and `packVel` also run on frames the solver did
+   not step, half of all frames at 120 Hz (`PLAN.md` 14j caps the draw rate; this is the
+   part that stays).
+10. **Pinned grids a multiple of 32.** `resolveSimResolution` rounds to even only; at N
+    ≡ 2 (mod 4) (`?sim=514`, `?sim=1000`, a saved look) the coarsest level is N/2 or
+    N/8, and the V-cycle is little better than sweeps.
+11. **Smaller:** seven to ten `createBindGroup` and about 35 `createView` a frame in the
+    frame loop (the display's group can be cached on the grain and air parity); the GPU
+    stats reduction (`measure()`, `statsRun`) is built behind the show and called only
+    by harnesses; `shader-f16` storage for the r32float scratch fields, worth little
+    beside the dispatch counts.
+
+Two readings the governor trusts are a frame or more out. The timestamp labels are the
+frame just issued, while the data is a copy one to three frames old (`kit.ts`), so when
+the list of passes changes (particles, the camera, the finish, the output) the times
+land on the wrong labels for a moment and `gpuFrameMs` is skewed: keep the labels with
+their ring slot. The flash probe's pixel count has the same fault (`PLAN.md` 14r).
+
 ## P5 so far, 2026-09-20
 
 **The show night runs on the stage.** `QA_RENDERER=webgpu npm run qa` walks
