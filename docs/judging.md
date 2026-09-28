@@ -405,7 +405,48 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
-## 17. The Mac app, on the Mac and on a projector
+## 16. The Magnet pulls a pool out in fingers
+
+A pool bigger than the spikes' reach used to stay a round blob past them
+under the Magnet tool: on Magnet Garden what it pushed out thinned to a grey
+the plate does not draw. Now, on the looks with a Labyrinth, the edge goes out in black fingers round the magnet,
+the sunflower in the references (PLAN §9i; `npm run fingers` measures it in the
+lab). Worth looking at:
+
+- pour a big pool on Ferro Paint, Ferro Maze and Magnet Garden and hold the
+  Magnet over it for five seconds: spikes in the middle, thin black fingers
+  with round tips running out all round, each about as wide as the gaps;
+- drop ferrofluid on Classic and do the same: it should gather under the
+  magnet as before, with spikes and no fingers (PLAN §9o);
+- let go: the fingers should stay where they are and slowly round off, not
+  spring back into a disc;
+- the same with two fingers on the phone, one over each of two pools;
+- on Magnet Garden, drag the Magnet slowly: the pool should still follow it
+  (PLAN §9l).
+
+```
+?set=ferroLabyrinth=0.8   what Magnet Garden's own field adds to the hand's
+```
+
+---
+
+## 17. Blow and Finger move the ferrofluid
+
+They used to leave it where it was (PLAN §9n; `npm run ferrohands` measures
+the carry in the lab). Worth looking at, on Magnet Garden or Ferro Paint:
+
+- a Finger drawn through a pool drags a tongue of ferrofluid along with the
+  dye, and the pool closes behind it;
+- Blow held over a pool opens a hole under it; moved across, even slowly, it
+  pushes a tongue of ferrofluid ahead of it and does not leave a row of holes;
+- with Automation on, the ferrofluid stays put between hands (only a hand
+  carries it);
+- the same on the phone, with a finger on Finger or Blow; a finger on the
+  Magnet is still a magnet.
+
+---
+
+## 18. The Mac app, on the Mac and on a projector
 
 The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
 server in one Electron app. CI opens the packed app on its Mac runner and
@@ -435,31 +476,6 @@ or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
   every display, so the laptop's screen may go black too. Say which it is on
   your Mac; if it does, the app should use a borderless window over the
   projector's screen instead.
-
----
-
-## 16. The Magnet pulls a pool out in fingers
-
-A pool bigger than the spikes' reach used to stay a round blob past them
-under the Magnet tool: on Magnet Garden what it pushed out thinned to a grey
-the plate does not draw. Now, on the looks with a Labyrinth, the edge goes out in black fingers round the magnet,
-the sunflower in the references (PLAN §9i; `npm run fingers` measures it in the
-lab). Worth looking at:
-
-- pour a big pool on Ferro Paint, Ferro Maze and Magnet Garden and hold the
-  Magnet over it for five seconds: spikes in the middle, thin black fingers
-  with round tips running out all round, each about as wide as the gaps;
-- drop ferrofluid on Classic and do the same: it should gather under the
-  magnet as before, with spikes and no fingers (PLAN §9o);
-- let go: the fingers should stay where they are and slowly round off, not
-  spring back into a disc;
-- the same with two fingers on the phone, one over each of two pools;
-- on Magnet Garden, drag the Magnet slowly: the pool should still follow it
-  (PLAN §9l).
-
-```
-?set=ferroLabyrinth=0.8   what Magnet Garden's own field adds to the hand's
-```
 
 ---
 

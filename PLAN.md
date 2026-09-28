@@ -57,11 +57,11 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (`npm run fingers`), not yet judged on the Mac; 9f–9h, 9j and 9k–9p open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; 9f–9h, 9j, 9k–9m and 9o–9r open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §17); steps 2 to 6 not started |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §18); steps 2 to 6 not started |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15b–15e open, the ferrofluid's under 9n |
 
@@ -796,7 +796,7 @@ Open, from building 9e (in the order to do them):
   some phones) needs a coarser pitch.
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
-- **9i. Fingers past the spikes** (**shipped**, this PR). A pool bigger than the
+- **9i. Fingers past the spikes** (**shipped**, #200). A pool bigger than the
   spikes' reach stayed a round blob past them under the Magnet: on Magnet Garden
   the push it gave went in through the separation's own diffusion and thinned the
   edge to a grey the plate does not draw. Now, on a look with a Labyrinth, the
@@ -848,10 +848,33 @@ Open, from building 9i:
   the hand is held: the hand's share (spikesClose) is one number for the plate,
   so the push leaves the far labyrinth's separation too, and it rests on the
   maze's flow alone there.
-- **9n. Blow and Finger on the ferrofluid.** Asked by the owner (2026-09-27):
-  shouldn't blowing and Finger also move the ferrofluid round? Both push the flow
-  the ferrofluid rides; whether it moves, and how far against the dye, is next to
-  measure, and to fix in its own PR if it does not.
+- **9n. Blow and Finger on the ferrofluid** (**shipped**, #206). Asked by the owner
+  (2026-09-27): shouldn't blowing and Finger also move the ferrofluid round? They
+  barely did: both only added velocity, which lasts one step before the speed
+  clamp cuts it back (a stroke across a pool moved it 0.2 of a cell), so the dye
+  has long been carried by hand and the ferrofluid never was. Now the Finger
+  carries it along the stroke as it carries the dye, Blow held still blows a hole
+  in a pool and moved pushes it along (`carryPhase`, conserving). A moving Blow
+  keeps the way the hand last went for 150 ms, so a frame's later steps and a
+  frame the pointer did not report a move in push rather than puff. Only a hand's
+  Blow and Finger: the pour event's burst, a bubble's pop and the automation's
+  breath and evolve stroke, which also blow or drag, leave it be. Every hand goes
+  through the same methods, so a phone's fingers on Finger and Blow do it too
+  (the pointer's path, the mouse's numbers), as does the remote
+  (`performGesture`); a phone finger on the Magnet is still a magnet. `npm run
+  ferrohands`.
+- **9q. A Mac check of the hands on the ferrofluid.** `npm run ferrohands` measures
+  the carry with the app's own numbers (lib/handCarry.ts) but not the app's calls:
+  which method each hand reaches, the Finger's carry waiting on each reading of the
+  dye, how often a hand acts, and a moving Blow's held direction. A check through
+  the real pointer on Magnet Garden, reading the phase before and after, belongs in
+  `npm run tools` on the Mac.
+- **9r. The Finger's carry searches when it need not.** `phaseCarry` gathers each
+  cell's share from every cell within the hop, which only a puff (straight out)
+  needs; along a stroke exactly one cell can land on each, and could be read
+  directly as `mixCarry` does. The remote's widest directed Blow at 512² is about
+  4000 reads a cell over 28 000 cells. Worth doing if a Mac frame-time reading
+  under a held Blow shows it.
 
 ### 10. Playing like a show
 
@@ -1720,7 +1743,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    Measured in a cloud session before and after: with a stand-in second screen, no
    projector window opened before, one opened in full screen after; without the
    app's fill, the wall showed the click hint and the laptop the title-bar chip.
-   **Owed:** the Mac look (`docs/judging.md` §17), and signing it with the owner's
+   **Owed:** the Mac look (`docs/judging.md` §18), and signing it with the owner's
    Developer ID (the secrets in `desktop/README.md`); until then macOS asks once in
    Privacy & Security before it opens.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
@@ -1785,7 +1808,7 @@ network):
   on CI's Mac runner only if its window server really hides a minimised window.
   The first run's control, a window inside the app, stayed visible at 46 frames/s
   minimised because the app's switches reach every window in its process. Where
-  it is not measured, it is `docs/judging.md` §17 on the owner's Mac.
+  it is not measured, it is `docs/judging.md` §18 on the owner's Mac.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
@@ -2280,3 +2303,48 @@ the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured. A
 minor, in `performGesture`: a remote Finger is half as strong as the mouse's, and a
 remote Blow never makes a straw bubble.
 
+
+## 17. Hear the set ahead, from files
+
+Not started. Came out of asking what a streaming service's API could add
+(2026-09-27): the one idea worth having was the show knowing each song before it
+plays, and it needs no service at all, only the files.
+
+Live, the show can only react. A song map (sections, energy, pitch) is made by
+recording the song's first play (`ListenRecorder` in `src/lib/songMap.ts`, from
+`useMusicIntelligence.ts`) and is cached by ISRC for the next time, so the first
+time a song is played at a gig, nothing is known ahead of the note that is sounding.
+Only the film render reads a song ahead: `src/lib/songTrack.ts` decodes the whole
+file and works out every frame's bands and kicks before drawing (§6).
+
+The idea is that the live show does what the render does, for a whole set:
+
+- **Load the set as files.** Drop a folder or a playlist of files (bought FLAC or
+  MP3; store downloads such as Qobuz's carry no DRM) onto the desk, or the Mac app
+  (§13). Each song is decoded and analysed before the show, through the same code
+  the render uses, and its song map is ready before its first note.
+- **The show plays the files itself**, so it knows which song is on and where in it,
+  to the sample, with no fingerprint service (`fingerprint.ts`) and no guessing at the
+  gap between songs (`songBoundary.ts`). Offline at the venue, which is §14h.
+- **Anticipate, don't react.** With every kick and section known ahead, a song show
+  (`songShows.ts`) can fire an action a bar or two *before* a drop or on the last
+  beat of a song, not after it: start a pour ahead of the build, black on the last
+  hit, pick the next look from what the next song will do.
+- **From the files' own tags:** the ISRC, so per-song looks attach exactly
+  (`songRef.ts`), with MusicBrainz for files that lack one; embedded cover art as a
+  source of the song's dyes; ReplayGain (or a loudness measured during the analysis)
+  so a quiet record and a loud master drive the plate the same amount without
+  recalibrating (`audioCalibration.ts`).
+- **When something else is the player** (a DJ, a phone), the show carries on as it
+  does today, through the mic or the interface.
+
+**Open questions:** how much a whole set's analysis costs up front (a ten-minute song
+decodes to about 230 MB of float before it is cut down, `songMap.ts`), so it wants a
+worker and one song at a time; and whether anticipation is a new *when* for song
+shows ("n beats before section") or a new kind of action. The phone gets the set
+list, the now-playing song and the song shows' next cue, the same as the desk.
+
+**Not doing:** a streaming service's API for this. Qobuz's API terms (researched
+2026-09-27) forbid earning anything around the service and indexing its catalogue,
+and a consumer subscription is for personal listening, so a stream at a gig is
+outside its terms whatever the app does. Files the performer owns carry none of that.
