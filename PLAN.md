@@ -64,6 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
+| 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes; nothing built in the plate. 20a–20f open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2481,3 +2482,230 @@ list, the now-playing song and the song shows' next cue, the same as the desk.
 2026-09-27) forbid earning anything around the service and indexing its catalogue,
 and a consumer subscription is for personal listening, so a stream at a gig is
 outside its terms whatever the app does. Files the performer owns carry none of that.
+
+## 20. Lace and holes: a pale film torn open over colour
+
+Asked 2026-09-28. The owner sent a still from another performer's liquid light show
+and asked what it would take for the plate to look like it. Numbered 20 because 16,
+18 and 19 are taken by open PRs.
+
+What the still shows:
+
+- a pale layer, white with faint pink and lavender in it, torn into a **lace** of holes
+  from a pixel or two to a sixth of the frame, many of them stretched along the flow
+  into slits;
+- rows of small **dots** along the lace's edges and ligaments;
+- a thin **dark line** round every hole and every edge of the lace, and edges that are
+  sharp rather than soft;
+- flat **discs**, round and translucent, with a faint darker rim, sitting over both
+  the lace and the colour;
+- behind it all, **dense colour fields** (orange, red, indigo, a little teal) in
+  streaks, going black where two dense dyes overlap.
+
+This is not batch 2's lacing, which paints hair-thin filaments along dye boundaries.
+Here the pale part is a liquid of its own, and the holes are where it has come apart.
+
+### What each feature is, physically
+
+**The pale lace is clear liquid under the lamp, not white paint.** On a projector the
+lamp shines through the dish, so a region with no dye in it throws the lamp's own white.
+A milky or white-pigmented liquid would throw grey or dark, because the light it
+scatters misses the lens (18j). So the lace is a clear liquid (most likely an oil)
+that fills most of the gap between the glasses, with a thin layer of dyed water left
+under it: that thin layer is the pink and lavender tint. Where it has torn, the dyed
+water spans the whole gap and the colour shows at full strength.
+
+**The holes are a thin film dewetting.** A liquid film thin enough to feel the glass
+(well under a millimetre) is only metastable. Where it is thinnest, or where a speck
+of dust or a drop of solvent lands, it ruptures, and the hole grows as surface tension
+pulls the film back. That is dewetting (Reiter 1992; Brochard-Wyart and Daillant 1990).
+Its signs are all in the still:
+
+- **Holes of many sizes.** Holes open at different times and grow from their own
+  moment, so the early ones are large and the late ones small. A film's spinodal
+  spacing also grows as the square of its thickness (for van der Waals forces), so
+  thin parts of the film tear fine and thick parts tear coarse.
+- **The lace.** Neighbouring holes grow until the film between them is a network of
+  ligaments.
+- **The dotted rows.** A ligament is a thread, and a thread breaks into a row of drops
+  (Rayleigh–Plateau). So does the ragged rim at the film's edge.
+- **Slits.** The dish is flowing while the holes grow, so the shear stretches them.
+
+A drop of alcohol or a surfactant makes holes on purpose. It lowers the surface tension
+where it lands (about 22 mN/m for alcohol against 72 for water), and the film is pulled
+away from it (Marangoni flow). Performers use exactly this gesture.
+
+**The dark lines are refraction, not ink.** Oil (n ≈ 1.47) and water (1.333) differ,
+so where the film's thickness changes steeply, the optical path through the gap
+changes steeply and light is bent out of the projector's lens. That draws a hairline
+at every edge; a slight defocus adds a bright partner (a shadowgraph). This is 18e.
+The edges are sharp because two immiscible liquids keep a real interface, where
+dyes in water would blur.
+
+**The discs are flat drops of oil in the gap.** A drop wider than the gap is squashed
+into a pancake: flat in the middle, and curved only at the rim. So only the rim bends
+light out of the lens, which gives the faint dark ring. The body tints what is behind
+it by absorption, because the oil is lightly dyed or the water under it is thinner.
+They sit over the lace, so they are in the other layer (the front plate) or against
+the other glass.
+
+**The colour fields are dye by absorption.** Dense dye through the full gap is deep and
+saturated, and two dense dyes overlapping go black (subtractive mixing). The fine
+streaks are dye drawn out along the flow (18h).
+
+**An alternative, to check against a video.** A mixture of oil, alcohol and dyed water
+can also break up by phase separation as the alcohol leaves, with no film. The two can
+be told apart in motion. Dewetting holes appear one by one and each grows steadily
+from its own start. Phase separation appears everywhere at once, at one size, and
+then coarsens slowly (as t^(1/3)). A clip of this performer's show through the
+`watch` skill would settle it. The plan below follows dewetting, which the still fits
+best, and the prototype supports it.
+
+### The prototype
+
+`/mnt/project-files/lace/lace.py` (project files, not the repo) is a CPU prototype in
+numpy on a 384² periodic grid. It checks that this physics makes the picture before any
+of it is written in WGSL. The gap has depth 1. A clear oil film of thickness h lies
+against one glass, and dyed water fills the other 1 − h. The film obeys the
+thin-film equation:
+
+    ∂h/∂t = ∇·(h³ ∇p) − ∇·J_M − u·∇h
+    p     = −σ∇²h − Π(h) + (top glass)
+    Π(h)  = K[(h_p/h)³ − (h_p/h)²]    (disjoining pressure; h_p a precursor film)
+    J_M   = −k h² ∇Γ                   (film pulled away from a solvent Γ)
+
+It is solved semi-implicitly (spectral) with the film conserved to the last digit.
+Solvent drops land now and then, then spread and evaporate, and a slow stir carries
+everything. The picture is Beer–Lambert through the gap: lamp × exp(−Σ εᵢcᵢ(1 − h)),
+with the aperture loss and a shadowgraph term taken from the optical path
+1.47h + 1.333(1 − h). Three flat oil pancakes are laid on top.
+
+What it showed, at 2,000 steps:
+
+- **The film tears on its own.** Nothing in the code draws a hole, a rim, a ligament
+  or a dot. There are 76 holes, with diameters (in cells) of p10 1.1, p50 2.9, p90 16.4
+  and p99 107: a hundredfold spread. The ligaments break into rows of drops along
+  every edge.
+- **The ground decides whether any of it shows.** The same state drawn the way the
+  plate draws today (dye on a black ground) puts 0.0% of pixels near white, and the
+  lace is black. Under the lamp, 10.1% are near white and the lace reads as the
+  still's does. `today-lamp-refraction.png` shows the same state three ways.
+- **The dark lines come out of the optics.** They appear with the aperture and
+  shadowgraph terms, with no painted edge. At first they came out too heavy (lines 3–4
+  cells wide), and they needed a narrower cone than the drops use. That is the
+  question 18e already asks about `DROP_NA`.
+- **It does not reach the still's stage.** In the still, the film still covers most
+  of the lace and its holes are cut clean, with no raised rim. The prototype's film
+  (a no-slip lubrication film, mobility h³) builds rims and retracts into a thin
+  network before the holes are dense. Holes that open with no rim, growing
+  exponentially, are the signature of a **viscous** film retracting on a liquid
+  underneath: its own stretching viscosity resists it, not the glass (Debrégeas,
+  Martin and Brochard-Wyart 1995, R ∝ exp(σt/ηh)). So the real film is thicker and
+  more viscous than the prototype's (a heavy oil or a syrup), and 20c is the fix.
+
+Pictures in `/mnt/project-files/lace/`: `reference-vs-prototype.png`,
+`lace-over-time.png`, `today-lamp-refraction.png` and `lace-final.png`.
+
+### Where the plate stands
+
+| Feature | What the plate has | What is missing |
+|---|---|---|
+| White where there is no dye | Dye stored as absorbance; the gap bound in the plate pass | The lamp ground: 18b. Today, clear liquid shows black |
+| A film that tears | A Cahn–Hilliard phase (Oil Bodies, §10 step 5; the ferrofluid) with flux-form transport, Rayleigh–Plateau for free; `marangoniFlux` moving what rides the surface away from soap | A film **thickness** field with a disjoining pressure; nucleation from solvent and dust |
+| Rimless holes, slits | Flow shear from the stir | A viscous film (20c); 18a's flow that remembers |
+| Hairline edges | The projector's aperture law for drops and bubbles (`dropLens`, u*) | The same law applied to every edge: 18e |
+| Flat discs | Drops flattened by the half gap (`DROP_HALF_GAP`); Oil Bodies; two layers | Large pancakes poured on the front layer, and tinted by absorption (18b) rather than glowing |
+| Dense colour going black | Subtractive mixing in the solver | Shown only with the lamp ground (18b); streaks: 18h |
+
+### 20a. A look on the lamp ground (depends on 18b)
+
+Nothing below shows without it: under today's ground the lace is black. 18b already
+plans the lamp as a per-look choice. This look is the first that must have it, so it
+is a good first customer. **Check:** the prototype's white fraction measured in the
+lab: a clear pool on the lamp ground throws at least 90% of the lamp, and the same
+pool on the black ground stays the control.
+
+### 20b. A clear film that tears (the thin-film equation)
+
+- **What:** a new liquid, a clear film against the glass. It gets its own thickness
+  field h (one R32F texture), moved with the plate's flow in flux form (`mixAdvect`),
+  and evolved by the thin-film equation above. The water under it is the gap less h,
+  which feeds the lamp's Beer–Lambert (18b) and the optical path (18e).
+- **Nucleation, never a timer:**
+  - Holes open where the film is thin (the disjoining pressure's spinodal band), and
+    where solvent lands. Alcohol and soap already go into the mix's surfactant
+    channel, and `marangoniFlux` already moves what rides the surface. The film is one
+    more thing it moves.
+  - Dust is a fixed, seeded field of weak spots (a slightly lower local K), so a
+    thick film left alone stays whole, and a thin one tears where the dish is dirty.
+- **Kernels:** `filmMu` (p = −σ∇²h − Π(h) plus the top glass) and `filmUpdate` (∇·(M∇p)
+  in flux form, degenerate mobility M = h³ or 20c's). They have the same shape as
+  `mixMu` and `mixUpdate`, which are Cahn–Hilliard with a constant mobility.
+- **Cost:** unmeasured. The explicit fourth-order update needs a small step. The film
+  can run at half the dye's grid, with 6–10 substeps of two light passes, or with a
+  few Jacobi sweeps of a stabilised semi-implicit form. The estimate is 0.2–0.4 ms at
+  the 768² rung. It is skipped entirely when no film is on the plate, like the oil's
+  kernels.
+- **Checks:**
+  - A new lab check, `lace`: the film's volume conserved over 20 s;
+  - a thick film with no dust and no solvent stays whole for 20 s (holes come from the
+    physics, not a clock);
+  - a solvent drop opens a hole whose radius grows steadily;
+  - on a dusty thin film, the hole diameters span at least tenfold (p10 to p99);
+  - after the lace forms, the count of separate film pieces rises (the ligaments bead);
+  - the same film on today's ground is the control.
+  - The `look` skill renders it beside the still.
+- **Tools and phone:** the performer's gestures are pouring the film, which is a
+  bottle (15a lays it from every tool), and a drop of alcohol, which is a bottle that
+  punches a hole where it lands. Both are in the phone's bottle picker and on MIDI,
+  like every other bottle.
+
+### 20c. The lace stays lace: a viscous film
+
+The still's holes have no rims and the film between them stays wide. That is a viscous
+film, whose own stretching viscosity 4ηh resists its retraction (a Trouton sheet), not
+a thin film dragged over the glass. Two ways to get it, in order:
+
+1. **With 18a:** the film as a phase of high viscosity in the Hele-Shaw solver. The
+   hole is water invading a viscous liquid under capillary pressure, resisted by
+   Darcy drag. This needs 18a's variable mobility and 18d's per-liquid viscosity, and
+   costs nothing beyond them.
+2. **Standalone:** the film's own in-plane velocity from the viscous-sheet equations,
+   ∇·[ηh(∇v + ∇vᵀ + 2(∇·v)I)] = drag, driven by the film's edge tension 2σ. That is
+   a vector elliptic solve like the pressure's. Try this only if the first way fails.
+
+**Check:** a hole in a viscous film grows exponentially with no rim. The rim excess,
+the film's thickness at the edge over its far thickness, stays under 1.2, where the
+prototype's h³ film reaches about 2. A sheared hole stretches along the flow by at
+least 2:1 before it meets another.
+
+### 20d. Hairline edges from the optical path (this is 18e)
+
+No new work beyond 18e, but this look is its test: every edge of the lace is an
+oil–water step of Δn ≈ 0.14 across up to the whole gap, the strongest the plate will
+ever draw. **Check:** the line's width in the `look` render is one to two pixels at
+1080p, and it sits on the edge.
+
+### 20e. Flat discs on the front layer
+
+- **What:** pouring large oil drops (up to about a sixth of the frame) on the front
+  layer, where they sit over whatever the back layer holds. They are flat in the
+  middle by the half gap, as `dropLens` already draws them. Their body tints by
+  absorption through 18b, and the rim's ring comes from the aperture.
+- **Missing:** the drop sizes' upper bound (`dropRadius` redraws past 5.2), and a
+  look that pours drops on the front layer while the back layer carries the colour
+  and the lace.
+- **Check:** in the `look` render, a disc's middle is within 10% of the colour behind
+  it, times the oil's tint, and its ring is darker than both sides.
+
+### 20f. A look that puts it together, and its cost
+
+A look with dense orange, red and indigo water on the back layer, the clear film
+poured over it, alcohol on the sound's accents, and oil discs on the front. It is
+named for what it is (Lace), not for the performer. It ships with its phone version,
+like every look. It needs 18b, 20b and 20e; 20c and 18e make it match the still, and
+it is judged on the Mac against the still.
+
+**Order:** 18b (already planned first among the optics), then 20b with the lab check,
+then 20e, then 20c, which rides 18a when that lands. 20a and 20d are the checks that
+this look holds 18b and 18e to.
