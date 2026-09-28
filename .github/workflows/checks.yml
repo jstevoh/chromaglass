@@ -411,6 +411,11 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
+      # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
+      # the screen, a pool one flat ink outlined in black, and only Roy prints.
+      - name: The Ben-Day print
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run benday
       # The mixer: each source moved lands only where that source is (the
       # film under the back plate, the logo under the film), the LED ring
       # passes the front plate from lamp to beam, every grade does what its

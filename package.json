@@ -113,6 +113,7 @@
     "pressoil": "node scripts/pressoil.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
+    "benday": "node scripts/benday.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",

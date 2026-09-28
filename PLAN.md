@@ -64,6 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b not started |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
+| 19 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 19a–19d open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2354,3 +2355,40 @@ list, the now-playing song and the song shows' next cue, the same as the desk.
 2026-09-27) forbid earning anything around the service and indexing its catalogue,
 and a consumer subscription is for personal listening, so a stream at a gig is
 outside its terms whatever the app does. Files the performer owns carry none of that.
+
+## 19. Looks after painters
+
+The owner, 2026-09-27, over a screenshot of Classic at 2.8x covered in red dots on
+white by accident: "kinda cool, Roy Lichtenstein type style ... let's reserve this
+effect for a particular preset and a particular control." What makes the dots on
+Classic is another thread's to find and stop; this section is the effect on purpose.
+
+**Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
+the desks, the remote, and the phone's Looks sheet while a look prints) that reads the
+finished picture as a comic printer would: dark is black, anything lit is white paper
+with one of three process inks on it (red, yellow, blue, whichever the hue is
+nearest), a pale wash is that ink laid as even Ben-Day dots on a 45° screen fixed to
+the picture (32 rows down it), and a strong one is the flat ink. The front plate's
+shapes are outlined in black from its dye, a pen's width (a ring of taps round each
+pixel), and so are the seams where two inks meet. Only Roy turns it up: big flat
+pools of the three primaries in thin washes of themselves on a white light table,
+milk and ink so the shapes keep their own edges, and nothing that shades (no gloss,
+hot-spot, beads, bubbles or closeup texture). `npm run benday` measures the print on
+a lab plate: a wash is 242 separate dots against 256 on the lattice, one size to
+2.7%, fixed while the plate turns; a pool is one flat ink with a line all the way
+round it and a line where red meets yellow; and only Roy prints.
+
+Open:
+
+- **19a. Judge it on the Mac** (docs/judging.md §19): the dots' size on a wall, the
+  line's weight, and whether it holds up moving at 60 fps. The lab shows still frames.
+- **19b. The line is drawn round the front plate only.** It needs the dye, and it is
+  drawn from the front plate's; a second plate, the film and the lamps are printed
+  (dots and inks) but not outlined. Roy has one plate, so it does not show there.
+- **19c. The dots do not grow with the zoom.** The screen is fixed to the picture,
+  as a print's is; the owner's accidental dots at 2.8x were about twice the size.
+  If a bigger dot is wanted in the closeup, the pitch could follow the zoom.
+- **19d. More painters.** The same print with other inks is the start of more looks
+  after painters (a Warhol screen print's off-register blocks, Riley's black and
+  white, Rothko's soft fields); none is planned yet.
+

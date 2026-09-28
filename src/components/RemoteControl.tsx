@@ -157,6 +157,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   });
 
   const settings = state?.settings;
+  /*
+    Ben-Day Dots is shown while the plate prints (the Roy look), and kept
+    through a thumb taking it to 0, which would otherwise lose the slider it
+    was on (the look then matches no preset, so its id reads null). Another
+    look picked puts it away, so it stays the one look's control.
+  */
+  const printed = useRef(false);
+  const printedOn = useRef<string | null>(null);
+  {
+    const pid = state?.activePresetId ?? null;
+    if ((settings?.benDay ?? 0) > 0.001) { printed.current = true; if (pid) printedOn.current = pid; }
+    else if (pid && pid !== printedOn.current) printed.current = false;
+  }
   const value = useCallback(
     <K extends keyof VisualizerSettings>(key: K): VisualizerSettings[K] | undefined =>
       (localValues[key] ?? settings?.[key]) as VisualizerSettings[K] | undefined,
@@ -639,6 +652,13 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {(settings?.phaseAmount ?? 0) > 0.001 && (
             <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/*
+            And Ben-Day Dots while the plate prints (the Roy look): how much
+            of a comic it is, for a thumb.
+          */}
+          {printed.current && (
+            <Slider label="Ben-Day Dots" field="benDay" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (

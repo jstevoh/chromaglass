@@ -1678,6 +1678,150 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   return c;
 }
 
+/*
+  Ben-Day dots: the picture printed as a comic panel was, which is what Roy
+  Lichtenstein painted by hand at the size of a wall.
+
+  Asked for by the owner after a screenshot of Classic at 2.8x came up covered
+  in red dots on white by accident ("kinda cool, Roy Lichtenstein type style,
+  but let's reserve this effect for a particular preset and a particular
+  control"). The accident is another thread's to stop; this is the effect on
+  purpose, behind its own control (benDay), which only the Roy look turns up.
+
+  A comic was printed in a few flat inks on white paper, and a tint was not a
+  paler ink but the same ink laid as dots: pink is red dots on white. Ben-Day
+  dots, unlike a photograph's halftone, are one size all over a tint, and that
+  evenness is the look. So each pixel is read as a printer would separate it:
+
+  - its key: dark is black ink, and anything lit is paper with ink on it.
+    Lichtenstein has no shading, so the key is a step, not a ramp;
+  - its ink: whichever of the three process inks (BENDAY_RED, _YELLOW,
+    _BLUE) its hue is nearest, at full strength. Taking the pixel's own hue
+    instead was the first try, and it printed the plate's gradients as
+    gradients (red running through orange into yellow across one pool) and
+    the tints as rainbow dots, which is a photograph, not a print;
+  - its coverage: how much of the pixel is that ink rather than paper,
+    (max - min) / max. Little is bare paper, some is the tint (the dots) and
+    most is the solid ink.
+
+  Then the line. A panel's shapes are drawn in black before they are coloured,
+  so the edge of every solid shape is outlined, and so is the seam where one
+  solid ink meets another (benDayEdge, on the front plate's dye).
+
+  The dots sit on the screen, not on the glass, on a square lattice at 45° as
+  the screens were, a fixed number of rows down the picture (BENDAY_ROWS), so
+  a projector at any resolution prints the same panel and the colour slides
+  under a screen that holds still, rather than dots that swim with the plate.
+  Their edge is antialiased over a pixel and a half so they do not crawl.
+
+  Called only while the control is up, so at 0 the picture is what it always
+  was. The one thing the print does not reach is a line round the back
+  plate's shapes and the other sources: the line needs the dye, and it is
+  drawn from the front plate's (Roy has one plate).
+*/
+const BENDAY_ROWS: f32 = 32.0;
+/** A Ben-Day dot's radius in lattice cells: 0.3 covers 28% of the tint. */
+const BENDAY_DOT: f32 = 0.3;
+/** A line's half-width, in the lattice's pitch. */
+const BENDAY_LINE: f32 = 0.18;
+/** The coverage from which a pixel is solid ink. */
+const BENDAY_SOLID: f32 = 0.62;
+const BENDAY_RED = vec3f(0.89, 0.1, 0.12);
+const BENDAY_YELLOW = vec3f(1.0, 0.86, 0.06);
+const BENDAY_BLUE = vec3f(0.08, 0.33, 0.78);
+fn chromaDir(c: vec3f) -> vec3f { return normalize(c - vec3f((c.r + c.g + c.b) / 3.0)); }
+/** Which of the three inks a colour's hue is nearest: 0 red, 1 yellow, 2 blue. */
+fn benDayInkIndex(hue: vec3f) -> f32 {
+  let a = hue - vec3f((hue.r + hue.g + hue.b) / 3.0);
+  let r = dot(a, chromaDir(BENDAY_RED));
+  let y = dot(a, chromaDir(BENDAY_YELLOW));
+  let b = dot(a, chromaDir(BENDAY_BLUE));
+  if (r >= y && r >= b) { return 0.0; }
+  if (y >= b) { return 1.0; }
+  return 2.0;
+}
+fn benDayInk(hue: vec3f) -> vec3f {
+  let i = benDayInkIndex(hue);
+  if (i < 0.5) { return BENDAY_RED; }
+  if (i < 1.5) { return BENDAY_YELLOW; }
+  return BENDAY_BLUE;
+}
+/*
+  The outline of the front plate's shapes, as thick as a pen's line.
+
+  The first try drew it from the finished picture, as a contour: the
+  coverage's distance to the solid threshold, over its gradient. A contour
+  like that can only be as wide as the edge it is drawn on, since past the
+  edge the gradient is nothing, and the gooey contrast sharpens a pool's
+  edge to a pixel or two: the line came out a hair (two pixels at 512 in
+  the lab), where a panel's is a pen stroke. So the line is drawn from the
+  front plate's dye instead: eight taps on a ring of the line's half-width
+  round the pixel, and the pixel is on the line when the ring has both solid
+  ink and something less on it (it is within that distance of the shape's
+  edge), or two different inks (of a seam). Solid is read as benDay() reads
+  it, opacity times the colour's coverage (benDayStrength), and not opacity
+  alone: a pale wash is opaque enough, and opacity drew a soft grey band
+  round every wash and a line through the middle of two of them. The first
+  is the ring's range straddling BENDAY_EDGE, cut over a pixel so the line's
+  own edge is antialiased and not smeared; the second is a step, and is
+  only ever inside a line's width of a solid shape. Only while the print is
+  up, so eight decodes a pixel cost nothing on any other look.
+*/
+const BENDAY_EDGE: f32 = 0.5;
+/**
+ * How much ink a decoded dye sample lays: its opacity times its colour's
+ * coverage, as benDay() reads coverage.
+ */
+fn benDayStrength(f: vec4f) -> f32 {
+  let hi = max(f.r, max(f.g, f.b));
+  return f.a * (hi - min(f.r, min(f.g, f.b))) / max(hi, 1e-4);
+}
+fn benDayEdge(t: texture_2d<f32>, fuv: vec2f, rad: f32) -> f32 {
+  let c = decodeFluid(t, fuv, 0.0, false);
+  let sc = benDayStrength(c);
+  var lo = sc;
+  var hi = sc;
+  var first = -1.0;
+  var seam = 0.0;
+  if (sc > BENDAY_EDGE) { first = benDayInkIndex(c.rgb); }
+  for (var k = 0; k < 8; k++) {
+    let a = f32(k) * 0.78539816;
+    let f = decodeFluid(t, fuv + vec2f(cos(a), sin(a)) * rad, 0.0, false);
+    let sf = benDayStrength(f);
+    lo = min(lo, sf);
+    hi = max(hi, sf);
+    if (sf > BENDAY_EDGE) {
+      let ink = benDayInkIndex(f.rgb);
+      if (first < 0.0) { first = ink; } else if (ink != first) { seam = 1.0; }
+    }
+  }
+  // Positive while the ring straddles the threshold, and cut at 0 over a
+  // pixel of its own gradient: over a smooth one the plain smoothstep of
+  // each end left a band of grey a dozen pixels wide beside the line.
+  let straddle = min(hi - BENDAY_EDGE, BENDAY_EDGE - lo);
+  let edge = clamp(straddle / max(fwidth(straddle), 1e-5) + 0.5, 0.0, 1.0);
+  return max(edge, seam);
+}
+
+fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
+  let hi = max(c.r, max(c.g, c.b));
+  let lo = min(c.r, min(c.g, c.b));
+  let chroma = hi - lo;
+  let cover = chroma / max(hi, 1e-4);
+  let ink = benDayInk(c);
+  let key = smoothstep(0.16, 0.3, hi);
+  let pitch = max(4.0, U.resolution.y / BENDAY_ROWS);
+  let q = vec2f(px.x + px.y, px.x - px.y) * 0.70710678 / pitch;
+  let d = length(fract(q) - 0.5) * pitch;
+  let r = BENDAY_DOT * pitch;
+  let dotMask = 1.0 - smoothstep(r - 0.75, r + 0.75, d);
+  let tint = smoothstep(0.1, 0.22, cover);
+  let solid = smoothstep(BENDAY_SOLID - 0.07, BENDAY_SOLID + 0.08, cover);
+  let inkMask = max(dotMask * tint, solid);
+  let printed = mix(vec3f(1.0), ink, inkMask) * key * (1.0 - plateEdge);
+  return mix(c, printed, clamp(amount, 0.0, 1.0));
+}
+
 @fragment fn fs(in: VsOut) -> FsOut {
   var uv = in.uv;
   let darkBlend = U.darkBlend != 0;
@@ -1782,6 +1926,12 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
+  // The print's pen line round the front plate's shapes (benDayEdge): a
+  // half-width of a line in screen pixels, turned into the plate's units.
+  var benEdge = 0.0;
+  if (U.benDay > 0.001) {
+    benEdge = benDayEdge(layer0, fuv0, phasePx * max(1.0, U.resolution.y / BENDAY_ROWS * BENDAY_LINE));
+  }
   var dish0 = vec2f(1.0, 0.0);
   var dish1 = vec2f(1.0, 0.0);
   if (U.dishSpread > 0.001) {
@@ -2627,6 +2777,12 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   // ── Saturation grade ──────────────────────────────────────────────
   let luma = dot(outColor, vec3f(0.299, 0.587, 0.114));
   outColor = clamp(mix(vec3f(luma), outColor, U.saturation), vec3f(0.0), vec3f(1.0));
+
+  // ── Ben-Day dots: the finished picture, printed as a comic (benDay) ──
+  if (U.benDay > 0.001) {
+    let benPx = vec2f(in.pos.x, select(in.pos.y, U.resolution.y - in.pos.y, FLIP_Y < 0.0));
+    outColor = benDay(outColor, benPx, U.benDay, benEdge * U.mixLevel.y);
+  }
 
   // ── Film grain ────────────────────────────────────────────────────
   let grainLuma = dot(outColor, vec3f(0.299, 0.587, 0.114));
