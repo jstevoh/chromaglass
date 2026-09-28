@@ -975,13 +975,22 @@ try {
   const heldAt = (h) => (h.stretches.length ? h.stretches.map(([a, n]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s`).join(', ') : 'none');
   const seenOk = held.seen.longOk && held.seen.tickMedian != null && held.seen.tickMedian <= TICK_OK_MS;
   const loafs = o.loaf.filter(([, d]) => d >= 0.2);
+  /*
+    The silent stretches set aside as the page's own because they began where
+    a promise it awaits had just settled, the show's and the control's. On
+    36360768615 the show's hold (1.75 s from 1.03 s) was taken out and the
+    control's (2.27 s from 1.11 s) was not, with neither printed here; so
+    whether a fetch settling just before Chromium's hold can hide it is now
+    read on every run.
+  */
+  const setAside = (x) => (x.settledStarts?.length ? x.settledStarts.map(([a, n]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s`).join(', ') : 'none');
   const fmtLoaf = ([a, d, rs, bl, n]) => `${d.toFixed(2)} s from ${a.toFixed(2)} s (rendering from ${rs == null ? '?' : `${rs.toFixed(2)} s`}, blocking ${bl == null ? '?' : `${bl.toFixed(2)} s`}, ${n} script${n === 1 ? '' : 's'})`;
   const heldOk = seenOk && held.total <= COLD_CAP_S;
   check(`and the page's thread was held from outside it, in the first ${HELD_BY_S} s and before the first step, no more than ${COLD_CAP_S} s all told (Chromium starting its GPU)`,
     heldOk,
     `${held.total.toFixed(2)} s (${heldAt(held)}), against ${cHeld.total.toFixed(2)} s (${heldAt(cHeld)}) for ?prepare=0`
       + `; long tasks ${held.seen.longOk ? 'seen' : 'not observable, so nothing is taken out'}`
-      + `; not taken out, as the page's own code after an await: ${o.settledStarts.length ? o.settledStarts.map(([a, n]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s`).join(', ') : 'none'}`
+      + `; not taken out, as the page's own code after an await: ${setAside(o)}, against ${setAside(c)} for ?prepare=0`
       + `; long animation frames of 0.2 s or more in the first ${HELD_BY_S + 3} s (printed, not judged): ${loafs.length ? loafs.map(fmtLoaf).join(', ') : 'none'}`
       + `, the page's timer every ${held.seen.tickMedian == null ? 'never' : `${held.seen.tickMedian.toFixed(0)} ms`} (no more than ${TICK_OK_MS})`);
   console.log(`     ${underWay(o, o.frames)}`);
