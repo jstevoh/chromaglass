@@ -17,6 +17,10 @@ a frame that will not upload.
 **S0**, below, closes the doors that are cheap to close. **S1–S13** are the
 larger jobs; all but S7 (an hour in CI) have shipped.
 
+**S14–S21** were found on 2026-09-28, in a second reading of the code for the ways a
+set stops, and none is built. They are the same kind of door: a failure in one part
+that the show has no way back from, or that it never notices.
+
 ## S0: shipped with the black box (#127)
 
 | Door | What happened | Now |
@@ -122,6 +126,134 @@ Ranked by what they cost a show.
     - `WebGPUPlate` is never disposed in the cleanup (the device's destroy covers it, but it should say so).
     - `beads.ts` allocates a `Map`, a `Set` and arrays every crowding step.
     - `WebGPUChemistry` is never imported; delete it.
+
+## S14–S21: found 2026-09-28, not done
+
+Ranked, as above, by what they cost a show. Each says whether it was measured (headless
+Chromium, the day it was found) or read in the code.
+
+14. **S14 — A panel that throws takes the plate with it.**
+    - *Read in the code.* `Boot` (`src/main.tsx`) is the only error boundary, and
+      `LiquidVisualizer` sits in the same tree as every desk, sheet and phone component
+      (`App.tsx`). A render error in any of them unmounts the plate: the device is
+      destroyed, the ear and the recorder end, the wall stops, and the screen says
+      "ChromaGlass could not start" with only a reload, which then strands the wall
+      (S15).
+
+    **Do:** a boundary round each panel, desk and phone component that draws a "this
+    panel failed" card and writes the error to the black box, with the plate outside all
+    of them. **Measure:** a `?debug` hook that makes one panel throw; `npm run crash`
+    finds its line, the frames go on, and the card is drawn.
+15. **S15 — A reload mid-show loses the set and strands the wall.**
+    - *Measured.* The projector window sets `opener.__chromaglassMirror = paint` once
+      (`CastDisplay.tsx`), and its watch asks only whether the opener is `closed`, which
+      a reload does not make it. After `page.reload()` the show had no
+      `__chromaglassMirror`, the wall stayed open on its last frame and said nothing,
+      and the new show's `isCasting` was false. A reload comes from F5, Boot's "clear
+      the cache and reload", `startOver()` after a stale chunk, or a crash.
+    - *Read in the code.* The reloaded show opens on the opening look
+      (`OPENING_LOOK`, `App.tsx`): the set list's place, the sequencer's stage, the armed
+      look and the tempo are gone.
+
+    **Do:** the watch puts `paint` back whenever the opener's differs, and announces the
+    stage again; the wall fades to black while it has no show, rather than holding a
+    frame. Keep the live state (the set's place, the stage, the armed look, the tempo,
+    the Mixer's takes) in `sessionStorage` every second, and on a load within a few
+    minutes of it open there, with "resumed at …" on the desk and the phone. **Measure:**
+    a `?cast` check, which nothing has yet (PLAN.md 19c): reload the show, and the wall
+    draws the new show's frames within a second; the resumed show's place and stage are
+    the ones before.
+16. **S16 — A GPU rebuild stops the film.**
+    - *Read in the code.* The setup effect's cleanup (`LiquidVisualizer.tsx`) calls
+      `stopFilm()`, and the effect runs again on every `glEpoch`: each loss, heal and
+      retry. `stopFilm` revokes the file's URL and stops a camera or a window capture,
+      and nothing tells the App, whose `filmSource` still says file, camera or window.
+      Plugging a projector into a running laptop, or a GPU switch, loses the film, and a
+      window share has to be picked again.
+
+    **Do:** the film belongs to the component, not the GPU effect: stopped on unmount
+    only, attached again after a rebuild. **Measure:** `npm run crash`'s forced loss
+    with a film playing: the film still draws after the recovery.
+17. **S17 — One pipeline that fails to build takes down the whole step.**
+    - *Read in the code.* `prepareCompute` swallows an async build's failure ("built on
+      the frame instead", `kit.ts`); `computePipeline` then builds it synchronously and
+      caches the invalid pipeline; and the step is one compute pass in one encoder, the
+      frame one encoder (`fluid.ts`). A driver that refuses one optional kernel (BZ, the
+      maze, film stock, the camera) invalidates every step or every frame: a frozen or
+      black plate, sixty errors a second, three heals and a fatal. `npm run wgsl` checks
+      one compiler, Chromium's.
+
+    **Do:** remember a failed build by scope and name, from the async rejection or an
+    error scope round the synchronous build, and skip that stage so the rest of the
+    plate runs, with the black box naming it. **Measure:** a `?debug` hook that makes one
+    named pipeline fail: the plate steps without it, and `npm run crash` reads its line.
+    It is next to #212's startup work; take it after that merges.
+18. **S18 — A non-finite number in a carried field stops the dye for good.**
+    - *Read in the code.* The dye and the velocity have had `finite4` and `safeVel`
+      since "36864 of 36864 cells NaN" (`wgsl/fluid.ts`). The fields carried from step to
+      step have not: the lasting current (`currentForces`), its gradient
+      (`curGradient`), the squeeze (`squeezeUpdate`, and `squeezeRedBlack` into the
+      warm-started `spress`, which is never cleared), and the phase, psi and mix
+      kernels. The current's cap, `if (s > S.maxCur)`, is false for NaN, so NaN is
+      stored; the comment at the current's `tanh` records this failure once already
+      ("the flow was wiped every step after it"). From the current, `safeVel` then
+      zeroes the forced velocity in every cell, every step, until a rung change.
+      `writeSim` (`fluid.ts`) passes the step's parameters (twist, rock, mean density,
+      the gap's spring, …) unchecked, so one non-finite uniform is enough.
+
+    **Do:** those stores guarded with `select(0, x, finite)`; `GpuStepParams` sanitised in
+    `writeSim`. **Measure:** a lab check that sets one step's twist to NaN and finds the
+    plate moving again two steps later.
+19. **S19 — Dye Particles at full on a 1024² grid invalidates every step.**
+    - *Read in the code.* `capacity = grid² × PER_CELL` (4) and `groups = ceil(live /
+      64)` (`particles.ts`): at 1024² with Dye Particles at 1.0 that is 65,536
+      workgroups, one over the default `maxComputeWorkgroupsPerDimension`, and the
+      device asks for no higher limit (`device.ts`). The particles are encoded into the
+      step's own encoder, so the step's whole command buffer is invalid, every step: a
+      frozen plate, errors, three heals, a fatal. 1024² is on the native ladder at a
+      pixel ratio of 1, on stage ladders and behind `?sim=1024`, and the slider or a
+      fader at 127 reaches 1.0. The particle buffer is also exactly 128 MiB there, the
+      default `maxStorageBufferBindingSize`, so any growth in `PER_CELL` or the stride
+      breaks it the same way.
+
+    **Do:** a two-dimensional dispatch (or `live` clamped to 65,535 × 64), groups of 256,
+    and the adapter asked for the limits the top rung needs. **Measure:** a lab check at
+    1024² with particles at 1.0: no validation error, and particles that move.
+20. **S20 — Smaller doors.**
+    - The out-of-memory error scope is popped only when the solver builds
+      (`attachSolver`, `LiquidVisualizer.tsx`). If the constructor throws, the scope
+      stays on the stack and swallows every later out-of-memory error, and the
+      half-built solver's textures leak. Pop it in a `finally`; the constructor disposes
+      what it made.
+    - `settles()` gives up on `requestDevice` after 10 s (`device.ts`), but a device that
+      arrives later is never destroyed, so each slow retry can leave one alive. Destroy
+      it when it lands.
+    - The look-specific textures (mix, oilDye, oilReach, psi, phaseMu, scratchR, rxn,
+      lies) are made when a look asks and freed only in `dispose()` (`fluid.ts`): after
+      one look that uses them, about 25 MiB a layer at 512², 57 at 768² and 100 at 1024²
+      for the rest of the set. Free them in `clearChemistry()` and `clearPhase()`, or
+      once idle, and drop their bind groups too: the cache is keyed by label, and a
+      remade texture has the same one.
+    - The bubble rims' "once per mirror, not once per frame" guard fires every frame.
+      `readbackAsync` calls a readback fresh whenever its ring holds any copy
+      (`ring.latest`), which after the first landing it always does, so `rbSeq` moves
+      every frame and `depositBubbleRims` deposits again from a mirror that has not
+      changed: the failure `rbSeq`'s comment was written for (a popped bubble refilling
+      to 124 %). Fresh only when `landed` moved.
+
+    **Measure:** `npm run crash`'s out-of-memory door with a constructor that throws (a
+    later out-of-memory is still caught); `npm run pops` with both ring slots held busy
+    (a popped bubble's rim is laid once).
+21. **S21 — A wall that is drawing, but wrong.**
+    - The heartbeat catches frames that stop. Nothing catches a wall that draws the
+      wrong thing: a frozen mirror (S15), one flat colour, or black that nothing asked
+      for (no blackout, no Pacing fade, no dark ending).
+
+    **Do:** a coarse colour variance and a motion reading from the probe (PLAN.md 14r's
+    tiles), held against what the show intends; the desk and the phone go amber, and a
+    learnable Rescue Go goes to a safe look the set list names, logged with a
+    screenshot. **Measure:** `npm run crash` with a frozen mirror and a forced flat
+    plate: amber within 3 s, and Rescue brings the motion back.
 
 ## Picking this back up (on the Mac)
 
