@@ -18,19 +18,34 @@
  * The solver's magnet is a dipole a height h under the plate (fluid.ts,
  * magnetEnergy), whose field at the glass spreads over about h and is, on
  * its axis, the strength over h³. A magnet k times the size is that dipole k
- * times deeper with k³ the strength: the field over it is the same, and its
+ * times deeper with k³ the strength: the field's share over it is the same
+ * (but see the saturation, below), and its
  * footprint, the spikes' patch with it (spikes.ts: the onset is a share of
  * the field, strength over height cubed, so k³ over k³ leaves it where it
  * was), is k times as wide. The step's other inputs see a magnet: the pull
  * is the field's gradient, so a big magnet pulls more gently over more of
  * the plate, which is what a big magnet under a dish does.
  *
- * The shortcut, named: a real disc held at a fixed gap is not exactly a
+ * The shortcuts, named. A real disc held at a fixed gap is not exactly a
  * deeper dipole. Near its face the field is flatter than a dipole's (a disc's
- * own width spreads it) and a bigger disc at the same gap is somewhat
- * stronger at the glass, not equal. The dipole was already the magnet's
- * model, and its saturation (MAGNET_BSAT) flattens the peak much as a disc's
- * face does; replacing it with a finite disc's field is PLAN.md 9v.
+ * own width spreads it), and a bigger disc at the same gap is somewhat
+ * stronger at the glass, not equal.
+ *
+ * And the scaling is exact only where the liquid is far from saturation. The
+ * solver's saturation (MAGNET_BSAT in fluid.ts) is a fixed number in the
+ * field's geometric units, not in tesla, so a dipole k times deeper sits
+ * lower on that curve than the magnet it stands for. Below the spikes the
+ * field share is the same, as above, but the pull, the energy's gradient, is
+ * not the 1/k a scaled magnet gives. Against an exactly scaled magnet, at
+ * Size 0.9 (k 1.74) the solver's pull is 0.68 of it half a height out from
+ * the axis, 0.47 at one height and 0.33 at one and a half. At Size 1 (k 2)
+ * it is 0.55, 0.35 and 0.23. At Size 0 (k 0.5) it is 1.05 to 2.2, stronger.
+ * So a big magnet holds its pool more weakly at the edge of its reach than a
+ * real one would. In the lab it still carried the pool 90% of a drag at
+ * Size 0.9 (scripts/magnet.mjs, check 3).
+ *
+ * Both are PLAN.md 9v: a finite disc's field, with the saturation in field
+ * units, so that Size sets the disc's radius and nothing else.
  *
  * ## The range
  *

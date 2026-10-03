@@ -190,9 +190,40 @@ try {
     or the pool is in the solver and invisible on the plate.
   */
   const POOL = 0.9 * Math.PI * (0.09 * 2 ** 0.8) ** 2 / 2;
+  /*
+    What the plate is doing round the touch, printed and not asked: on one
+    Mac run the pool's centre sat 0.11 off the hand 1.5 s after the touch
+    (85% of it within 0.18, against 100% on the run before) and the drag
+    then left it behind, while the lab replaying that run's own step (its
+    STEP line, magnet, hand path and pool, 256²) kept it on the hand and
+    carried it 90% of the way, 87% with the pool started 0.11 off, on a
+    bare plate and on a dyed one alike. So whatever moved it is in the app
+    and not in the step: these say which, the next time it happens. The
+    pool where it was laid, a fifth of a second after the touch; the
+    solver's magnet through the first second and a half; the plate's turn
+    and spin; the steps the solver took; and the automation's own hands.
+  */
+  const scene = () => page.evaluate(() => {
+    const d = window.chromaglassDebug(), f = d.fluids?.[0];
+    return { angle: d.rotation?.current?.[0] ?? null, spin: d.spin?.current?.[0] ?? null, steps: f?.stepCount ?? null, auto: { ...(d.autoEvents ?? {}) }, at: performance.now() };
+  });
+  const sceneBefore = await scene();
   await page.mouse.move(...at(0.05));
   await page.mouse.down();
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(200);
+  const laid = await phase(null);
+  const laidHand = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  const early = [];
+  for (let k = 0; k < 5; k++) {
+    await page.waitForTimeout(260);
+    early.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
+  }
+  const sceneTouch = await scene();
+  const fmtScene = (a, b) => `the plate turned ${a.angle !== null && b.angle !== null ? (b.angle - a.angle).toFixed(4) : '?'} rad (spin ${b.spin !== null ? b.spin.toFixed(4) : '?'} rad/s), ` +
+    `${a.steps !== null && b.steps !== null ? b.steps - a.steps : '?'} solver steps in ${((b.at - a.at) / 1000).toFixed(1)} s, automation ${JSON.stringify(a.auto)} → ${JSON.stringify(b.auto)}`;
+  console.log(`     the touch: the pool laid with its centre at ${laid.x.toFixed(2)},${laid.y.toFixed(2)} (${(laid.total * 100).toFixed(2)}%), the hand at ${laidHand ? `${laidHand.x.toFixed(2)},${laidHand.y.toFixed(2)}` : 'nowhere'}; ` +
+    `the solver's magnet ${early.join(' ')}; ${fmtScene(sceneBefore, sceneTouch)}`);
+  console.log(`     STEP at the touch ${await page.evaluate(() => JSON.stringify(window.chromaglassDebug().fluids?.[0]?.lastStep ?? null))}`);
   const first = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   const firstAt = first ? { x: Math.max(0.05, Math.min(0.95, first.x)), y: Math.max(0.05, Math.min(0.95, first.y)) } : null;
   const brought = await phase(firstAt, 0.18);
@@ -238,6 +269,7 @@ try {
   */
   const relays0 = await relays();
   const drag0 = await phase(null);
+  const sceneDrag = await scene();
   const trail = [];
   const sample = async () => { const h = await page.evaluate(() => window.chromaglassDebug().magnetHand?.()); if (h) trail.push({ x: h.x, y: h.y }); };
   for (let i = 0; i <= 40; i++) {
@@ -255,6 +287,7 @@ try {
   console.log(`     STEP ${await page.evaluate(() => JSON.stringify(window.chromaglassDebug().fluids?.[0]?.lastStep ?? null))}`);
   const spot = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   const solverMagnet = await page.evaluate(() => window.chromaglassDebug().magnetNow?.());
+  console.log(`     through the drag and the hold: ${fmtScene(sceneDrag, await scene())}`);
   const drag1 = await phase(spot ? { x: spot.x, y: spot.y } : null, 0.18);
   const after = { pools: await pools(), lays: await lays(), relays: await relays() };
   await page.mouse.up();

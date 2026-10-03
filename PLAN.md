@@ -1049,7 +1049,8 @@ Open, from building 9i:
   0.5 the tool as it was; `lib/magnetSize.ts`) sets how big the hand's magnet is,
   held and set down: k = 0.5 to 2 times the size, the dipole k times deeper with k³
   the strength, which is a real magnet scaled (magnetostatics has no length of its
-  own): the same field over it, reaching k times as far, so the spikes' patch and
+  own): the same field share over it, reaching k times as far (the pull is weaker
+  than a scaled magnet's at a big Size, see 9v), so the spikes' patch and
   the pool it brings are k times as wide (lab: 0.3%, 1.1% and 4.6% of the plate at k
   0.5, 1 and 2). It is the performer's, kept across looks (`RIG_KEYS`) and never
   drifted, on the Settings sheet, the desks' Magnet options (right-click the Magnet)
@@ -1064,6 +1065,13 @@ Open, from building 9i:
   phone` asks that Size is under the Magnet's Amount and moves the setting. The
   pool still reads as a black disc with domes round its rim, because the plate
   cannot open gaps between domes yet: that is 9t's standing-domes plate PR.
+  Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off
+  the hand 1.5 s after the touch, before the drag, and the drag then left it behind
+  (46% of the way). The lab replaying that run's own step, magnet path and pool kept
+  it on the hand and carried it 87–90%, bare plate or dyed, so the cause is in the
+  app and not the step. `npm run magnet` now prints the pool as laid, the solver's
+  magnet through the first second and a half, the plate's turn, the step count and
+  the automation's hands, so a recurrence names it.
 - **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
   solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
   its face than a dipole, and a bigger one at the same gap is somewhat stronger at
@@ -1071,6 +1079,12 @@ Open, from building 9i:
   flat face today. Replace `magnetEnergy` (and `spikeAmp`, which must agree) with a
   finite disc's field (a disc of radius a at depth g: the on-axis field
   Br/2 · (1 − g/√(g² + a²)) and its off-axis form), with Size setting a.
+  And put the saturation in field units: `MAGNET_BSAT` is a number in the
+  dipole's geometric units, so the k-deeper dipole sits lower on the curve than
+  the magnet it stands for and pulls less than the 1/k a scaled magnet does
+  (lib/magnetSize.ts: at Size 0.9, 0.47 of it one height out and 0.33 at one and
+  a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
+  weakly at the edge of its reach than a real one.
 - **9w. Carry the ferrofluid across a new solver.** The dye is carried when the
   governor moves the grid; the phase is not. The look's ring is poured again, and the
   Magnet's pool laid again where the magnet is (9x), so a pool dragged into a
