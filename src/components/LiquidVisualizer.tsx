@@ -3405,9 +3405,11 @@ class FluidSimulation {
         lets go of it: the ring a press pushed out is a third of the way
         back in a second and within 3% of where it began once the glass is
         (`npm run presslift`, Classic's glass; on the look's clock, 4% in
-        that second).
+        that second). Keyed on the thin gap running, not the setting: while
+        its pipelines build, or where it cannot run, the old solver steps,
+        and its glass stays on the clock its looks were tuned on.
       */
-      gapSpring: glassSpring(settings.plateSpring ?? 0.35, (settings.thinGap ?? 0) > 0.5 ? this.dtSeconds : this.dt),
+      gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
       platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,

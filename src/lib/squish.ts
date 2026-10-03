@@ -158,7 +158,9 @@ function onSpoke(theta: number, sp: Spokes) {
  * back, so the strokes' own pushes and their dye multiplies (the cleared
  * centre, the piled rim, the lift's inward push along its spokes) would
  * move the colour a second time: a press lays only its dent, a lift only
- * its opening. And the press's dent is a bowl, not a disc:
+ * its opening. Only those two so far: the other strokes (a drop's splash)
+ * still lay their pushes and multiplies on a thin gap, a PLAN 18a item.
+ * And the press's dent is a bowl, not a disc:
  *
  * A palm on a sheet of glass bends it. The glass is a plate clamped where
  * the liquid round the press holds it, under a load over the palm, and a

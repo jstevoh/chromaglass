@@ -3199,7 +3199,11 @@ its frame rate live. "Free" means no new passes or texture reads.
     liquid (×0.171 against the gap's ×0.227), 34% of the shift back after 1 s
     (4% with the glass on the look's clock), and once the glass is back the ring is
     3% of its shift from where it began. `npm run tools` on the Mac now presses and
-    lets go through the real pointer with Thin Gap on.
+    lets go through the real pointer with Thin Gap on, against an idle pool.
+  - `npm run thingap`'s Darcy disc is now held for twenty steps, as a hand holds a
+    Press: closing as h³, one step's dent leaves the film at about 0.008, not the
+    floor its λ is counted at (16/16 after: oil 0.0449 against 0.0368, water
+    0.1951 against 0.1854).
   - The phone has Thin Gap and Press Lift on the Press's own Amount, beside
     Fingering.
 - **Found along the way, open:**

@@ -92,8 +92,10 @@ const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 
   is 8 cells a step on a 384² solver under Classic's clock (`npm run
   presslift`), with the glass closing as h³ (squeezeUpdate). 33 leaves room
   for a harder press and a finer solver. Odd, since the first substep runs
-  alone and the rest in pairs. A step that needs one costs one carry and
-  sixteen dispatches of no workgroups.
+  alone and the rest in pairs. A step that needs one costs, for each carry,
+  one substep and thirty-two dispatches of no workgroups (sixteen pairs),
+  and once a step the Courant pass and the plan: with Oil Bodies and the
+  mix on, three carries, so ninety-six empty dispatches a step.
 */
 export const CARRY_COURANT = 0.4;
 export const CARRY_SUBSTEPS = 33;
@@ -2469,12 +2471,13 @@ export class WebGPUFluid {
    * between compiles, not during them, so every pipeline there is paid for
    * by every show's first seconds, and on a slow runner the WebGPU smoke's
    * "the stage starts" (thirty frames in thirty seconds) went red with these
-   * twelve added (run 36367898896: 31 frames drawn by 37 s after load, where
+   * twelve of them added (run 36367898896: 31 frames drawn by 37 s after load, where
    * another PR's green run that hour had drawn 852; that runner was slow
    * all round, so how much was these twelve is not known). Thin Gap is off
    * in every look, so a show that never turns it on should not pay for it;
-   * one that does runs the old way for as long as the twelve compiles take
-   * (about three seconds at prepare.ts's 0.23 s each on CI's Mac), rather
+   * one that does runs the old way for as long as its compiles take
+   * (fifteen now with the carries' substeps and their plan: about three
+   * and a half seconds at prepare.ts's 0.23 s each on CI's Mac), rather
    * than stopping on the frame to build them.
    */
   prepareThinGap(): Promise<void> {

@@ -45,11 +45,18 @@
  *      clamped carry left it, reads well over 1.
  *   2. Every drop is kept, each colour to 0.5%.
  *   3. The carries took the substeps the press needed: more than one while
- *      the glass closed, every face then under the flux step's 0.45 of a
- *      cell, and one again once the press held still.
+ *      the glass closed, and never as many as the plan allows (carryPlan
+ *      picks enough to keep every face under 0.4 of a cell a substep, so
+ *      only at its ceiling can a face cross more), and one again once the
+ *      press held still.
  *   4. Let go, the ring is on its way back within a second: at least a
  *      quarter of its shift back after 1 s. Control: the glass on the look's
- *      clock, as it was, which must come back less than that.
+ *      clock, as it was, which must come back less than that. And it is
+ *      where the glass still pressed down puts it, check 1's law with the
+ *      volume left, to a tenth of its shift at 1, 1.5 and 3 s (a ring a
+ *      third behind its glass would still pass a quarter back), with every
+ *      drop kept to 0.5% at 1 and 9 s: a mean radius also falls when colour
+ *      is lost from the outside.
  *   5. And all the way back: once the gap is within a twentieth of its
  *      press of rest, the ring is within a tenth of its shift of where it
  *      began, and the colour under the palm within a quarter (it was drawn
@@ -79,7 +86,7 @@ try {
     const PRESS = { radii: [30, 18, 8].map((r) => r * (L / 128)), amount: 0.004, steps: 90 };
     const dist = (i, j, n) => Math.hypot((i + 0.5) / n - 0.5, (j + 0.5) / n - 0.5);
     const R0 = 0.3, DISC = 0.06, MID = 0.03;
-    const run = async ({ thin = true, spring = 'seconds', liftSteps = 540, samples = [60, 90, 540] }) => {
+    const run = async ({ thin = true, spring = 'seconds', liftSteps = 540, samples = [60, 90, 180, 540] }) => {
       await lab.create(N, L);
       const over = {
         thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, gapMemory: 0,
@@ -128,12 +135,14 @@ try {
       return { t0, t1, lift, carries, expect: Math.sqrt(R0 * R0 + t1.V / (Math.PI * 0.03)) };
     };
     return {
+      ceiling: lab.carrySubsteps,
       now: await run({}),
       clock: await run({ spring: 'look', liftSteps: 60, samples: [60] }),
     };
   });
 
-  const { now, clock } = r;
+  const { now, clock, ceiling } = r;
+  const R0 = 0.3;
   const pct = (a, b) => `${((b / a - 1) * 100).toFixed(2)}%`;
   const shift = now.expect - now.t0.ring;
   const back = (run, s) => (run.t1.ring - run.lift[s].ring) / (run.t1.ring - run.t0.ring);
@@ -160,16 +169,20 @@ try {
   {
     const closing = now.carries.slice(0, 12), held = now.carries[now.carries.length - 1];
     const most = closing.reduce((a, c) => (c && c.n > a.n ? c : a), { n: 0, courant: 0 });
-    const perStep = closing.every((c) => c && c.courant / c.n <= 0.45);
-    check('the carries took the substeps the closing glass needed, and one once it held still',
-      most.n > 1 && perStep && held && held.n === 1,
-      `at most ${most.n} substeps for a Courant number of ${most.courant.toFixed(2)} (${(most.courant / Math.max(1, most.n)).toFixed(2)} a substep); held still, ${held ? held.n : '—'} (${held ? held.courant.toFixed(4) : '—'})`);
+    const underCeiling = closing.every((c) => c && c.n < ceiling && c.courant / c.n <= 0.45);
+    check('the carries took the substeps the closing glass needed, never at their ceiling, and one once it held still',
+      most.n > 1 && underCeiling && held && held.n === 1,
+      `at most ${most.n} substeps of ${ceiling} for a Courant number of ${most.courant.toFixed(2)} (${(most.courant / Math.max(1, most.n)).toFixed(2)} a substep); held still, ${held ? held.n : '—'} (${held ? held.courant.toFixed(4) : '—'})`);
   }
 
   // 4.
-  check('let go, the ring is on its way back within a second',
-    back(now, 60) >= 0.25 && back(clock, 60) < 0.25,
-    `${(back(now, 60) * 100).toFixed(0)}% of its shift back after 1 s, ${(back(now, 90) * 100).toFixed(0)}% after 1.5 s; with the glass on the look's clock (the control) ${(back(clock, 60) * 100).toFixed(0)}% after 1 s`);
+  // Where the ring should be at each moment of the lift: check 1's law, with the volume the glass still holds down.
+  const law = (t) => Math.sqrt(R0 * R0 + t.V / (Math.PI * 0.03));
+  const behind = [60, 90, 180].map((s) => Math.abs(now.lift[s].ring - law(now.lift[s])) / shift);
+  const keptLift = [60, 540].map((s) => Math.max(Math.abs(now.lift[s].red / now.t0.red - 1), Math.abs(now.lift[s].green / now.t0.green - 1)));
+  check('let go, the ring is on its way back within a second, where the glass still held down puts it, and every drop kept',
+    back(now, 60) >= 0.25 && back(clock, 60) < 0.25 && behind.every((b) => b < 0.1) && keptLift.every((l) => l < 0.005),
+    `${(back(now, 60) * 100).toFixed(0)}% of its shift back after 1 s, ${(back(now, 90) * 100).toFixed(0)}% after 1.5 s, ${(back(now, 180) * 100).toFixed(0)}% after 3 s; with the glass on the look's clock (the control) ${(back(clock, 60) * 100).toFixed(0)}% after 1 s; off where r² = r₀² + V/πh₀ puts it by ${behind.map((b) => `${(b * 100).toFixed(0)}%`).join(', ')} of the shift at 1, 1.5 and 3 s; colour lost ${keptLift.map((l) => `${(l * 100).toFixed(2)}%`).join(' and ')} at 1 and 9 s`);
 
   // 5.
   {

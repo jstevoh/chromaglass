@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate } from '../src/gpu/plateUniforms';
@@ -135,6 +135,8 @@ const api = {
   PressLift,
   /** The glass's spring a step, as the app derives it from Press Lift (`npm run presslift`). */
   glassSpring,
+  /** The most substeps a thin gap's carry takes in a step (carryPlan). */
+  carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);

@@ -331,14 +331,15 @@ try {
   const thinRatio = flow(r.dent.thin), waterRatio = flow(r.dent.water), oldRatio = flow(r.dent.old);
   const want = darcy(r.dent.lambda.thin), wantWater = darcy(r.dent.lambda.water);
   check('a disc pressed tight carries the flux Darcy says, 2λ/(1+λ) of the open plate\'s',
-    Math.abs(thinRatio / want - 1) < 0.4 && thinRatio < 0.5 * oldRatio,
-    `${thinRatio.toFixed(4)} against ${want.toFixed(4)} (λ ${r.dent.lambda.thin.toFixed(4)}); the old solver's ${oldRatio.toFixed(4)}, the gap ratio ${(r.dent.old.pressed.h / r.dent.old.open.h).toFixed(4)}`);
+    // λ is counted at the floor, so the disc has to be at it: a press that stopped short (one step's dent, closing as h³) is a different λ.
+    Math.abs(thinRatio / want - 1) < 0.4 && thinRatio < 0.5 * oldRatio && r.dent.thin.pressed.h < 0.0045,
+    `${thinRatio.toFixed(4)} against ${want.toFixed(4)} (λ ${r.dent.lambda.thin.toFixed(4)}, the disc's gap ${r.dent.thin.pressed.h.toFixed(4)} against the floor's 0.004); the old solver's ${oldRatio.toFixed(4)}, the gap ratio ${(r.dent.old.pressed.h / r.dent.old.open.h).toFixed(4)}`);
   {
     // What water's λ would be with a mobility that forgot the drag (h alone) or had nothing but it (h³).
     const hOnly = darcy(0.004 / 0.03), hCubed = darcy(Math.pow(0.004 / 0.03, 3));
     check('and water, whose drag is weaker, carries through it what its λ says, the drag counted',
-      Math.abs(waterRatio / wantWater - 1) < 0.1,
-      `${waterRatio.toFixed(4)} against ${wantWater.toFixed(4)} (λ ${r.dent.lambda.water.toFixed(4)}); a mobility of h alone would say ${hOnly.toFixed(4)}, of h³ alone ${hCubed.toFixed(4)}`);
+      Math.abs(waterRatio / wantWater - 1) < 0.1 && r.dent.water.pressed.h < 0.0045,
+      `${waterRatio.toFixed(4)} against ${wantWater.toFixed(4)} (λ ${r.dent.lambda.water.toFixed(4)}, the disc's gap ${r.dent.water.pressed.h.toFixed(4)}); a mobility of h alone would say ${hOnly.toFixed(4)}, of h³ alone ${hCubed.toFixed(4)}`);
   }
 
   // 5.
