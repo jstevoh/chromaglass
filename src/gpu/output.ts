@@ -18,7 +18,7 @@ import { OUTPUT_LAYOUT } from './wgsl/outputFields';
 import { OUTPUT_WGSL } from './wgsl/output';
 import {
   MAX_SURFACES, composeOntoPin, cornerPinMatrix,
-  type OutputConfig, type SurfaceShape, type SurfaceSource,
+  type OutputConfig, type SurfaceBlend, type SurfaceShape, type SurfaceSource,
 } from '../lib/outputConfig';
 
 const SHAPE_INDEX: Record<SurfaceShape, number> = { rect: 0, ellipse: 1, triangle: 2, diamond: 3 };
@@ -26,6 +26,8 @@ const SHAPE_INDEX: Record<SurfaceShape, number> = { rect: 0, ellipse: 1, triangl
 export const SOURCE_INDEX: Record<SurfaceSource, number> = { wall: 0, front: 1, back: 2, film: 3 };
 /** A source drawn by the plate again, rather than the finished frame. */
 export type PlateSource = Exclude<SurfaceSource, 'wall'>;
+/** As the shader counts them (`lay.x`). */
+export const BLEND_INDEX: Record<SurfaceBlend, number> = { over: 0, add: 1 };
 
 /**
  * Every quad of a frame into the buffer at once, and how many there are.
@@ -52,6 +54,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     feather: number,
     opacity: number,
     source: SurfaceSource = 'wall',
+    blend: SurfaceBlend = 'over',
   ) => {
     if (n >= MAX_SURFACES) return;
     const m = cornerPinMatrix(corners);
@@ -64,6 +67,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     pack.setAt('cornerCD', at, corners[4], corners[5], corners[6], corners[7]);
     pack.setAt('src', at, src[0], src[1], src[2], src[3]);
     pack.setAt('form', at, SHAPE_INDEX[shape], feather, opacity, SOURCE_INDEX[source]);
+    pack.setAt('lay', at, BLEND_INDEX[blend], 0, 0, 0);
     n++;
   };
 
@@ -78,17 +82,18 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     for (const s of surfaces) {
       if (!s.enabled || s.opacity <= 0) continue;
       const placed = composeOntoPin(s.corners, cfg.corners);
-      if (placed) quad(placed, s.src, s.shape, s.feather, s.opacity, s.source);
+      if (placed) quad(placed, s.src, s.shape, s.feather, s.opacity, s.source, s.blend);
     }
   }
   // Everything past the last quad still has to hold something: a uniform
   // buffer is read whole, and an unwritten slot is whatever the last frame
   // left there. They are never drawn, but they are never undefined either.
   for (let i = n; i < MAX_SURFACES; i++) {
-    for (const f of ['warpA', 'warpB', 'warpC', 'cornerAB', 'cornerCD', 'src', 'form'] as const) {
+    for (const f of ['warpA', 'warpB', 'warpC', 'cornerAB', 'cornerCD', 'src', 'form', 'lay'] as const) {
       pack.setAt(f, i, 0, 0, 0, 0);
     }
   }
+  pack.set('quads', n);
   return n;
 }
 
@@ -106,8 +111,19 @@ function outputRecipe(device: GPUDevice, format: GPUTextureFormat): RenderRecipe
       module: module(OUTPUT_WGSL), entryPoint: 'fs',
       targets: [{
         format,
+        /*
+          Premultiplied colour (§16c): the shader hands back its colour
+          already clamped and scaled by its coverage, and its alpha says how
+          much of what is under it to take away. A surface laid over says
+          its coverage, so this is the old src-alpha blend (`npm run beams`
+          holds it to the old pass, byte for byte, at every gain); a beam
+          says 0, so its light is added to what is there. The alpha channel
+          keeps the old src-alpha factor, so a laid-over surface leaves the
+          alpha it always did and a beam leaves it alone. One pipeline for
+          both, so the quads stay one draw in the order they were given.
+        */
         blend: {
-          color: { srcFactor: 'src-alpha' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
+          color: { srcFactor: 'one' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
           alpha: { srcFactor: 'src-alpha' as GPUBlendFactor, dstFactor: 'one-minus-src-alpha' as GPUBlendFactor, operation: 'add' as GPUBlendOperation },
         },
       }],

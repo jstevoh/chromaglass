@@ -2964,6 +2964,25 @@ export default function App() {
     const bar = visualizerRef.current?.songShape().bar;
     return fadeTempo(tempoRef.current?.bpm ?? 0, bar?.period ?? 0, bar?.beatConfidence ?? 0);
   };
+  /*
+    The check's window on the takes (`npm run phone`): when the page has put an
+    array at `window.__cgFadeLog`, every level a take writes is pushed there
+    with the moment it was worked out, on the page's own clock. The check used
+    to judge the fade's steps from the level slider, but a slider shows what
+    React last rendered, and on a loaded page a render lands late and the next
+    one catches up: a fade moving at the curve's own speed read as a jump (the
+    numbers are in scripts/phone.mjs). The moment each level is worked out is
+    the time its step can fairly be held to, and the gap between them is
+    where a slowed timer shows. It is `performance.now()`, not the `now` the
+    fade was handed, so a fade handed the wrong time still shows as the jump
+    it is. Nothing is kept when no array is there, as in every show.
+  */
+  const traceFade = (levels: Partial<Record<MixSource, number>>) => {
+    const log = (window as unknown as { __cgFadeLog?: unknown }).__cgFadeLog;
+    if (!Array.isArray(log)) return;
+    const at = performance.now();
+    for (const [row, v] of Object.entries(levels)) log.push([at, row, v]);
+  };
   const fadeRow = (id: MixSource) => {
     const cur = settingsRef.current as unknown as Record<string, unknown>;
     const levelKey = String(MIX_SOURCE_INFO[id].level);
@@ -2972,12 +2991,14 @@ export default function App() {
     const glide = glidesRef.current.get(levelKey);
     if (glide) { clearShowInterval(glide); glidesRef.current.delete(levelKey); }
     const first = rowFades.press(id, level, barsToMs(fadeBarsOf(settingsRef.current, id), fadeBpm()), showNow());
+    traceFade({ [id]: first });
     if (first !== level) setSettings(prev => ({ ...prev, [levelKey]: first }));
     setDocDirty(true);
     setRowFading(rowFades.running());
     if (rowFadeTimer.current || !rowFades.isFading(id)) return;
     rowFadeTimer.current = showInterval(() => {
       const levels = rowFades.step(showNow());
+      traceFade(levels);
       const patch = Object.fromEntries(Object.entries(levels).map(([row, v]) => [String(MIX_SOURCE_INFO[row as MixSource].level), v]));
       if (Object.keys(patch).length) setSettings(prev => ({ ...prev, ...patch }));
       const running = rowFades.running();

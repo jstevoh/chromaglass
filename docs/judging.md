@@ -562,6 +562,18 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
+## 22. Colour between the domes
+
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
+
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
+
 ---
 
 ## 22. The Press on the ferrofluid (PLAN 15d)
@@ -591,6 +603,53 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
+
+## 23. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
+---
+
+## 23. The Mac app, on the Mac and on a projector
+
+The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
+server in one Electron app. CI opens the packed app on its Mac runner and
+measures it (`npm run desktop`): offline, a lit plate, OSC, a projector with
+no click (a stand-in second screen), and quitting. What only a real Mac with
+a real projector can say. Get it from Actions → *Mac app* → *Run workflow*,
+or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
+
+- Wi-Fi off before opening it: the show opens and plays, and the music
+  shelf plays its songs;
+- the plate at 60 fps against the same look in Chrome (`?debug`'s
+  `frameMs`): the app is the same Chromium, so a difference is a finding;
+- a projector plugged in *before* opening: the show is on it in full screen
+  with no title bar and no click. Unplug and plug back in: it comes back.
+  Settings → Wall → Ask: the chip is back, and Auto again sends it;
+- the laptop window covered by another app, and minimised: the wall keeps
+  moving, and the sound still moves it;
+- Show → Show Server Details…: the phone's address works, the key is the same
+  after quitting and reopening, and a phone linked before the restart
+  relinks by itself;
+- OSC from Resolume or TouchDesigner to UDP 9000, and Art-Net if the rig is
+  there;
+- the MIDI controller: works with no prompt;
+- the lid closed with the projector as the only screen: the show stays up;
+- the projector's full screen is macOS's own. With System Settings → Desktop
+  & Dock → "Displays have separate Spaces" off, a full-screen window takes
+  every display, so the laptop's screen may go black too. Say which it is on
+  your Mac; if it does, the app should use a borderless window over the
+  projector's screen instead.
 
 ---
 

@@ -372,16 +372,67 @@ try {
         front plate, the one row every look has on the wall: a thumb's size
         beside the level, saying what a press does, lit while it runs, and
         the level walked down over two bars (four seconds at the 120 counted
-        when nothing is heard or sent) rather than cut. Read off the level
-        slider itself, so what is measured is what the show wrote, through
-        React, at whatever rate the page's timer really ran at. The curve's
+        when nothing is heard or sent) rather than cut. Its landing is read off
+        the level slider itself, so what is measured is what the show wrote,
+        through React, at whatever rate the page's timer really ran at; its
+        steps are read off the fade (below). The curve's
         own shape, step by step, is `npm run rowfade`'s; here the question
-        is only whether the phone's press reaches it and no sample jumps.
-        A jump is measured against the time between the two samples, not
+        is only whether the phone's press reaches it and it never jumps.
+        A jump is measured against the time between the two writes, not
         one number for all: the steepest part of a four-second fade moves
-        1.5 × dt / 4000 between samples dt apart (0.03 at 80 ms), and a
-        flat 0.2 let a timer slowed from 16 ms to 400 ms, writing steps of
-        0.13, through.
+        1.5 × dt / 4000 in dt (0.03 in 80 ms), and a flat 0.2 let a timer
+        slowed from 16 ms to 400 ms, writing steps of 0.13, through.
+
+        Between which two writes, and timed by whom, is the part that went
+        wrong. Until 2026-09-27 the harness read the slider every 80 ms from
+        outside and judged each step against the gap between its own reads.
+        But a read shows the level React last rendered into the slider, not
+        the level of the moment it is read, and on a loaded page a render
+        lands late and the next one catches up. #207's Checks run went red on
+        the one-bar take ("with a jump"), on a phone check that PR did not
+        touch, and here (no GPU, the plate drawing in software) the take went
+        red on 2 of 3 lines, then 1 of 3, in two runs. The trace of one: 0.58,
+        then 0.64 290 ms later, then 0.73 126 ms after that. Read back through
+        the curve, the 0.64 was about 120 ms staler than the reads either side
+        of it, and the page's own clock, read in the same call, put the reads
+        135 ms apart as the harness had: the lag was in the level shown, not
+        in the timing of the reads. Timing the slider's own writes did not
+        cure it (red on 3 of 3 lines in two runs, and 2 of 3 in two more once
+        React's re-writes of an unchanged level were dropped): a render that
+        lands late writes a level worked out tens of ms before, and the next
+        one, on time, looks like a step of 0.03 to 0.08 in a few ms.
+
+        So the take's steps are judged where the level is made: App pushes
+        every level a take works out into `window.__cgFadeLog`, stamped with
+        the page's own performance.now() at that moment (not the time the
+        fade was handed, so a fade handed the wrong time still shows), and
+        each is held to the time since the one before it. That alone would
+        pass the slowed timer, whose levels are 400 ms apart and each the
+        curve's over its 400 ms, so they are also held to coming about a tick
+        apart: the median gap while the level is on its way under 40 ms,
+        against the 16 ms timer (16 to 17 ms measured here, under load too).
+
+        And the slider is held to the fade, by how late it is rather than by
+        how far it steps: each read on the way, stamped by the page's clock in
+        the same call, is as late as the last moment the fade was at the level
+        it shows (to the slider's 0.01). A late render is late by what it
+        was, once; a slider that is not following the fade is late on every
+        read. The median read under 50 ms and none over 300 ms or at a level
+        the fade never had; and at least 0.6 as many different levels as
+        reads, since a slider that follows shows a new level on nearly every
+        read (the smoothstep's flat ends repeat a few). Without that half, a
+        show that worked the fade out every tick but put it in the slider (and
+        so on the plate) every 400 ms, or rounded to tenths, passed all three
+        lines, 243/243, found by the check-skeptic.
+
+        Measured here, three runs of the app as it is: the fade's steepest
+        step 0.38 to 0.42 of its allowance, 16 ms apart; the slider 6 to 10 ms
+        behind it, at most 19, with 37 to 38 levels in 39 reads; green. Red
+        on all three lines: the timer slowed to 400 ms (400 ms apart, the
+        slider 193 to 212 ms behind); the slider written one tick in 25 (197
+        ms behind, 9 levels in 38 reads); the level rounded to tenths (a level
+        the fade never had, 9 in 32); a clock a quarter second ahead on one
+        tick in ten (6.1 to 6.6 of the allowance).
       */
       const take = 'phone-mixer-front-take';
       const lvl = () => page.getByTestId('phone-mixer-frontLevel').locator('input').first().inputValue().then(Number);
@@ -390,36 +441,66 @@ try {
       await page.getByTestId(take).first().scrollIntoViewIfNeeded();
       const takeBox = await box(page, take);
       const saidOut = await say();
-      // `fadeMs` is the whole fade's time, for the steepest a sample may move.
+      // Every level the take works out, with the page's clock at that moment
+      // (App's traceFade, into an array the page puts at __cgFadeLog).
+      const record = () => page.evaluate(() => { window.__cgFadeLog = []; });
+      const shown = () => page.getByTestId('phone-mixer-frontLevel').locator('input').first().evaluate(el => [performance.now(), Number(el.value)]);
+      const written = () => page.evaluate(() => (window.__cgFadeLog ?? []).filter(e => e[1] === 'front').map(e => [e[0], e[2]]));
+      // Presses the take and follows it to `to`. `fadeMs` is the whole
+      // fade's time, for the steepest a write may move.
       const walk = async (to, ms, fadeMs = 4000) => {
+        await record();
+        await page.getByTestId(take).first().tap();
         const seen = [{ t: 0, v: await lvl() }];
         const t0 = Date.now();
         let litWhile = false;
         let saidWhile = '';
         while (Date.now() - t0 < ms) {
           await page.waitForTimeout(80);
-          const v = await lvl();
-          // Stamped as the level is read, before the other two reads, whose
-          // time varies with the page and would stretch or shrink the gap.
+          // The slider and the page's clock in one call, for its lag behind
+          // the fade (below).
+          const [at, v] = await shown();
           const t = Date.now() - t0;
           if (await lit()) { litWhile = true; if (!saidWhile) saidWhile = await say(); }
-          seen.push({ t, v });
+          seen.push({ t, v, at });
           if (v === to) break;
         }
-        // Twice the steepest the curve moves (1.5 × dt / fade), plus a tick
-        // for the page drawing the level a frame behind the fade, plus the
-        // slider's 0.01: 0.058 at 80 ms, against the 0.13 of a slowed timer.
-        const over = seen.slice(1).map((p, i) => Math.abs(p.v - seen[i].v) / (2 * (p.t - seen[i].t + 16) / fadeMs + 0.01));
+        // The writes, from the one the press made (the level it starts from,
+        // which on a turn is where the walk had got to). Each is held to
+        // twice the steepest the curve moves over the show time since the
+        // last (1.5 × dt / fade), plus a tick for the timer. No allowance for
+        // the slider's 0.01: these are the levels written, not the slider's
+        // rounding of them.
+        const writes = await written();
+        const steps = writes.slice(1).map(([t, v], i) => ({ at: Math.round(t - writes[0][0]), dt: t - writes[i][0], from: writes[i][1], to: v }));
+        const over = steps.map(st => Math.abs(st.to - st.from) / (2 * (st.dt + 16) / fadeMs));
+        const w = over.indexOf(Math.max(...over));
+        const gaps = steps.filter(st => st.from > 0 && st.from < 1).map(st => st.dt).sort((a, b) => a - b);
+        const gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : Infinity;
+        // And the slider held to the fade: each read on the way is as late
+        // as the last moment the fade was at the level it shows (to the
+        // slider's 0.01), and no later. A read the fade was never at is red.
+        const lags = seen.slice(1).filter(p => p.v > 0 && p.v < 1).map(p => {
+          let at = -Infinity;
+          for (const [t, v] of writes) if (t <= p.at && Math.abs(v - p.v) <= 0.0051) at = t;
+          return p.at - at;
+        }).sort((a, b) => a - b);
+        const lagMid = lags.length ? lags[Math.floor(lags.length / 2)] : Infinity;
+        const lagMax = lags.length ? lags[lags.length - 1] : Infinity;
+        const distinct = new Set(seen.slice(1).filter(p => p.v > 0 && p.v < 1).map(p => p.v)).size;
+        const jumped = !steps.length || over[w] > 1 || gap >= 40 || lagMid >= 50 || lagMax >= 300 || distinct < 0.6 * lags.length;
+        const worst = !steps.length ? 'no writes recorded'
+          : `${steps.length} writes, median ${gap.toFixed(0)} ms apart; steepest ${steps[w].from.toFixed(3)}→${steps[w].to.toFixed(3)} in ${steps[w].dt.toFixed(0)} ms at ${steps[w].at} ms, ${over[w].toFixed(2)} of allowed; the slider ${lagMid.toFixed(0)} ms behind it (at most ${lagMax.toFixed(0)}), ${distinct} levels in ${lags.length} reads`;
+        if (process.env.FADE_TRACE) console.log('      writes', JSON.stringify(steps.map(st => [st.at, +st.to.toFixed(4)])));
         const drops = seen.slice(1).map((p, i) => Math.abs(p.v - seen[i].v));
-        return { seen, litWhile, saidWhile, last: seen[seen.length - 1], most: Math.max(0, ...drops), jumped: Math.max(0, ...over) > 1, between: new Set(seen.map(p => p.v).filter(v => v > 0 && v < 1)).size };
+        return { seen, litWhile, saidWhile, worst, last: seen[seen.length - 1], most: Math.max(0, ...drops), jumped, between: new Set(seen.map(p => p.v).filter(v => v > 0 && v < 1)).size };
       };
-      await page.getByTestId(take).first().tap();
       const out = await walk(0, 8000);
       const outDown = out.seen.every((p, i) => !i || p.v <= out.seen[i - 1].v);
       check('portrait: a row\'s take button is a thumb\'s size and says Fade out; pressed, it is lit and says Fade in while the front plate walks down to 0, never back up, over about two bars and not in a jump',
         takeBox && takeBox.height >= 48 && saidOut === 'Fade out' && out.litWhile && out.saidWhile === 'Fade in' && outDown && out.last.v === 0
           && out.last.t >= 2500 && out.last.t <= 6500 && !out.jumped && out.between >= 8,
-        `${Math.round(takeBox?.height ?? 0)} px "${saidOut}", 0 at ${out.last.t} ms, ${out.between} levels on the way, largest step between samples ${out.most.toFixed(3)}${out.jumped ? ' (a jump for its time)' : ''}${out.litWhile ? `, "${out.saidWhile}" while lit` : ', never lit'}${outDown ? '' : ', went back up'}`);
+        `${Math.round(takeBox?.height ?? 0)} px "${saidOut}", 0 at ${out.last.t} ms, ${out.between} levels on the way, largest step between reads ${out.most.toFixed(3)}; ${out.worst}${out.jumped ? ' (a jump for its time)' : ''}${out.litWhile ? `, "${out.saidWhile}" while lit` : ', never lit'}${outDown ? '' : ', went back up'}`);
       // The slider shows the level to its step of 0.01, so it reads 0 for the
       // fade's last hundred-odd milliseconds, when the walk is still landing.
       let outLit = true;
@@ -430,13 +511,11 @@ try {
       await page.getByTestId(take).first().tap();
       await page.waitForTimeout(1200);
       const turnAt = await lvl();
-      await page.getByTestId(take).first().tap();
       const turned = await walk(0, 8000);
-      await page.getByTestId(take).first().tap();
       const home = await walk(1, 8000);
       check('portrait: pressed again part-way in, it turns round from there without a jump, and comes back to where it was',
         turnAt > 0 && turnAt < 1 && !turned.jumped && turned.last.v === 0 && home.last.v === 1 && !home.jumped,
-        `turned at ${turnAt.toFixed(2)}, largest step ${turned.most.toFixed(3)}${turned.jumped ? ' (a jump for its time)' : ''}; back to ${home.last.v}${home.jumped ? ', with a jump' : ''}`);
+        `turned at ${turnAt.toFixed(2)}, ${turned.worst}${turned.jumped ? ' (a jump for its time)' : ''}; back to ${home.last.v}, ${home.worst}${home.jumped ? ' (a jump for its time)' : ''}`);
       /*
         The hand wins: the level's own slider moved while the take runs stops
         the take where the hand put it, and the button goes out. The rule is
@@ -476,13 +555,11 @@ try {
       await page.waitForTimeout(200);
       const oneBar = await fadeText();
       const topAgain = await lvl();
-      await page.getByTestId(take).first().tap();
       const short = await walk(0, 8000, 2000);
       check('portrait: set to one bar in the drawer, the same take lands in about half the time',
         /Fade time 1 bar\b/.test(oneBar) && topAgain === 1 && short.last.v === 0 && short.last.t >= 1200 && short.last.t <= 3300
           && short.last.t < out.last.t * 0.7 && !short.jumped,
-        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms), largest step between samples ${short.most.toFixed(3)}${short.jumped ? ' (a jump for its time)' : ''}`);
-      await page.getByTestId(take).first().tap();
+        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms), ${short.worst}${short.jumped ? ' (a jump for its time)' : ''}`);
       await walk(1, 8000, 2000);
       await page.getByTestId('phone-mixer-frontFade').locator('input').first().focus();
       await page.keyboard.press('ArrowRight');
@@ -644,10 +721,18 @@ try {
       await tap(page, 'settings-nav-mapping');
       await tap(page, 'add-surface-rect');
       await tap(page, 'surface-source-back');
-      const sourcePick = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="surface-source-"]')]
-        .map(el => ({ id: el.dataset.testid.slice('surface-source-'.length), h: Math.round(el.getBoundingClientRect().height), on: el.getAttribute('aria-checked') === 'true' })));
+      const picker = (prefix) => page.evaluate((prefix) => [...document.querySelectorAll(`[data-testid^="${prefix}"]`)]
+        .map(el => ({ id: el.dataset.testid.slice(prefix.length), h: Math.round(el.getBoundingClientRect().height), on: el.getAttribute('aria-checked') === 'true' })), prefix);
+      const sourcePick = await picker('surface-source-');
+      // Over before the tap, in the button and the show's config, so a
+      // default of Add with a dead button cannot pass for a working one.
+      const blendBefore = (await picker('surface-blend-')).filter(b => b.on).map(b => b.id).join();
+      const blendLiveBefore = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.blend ?? null);
+      await tap(page, 'surface-blend-add');
+      const blendPick = await picker('surface-blend-');
       // What the renderer reads, not only what the button says.
       const pickedLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.source ?? null);
+      const blendLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.blend ?? null);
       await tap(page, 'surfaces-clear');
       const leftOver = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.length ?? null);
       await page.keyboard.press('Escape');
@@ -656,6 +741,11 @@ try {
         sourcePick.length === 4 && sourcePick.every(b => b.h >= 48) && sourcePick.filter(b => b.on).map(b => b.id).join() === 'back'
         && pickedLive === 'back' && leftOver === 0,
         `${sourcePick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${pickedLive}, ${leftOver} shapes after Clear all`);
+      // And how its light meets the wall (§16c), the same way.
+      check('and its light is set to add as a beam from there: two of 48 px or more, Add on, and the show draws it so',
+        blendBefore === 'over' && blendLiveBefore === 'over'
+        && blendPick.length === 2 && blendPick.every(b => b.h >= 48) && blendPick.filter(b => b.on).map(b => b.id).join() === 'add' && blendLive === 'add',
+        `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
 
       /*
         The back plate's own look (PLAN.md §16a), from the same sheet: the
