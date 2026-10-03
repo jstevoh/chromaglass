@@ -506,7 +506,44 @@ ship with it up, so those two look different under a held Drop now:
 - the pool should be about a tenth of what it used to be for the same hold. Say if
   the old gush was the look you wanted on either, and it can be a setting instead.
 
-## 20. Roy, 1963: the plate printed as a comic (PLAN 21)
+## 20. The fingering push taken out (PLAN §0)
+
+Classic drew stripes a few cells across over its pools, and after a while red dots
+in a lattice with labyrinths between them. It was a push, set by Polarity, that
+moved the dye along its own slope by a slow noise, and ran diffusion backwards
+through the inside of every pool. It is gone, on every look.
+
+On Classic, and on Velvet Underground on the iPhone (where it drew a fine
+crosshatch pinned to the grid), and one other look with Polarity up and Blob
+Surface Tension low (which made the push strongest):
+
+- leave it for ten minutes or more: no stripes, dots or labyrinths inside the
+  pools, and the plate should hold its dye rather than thin out;
+- watch a pool's edge: the slow pushing out and drawing back the push added is
+  gone. Say whether you miss it; real fingering, from a lift or a pour, is the
+  plan's next step for it, not a noise;
+- the Finger through a pool: it should carry the dye and not seem to add any.
+
+## 21. A projector picks its source
+
+PLAN.md §16b. With a projector (or a second window) on, open Settings,
+Mapping, add two rectangles side by side, and set one's Source to **Front** and
+the other's to **Back**, on a two-plate look (Classic). Worth looking at:
+
+- each rectangle carries one plate, and the two are the same liquid, turned
+  opposite ways, moving together;
+- **Film** on a surface with a film playing shows the film alone, graded as
+  the Mixer's film row is, with none of the plate's liquid in it;
+- the logo is on the front plate's projector and not the back's;
+- grading a row in the Mixer (the back plate's brightness, say) changes that
+  plate on its own projector as on the wall; the dimmer and a blackout take
+  every projector down;
+- the frame time with two or three sources on against one (`chromaglassDebug()`,
+  `webgpu.timings`: `plate`, `plate front`, `plate back`, `plate film`);
+- whether two plates on two projectors, overlapping on a wall, read as a light
+  show's two projectors is the judgement this is for (16c makes their overlap add).
+
+## 22. Roy, 1963: the plate printed as a comic (PLAN 21)
 
 Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
 panel: flat red, yellow and blue on white, a black line round every solid shape
@@ -520,6 +557,7 @@ and where two colours meet, and the pale washes round the shapes as even dots.
   point between where it looks better than either end;
 - zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
   them to grow with the zoom, as the accidental ones did.
+
 
 ---
 

@@ -45,7 +45,7 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.55,         // audible music visibly drives the fluid
       turbulenceScale: 0.5,      // lively multi-scale ripple
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.35,  // loose amoeba shapes, slow pinch-and-merge
+      blobSurfaceTension: 0.35,  // colours hold apart loosely
       boundaryContrast: 0.5,     // bright line where dyes meet
       saturationBoost: 1.45,
       glossiness: 0.0,           // flat backlit dye — the projector look
@@ -90,7 +90,7 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.4,
       turbulenceScale: 0.55,     // strong swirl — spiral arms shear and stretch
       turbulenceDetail: 4,       // fine filament detail down to star-cluster scale
-      blobSurfaceTension: 0.1,   // near-zero cohesion — matter fragments freely
+      blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
       glossiness: 0.0,
@@ -225,7 +225,7 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.9,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,  // shapes constantly tear and reform
+      blobSurfaceTension: 0.15,  // colours barely hold apart
       edgeRelief: 0.65,
       bubbles: 0.17,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces

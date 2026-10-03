@@ -18,7 +18,7 @@ ones.
 
 ## Features
 
-- **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy, immiscibility and fingering instabilities; MacCormack advection keeps thin filaments alive
+- **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy and immiscibility; MacCormack advection keeps thin filaments alive
 - **GPU solver with a frame-time governor** — the whole solve runs as WGSL compute passes on a 256–768² grid; a governor measures the real frame rate and what the GPU spent on it, and picks the largest grid and pixel density the machine holds at 60 fps (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Beats ahead of the microphone** — a phase-locked beat clock listens to the onsets, settles on the tempo, and once confident fires every kick a little before the onset would be heard, absorbing the real onset when it arrives; a breakdown or silence hands back to plain detection (Settings → Sound → Beat Prediction and Beat Lead)
@@ -399,7 +399,7 @@ permission, so a reload never puts a prompt over the plate.
 
 The solver is Jos Stam's stable-fluids scheme — diffuse, project, advect,
 project — with the extras a liquid light show needs: a Hele-Shaw squeeze-film
-term for the plate pressure, immiscibility and fingering forces, curl-noise
+term for the plate pressure, an immiscibility force between colours, curl-noise
 turbulence and a self-regulating dye budget. Two things are worth knowing:
 
 - **Where it runs.** On the GPU, as a chain of WGSL compute passes — there is
