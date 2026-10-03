@@ -141,6 +141,7 @@
     "bottles": "npm run build && node scripts/bottles.mjs",
     "fingers": "node scripts/fingers.mjs",
     "ferrohands": "node scripts/ferrohands.mjs",
+    "domes": "node scripts/domes.mjs",
     "ferropress": "node scripts/ferropress.mjs"
   },
   "dependencies": {
