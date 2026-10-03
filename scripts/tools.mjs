@@ -72,7 +72,7 @@ try {
   const snap = (keep) => page.evaluate((keep) => {
     const d = window.chromaglassDebug();
     const f = d.fluids?.[0];
-    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1 };
+    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1, dt: f.dtSeconds ?? 0 };
     return d.pointer();
   }, keep);
   /**
@@ -365,16 +365,17 @@ try {
 
     Two controls. The same press with Thin Gap off, the Press the owner
     reported, which must come back less than half: a check that passed it
-    would not be measuring the fault. And the same pool left alone for as
-    long, because the mean distance also falls if colour is lost from the
+    would not be measuring the fault. And each pool against itself: a pool
+    on this plate keeps spreading on its own (the look's flow and the dye's
+    spread), so before the hand comes down the same pool is watched for three
+    of the plate's seconds, and that drift is taken off what the press and
+    the lift do. The mean distance also falls if colour is lost from the
     outside of the pool (the look's own fade, or colour pushed over the
     dish's rim), and would read as colour come back, and rises if colour
     under the palm is deleted rather than moved (the old press's cleared
-    centre). What the idle pool's mean does on its own is taken off what
-    the lift does, and neither the press nor the lift may lose more colour
-    than the idle pool does over the same time (5% of it, for the plate's
-    own flicker). An idle pool that read empty, or far from the pressed
-    one's size, fails the check rather than agreeing to anything.
+    centre): so neither the press nor the lift may lose more colour than
+    the pool lost on its own over the drift window (5% of it, for the
+    plate's own flicker).
   */
   {
     /*
@@ -402,32 +403,46 @@ try {
       return plate >= seconds;
     };
     /*
-      The pool settles for eight of the plate's seconds before anything is
-      read. With 1.5 s of the wall's it was a fresh drop still spreading: on
-      the Mac the idle pool went out 0.009 to 0.016 in the three seconds after
-      the lift, as much as the press's whole net push (0.015 to 0.020), and
-      the pressed pool, already pushed wide, did not keep pace. So the lift's
-      return was read against a baseline moving as fast as the thing measured
-      (check-skeptic), and one run passed a press whose own colour never came
-      in (0.077 → 0.076).
+      The pool settles for twelve of the plate's seconds before anything is
+      read, and the hand holds for two and a half. With 1.5 s of the wall's
+      the pool was a fresh drop still spreading, as fast as the press's
+      whole net push (the idle pool 0.009 to 0.016 out in three seconds
+      against pushes of 0.015 to 0.020), and one run passed a press whose
+      own colour never came in (0.077 → 0.076; check-skeptic). Settled eight
+      seconds it still drifted 0.012 in three against a push of 0.023, so
+      the push is made longer and the drift smaller.
     */
-    const settlePool = () => plateWait(8, false);
-    // One press and let go from a settled pool at A: before, held 1.5 s of the plate's, and 3 s after.
+    const settlePool = () => plateWait(12, false);
+    const HOLD = 2.5;
     let timed = true;
+    /*
+      One press and let go on a settled pool at A. Read four times: settled;
+      three of the plate's seconds later with nothing touching it (its own
+      drift); held down HOLD seconds; three seconds after letting go.
+
+      Each pool is its own control. The runs before this laid a second,
+      idle pool as the control, and the two pools of one run started 15 to
+      40% apart in mean distance (37148523629: 0.105 against 0.072; the
+      re-run of 37150787513: 0.071 against 0.084) and drifted at different
+      rates, so the control's noise was as big as the effect.
+    */
     const pressLift = async (name) => {
       await clear();
       await pool(A);
       await settlePool();
-      await snap(`${name}0`);
+      const where = await snap(`${name}0`);
+      timed = (await plateWait(3)) && timed;
+      await snap(`${name}1`);
       await tool('press');
       await settle(300);
       await page.mouse.move(...screen(...A));
       await page.mouse.down();
-      timed = (await plateWait(1.5)) && timed;
-      await snap(`${name}1`);
+      timed = (await plateWait(HOLD)) && timed;
+      await snap(`${name}2`);
       await page.mouse.up();
       timed = (await plateWait(3)) && timed;
-      await snap(`${name}2`);
+      await snap(`${name}3`);
+      return where;
     };
     const spread = (keep, at) => page.evaluate(({ keep, at }) => {
       const s = window.__toolSnaps[keep];
@@ -439,38 +454,21 @@ try {
         w += v; d += v * r;
         if (r < 0.05) near += v;
       }
-      return { total: w, mean: w > 0 ? d / w : 0, under: w > 0 ? near / w : 0 };
+      // A snapshot with no colour would read a mean of 0 and agree to anything below (check-skeptic): it stops the check instead.
+      if (!(w > 5)) throw new Error(`${keep}: no colour on the plate to measure`);
+      return { total: w, mean: d / w, under: near / w, step: s.step, dt: s.dt };
     }, { keep, at });
-    const readRun = async (name, at) => [await spread(`${name}0`, at), await spread(`${name}1`, at), await spread(`${name}2`, at)];
+    const readRun = async (name, at) => Promise.all([0, 1, 2, 3].map((k) => spread(`${name}${k}`, at)));
 
-    // The control: the same pool, no hand, for as long (the hand's 0.3 s to pick the tool and 1.5 s held, then 3 s).
-    const idleRun = async (name) => {
-      await clear();
-      await pool(A);
-      await settlePool();
-      const where = await snap(`${name}0`);
-      timed = (await plateWait(1.8)) && timed;
-      await snap(`${name}1`);
-      timed = (await plateWait(3)) && timed;
-      await snap(`${name}2`);
-      return where;
-    };
     /*
-      Each press right after its own idle pool, on the same solver, and both
-      laid well after the switch that set the solver. The fifth Mac run
-      (37148523629) laid the two pressed pools with less colour and further
-      out than the idle pools (213 of colour at 0.105 and 0.083 against 284
-      and 261 at 0.072 and 0.071), and those two were the pools laid straight
-      after a change of Thin Gap. Why a change does that is not known yet (it
-      is printed when a control does not match); the order now keeps it off
-      the comparison.
+      Each solver set, and the plate left three seconds, before its pool:
+      the fifth Mac run laid its pools straight after a change of Thin Gap
+      with less colour and further out than the others.
     */
     await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
     await settle(3000);
-    const at = await idleRun('idle');
-    const idle = await readRun('idle', at);
     // The Press as the owner has it, Thin Gap off.
-    await pressLift('off');
+    const at = await pressLift('off');
     const off = await readRun('off', at);
 
     await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 1 }));
@@ -482,67 +480,64 @@ try {
       thin = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap);
     }
     await settle(3000);
-    /*
-      And the idle control again on the thin gap, which the pressed pool is
-      laid on. The fourth Mac run (37145038742) laid it there 0.062 from the
-      palm after its settle against the old solver's 0.052, a fifth wider: a
-      pool spreads its own way on each solver, so the old solver's idle pool
-      is not this one's. Each press is taken net of its own solver's.
-    */
-    await idleRun('idleThin');
-    const idleThin = await readRun('idleThin', at);
-    await pressLift('lift');
-    const on = await readRun('lift', at);
+    const on = await readRun('lift', await pressLift('lift'));
     await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
 
     /*
-      Net of the pool's own spreading, both ways. The second Mac run, timed in
-      the plate's seconds, read the pressed pool 0.050 → 0.079 → 0.080: the
-      colour seemed not to come back at all. But the idle pool, a fresh drop
-      still settling, spread 0.016 further out in those three seconds on its
-      own, and must have spread through the hold as well. So the press's
-      push is what the pressed pool did over the hold less what the idle pool
-      did over the same plate seconds, and the lift's return is what it did
-      after less what the idle pool did then (the check above, the hover's,
-      learnt the same about a settling pool). Measured that way the lab's
-      colour under the palm (`npm run presslift`) is 77% back at 3 s; the
-      bar is half. And the push has to be real: the colour's mean distance
-      grows by a fifth more than the idle pool's, which is the film under the
-      palm thinned by a third (the colour moving with its liquid stretches by
-      √(h₀/h)); the lab's press grows it ×2.13.
+      Net of the pool's own drift. `drift` is how far its mean moved a
+      plate second over the three before the hand. The push is what the
+      held pool did beyond that drift over the hold (the 0.3 s to pick the
+      tool adds a hundredth of the drift window's change, against it); the
+      return is how far it came in over the three seconds after letting go,
+      plus the three seconds of drift it would otherwise have made, as a
+      share of the push. Reversible flow brings the pool back to where it
+      would have drifted to had the glass never moved: that is 100%. The
+      lab's colour under the palm (`npm run presslift`) is 77% back at 3 s,
+      and the bar is half.
+
+      And the drift must not do the work: a press frozen where the hand left
+      it, its colour not moving at all after the lift, has to read under
+      half (check-skeptic's control: on an earlier run's numbers the frozen
+      press read 107%), and the pressed colour's own mean has to fall. The
+      push has to be real: the mean grows by a fifth more than the drift,
+      which is the film under the palm thinned by a third (the colour moving
+      with its liquid stretches by √(h₀/h)); the lab's press grows it ×2.13.
     */
-    const pushOf = (r, i) => (r[1].mean - r[0].mean) - (i[1].mean - i[0].mean);
-    const backOf = (r, i) => (pushOf(r, i) > 0 ? ((r[1].mean - r[2].mean) - (i[1].mean - i[2].mean)) / pushOf(r, i) : 0);
-    const pushed = (r, i) => pushOf(r, i) > 0.2 * r[0].mean;
-    const ratio = (a, b) => (a.total > 0 ? b.total / a.total : 0);
-    // A control is one only if it starts as the pressed pool did: as much colour, and as far out (to 15%).
-    const like = (r, i) => i[0].total > 5 && ratio(r[0], i[0]) > 0.5 && ratio(r[0], i[0]) < 2 && Math.abs(r[0].mean - i[0].mean) < 0.15 * r[0].mean;
+    // Each window's length in the plate's seconds as the solver stepped it, not the wait asked for (a wait stops past its target, and the hold holds the 0.3 s tool pick too).
+    const span = (a, b) => (b.step - a.step) * b.dt;
+    const drift = (r) => (r[1].mean - r[0].mean) / Math.max(span(r[0], r[1]), 1e-3);
+    const pushOf = (r) => (r[2].mean - r[1].mean) - drift(r) * span(r[1], r[2]);
+    const backOf = (r) => (pushOf(r) > 0 ? ((r[2].mean - r[3].mean) + drift(r) * span(r[2], r[3])) / pushOf(r) : 0);
     /*
-      And the idle pool must not do the work. A press frozen where the hand
-      left it (its colour not moving at all after the lift) has to read under
-      half back against the same idle pool, and the pressed colour's own mean
-      distance has to fall: otherwise the idle pool spreading after the lift
-      is all that is measured (the check-skeptic's control, on the passing
-      run's numbers: the frozen press read 107% back).
+      And a quarter of the push has to come back on its own, before any drift
+      is credited. The frozen press rules out a return of nothing; it does not
+      rule out a token return plus a drift that slowed after the press (a
+      pushed-out pool spreads more slowly), which the pre-press rate then
+      over-credits: with drift 0.004 a second halving under the hand and a 2%
+      return on a 0.03 push, the formula reads 50% (check-skeptic). With this
+      the drift can supply at most half the bar.
     */
-    const frozen = (r) => [r[0], r[1], r[1]];
-    const resolves = (r, i) => backOf(frozen(r), i) < 0.5;
-    const idleOk = like(on, idleThin) && like(off, idle);
-    const pressKept = ratio(on[0], on[1]), liftKept = ratio(on[1], on[2]);
-    const idlePress = ratio(idleThin[0], idleThin[1]), idleLift = ratio(idleThin[1], idleThin[2]);
+    const cameIn = (r) => r[2].mean - r[3].mean >= 0.25 * pushOf(r);
+    const pushed = (r) => pushOf(r) > 0.2 * r[1].mean;
+    const frozen = (r) => [r[0], r[1], r[2], { ...r[2], step: r[3].step, dt: r[3].dt }];
+    const resolves = (r) => backOf(frozen(r)) < 0.5;
+    const ratio = (a, b) => (a.total > 0 ? b.total / a.total : 0);
+    const own = (r) => ratio(r[0], r[1]);
+    const pressKept = ratio(on[1], on[2]), liftKept = ratio(on[2], on[3]);
+    const laid = on[0].total > 5 && off[0].total > 5;
     const timing = timed ? `; waited ${waits.join(', ')}` : `; the plate did not step through every wait: ${waits.join(', ')}`;
-    const idleNote = idleOk ? '' : ` (an idle control did not start as its press did: on the thin gap ${idleThin[0].total.toFixed(0)} of colour at ${idleThin[0].mean.toFixed(3)} against the pressed pool's ${on[0].total.toFixed(0)} at ${on[0].mean.toFixed(3)}, off it ${idle[0].total.toFixed(0)} at ${idle[0].mean.toFixed(3)} against ${off[0].total.toFixed(0)} at ${off[0].mean.toFixed(3)})`;
-    const frozenNote = resolves(on, idleThin) ? '' : `; the idle pool spread too much to tell: a press frozen at the lift would read ${(backOf(frozen(on), idleThin) * 100).toFixed(0)}% back`;
+    const frozenNote = resolves(on) ? '' : `; the pool drifted too much to tell: a press frozen at the lift would read ${(backOf(frozen(on)) * 100).toFixed(0)}% back`;
+    const fmt = (r) => r.map((x) => x.mean.toFixed(3)).join(' → ');
     // Printed, not asserted: the share of the colour within 0.05 of the palm, as the lab's presslift reads it.
     const under = (r) => r.map((x) => `${(x.under * 100).toFixed(0)}%`).join(' → ');
     check('Press on a thin gap pushes the colour out from under the palm',
-      thin && timed && idleOk && on[0].total > 5 && pushed(on, idleThin) && pressKept >= idlePress - 0.05,
-      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${on[0].mean.toFixed(3)} → ${on[1].mean.toFixed(3)} of the plate held down, the idle pool's on the thin gap ${idleThin[0].mean.toFixed(3)} → ${idleThin[1].mean.toFixed(3)}: pushed ${pushOf(on, idleThin).toFixed(3)} net, against a fifth of ${on[0].mean.toFixed(3)}; ${(pressKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idlePress * 100).toFixed(0)}%${idleNote}${timing}`);
+      thin && timed && laid && pushed(on) && pressKept >= own(on) - 0.05,
+      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${fmt(on)} (settled, its own drift, held down, let go): drifting ${drift(on).toFixed(4)} a second, pushed ${pushOf(on).toFixed(3)} net, against a fifth of ${on[1].mean.toFixed(3)}; ${(pressKept * 100).toFixed(0)}% of the colour kept against its own ${(own(on) * 100).toFixed(0)}% before the hand${timing}`);
     check('and draws it back when the hand lets go, where the Press as it was did not',
-      thin && timed && idleOk && pushed(on, idleThin) && resolves(on, idleThin) && on[2].mean < on[1].mean && backOf(on, idleThin) >= 0.5 && liftKept >= idleLift - 0.05
-        && pushed(off, idle) && backOf(off, idle) < 0.5,
-      `${on[1].mean.toFixed(3)} → ${on[2].mean.toFixed(3)} three of the plate's seconds after letting go, the idle pool's ${idleThin[1].mean.toFixed(3)} → ${idleThin[2].mean.toFixed(3)}: ${(backOf(on, idleThin) * 100).toFixed(0)}% of the way back to ${on[0].mean.toFixed(3)}, ${(liftKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idleLift * 100).toFixed(0)}%; with Thin Gap off (the control) ${off[0].mean.toFixed(3)} → ${off[1].mean.toFixed(3)} → ${off[2].mean.toFixed(3)} against its idle pool's ${idle[0].mean.toFixed(3)} → ${idle[1].mean.toFixed(3)} → ${idle[2].mean.toFixed(3)}, pushed ${pushOf(off, idle).toFixed(3)} net, ${(backOf(off, idle) * 100).toFixed(0)}% back${frozenNote}${idleNote}`);
-    console.log(`     the colour within 0.05 of the palm: pressed on the thin gap ${under(on)}, its idle pool ${under(idleThin)}; Thin Gap off ${under(off)}, its idle pool ${under(idle)}`);
+      thin && timed && laid && pushed(on) && resolves(on) && cameIn(on) && backOf(on) >= 0.5 && liftKept >= own(on) - 0.05
+        && pushed(off) && backOf(off) < 0.5,
+      `${on[2].mean.toFixed(3)} → ${on[3].mean.toFixed(3)} three of the plate's seconds after letting go: ${(backOf(on) * 100).toFixed(0)}% of the way back net of its drift, ${(((on[2].mean - on[3].mean) / Math.max(pushOf(on), 1e-6)) * 100).toFixed(0)}% before it (a quarter needed); ${(liftKept * 100).toFixed(0)}% of the colour kept against its own ${(own(on) * 100).toFixed(0)}%; with Thin Gap off (the control) ${fmt(off)}, pushed ${pushOf(off).toFixed(3)} net, ${(backOf(off) * 100).toFixed(0)}% back${frozenNote}`);
+    console.log(`     the colour within 0.05 of the palm: pressed on the thin gap ${under(on)}; Thin Gap off ${under(off)}`);
     console.log(`     the Press's waits, in the plate's seconds: ${waits.join(', ')}`);
   }
 } finally {
