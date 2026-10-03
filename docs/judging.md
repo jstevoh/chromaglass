@@ -576,7 +576,7 @@ Magnet pressed under a pool:
 
 ---
 
-## 22. The Press on the ferrofluid (PLAN 15d)
+## 23. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
 leave it the size it was. Now, with Thin Gap on (Settings → Squish Plate → Thin Gap),
@@ -604,7 +604,7 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
-## 23. Beams, and tiles with no seam
+## 24. Beams, and tiles with no seam
 
 PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
 both with Light on **Add**:
@@ -620,7 +620,7 @@ both with Light on **Add**:
 
 ---
 
-## 24. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+## 25. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
 
 On Classic (a look with no ferrofluid), desk and phone:
 

@@ -3217,9 +3217,9 @@ lift is the unstable one. The same drag sets how fast the ferrofluid answers any
 body force under Thin Gap, the magnet's included: at the default Thickness about 4.4
 times faster than before (its drag is 0.22 of the oil's), in water about 5 times
 slower. That is the real liquid's answer, not a change to the magnet's code; the
-owner's eye on it is in judging §22. The
+owner's eye on it is in judging §23. The
 phone's Press is the same press on the same solver, and Thin Gap is on its settings
-sheet. Judged on the Mac: `docs/judging.md` §22.
+sheet. Judged on the Mac: `docs/judging.md` §23.
 
 *Open, found building it:*
 - **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
