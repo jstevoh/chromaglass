@@ -199,7 +199,7 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
   await build({
     stdin: {
       contents: `
-        export { fillOutputUniforms, SOURCE_INDEX } from './src/gpu/output.ts';
+        export { fillOutputUniforms, SOURCE_INDEX, BLEND_INDEX } from './src/gpu/output.ts';
         export { OUTPUT_WGSL } from './src/gpu/wgsl/output.ts';
         export { UniformPack } from './src/gpu/uniforms.ts';
         export { OUTPUT_LAYOUT } from './src/gpu/wgsl/outputFields.ts';
@@ -249,6 +249,30 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
   check('the shader is told each quad\'s source in that quad\'s slot (0 wall, 1 front, 2 back, 3 film)',
     n === 3 && got.join(' ') === `${m.SOURCE_INDEX.back} ${m.SOURCE_INDEX.film} ${m.SOURCE_INDEX.wall}` && m.SOURCE_INDEX.front === 1 && m.SOURCE_INDEX.back === 2 && m.SOURCE_INDEX.film === 3,
     `${n} quads, sources ${got.join(' ')}`);
+
+  /*
+    How each surface's light meets the wall (§16c): laid over, as every
+    surface was, unless it is set to add as a beam; and that reaches the
+    quad's own slot, with the count of quads the beams search for the
+    others they cross. The light itself is `npm run beams`.
+  */
+  {
+    const kept = normalizeSurfaces([{ corners: SKEW }, { corners: SKEW, blend: 'screen' }, { corners: SKEW, blend: 'add' }]);
+    check('a stored surface with no blend is laid over, one this build does not know too, and an add is kept',
+      kept.map(x => x.blend).join(' ') === 'over over add' && makeSurface().blend === 'over' && makeCube().every(f => f.blend === 'over'),
+      kept.map(x => x.blend).join(' '));
+    const lp = new m.UniformPack(m.OUTPUT_LAYOUT);
+    // Four beams first, so a slot the three-quad frame after leaves unwritten
+    // still says add, and the check below sees it.
+    m.fillOutputUniforms(lp, cfg([0, 0.25, 0.5, 0.75].map(x => quad(x, 'wall', { blend: 'add' }))), 800, 600);
+    const nq = m.fillOutputUniforms(lp, cfg([quad(0, 'wall', { blend: 'add' }), quad(0.25, 'wall', { enabled: false, blend: 'add' }), quad(0.5, 'front'), quad(0.75, 'back', { blend: 'add' })]), 800, 600);
+    const lay = lp.get('lay');
+    const slots = [0, 1, 2].map(i => lay[i * 4]);
+    check('the shader is told each quad\'s blend in that quad\'s slot (0 over, 1 add), and how many quads there are',
+      nq === 3 && slots.join(' ') === `${m.BLEND_INDEX.add} ${m.BLEND_INDEX.over} ${m.BLEND_INDEX.add}` && m.BLEND_INDEX.over === 0 && m.BLEND_INDEX.add === 1
+      && lp.get('quads')[0] === 3 && lay[3 * 4] === 0,
+      `${nq} quads, blends ${slots.join(' ')}, count ${lp.get('quads')[0]}`);
+  }
 
   /*
     And that slot reaches that texture: the shader's branch on the slot's

@@ -117,7 +117,9 @@
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
+    "beams": "node scripts/beams.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
+    "backplate": "node scripts/backplate.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
@@ -140,6 +142,7 @@
     "bottles": "npm run build && node scripts/bottles.mjs",
     "fingers": "node scripts/fingers.mjs",
     "ferrohands": "node scripts/ferrohands.mjs",
+    "domes": "node scripts/domes.mjs",
     "ferropress": "node scripts/ferropress.mjs"
   },
   "dependencies": {

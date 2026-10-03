@@ -19,6 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reaching up to twice as far, or half (a big one pulls more weakly at the edge
   of its reach than a real one; PLAN 9v). The performer's, kept across looks.
 
+### Added — beams that add, and tiles with no seam
+
+- A mapped surface's **Light** can be **Add**, a projector's beam, instead of
+  laid over. Two beams of different pictures add where they cross; two
+  carrying one picture blend across their overlap so the join shows no seam.
+  Surfaces stay laid over unless set, so a saved rig looks as it did. On the
+  phone: More, Settings, Mapping.
+
+### Added — the back plate's own look
+
+- **To Back Plate**: a cued look can be sent to the back plate alone, from the
+  desk (under Go), the phone's looks sheet (a Whole plate / Back plate switch)
+  or a controller. The back plate's liquid moves as that look says and pours
+  that look's colours, liquids and pour styles, while the front plate and how
+  both are drawn stay as they were. **Follow Front** fades it back to the
+  front's twin. The Mixer's Back Plate row says which look it is on.
+
 ### Changed — Back goes fully back
 
 - **Back puts the room back too**: the film's and the logo's levels, the

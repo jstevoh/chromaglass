@@ -405,6 +405,25 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
+## 17. The back plate's own look
+
+PLAN.md §16a. On the desk, cue a look with two plates in mind (Oil & Water on
+the front, say), press Go, then cue a different one (Boiling Point, Ferro
+Paint) and press **To Back Plate**. Worth looking at:
+
+- over the fade, the back plate's liquid changes how it moves and what colour
+  it pours while the front keeps its own; nothing cuts, and the front does not
+  thin or re-lay;
+- the Mixer's Back Plate row says "On" and the look's name; grading it and
+  moving it in the stack behave as before;
+- a Go on the front (and a cut from the preset strip) leaves the back plate on
+  its look;
+- **Follow Front** fades the back plate back into the front's twin; on a
+  one-plate front look the back plate goes when that fade lands;
+- the same from the phone: the looks sheet's Back plate switch, then a look;
+- whether two looks on two plates read as two projectors or as a muddle is
+  the judgement this is for.
+
 ---
 
 ## 16. The Magnet pulls a pool out in fingers
@@ -543,6 +562,20 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
+## 22. Colour between the domes
+
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
+
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
+
+---
+
 ## 22. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
@@ -571,9 +604,23 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
+## 23. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
 ---
 
-## 23. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+## 24. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
 
 On Classic (a look with no ferrofluid), desk and phone:
 
