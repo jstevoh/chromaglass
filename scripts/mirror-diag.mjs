@@ -20,10 +20,7 @@ const VARIANTS = [
   { name: 'warm-up (browser cold)', drop: false, extra: {}, reps: 1 },
   { name: 'drops', drop: true, extra: {} },
   { name: 'drops, hand held still', drop: true, still: true, extra: {} },
-  { name: 'drops, heatDecay 0', drop: true, extra: { heatDecay: 0 } },
-  { name: 'drops, polarity 0 heatDecay 0', drop: true, extra: { polarity: 0, heatDecay: 0 } },
-  { name: 'drops, viscosity thin', drop: true, extra: { viscosity: 'thin' } },
-  { name: 'drops, advection 0.1', drop: true, extra: { advection: 0.1 } },
+  { name: 'no drops, longer', drop: false, extra: {}, reps: 8 },
 ];
 const browser = await launchChromium(chromium);
 try {
@@ -44,7 +41,21 @@ try {
     const state = () => page.evaluate(() => {
       const d = window.chromaglassDebug?.();
       const s = d?.settings ?? {};
+      const f0 = d?.fluids?.[0];
+      let rot = 0, rad = 0, mag = 0, mvx = 0, mvy = 0;
+      if (f0?.readVx) {
+        const vx = f0.readVx, vy = f0.readVy, N = Math.round(Math.sqrt(vx.length));
+        for (let i = 0; i < vx.length; i++) {
+          const x = (i % N) / N - 0.5, y = Math.floor(i / N) / N - 0.5, r = Math.hypot(x, y) || 1e-6;
+          const u = vx[i], w = vy[i]; if (!Number.isFinite(u) || !Number.isFinite(w)) continue;
+          rot += (x * w - y * u) / r; rad += (x * u + y * w) / r; mag += Math.hypot(u, w); mvx += u; mvy += w;
+        }
+      }
+      const flat = {}; for (const [k, v] of Object.entries(s)) if (typeof v !== 'object') flat[k] = v;
       return {
+        flat, spinv: JSON.stringify(d?.spin ?? null), rotc: JSON.stringify(d?.rotation?.current ?? null), plateSpin: f0?.plateSpin,
+        flow: mag ? { swirl: +(rot / mag).toFixed(3), outward: +(rad / mag).toFixed(3), drift: +(Math.hypot(mvx, mvy) / mag).toFixed(3) } : null,
+        tool: d?.tool?.(), take: JSON.stringify(d?.take ?? null)?.slice(0, 80),
         t: performance.now() / 1000,
         layers: (d?.fluids ?? []).map((f) => {
           const vx = f.readVx, vy = f.readVy; let sp = 0, n = 0, mx = 0;
@@ -81,7 +92,9 @@ try {
       }
       return { abs: abs / n, sgn: sgn / n, bright: sumA / n, litA: litA / n, litB: litB / n };
     }, { ia: a.id, ib: b.id });
-    const fmt = (s) => `t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)} |v| ${l[3].toExponential(2)} max ${l[4].toExponential(2)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)}`;
+    let lastFlat = null;
+    const changed = (st) => { const out = []; if (lastFlat) for (const k of new Set([...Object.keys(lastFlat), ...Object.keys(st.flat)])) if (lastFlat[k] !== st.flat[k]) out.push(`${k}:${lastFlat[k]}→${st.flat[k]}`); lastFlat = st.flat; return out.join(' '); };
+    const fmt = (s) => `flow=${JSON.stringify(s.flow)} spin=${s.spinv} plateSpin=${s.plateSpin} rot=${s.rotc} tool=${s.tool} changed[${changed(s)}] t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)} |v| ${l[3].toExponential(2)} max ${l[4].toExponential(2)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)}`;
     console.log(`\n== ${v.name}  settings [dyeBudget evap platePressure air automate speed surge damping] = ${JSON.stringify((await state()).set)}`);
     const hx = hole.x + hole.width * 0.75, hy = hole.y + hole.height * 0.75;
     for (let rep = 0; rep < (v.reps ?? 6); rep++) {
