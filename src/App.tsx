@@ -26,7 +26,7 @@ import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DronePa
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
-import { targetLook, evolvedLook, lookStep, roomMoved, roomBack, RIG_KEYS, DEFAULT_FADE_SECONDS, type RoomMove } from './lib/lookFade';
+import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -88,7 +88,7 @@ import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
 import { blendKey, nextBlend, raiseInMix, MIX_SOURCE_INFO, type MixMover, type MixSource } from './lib/mixer';
-import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
+import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -1420,8 +1420,17 @@ export default function App() {
   */
   const rowFades = useRef(new RowFades()).current;
   const [rowFading, setRowFading] = useState<Partial<Record<MixSource, FadeWay>>>({});
+  /*
+    And when each setting was last written from outside a look fade, for a
+    Back to leave what was written after it began (lib/lookFade's backStep):
+    a Back fades the room's levels back, and a fader ridden while it runs is
+    the later hand.
+  */
+  const laterWrites = useRef(new LaterWrites()).current;
   const handOnLevels = (keys: Iterable<string>) => {
-    if (rowFades.handOn(keys)) setRowFading(rowFades.running());
+    const list = [...keys];
+    laterWrites.mark(list, showNow());
+    if (rowFades.handOn(list)) setRowFading(rowFades.running());
   };
   /*
     A new look sets the levels that belong to a look, the gel wheel's and the
@@ -1430,7 +1439,9 @@ export default function App() {
     walks writing one setting would fight a tick at a time.
   */
   const lookTakesLevels = () => {
-    handOnLevels(LOOK_LEVEL_KEYS);
+    // Not handOnLevels: the look is not a later hand, and a Back must not
+    // hold the gel and the lumia where they are because its own fade began.
+    if (rowFades.handOn(LOOK_LEVEL_KEYS)) setRowFading(rowFades.running());
     rowFades.forget(['gel', 'lumia']);
   };
 
@@ -1775,6 +1786,7 @@ export default function App() {
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
     ride.write(String(key), value);
     setDocDirty(true);
+    laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
     if (rideFrame.current) return;
     rideFrame.current = requestAnimationFrame(() => {
@@ -1840,7 +1852,7 @@ export default function App() {
   // the fade would arrive in three steps.)
   const lookFadeRef = useRef<ShowIntervalHandle | null>(null);
   /** The look before the last Go, so one step back is always available. */
-  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings; room?: RoomMove } | null>(null);
+  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
   /*
     The phone (components/phone/PhoneStage.tsx, lib/phone.ts): a touch screen
@@ -2081,26 +2093,34 @@ export default function App() {
     tick keeps them as they are now, and keeps a row taken from its button
     since the Go began as it is too (lib/lookFade's lookStep says why).
   */
-  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
+  /*
+    A Back (`back`) is the one fade that puts the room back too: it is undo,
+    and the owner asked for it to go fully back (lib/lookFade's backStep).
+    What a hand wrote after the Back began is left where the hand put it,
+    and so is whatever `hold` names (the dimmer, while a blackout is on).
+  */
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
     const from = settingsRef.current;
-    if (seconds <= 0) { setSettings(prev => lookStep(from, to, 1, prev)); setFading(0); return; }
+    const step = lookFadeStep(back);
+    if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
     const ms = seconds * 1000;
     lookFadeRef.current = showInterval(() => {
       const t = Math.min(1, (showNow() - started) / ms);
       // A take pressed since the Go began (the gel's or the lumia's, whose
-      // level the look also sets) is left to its button, to the Go's end.
-      const taken = rowFades.levelsTakenSince(started);
+      // level the look also sets) is left to its button, to the Go's end;
+      // and on a Back, anything else written since it began.
+      const taken = back ? [...rowFades.levelsTakenSince(started), ...laterWrites.since(started), ...hold] : rowFades.levelsTakenSince(started);
       if (t >= 1) {
         if (lookFadeRef.current) clearShowInterval(lookFadeRef.current);
         lookFadeRef.current = null;
-        setSettings(prev => lookStep(from, to, 1, prev, taken));
+        setSettings(prev => step(from, to, 1, prev, taken));
         setFading(0);
         return;
       }
-      setSettings(prev => lookStep(from, to, t, prev, taken));
+      setSettings(prev => step(from, to, t, prev, taken));
       setFading(t);
     }, 33, 'look-fade');
     // lookTakesLevels closes over nothing that changes: the one RowFades and
@@ -2200,13 +2220,15 @@ export default function App() {
     previousLook.current = null;
     if (prev.id) adoptPreset(prev.id);
     visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
-    fadeSettingsTo(prev.settings, fadeSeconds);
-    // The room the change itself moved (Lucky's microphone roll), where the
-    // hand has not moved it since; the fade keeps the room as it is.
-    if (prev.room) {
-      const back = roomBack(prev.room, settingsRef.current);
-      if (Object.keys(back).length) setSettings(s => ({ ...s, ...back }));
-    }
+    // A take still walking stops where it is: the Back puts every row's level
+    // back and was pressed later, and two walks writing one setting would
+    // fight a tick at a time. Every row, not only the ones whose level moved
+    // since the Go: the Back writes them all, a row at its old level included.
+    if (rowFades.handOn(FADE_LEVEL_KEYS)) setRowFading(rowFades.running());
+    // A blackout on stays on: a Back that faded the dimmer up would light the
+    // wall with the Blackout button still lit.
+    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
   useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
@@ -2432,7 +2454,7 @@ export default function App() {
 
   const triggerLucky = () => {
     const next = luckyLook(settings, liquidTypes.map(t => t.color));
-    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current, room: roomMoved(settingsRef.current, next) };
+    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
     // A look coming in, like a Go's: a take on the gel or the lumia stops.
     lookTakesLevels();
     setSettings(next);
@@ -2757,6 +2779,7 @@ export default function App() {
       const k = Math.min(1, (showNow() - began) / ms);
       const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       setSettings(prev => ({ ...prev, dimmer: from + (to - from) * e }));
+      laterWrites.mark(['dimmer'], showNow());
       if (k >= 1 && fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
     }, 16, 'dimmer-fade');
   }, []);
@@ -2917,12 +2940,14 @@ export default function App() {
   */
   const raiseMix = (id: MixMover) => {
     setSettings(prev => ({ ...prev, mixOrder: raiseInMix(prev.mixOrder, id) }));
+    laterWrites.mark(['mixOrder'], showNow());
     setDocDirty(true);
   };
   /** A row's blend, one along (lib/mixer.ts, nextBlend), from the state being updated for the same reason. */
   const stepBlend = (id: MixMover) => {
     const key = blendKey(id);
     setSettings(prev => ({ ...prev, [key]: nextBlend(prev[key]) }));
+    laterWrites.mark([String(key)], showNow());
     setDocDirty(true);
   };
   /*
@@ -3216,6 +3241,9 @@ export default function App() {
       const k = Math.min(1, (showNow() - started) / (seconds * 1000));
       const e = k * k * (3 - 2 * k);
       setSettings(p => ({ ...p, [key]: k >= 1 ? to : from + (to - from) * e, ...(k >= 1 ? atEnd ?? {} : {}) }));
+      // Every tick, not only the first: a glide still walking when a Back is
+      // pressed is the later writer, and the Back leaves it be.
+      laterWrites.mark([String(key), ...(k >= 1 ? Object.keys(atEnd ?? {}) : [])], showNow());
       if (k >= 1) { clearShowInterval(timer); timers.delete(String(key)); }
     }, 33, `glide:${String(key)}`);
     timers.set(String(key), timer);
@@ -3310,6 +3338,7 @@ export default function App() {
       glidesRef.current.clear();
       if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
       rowFades.clear();
+      laterWrites.clear();
       setRowFading({});
       driftGlide.current.clear();
       aimTick.current = 0;
@@ -3332,6 +3361,7 @@ export default function App() {
         glidesRef.current.clear();
         if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
         rowFades.clear();
+        laterWrites.clear();
         renderHoldRef.current = false;
         flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); setRowFading({}); });
         driftAnchor.current = kept.anchor;
