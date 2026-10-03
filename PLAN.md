@@ -1474,7 +1474,17 @@ while this batch's plan was going in (#177), and no cause is known yet:
   times on a cleared plate. The line now prints the disk and the nearest-dye readings
   side by side, so a red with equal counts and unequal nearest dye is the plate
   losing one pool's dye, and equal nearest dye with unequal disks is the plate
-  moving it.
+  moving it. Both halves were shown red on the Mac before merging, each on a mutant
+  pushed to the PR and reverted. With B's dye reaching the plate at a third, the
+  plate half went red (A 194, B 72, 0.37) while the count half stayed green (A 28
+  steps and 222 dye, B 26 and 206, against the plate's 26 to 30 steps), as it
+  should, since both fingers had laid alike. With B laying on every other step, the
+  count half went red (A 23 steps, B 11, against the plate's 21 to 25), and the
+  plate half stayed green at A 101 to B 61 (0.60). A half-rate finger is inside
+  the plate's own scatter, so the plate's balance could never have caught it. On
+  both runs, the dye nearest each finger equalled the dye in its disk, so in these
+  1.9 s the plate does not carry a pool off its finger. A red with equal counts is
+  therefore dye the plate lost, not dye it moved.
 - **Found while reading it, and fixed with it: a held Drop with Drop Height up let
   go of a drop on every step, not every tenth.** Its clock (`dropClockRef`, and each
   finger's own) was counted up only past a frame's first step until it had started,
@@ -1484,6 +1494,11 @@ while this batch's plan was going in (#177), and no cause is known yet:
   the dye and a splash on every step until the first frame that happened to owe two.
   Counted after each step it is used on, the first step is still a drop at once.
   `npm run phone` counts a held finger's drops against its steps on the Mac shard.
+  It cannot show the old clock there: the Mac runner's phone section steps
+  less than once a frame (14 to 18 steps over 15 to 20 frames). That makes two-step
+  frames common, which unstuck the old clock, so the old clock passed too (2 drops
+  over 16 steps). The arithmetic above is the evidence for the fix, and the owner's
+  look at Bass Drop and Boiling Point at 60 fps is the check (`docs/judging.md` §19).
 - `tools.mjs`, "Blow held still blows a bubble": the straw blew 0 bubbles, on the
   run after, where every other shard passed.
 - `npm run startup`, the same check, a second kind of stop: on #186's run on 1f627f3

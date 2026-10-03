@@ -6453,8 +6453,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // not show; a drop with more in it spreads further.
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k;
-                // MUTANT (c), not for merging: a second finger lays on every other step.
-                if (!primary && hand.clock % 2 === 1) { hand.clock++; continue; }
                 hand.laid.steps++;
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {
