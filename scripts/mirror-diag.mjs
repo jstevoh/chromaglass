@@ -17,13 +17,13 @@ const CALM = {
   audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
 };
 const VARIANTS = [
-  { name: 'warm-up (browser cold)', drop: false, extra: {}, reps: 2 },
+  { name: 'warm-up (browser cold)', drop: false, extra: {}, reps: 1 },
   { name: 'drops', drop: true, extra: {} },
-  { name: 'no drops', drop: false, extra: {} },
-  { name: 'drops, polarity 0', drop: true, extra: { polarity: 0 } },
-  { name: 'drops, blobSurfaceTension 0', drop: true, extra: { blobSurfaceTension: 0 } },
-  { name: 'drops, damping 0.9', drop: true, extra: { damping: 0.9 } },
-  { name: 'drops, surge 0', drop: true, extra: { surge: 0 } },
+  { name: 'drops, hand held still', drop: true, still: true, extra: {} },
+  { name: 'drops, heatDecay 0', drop: true, extra: { heatDecay: 0 } },
+  { name: 'drops, polarity 0 heatDecay 0', drop: true, extra: { polarity: 0, heatDecay: 0 } },
+  { name: 'drops, viscosity thin', drop: true, extra: { viscosity: 'thin' } },
+  { name: 'drops, advection 0.1', drop: true, extra: { advection: 0.1 } },
 ];
 const browser = await launchChromium(chromium);
 try {
@@ -49,7 +49,9 @@ try {
         layers: (d?.fluids ?? []).map((f) => {
           const vx = f.readVx, vy = f.readVy; let sp = 0, n = 0, mx = 0;
           if (vx && vy) for (let i = 0; i < vx.length; i++) { const v = Math.hypot(vx[i], vy[i]); if (Number.isFinite(v)) { sp += v; n++; if (v > mx) mx = v; } }
-          return [f.stepCount, f.meanDensity, f.dt, n ? sp / n : -1, mx];
+          const N = Math.round(Math.sqrt(vx?.length ?? 0)); const G = 6; const m = Array(G * G).fill(0), c = Array(G * G).fill(0);
+          for (let i = 0; i < (vx?.length ?? 0); i++) { const x = i % N, y = Math.floor(i / N); const k = Math.min(G - 1, Math.floor(y / N * G)) * G + Math.min(G - 1, Math.floor(x / N * G)); const v = Math.hypot(vx[i], vy[i]); if (Number.isFinite(v)) { m[k] += v; c[k]++; } }
+          return [f.stepCount, f.meanDensity, f.dt, n ? sp / n : -1, mx, m.map((v, k) => v / Math.max(1, c[k]))];
         }),
         sps: d?.solver?.().stepsPerSec, auto: d?.autoEvents,
         set: [s.dyeBudget, s.evaporationRate, s.platePressure, s.airVelocity, s.automateRate, s.globalSpeed, s.surge, s.damping].map((x) => typeof x === 'number' ? +x.toFixed(4) : x),
@@ -86,7 +88,8 @@ try {
       const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
       if (v.drop && rep < 4) {
         await page.mouse.move(hx, hy); await page.mouse.down();
-        for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
+        if (rep === 0) console.log('     hand at', JSON.stringify(await page.evaluate(() => window.chromaglassDebug?.().pointer?.())));
+        for (let k = 1; k <= 6; k++) { if (!v.still) await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
         await page.mouse.up();
       } else {
         await page.mouse.move(hx, hy);
@@ -98,6 +101,8 @@ try {
       const d = await diff(a, b), ch = await diff(b, c);
       console.log(`  rep ${rep + 1}${v.drop && rep < 4 ? ' (drop)' : ''}: drift |${d.abs.toFixed(1)}| signed ${d.sgn.toFixed(1)}  change |${ch.abs.toFixed(1)}| signed ${ch.sgn.toFixed(1)}  bright ${d.bright.toFixed(1)} lit ${(d.litA * 100).toFixed(1)}%→${(ch.litB * 100).toFixed(1)}%`);
       console.log(`     a ${fmt(a.st)}\n     c ${fmt(c.st)}`);
+      const map = c.st.layers[0]?.[5];
+      if (map) for (let y = 0; y < 6; y++) console.log('       |v| ' + map.slice(y * 6, y * 6 + 6).map((x) => x.toExponential(1).padStart(8)).join(''));
       await page.evaluate(() => { window.__shots = {}; });
     }
     await page.close();
