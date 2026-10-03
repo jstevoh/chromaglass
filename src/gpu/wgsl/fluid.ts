@@ -805,6 +805,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       // rest is left where it is, not pulled down.
       var g2 = max(0.004, gap + dg);
       if (dg > 0.0) { g2 = min(g2, max(gap, rest)); }
+      /*
+        On a thin gap (A.a.y) a press closes the film as a film under a load
+        does: the liquid has to leave through the gap it is closing, whose
+        resistance goes as 1/h³ (Reynolds; Stefan's law for two plates,
+        F = 3πμR⁴ḣ / 2h³), so under a steady hand the glass comes down fast
+        and slows as the film thins, dh/dt = −a (h/h₀)³, never quite reaching
+        the floor. \`dg\` is the hand's rate at the rest gap h₀, as the
+        Press lays it; integrated exactly over the step, 1/h² grows by
+        2a/h₀³. Laid as a straight subtraction, the Press's bowl took the
+        film from rest to the floor in one step, and the liquid it pushed out
+        crossed 75 cells of a 384² solver in that step, past anything the
+        dye's carry can follow (npm run presslift). The rate's other
+        factors, the palm's size and the liquid's viscosity, stay in the
+        hand's own number: a thicker liquid does not yet press slower.
+      */
+      if (dg < 0.0 && A.a.y > 0.5) {
+        let h0 = max(rest, 0.004);
+        g2 = max(0.004, inverseSqrt(1.0 / (gap * gap) + 2.0 * (-dg) / (h0 * h0 * h0)));
+      }
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }
@@ -3022,6 +3041,104 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), d);
 }`,
 
+  /*
+    How far the step's flow carries anything across a face, at the most,
+    in cells: for the carries' substeps in a thin gap (carryPlan, and why).
+
+    The face velocity is bodyAdvect's own (the same smoothing along the face
+    and the same Rhie–Chow correction from the pressure), so the number is
+    the Courant number the flux step itself would clamp, not an estimate of
+    it. Each cell reads its east and north faces; a workgroup keeps its
+    largest and hands one atomicMax to the buffer. A positive float's bits
+    order as the float does, so the maximum of the bits is the bits of the
+    maximum. A.b.y is the step's displacement and A.b.z the Rhie–Chow
+    scale, as the carries take them.
+  */
+  carryCourant: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read> pr: array<f32>;
+@group(0) @binding(4) var<storage, read_write> most: array<atomic<u32>>;
+${PACKED}
+var<workgroup> wgMost: atomic<u32>;
+fn faceCourant(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  let t = vec2i(e.y, e.x);
+  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let pa = packedAt(a.x, a.y, n);
+  let pb = packedAt(b.x, b.y, n);
+  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
+  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
+  return abs(ve * A.b.y * f32(n));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32) {
+  // No early return: the barriers below have to be reached by the whole workgroup.
+  if (li == 0u) { atomicStore(&wgMost, 0u); }
+  workgroupBarrier();
+  if (inGrid(id)) {
+    let p = vec2i(id.xy);
+    let n = i32(S.n);
+    var c = 0.0;
+    if (p.x + 1 < n) { c = max(c, faceCourant(p, vec2i(1, 0), n)); }
+    if (p.y + 1 < n) { c = max(c, faceCourant(p, vec2i(0, 1), n)); }
+    // A NaN fails this and counts as nothing: safeVel has already zeroed any such cell.
+    if (c > 0.0) { atomicMax(&wgMost, bitcast<u32>(min(c, 1e30))); }
+  }
+  workgroupBarrier();
+  if (li == 0u) { atomicMax(&most[0], atomicLoad(&wgMost)); }
+}`,
+
+  /*
+    How many substeps this step's carries take, decided on the GPU from the
+    Courant number carryCourant found, so a press is followed from its first
+    step with nothing read back.
+
+    The carries move an amount across each face, upwind and limited, and a
+    face may carry no more than 0.45 of a cell in one go (the clamp in
+    bodyAdvect). That is plenty for a stir, and nowhere near a hand on the
+    glass: on a thin gap the app's Press thins the film by half in its first
+    steps, and the liquid it squeezes out crosses up to 8 cells of a 384²
+    solver a step even with the film closing as h³ (squeezeUpdate; 75 when
+    it closed by subtraction), measured in the lab on Classic's clock.
+    Clamped, the colour stayed where the liquid left it: the ring
+    round a press went 42% of the way the displaced volume sends it, and
+    when the glass came back up, slowly enough to be carried, it was drawn
+    in past where it began. The fast stroke out and the slow stroke back
+    were two different flows to the dye, so a press could never be undone.
+
+    So the carries are split into n substeps of 1/n of the step each, n
+    enough to keep every face under A.a.x of a cell. n is odd: one substep
+    is run as always, then the rest in pairs, each pair from the read field
+    to the write field and back, so the result lands in the same texture
+    whatever n is and the encoder needs no count. Each pair is an indirect
+    dispatch; a pair this step does not need is given no workgroups.
+    A.a.y is the most substeps (odd), A.a.z the workgroups across the grid,
+    A.a.w the pairs. `sub` is 1/n, n and the Courant number, for the
+    carries and for a check to read.
+  */
+  carryPlan: `${HEAD}
+@group(0) @binding(2) var<storage, read_write> most: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> ind: array<u32>;
+@group(0) @binding(4) var<storage, read_write> sub: array<f32>;
+@compute @workgroup_size(1)
+fn main() {
+  let c = bitcast<f32>(atomicLoad(&most[0]));
+  // Ready for the next step's maximum.
+  atomicStore(&most[0], 0u);
+  // Clamped as a float first: a float past u32's range has no defined conversion.
+  let n = u32(clamp(ceil(c / A.a.x), 1.0, A.a.y)) | 1u;
+  let w = u32(A.a.z);
+  for (var k = 0u; k < u32(A.a.w); k++) {
+    let on = 2u * k + 1u < n;
+    ind[3u * k] = select(0u, w, on);
+    ind[3u * k + 1u] = select(0u, w, on);
+    ind[3u * k + 2u] = 1u;
+  }
+  sub[0] = 1.0 / f32(n);
+  sub[1] = f32(n);
+  sub[2] = c;
+}`,
+
   // Clear a field to a constant (A.a), used by clear() and the pressure warm start.
   fill: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<DYE_FORMAT, write>;
@@ -3032,6 +3149,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W),
 };
+
+/*
+  The carries that run in substeps on a thin gap (carryPlan): the same
+  kernels, reading what share of the step each substep is from the plan's
+  buffer, bound after everything they already take.
+*/
+function substepped(name: string): string {
+  const src = KERNELS[name];
+  const bound = '@group(0) @binding(5) var<storage, read> pr: array<f32>;';
+  const moved = 'A.b.y * f32(n)';
+  if (!src.includes(bound) || src.split(moved).length !== 2) throw new Error(`${name} cannot be substepped: its pressure binding or its one displacement moved`);
+  return src
+    .replace(bound, `${bound}\n@group(0) @binding(6) var<storage, read> sub: array<f32>;`)
+    .replace(moved, 'A.b.y * sub[0] * f32(n)');
+}
+KERNELS.bodyAdvectSub = substepped('bodyAdvect');
+KERNELS.mixAdvectSub = substepped('mixAdvect');
 
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {

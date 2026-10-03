@@ -83,7 +83,21 @@ const MG_COARSE_SWEEPS = 16;
 /** The Thickness a thin gap runs at when a look does not set one: a light oil (PLAN §18a). */
 export const THIN_GAP_THICKNESS = 0.45;
 /** The thin gap's kernels (wgsl/thinGap.ts), built when it is first turned on. */
-const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient'];
+const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
+/*
+  The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
+  substep may carry across a face, in cells, and the most substeps a step
+  takes. 0.4 leaves the flux step's own clamp (0.45) a margin for the
+  limiter's slope. The app's Press at 1× asks 21 at most: its fastest face
+  is 8 cells a step on a 384² solver under Classic's clock (`npm run
+  presslift`), with the glass closing as h³ (squeezeUpdate). 33 leaves room
+  for a harder press and a finer solver. Odd, since the first substep runs
+  alone and the rest in pairs. A step that needs one costs one carry and
+  sixteen dispatches of no workgroups.
+*/
+export const CARRY_COURANT = 0.4;
+export const CARRY_SUBSTEPS = 33;
+const CARRY_PAIRS = (CARRY_SUBSTEPS - 1) / 2;
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
 /*
@@ -479,12 +493,18 @@ export class WebGPUFluid {
   private hsFaceC: GPUBuffer[] = [];
   /** The gap as the last thin step left it, a cell at a time: its change is the press (hsDivergence). */
   private hsGap: GPUBuffer | null = null;
+  /** The carries' plan on a thin gap (carryPlan): the step's largest Courant number, the pairs' indirect dispatches, and 1/n, n and that number. */
+  private carryMost: GPUBuffer | null = null;
+  private carryInd: GPUBuffer | null = null;
+  private carrySub: GPUBuffer | null = null;
   /** False until a thin step has recorded the gap, and again whenever the glasses are re-laid rather than pressed. */
   private hsPrimed = false;
   /** V-cycles a thin solve takes: the old solver's count, which leaves under 2% of the flow's divergence (`npm run thingap`). */
   private readonly hsCycles = MG_CYCLES;
   /** Whether the last step ran as a thin gap: the next frame's deltas are imposed, not added. */
   private thinLive = false;
+  /** The same, for the hands (PlateSolver.thinGapLive). */
+  get thinGapLive(): boolean { return this.thinLive; }
   /*
     Oil Bodies: the oil's own share of the dye (see bodyPartition), in the
     dye's format, made the first step a plate has oil on it with Oil Bodies
@@ -1082,7 +1102,7 @@ export class WebGPUFluid {
     this.dye.swap();
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
     this.vel.swap();
-    this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, 0, 0, 0]));
+    this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
   }
 
@@ -1510,9 +1530,14 @@ export class WebGPUFluid {
         336.0, before and after), and the ring lands where the displaced
         volume puts it (100% of the shift, against 85% by backtrace).
       */
+      /*
+        And in substeps on a thin gap, as many as the step's flow needs
+        (carryPlan, and why): a hand on the glass moves the liquid many cells
+        a step, and a carry that cannot keep up leaves the colour behind.
+      */
+      if (thin) this.planCarry(pass, disp);
       if (!bodiesOn && thin) {
-        this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
-        this.dye.swap();
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
         return;
       }
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
@@ -1525,6 +1550,11 @@ export class WebGPUFluid {
       const od = this.oilDye!;
       if (bodiesFresh) for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
+      if (thin) {
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, adv);
+        this.carrySubsteps(pass, 'bodyAdvect', od, adv);
+        return;
+      }
       this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], adv);
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
@@ -1709,8 +1739,12 @@ export class WebGPUFluid {
     stage('mix', (pass) => {
       const m = mix!;
       if (this.mixLive) {
-        this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
-        m.swap();
+        // The oil with its colour: in the dye's substeps on a thin gap (carryPlan).
+        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+        else {
+          this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+          m.swap();
+        }
         for (let k = 0; k < PHASE_RELAX; k++) {
           this.run(pass, 'mixRelax', m.write, [m.read], none);
           m.swap();
@@ -2449,6 +2483,9 @@ export class WebGPUFluid {
         for (const name of THIN_GAP_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, kernel(name, 'rgba16float'));
         // The snapshot before the forces, and the copy the dye rides, both into the velocity's format.
         await this.pipelines.prepareCompute(`scaleDye:${VEL}`, kernel('scaleDye', VEL));
+        // The carries in substeps (carryPlan): the dye and the oil's share of it, and the oil.
+        await this.pipelines.prepareCompute(`bodyAdvectSub:${this.dyeFormat}`, kernel('bodyAdvectSub', this.dyeFormat));
+        await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
       })();
     }
@@ -2471,8 +2508,74 @@ export class WebGPUFluid {
       this.hsMobC = this.mg.map((lv) => buf(`thin gap rim ${lv.n}`, lv.n));
       // Each coarse level's faces: every cell's east face, then every cell's north.
       this.hsFaceC = this.mg.map((lv) => this.disposer.track(this.device.createBuffer({ label: `thin gap faces ${lv.n}`, size: Math.max(16, 2 * lv.n * lv.n * 4), usage: GPUBufferUsage.STORAGE })));
+      this.carryMost = this.disposer.track(this.device.createBuffer({ label: 'carry courant', size: 16, usage: GPUBufferUsage.STORAGE }));
+      this.carryInd = this.disposer.track(this.device.createBuffer({ label: 'carry pairs', size: 12 * CARRY_PAIRS, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT }));
+      this.carrySub = this.disposer.track(this.device.createBuffer({ label: 'carry substeps', size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
     }
     return this.hsPrev;
+  }
+
+  /**
+   * How many substeps this step's carries take on a thin gap, decided on the
+   * GPU (carryCourant, carryPlan in wgsl/fluid.ts): after the velocity the
+   * carries ride is final, before the first of them.
+   */
+  private planCarry(pass: GPUComputePassEncoder, disp: number): void {
+    this.ensureThinGap();
+    this.hsRun(pass, 'carryCourant', `carryCourant:${this.velForced.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, 0]),
+      [this.velForced, this.press, this.carryMost!]);
+    this.hsRun(pass, 'carryPlan', 'carryPlan', this.arg('carry plan', [CARRY_COURANT, CARRY_SUBSTEPS, Math.ceil(this.N / 8), CARRY_PAIRS]),
+      [this.carryMost!, this.carryInd!, this.carrySub!], 1);
+  }
+
+  /**
+   * One carry (`bodyAdvect` or `mixAdvect`) of `field` along the step's
+   * velocity, in the substeps planCarry chose: the first as always, the rest
+   * in pairs that go to the write field and back, each pair dispatched
+   * indirectly so one this step does not need runs no workgroups. The field
+   * ends swapped once, as a single carry leaves it.
+   */
+  private carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer): void {
+    const kernelName = `${name}Sub`;
+    const pipe = this.pipeline(kernelName, field.format);
+    const group = (src: GPUTexture, dst: GPUTexture) => {
+      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}`;
+      let g = this.groups.get(key);
+      if (!g) {
+        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.press, this.carrySub!]);
+        this.groups.set(key, g);
+      }
+      return g;
+    };
+    const w = Math.ceil(this.N / 8);
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group(field.read, field.write));
+    pass.dispatchWorkgroups(w, w);
+    field.swap();
+    const there = group(field.read, field.write), back = group(field.write, field.read);
+    for (let k = 0; k < CARRY_PAIRS; k++) {
+      pass.setBindGroup(0, there);
+      pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
+      pass.setBindGroup(0, back);
+      pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
+    }
+  }
+
+  /**
+   * How many substeps the last thin step's carries took, and the Courant
+   * number that asked for them: for a check. Null off a thin gap.
+   */
+  async readCarry(): Promise<{ n: number; courant: number } | null> {
+    if (!this.carrySub) return null;
+    const buf = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read carry' });
+    enc.copyBufferToBuffer(this.carrySub, 0, buf, 0, 16);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const f = new Float32Array(buf.getMappedRange().slice(0));
+    buf.unmap();
+    buf.destroy();
+    return { n: f[1], courant: f[2] };
   }
 
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */

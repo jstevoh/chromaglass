@@ -11,7 +11,7 @@ import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/deta
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
-import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { fingerCarry, blowCarry } from '../src/lib/handCarry';
 
@@ -111,12 +111,14 @@ const api = {
    * `radius` cells. The app's plate is 192 cells, the lab's L by default, so
    * a press the app makes at radius 30 × GRID_SCALE is radius 45 here too.
    */
-  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0) {
+  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0, thin = false) {
     const { L, velAdd, mul } = lab!;
     squishDisc(L, x, y, radius, amount, fingering, stroke, pile, (idx, gap, vx, vy, m) => {
       velAdd[idx * 4] += vx; velAdd[idx * 4 + 1] += vy; velAdd[idx * 4 + 3] += gap; mul[idx] *= m;
-    });
+    }, thin);
   },
+  /** The carries' substeps on the last thin step, and the Courant number that asked for them (carryPlan). */
+  async carry() { return lab!.solver.readCarry(); },
   /**
    * What a stroke would lay, without laying it: the gap delta cell by cell
    * (L × L). `npm run lift` holds the plate's picture against this, so it
@@ -131,6 +133,8 @@ const api = {
   },
   /** The press's memory, as the plate keeps it: `npm run lift` presses and lets go through this. */
   PressLift,
+  /** The glass's spring a step, as the app derives it from Press Lift (`npm run presslift`). */
+  glassSpring,
   flush(dt = BASE.dt) {
     const l = lab!;
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);

@@ -211,7 +211,12 @@ try {
       for (const pressed of [false, true]) {
         await lab.create(N, N);
         await lab.step(1, over);
-        if (pressed) { lab.vel(0.5, 0.5, 0.08, [0, 0, 0, -0.2]); lab.flush(); }
+        // Held for twenty steps, as a hand holds a Press. Since the thin gap's
+        // glass closes as a film under a load does, slowing as h³ (Stefan,
+        // squeezeUpdate), one step's dent leaves this disc at 0.008, twice the
+        // floor λ is counted at; held, it reaches the floor out to about 0.1
+        // of the plate, as one step's dent did on the old solver.
+        if (pressed) for (let k = 0; k < 20; k++) { lab.vel(0.5, 0.5, 0.08, [0, 0, 0, -0.2]); lab.flush(); await lab.step(1, over); }
         // Long enough for the press's own flow to be gone before the push.
         await lab.step(40, over);
         lab.vel(0.5, 0.5, 5, [1, 0, 0, 0]); lab.flush();

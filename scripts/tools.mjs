@@ -20,6 +20,8 @@
  *               hand stops (it used to go on pushing while held still)
  *   Blow        clears dye from under it
  *   Press       pushes dye out from under the palm into a ring, keeping it
+ *   Press, let go, on a thin gap (Thin Gap, PLAN §18a): the colour goes out
+ *               under the palm and comes back when the hand lets go
  *
  * The Magnet has its own check (npm run magnet).
  *
@@ -344,6 +346,64 @@ try {
       check('and keeps it', made > -0.15 * a.total - slack && made < 1.0 * a.total + slack,
         `${a.total.toFixed(0)} → ${b.total.toFixed(0)}, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} with the plate left alone as long`);
     }
+  }
+
+  // ── Press, let go, on a thin gap ────────────────────────────────
+  /*
+    The owner, 2026-09-28: the Press "just pushes everything out instead of
+    bringing it back when you release". With Thin Gap on, the flow between
+    the glasses is reversible, so what the glass pushed out it draws back
+    as it lifts; this asks it of the app, through the real pointer, on
+    Classic. Measured as the colour's mean distance from the palm, over the
+    whole cleared plate: it has to grow under the press, and once the hand
+    lets go a half of that growth has to come back within three seconds
+    (the lab's `npm run presslift` reads 72% at three seconds on Classic's
+    glass; a glass on the look's clock, as it was, came back about a tenth,
+    and a carry that moved the colour out to a ring never brought it back
+    at all). Turned off again after, so nothing below or in later checks
+    runs on it.
+  */
+  {
+    await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 1 }));
+    // The thin gap's pipelines are built when it is first asked for; the plate runs the old way until they are in.
+    const thinBy = Date.now() + 20000;
+    let thin = false;
+    while (!thin && Date.now() < thinBy) {
+      await settle(250);
+      thin = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap);
+    }
+    await clear();
+    await pool(A);
+    await settle(1500);
+    const p = await snap('lift0');
+    await tool('press');
+    await settle(300);
+    await page.mouse.move(...screen(...A));
+    await page.mouse.down();
+    await settle(1500);
+    await snap('lift1');
+    await page.mouse.up();
+    await settle(3000);
+    await snap('lift2');
+    const spread = (keep) => page.evaluate(({ keep, at }) => {
+      const s = window.__toolSnaps[keep];
+      const n = s.n; let w = 0, d = 0;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const v = Math.max(0, s.data[x + y * n]);
+        if (!Number.isFinite(v)) continue;
+        w += v; d += v * Math.hypot(x - at.x, y - at.y) / n;
+      }
+      return { total: w, mean: w > 0 ? d / w : 0 };
+    }, { keep, at: p });
+    const s0 = await spread('lift0'), s1 = await spread('lift1'), s2 = await spread('lift2');
+    await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
+    const out = s1.mean - s0.mean, back = out > 0 ? (s1.mean - s2.mean) / out : 0;
+    check('Press on a thin gap pushes the colour out from under the palm',
+      thin && s0.total > 5 && out > 0.03,
+      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${s0.mean.toFixed(3)} → ${s1.mean.toFixed(3)} of the plate held down (${s0.total.toFixed(0)} of colour)`);
+    check('and draws it back when the hand lets go',
+      thin && out > 0.03 && back >= 0.5,
+      `${s1.mean.toFixed(3)} → ${s2.mean.toFixed(3)} three seconds after letting go: ${(back * 100).toFixed(0)}% of the way back to ${s0.mean.toFixed(3)}; the colour ${s0.total.toFixed(0)} → ${s1.total.toFixed(0)} → ${s2.total.toFixed(0)}`);
   }
 } finally {
   await browser.close();

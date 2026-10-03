@@ -113,6 +113,7 @@
     "lift": "node scripts/lift.mjs",
     "pressoil": "node scripts/pressoil.mjs",
     "thingap": "node scripts/thingap.mjs",
+    "presslift": "node scripts/presslift.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
