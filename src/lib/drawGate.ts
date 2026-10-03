@@ -146,6 +146,11 @@ export function refreshStamp(ts: unknown, now: number): number {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return now;
   if (ts > now + STAMP_AHEAD_MS || ts < now - STAMP_OLDEST_MS) {
     stampFallbacks++;
+    const ahead = ts > now;
+    const by = Math.abs(ts - now);
+    if (ahead) { stampMisses.ahead++; stampMisses.aheadMs = Math.max(stampMisses.aheadMs, by); }
+    else { stampMisses.stale++; stampMisses.staleMs = Math.max(stampMisses.staleMs, by); }
+    stampMisses.lastAt = now;
     return now;
   }
   return ts;
@@ -162,6 +167,16 @@ export function refreshStamp(ts: unknown, now: number): number {
  * (a call that is not an animation frame) is not counted.
  */
 export let stampFallbacks = 0;
+/**
+ * The same fallbacks told apart, for `?debug` and `npm run wall`: stamps
+ * ahead of now (a wall whose time origin was converted wrong, or a clock
+ * ahead of this one) and stamps older than a second (a callback held up
+ * that long), each with the worst gap seen and when the last one was. The
+ * check went red on one PR's Mac runs with a single fallback, three runs
+ * out of three, and the total alone could not say which bound it was or
+ * when; this does not change what is believed, only what is reported.
+ */
+export const stampMisses = { ahead: 0, aheadMs: 0, stale: 0, staleMs: 0, lastAt: 0 };
 
 export class DrawGate {
   /** When anything was last drawn (ms). */

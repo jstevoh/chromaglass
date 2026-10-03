@@ -748,6 +748,8 @@ let failed = 0;
         fedN,
         fedMedian,
         fallbacks: d.drawGate?.stampFallbacks ?? null,
+        misses: d.drawGate?.stampMisses ?? null,
+        missedAgo: d.drawGate?.stampMisses?.lastAt ? performance.now() - d.drawGate.stampMisses.lastAt : null,
         engine: d.engine,
       };
     }, ms);
@@ -848,7 +850,7 @@ let failed = 0;
           without the draw cost, so the rate lines would not see it.
         */
         if (m.fallbacks !== null) {
-          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran`);
+          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran${m.fallbacks && m.misses ? ` since the page opened (${m.misses.ahead} ahead of now, the worst by ${f1(m.misses.aheadMs)} ms; ${m.misses.stale} over a second old, the worst ${f1(m.misses.staleMs)} ms; the last ${f1((m.missedAgo ?? 0) / 1000)} s before this reading)` : ''}`);
         }
         check('  and both clocks were offering, each at its own window\'s rate',
           m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.wallServable > 10 && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0, offered);
