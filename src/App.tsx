@@ -267,15 +267,20 @@ export default function App() {
   const tempoRef = useRef<TempoSource | null>(null);
   if (!tempoRef.current) tempoRef.current = new TempoSource();
   const [tempoLabel, setTempoLabel] = useState<{ source: string | null; bpm: number; taps: number }>({ source: null, bpm: 0, taps: 0 });
+  const tempoLabelRef = useRef(tempoLabel);
   useEffect(() => {
     const timer = setInterval(() => {
       const t = tempoRef.current;
       if (!t) return;
       t.read(performance.now());        // lets a stopped MIDI clock lapse
-      setTempoLabel(prev => {
-        const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount };
-        return prev.source === next.source && prev.bpm === next.bpm && prev.taps === next.taps ? prev : next;
-      });
+      const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount };
+      // Compared here, not in an updater that hands back the old value: React
+      // still renders the App to find that out whenever anything else is
+      // pending, which with the ear running is always (PLAN.md §14f).
+      const prev = tempoLabelRef.current;
+      if (prev.source === next.source && prev.bpm === next.bpm && prev.taps === next.taps) return;
+      tempoLabelRef.current = next;
+      setTempoLabel(next);
     }, 250);
     return () => clearInterval(timer);
   }, []);
@@ -698,15 +703,17 @@ export default function App() {
   const [songLine, setSongLine] = useState('');
   /** What the bar grid knows (lib/barGrid.ts barLine), for Accent the One on the phone. */
   const [barKnown, setBarKnown] = useState('');
+  const shownShape = useRef({ line: '', bar: '' });
   /** The last song-shape event the sequencer has been handed, by its number. */
   const songCueSeqRef = useRef(0);
   useEffect(() => {
     const timer = setInterval(() => {
       const report = visualizerRef.current?.songShape();
+      // Compared against what was last set, for the reason the tempo label is.
       const next = report ? songShapeLine(report.now) : '';
-      setSongLine(prev => (prev === next ? prev : next));
+      if (next !== shownShape.current.line) { shownShape.current.line = next; setSongLine(next); }
       const bar = report ? barLine(report.bar) : '';
-      setBarKnown(prev => (prev === bar ? prev : bar));
+      if (bar !== shownShape.current.bar) { shownShape.current.bar = bar; setBarKnown(bar); }
     }, 250);
     return () => clearInterval(timer);
   }, []);
@@ -1026,6 +1033,7 @@ export default function App() {
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
+  const shownEngineStatus = useRef<EngineStatus | null>(null);
   const engineStatusRef = useRef<EngineStatus | null>(null);
   // ── The grid sweep ──
   // Walks the solver down every grid and reports where a frame's time went on
@@ -1201,6 +1209,15 @@ export default function App() {
     gap between songs (`useSongChange` below) and roll a new look mid-film.
   */
   const [renderAudio, setRenderAudio] = useState<AudioData | null>(null);
+  // The same, for readers on a clock of their own (the plate, the cast feed).
+  const renderAudioRef = useRef<AudioData | null>(null);
+  /*
+    What the plate hears this frame: the render's reading, else the ear's
+    latest, read at the moment it asks rather than the last one React was
+    shown (PLAN.md §14f). Stable, so handing it down re-renders nothing.
+  */
+  const earLive = ear.live;
+  const hear = useCallback(() => renderAudioRef.current ?? earLive.current, [earLive]);
   const [renderHold, setRenderHold] = useState(false);
   const renderHoldRef = useRef(false);
   const audioData = renderAudio ?? liveAudio;
@@ -1472,6 +1489,7 @@ export default function App() {
    * each.
    */
   const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
+  const layerReportKey = useRef('');
   /** Which desk is up, for the poll below, which is armed once and never re-armed. */
   const deskModeRef = useRef(deskMode);
   deskModeRef.current = deskMode;
@@ -1482,7 +1500,15 @@ export default function App() {
       // looking at.
       if (deskModeRef.current !== 'design') return;
       const r = visualizerRef.current?.layerReport?.();
-      if (r && r.length > 1) setLayerReport(r);
+      if (!r || r.length < 2) return;
+      // Only when the badge would change: a fresh array every poll re-rendered
+      // the whole App two and a half times a second on an empty plate
+      // (PLAN.md §14f, measured with `npm run renders`), and the tabs show a
+      // whole percent and a colour, not the fill's fourth decimal.
+      const key = r.map(l => `${Math.round(l.fill * 100)}:${l.colour}`).join(' ');
+      if (key === layerReportKey.current) return;
+      layerReportKey.current = key;
+      setLayerReport(r);
     }, 400);
     return () => clearInterval(id);
   }, []);
@@ -1671,20 +1697,40 @@ export default function App() {
   /*
     The Magnet brings its ferrofluid. A magnet over a plate with none on it
     does nothing at all, which read as the tool being broken, so picking it
-    on such a look pours some (the visualizer lays it when the amount rises)
-    and gives the magnet enough strength to be felt. The look keeps it, and
-    the Ferrofluid slider takes it away again.
+    on such a look pours some (the visualizer lays it when the amount rises).
+    The look keeps it, and the Ferrofluid slider takes it away again.
+
+    Picking it used to give the look a magnet as well (Magnet Strength 0.8),
+    and a look's magnet sits under the plate at Magnet Across and Up, the
+    middle on every look, from the moment it has strength. So before the hand
+    had touched anything, a magnet nobody put there was pulling the freshly
+    poured ring of ferrofluid into the middle. Reported by the owner: "Magnet
+    makes an immediate big black hole in the middle when I select it." In the
+    lab (Classic's pour, that magnet, 256²) 9% of the disc 0.12 round the
+    middle was black as poured, 54% a second later and all of it in four;
+    with no magnet it stayed at 9%. Picking a magnet up is taking it in the hand: nothing is
+    under the dish until the hand puts it there. So the strength now comes
+    with the first hold (onMagnetInHand, below), and the magnet is set down
+    where that hand lets go of it, as before.
   */
   useEffect(() => {
     if (activeTool !== 'magnet') return;
     const s = settingsRef.current;
-    if ((s.phaseAmount ?? 0) > 0.002 && (s.magnetStrength ?? 0) > 0) return;
-    updateSettings({
-      phaseAmount: Math.max(s.phaseAmount ?? 0, 0.6),
-      magnetStrength: Math.max(s.magnetStrength ?? 0, 0.8),
-    });
+    if ((s.phaseAmount ?? 0) > 0.002) return;
+    updateSettings({ phaseAmount: 0.6 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool]);
+  /**
+   * The first hand to hold the Magnet over a look with no magnet of its own
+   * gives it one (see above). Every hold does, so a Magnet Strength set to 0
+   * by hand comes back to 0.8 the next time the Magnet is held: holding a
+   * magnet under the glass is giving the plate one, and the slider is how it
+   * is taken away again between holds.
+   */
+  const magnetInHand = () => {
+    if ((settingsRef.current.magnetStrength ?? 0) > 0) return;
+    updateSettings({ magnetStrength: 0.8 });
+  };
 
   /*
     A hand on a hardware fader, answered at once and rendered once a frame.
@@ -2103,14 +2149,15 @@ export default function App() {
   */
   const timecodeRef = useRef(new TimecodeReader());
   const [timecode, setTimecode] = useState<TimecodePosition | null>(null);
+  const shownTimecode = useRef<TimecodePosition | null>(null);
   useEffect(() => {
     const id = setInterval(() => {
       const p = timecodeRef.current.read(performance.now());
-      setTimecode(prev => {
-        if (p === null) return prev === null ? prev : null;
-        if (prev && prev.seconds === p.seconds && prev.minutes === p.minutes && prev.hours === p.hours) return prev;
-        return p;
-      });
+      // Compared against what was last set, for the reason the tempo label is.
+      const prev = shownTimecode.current;
+      if (p === null ? prev === null : !!prev && prev.seconds === p.seconds && prev.minutes === p.minutes && prev.hours === p.hours) return;
+      shownTimecode.current = p;
+      setTimecode(p);
     }, 250);
     return () => clearInterval(id);
   }, []);
@@ -2535,6 +2582,17 @@ export default function App() {
   */
   const earDebugRef = useRef(ear.debug);
   earDebugRef.current = ear.debug;
+  /*
+    How many times the App has rendered, for `npm run renders` (PLAN.md
+    §14f): with a band playing it was about seventy a second, one per sound
+    reading and then some, and the check holds it down. Counting in the body
+    counts the renders React commits and the ones strict mode throws away
+    alike, which is what the page paid for.
+  */
+  const appRendersRef = useRef(0);
+  appRendersRef.current++;
+  const hearRef = useRef(hear);
+  hearRef.current = hear;
   const liveDebugRef = useRef({ isCasting, castState, audioData, songChange, isAutomated });
   liveDebugRef.current = { isCasting, castState, audioData, songChange, isAutomated };
   useEffect(() => {
@@ -2544,34 +2602,66 @@ export default function App() {
         return {
           isCasting: l.isCasting,
           castState: l.castState,
-          audio: l.audioData,
+          // The reading the plate hears now, not the last one React was
+          // shown: a harness asking what the show hears means the plate.
+          audio: hearRef.current(),
           ear: earDebugRef.current(),
           songChange: l.songChange,
           // Straight from the render rather than from the cast snapshot, which
           // is assembled for a receiver and not for a question.
           isAutomated: l.isAutomated,
           settings: settingsRef.current,
+          appRenders: appRendersRef.current,
         };
       };
     }
   }, []);
-  // The audio bands, thirty times a second — the raw spectrum stays here.
+  /*
+    The audio bands, thirty times a second; the raw spectrum stays here.
+
+    This was an effect on `audioData`, so it ran on every render the ear
+    caused. The ear now tells React what it heard ten times a second
+    (useAudioAnalyzer's EAR_VIEW_MS, PLAN.md §14f), and ten readings a second
+    is too few for a receiver's plate to move with the beat. So the feed
+    listens to the ear itself, which hands over every reading on its own
+    clock, and keeps its own thirty-a-second limit. Not a page timer: the ear
+    keeps reading while this window is hidden behind the wall (§14a), and a
+    hidden window's timers are held to one a second.
+
+    A render's readings (`renderAudio`) are sent from the effect below
+    instead, one per frame of the film as before, and the room's are not sent
+    while one is running, as they were not when this read `audioData`.
+  */
   const lastCastAudioRef = useRef(0);
-  useEffect(() => {
-    if (!isCasting && mirrorCount === 0) return;
+  const sendCastAudio = useCallback((a: AudioData | null) => {
     const now = performance.now();
     if (now - lastCastAudioRef.current < 33) return;
     lastCastAudioRef.current = now;
     const message: CastMessage = {
       type: 'audio',
-      audio: audioData ? {
-        volume: audioData.volume, bass: audioData.bass, mid: audioData.mid, treble: audioData.treble,
-        energy: audioData.energy, spectralCentroid: audioData.spectralCentroid, timbre: audioData.timbre, complexity: audioData.complexity,
+      audio: a ? {
+        volume: a.volume, bass: a.bass, mid: a.mid, treble: a.treble,
+        energy: a.energy, spectralCentroid: a.spectralCentroid, timbre: a.timbre, complexity: a.complexity,
       } : null,
     };
-    if (isCasting && !stageRef.current) castSend(message);   // a mirror of this canvas needs no feed
-    if (mirrorCount > 0) relaySendRef.current?.({ type: 'cast', message });
-  }, [audioData, isCasting, mirrorCount, castSend]);
+    if (castingRef.current && !stageRef.current) castSendRef.current(message);   // a mirror of this canvas needs no feed
+    if (mirrorCountRef.current > 0) relaySendRef.current?.({ type: 'cast', message });
+  }, []);
+  const castingRef = useRef(isCasting);
+  castingRef.current = isCasting;
+  const feedingCast = isCasting || mirrorCount > 0;
+  const { onReading } = ear;
+  useEffect(() => {
+    if (!feedingCast) return;
+    return onReading((a) => { if (!renderAudioRef.current) sendCastAudio(a); });
+  }, [feedingCast, onReading, sendCastAudio]);
+  // A render's reading, and the ear going quiet (stopped: no more readings to
+  // say so), both reach the feed as state.
+  useEffect(() => {
+    if (!feedingCast) return;
+    if (renderAudio) sendCastAudio(renderAudio);
+    else if (!liveAudio) { lastCastAudioRef.current = -Infinity; sendCastAudio(null); }
+  }, [feedingCast, renderAudio, liveAudio, sendCastAudio]);
 
   // ── The house lights ──
   // Blackout fades the dimmer to nothing over a second and back to where it
@@ -3134,7 +3224,7 @@ export default function App() {
   */
   const renderHost = useMemo(() => ({
     render: () => visualizerRef.current?.render() ?? null,
-    setAudio: (a: AudioData | null) => setRenderAudio(a),
+    setAudio: (a: AudioData | null) => { renderAudioRef.current = a; setRenderAudio(a); },
     prepare: () => {
       const el = musicElRef.current;
       if (showSequencerRef.current.status.sequenceId !== null) showSequencerRef.current.stop();
@@ -3588,7 +3678,7 @@ export default function App() {
     <div className={`relative w-full ${phone ? 'h-[100dvh]' : 'h-screen'} bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
         ref={visualizerRef}
-        audioData={audioData} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
+        audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         onAim={aimMacro}
         onPinchZoom={phone ? pinchZoom : undefined}
@@ -3602,14 +3692,18 @@ export default function App() {
         soundBindings={midi.map.sound}
         onSoundTrigger={runSoundTrigger}
         onManualGesture={musicIntel.recordGesture}
+        onMagnetInHand={magnetInHand}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
           // open); the shell only re-renders when the engine itself changed.
           engineStatusRef.current = next;
-          setEngineStatus((prev) =>
-            prev && prev.label === next.label && prev.steppedDown === next.steppedDown &&
-            prev.gpuUnavailable === next.gpuUnavailable ? prev : next,
-          );
+          // Compared against what was last set, for the reason the tempo
+          // label is: this arrives once a second, and an updater handing back
+          // the old value still renders the App (PLAN.md §14f).
+          const shown = shownEngineStatus.current;
+          if (shown && shown.label === next.label && shown.steppedDown === next.steppedDown && shown.gpuUnavailable === next.gpuUnavailable) return;
+          shownEngineStatus.current = next;
+          setEngineStatus(next);
         }}
       />
 

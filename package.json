@@ -62,6 +62,7 @@
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
     "ears": "npm run build && node --experimental-strip-types scripts/ears.mjs",
+    "renders": "npm run build && node scripts/renders.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "crash": "npm run build && node scripts/crash.mjs",
     "watch": "node scripts/watch.mjs",
@@ -111,6 +112,7 @@
     "straw": "node scripts/straw.mjs",
     "lift": "node scripts/lift.mjs",
     "pressoil": "node scripts/pressoil.mjs",
+    "thingap": "node scripts/thingap.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
@@ -136,7 +138,8 @@
     "rolls": "npm run build && esbuild scripts/rolls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/rolls.mjs && node node_modules/.cache/rolls.mjs",
     "bottles": "npm run build && node scripts/bottles.mjs",
     "fingers": "node scripts/fingers.mjs",
-    "ferrohands": "node scripts/ferrohands.mjs"
+    "ferrohands": "node scripts/ferrohands.mjs",
+    "ferropress": "node scripts/ferropress.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

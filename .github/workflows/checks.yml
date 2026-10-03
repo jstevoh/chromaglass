@@ -271,6 +271,16 @@ jobs:
       # dist/, which the show server serves, so this runs the script alone.
       - name: The remote's Mixer
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
+      # §14f): with the band playing the App renders at most five times a
+      # second more than the ear tells it (ten), and the plate still hears a
+      # new reading nearly every frame; on a quiet page, at most one and a
+      # half. On a laptop page and a phone.
+      # The counts need no GPU; the plate's own line (a new reading nearly
+      # every frame) needs a plate that draws and is held on the Mac's open
+      # shard below. On the dist/ the phone's step built, like the Mixer.
+      - name: The sound's renders
+        run: node scripts/renders.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -340,6 +350,13 @@ jobs:
       - name: The press moves the oil
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run pressoil
+      # Thin Gap (PLAN §18a): a push fades at the drag time 12ν/h², a press
+      # pushes out the volume it displaces and takes it back when the glass
+      # lifts, a tight gap carries what Darcy says, and liquid is conserved
+      # where the gap changes; each against the old solver.
+      - name: The thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run thingap
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
@@ -392,6 +409,13 @@ jobs:
       - name: The hands move the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrohands
+      # Thin Gap: a pressed pool of ferrofluid stays full and spreads by the
+      # volume the glass displaced, comes back on the lift, and a front where
+      # the thinner liquid pushes the thicker fingers (PLAN 15d).
+      # In the open shard: the plate shard is near its timeout.
+      - name: The Press on the ferrofluid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferropress
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
@@ -467,8 +491,11 @@ jobs:
       # The show opens without stopping (scripts/startup.mjs): what the look
       # opens with is built before it opens and the rest behind it, none is
       # built on a frame, no two frames are more than two seconds apart but
-      # the one stop Chromium makes starting its GPU (held to the old way's),
-      # and the plate moves for good no later than it did the old way. On a shard
+      # for the time Chromium holds the page's whole thread while it starts
+      # its GPU (no frame, timer or long task of the page's, not begun where
+      # a promise it awaits settled, in the first three seconds; held to
+      # 4.5 s), and the plate
+      # moves for good no later than it did the old way. On a shard
       # of its own, because it empties the Mac's shader cache, and one after
       # another check would find it warm; depth, first on the tools shard,
       # is how the nine-second freeze was found and still sees it cold.
@@ -484,6 +511,12 @@ jobs:
       - name: The ear behind the wall
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node --experimental-strip-types scripts/ears.mjs
+      # The plate hears a new reading nearly every frame while the App renders
+      # ten times a second (scripts/renders.mjs, PLAN.md §14f): the line the
+      # Measure job skips, because there no plate draws. About forty seconds.
+      - name: The sound's renders, with a plate
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/renders.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a

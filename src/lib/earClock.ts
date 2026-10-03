@@ -173,3 +173,26 @@ export function onWallAsk(fn: ((now: number) => void) | null): void {
 export function wallAsked(now: number): void {
   askListener?.(now);
 }
+
+/*
+  The plate's own frame, the same way (PLAN.md §14f). The ear reads on this
+  window's animation frames from a loop of its own, and the plate draws from
+  another; which of the two runs first in a frame is the order they were
+  registered in, which a restart of either (a song render hands the plate's
+  loop back) can turn round. Read second, the plate drew last frame's
+  reading. So the plate's frame, once the gate has let it draw, offers the
+  ear the frame first, and the ear reads once a frame whichever of them
+  arrives first, told apart by the frame's own timestamp, which every
+  callback of one frame is given.
+*/
+let frameListener: ((ts: number) => void) | null = null;
+
+/** The ear, registering to be offered each frame the plate is about to draw. */
+export function onPlateFrame(fn: ((ts: number) => void) | null): void {
+  frameListener = fn;
+}
+
+/** The plate is about to draw the frame that began at `ts`: the ear reads for it first, if it has not. */
+export function plateFrame(ts: number): void {
+  frameListener?.(ts);
+}

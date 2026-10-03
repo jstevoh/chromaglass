@@ -107,13 +107,34 @@ export interface GpuStepParams {
   plateCurve: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
   depthDrag: number;
+  /**
+   * The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): over 0.5, the
+   * flow between the glasses has the gap's drag and a variable-mobility
+   * projection with an open rim, in place of the speed clamp. Off (0) is the
+   * solver every look was made on.
+   */
+  thinGap?: number;
+  /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
+  gapThickness?: number;
+  /**
+   * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
+   * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the
+   * lab sets it, to hold a check against a ferrofluid as thick as the clear
+   * liquid round it.
+   */
+  ferroViscosity?: number;
+  /**
+   * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
+   * as before the Press on the ferrofluid (PLAN 15d), so `npm run
+   * ferropress` can hold its checks against what was there. Unset is on.
+   */
+  phaseVolume?: number;
   /** How fast the plates spring back toward that dome, per step. */
   gapSpring: number;
   /** How much of a press's squeeze survives into the next step. */
   gapMemory: number;
   /** How hard the hand is on the glass: scales the press's push on the flow. */
   platePressure: number;
-  fingering: number;
   vibIntensity: number;
   vibFrequency: number;
   drip: number;         // rainDrip (0 = off)
