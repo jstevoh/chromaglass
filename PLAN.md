@@ -3512,6 +3512,15 @@ its frame rate live. "Free" means no new passes or texture reads.
     has to read under half and the pressed colour's own mean has to fall. If it
     is red after that, the app is not drawing the colour back as the lab does
     (presslift: 77% under the palm at 3 s), and that is the next thing to find.
+    Run 37148523629 with these: the thin press 0.083 → 0.116 → 0.109, 62% back
+    net of its idle pool (a frozen press 33%); red only on the Thin Gap off
+    control, whose pool was laid wider than its idle one (0.105 against 0.072).
+  - **On the Mac the thin Press barely clears the colour from under the palm.**
+    The share of the colour within 0.05 of the palm went 76% → 69% held → 68%
+    after the lift (its idle pool 78% → 76% → 72%; Thin Gap off 72% → 1%). The
+    lab's press takes the middle's colour to ×0.171. Find what the app's Press
+    lays on a thin gap that the lab's does not (radius, depth, the bowl's 3×,
+    the stroke's per-frame rate), and measure it under the palm.
   - **The substeps' ceiling.** 33 substeps of 0.4 cover 13 cells a step; the
     Press at 1× on 384² asks 8. A Press at 2× Amount on a 512² solver, or a
     machine-starved step (a longer step's spring), can ask more, and past it the

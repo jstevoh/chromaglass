@@ -455,11 +455,21 @@ try {
       await snap(`${name}2`);
       return where;
     };
+    /*
+      Each press right after its own idle pool, on the same solver, and both
+      laid well after the switch that set the solver. The fifth Mac run
+      (37148523629) laid the two pressed pools with less colour and further
+      out than the idle pools (213 of colour at 0.105 and 0.083 against 284
+      and 261 at 0.072 and 0.071), and those two were the pools laid straight
+      after a change of Thin Gap. Why a change does that is not known yet (it
+      is printed when a control does not match); the order now keeps it off
+      the comparison.
+    */
+    await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
+    await settle(3000);
     const at = await idleRun('idle');
     const idle = await readRun('idle', at);
-
     // The Press as the owner has it, Thin Gap off.
-    await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
     await pressLift('off');
     const off = await readRun('off', at);
 
@@ -471,19 +481,18 @@ try {
       await settle(250);
       thin = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap);
     }
+    await settle(3000);
     /*
       And the idle control again on the thin gap, which the pressed pool is
       laid on. The fourth Mac run (37145038742) laid it there 0.062 from the
       palm after its settle against the old solver's 0.052, a fifth wider: a
       pool spreads its own way on each solver, so the old solver's idle pool
-      is not this one's. Each press is taken net of its own solver's. Run
-      after the press, so a transient as the thin solver starts lands on
-      neither alone the way it did on the press.
+      is not this one's. Each press is taken net of its own solver's.
     */
-    await pressLift('lift');
-    const on = await readRun('lift', at);
     await idleRun('idleThin');
     const idleThin = await readRun('idleThin', at);
+    await pressLift('lift');
+    const on = await readRun('lift', at);
     await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
 
     /*
