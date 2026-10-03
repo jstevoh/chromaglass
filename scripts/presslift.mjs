@@ -179,10 +179,12 @@ try {
   // Where the ring should be at each moment of the lift: check 1's law, with the volume the glass still holds down.
   const law = (t) => Math.sqrt(R0 * R0 + t.V / (Math.PI * 0.03));
   const behind = [60, 90, 180].map((s) => Math.abs(now.lift[s].ring - law(now.lift[s])) / shift);
+  // The colour under the palm comes back more slowly than the ring (a thin ring drawn out is smeared by the carry's limiter): printed, for the app's check (tools.mjs), which reads the same colour.
+  const discBack = [60, 90, 180].map((s) => (now.t1.disc - now.lift[s].disc) / (now.t1.disc - now.t0.disc));
   const keptLift = [60, 540].map((s) => Math.max(Math.abs(now.lift[s].red / now.t0.red - 1), Math.abs(now.lift[s].green / now.t0.green - 1)));
   check('let go, the ring is on its way back within a second, where the glass still held down puts it, and every drop kept',
     back(now, 60) >= 0.25 && back(clock, 60) < 0.25 && behind.every((b) => b < 0.1) && keptLift.every((l) => l < 0.005),
-    `${(back(now, 60) * 100).toFixed(0)}% of its shift back after 1 s, ${(back(now, 90) * 100).toFixed(0)}% after 1.5 s, ${(back(now, 180) * 100).toFixed(0)}% after 3 s; with the glass on the look's clock (the control) ${(back(clock, 60) * 100).toFixed(0)}% after 1 s; off where r² = r₀² + V/πh₀ puts it by ${behind.map((b) => `${(b * 100).toFixed(0)}%`).join(', ')} of the shift at 1, 1.5 and 3 s; colour lost ${keptLift.map((l) => `${(l * 100).toFixed(2)}%`).join(' and ')} at 1 and 9 s`);
+    `${(back(now, 60) * 100).toFixed(0)}% of its shift back after 1 s, ${(back(now, 90) * 100).toFixed(0)}% after 1.5 s, ${(back(now, 180) * 100).toFixed(0)}% after 3 s; with the glass on the look's clock (the control) ${(back(clock, 60) * 100).toFixed(0)}% after 1 s; off where r² = r₀² + V/πh₀ puts it by ${behind.map((b) => `${(b * 100).toFixed(0)}%`).join(', ')} of the shift at 1, 1.5 and 3 s; colour lost ${keptLift.map((l) => `${(l * 100).toFixed(2)}%`).join(' and ')} at 1 and 9 s; the colour under the palm ${discBack.map((b) => `${(b * 100).toFixed(0)}%`).join(', ')} back at 1, 1.5 and 3 s`);
 
   // 5.
   {

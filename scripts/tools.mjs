@@ -357,10 +357,10 @@ try {
     Classic. Measured as the colour's mean distance from the palm, over the
     whole cleared plate: it has to grow under the press, and once the hand
     lets go a half of that growth has to come back within three seconds
-    (the lab's `npm run presslift` prints the ring's return at 1, 1.5 and
-    3 s on Classic's glass; a glass on the look's clock, as it was, came
-    back 4% in the first second, and a carry that moved the colour out to a
-    ring never brought it back at all). Turned off again after, so nothing
+    (the lab's `npm run presslift` reads the same colour, under the palm,
+    77% back at 3 s on Classic's glass, and its ring 72%; a glass on the
+    look's clock, as it was, came back 4% in the first second, and a carry
+    that moved the colour out to a ring never brought it back at all). Turned off again after, so nothing
     below or in later checks runs on it.
 
     Two controls. The same press with Thin Gap off, the Press the owner
@@ -377,7 +377,32 @@ try {
     one's size, fails the check rather than agreeing to anything.
   */
   {
-    // One press and let go from a fresh pool at A: before, held, three seconds after.
+    /*
+      Held and let go in the plate's own seconds, not the page's. The first
+      Mac run held the Press 1.5 s and waited 3 s by the wall clock, and read
+      it pushed out 0.027 and a third back; on a runner that cannot keep the
+      step rate, the solver runs fewer steps than the wall's seconds and the
+      glass both closes and lifts less (the glass springs in the show's
+      seconds, `dtSeconds` a step). So each wait counts the solver's steps,
+      times what each stands for, and prints how long it took.
+    */
+    const waits = [];
+    const plateWait = async (seconds) => {
+      const t0 = Date.now();
+      const read = () => page.evaluate(() => { const f = window.chromaglassDebug().fluids?.[0]; return { n: f?.stepIndex ?? -1, dt: f?.dtSeconds ?? 0 }; });
+      const a = await read();
+      let b = a;
+      while (Date.now() - t0 < seconds * 8000 + 5000) {
+        await settle(50);
+        b = await read();
+        if (a.n >= 0 && b.dt > 0 && (b.n - a.n) * b.dt >= seconds) break;
+      }
+      const plate = a.n >= 0 ? (b.n - a.n) * b.dt : 0;
+      waits.push(`${plate.toFixed(2)} s of plate in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+      return plate >= seconds;
+    };
+    // One press and let go from a fresh pool at A: before, held 1.5 s of the plate's, and 3 s after.
+    let timed = true;
     const pressLift = async (name) => {
       await clear();
       await pool(A);
@@ -387,10 +412,10 @@ try {
       await settle(300);
       await page.mouse.move(...screen(...A));
       await page.mouse.down();
-      await settle(1500);
+      timed = (await plateWait(1.5)) && timed;
       await snap(`${name}1`);
       await page.mouse.up();
-      await settle(3000);
+      timed = (await plateWait(3)) && timed;
       await snap(`${name}2`);
     };
     const spread = (keep, at) => page.evaluate(({ keep, at }) => {
@@ -410,9 +435,9 @@ try {
     await pool(A);
     await settle(1500);
     const at = await snap('idle0');
-    await settle(1800);
+    timed = (await plateWait(1.8)) && timed;
     await snap('idle1');
-    await settle(3000);
+    timed = (await plateWait(3)) && timed;
     await snap('idle2');
     const idle = await readRun('idle', at);
 
@@ -441,13 +466,15 @@ try {
     const idleOk = idle[0].total > 5 && ratio(on[0], idle[0]) > 0.5 && ratio(on[0], idle[0]) < 2;
     const pressKept = ratio(on[0], on[1]), liftKept = ratio(on[1], on[2]);
     const idlePress = ratio(idle[0], idle[1]), idleLift = ratio(idle[1], idle[2]);
+    const timing = timed ? `; waited ${waits.join(', ')}` : `; the plate did not step through every wait: ${waits.join(', ')}`;
     const idleNote = idleOk ? '' : ` (the idle control had no pool to compare: ${idle[0].total.toFixed(0)} of colour against the pressed pool's ${on[0].total.toFixed(0)})`;
     check('Press on a thin gap pushes the colour out from under the palm',
-      thin && idleOk && on[0].total > 5 && outOf(on) > 0.03 && pressKept >= idlePress - 0.05,
-      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${on[0].mean.toFixed(3)} → ${on[1].mean.toFixed(3)} of the plate held down, ${(pressKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idlePress * 100).toFixed(0)}%${idleNote}`);
+      thin && timed && idleOk && on[0].total > 5 && outOf(on) > 0.03 && pressKept >= idlePress - 0.05,
+      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${on[0].mean.toFixed(3)} → ${on[1].mean.toFixed(3)} of the plate held down, ${(pressKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idlePress * 100).toFixed(0)}%${idleNote}${timing}`);
     check('and draws it back when the hand lets go, where the Press as it was did not',
-      thin && idleOk && outOf(on) > 0.03 && backOf(on) >= 0.5 && liftKept >= idleLift - 0.05 && outOf(off) > 0.03 && backOf(off) < 0.5,
-      `${on[1].mean.toFixed(3)} → ${on[2].mean.toFixed(3)} three seconds after letting go, less the idle pool's own ${drift.toFixed(3)}: ${(backOf(on) * 100).toFixed(0)}% of the way back to ${on[0].mean.toFixed(3)}, ${(liftKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idleLift * 100).toFixed(0)}%; with Thin Gap off (the control) ${off[0].mean.toFixed(3)} → ${off[1].mean.toFixed(3)} → ${off[2].mean.toFixed(3)}, ${(backOf(off) * 100).toFixed(0)}% back${idleNote}`);
+      thin && timed && idleOk && outOf(on) > 0.03 && backOf(on) >= 0.5 && liftKept >= idleLift - 0.05 && outOf(off) > 0.03 && backOf(off) < 0.5,
+      `${on[1].mean.toFixed(3)} → ${on[2].mean.toFixed(3)} three of the plate's seconds after letting go, less the idle pool's own ${drift.toFixed(3)}: ${(backOf(on) * 100).toFixed(0)}% of the way back to ${on[0].mean.toFixed(3)}, ${(liftKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idleLift * 100).toFixed(0)}%; with Thin Gap off (the control) ${off[0].mean.toFixed(3)} → ${off[1].mean.toFixed(3)} → ${off[2].mean.toFixed(3)}, ${(backOf(off) * 100).toFixed(0)}% back${idleNote}`);
+    console.log(`     the Press's waits, in the plate's seconds: ${waits.join(', ')}`);
   }
 } finally {
   await browser.close();
