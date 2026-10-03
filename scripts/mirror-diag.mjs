@@ -19,15 +19,17 @@ const CALM = {
 const VARIANTS = [
   { name: 'warm-up (browser cold)', drop: false, extra: {}, reps: 1 },
   { name: 'drops', drop: true, extra: {} },
-  { name: 'drops, hand held still', drop: true, still: true, extra: {} },
-  { name: 'no drops, longer', drop: false, extra: {}, reps: 8 },
+  { name: 'drops, rung pinned where it opened', drop: true, pin: true, extra: {} },
+  { name: 'drops again', drop: true, extra: {} },
+  { name: 'drops, rung pinned again', drop: true, pin: true, extra: {} },
 ];
+let openedRung = null;
 const browser = await launchChromium(chromium);
 try {
   for (const v of VARIANTS) {
     const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
     await page.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* none */ } });
-    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${v.pin && openedRung !== null ? `&rung=${openedRung}` : ''}`, { waitUntil: 'load' });
     await page.waitForTimeout(8000);
     await page.evaluate(({ CALM, extra }) => {
       window.chromaglassSettings?.({ ...CALM, layerCount: 2, ...extra });
@@ -53,6 +55,7 @@ try {
       }
       const flat = {}; for (const [k, v] of Object.entries(s)) if (typeof v !== 'object') flat[k] = v;
       return {
+        gov: { index: d?.governor?.index, rung: d?.governor?.rung, rungs: d?.governor?.rungs?.length, N: f0?.gpu?.N, L: f0?.gpu?.L },
         flat, spinv: JSON.stringify(d?.spin ?? null), rotc: JSON.stringify(d?.rotation?.current ?? null), plateSpin: f0?.plateSpin,
         flow: mag ? { swirl: +(rot / mag).toFixed(3), outward: +(rad / mag).toFixed(3), drift: +(Math.hypot(mvx, mvy) / mag).toFixed(3) } : null,
         tool: d?.tool?.(), take: JSON.stringify(d?.take ?? null)?.slice(0, 80),
@@ -94,8 +97,9 @@ try {
     }, { ia: a.id, ib: b.id });
     let lastFlat = null;
     const changed = (st) => { const out = []; if (lastFlat) for (const k of new Set([...Object.keys(lastFlat), ...Object.keys(st.flat)])) if (lastFlat[k] !== st.flat[k]) out.push(`${k}:${lastFlat[k]}→${st.flat[k]}`); lastFlat = st.flat; return out.join(' '); };
-    const fmt = (s) => `flow=${JSON.stringify(s.flow)} spin=${s.spinv} plateSpin=${s.plateSpin} rot=${s.rotc} tool=${s.tool} changed[${changed(s)}] t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)} |v| ${l[3].toExponential(2)} max ${l[4].toExponential(2)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)}`;
+    const fmt = (s) => `gov=${JSON.stringify(s.gov)} flow=${JSON.stringify(s.flow)} spin=${s.spinv} plateSpin=${s.plateSpin} rot=${s.rotc} tool=${s.tool} changed[${changed(s)}] t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)} |v| ${l[3].toExponential(2)} max ${l[4].toExponential(2)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)}`;
     console.log(`\n== ${v.name}  settings [dyeBudget evap platePressure air automate speed surge damping] = ${JSON.stringify((await state()).set)}`);
+    { const g = (await state()).gov; console.log('   opened at', JSON.stringify(g), 'pinned', v.pin ? openedRung : 'no'); if (openedRung === null && v.drop) openedRung = g.index; }
     const hx = hole.x + hole.width * 0.75, hy = hole.y + hole.height * 0.75;
     for (let rep = 0; rep < (v.reps ?? 6); rep++) {
       const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
