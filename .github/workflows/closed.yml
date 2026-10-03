@@ -12,12 +12,18 @@ name: A closed PR stops its runs
 # GitHub cancels a run when another run enters the same concurrency group
 # with `cancel-in-progress`, and concurrency groups are shared by every
 # workflow in the repository. So each job below joins the group the run it
-# stops is in, spelled out by hand, and does nothing: a pull request event's
-# `github.ref` is `refs/pull/<n>/merge` for every activity type, closed
-# included, so the groups match.
+# stops is in, spelled out by hand. A PR's own runs evaluate `github.ref` to
+# `refs/pull/<n>/merge`, but the closed event of a *merged* PR does not: its
+# `github.ref` is the base branch. The first version here wrote
+# `${{ github.ref }}` on the strength of GitHub's docs, and on #234's own merge
+# (2026-10-03 22:59 UTC) its jobs logged "joined checks-Checks-refs/heads/main",
+# a group no PR run is ever in, and went green because nothing happened to be
+# running. So the ref is built from the PR's number, which every activity
+# type carries:
 #
 #   checks.yml   checks-${{ github.workflow }}-${{ github.ref }}, where its
-#                github.workflow is its name, "Checks"
+#                github.workflow is its name, "Checks", and its github.ref
+#                refs/pull/<n>/merge
 #   ios.yml      ios-${{ github.ref }}
 #
 # The stopping is done here rather than by adding `closed` to checks.yml's own
@@ -53,12 +59,12 @@ jobs:
     permissions:
       actions: read
     concurrency:
-      group: checks-Checks-${{ github.ref }}
+      group: checks-Checks-refs/pull/${{ github.event.pull_request.number }}/merge
       cancel-in-progress: true
     env:
       GH_TOKEN: ${{ github.token }}
       WORKFLOW: checks.yml
-      GROUP: checks-Checks-${{ github.ref }}
+      GROUP: checks-Checks-refs/pull/${{ github.event.pull_request.number }}/merge
       HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Nothing of it is left queued or running
@@ -82,12 +88,12 @@ jobs:
     permissions:
       actions: read
     concurrency:
-      group: ios-${{ github.ref }}
+      group: ios-refs/pull/${{ github.event.pull_request.number }}/merge
       cancel-in-progress: true
     env:
       GH_TOKEN: ${{ github.token }}
       WORKFLOW: ios.yml
-      GROUP: ios-${{ github.ref }}
+      GROUP: ios-refs/pull/${{ github.event.pull_request.number }}/merge
       HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Nothing of it is left queued or running
