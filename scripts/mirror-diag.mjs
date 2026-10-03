@@ -17,10 +17,13 @@ const CALM = {
   audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
 };
 const VARIANTS = [
+  { name: 'warm-up (browser cold)', drop: false, extra: {}, reps: 2 },
   { name: 'drops', drop: true, extra: {} },
   { name: 'no drops', drop: false, extra: {} },
-  { name: 'drops, no evaporation', drop: true, extra: { evaporationRate: 0 } },
-  { name: 'drops, platePressure 0 airVelocity 0', drop: true, extra: { platePressure: 0, airVelocity: 0 } },
+  { name: 'drops, polarity 0', drop: true, extra: { polarity: 0 } },
+  { name: 'drops, blobSurfaceTension 0', drop: true, extra: { blobSurfaceTension: 0 } },
+  { name: 'drops, damping 0.9', drop: true, extra: { damping: 0.9 } },
+  { name: 'drops, surge 0', drop: true, extra: { surge: 0 } },
 ];
 const browser = await launchChromium(chromium);
 try {
@@ -43,7 +46,11 @@ try {
       const s = d?.settings ?? {};
       return {
         t: performance.now() / 1000,
-        layers: (d?.fluids ?? []).map((f) => [f.stepCount, f.meanDensity, f.dt]),
+        layers: (d?.fluids ?? []).map((f) => {
+          const vx = f.readVx, vy = f.readVy; let sp = 0, n = 0, mx = 0;
+          if (vx && vy) for (let i = 0; i < vx.length; i++) { const v = Math.hypot(vx[i], vy[i]); if (Number.isFinite(v)) { sp += v; n++; if (v > mx) mx = v; } }
+          return [f.stepCount, f.meanDensity, f.dt, n ? sp / n : -1, mx];
+        }),
         sps: d?.solver?.().stepsPerSec, auto: d?.autoEvents,
         set: [s.dyeBudget, s.evaporationRate, s.platePressure, s.airVelocity, s.automateRate, s.globalSpeed, s.surge, s.damping].map((x) => typeof x === 'number' ? +x.toFixed(4) : x),
         phrase: (() => { const p = d?.phrase?.(); return p ? { gust: +(p.gust ?? 0).toFixed(2), drive: +(p.drive ?? 0).toFixed(2), lean: +(p.lean ?? 0).toFixed(2), dt: +(p.dt ?? 0).toFixed(4) } : null; })(),
@@ -72,10 +79,10 @@ try {
       }
       return { abs: abs / n, sgn: sgn / n, bright: sumA / n, litA: litA / n, litB: litB / n };
     }, { ia: a.id, ib: b.id });
-    const fmt = (s) => `t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)} auto=${JSON.stringify(s.auto)}`;
+    const fmt = (s) => `t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)} |v| ${l[3].toExponential(2)} max ${l[4].toExponential(2)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)}`;
     console.log(`\n== ${v.name}  settings [dyeBudget evap platePressure air automate speed surge damping] = ${JSON.stringify((await state()).set)}`);
     const hx = hole.x + hole.width * 0.75, hy = hole.y + hole.height * 0.75;
-    for (let rep = 0; rep < 7; rep++) {
+    for (let rep = 0; rep < (v.reps ?? 6); rep++) {
       const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
       if (v.drop && rep < 4) {
         await page.mouse.move(hx, hy); await page.mouse.down();

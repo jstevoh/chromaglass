@@ -321,7 +321,7 @@ jobs:
         run: npm run build
       - name: TEMPORARY mirror diagnostic
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'diag' }}
-        run: node scripts/mirror-diag.mjs && node scripts/mirror.mjs; node scripts/mirror.mjs
+        run: node scripts/mirror-diag.mjs
       # Every shader compiles, before anything builds a pipeline from one.
       - name: The shaders compile
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
