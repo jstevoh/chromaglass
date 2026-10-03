@@ -8425,6 +8425,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let stage: WebGPUStage | null = null;
     let camera: WebGPUCamera | null = null;
     let projector: WebGPUOutput | null = null;
+    /** The projector sources last frame drew, to scope the frame a new one is built on. */
+    let sourcesBefore = '';
     let probe: WebGPUFrameProbe | null = null;
     let chain: WebGPUPostChain | null = null;
     /** The compositor, so the cleanup releases it by name rather than leaving it to the device's destroy (S13). */
@@ -8823,6 +8825,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               the flash guard's gain and the logo, as the wall has them.
             */
             const sourcesNow = out ? sourcesAskedFor(view.outputCfg) : [];
+            // A source picked mid-show allocates two canvas-sized textures on
+            // its first frame (the output's and the plate's second target):
+            // scope that frame, as a new projector's is, so running out of
+            // memory there steps the governor down rather than blacking every
+            // projector with a bind group that fails each frame.
+            const sourcesKey = sourcesNow.join(' ');
+            if (sourcesKey !== sourcesBefore) { if (sourcesNow.some(k => !sourcesBefore.split(' ').includes(k))) scopeSoon = 2; sourcesBefore = sourcesKey; }
             plate.keepSources(sourcesNow);
             out?.keepSources(sourcesNow);
             for (const kind of sourcesNow) {

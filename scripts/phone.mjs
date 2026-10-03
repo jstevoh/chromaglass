@@ -646,12 +646,16 @@ try {
       await tap(page, 'surface-source-back');
       const sourcePick = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="surface-source-"]')]
         .map(el => ({ id: el.dataset.testid.slice('surface-source-'.length), h: Math.round(el.getBoundingClientRect().height), on: el.getAttribute('aria-checked') === 'true' })));
+      // What the renderer reads, not only what the button says.
+      const pickedLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.source ?? null);
       await tap(page, 'surfaces-clear');
+      const leftOver = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.length ?? null);
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
-      check('a projector\'s source is picked from the phone\'s Settings: four of 48 px or more, and the tapped one, Back plate, is the one on',
-        sourcePick.length === 4 && sourcePick.every(b => b.h >= 48) && sourcePick.filter(b => b.on).map(b => b.id).join() === 'back',
-        sourcePick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · '));
+      check('a projector\'s source is picked from the phone\'s Settings: four of 48 px or more, the tapped one, Back plate, is the one on and the one the show draws, and clearing leaves no shape',
+        sourcePick.length === 4 && sourcePick.every(b => b.h >= 48) && sourcePick.filter(b => b.on).map(b => b.id).join() === 'back'
+        && pickedLive === 'back' && leftOver === 0,
+        `${sourcePick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${pickedLive}, ${leftOver} shapes after Clear all`);
 
       // Clean screen, and a still finger to bring it back.
       // Painting is a moving finger, so a drag over a second leaves the

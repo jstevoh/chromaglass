@@ -58,9 +58,12 @@
  *   8. a projector's own source (PLAN.md §16b): the front plate alone, the
  *      back plate alone and the film alone, drawn in the wall's frame as the
  *      app draws them, are each exactly the wall with the other rows at 0,
- *      and none of them moves the wall; the film alone does not show the LED
- *      ring the front plate's projector shows; and the dimmer at 0 blacks
- *      every one of them, so a blackout reaches every projector
+ *      and none of them moves the wall; the film alone does not show the
+ *      lamp's rows the front plate's projector shows, and is the same picture
+ *      with the front plate's dye down as with none (it tinted and bent the
+ *      film at full strength whatever the front plate's level, 171 at worst),
+ *      and a film on Multiply is its frame there, not black; and the dimmer
+ *      at 0 blacks every one of them, so a blackout reaches every projector
  *
  * Each rule was held to a broken shader when it was written (a beam that
  * draws nothing, a logo that vanishes when lowered, the ring left lighting
@@ -220,6 +223,16 @@ const shots = await page.evaluate(async (controls) => {
   // Dye over the left half only, so the right half is bare glass to compare
   // against; the back plate is the same dye turned half round, so it lies over
   // the right half, and the two plates' dye can be told apart.
+  /*
+    The film alone on a plate with no dye yet, for section 8: the same film
+    source once the dye is down must be the same picture, since the film
+    alone has no glass in its gate. The plate's clock is pinned for both, so
+    only the dye differs. Made here, before the dye, with its own film.
+  */
+  const preFilm = (() => { const c = new OffscreenCanvas(128, 128); const g = c.getContext('2d'); for (let x = 0; x < 128; x += 8) { g.fillStyle = `hsl(${x * 3},85%,${55 + (x % 24)}%)`; g.fillRect(x, 0, 8, 128); } return c; })();
+  const filmSourceAt = async (blend) => (await lab.render(128, { layerCount: 2, filmMix: 0.9, markMix: 0, beads: 0, lampHotspot: 0, secondLamp: 0, microDroplets: 0, lampWarmth: 0, dishVignette: 0, filmBlend: blend },
+    { film: preFilm, backPlate: true, backRotation: Math.PI, sources: ['film'], time: 1 })).film;
+  const filmNoDye = { own: await filmSourceAt('own'), multiply: await filmSourceAt('multiply') };
   for (let i = 0; i < 10; i++) lab.dye(0.08 + 0.34 * r(), 0.15 + 0.7 * r(), 0.06 + 0.08 * r(), [0.3 + 1.2 * r(), 0.3 + 1.2 * r(), 0.3 + 1.2 * r()], 1.4);
   lab.flush(); await lab.step(6);
   const mk = (w, h, paint) => { const c = new OffscreenCanvas(w, h); paint(c.getContext('2d'), w, h); return c; };
@@ -363,13 +376,17 @@ const shots = await page.evaluate(async (controls) => {
     all: await lab.render(S, base, { ...all, sources: THREE }),
     wall: await flat({}),
     front: await flat({ backLevel: 0, filmMix: 0 }),
-    back: await flat({ frontLevel: 0, filmMix: 0 }),
-    film: await flat({ frontLevel: 0, backLevel: 0, markMix: 0 }),
+    back: await flat({ frontLevel: 0, filmMix: 0, markMix: 0 }),
+    film: await flat({ frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0 }),
+    // The film alone with the dye down, against the same before it (above).
+    filmDyed: { own: await filmSourceAt('own'), multiply: await filmSourceAt('multiply') },
+    filmNoDye,
     // No plate, no film: what the back plate adds to the bare lamp, and what the film does.
     none: await flat({ frontLevel: 0, backLevel: 0, filmMix: 0 }),
     black: await flat({ frontLevel: 0, backLevel: 0, markMix: 0, filmMix: 0 }),
-    // The LED ring on in the lamp: the front plate's projector shows it, the film's does not.
-    led: await lab.render(S, { ...base, ledPlatform: true, ledMode: 'rainbow' }, { ...all, sources: THREE }),
+    // The lamp's three rows lit (the LED ring, the gel, the lumia): the front
+    // plate's projector shows them, the film's does not.
+    led: await lab.render(S, { ...base, ledPlatform: true, ledMode: 'rainbow', gelWheel: 0.6, lumia: 0.6 }, { ...all, sources: THREE }),
     // A blackout. The logo is laid over the dimmer (finishLight in the plate
     // shader), so a blackout leaves it lit on the wall, and on the front and
     // back plates' projectors with it; it is taken off here so black is black.
@@ -774,15 +791,24 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
     front.max === 0 && frontApart.mean > 10 && frontFilm.mean > 10,
     `worst ${front.max}; the wall differs from it by ${f1(frontApart.mean)} a channel where the back plate has dye, ${f1(frontFilm.mean)} where it has none`);
   const back = diff(all.back, src.back), backDyed = diff(src.back, src.none, backDye), backFront = diff(src.back, src.front, noBackDye);
-  check('the back plate alone is the wall with the front plate and the film at 0, exactly',
+  check('the back plate alone is the wall with the front plate, the film and the logo at 0, exactly',
     back.max === 0 && backDyed.mean > 10 && backFront.mean > 10,
     `worst ${back.max}; its dye ${f1(backDyed.mean)} a channel over the bare lamp, and ${f1(backFront.mean)} off the front plate's picture off its dye`);
   const film = diff(all.film, src.film), filmShows = diff(src.film, src.black);
   check('the film alone is the wall with both plates, the lamp\'s rows and the logo at 0, exactly',
     film.max === 0 && filmShows.mean > 20, `worst ${film.max}; the film ${f1(filmShows.mean)} a channel over black`);
   const ledFront = diff(src.led.front, all.front), ledFilm = diff(src.led.film, all.film);
-  check('the LED ring lights the front plate\'s projector and not the film\'s', ledFront.mean > 3 && ledFilm.max === 0,
+  check('the LED ring, the gel and the lumia light the front plate\'s projector and not the film\'s', ledFront.mean > 3 && ledFilm.max === 0,
     `${f1(ledFront.mean)} a channel on the front plate's, worst ${ledFilm.max} on the film's`);
+  // The film alone has no glass in its gate: the front plate's dye neither
+  // tints nor bends it. Its control is the film being there at all.
+  const tint = diff(src.filmDyed.own, src.filmNoDye.own), filmThere = diff(src.filmNoDye.own, src.black);
+  check('the film alone is the same picture with the front plate\'s dye down as with none: nothing tints or bends it',
+    tint.max === 0 && filmThere.mean > 20, `worst ${tint.max} (${f1(tint.mean)} a channel); the film ${f1(filmThere.mean)} over black`);
+  // And a film row on Multiply, alone, is the film and not a dark projector.
+  const multLit = diff(src.filmNoDye.multiply, src.black), multDyed = diff(src.filmDyed.multiply, src.filmNoDye.multiply);
+  check('a film row on Multiply shows its frame on the film\'s own projector, not black, and still no dye',
+    multLit.mean > 20 && multDyed.max === 0, `${f1(multLit.mean)} a channel over black, worst ${multDyed.max} with the dye`);
   // Lit at a dimmer of 1, so black at 0 is the dimmer's doing and not a source that was black already.
   const lit = THREE_KINDS.map(k => [k, diff(src.lit[k], src.dark[k]).mean]);
   const darkest = ['wall', ...THREE_KINDS].map(k => [k, src.dark[k].reduce((m, v, i) => (i % 4 === 3 ? m : Math.max(m, v)), 0)]);

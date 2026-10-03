@@ -527,13 +527,14 @@ Surface Tension low (which made the push strongest):
 ## 21. A projector picks its source
 
 PLAN.md §16b. With a projector (or a second window) on, open Settings,
-Mapping, add two rectangles side by side, and set one to **Front plate** and
-the other to **Back plate**, on a two-plate look (Classic). Worth looking at:
+Mapping, add two rectangles side by side, and set one's Source to **Front** and
+the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 
 - each rectangle carries one plate, and the two are the same liquid, turned
   opposite ways, moving together;
 - **Film** on a surface with a film playing shows the film alone, graded as
-  the Mixer's film row is;
+  the Mixer's film row is, with none of the plate's liquid in it;
+- the logo is on the front plate's projector and not the back's;
 - grading a row in the Mixer (the back plate's brightness, say) changes that
   plate on its own projector as on the wall; the dimmer and a blackout take
   every projector down;

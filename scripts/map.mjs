@@ -200,6 +200,7 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
     stdin: {
       contents: `
         export { fillOutputUniforms, SOURCE_INDEX } from './src/gpu/output.ts';
+        export { OUTPUT_WGSL } from './src/gpu/wgsl/output.ts';
         export { UniformPack } from './src/gpu/uniforms.ts';
         export { OUTPUT_LAYOUT } from './src/gpu/wgsl/outputFields.ts';
         export { sourceSettings, SOURCE_OFF } from './src/lib/plateSources.ts';
@@ -249,19 +250,59 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
     n === 3 && got.join(' ') === `${m.SOURCE_INDEX.back} ${m.SOURCE_INDEX.film} ${m.SOURCE_INDEX.wall}` && m.SOURCE_INDEX.front === 1 && m.SOURCE_INDEX.back === 2 && m.SOURCE_INDEX.film === 3,
     `${n} quads, sources ${got.join(' ')}`);
 
-  // Each source takes out the rows it names and nothing else, by the Mixer's
-  // own level keys, so a renamed level cannot leave a row on.
-  const base = { ...m.DEFAULT_SETTINGS, frontLevel: 0.9, backLevel: 0.8, filmMix: 0.7, ledLevel: 0.6, gelWheel: 0.5, lumia: 0.4, markMix: 0.3 };
+  /*
+    And that slot reaches that texture: the shader's branch on the slot's
+    number to a texture variable, that variable's binding, and the binding
+    the output pass puts each source's picture at. Read from the two sources
+    themselves, because no picture here can see it: the lab reads each
+    source's texture directly, and two projectors with front and back
+    swapped are, to the Mac's check, as different as the right way round.
+  */
+  {
+    const { readFileSync } = await import('node:fs');
+    const wgsl = m.OUTPUT_WGSL;
+    const ts = readFileSync(join(root, 'src/gpu/output.ts'), 'utf8');
+    const varAt = Object.fromEntries([...wgsl.matchAll(/which == (\d+)\) \{ col = textureSampleLevel\((\w+),/g)].map(x => [Number(x[1]), x[2]]));
+    const bindingOf = Object.fromEntries([...wgsl.matchAll(/@binding\((\d+)\) var (\w+): texture_2d/g)].map(x => [x[2], Number(x[1])]));
+    const kindAt = Object.fromEntries([...ts.matchAll(/binding: (\d+), resource: this\.bound\('(\w+)'\)/g)].map(x => [Number(x[1]), x[2]]));
+    const routes = ['front', 'back', 'film'].map(kind => {
+      const n = m.SOURCE_INDEX[kind];
+      const v = varAt[n];
+      return { kind, n, v, reaches: kindAt[bindingOf[v]] };
+    });
+    check('each source\'s slot number reaches that source\'s picture: the shader\'s branch, its binding, the texture bound there',
+      routes.every(r => r.reaches === r.kind) && Object.keys(varAt).length === 3 && !varAt[m.SOURCE_INDEX.wall],
+      routes.map(r => `${r.kind}: ${r.n} → ${r.v} → ${r.reaches}`).join(' · '));
+  }
+
+  /*
+    Each source takes out the rows it names and nothing else, by the Mixer's
+    own level keys, so a renamed level cannot leave a row on. Against a base
+    in which every number is its own non-zero value and every switch is
+    thrown from its default, so a key a source quietly set to 0 (or to
+    anything) cannot hide behind a default that was 0 already.
+  */
+  const base = Object.fromEntries(Object.entries(m.DEFAULT_SETTINGS).map(([k, v], i) =>
+    [k, typeof v === 'number' ? 0.37 + i * 1e-3 : typeof v === 'boolean' ? !v : v]));
   const level = (id) => m.MIX_SOURCE_INFO[id].level;
-  const zeroed = (kind) => Object.keys(base).filter(k => m.sourceSettings(kind, base)[k] !== base[k]).sort().join(' ');
+  const zeroed = (kind) => {
+    const got = m.sourceSettings(kind, base);
+    return [...new Set([...Object.keys(base), ...Object.keys(got)])].filter(k => got[k] !== base[k]).sort().join(' ');
+  };
   check('the front plate alone takes out the back plate and the film, and nothing else',
     zeroed('front') === [level('back'), level('film')].sort().join(' '), zeroed('front'));
-  check('the back plate alone takes out the front plate and the film, and nothing else',
-    zeroed('back') === [level('front'), level('film')].sort().join(' '), zeroed('back'));
+  check('the back plate alone takes out the front plate, the film and the logo (which goes out on the front plate\'s projector), and nothing else',
+    zeroed('back') === [level('front'), level('film'), level('mark')].sort().join(' '), zeroed('back'));
   check('the film alone takes out both plates, the lamp rows and the logo, and nothing else',
     zeroed('film') === ['front', 'back', 'led', 'gel', 'lumia', 'mark'].map(level).sort().join(' '), zeroed('film'));
   check('and none of them touches the dimmer, so the dimmer and a blackout reach every projector',
     ['front', 'back', 'film'].every(k => m.sourceSettings(k, { ...base, dimmer: 0.37 }).dimmer === 0.37));
+  // Multiply over the black under the film alone is black: the film alone draws a Multiply film as Add, and only it.
+  const blends = ['own', 'screen', 'add', 'multiply', 'key'].map(b => [b, m.sourceSettings('film', { ...base, filmBlend: b }).filmBlend]);
+  check('the film alone draws a film row on Multiply as Add, the frame itself, and keeps every other blend',
+    blends.every(([b, got]) => got === (b === 'multiply' ? 'add' : b))
+    && ['front', 'back'].every(k => m.sourceSettings(k, { ...base, filmBlend: 'multiply' }).filmBlend === 'multiply'),
+    blends.map(([b, got]) => `${b} → ${got}`).join(' · '));
 }
 
 console.log('');

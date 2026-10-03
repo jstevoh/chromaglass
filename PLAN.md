@@ -3031,26 +3031,41 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
   asks for is the plate's display pass drawn again into its own texture with its own
   uniforms (`WebGPUPlate.drawSource`): the frame's settings with the Mixer's other rows
   at 0 (`lib/plateSources.ts`), so a source is graded, blended and dimmed as its row is
-  on the wall, and a blackout or the flash guard reaches every projector. Only the
+  on the wall, and a blackout or the flash guard reaches every projector. The logo goes
+  out on the front plate's projector only, so two projectors do not carry two. Only the
   full-screen display is repeated; the solvers, the pack and the derive are the wall's.
-  Nothing is drawn for a source no enabled surface shows. Checks: `npm run map` (40:
-  the routing, the shader's source index, the rows each source leaves out), `npm run
-  mixer` section 8 (6: each source exactly the wall with the other rows at 0, drawn in
-  the wall's frame, and the wall untouched; red when a source reads the wall's
-  uniforms), a phone check (the picker from the phone), and `wall` on the Mac (two
-  projectors side by side, each its own source, and each source's pass timed).
+  Nothing is drawn for a source no enabled surface shows. Two things found in review and
+  fixed with it: the film was tinted and bent by the front plate's dye at full strength
+  whatever the front plate's level, which printed the liquid into the film-alone
+  projector (171 at worst on the lab plate; now by the front plate's level, so a faded
+  front plate also stops tinting the film on the wall), and a film row on Multiply was
+  a black film projector (it multiplies what is under it, and under the film alone is
+  black; there it is drawn Add, the frame itself). Checks: `npm run map` (42: the
+  routing from each slot's number through the shader's branch and binding to the
+  texture bound there, the rows each source leaves out against a base where every
+  setting has its own value, Multiply on the film), `npm run mixer` section 8 (8: each
+  source exactly the wall with the other rows at 0, drawn in the wall's frame, and the
+  wall untouched; the film alone the same with and without dye; red when a source reads
+  the wall's uniforms and on the old film tint), a phone check (the picker from the
+  phone, and the show's config holding the pick), and `wall` on the Mac (on Classic, two
+  projectors side by side: each source against the wall with its other rows at 0 in the
+  same frame, and each source's pass timed).
   Found while building it, not done:
   - *A source has no post effects and no closeup camera.* The wall's chain (bloom,
     the photographic presets' lens) runs once, on the wall; a source is the plate as
     the display pass draws it. Running the chain per source doubles its cost; worth
     it only if a rig asks.
-  - *The logo stays up in a blackout* on the wall and on each plate's projector: it is
-    laid over the dimmer (`finishLight`), as it always was on the wall. The film alone
-    has no logo.
-  - *Cast and network displays show the wall*: `CastState` carries no surfaces.
+  - *The logo stays up in a blackout* on the wall and on the front plate's projector:
+    it is laid over the dimmer (`finishLight`), as it always was on the wall.
+  - *Every network display draws every source its surfaces ask for*, since the cast
+    state carries the output config and a receiver runs this same frame: a receiver on
+    a weak GPU pays for the sources a laptop's projectors asked for. A receiver could
+    be told which surfaces are its own.
   - *The remote cannot pick a source*, only the laptop and the phone's own Settings.
-  - *What a source costs* is printed by `wall` on the Mac and not yet read against a
-    budget. 16d (four plates) is where it has to be.
+  - *What a source costs* is printed by `wall` on the Mac (`plate front`, `plate back`,
+    `plate film` against `plate`), read from this PR's run, and not yet held to a
+    budget: each is the whole display pass again at the canvas's size. 16d (four
+    plates) is where a budget has to be.
 - **16c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
   and two feathered edges that overlap sum to one rather than to a bright seam.
   Check: `wall` reads the overlap's brightness against each beam's.

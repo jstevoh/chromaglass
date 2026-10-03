@@ -15,9 +15,15 @@
  * - The **back plate alone** is the front plate's row at nothing, which the
  *   shader draws as the bare lamp, with the back plate over it: a second
  *   projector with only the back dish in its gate. With one plate on the
- *   stage there is no back plate, and it is the lamp alone.
+ *   stage there is no back plate, and it is the lamp alone. No logo: the
+ *   logo goes out on one projector, the front plate's, or two projectors
+ *   side by side would carry two, and two overlapping beams (16c) one twice
+ *   as bright.
  * - The **film alone** takes out both plates and every lamp row and the logo,
- *   so it is the film over the bare background.
+ *   so it is the film over the bare background. A film row on Multiply is
+ *   drawn Add here: multiply lays the film over what is under it, and under
+ *   the film alone is black, so Multiply would be a dark projector. Over
+ *   black, Add is the frame itself, which is what a film projector shows.
  *
  * Pure and small so `npm run map` can hold it without a GPU.
  */
@@ -28,12 +34,13 @@ import type { SurfaceSource } from './outputConfig';
 /** The Mixer rows each source leaves out, by their level settings (lib/mixer.ts MIX_SOURCE_INFO). */
 export const SOURCE_OFF: Record<Exclude<SurfaceSource, 'wall'>, readonly (keyof VisualizerSettings)[]> = {
   front: ['backLevel', 'filmMix'],
-  back: ['frontLevel', 'filmMix'],
+  back: ['frontLevel', 'filmMix', 'markMix'],
   film: ['frontLevel', 'backLevel', 'ledLevel', 'gelWheel', 'lumia', 'markMix'],
 };
 
 export function sourceSettings(kind: Exclude<SurfaceSource, 'wall'>, s: VisualizerSettings): VisualizerSettings {
   const out = { ...s } as Record<string, unknown>;
   for (const key of SOURCE_OFF[kind]) out[key] = 0;
+  if (kind === 'film' && out.filmBlend === 'multiply') out.filmBlend = 'add';
   return out as unknown as VisualizerSettings;
 }

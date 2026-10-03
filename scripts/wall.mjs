@@ -1670,9 +1670,21 @@ try {
   // columns over are the same place on the plate in the same frame. Every
   // claim is between the two halves of one frame: across two frames the
   // liquid has moved, and a difference between them would be the liquid's.
+  //
+  // Each source is held to a reference drawn in the same frame: the left
+  // projector shows the wall with that source's other rows set to 0 on the
+  // running plate (the settings hook), the right one the source. They must
+  // be one picture, to within what two quads a pixel apart differ by (the
+  // control, both on the wall); and with the settings put back, the two must
+  // be apart. A source routed to another source's texture, or never drawn,
+  // fails the first; a source that is only the wall fails the second.
+  //
+  // On Classic, two plates, and with the camera and the film stock off, so
+  // the wall is the plate's display pass as the sources are: section 6 left
+  // Oil on Water up, one plate under a lens, where the back plate alone and
+  // the film alone are both the bare lamp and could not be told apart.
   // `npm run mixer` holds each source to the exact picture on a lab plate;
-  // this asks whether the app's frame routes each surface to its own
-  // texture on a real GPU, and says what each extra picture costs.
+  // this asks the app's frame on a real GPU, and prints what each costs.
   {
     const half = (x0, source) => ({
       id: `half-${x0}-${source}`, shape: 'rect', corners: [x0, 0, x0 + 0.5, 0, x0 + 0.5, 1, x0, 1],
@@ -1680,7 +1692,7 @@ try {
     });
     /** Left against right, cell by cell: the mean luminance of each and the mean difference between them. */
     const halves = async (left, right) => {
-      await withOutput({ surfaces: [half(0, left), half(0.5, right)] });
+      await withOutput({ surfaces: [half(0, left), half(0.5, right)], flashGuard: false });
       const g = await gridOf();
       const cols = g.cols / 2;
       let l = 0, r = 0, d = 0, n = 0;
@@ -1690,36 +1702,71 @@ try {
       }
       return { left: l / n, right: r / n, diff: d / n };
     };
+    const set = async (patch) => {
+      await page.evaluate((p) => window.chromaglassSettings?.(p), patch);
+      await page.waitForFunction((p) => {
+        const now = window.chromaglassSettings?.();
+        return !!now && Object.entries(p).every(([k, v]) => now[k] === v);
+      }, patch, { timeout: 20000 });
+      await page.waitForTimeout(400);
+    };
     const f3 = (v) => v.toFixed(3);
-    // The control: both halves the wall are the same picture, less the
-    // filtering of two quads a pixel apart.
+    const timings = () => page.evaluate(() => {
+      const d = window.chromaglassDebug?.().webgpu;
+      return d ? { on: !!d.timestamps, t: { ...(d.timings ?? {}) } } : null;
+    });
+
+    await page.evaluate(() => window.chromaglassApplyPreset?.('classic'));
+    await set({ camera: 0, stock: 0 });
+    const look = await page.evaluate(() => {
+      const s = window.chromaglassSettings?.();
+      return s ? { layers: s.layerCount, camera: s.camera ?? 0, stock: s.stock ?? 0, levels: [s.frontLevel ?? 1, s.backLevel ?? 1] } : null;
+    });
+    check('the sources are asked on a two-plate look with no camera and no film stock',
+      !!look && look.layers === 2 && look.camera === 0 && look.stock === 0 && look.levels.every(v => v > 0.5), JSON.stringify(look));
+    // Let Classic's plate fill before anything is measured on it.
+    await withOutput({ flashGuard: false });
+    for (let i = 0; i < 20 && !(meanOver(await gridOf(), () => true) > LIT); i++) await page.waitForTimeout(500);
+    const before = await timings();
+
     const same = await halves('wall', 'wall');
     check('two projectors both on the wall show the same picture', same.left > LIT && same.diff < 0.1 * same.left,
       `left ${f3(same.left)}, right ${f3(same.right)}, apart by ${f3(same.diff)}`);
-    // The film with no film loaded is the bare background: no plate on it.
-    const film = await halves('wall', 'film');
-    check('a projector on the film, with no film playing, shows no plate where the wall shows it',
-      film.left > LIT && film.diff > Math.max(4 * same.diff, 0.3 * film.left),
-      `wall ${f3(film.left)}, film ${f3(film.right)}, apart by ${f3(film.diff)} (the control ${f3(same.diff)})`);
-    // Classic has two plates, turned opposite ways: each alone is lit, and
-    // they are not one picture.
-    const plates = await halves('front', 'back');
-    check('the front plate alone and the back plate alone are each lit, and two different plates',
-      plates.left > LIT && plates.right > LIT && plates.diff > 4 * same.diff,
-      `front ${f3(plates.left)}, back ${f3(plates.right)}, apart by ${f3(plates.diff)} (the control ${f3(same.diff)})`);
-    // What each picture costs: its own display pass, timed under its own
-    // label. Only where the device has timestamps; printed so a run says
-    // what a second and a third picture cost against the wall's.
-    const timed = await page.evaluate(() => {
-      const d = window.chromaglassDebug?.().webgpu;
-      return d ? { on: !!d.timestamps, t: d.timings ?? {} } : null;
-    });
-    if (timed?.on) {
-      const t = timed.t;
-      check('each source is drawn, and timed, as its own pass',
-        typeof t['plate front'] === 'number' && typeof t['plate back'] === 'number' && typeof t.plate === 'number',
-        `wall ${t.plate?.toFixed(2)} ms, front ${t['plate front']?.toFixed(2)} ms, back ${t['plate back']?.toFixed(2)} ms`);
+    // Within twice the control, and never under a floor of 0.004 of full
+    // scale: two quads a pixel apart can agree better than a cell's dither.
+    const near = Math.max(2 * same.diff, 0.004);
+    const OFF = {
+      front: { backLevel: 0, filmMix: 0 },
+      back: { frontLevel: 0, filmMix: 0, markMix: 0 },
+      film: { frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0 },
+    };
+    const live = await page.evaluate(() => window.chromaglassSettings?.());
+    const drawn = {};
+    for (const kind of ['front', 'back', 'film']) {
+      const restore = Object.fromEntries(Object.keys(OFF[kind]).map(k => [k, live[k] ?? (k === 'filmMix' || k === 'markMix' || k === 'gelWheel' || k === 'lumia' ? 0 : 1)]));
+      await set(OFF[kind]);
+      const ref = await halves('wall', kind);
+      await set(restore);
+      const apart = await halves('wall', kind);
+      drawn[kind] = (await timings())?.t?.[`plate ${kind}`];
+      check(`the ${kind} source is the wall with its other rows at 0, drawn in the same frame, and not the wall itself`,
+        ref.left > LIT && ref.diff <= near && apart.diff > 4 * same.diff,
+        `against its reference ${f3(ref.diff)} (within ${f3(near)}); against the wall ${f3(apart.diff)} (the control ${f3(same.diff)}); it ${f3(ref.right)}, the reference ${f3(ref.left)}`);
     }
+    // What each picture costs: its own display pass, timed under its own
+    // label, absent before any projector asked for it and fresh while one
+    // does (the profiler decays an old label rather than dropping it, so
+    // "present" alone would be true a minute after the pass stopped).
+    if (before?.on) {
+      const t = (await timings()).t;
+      const absent = ['front', 'back', 'film'].filter(k => typeof before.t[`plate ${k}`] === 'number');
+      check('each source is drawn as its own pass, timed only once a projector asks for it',
+        absent.length === 0 && ['front', 'back', 'film'].every(k => drawn[k] > 0.001),
+        `before: ${absent.length ? absent.join(', ') + ' already there' : 'none'}; wall ${t.plate?.toFixed(2)} ms, ${['front', 'back', 'film'].map(k => `${k} ${drawn[k]?.toFixed(2)} ms`).join(', ')}`);
+    } else {
+      console.log(' skip  each source\'s cost: this device has no timestamp queries');
+    }
+    await withOutput({ flashGuard: true });
   }
 
   // ── 8. Back to nothing ─────────────────────────────────────────────
