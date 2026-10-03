@@ -102,6 +102,20 @@ try {
     const centre = async () => (await lab.field('vel'))[(N / 2 + (N / 2) * N) * 4];
 
     // 1. A push lasts the drag time.
+    /*
+      The push is laid as the lab lays one, 1 − d²/r², and at r = 5 plates
+      that is 2% weaker at the corners than in the middle: a field with a
+      divergent part, which the thin gap's projection takes out over the
+      first two steps (the middle's speed fell 1.5% more than the drag in
+      the first step and 0.7% more in the second, and then by exactly the
+      drag; on Metal that put the ten-step fit 3.4% over, CI run
+      36370603193). At r = 50 it is flat to 0.02%, so what the fit sees is
+      the drag alone. The old solver keeps the r = 5 push: it feeds no fit,
+      only the travel control below, and a flat push in its closed box is
+      pure gradient that any projection removes whole, so it would read 0
+      whatever its clamp did; at r = 5 it reads what the header says.
+    */
+    const PUSH = 50;
     const push = {};
     for (const [name, over] of [['old', { gapSpring: 0 }], ['thin', { thinGap: 1, gapThickness: 0.3, gapSpring: 0 }], ['thick', { thinGap: 1, gapThickness: 0.45, gapSpring: 0 }]]) {
       await lab.create(N, N);
@@ -109,7 +123,7 @@ try {
       await lab.step(2, over);
       const cx = async () => { const d = await lab.field('dye'); let s = 0, w = 0; for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = d[(i + j * N) * 4 + 3]; s += a * (i + 0.5) / N; w += a; } return s / w; };
       const x0 = await cx();
-      lab.vel(0.5, 0.5, 5, [1, 0, 0, 0]); lab.flush();
+      lab.vel(0.5, 0.5, name === 'old' ? 5 : PUSH, [1, 0, 0, 0]); lab.flush();
       const speeds = [];
       for (let k = 0; k < 11; k++) { await lab.step(1, over); speeds.push(await centre()); }
       await lab.step(160, over);
@@ -123,7 +137,7 @@ try {
       lab.vel(0.5, 0.5, 5, [0, 0, 0, -0.015]); lab.flush();
       await lab.step(40, over);
       const sq = await lab.squeeze();
-      lab.vel(0.5, 0.5, 5, [1, 0, 0, 0]); lab.flush();
+      lab.vel(0.5, 0.5, PUSH, [1, 0, 0, 0]); lab.flush();
       const speeds = [];
       for (let k = 0; k < 11; k++) { await lab.step(1, over); speeds.push(await centre()); }
       push.halved = { speeds, gap: sq.gap[sq.n / 2 + (sq.n / 2) * sq.n] };
