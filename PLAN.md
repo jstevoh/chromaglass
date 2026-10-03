@@ -134,7 +134,12 @@ branches that do not touch the plate. Either the mirror echo it was written to c
 comes back now and then, or the allowance is drawn from a drift reading that is
 sometimes as large as the echo; which of the two is the first thing to settle, from
 the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
-of these costs the owner a by-hand re-run.
+of these costs the owner a by-hand re-run. *Later that day:* #208's plate shard read
+13.4 past drift against 12.5 at row 3, column 5, not a mirror cell, where the drift
+grew on every drop (3.5, 5.9, 11.2, 60.1): a region starting up by itself caught two of
+the four drops (past drift 1.0, 3.1, 30.8, 23.7), and a median of four does not hold
+two. So the second guess, the plate's own movement, not an echo; #225 traces that
+movement to a held press (every trapped bubble) setting the whole plate flowing.
 
 *Found 2026-10-03 (#225), open:* **with presses that move the dye, the grid pass
 holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −0.3 in a
@@ -190,6 +195,19 @@ where the keystone before it read 0.05 to 0.19). The wait after a config change 
 the page's animation frames, not the stage's drawn ones, and did not wait for the guard
 to be off; it now waits for both, and the check prints all seven readings in order, so
 the next red says which frame was odd (this PR).
+
+**The phone's take-button checks judge the fade by its own clock, and the slider by
+its lag behind it** (this PR, `npm run phone`). #207's Checks run went red on "set to
+one bar in the drawer, the same take lands in about half the time … with a jump", on a
+PR that does not touch the Mixer, and a cloud session went red on it on 4 of 4 runs.
+The check read the slider every 80 ms and judged each step against the time between
+reads, but a slider shows what React last rendered: one render landing ~120 ms late
+and the next catching up read as a jump. Now the app logs each level a take works out
+(`window.__cgFadeLog`, kept only when a page asks), the fade's steps are held to the
+time between them and to coming about a tick apart, and the slider is held to how late
+it is behind the fade. 5 of 5 runs green (two on 2026-10-03's main); red on all three lines against a timer slowed
+to 400 ms, a slider written one tick in 25, a level rounded to tenths and a clock a
+quarter second ahead on one tick in ten.
 
 **Deploys no longer re-measure a tree its PR already passed** (this PR, `npm run
 deploygate`). Measured 2026-09-27, 1 AM to 11 AM PT: 18 red runs, 5 of 16 deploys.
