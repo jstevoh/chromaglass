@@ -1812,6 +1812,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                   weightAt(uv + vec2f(0.0, e)) - weightAt(uv - vec2f(0.0, e))) / (2.0 * e);
     a -= 0.5 * A.a.z * dot(d, d) * g;
   }
+  /*
+    A thin gap (A.a.w below zero) takes the drive itself, as the speed it
+    would hold the liquid to at the rest gap: its own solve brings the liquid
+    toward that at k0 and drags it with the local 12ν/h², which lands on a/k,
+    the same steady swirl, with the lag its own (fluid.ts, the swirl stage).
+  */
+  if (A.a.w < 0.0) {
+    textureStore(dst, q, safeVel(vec4f(a / A.a.y, 0.0, 0.0)));
+    return;
+  }
   let still = a / k;
   let w = still + (textureLoad(sw, q, 0).xy - still) * exp(-k * A.a.w);
   textureStore(dst, q, safeVel(vec4f(w, 0.0, 0.0)));

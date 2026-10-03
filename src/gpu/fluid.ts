@@ -1454,13 +1454,19 @@ export class WebGPUFluid {
       and a thin gap takes it in before its solve, with the current: the
       swirl is a speed the dish's drag holds the liquid to against the
       glass, which is what the thin solve takes a current to be, and the
-      solve then makes it conserve liquid with everything else. On the old
+      solve then makes it conserve liquid with everything else. There the
+      swirl field holds the drive as a speed at the rest gap, a/k0, not the
+      integrated swirl: the thin solve brings the liquid to whatever it is
+      given at k0 and then drags it with its own 12ν/h², so handed the swirl
+      itself it counted the gap twice and a pressed palm went round at 0.045
+      of the dish's turn where the old plate gives 0.53 (measured in the lab,
+      the press of `npm run dish`, which now runs both plates). On the old
       plate it is laid over the flow after both projections, as the current
       is, and it is divergence-free already (stepSwirl projects it).
     */
     const swirlOn = this.swirlWanted(p);
     stage('swirl', (pass) => {
-      if (swirlOn) { this.stepSwirl(pass, p); return; }
+      if (swirlOn) { this.stepSwirl(pass, p, thin); return; }
       for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     }, swirlOn || this.swirlLive);
     this.swirlLive = swirlOn;
@@ -2520,7 +2526,7 @@ export class WebGPUFluid {
   }
 
   /** The swirl: the dish's drag and the centrifuge, then the current's projection on its own textures. */
-  private stepSwirl(pass: GPUComputePassEncoder, p: GpuStepParams): void {
+  private stepSwirl(pass: GPUComputePassEncoder, p: GpuStepParams, thin: boolean): void {
     const spin = p.spinLiquid ?? 0;
     const tau = Math.max(1e-4, p.spinTau ?? 1);
     const mixOn = this.mixLive && !!this.mix;
@@ -2528,7 +2534,7 @@ export class WebGPUFluid {
       this.swirl.read, this.dye.read, this.squeeze.read,
       mixOn ? this.mix!.read : this.blank('rgba'),
       this.phaseLive ? this.phase.read : this.blank('r'),
-    ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, Math.max(0, p.magnetSeconds ?? 1 / 60),
+    ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
       Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT]), this.M);
     this.swirl.swap();
     const m = this.arg('current grid', [0, this.M, 0, 0]);

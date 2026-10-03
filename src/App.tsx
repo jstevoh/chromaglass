@@ -3099,7 +3099,7 @@ export default function App() {
           break;
         // The pad's finger on the dish (PLAN §21): the dish turns under it.
         case 'spin':
-          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount });
+          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount, id: message.id });
           break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);

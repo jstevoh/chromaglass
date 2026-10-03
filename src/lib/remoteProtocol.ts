@@ -169,9 +169,10 @@ export type RemoteMessage =
    * A finger on the dish (the Spin tool, PLAN §21): the dish turns under it
    * as it goes round the middle, and holds still while it holds still. Sent
    * all the time the finger is down, since a finger that stops is a brake;
-   * the display lets go a quarter of a second after the last one.
+   * the display lets go a quarter of a second after the last one. `id` is
+   * the finger (its pointer id), so two fingers are two hands.
    */
-  | { type: 'spin'; x: number; y: number; layer: number; amount?: number }
+  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number }
   | { type: 'tilt'; x: number; y: number }
   /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
   | { type: 'dye'; color: string }

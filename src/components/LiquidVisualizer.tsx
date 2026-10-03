@@ -740,7 +740,7 @@ export interface LiquidVisualizerHandle {
    * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => void;
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => void;
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -878,6 +878,15 @@ class FluidSimulation {
    */
   dishSpin = 0;
   liquidSpin = 0;
+  /**
+   * How fast the liquid really goes round, for the centrifuge: the look's
+   * turn and the turntable's liquid together, while the turntable is
+   * turning; zero otherwise, so a look nobody spins is no centrifuge (21h).
+   * Not the turntable's liquid alone: a hand held still on a flicked plate
+   * stops the picture by turning the turntable against the flick, and the
+   * liquid it holds still is flung nowhere.
+   */
+  spinCentrifuge = 0;
   /**
    * The angle the dish is drawn turned to, and how far down from its centre
    * the plate is still on screen (in plate widths). Gravity is the room's,
@@ -1017,6 +1026,7 @@ class FluidSimulation {
     this.plateSpin = 0;
     this.dishSpin = 0;
     this.liquidSpin = 0;
+    this.spinCentrifuge = 0;
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
@@ -3444,7 +3454,7 @@ class FluidSimulation {
         does not run.
       */
       spinDish: this.dishSpin - this.liquidSpin,
-      spinLiquid: this.liquidSpin,
+      spinLiquid: this.spinCentrifuge,
       spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
       spinNu: carrierViscosity(settings.viscosity),
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
@@ -4604,7 +4614,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * of hand be added without teaching it about bubbles, beads or the squeeze
    * film all over again.
    */
-  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => {
+  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => {
     // The magnet moves no fluid itself: it is held where the gesture is, and
     // the next solver step pulls the ferrofluid toward it. Ahead of the drain
     // gate, since holding it over an emptying plate is harmless.
@@ -4624,7 +4634,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       case 'spin': {
         const layer = Math.max(0, Math.floor(g.layer ?? activeLayerRef.current));
-        if (Number.isFinite(g.x) && Number.isFinite(g.y)) spinHandOf(layer).move('gesture', g.x - 0.5, g.y - 0.5, showNow());
+        // Each finger its own hand: two on one pad, or two remotes on one
+        // plate, sharing one would read the jump between them as a whirl.
+        const id = `gesture:${Number.isFinite(g.id) ? g.id : 0}`;
+        if (Number.isFinite(g.x) && Number.isFinite(g.y)) spinHandOf(layer).move(id, g.x - 0.5, g.y - 0.5, showNow());
         return;
       }
     }
@@ -7458,7 +7471,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const held = hands?.rate(showNow()) ?? null;
             let dishVel: number;
             if (held !== null && Number.isFinite(held)) {
-              const want = held * toolAmountRef.current - (spinVelRef.current[l] ?? 0);
+              const want = held - (spinVelRef.current[l] ?? 0);
               dishVel = dish0 + (want - dish0) * (1 - Math.exp(-realDt / GRIP_SECONDS));
               auto.release();
             } else {
@@ -7478,8 +7491,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (Number.isFinite(liq)) liquidSpinRef.current[l] = liq;
             // The solver drags the liquid toward the dish by the difference (the swirl).
             if (fluidsRef.current[l]) {
+              const liqNow = liquidSpinRef.current[l] ?? 0;
               fluidsRef.current[l].dishSpin = dishNow;
-              fluidsRef.current[l].liquidSpin = liquidSpinRef.current[l] ?? 0;
+              fluidsRef.current[l].liquidSpin = liqNow;
+              fluidsRef.current[l].spinCentrifuge = dishNow !== 0 || liqNow !== 0 ? (spinVelRef.current[l] ?? 0) + liqNow : 0;
             }
             /*
               An angle that accumulates cannot be allowed to go non-finite —
@@ -9434,7 +9449,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const a = rotationAnglesRef.current[activeLayerRef.current] || 0;
       const dx = fx * Math.cos(a) - fy * Math.sin(a), dy = fx * Math.sin(a) + fy * Math.cos(a);
       const hand = spinHandOf(activeLayerRef.current);
-      if (landing) hand.down(id, dx, dy, showNow()); else hand.move(id, dx, dy, showNow());
+      if (landing) hand.down(id, dx, dy, showNow(), toolAmountRef.current); else hand.move(id, dx, dy, showNow(), toolAmountRef.current);
     };
     const spinLetGo = (id?: string) => {
       for (const h of spinHandsRef.current) { if (!h) continue; if (id === undefined) h.clear(); else h.up(id); }

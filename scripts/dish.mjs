@@ -41,8 +41,19 @@
  *      and exactly 4 (1 − e^(−t/τ_thin)) / (1 − e^(−t/τ_thick)) at t = 0.75 s,
  *      to 5%.
  *   7. when the spinning stops the swirl dies away and is emptied: after
- *      the tail, the field is zero to the bit and the flow the dye rides is
- *      exactly the flow a plate that never spun rides.
+ *      the tail, the field is zero to the bit;
+ *   8. with Thin Gap on (PLAN §18a), the swirl goes into the thin solve, and
+ *      a pressed palm still goes round with the dish (at least half what the
+ *      old plate's flow does there) while the plate away from it does not
+ *      (under a tenth of the palm). Handed the integrated swirl, the thin
+ *      solve counted the gap twice and the palm went round at 0.045 against
+ *      the old plate's 0.53;
+ *   9. and a plate nobody spins steps exactly as without the spin's numbers:
+ *      a pressed plate, its liquid moving, stepped with the spin fields at
+ *      zero and stepped without them, gives the same flow and the same dye
+ *      to the bit, on the old plate and with Thin Gap on. The flow is asked
+ *      to be moving first, so two still plates cannot pass it (the first
+ *      version compared two plates with nothing moving at all).
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
  * a Linux box's software WebGPU anywhere else.
@@ -134,7 +145,7 @@ try {
     out.still = await centrifuge(0, THICK);
     out.thinner = await centrifuge(3, THICK / 4);
 
-    // 7. Stop, let the tail run out, and compare the flow with a plate that never spun.
+    // 7. Stop and let the tail run out: the swirl is emptied.
     await fresh(0);
     lab.dye(0.6, 0.5, 0.08, [1, 1, 1], 1); lab.flush();
     await lab.step(30, spin(0, 3, THICK));
@@ -142,13 +153,40 @@ try {
     const tail = 5 * drag(THICK, 0.06);
     await lab.step(Math.ceil(tail * 60) + 5, spin(0, 0, THICK));
     const after = await lab.swirl();
-    const velSpun = await lab.field('vel');
-    await fresh(0);
-    lab.dye(0.6, 0.5, 0.08, [1, 1, 1], 1); lab.flush();
-    await lab.step(1, {});
-    const velStill = await lab.field('vel');
-    let diff = 0; for (let k = 0; k < velSpun.length; k++) diff = Math.max(diff, Math.abs(velSpun[k] - velStill[k]));
-    out.after = { max: maxAbs(after), nonzero: after.data.some((v) => v !== 0), velDiff: diff, tail };
+    out.after = { max: maxAbs(after), nonzero: after.data.some((v) => v !== 0), tail };
+
+    // 8 and 9. A pressed palm on each plate: its flow (the field the dye
+    // rides), its azimuthal part at the palm and away from it.
+    const az = (f, cx, cy, rr) => {
+      const L = Math.round(Math.sqrt(f.length / 4));
+      let s = 0, n = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+        const x = (i + 0.5) / L, y = (j + 0.5) / L;
+        if (Math.hypot(x - cx, y - cy) >= rr) continue;
+        const dx = x - 0.5, dy = y - 0.5, rr2 = Math.hypot(dx, dy) || 1, k = (j * L + i) * 4;
+        s += (f[k] * -dy + f[k + 1] * dx) / rr2; n++;
+      }
+      return s / Math.max(1, n);
+    };
+    const pressed = async (extra, over) => {
+      await lab.create(256, 192); await lab.step(1, extra);
+      for (let k = 0; k < 6; k++) { lab.squish(0.65 * 192, 96, 12, 0.004, 0, 'press'); lab.flush(); await lab.step(1, extra); }
+      lab.dye(0.6, 0.5, 0.08, [1, 1, 1], 1); lab.flush();
+      await lab.step(60, { ...extra, ...over });
+      return { vel: await lab.field('vel'), dye: await lab.field('dye') };
+    };
+    out.grip = {};
+    out.same = {};
+    for (const [name, extra] of [['old', { gapSpring: 0 }], ['thin', { gapSpring: 0, thinGap: 1 }]]) {
+      const spun = await pressed(extra, spin(A, 0, THICK));
+      out.grip[name] = { palm: az(spun.vel, 0.65, 0.5, 0.02), away: az(spun.vel, 0.35, 0.5, 0.04) };
+      const bare = await pressed(extra, {});
+      const zero = await pressed(extra, spin(0, 0, THICK));
+      let dv = 0, dd = 0;
+      for (let k = 0; k < bare.vel.length; k++) dv = Math.max(dv, Math.abs(bare.vel[k] - zero.vel[k]));
+      for (let k = 0; k < bare.dye.length; k++) dd = Math.max(dd, Math.abs(bare.dye[k] - zero.dye[k]));
+      out.same[name] = { moving: maxAbs({ data: bare.vel }), dv, dd };
+    }
     return out;
   });
 
@@ -184,7 +222,16 @@ try {
   check(`the drift scales with the drag time: four times thinner, ${want.toFixed(2)}× faster by 0.75 s, to 5%`,
     Math.abs(ratio / want - 1) < 0.05, `${ratio.toFixed(3)}×`);
   check('when the spinning stops, the swirl dies away and is emptied', !r.after.nonzero, `max |w| ${r.after.max} after a ${r.after.tail.toFixed(1)} s tail`);
-  check('and the flow the dye rides is exactly a still plate\'s', r.after.velDiff === 0, `largest difference ${r.after.velDiff}`);
+  const g = r.grip;
+  check('with Thin Gap on, a pressed palm still goes round with the dish: at least half what the old plate gives',
+    g.thin.palm > 0.5 * g.old.palm, `${g.thin.palm.toFixed(3)} against ${g.old.palm.toFixed(3)}`);
+  check('and the plate away from it barely moves: under a tenth of the palm', Math.abs(g.thin.away) < 0.1 * g.thin.palm,
+    `${g.thin.away.toExponential(2)} (the old plate ${g.old.away.toExponential(2)})`);
+  for (const name of ['old', 'thin']) {
+    const q = r.same[name];
+    check(`a plate nobody spins steps exactly as without the spin's numbers (${name === 'thin' ? 'Thin Gap on' : 'the old plate'})`,
+      q.moving > 0 && q.dv === 0 && q.dd === 0, `its flow moving at up to ${q.moving.toExponential(2)}; largest difference ${q.dv} in the flow, ${q.dd} in the dye`);
+  }
 } finally {
   await close();
 }

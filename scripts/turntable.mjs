@@ -25,9 +25,11 @@
  *   7. a hand going round at one turn a second, reported at 60 Hz, reads
  *      2π rad/s to 3%, across the ±π seam without a spike; held still it
  *      stops the dish within a fifth of a second; near the middle it reads
- *      nothing; lifted it lets go;
+ *      nothing; lifted it lets go; a fast swipe past the middle turns the
+ *      dish no faster than a hand can, a turn and a half a second;
  *   8. with Auto Spin off and no hand, the turntable and its liquid are
- *      exactly zero, so a look nobody spins turns as it always did.
+ *      exactly zero, so a look nobody spins turns as it always did;
+ *   9. and let go, they come back to exactly zero, not for ever nearly.
  */
 import {
   AutoSpin, SpinHand, SPIN_RATE, SPIN_TEMPO, SPIN_OFF, WATER_NU, THICK_NU, OIL_NU,
@@ -162,6 +164,15 @@ check('water takes twenty times as long as the thick liquid', near(reach(tw) / r
   check('near the middle, a hand reads nothing', c.rate(16) === 0);
   h.up('m');
   check('lifted, it lets go', h.rate(t) === null && !h.held);
+  // A swipe straight across, 0.6 of the plate in a quarter of a second, passing 0.06 from the middle.
+  const sw = new SpinHand();
+  let peak = 0;
+  for (let k = 0; k <= 15; k++) {
+    sw.move('s', -0.3 + 0.6 * k / 15, 0.06, k * 1000 / 60);
+    peak = Math.max(peak, Math.abs(sw.rate(k * 1000 / 60)));
+  }
+  check('a fast swipe across the middle turns the dish no faster than a turn and a half a second', peak <= SpinHand.MAX + 1e-9 && peak > 0.5 * SpinHand.MAX,
+    `peak ${peak.toFixed(2)} rad/s, the hand's limit ${SpinHand.MAX.toFixed(2)} (22.4 unheld)`);
   const q = new SpinHand();
   q.move('remote:0', 0.2, 0, 0);
   q.forgetQuiet(400, 250, 'remote:');
@@ -190,6 +201,20 @@ check('water takes twenty times as long as the thick liquid', near(reach(tw) / r
   }
   check('with Auto Spin off and no hand, the turntable and its liquid stay exactly still', dish === 0 && liq === 0 && angle === 0,
     `dish ${dish}, liquid ${liq}, angle ${angle}, beside a look swinging to ${look.toFixed(4)} rad/s`);
+}
+
+// 9
+{
+  // A hand spins the dish up and lets go: the turntable and the water it drags come back to exactly rest.
+  const D = (0.04 + 0.25 * 1.2) * 0.8;
+  let dish = 3, liq = 2, t = 0;
+  while ((dish !== 0 || liq !== 0) && t < 600) {
+    dish = dishFollow(dish, 0, D, 1 / 60);
+    liq = liquidFollow(liq, dish, 1 / 60, tw);
+    t += 1 / 60;
+  }
+  check('let go, the dish and its water come to rest exactly, not for ever nearly', dish === 0 && liq === 0 && t < 120,
+    `at rest after ${t.toFixed(1)} s`);
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');

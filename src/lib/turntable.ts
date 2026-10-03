@@ -101,10 +101,19 @@ export function dragSeconds(nu: number, gap = DISH_REST_GAP): number {
  * The liquid's bulk, following the dish: dω_l/dt = (Ω − ω_l)/τ, exactly over
  * the step. Non-finite inputs leave it where it was: this is integrated into
  * an angle, and an angle that goes NaN stays NaN for the rest of the show.
+ *
+ * Within LIQUID_REST of a dish at rest it is at rest, exactly. An exponential
+ * only approaches zero, and the frame treats a turntable whose liquid is not
+ * exactly zero as turning (the centrifuge takes the look's own turn then,
+ * and the picture adds the liquid's): water's 3 s would leave a residue for
+ * the rest of the show after one touch of the Spin tool. The dish itself
+ * comes to rest exactly by its dry friction (dishFollow).
  */
+export const LIQUID_REST = 1e-6;
 export function liquidFollow(omegaL: number, dish: number, dt: number, tau: number): number {
   if (!Number.isFinite(dish) || !Number.isFinite(dt) || dt <= 0) return omegaL;
   const next = dish + (omegaL - dish) * Math.exp(-dt / Math.max(1e-4, tau));
+  if (dish === 0 && Math.abs(next) < LIQUID_REST) return 0;
   return Number.isFinite(next) ? next : omegaL;
 }
 
@@ -202,7 +211,7 @@ export const TEMPO_LOCK = 0.25;
  * a few tens of milliseconds, the time a pointer takes to report twice.
  */
 export class SpinHand {
-  private hands = new Map<string, { phi: number; at: number; rate: number; moved: number }>();
+  private hands = new Map<string, { phi: number; at: number; rate: number; moved: number; scale: number }>();
   /** Radius, in plate widths from the middle, inside which the hand's angle is not read. */
   static readonly DEAD = 0.05;
   /** Seconds the hand's speed is smoothed over. */
@@ -211,23 +220,41 @@ export class SpinHand {
   static readonly STILL = 0.08;
   /** Seconds a still hand takes the speed out of the dish in: a hand that stops, stops it. */
   static readonly BRAKE = 0.03;
+  /**
+   * The fastest a hand turns the dish, rad/s: a turn and a half a second,
+   * twice the top of Auto Spin's Rate and quicker than anyone spins a record
+   * by hand. A hand is read by its angle round the middle, so a swipe across
+   * the plate that passes near the middle reads as a whirl: 0.6 of the plate
+   * in a quarter of a second, 0.06 from the middle, peaked at 22 rad/s, three
+   * and a half turns a second, from an ordinary drag (measured by review,
+   * `npm run turntable` holds it here). A real hand that near the axis has no
+   * lever to turn the glass that fast with, so each reading is held to this.
+   */
+  static readonly MAX = 3 * Math.PI;
 
   get held(): boolean { return this.hands.size > 0; }
 
-  /** A hand lands, at (dx, dy) from the dish's middle as the audience sees it (plate widths). */
-  down(id: string, dx: number, dy: number, atMs: number): void {
-    this.hands.set(id, { phi: Math.atan2(dy, dx), at: atMs, rate: 0, moved: atMs });
+  /**
+   * A hand lands, at (dx, dy) from the dish's middle as the audience sees it
+   * (plate widths). `scale` is how much of its speed it gives the dish: the
+   * Spin tool's Amount for this screen's pointer, one for a remote's finger,
+   * which carries no Amount of its own (the display's would be whatever tool
+   * the laptop has in hand).
+   */
+  down(id: string, dx: number, dy: number, atMs: number, scale = 1): void {
+    this.hands.set(id, { phi: Math.atan2(dy, dx), at: atMs, rate: 0, moved: atMs, scale: Number.isFinite(scale) ? scale : 1 });
   }
 
   /** It moves: its speed round the middle, smoothed. Implicitly lands a hand not yet down. */
-  move(id: string, dx: number, dy: number, atMs: number): void {
+  move(id: string, dx: number, dy: number, atMs: number, scale = 1): void {
     const h = this.hands.get(id);
-    if (!h) { this.down(id, dx, dy, atMs); return; }
+    if (!h) { this.down(id, dx, dy, atMs, scale); return; }
+    if (Number.isFinite(scale)) h.scale = scale;
     if (Math.hypot(dx, dy) < SpinHand.DEAD) { h.phi = Math.atan2(dy, dx); h.at = atMs; return; }
     const phi = Math.atan2(dy, dx);
     const dt = (atMs - h.at) / 1000;
     if (dt > 1e-4) {
-      const inst = wrapPi(phi - h.phi) / dt;
+      const inst = Math.max(-SpinHand.MAX, Math.min(SpinHand.MAX, wrapPi(phi - h.phi) / dt));
       const k = 1 - Math.exp(-dt / SpinHand.SMOOTH);
       h.rate = SpinHand.held(h, atMs);
       if (Number.isFinite(inst)) h.rate += (inst - h.rate) * k;
@@ -244,13 +271,14 @@ export class SpinHand {
   }
 
   /**
-   * The speed the hands ask of the dish, rad/s, or null when no hand is on
-   * it. A hand that has not moved for STILL is holding the dish still.
+   * The speed the hands ask of the dish, rad/s (each hand's speed times its
+   * scale, averaged), or null when no hand is on it. A hand that has not
+   * moved for STILL is holding the dish still.
    */
   rate(nowMs: number): number | null {
     if (this.hands.size === 0) return null;
     let sum = 0;
-    for (const h of this.hands.values()) sum += SpinHand.held(h, nowMs);
+    for (const h of this.hands.values()) sum += SpinHand.held(h, nowMs) * h.scale;
     return sum / this.hands.size;
   }
 

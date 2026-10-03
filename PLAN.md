@@ -67,7 +67,7 @@ Where each batch stands, as of 2026-09-27:
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
-| 21 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 21a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §22); 21b–21h open |
+| 21 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 21a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §22); 21b–21i open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -3848,13 +3848,13 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   should brake a flicked dish harder than water.
 - **21f. The performance recorder does not record a Spin hand.** A spin from the tool
   replays as nothing; Auto Spin is a setting, so it replays.
-- **21g. With Thin Gap on (18a, #220).** The swirl goes in with the current before
-  the thin solve, as a speed the dish's drag holds the liquid to, and the solve makes
-  it conserve liquid; it is worked out from its own drag k = 12ν/h², the same
-  Hele-Shaw term the thin solve uses. Properly the dish's drag is a force in the
-  thin solve's own momentum balance (A(k − k0)ẑ×r beside 18a-2's forces), sharing one
-  gap field and one solve, with no swirl field at all. Not yet measured with Thin Gap
-  on: `npm run dish` runs the old plate.
+- **21g. With Thin Gap on (18a, #220).** The swirl field hands the thin solve the
+  dish's drive as a speed at the rest gap, a/k0, and the solve's own drag 12ν/h²
+  brings the liquid to a/k and makes it conserve liquid (`npm run dish`: a pressed
+  palm 0.607 against the old plate's 0.534, away from it 0.006 of that; handed the
+  integrated swirl it counted the gap twice and the palm read 0.045). Properly the
+  dish's drag is a force in the thin solve's own momentum balance (A(k − k0)ẑ×r beside
+  18a-2's forces), with no swirl field at all.
 - **21h. The look's own turning is still rigid.** A look's motor, the music routed
   to rotation (eleven shipped looks) and a flick turn the picture as they always
   have, with the flick's twist term, and not through the dish: sent through the
@@ -3863,3 +3863,8 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   The turntable is a second dish under the look's. Once the lag has been seen on the
   Mac (`docs/judging.md` §22), put the look's turning on the same dish, retire the
   twist's flick term, and judge those eleven looks against main.
+- **21i. The hand reads its angle, not its grip.** A hand turns the dish at its
+  angular speed round the middle, held to a turn and a half a second, because near
+  the middle a small move is a large angle. A hand's real torque is its friction
+  times its lever arm: weight each hand by its radius and let a thick liquid's drag
+  push back (21e).

@@ -265,7 +265,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount }); }
     // A finger on the dish (PLAN §21): it turns under the finger, and the
     // finger held still keeps sending (below), because a still hand is a brake.
-    else if (kind === 'spin') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount }); }
+    else if (kind === 'spin') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: e.pointerId }); }
     else if (kind === 'finger') {
       // A finger mixes by moving, so the stroke's own direction is the whole
       // gesture: where the touch was last, against where it is now. A tap
@@ -331,7 +331,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         const p = padTouches.current.get(pid);
         if (!p || now - (padLastSend.current.get(pid) ?? 0) < 50) continue;
         padLastSend.current.set(pid, now);
-        send({ type: padTool === 'spin' ? 'spin' : 'press', x: p.x, y: p.y, layer: padLayer, amount });
+        if (padTool === 'spin') send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: pid });
+        else send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
       }
     }, 50);
     return () => window.clearInterval(id);
