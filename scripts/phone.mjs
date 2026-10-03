@@ -879,11 +879,65 @@ try {
       await settle(700);
       const after = await snap();
       const rb1 = await readbacks();
+      /*
+        What each finger laid is the app's own count, so it is asked wherever
+        the plate stepped through the hold, readbacks or none (the plate
+        below needs them).
+      */
+      const gave = held.map(h => h.laid ?? null);
+      const gaveOk = gave.length === 2 && gave.every(g => g && g.steps >= 10)
+        && gave[1].steps <= gave[0].steps && gave[1].steps >= gave[0].steps - 8
+        && Math.min(gave[0].dye / gave[0].steps, gave[1].dye / gave[1].steps) >= 0.95 * Math.max(gave[0].dye / gave[0].steps, gave[1].dye / gave[1].steps);
+      const gaveAsked = NEED_GPU || (gave.length === 2 && gave.every(g => g && g.steps >= 10));
+      if (gaveAsked) check('two fingers holding Drop each lay it on every step both are down, as much as the other',
+        gaveOk,
+        gave.length === 2 && gave.every(Boolean)
+          ? gave.map((g, i) => `${'AB'[i]} ${g.steps} steps, ${g.dye.toFixed(0)} dye`).join('; ')
+          : `held ${held.length} hands, ${gave.filter(Boolean).length} with a count (chromaglassDebug().hands()[i].laid is gone?)`);
+      else console.log(` --   the plate took ${gave.map(g => g?.steps ?? '?').join(' and ')} steps under the two fingers here: what each laid is not asked (the Mac shard asks it)`);
       if (rb0 < 0) {
         check('the plate counts its readbacks, so the dye check knows it can look', false, 'fluids[0].readbacks is gone');
       } else if (!pick) {
         check('two places on the screen keep their mirrors clear, so the dye can be told from a wrong hand\'s', false, `${spots.length} places read`);
       } else if (rb1 - rb0 >= 3) {
+        /*
+          Two questions, asked apart, where this was one.
+
+          What each finger laid, by the app's own count (DropLaid in
+          LiquidVisualizer: the steps that finger held the Drop on the plate
+          and the dye it handed the solver). Both fingers are down from the
+          second touch to the lift, so the second's steps are the first's
+          less at most the frame or two between the two touches, and a step
+          of one finger's Drop gives exactly what a step of the other's does
+          (the same disc, wholly inside the plate). This is where a second
+          touch that started late, was skipped on some steps or laid a
+          fraction of the first would show, and it is asked of numbers the
+          solver has not touched.
+
+          And what the plate holds of it. Under each finger (the disk at its
+          held cell) there must be dye, three times anything at that finger's
+          mirrors. The balance, which held the two disks to within 0.4 of each
+          other, is now asked of the dye nearest each finger (every cell
+          within three disks of it and nearer it than the other), so it counts
+          a finger's dye wherever the plate carried it in the 1.9 s between
+          landing and reading, and not only the part still inside one disk.
+          The disks read 62 to 81 against 181 to 234 on four Mac runs (one
+          in 36 of the last), with both fingers 52 cells from the middle on
+          a cleared plate, and the plate's pools differed by up to 2.5 times
+          between runs too (74 to 269 for one finger), which the disk alone
+          could not tell from a finger that laid less. A finger that laid
+          less still fails both halves; one whose pool the plate moved fails
+          neither, and the line prints all three readings, so a red names
+          which it was.
+        */
+        const near = (c, other) => {
+          let sum = 0;
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const d = Math.hypot(x - c.x, y - c.y);
+            if (d < 3 * R && d < Math.hypot(x - other.x, y - other.y)) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
+          }
+          return sum;
+        };
         const disk = (c) => {
           let sum = 0;
           for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < R) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
@@ -891,15 +945,15 @@ try {
         };
         const fingers = held.length === 2 ? held : [ref.DA, ref.DB];
         const drift = held.length === 2 ? Math.max(...held.map((h, i) => Math.hypot(h.x - [ref.DA, ref.DB][i].x, h.y - [ref.DA, ref.DB][i].y))) : NaN;
-        const rows = fingers.map(p => {
+        const rows = fingers.map((p, i) => {
           const laid = disk(p);
           const elsewhere = controlsOf(p).filter(clearOf(fingers)).map(disk);
-          return { laid, elsewhere, worst: Math.max(0, ...elsewhere) };
+          return { laid, near: near(p, fingers[1 - i]), elsewhere, worst: Math.max(0, ...elsewhere) };
         });
         const ok = rows.every(r => r.laid > 5 && r.elsewhere.length >= 2 && r.laid > 3 * r.worst)
-          && Math.min(rows[0].laid, rows[1].laid) > 0.4 * Math.max(rows[0].laid, rows[1].laid);
+          && Math.min(rows[0].near, rows[1].near) > 0.4 * Math.max(rows[0].near, rows[1].near);
         check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
-          rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
+          rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} under it (${r.near.toFixed(0)} nearest it) against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
             + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); ${rb1 - rb0} readbacks`);
       } else if (NEED_GPU) {
         check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
@@ -909,6 +963,30 @@ try {
       }
 
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
+
+      /*
+        With Drop Height up a held Drop lets go of a drop as it lands and
+        then one every tenth step (DROP_EVERY), each carrying ten steps'
+        dye. Its clock was counted up only past a frame's first step until it
+        had started, so on frames of one step each, which is a plate stepping
+        at the display's rate, it stayed at 0 and a drop fell on every step:
+        ten times the dye and a splash a step. Asked of the finger's own
+        count, at one instant, so a slow runner's fewer steps change nothing.
+      */
+      await settings({ dropHeight: 0.9 });
+      await touch('touchStart', [{ ...DA, id: 7 }]);
+      await settle(1000);
+      const dropping = (await hands()).hands[0]?.laid ?? null;
+      await touch('touchEnd', [{ ...DA, id: 7 }]);
+      await settle(300);
+      await settings({ dropHeight: 0 });
+      if (NEED_GPU || (dropping && dropping.steps >= 10)) {
+        check('a finger holding Drop with Drop Height up lets go of a drop as it lands and one every ten steps after',
+          !!dropping && dropping.steps >= 10 && dropping.drops === Math.ceil(dropping.steps / 10),
+          dropping ? `${dropping.drops} drops over ${dropping.steps} steps (${Math.ceil(dropping.steps / 10)} wanted)` : 'no hand, or chromaglassDebug().hands()[0].laid is gone');
+      } else {
+        console.log(` --   the plate took ${dropping?.steps ?? '?'} steps under the held Drop here: its drops are not counted (the Mac shard counts them)`);
+      }
 
       /*
         Two fingers holding the Magnet are two magnets, each under its own

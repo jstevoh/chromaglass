@@ -284,6 +284,17 @@ const BODY_COVER = 0.35;
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
+/*
+  What one hand's Drop has handed the plate since it landed: the solver steps
+  it was held on the plate, the drops it let go of (Drop Height up), and the
+  dye it gave, the sum of every cell's share it put into the deltas (a drop
+  counts its whole amount). Each finger keeps its own, so a second finger
+  that started late or was skipped on some steps shows it here, before the
+  solver has touched anything; `npm run phone` holds two fingers' counts to
+  each other and the plate's dye to them.
+*/
+type DropLaid = { steps: number; drops: number; dye: number };
+const freshLaid = (): DropLaid => ({ steps: 0, drops: 0, dye: 0 });
 
 /*
   The bottle, from every tool that lays liquid.
@@ -4356,7 +4367,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * own way) and its own drop clock (so each lays its first drop as it lands).
    * Keyed by the touch's identifier; emptied when the fingers leave.
    */
-  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number; blowDir?: BlowDir }>());
+  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; laid: DropLaid; magnetAt?: number; blowDir?: BlowDir }>());
   /** Which touch is the pointer, while one is. */
   const primaryTouchRef = useRef<number | null>(null);
   /**
@@ -4506,6 +4517,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
   const beadFrameRef = useRef(0);    // the beads' own frame clock (see the populate call)
   const dropClockRef = useRef(0);    // solver steps since the dropper was pressed (Drop Height lets go of drops on it)
+  const dropLaidRef = useRef<DropLaid>(freshLaid());  // what the pointer's Drop has laid since it was pressed (DropLaid)
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
@@ -6191,11 +6203,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
 
           // ── Manual injection ───────────────────────────────────
-          // The dropper's clock runs while it is held and starts again at 0 on
-          // the next press, so every press lands a drop at once.
-          if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; blowDirRef.current = undefined; }
-          else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
-          for (const h of extraHandsRef.current.values()) if (simStep > 0 || h.clock > 0) h.clock++;
+          /*
+            The dropper's clock: the steps a hand has held it, 0 on the step
+            it lands (so every press lets go of a drop at once) and counted up
+            after each step it is held, below.
+
+            It was counted up here, before the hands, and only "if this is not
+            a frame's first step, or the clock has already started", so that
+            a press's first step read 0. But a frame that runs one step has no
+            other step, so a clock still at 0 stayed at 0 for as long as the
+            frames ran one step each, which is every frame of a plate stepping
+            at the display's own rate: a held Drop with Drop Height up let go
+            of a splashing drop on every step instead of every tenth, until the
+            first frame that happened to owe two. Counted after use, the first
+            step is 0 and the next is 1 whatever the frames do.
+          */
+          if (!isMouseDownRef.current) {
+            dropClockRef.current = 0; strokeLastRef.current = null; blowDirRef.current = undefined;
+            if (dropLaidRef.current.steps > 0) dropLaidRef.current = freshLaid();
+          }
           /*
             Every hand on the glass: the pointer, then each other finger on a
             touch screen (extraHandsRef). The same tool at the same Amount for
@@ -6204,9 +6230,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             pointer's stroke is written back to its ref for the next step; the
             other fingers' live in their own entries.
           */
-          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number; blowDir?: BlowDir };
+          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; laid: DropLaid; magnetAt?: number; blowDir?: BlowDir };
           const hands: { hand: Hand; primary: boolean }[] = [];
-          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, blowDir: blowDirRef.current }, primary: true });
+          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, laid: dropLaidRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
           for (const { hand, primary } of hands) {
             if (drainFrameRef.current !== 0) break;
@@ -6411,8 +6437,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // DROP_EVERY steps while it is held, each carrying the dye the
                 // stream would have laid in that time and each landing with its
                 // splash (autoInject's drop reads the height).
+                hand.laid.steps++;
                 if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
+                  hand.laid.drops++;
+                  hand.laid.dye += amt;
                   af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
                   if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k);
@@ -6424,6 +6453,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // not show; a drop with more in it spreads further.
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k;
+                hand.laid.steps++;
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -6431,6 +6461,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const nx = x + dx, ny = y + dy;
                     if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
                     const w = (1 - dist / r) ** 2;
+                    hand.laid.dye += amt * w;
                     af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
@@ -6441,7 +6472,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k);
               }
             }
-            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; }
+            // Counted after the step it was read on (see the clock above).
+            hand.clock++;
+            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; dropClockRef.current = hand.clock; }
           }
 
           // ── Automation logic ───────────────────────────────────
@@ -7819,6 +7852,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       beadsRef.current.clear();
       fxFrameRef.current = 0;
       dropClockRef.current = 0;
+      dropLaidRef.current = freshLaid();
       beadFrameRef.current = 0;
       gestureFrameRef.current = 0;
       /*
@@ -8145,7 +8179,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
          */
         magnets: () => magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
         hands: () => ({
-          hands: [...(isMouseDownRef.current ? [{ ...mousePosRef.current }] : []), ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y }))],
+          hands: [
+            ...(isMouseDownRef.current ? [{ ...mousePosRef.current, laid: { ...dropLaidRef.current } }] : []),
+            ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y, laid: { ...h.laid } })),
+          ],
           pinch: pinchRef.current !== null,
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
@@ -9380,7 +9417,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           lastMousePosRef.current = { ...p };
           mousePosRef.current = p;
         } else if (t.identifier !== primaryTouchRef.current) {
-          extraHandsRef.current.set(t.identifier, { ...p, stroke: null, clock: 0 });
+          extraHandsRef.current.set(t.identifier, { ...p, stroke: null, clock: 0, laid: freshLaid() });
         }
       }
     };
@@ -9411,6 +9448,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             lastMousePosRef.current = { x: h.x, y: h.y };
             strokeLastRef.current = h.stroke;
             dropClockRef.current = h.clock;
+            dropLaidRef.current = h.laid;
           }
         } else {
           extraHandsRef.current.delete(t.identifier);
