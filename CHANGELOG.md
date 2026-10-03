@@ -15,6 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Surfaces stay laid over unless set, so a saved rig looks as it did. On the
   phone: More, Settings, Mapping.
 
+### Changed — Back goes fully back
+
+- **Back puts the room back too**: the film's and the logo's levels, the
+  dimmer, the Mixer's levels and grades and the microphone's gain fade back
+  to where they were before the Go, with the look, over the same fade. It
+  leaves the machine's setup (the grid, the microphone's latency, the room
+  camera's reading, the set's pacing, where the logo sits, each row's take
+  time). A fader, a Mixer pad or a song's glide moved while the Back runs
+  stays where it is put, and a blackout stays black. Every take still
+  walking stops. Since the Mixer's step 4, Back had kept the room as it was.
+
+### Changed — the Press on the ferrofluid (PLAN 15d)
+
+- **With Thin Gap on, a pressed pool of ferrofluid stays black and spreads**
+  instead of greying under the palm, and draws back when the glass lifts. The
+  ferrofluid moves as a volume (its share times the gap) on the thin solve's
+  own face fluxes, so the glass's outflow no longer takes a share of every
+  cell. With Thin Gap off nothing changes.
+- The gap's drag takes the ferrofluid's own viscosity (5 mm²/s) by its share,
+  so a press into the default liquid fingers its edge (Saffman–Taylor) and,
+  under Thin Gap, the pool answers body forces, the magnet's included, about
+  4.4 times faster at the default Thickness and 5 times slower in water.
+- `npm run ferropress` (7 checks, lab, on every PR): pressed to a sixth of
+  the gap the middle holds 0.955 → 0.961 (by area: 0.155), its volume is kept
+  to 0.13% while the cells it fills grow 2.5 times, after the lift every ring
+  is within 0.006 of a pool never pressed, and a ragged edge keeps 1.4 times
+  the bumps of an even pair when it is the thinner liquid.
+
 ### Added — a projector picks its source
 
 - A mapped surface (Settings, Mapping) can show the **front plate alone**, the

@@ -137,6 +137,8 @@ export const LOOK_LEVEL_KEYS: readonly string[] = ['gelWheel', 'lumia'];
 
 /** Which row a level setting belongs to: `filmMix` is the film's. */
 const LEVEL_ROW = new Map<string, MixSource>(FADE_ROWS.map(id => [String(MIX_SOURCE_INFO[id].level), id]));
+/** Every row's level setting: what a Back puts back, so every take it meets stops. */
+export const FADE_LEVEL_KEYS: readonly string[] = [...LEVEL_ROW.keys()];
 
 /** A level this close to 0 is out: the row is not on the wall. */
 const OUT = 0.001;
