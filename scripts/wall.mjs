@@ -18,6 +18,9 @@
  *   corner pin  outside the pinned quad is black, inside it is the picture
  *   flip        the picture reverses inside the quad while the quad stays put
  *   grade       gain lifts what is on the wall, and gamma is not gain
+ *   sources     a projector showing the front plate, the back plate or the
+ *               film alone shows that and not the wall (PLAN.md §16b), and
+ *               what each extra picture costs the GPU
  *   one clock   with the projector window open and both windows animating,
  *               the plate draws at most once for each refresh either window
  *               was handed (1.05 times them) and at least 0.9 of what the
@@ -385,10 +388,13 @@ const check = (name, ok, detail = '') => {
   /*
     The stamp: a refresh's own time when there is a believable one (held up
     behind a draw, it is older than now, which is the point), and the time
-    now when there is none or it is from some other clock.
+    now when there is none or it is from some other clock. A stamp a little
+    ahead of now is believed: the Mac runners stamp some refreshes up to
+    2.4 ms ahead (1002.4 here), and the bound is one 240 Hz refresh; past
+    that (1005) it would name the next refresh, so it is not.
   */
   {
-    const cases = [[990, 1000, 990], [700, 1000, 700], [undefined, 1000, 1000], [NaN, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
+    const cases = [[990, 1000, 990], [700, 1000, 700], [1002.4, 1000, 1002.4], [undefined, 1000, 1000], [NaN, 1000, 1000], [1005, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
     const wrong = cases.filter(([ts, now, want]) => refreshStamp(ts, now) !== want);
     check('an offer is stamped with its refresh\'s time, or now when that is missing or not believable', wrong.length === 0,
       wrong.length ? wrong.map(([ts, now, want]) => `${ts} at ${now} gave ${refreshStamp(ts, now)}, not ${want}`).join('; ') : `${cases.length} cases`);
@@ -748,6 +754,8 @@ let failed = 0;
         fedN,
         fedMedian,
         fallbacks: d.drawGate?.stampFallbacks ?? null,
+        misses: d.drawGate?.stampMisses ?? null,
+        missedAgo: d.drawGate?.stampMisses?.lastAt ? performance.now() - d.drawGate.stampMisses.lastAt : null,
         engine: d.engine,
       };
     }, ms);
@@ -842,13 +850,14 @@ let failed = 0;
         const offered = m.offered ? `the show's frames ${f1(m.offered.frame)} a second against ${f1(m.hz)} Hz, the wall's asks ${f1(m.offered.ask)} against the ${f1(m.wallServable)} refreshes the harness did not hold (its display ${f1(m.wallHz)} Hz, ${f1(m.wallFrames)} handed)` : 'this build has no draw gate to ask';
         /*
           And every refresh's timestamp believed. A wall whose time origin was
-          converted the wrong way, or a clock ahead of this one, falls back to
-          the time its callback ran, which is the stamping that let a slow
+          converted the wrong way (seconds behind, since the wall opens five
+          seconds after the show), or a clock ahead of this one by more than a
+          240 Hz refresh, falls back to the time its callback ran, which is the stamping that let a slow
           frame's second clock draw too; on one display the gate still holds
           without the draw cost, so the rate lines would not see it.
         */
         if (m.fallbacks !== null) {
-          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran`);
+          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran${m.fallbacks && m.misses ? ` since the page opened (${m.misses.ahead} ahead of now, the worst by ${f1(m.misses.aheadMs)} ms; ${m.misses.stale} over a second old, the worst ${f1(m.misses.staleMs)} ms; the last ${f1((m.missedAgo ?? 0) / 1000)} s before this reading)` : ''}`);
         }
         check('  and both clocks were offering, each at its own window\'s rate',
           m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.wallServable > 10 && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0, offered);
@@ -997,7 +1006,7 @@ try {
         && (live.surfaces ?? []).length === (c.surfaces ?? []).length
         && (live.surfaces ?? []).every((s, i) => {
           const w = (c.surfaces ?? [])[i];
-          return w && s.shape === w.shape && s.enabled === w.enabled
+          return w && s.shape === w.shape && s.enabled === w.enabled && (s.source ?? 'wall') === (w.source ?? 'wall')
             && s.corners.every((v, j) => Math.abs(v - w.corners[j]) < 1e-6);
         });
     }, want, { timeout: 20000 });
@@ -1658,6 +1667,167 @@ try {
     const dark = await gridOf();
     check('a shape switched off lights nothing', region(dark, 0, 0, 1, 1) < 0.005,
       `${region(dark, 0, 0, 1, 1).toFixed(4)}`);
+  }
+
+  // ── 7c. A projector's own source (PLAN.md §16b) ──────────────────────
+  //
+  // Two projectors side by side, each the whole picture squeezed into its
+  // own half of the frame, so a cell in the left half and the cell sixteen
+  // columns over are the same place on the plate in the same frame. Every
+  // claim is between the two halves of one frame: across two frames the
+  // liquid has moved, and a difference between them would be the liquid's.
+  //
+  // Each source is held to a reference drawn in the same frame: the left
+  // projector shows the wall with that source's other rows set to 0 on the
+  // running plate (the settings hook), the right one the source. They must
+  // be one picture, to within what two quads a pixel apart differ by (the
+  // control, both on the wall); and with the settings put back, the two must
+  // be apart. A source routed to another source's texture, or never drawn,
+  // fails the first; a source that is only the wall fails the second.
+  //
+  // On Fillmore East, two plates, with the camera and the film stock off, so
+  // the wall is the plate's display pass as the sources are: section 6 left
+  // Oil on Water up, one plate under a lens, where the back plate alone and
+  // the film alone are both the bare lamp and could not be told apart.
+  //
+  // Fillmore and not Classic, and a film playing, because each source has to
+  // have something of its own to show. The first Mac run (#226) was on
+  // Classic with no film: Classic lays its back plate empty (`layPlate`
+  // clears every plate and seeds only the front; the back fills only as the
+  // automation pours into it), so the back source and its reference were both
+  // black, the front source was the wall to 0.001 because the back added
+  // nothing to it, and the film alone was black because nothing was loaded.
+  // All three were measuring a moment of the plate, not the routing. Fillmore
+  // is the look made of two projectors: the back plate is laid with its own
+  // wash (`laySecondPlate`) and the film row is at 0.7. The film is the
+  // browser's fake camera (scripts/chromium.mjs asks for one), started from
+  // Settings, Film, Camera, as a person would.
+  // `npm run mixer` holds each source to the exact picture on a lab plate;
+  // this asks the app's frame on a real GPU, and prints what each costs.
+  {
+    const half = (x0, source) => ({
+      id: `half-${x0}-${source}`, shape: 'rect', corners: [x0, 0, x0 + 0.5, 0, x0 + 0.5, 1, x0, 1],
+      src: [0, 0, 1, 1], enabled: true, opacity: 1, feather: 0, source,
+    });
+    /** Left against right, cell by cell: the mean luminance of each and the mean difference between them. */
+    const halves = async (left, right) => {
+      await withOutput({ surfaces: [half(0, left), half(0.5, right)], flashGuard: false });
+      const g = await gridOf();
+      const cols = g.cols / 2;
+      let l = 0, r = 0, d = 0, n = 0;
+      for (let y = 0; y < g.rows; y++) for (let x = 0; x < cols; x++) {
+        const a = g.lum[y * g.cols + x], b = g.lum[y * g.cols + x + cols];
+        l += a; r += b; d += Math.abs(a - b); n++;
+      }
+      return { left: l / n, right: r / n, diff: d / n };
+    };
+    const set = async (patch) => {
+      await page.evaluate((p) => window.chromaglassSettings?.(p), patch);
+      await page.waitForFunction((p) => {
+        const now = window.chromaglassSettings?.();
+        return !!now && Object.entries(p).every(([k, v]) => now[k] === v);
+      }, patch, { timeout: 20000 });
+      await page.waitForTimeout(400);
+    };
+    const f3 = (v) => v.toFixed(3);
+    const timings = () => page.evaluate(() => {
+      const d = window.chromaglassDebug?.().webgpu;
+      return d ? { on: !!d.timestamps, t: { ...(d.timings ?? {}) } } : null;
+    });
+
+    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
+    await set({ camera: 0, stock: 0 });
+    await page.getByTestId('open-all-settings').click();
+    await page.getByTestId('settings-nav-film').click();
+    await page.getByTestId('film-camera').click();
+    // Playing, not only started: `startFilmCamera` names the film a camera
+    // before its first frame, and the plate counts a film as on only once the
+    // video has a frame and a size (gpu/plateUniforms.ts). The check below
+    // asks the same, so a camera that never sends a frame is reported as that
+    // and not as a source routed wrong.
+    const filmPlaying = () => {
+      const v = window.chromaglassDebug?.().film?.video;
+      return window.chromaglassDebug?.().film?.kind === 'camera' && !!v && v.readyState >= 2 && v.videoWidth > 0;
+    };
+    await page.waitForFunction(filmPlaying, null, { timeout: 15000 }).catch(() => {});
+    await page.keyboard.press('Escape');
+    const look = await page.evaluate(() => {
+      const s = window.chromaglassSettings?.();
+      return s ? {
+        layers: s.layerCount, camera: s.camera ?? 0, stock: s.stock ?? 0, levels: [s.frontLevel ?? 1, s.backLevel ?? 1],
+        film: window.chromaglassDebug?.().film?.kind ?? null, filmMix: s.filmMix ?? 0,
+        frames: (() => { const v = window.chromaglassDebug?.().film?.video; return v ? { ready: v.readyState, width: v.videoWidth } : null; })(),
+      } : null;
+    });
+    const playing = !!look?.frames && look.frames.ready >= 2 && look.frames.width > 0;
+    check('the sources are asked on a two-plate look with no camera and no film stock, and a film playing',
+      !!look && look.layers === 2 && look.camera === 0 && look.stock === 0 && look.levels.every(v => v > 0.5)
+        && look.film === 'camera' && playing && look.filmMix > 0.3, JSON.stringify(look));
+    // Let the plate fill before anything is measured on it.
+    await withOutput({ flashGuard: false });
+    for (let i = 0; i < 20 && !(meanOver(await gridOf(), () => true) > LIT); i++) await page.waitForTimeout(500);
+    const before = await timings();
+
+    const same = await halves('wall', 'wall');
+    check('two projectors both on the wall show the same picture', same.left > LIT && same.diff < 0.1 * same.left,
+      `left ${f3(same.left)}, right ${f3(same.right)}, apart by ${f3(same.diff)}`);
+    // Within twice the control, and never under a floor of 0.004 of full
+    // scale: two quads a pixel apart can agree better than a cell's dither.
+    const near = Math.max(2 * same.diff, 0.004);
+    const OFF = {
+      front: { backLevel: 0, filmMix: 0 },
+      back: { frontLevel: 0, filmMix: 0, markMix: 0 },
+      film: { frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0 },
+    };
+    const live = await page.evaluate(() => window.chromaglassSettings?.());
+    // The film source draws a Multiply film as Add (lib/plateSources.ts), so
+    // its reference on the wall has to as well, or it is black by design.
+    if (live.filmBlend === 'multiply') OFF.film.filmBlend = 'add';
+    const drawn = {};
+    for (const kind of ['front', 'back', 'film']) {
+      const restore = Object.fromEntries(Object.keys(OFF[kind]).map(k => [k, live[k] ?? (k === 'filmMix' || k === 'markMix' || k === 'gelWheel' || k === 'lumia' ? 0 : 1)]));
+      await set(OFF[kind]);
+      const ref = await halves('wall', kind);
+      await set(restore);
+      const apart = await halves('wall', kind);
+      drawn[kind] = (await timings())?.t?.[`plate ${kind}`];
+      check(`the ${kind} source is the wall with its other rows at 0, drawn in the same frame, and not the wall itself`,
+        ref.left > LIT && ref.diff <= near && apart.diff > 4 * same.diff,
+        `against its reference ${f3(ref.diff)} (within ${f3(near)}); against the wall ${f3(apart.diff)} (the control ${f3(same.diff)}); it ${f3(ref.right)}, the reference ${f3(ref.left)}`);
+    }
+    // And the film alone is the film: with its row at 0 the film's projector
+    // goes dark. Without this the film line above would pass on anything else
+    // still lit in a view whose plates are off (the lamp's rim, the beads),
+    // since that view always differs from the wall.
+    {
+      await set({ filmMix: 0 });
+      const dark = await halves('wall', 'film');
+      await set({ filmMix: live.filmMix });
+      check('the film source is lit by the film: with the film row at 0 its projector is dark',
+        dark.right < LIT, `film source ${f3(dark.right)} at Film Mix 0 (dark under ${LIT}), the wall beside it ${f3(dark.left)}`);
+    }
+    // What each picture costs: its own display pass, timed under its own
+    // label, absent before any projector asked for it and fresh while one
+    // does (the profiler decays an old label rather than dropping it, so
+    // "present" alone would be true a minute after the pass stopped).
+    if (before?.on) {
+      const t = (await timings()).t;
+      const absent = ['front', 'back', 'film'].filter(k => typeof before.t[`plate ${k}`] === 'number');
+      check('each source is drawn as its own pass, timed only once a projector asks for it',
+        absent.length === 0 && ['front', 'back', 'film'].every(k => drawn[k] > 0.001),
+        `before: ${absent.length ? absent.join(', ') + ' already there' : 'none'}; wall ${t.plate?.toFixed(2)} ms, ${['front', 'back', 'film'].map(k => `${k} ${drawn[k]?.toFixed(2)} ms`).join(', ')}`);
+    } else {
+      console.log(' skip  each source\'s cost: this device has no timestamp queries');
+    }
+    // Off is disabled with no film playing, and a click on it would wait out
+    // Playwright's thirty seconds and lose every section after this one.
+    if (look?.film === 'camera') {
+      await page.getByTestId('open-all-settings').click();
+      await page.getByTestId('settings-nav-film').click();
+      await page.getByTestId('film-off').click();
+      await page.keyboard.press('Escape');
+    }
+    await withOutput({ flashGuard: true });
   }
 
   // ── 8. Back to nothing ─────────────────────────────────────────────
