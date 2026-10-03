@@ -405,6 +405,27 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
+## 17. The back plate's own look
+
+PLAN.md §16a. On the desk, cue a look with two plates in mind (Oil & Water on
+the front, say), press Go, then cue a different one (Boiling Point, Ferro
+Paint) and press **To Back Plate**. Worth looking at:
+
+- over the fade, the back plate's liquid changes how it moves and what colour
+  it pours while the front keeps its own; nothing cuts, and the front does not
+  thin or re-lay;
+- the Mixer's Back Plate row says "On" and the look's name; grading it and
+  moving it in the stack behave as before;
+- a Go on the front (and a cut from the preset strip) leaves the back plate on
+  its look;
+- **Follow Front** fades the back plate back into the front's twin; on a
+  one-plate front look the back plate goes when that fade lands;
+- the same from the phone: the looks sheet's Back plate switch, then a look;
+- whether two looks on two plates read as two projectors or as a muddle is
+  the judgement this is for.
+
+---
+
 ## 16. The Magnet pulls a pool out in fingers
 
 A pool bigger than the spikes' reach used to stay a round blob past them
