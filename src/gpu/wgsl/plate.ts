@@ -1672,7 +1672,17 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
       let m = mixBlendOf(U.mixBlend.z);
       if (m == 0) { c = screenOver(c, lumiaLight(uv) * U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
     }
-    if (U.mixPos.z == fp) { c = filmOver(c, uv, fluid0, normal0); }
+    /*
+      The film lands on the front plate's dye, tinted by it and bent by its
+      surface, as far as the front plate is there: by its level. At a level
+      of 0 there is no glass in the front projector's gate, so nothing tints
+      or bends the film, which is what a projector showing the film alone
+      needs (PLAN.md §16b, lib/plateSources.ts). Before, the tint read the
+      dye at full strength whatever the level, and the film-alone projector
+      printed the front plate's liquid into the film: 10 a channel on
+      average, 171 at worst, on the lab plate.
+    */
+    if (U.mixPos.z == fp) { c = filmOver(c, uv, vec4f(fluid0.rgb, fluid0.a * U.mixLevel.y), normal0); }
     if (U.mixPos.w == fp && fp < U.mixPos2.w) { c = markLayer(c, uvScreen, U.mixLevel.w, markTex); }
   }
   return c;
