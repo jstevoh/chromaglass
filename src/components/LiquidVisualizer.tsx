@@ -6222,9 +6222,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             dropClockRef.current = 0; strokeLastRef.current = null; blowDirRef.current = undefined;
             if (dropLaidRef.current.steps > 0) dropLaidRef.current = freshLaid();
           }
-          // MUTANT (a), not for merging: the old drop clock.
-          else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
-          for (const h of extraHandsRef.current.values()) if (simStep > 0 || h.clock > 0) h.clock++;
           /*
             Every hand on the glass: the pointer, then each other finger on a
             touch screen (extraHandsRef). The same tool at the same Amount for
@@ -6467,8 +6464,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
                     const w = (1 - dist / r) ** 2;
                     hand.laid.dye += amt * w;
-                    // MUTANT (b), not for merging: a second finger's dye reaches the plate at a third, counted in full.
-                    af.addDensity(nx, ny, primary ? amt * w : amt * w / 3, rgb.r, rgb.g, rgb.b);
+                    af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
                 }
@@ -6479,7 +6475,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
             // Counted after the step it was read on (see the clock above).
-            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; }
+            hand.clock++;
+            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; dropClockRef.current = hand.clock; }
           }
 
           // ── Automation logic ───────────────────────────────────
