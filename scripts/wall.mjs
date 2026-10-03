@@ -385,10 +385,13 @@ const check = (name, ok, detail = '') => {
   /*
     The stamp: a refresh's own time when there is a believable one (held up
     behind a draw, it is older than now, which is the point), and the time
-    now when there is none or it is from some other clock.
+    now when there is none or it is from some other clock. A stamp a little
+    ahead of now is believed: the Mac runners stamp some refreshes up to
+    2.4 ms ahead (1002.4 here), and the bound is one 240 Hz refresh; past
+    that (1005) it would name the next refresh, so it is not.
   */
   {
-    const cases = [[990, 1000, 990], [700, 1000, 700], [undefined, 1000, 1000], [NaN, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
+    const cases = [[990, 1000, 990], [700, 1000, 700], [1002.4, 1000, 1002.4], [undefined, 1000, 1000], [NaN, 1000, 1000], [1005, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
     const wrong = cases.filter(([ts, now, want]) => refreshStamp(ts, now) !== want);
     check('an offer is stamped with its refresh\'s time, or now when that is missing or not believable', wrong.length === 0,
       wrong.length ? wrong.map(([ts, now, want]) => `${ts} at ${now} gave ${refreshStamp(ts, now)}, not ${want}`).join('; ') : `${cases.length} cases`);
@@ -844,8 +847,9 @@ let failed = 0;
         const offered = m.offered ? `the show's frames ${f1(m.offered.frame)} a second against ${f1(m.hz)} Hz, the wall's asks ${f1(m.offered.ask)} against the ${f1(m.wallServable)} refreshes the harness did not hold (its display ${f1(m.wallHz)} Hz, ${f1(m.wallFrames)} handed)` : 'this build has no draw gate to ask';
         /*
           And every refresh's timestamp believed. A wall whose time origin was
-          converted the wrong way, or a clock ahead of this one, falls back to
-          the time its callback ran, which is the stamping that let a slow
+          converted the wrong way (seconds behind, since the wall opens five
+          seconds after the show), or a clock ahead of this one by more than a
+          240 Hz refresh, falls back to the time its callback ran, which is the stamping that let a slow
           frame's second clock draw too; on one display the gate still holds
           without the draw cost, so the rate lines would not see it.
         */
