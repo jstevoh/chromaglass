@@ -118,8 +118,14 @@ try {
       return { r: m, spread: Math.sqrt(rs.reduce((a, b) => a + (b - m) ** 2, 0) / rs.length) / m };
     };
     // A palm 0.15 of the plate in radius, pressing the middle to a sixth of the gap over twenty steps, as a hand lays a Press a step at a time.
+    // On a thin gap the glass closes as a squeeze film under a load (Stefan's law, squeezeUpdate in src/gpu/wgsl/fluid.ts): what the
+    // hand lays is its rate a at the rest gap h₀, and each step 1/h² grows by 2a/h₀³. Laid as the old solver's straight steps of
+    // h₀·(5/6)/20, twenty of them took the middle only to 0.61 of rest, and the check's "every press landed" failed on a press that
+    // never got there. So on a thin gap the hand presses at the rate that reaches a sixth in the same twenty steps: 1/h² from 1/h₀²
+    // to 36/h₀² is 35/h₀² = 20·2a/h₀³, a = 35·h₀/40. The old solver keeps its straight steps, which land at a sixth as before.
     const press = async (over) => {
-      for (let k = 0; k < 20; k++) { lab.vel(0.5, 0.5, 0.15, [0, 0, 0, -0.025 / 20]); lab.flush(); await lab.step(1, over); }
+      const a = over.thinGap ? 35 * H0 / 40 : H0 * 5 / 6 / 20;
+      for (let k = 0; k < 20; k++) { lab.vel(0.5, 0.5, 0.15, [0, 0, 0, -a]); lab.flush(); await lab.step(1, over); }
     };
     const thin = { thinGap: 1, gapThickness: 0.45, gapSpring: 0, gapMemory: 0.85 };
     const out = { laid: Math.PI * 0.1 * 0.1 / 2 };

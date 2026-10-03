@@ -4531,6 +4531,10 @@ export default function App() {
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
             fingering={settings.fingering ?? 0}
             onFingering={(v) => updateSettings({ fingering: v })}
+            thinGap={settings.thinGap ?? 0}
+            onThinGap={(v) => updateSettings({ thinGap: v })}
+            pressLift={settings.plateSpring ?? 0.35}
+            onPressLift={(v) => updateSettings({ plateSpring: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes }}

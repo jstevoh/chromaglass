@@ -268,6 +268,7 @@ try {
     if (amountUp) await shot(page, `${label.replace(/ /g, '-')}-amount`);
     check(`${label}: a second tap on it opens its Amount`, amountUp);
     const magnetFingers = await visible(page, 'phone-press-fingering');
+    const magnetGlass = (await visible(page, 'phone-press-thin')) || (await visible(page, 'phone-press-lift'));
     await tap(page, 'phone-tool-magnet');
     /*
       Fingering on the Press tool's own Amount (lib/squish.ts: the glass
@@ -291,6 +292,38 @@ try {
     check(`${label}: the Press's Amount has Fingering under it, and only the Press's, and it goes to 100 % and back`,
       pressFingers && !magnetFingers && under && fingersUp === '100' && fingersBack === '0',
       `on the Press ${pressFingers}, on the Magnet ${magnetFingers}, under the Amount ${under}, ${fingersUp}% then ${fingersBack}%`);
+    /*
+      And the glass under the Press (PLAN §18a): Thin Gap, with which the
+      press draws the liquid back as the glass lifts, and Press Lift, how
+      fast it lifts. On the Press's Amount, beside Fingering, and each
+      reaching the plate's settings: read back from the settings, not only
+      from the slider's own words, so a slider wired to nothing fails.
+    */
+    const setting = (k) => page.evaluate((k) => window.chromaglassSettings?.()?.[k], k);
+    const thinShown = await visible(page, 'phone-press-thin'), liftShown = await visible(page, 'phone-press-lift');
+    let thinOn = null, thinOff = null, thinSaid = '', liftUp = null, liftBack = null;
+    if (thinShown && liftShown) {
+      const was = { thin: await setting('thinGap'), lift: await setting('plateSpring') };
+      await page.getByTestId('phone-press-thin').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(150);
+      thinOn = await setting('thinGap');
+      thinSaid = (await page.getByTestId('phone-press-thin').innerText()).replace(/\s+/g, ' ');
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      thinOff = await setting('thinGap');
+      await page.getByTestId('phone-press-lift').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(150);
+      liftUp = await setting('plateSpring');
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      liftBack = await setting('plateSpring');
+      await page.evaluate((w) => window.chromaglassSettings?.({ thinGap: w.thin ?? 0, plateSpring: w.lift ?? 0.35 }), was);
+    }
+    check(`${label}: the Press's Amount has Thin Gap and Press Lift beside Fingering, and both reach the plate`,
+      thinShown && liftShown && !magnetGlass && thinOn === 1 && /On/.test(thinSaid) && thinOff === 0 && liftUp === 1 && liftBack === 0,
+      `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOn} ("${thinSaid}") then ${thinOff}; Press Lift ${liftUp} then ${liftBack}`);
     await tap(page, 'phone-tool-press');
     await tap(page, 'phone-tool-magnet');
     // Closed, with the dock still up and Magnet still in hand: "not visible"

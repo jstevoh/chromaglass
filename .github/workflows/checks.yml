@@ -297,11 +297,15 @@ jobs:
   # public, so the extra runners cost nothing. A fourth, `open`, is the
   # startup check alone: it opens the show twice on a cold shader cache and
   # then every look on its own, about five minutes, which the tools shard
-  # (eight already) had no room for under the timeout.
+  # (eight already) had no room for under the timeout. Twenty minutes since
+  # the tools shard took the Press's let-go on a thin gap with its two
+  # controls (about 35 s more): its last three green runs before it took
+  # 12:56, 13:10 and 13:29, so a slow runner would have been cancelled, not
+  # failed.
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -362,6 +366,12 @@ jobs:
       - name: The thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run thingap
+      # The app's own Press on a thin gap: the ring goes out as far as the
+      # displaced volume says with every drop kept, the colour's carry takes
+      # the substeps it needs, and it comes back when the glass lifts.
+      - name: The Press comes back on a thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run presslift
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.

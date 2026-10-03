@@ -65,7 +65,7 @@ Where each batch stands, as of 2026-09-27:
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
-| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac, and Thin Gap still off in every look until the owner picks which; 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -3117,9 +3117,9 @@ lift is the unstable one. The same drag sets how fast the ferrofluid answers any
 body force under Thin Gap, the magnet's included: at the default Thickness about 4.4
 times faster than before (its drag is 0.22 of the oil's), in water about 5 times
 slower. That is the real liquid's answer, not a change to the magnet's code; the
-owner's eye on it is in judging §22. The
+owner's eye on it is in judging §23. The
 phone's Press is the same press on the same solver, and Thin Gap is on its settings
-sheet. Judged on the Mac: `docs/judging.md` §22.
+sheet. Judged on the Mac: `docs/judging.md` §23.
 
 *Open, found building it:*
 - **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
@@ -3514,6 +3514,114 @@ its frame rate live. "Free" means no new passes or texture reads.
   solve keeps its pressure in its own buffer and hands the advections c·P for their
   Rhie–Chow faces. `npm run thingap` measures it against the old solver (16 checks).
   Judged on the Mac: docs/judging.md §19.
+- **Shipped, the Press draws the liquid back (Thin Gap, 2026-10-03).** The owner: the
+  Press "just pushes everything out instead of bringing it back when you release".
+  Thin Gap's flow is reversible, but the app's Press was not: measured in the lab
+  with the app's own strokes (Classic's clock), the press closed the film to its
+  floor in a step or two and the liquid it squeezed out crossed up to 75 cells of a
+  384² solver in a step, where the dye's face flux may carry 0.45. The colour was
+  left behind: the ring went 42% of the way out (192²), and the slow lift then drew
+  it 0.06 of the plate inside where it began. Five changes, each on a thin gap only
+  (off, every look presses as it did):
+  - **The glass closes as a film under a load** (`squeezeUpdate`): the liquid
+    leaves through the gap it is closing, whose resistance goes as 1/h³ (Reynolds;
+    Stefan's law), so the hand's press is its rate at the rest gap and slows as
+    h³, integrated exactly over the step. The fastest face fell from 75 cells a
+    step to 8. This is the physical half of 18a-5.
+  - **The carries in substeps** (`carryCourant`, `carryPlan`): the step's largest
+    face Courant number is found on the GPU and the dye, the oil's share of it and
+    the oil (`bodyAdvect`, `mixAdvect`) are carried in as many substeps as keep each
+    under 0.4 of a cell, up to 33, the pairs dispatched indirectly so nothing is
+    read back (21 at most for the Press at 1×). The numerical half of 18a-5.
+  - **The press is a bowl** (`squishDisc`, `thin`): a clamped plate under an even
+    load deflects as (1 − r²/R²)², laid with the flat disc's volume. The stacked
+    flat discs were steps in the gap, which the collocated grid carries colour
+    across badly. A kick's release gives its gap back in the same shape.
+  - **The glass lifts in seconds** (`glassSpring`): Press Lift's half-life was
+    counted on the look's step (Speed × 0.2), about 14 s on Classic; on a thin gap
+    it is the show's seconds, 1.55 s at the default.
+  - **The Press's carries retired on a thin gap** (`squeezeOut`: `pressDye`,
+    `pressOil`/`pressMix`), and the strokes lay only the glass there: no cleared
+    centre or piled rim on a press, no inward push along a lift's spokes (the spokes
+    remain as where the glass opens first). The Press part of 18a-3.
+  - Measured (`npm run presslift`, new, lab, plate shard; 384² under 192, software):
+    the ring lands at 100% of the displaced volume's shift (0.3427 against 0.3425),
+    every colour kept to 0.00%, the colour under the palm's middle leaves with its
+    liquid (×0.171 against the gap's ×0.227), 34% of the shift back after 1 s
+    (4% with the glass on the look's clock), and once the glass is back the ring is
+    3% of its shift from where it began. `npm run tools` on the Mac now presses and
+    lets go through the real pointer with Thin Gap on, against an idle pool.
+  - `npm run thingap`'s Darcy disc is now held for twenty steps, as a hand holds a
+    Press: closing as h³, one step's dent leaves the film at about 0.008, not the
+    floor its λ is counted at (16/16 after: oil 0.0449 against 0.0368, water
+    0.1951 against 0.1854).
+  - The phone has Thin Gap and Press Lift on the Press's own Amount, beside
+    Fingering.
+  - With the Press × ferrofluid PR (#229) merged in: `npm run ferropress` presses its
+    pool to a sixth of the gap in twenty steps at the rate the h³ closing needs
+    (its straight steps reached only 0.61 of rest). Pressed that fast, the
+    ferrofluid's volume grew 1.9%: its grid filter and Cahn–Hilliard kept Σc, not
+    Σc·h. Under the volume form they now move volume (`phaseGrid`,
+    `phaseCHVolume`): kept exactly, 0.01570 → 0.01570, 7/7.
+- **Found along the way, open:**
+  - **Thin Gap in every look.** The owner picked every look (2026-10-03, over "off
+    until tried" and "Classic only"). It changes how every look moves and what the
+    app checks measure, so it is its own PR after this one
+    (handoff/thin-gap-every-look.md in the project's files); until it lands Thin Gap
+    is off in every look. To judge on the Mac: docs/judging.md §22.
+  - **The ferrofluid's carry is not in these substeps.** Since #229 `phaseAdvect`
+    carries the ferrofluid as a volume on the thin solve's face fluxes, in a fixed
+    six substeps (PHASE_SUBSTEPS) where the Press at 1× asks up to 21 of 0.4 a
+    cell (`npm run presslift`). Put it on `carryPlan`'s count, as the dye, the
+    bodies and the mix are. `ferropress`'s press, now as hard as the h³ closing
+    makes it, keeps the volume in six,
+    so measure what the 0.45-a-cell clamp leaves behind instead: the pool's edge
+    against where its volume puts it. `phaseRelax` still keeps Σc, not Σc·h
+    (under 0.1% in that check).
+  - **The app's let-go check read a pool still spreading** (fixed in this PR,
+    not yet green on the Mac). On run 37134289958 the pressed pool read 0.047 →
+    0.077 → 0.076 from the palm and the idle pool 0.051 → 0.066 → 0.082: the check
+    passed at 112% net while the pressed colour never came in (a press frozen at
+    the lift reads 107% against that idle pool, check-skeptic). Run 37145038742
+    read 20% (pressed 0.062 → 0.094 → 0.098, the idle pool on the old solver).
+    Now the pool settles eight of the plate's seconds, the thin press is taken
+    net of an idle pool on the thin gap that starts where it did, a frozen press
+    has to read under half and the pressed colour's own mean has to fall. If it
+    is red after that, the app is not drawing the colour back as the lab does
+    (presslift: 77% under the palm at 3 s), and that is the next thing to find.
+    Run 37148523629 with these: the thin press 0.083 → 0.116 → 0.109, 62% back
+    net of its idle pool (a frozen press 33%); red only on the Thin Gap off
+    control, whose pool was laid wider than its idle one (0.105 against 0.072).
+  - **On the Mac the thin Press barely clears the colour from under the palm.**
+    The share of the colour within 0.05 of the palm went 76% → 69% held → 68%
+    after the lift (its idle pool 78% → 76% → 72%; Thin Gap off 72% → 1%). The
+    lab's press takes the middle's colour to ×0.171. Find what the app's Press
+    lays on a thin gap that the lab's does not (radius, depth, the bowl's 3×,
+    the stroke's per-frame rate), and measure it under the palm.
+  - **The substeps' ceiling.** 33 substeps of 0.4 cover 13 cells a step; the
+    Press at 1× on 384² asks 8. A Press at 2× Amount on a 512² solver, or a
+    machine-starved step (a longer step's spring), can ask more, and past it the
+    flux clamp leaves the colour behind again. Read it on the Mac (`readCarry`).
+  - **The press's rate is the hand's, not the film's.** Stefan's law has the palm's
+    size (R⁴) and the liquid's viscosity in it; the shader keeps only the h³, so a
+    thick liquid does not yet press slower than a thin one under the same hand.
+  - **The colour runs a little ahead of its liquid on a slope of the gap**: the
+    carries' face velocities are rebuilt from cells (18a-8), and in the bowl the
+    colour left under the palm's middle is 0.75 of what the gap there holds.
+  - **The lift is a spring, and liquid fills it.** A real glass lifted off a thin
+    film is held by the film's suction (Stefan, h³) and air comes in from the edge
+    as fingers (Saffman–Taylor, the unstable stroke). The plate has no air phase in
+    the gap, so the liquid always fills, and the lift's spokes are still a drawn
+    seed of where the glass opens first. Needs an air phase in the thin solve.
+  - **The bowl's width is the tool's.** A bent glass's dent is as wide as its
+    bending length under the load (the glass's stiffness against the film); the
+    bowl takes the Press's radius as it was.
+  - **The splash, Blow's puff and every other carry still run on a thin gap.** A
+    drop's splash still lays flat discs with pushes and dye multiplies, and Blow
+    held still still moves the colour with `pressDye`'s ring (18a-3).
+  - **The old solver's glass still springs on the look's clock**, about 14 s
+    to half way on Classic. Every look is tuned on it, so it stays until Thin Gap
+    replaces it.
 - **Left for later PRs, each its own thread (the shortcuts this one keeps, named):**
   - **18a-2, forces that are forces.** The look's stirring (`forcesB`: turbulence,
     spin, tension, drip, air) and every other force are still the old per-step
