@@ -116,6 +116,19 @@ export interface GpuStepParams {
   thinGap?: number;
   /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
   gapThickness?: number;
+  /**
+   * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
+   * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the
+   * lab sets it, to hold a check against a ferrofluid as thick as the clear
+   * liquid round it.
+   */
+  ferroViscosity?: number;
+  /**
+   * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
+   * as before the Press on the ferrofluid (PLAN 15d), so `npm run
+   * ferropress` can hold its checks against what was there. Unset is on.
+   */
+  phaseVolume?: number;
   /** How fast the plates spring back toward that dome, per step. */
   gapSpring: number;
   /** How much of a press's squeeze survives into the next step. */
