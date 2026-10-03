@@ -64,6 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -2923,6 +2924,479 @@ list, the now-playing song and the song shows' next cue, the same as the desk.
 2026-09-27) forbid earning anything around the service and indexing its catalogue,
 and a consumer subscription is for personal listening, so a stream at a gig is
 outside its terms whatever the app does. Files the performer owns carry none of that.
+
+## 18. The physics under the look: where the plate imitates a result instead of simulating it
+
+Asked 2026-09-28. The owner's standing rule is to build from the chemistry and physics
+of the liquids, not from a picture of their result, and to name any shortcut kept for
+speed. This section is the audit that rule asked for: every place found in the solver
+(`src/gpu/wgsl/fluid.ts`), the plate's optics (`src/gpu/wgsl/plate.ts`) and the tools,
+drops, bubbles and bottles (`LiquidVisualizer.tsx`, `src/lib/`) where the code paints
+how a liquid looks instead of simulating what makes it look that way. Each item says
+where the shortcut is, what the real phenomenon is, what simulating it would take, and
+what it would cost at the 768² rung. The costs are estimates from the per-stage table in
+`docs/webgpu-plan.md` (Classic, two layers, 768², 6.58 ms a step on the M4) and the
+plate pass's 2.0 ms, not measurements. Every item is read from the code; nothing here
+has been built or measured yet.
+
+The owner asked for all of these in the plan and picked 18a, the thin-gap flow, to
+build first (2026-09-28); it starts in its own thread.
+
+Three threads already own a piece of this, and their items are ranked here rather than
+written twice: Classic's fingering push (the "grates" thread; its PR adds the plan item
+for real Saffman–Taylor fingering), the ferrofluid's pull and the dye between the domes
+(9f), and Blow (15c, with 15b and 15g).
+
+### The one finding under most of the rest
+
+**The plate has no velocity that obeys physics and remembers.** `decayVel` multiplies
+the velocity by `damping` (a per-step factor with no dt in it) and then clamps every
+cell to `MAX_SPEED` 0.002 (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid.ts` `decayVel`).
+`docs/evaluation-2026-09.md` measured 99.7% of dyed cells sitting at that cap. So what
+carries the dye is the noise stirring added after the pressure solve (`forcesB`:
+turbulence, spin, vibration, drip, smear, air) and the half-resolution lasting current
+(`cur`), which was added beside the main field to get some memory back. The viscosity,
+the velocity's own advection and the second projection (about 2.4 ms, a third of the
+step) work on a field the clamp then throws away. That one decision is why a tool's push
+lasts one step (15b), why every tool moves the colour by a hand-written carry (15g), why
+a press or a pour pushes nothing that the projection does not delete (bubbles-plan H),
+and why viscous fingering could not be shown when it was built (physics-plan "What is
+not here": the closed plate balances every source with a uniform sink).
+
+A plate of liquid between two glasses is a Hele-Shaw cell. Its depth-averaged flow obeys
+ρ∂u/∂t = −∇p + f − (12μ/h²)u, with ∇·(hu) = −∂h/∂t plus any source. The drag time
+ρh²/12μ is about 0.02 s for water in a 0.5 mm gap, about 2 s in a 5 mm one, and nothing
+for glycerine. The plate's memory should come from the gap and the liquid's viscosity,
+not from a clamp.
+
+### Ranked
+
+By what the show gains against what it costs, GPU time first, since the show must hold
+its frame rate live. "Free" means no new passes or texture reads.
+
+| # | Item | Gain | GPU cost | Needs |
+|---|---|---|---|---|
+| 18a | The plate is a Hele-Shaw cell | Large: tools move every liquid, thick liquids stop, fingering becomes possible | About −2 ms a step (a saving) | Retuning every look; the owner's feel call (15b) |
+| 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground |
+| 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
+| 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
+| 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
+| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
+| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
+| 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
+| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
+| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
+| 18k | Smaller ones | Small | Free to small | See each |
+
+### 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
+
+- **Where:** `MAX_SPEED` and `damping` in `decayVel`; the lasting current
+  (`currentForces`, `addCurrent`); the squeeze film's red-black sweeps and
+  `squeezeVelBuf`; the depth multiply in `addCurrent`.
+- **The shortcuts it removes:**
+  - **The clamp** sets every speed on the plate (above).
+  - **The squeeze film's pressure solve** does almost nothing. Five red-black sweeps
+    solve ∇²p = 12μ ḣ/h³, and `squeezeVelBuf` adds −(h²/12μ)∇p to the velocity. That
+    is a pure gradient, which the next projection deletes, as the kernel's own comment
+    says ("pressing seventy-five times harder moved the same 1%"). The sweeps and the
+    add are most of the squeeze stage, which is the step's most expensive at 1.13 ms.
+    What actually presses is the −ḣ/h source in `divergence`. The operator is also the
+    wrong one: the Reynolds equation is ∇·(h³∇p) = 12μ ḣ, not ∇²p with h³ moved into
+    the source.
+  - **Depth as a capped multiply** on the projected flow ((h²/h₀²)^k, capped at 1),
+    which makes a divergence-free field divergent. That is why it ships off.
+- **What it takes:**
+  - One velocity field with implicit drag, u ← (u + dt(f − ∇p)/ρ)/(1 + dt·12ν/h²).
+  - A variable-coefficient projection ∇·(M∇p) = ∇·(Mf) + ∂h/∂t, with mobility
+    M = h³/12μ(x). The multigrid takes face coefficients (harmonic means); a version
+    was built once (physics-plan).
+  - **An open rim:** cells at the dish's edge held at p = 0, so liquid can enter and
+    leave there instead of every source being balanced by a uniform sink. This is what
+    viscous fingering was missing.
+  - At these Reynolds numbers the velocity's self-advection and the second projection
+    can go.
+  - A tool then acts on the flow and the flow carries every field. Blow is a surface
+    shear stress, a Finger is a solid in the layer (Brinkman penalisation: the hand's
+    velocity imposed inside its disc), a Press is ∂h/∂t. The hand-written carries
+    (`carryDye`, `carryMix`, `fingerCarry`, `pressDye`, `pressMix`, `blowDye`,
+    `blowOil`, `blowCarry`) can then be retired one at a time, each against its
+    existing check (`finger`, `wind`, `pressoil`, `ferrohands`).
+- **Cost:** removing the second projection (0.82), the velocity advection (0.69), most
+  of the viscosity (0.91), the current (0.41) and the squeeze sweeps saves about 3 ms.
+  The variable-coefficient solve and its coefficient pass add about 1 ms. So roughly
+  2 ms a step are saved. The collocated grid's patches (`dampGrid`, the Rhie–Chow
+  faces, `mixRelax`) are worth reconsidering in the same change: a staggered grid
+  removes the checkerboard they exist for.
+- **What is lost:** eddies. A thin plate has no turbulence, so the swirl has to come
+  from hands, heat (18f), tilt and rotation. The noise stirring should stay as a
+  declared dial ("hand stir"), fed in before the projection so that it too lasts
+  through the drag time, not added after it.
+- **Subsumes:** 15b (a tool's push lasts one step), the force half of 15g (air's shear
+  and the jet's dimple on the film), bubbles-plan G (press and lift as different
+  strokes: the lift's Saffman–Taylor fingers grow from this instead of from
+  `squish.ts`'s hashed spokes, whose count is 8 + seed % 9) and roadmap Stage 1 F
+  (depth). It is the prerequisite for the grates thread's Saffman–Taylor item.
+- **Ships as:** a solver mode behind a setting, off by default, judged look by look on
+  the Mac, because it changes how every look moves and every tool feels. Measured by
+  a new lab check (a press's ring radius against the volume displaced; a drag's
+  displacement against the drag time ρh²/12μ; dye conserved with the carries off).
+
+- **Shipped, first part (Thin Gap, off in every look, 2026-09-28):** the setting
+  `thinGap` (a switch) and `gapThickness` (water to glycerine, log in viscosity) on the
+  sheet, the desks, MIDI and the remote. With it on: implicit gap drag 12ν/h² in place
+  of the clamp (a 0.2 m plate, the rest gap 6 mm); the step's forces and the lasting
+  current read as terminal speeds at the rest gap and fed in before the solve, the
+  stirring included; a variable-coefficient multigrid with M = h·c (h³/12μ once the
+  drag dominates) and face coefficients built in series along each coarse row; the rim
+  held at p = 0; the press as the gap's own change, not the squeeze memory's rate; no
+  self-advection, second projection, squeeze sweeps or `squeezeVelBuf`; a hand's push
+  imposed along its direction rather than added; the dye moved across faces as an
+  amount (`bodyAdvect`), since a backtrace made dye under a press (332 → 656). The thin
+  solve keeps its pressure in its own buffer and hands the advections c·P for their
+  Rhie–Chow faces. `npm run thingap` measures it against the old solver (16 checks).
+  Judged on the Mac: docs/judging.md §19.
+- **Left for later PRs, each its own thread (the shortcuts this one keeps, named):**
+  - **18a-2, forces that are forces.** The look's stirring (`forcesB`: turbulence,
+    spin, tension, drip, air) and every other force are still the old per-step
+    velocities, read as terminal speeds at the rest gap. Each should become a force
+    with its own physics (the stirring a declared "hand stir" dial), and the grates
+    thread's Saffman–Taylor item needs this first.
+  - **18a-3, tools as solids.** A hand's push is imposed along its direction (a
+    penalised solid in the limit where the solid wins), not a disc moving at the hand's
+    velocity (Brinkman), and the hand-written carries (`carryDye`, `carryMix`,
+    `fingerCarry`, `pressDye`, `pressMix`, `blowDye`, `blowOil`, `blowCarry`) still run
+    on top of the flow, so with Thin Gap on the colour is moved twice. Retire them one
+    at a time against `finger`, `wind`, `pressoil`, `ferrohands`, `tools`.
+  - **18a-4, the current into the field.** The lasting current (`cur`) is fed into the
+    thin solve as a force, but it still has its own solver on the M grid; its forces
+    (rock, twist, buoyancy, centre gravity) belong in the main field, and then the
+    current's solver and its 0.4 ms go.
+  - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
+    step, so the displaced volume leaves in one step, faster than the dye's face
+    fluxes may carry it (0.45 of a cell a step). The app's Press lays its dent a step
+    at a time (`lib/squish.ts`), and `npm run thingap` presses over ten steps; the
+    glass should close over the press's own time wherever a dent is laid, and
+    `gapMemory` then has no job in a thin gap.
+  - **18a-6, inertia for water.** The velocity's self-advection is dropped. The reduced
+    Reynolds number Re·h/L is under 0.1 for oils and near 2 for water in the plate's
+    6 mm middle, so water in a deep gap has more inertia than this keeps. Measure it on
+    Water looks and bring back a cheap advection if it shows.
+  - **18a-7, the rim follows the dish.** The open rim is the plate's inscribed circle;
+    with Dish Spread (two dishes) or a round-dish vignette each dish has its own edge,
+    and the solver does not know it. And the inscribed circle touches the square's four
+    sides, where the box's wall, not the open rim, meets the liquid: a flow across the
+    plate is stopped at those four points (a lab probe of a uniform push read the speed
+    at the wall down to 0.54 of the rest and a sideways jet of 1.9 beside it), and the
+    pressure that takes it out reaches the middle for two steps (`npm run thingap`
+    prints that first step). The rim should sit a cell or two inside the square, or the
+    cells outside it count as open too.
+  - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
+    which leaves a small checkerboard at a floored dent's edge; the advections'
+    Rhie–Chow faces are given c·P, exact only where the drag is even; and the face
+    fluxes' upwinding squares off a ring under a fast radial flow (the pressed rings in
+    the picture). A staggered grid takes all three, and `dampGrid`'s job.
+  - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
+  - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
+    Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
+    against it; measure whether any look shows it, and drop it for the time if not.
+  - **18a-11, the cost measured.** The saving above is an estimate; measure the step
+    with Thin Gap on and off on the Mac (`?debug`, docs/judging.md §19).
+
+### 18b. The lamp shines through the dye (replaces paint over black)
+
+- **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the
+  dye is composited with `mix(outColor, fluid0.rgb, fluid0.a)`. `decodeFluid` makes
+  the opacity from the total density with a darkness fudge (×1.7 for dark dyes),
+  capped at 0.95, and clamps the path through the gap to 0.35–4. The shader's own
+  comment says it: "On this plate dye is light (bare water is dark)."
+- **The shortcut:** the solver already stores the dye the physical way, as
+  per-channel absorbance, so dyes mix subtractively in the solver. The picture then
+  draws that as paint on a black ground. Clear water shows black. A gel, LED ring or
+  lumia under the glass (`mixLamp`) does not pass through the dye, so blue dye over a
+  red gel shows blue where it should be nearly black. A drop's glow adds the dye as
+  emitted light.
+- **The real phenomenon:** Beer–Lambert transmission of the lamp,
+  out = L_lamp(x) · exp(−Σ εᵢCᵢh(x)). Clear liquid shows the lamp at full brightness,
+  and dense dye goes saturated and then dark.
+- **What it takes:** nothing new from the solver. The absorbances and the gap are
+  already bound to the plate pass. Replace the mix with `lamp * exp(-A * h)`, keep
+  `spectralThrough`'s six bands, and drop the clamp and the fudge. The chemistry's
+  colours (the BZ waves, Liesegang rings, the pH indicator) are lerped paint today
+  (`mix(outColor, col, 0.85)`); each becomes an absorbance added before the exp, so a
+  BZ front becomes a pale blue wave through orange liquid with the dye still showing.
+- **Cost:** free.
+- **Gain:** the largest honest change available in the picture.
+- **Caveat:** it inverts every approved look, which today are colour on black. It ships
+  as a per-look choice of ground (black or lamp). The dark ground can then be made the
+  physical way, with a dense base dye in the dish or the lamp dimmed, so a look can keep
+  its darkness for a real reason. Relates to physics-plan "Layer depth" and bubbles-plan
+  F (the wet carrier).
+
+### 18c. A pour adds liquid, not only colour
+
+- **Where:** the Dropper stamps dye with no volume. The Pour, the splash crown and
+  the Splatter push with a radial velocity kick, which is curl-free, so the projection
+  deletes it (bubbles-plan H's own rule). The splash fires at any energy above 0.02,
+  with a random count of satellites.
+- **The real phenomenon:** a landing drop is a volume source Q. Between glasses it
+  drives a radial flow, u_r = Q/(2πrh), that shoves the colour already there outward
+  into concentric rings (drop into drop). A crown splash needs K = We·Oh^−0.4 above
+  about 2100, which for a 3 mm water drop means falling from about 20 cm or more. Below
+  that a drop only merges and spreads. Whether an oil drop stays a lens or spreads to a
+  film is set by the spreading coefficient S = γ_w − γ_o − γ_ow, which is negative for
+  most oils.
+- **What it takes:** a volume channel on the splat record, fed into `divergence`
+  exactly as a growing bubble's rate already is. The splash is gated on K from
+  `dropHeight`.
+- **Cost:** free (one term in an existing pass).
+- **Gain:** drops push the plate's colour into rings, and bubbles and beads get pushed
+  by that real flow rather than by `disturb()` kicks. Works today against the uniform
+  sink. It is better with 18a's open rim, and with 18d it gives radial fingering when a
+  thin liquid is poured into a thick one.
+
+### 18d. Each liquid has its real properties (replaces the property scalars)
+
+- **Where:** `src/lib/liquidPhase.ts` and the bottles in `src/types.ts`. The viscosity
+  is one global switch (`thick ? 1.5 : 0.5`).
+- **The shortcuts:**
+  - **Soap, milk, silicone and glycerine** are channels on the CPU at 192², read back a
+    frame late, and each fades on a timer (soap 6 s, glycerine 22 s). A liquid does not
+    evaporate as a property.
+  - **Glycerine's "body"** is a drag against last frame's velocity, projected and then
+    clamped.
+  - **Soap's Marangoni force** is a pure gradient added before the projection, which
+    deletes it. The clear disc people see comes from a dye multiply that destroys the
+    colour. The GPU already moves soap correctly (`marangoniFlux`), so soap is modelled
+    twice.
+  - **Colour-difference "tension"** (`forcesB` `tension`, the Immiscibility dial) makes
+    two dyes of different hue in the same water repel. Interfacial tension exists only
+    between immiscible liquids; food dyes in water mix. Many looks are tuned on the
+    cohesion this gives, so retiring it is a look change and the oil or silicone
+    bottles have to take over the job.
+  - **Milk** has `repel: 1`, but milk is a miscible emulsion.
+  - **Alcohol** "rises through water". Nothing rises in a level dish. Alcohol's real
+    effect is a strong Marangoni burst (σ about 22 against 72 mN/m) plus evaporation:
+    the hole it punches in a film.
+- **What it takes:**
+  - Each bottle carries a viscosity, a surface tension (or its drop against water), a
+    density and a refractive index.
+  - One rgba32f species texture on the GPU, moved in flux form (the `mixAdvect`
+    kernel exists), with no decay.
+  - A mixture viscosity μ = μ_w^(1−c) μ_g^c (spanning about 1000×) feeds 18a's
+    mobility. Density feeds the tilt's buoyancy. Soap and alcohol go into the GPU's
+    surfactant field with a σ(Γ) law. Immiscible bottles get a Cahn–Hilliard phase
+    each, as the oil has.
+  - The CPU soap force, the dye multiply and the colour-difference tension are then
+    deleted.
+- **Cost:** about +0.5–0.7 ms on the GPU, less the CPU pass (1.5–3.5 ms of CPU at 192²).
+- **Gain:** glycerine crawls because it is thick, a thin liquid fingers into a thick one
+  (Saffman–Taylor, with 18a), alcohol blasts holes, and nothing silently disappears.
+  Extends 15e, which found these forces measured only on a stand-in plate.
+
+### 18e. Edges come from refraction (replaces the painted rims and highlights)
+
+- **Where:** in `plate.ts`, `sobelGrad` and `gradNormal` turn the gradient of dye
+  density into a "surface normal". That normal drives Lambert and Blinn–Phong shading
+  (`applyLighting`), the dark rim and highlight of `meniscus()`, the bright line of
+  `boundaryContrast` (set in 34 presets), `lacing`'s threads, and the camera pass's
+  refraction offset. The oil phase is drawn with its own `|∇oil|·2.2` darkening.
+- **The shortcut:** dye concentration is not a height, and there is no free surface
+  between two glasses to shade. Only the drops and bubbles (the beads and the air
+  field) get the real optics today: Snell refraction at the meniscus and the
+  projector's aperture (`dropLens`, the `u*` law).
+- **The real phenomenon:** light between two glasses bends where the optical path
+  OPL = ∫n dz changes. n depends on the dye's concentration (Δn about 10⁻³–10⁻²), oil
+  against water (1.47 against 1.333), temperature (about −10⁻⁴ per K) and the gap. A
+  projector then shows two effects:
+  - **Aperture loss:** darkness wherever the deflection is steeper than the lens can
+    take in. This is the drops' `u*` law, applied everywhere.
+  - **Shadowgraph:** at a defocus Δz, I ≈ I₀(1 − Δz·∇²OPL/n). This gives the bright
+    and dark doublets at fronts (Becke lines), and caustics once the rays cross.
+- **What it takes:** build n from the fields already bound (dye, oil, gap, heat), and
+  compute OPL = n·h with its gradient and Laplacian in the derive pass. That pass runs
+  once a frame and has a spare channel. The display pass applies the aperture and the
+  defocus term. The projector's focus becomes a real control a performer can ride.
+  - The aperture's hard threshold becomes the overlap of the condenser's illumination
+    disc with the lens pupil. The comment on `DROP_NA` (raised from the physical 0.05–
+    0.1 because it "drew black doughnuts") and the 0.85 and 0.9 floors are that
+    overlap, guessed.
+  - The solver's oil and the beads then look like the same material.
+  - The painted highlights (the Blinn–Phong spec, `meniscus`'s spec, the macro's "wet
+    highlight", `microDrops`' dots) go from projected looks: a plate lit from below
+    sends no reflection to the wall. They stay in the camera and closeup looks.
+  - True folded caustics would need a scatter pass. The 16-binding limit is reached,
+    so that is later.
+- **Cost:** under 0.1 ms for the gather version.
+- **Gain:** one mechanism replaces five painted ones, and edges answer to focus, press
+  and oil.
+- **Risk:** real dye-into-water fronts are faint (Δn is small), so the plate may lose
+  the bright boundary line its looks are tuned on. Keep a gain on it, named as a gain.
+  Research item 4 (`/mnt/project-files/drops/research/bubbles-and-drops.md`) is this;
+  it was not in the plan.
+
+### 18f. Heat comes from the lamp, and a level plate has no "up"
+
+- **Where:** `currentForces` pushes heat along `S.up` (the gravity direction, whatever
+  `plateUpright` says), saturated by tanh(20T). Heat is injected in spots by pours and
+  the music (`addTemp`), and `heatDecay` is per step. Centre gravity and rock use
+  tanh(dye − mean) and are not tied to the dome the gap actually has. The oil has no
+  density, so it never rises on a tilt. `mixForce` already gets this right: gravity
+  only in proportion to how upright the plate is. The noise stirring (`forcesB`) is
+  what moves an untouched plate, with no physical source.
+- **The real phenomenon:**
+  - On a level plate gravity points through the glass, so in-plane buoyancy is zero.
+  - The lamp heats the dish through the dye's absorption, so dark regions warm. A hot
+    spot drives liquid outward along the surface (thermocapillary flow: dσ/dT about
+    −0.15 mN/m per K for water, −0.06 for oils). It thins the film into holes, which is
+    the European school's burning away. From below, the lamp makes Bénard–Marangoni
+    cells once the Marangoni number passes about 80.
+  - Water's viscosity falls about 2% per K.
+  - Downhill on a dished glass is ∇h from the gap's dome.
+- **What it takes:**
+  - A heat source ∝ lamp intensity × absorbed fraction (from 18b), and Newton cooling
+    per second.
+  - ∇T fed into the existing `marangoniFlux` as σ(Γ, T).
+  - Buoyancy gated on `upright`, with the tanh removed. Oil gets a density below
+    water's.
+  - Viscosity falling with temperature, into 18a's mobility.
+  - Heat written to the velocity texture's spare channel in `packVel` (it is thrown
+    away there today) so 18e's shadowgraph shows the convection as shimmer.
+- **Cost:** a few operations in existing passes, and four taps in the plate.
+- **Gain:** an untouched plate breathes where it is dark and hot, speeds up with the
+  Dimmer, and shows the lamp's own cells. It is the mechanism slide-plan S2 is waiting
+  on (heat with a strength). Turbulence stays as the declared stir dial.
+
+### 18g. Colour leaves by flushing, not by fading
+
+- **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
+  applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's
+  `standing` pump, and soap's dye multiply.
+- **The shortcuts:** dye over the budget is removed everywhere, in proportion to the
+  square of the overage. "Evaporation" removes dye, not water. A bubble destroys the
+  dye under it by a multiply, a CPU rim deposit puts some back, and a bubble sitting
+  still keeps pumping liquid out of itself every step.
+- **The real phenomenon:**
+  - Nothing removes dye from a sealed plate. Old colour leaves a real plate by being
+    flushed out of the open rim as new liquid goes in (18c).
+  - Evaporation removes solvent: the concentration rises and the dye is left in a
+    coffee ring.
+  - A bubble is a volume with no liquid, so the dye is excluded by volume fraction.
+- **What it takes:** 18a's open rim as the outflow, pours as volume (18c), the dye
+  carried as concentration × liquid fraction with air as a phase, and evaporation
+  acting on a carrier-thickness field (bubbles-plan F's wet carrier). A safety cap
+  stays, named as one.
+- **Cost:** about 0.3 ms (one r16f texture and a flux pass).
+- **Gain:** a show ages the way a real plate does. It turns over, and it can dry.
+
+### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+
+- **Where:** Jacobi dye diffusion with one constant for every colour (about 1000× the
+  molecular rate where it is on); the MacCormack Jacobian clamp and neighbourhood cap
+  (`fluid.ts` advection), which lose the excess; `sharpenDye`, retired (0 by default)
+  but still in the step.
+- **The real phenomenon:** molecular diffusion is negligible at this scale. The blur in
+  a Hele-Shaw cell is Taylor–Aris dispersion along the flow,
+  D_L ≈ D_m + h²|u|²/(210 D_m). Edges stay sharp where the liquid is still and streak
+  where it moves.
+- **What it takes:** the dye moved in flux form (`bodyAdvect` exists), and one or two
+  explicit passes of dispersion with a tensor built from u⊗u. The Jacobian patch exists
+  because the transport field is divergent (the noise after the projection and the
+  depth multiply), so it can go with 18a.
+- **Cost:** about the same as today's diffusion (1.3 ms where it runs), or 0.3–0.6 ms
+  explicit.
+- **Gain:** streaks along the flow, and conserved dye. Honest: a minmod flux carries
+  fine threads a little softer than MacCormack, and the plate's detail table
+  (`npm run detail`) has to hold.
+
+### 18i. Bubbles and beads live by physics, not timers
+
+- **Bubbles** (`src/lib/bubbles.ts`) live 9–23 s and pop at the end. The soap film's
+  colour runs on age over life. A pop makes 2–3 random daughters, merges are random
+  (`rng < dt·0.12`), pairs are pulled together, and the drift has a random wander at a
+  fixed 1.4× the flow. A bubble trapped between glasses is an air pancake with no
+  draining film, so it does not pop on a timer. It ends at the rim, by dissolving (the
+  Ostwald ripening already there), by merging when the film between two drains, or
+  when a drop breaks it. With no free surface there is no pull between bubbles. A
+  bubble runs at about twice the flow, less a film correction.
+  The cheap version drops the timed pops, daughters and pull, drives merges by drainage
+  time and sets speed from the capillary number. The full one (air as a phase with
+  Laplace pressure in 18a's solve) lets bubbles finger and split. The Straw's finger
+  count is random (`lobes: 8 + rng(7)`); the real count follows the finger wavelength
+  λ ≈ πb/√Ca.
+- **Beads** (`src/lib/beads.ts`) are a carpet of particles born where a noise patch
+  allows, coloured from the look's palette, moving at a fixed 0.8× the flow with
+  jitter, merging at random. Nothing in the file knows about Oil Bodies. Real beads are
+  oil that broke up where threads pinched off (Rayleigh–Plateau), carrying the colour
+  they were poured with, and moving at about 2U/(1 + λ) for a viscosity ratio λ. What it
+  takes: beads handed down from the Cahn–Hilliard oil where it pinches, coloured from
+  the dye at birth, with speed from the bottle's λ.
+- **Cost:** CPU, plus a readback of the oil field for the beads.
+- **The owner's call:** timed pops also pace a show (`lifeScale`), and the bead carpet is
+  a look in its own right, so both stay available as looks.
+
+### 18j. Milky liquids scatter
+
+- **Where:** everything in the plate is a pure absorber. `colourBody` pushes opacity
+  and saturation up to imitate a body of colour, `granulation` modulates alpha with
+  noise, and the Liesegang precipitate is a lerp.
+- **The real phenomenon:** pigment and fat droplets scatter light (Mie), handled as
+  two-flux Kubelka–Munk. With a projector's small aperture almost all scattered light
+  misses the lens, so a milky liquid throws dark or grey with a soft forward halo. It
+  does not throw white. The "solid reds on milk" in the references are a reflected-light
+  look.
+- **What it takes:** a scattering coefficient per bottle (18d) and a scatter channel in
+  a repacked binding (the dye and `view0` are full). Extinction K + S·(the share the
+  aperture loses) in 18b's exponent, with an optional small blur for the halo.
+- **Cost:** free in the shader; +0.2–0.4 ms with the halo; the binding work.
+- **Gain:** milk, paint and latex look different from ink. This replaces §4's "milk's
+  opacity still owed" with its physics.
+
+### 18k. Smaller ones
+
+- **Thin-film colour:** the film's thickness is the dye's opacity ×16 plus drifting
+  noise, through a cosine rainbow at 85%. The physical Airy table (`filmTable.ts`,
+  `filmPhysics`) exists and is 0 in every preset. Real film colour in transmission is
+  faint (0–8%), so a strong rainbow is a look and should be named one. The honest
+  version is a transported film-thickness field driven by the soap. Cost: about 0.2 ms.
+- **Linear light:** everything is composited in sRGB-encoded values. The six-band
+  spectral sums, every mix, screen and add, the camera's blur and its bloom are biased
+  by that. Decoding at the inputs and encoding in the finish is free, but it moves every
+  look a few per cent against the "same picture to the bit" gates, so it goes with a
+  re-baseline.
+- **Stacked dishes multiply, beams add:** layers combine by "screen" in gamma space.
+  Two dishes in one beam multiply their transmittances, and two projectors on one wall
+  add in linear light. Free once linear; rig-plan R3 covers the projector half.
+- **Chemistry sits still under the stir:** Gray–Scott runs on a static 192² CPU grid
+  that the flow does not carry, and soap "breaks down" on a 10 s timer. The reactants
+  should be moved with the flow (one flux pass, about 0.1 ms), and soap should be left
+  to dilution. BZ (the Oregonator) and Liesegang (Keller–Rubinow) are real models.
+- **Spray and Splatter:** random stamps with an outward fling. Droplets land vertically,
+  so the fling has no physical cause. Each droplet should be a small volume source (18c)
+  with log-normal sizes (`dropRadius`).
+- **The ferrofluid's spikes are placed** on a fixed hexagonal lattice
+  (`src/gpu/wgsl/spikes.ts`) rather than emerging from the Rosensweig instability.
+  Noted for the ferrofluid thread (9f onward), not audited further here.
+
+### Kept, named as dials or looks
+
+These are not physics and do not pretend to be: vorticity confinement (declared "not
+physics a thin film has", off by default), the drift and room stir, the camera and
+closeup looks' lens effects (depth of field, bloom, chromatic aberration), film stock,
+the corner-pin grade, the lamp's hot spot and warmth, Roy's Ben-Day dots, and the
+kaleidoscope. The noise stirring stays as a stir dial once 18a gives the plate its own
+motion. The numerical patches of the collocated grid (`dampGrid`, the Rhie–Chow faces,
+`mixRelax`) are numerics, not faked physics, and are worth reconsidering with 18a.
+
+### Already physical
+
+The multigrid projection. The gap field, with the press as a −ḣ/h source. The oil's
+Cahn–Hilliard phase with a curvature capillary force, moved in flux form and conserved
+exactly. Oil Bodies' partition of the colour. Marangoni flow as conservative surface
+transport. Buoyancy in `mixForce` only when the plate stands up. The dye stored as
+per-channel absorbance. Acid and base as signed equivalents. BZ and Liesegang. The
+ferrofluid's pull as ∇|B|² with Langevin saturation, and the Ohta–Kawasaki labyrinth.
+The drops' and bubbles' aperture optics, shapes set by the gap, Paterson relaxation and
+Laplace-arc walls. The Airy thin-film table.
 
 ## 19. The checks, the build and the plan itself
 

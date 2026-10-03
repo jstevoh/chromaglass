@@ -10,7 +10,7 @@ import { phasePour } from '../lib/phasePour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
-import { WebGPUFluid } from '../gpu/fluid';
+import { WebGPUFluid, THIN_GAP_THICKNESS } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
@@ -3365,6 +3365,9 @@ class FluidSimulation {
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
+      // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
+      thinGap: (settings.thinGap ?? 0) > 0.5 ? 1 : 0,
+      gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
       gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
       platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),

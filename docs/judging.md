@@ -464,6 +464,33 @@ On Oil & Water (Oil Bodies on):
   going straight out: a stripe under the palm should come out as a stripe, not a smear
   round the whole ring. Say if the old even ring looked better.
 
+## 19. Thin Gap: the plate as a thin layer of liquid (PLAN 18a)
+
+Every look moves by a speed clamp: whatever pushes the liquid, it is cut back to
+one small speed at the end of the step, so a push lasts one frame. Thin Gap
+(Settings → Squish Plate, under Depth Drag) replaces the clamp with the drag of two
+glasses a few millimetres apart: a push lasts as long as the liquid and the gap say.
+It is off in every look, and nothing changes until you turn it on. `?set=thinGap=1`
+turns it on for a page load.
+
+On Classic, then Oil & Water, then a look with a Plate Shape:
+
+- turn it on: the plate should keep moving the way the look moves, not freeze or
+  race. The first time in a show it takes a few seconds to switch (its pipelines are
+  built then, off the frame), and there should be no stop while it does. Say if the look's stirring now reads as too strong or too weak;
+- Finger through the colour at Thickness 0 (water), 0.45 (the default, a light oil)
+  and 1 (glycerine): in water the liquid should keep sliding for a second or two
+  after the finger stops; at 1 it should stop the moment the finger does;
+- Press and hold, then let go: the colour should be pushed out by the press and drawn
+  back in when the glass lifts, and under the press the colour should pale (less
+  liquid between the glasses there) and come back as it lifts. At the dish's edge the
+  liquid should go out of the dish, not bunch up against it;
+- on a look with Plate Shape up: where the glasses are tight, the colour should
+  move slower than where they are open;
+- the frame time with it on and off (below): it should be the same or faster;
+- the same on the phone (Settings → Squish Plate → Thin Gap), and a MIDI pad
+  learned to it.
+
 ---
 
 ## Reading the frame time while you do it
