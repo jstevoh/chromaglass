@@ -670,6 +670,50 @@ try {
         && blendPick.length === 2 && blendPick.every(b => b.h >= 48) && blendPick.filter(b => b.on).map(b => b.id).join() === 'add' && blendLive === 'add',
         `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
 
+      /*
+        The back plate's own look (PLAN.md §16a), from the same sheet: the
+        switch at its top sends the next look picked to the back plate alone.
+        What has to be true is four things. The back plate says it is on that
+        look, in the sheet and on the Mixer's Back Plate row (which, on a look
+        with one plate, said the look had one). The front's look, named at the
+        top, is still the one it was. Follow front puts the back plate back.
+        And the switch goes back to Whole plate as soon as the look is sent,
+        so the next look picked is not sent to the back by a switch left over
+        from an hour ago. The check
+        above is this one's control: the same tap, without the switch, renames
+        the top.
+      */
+      await tap(page, 'phone-open-looks');
+      const frontBefore = (await page.getByTestId('phone-look-button').innerText()).trim();
+      const backSaid = (await page.getByTestId('phone-back-plate-on').innerText()).trim();
+      await tap(page, 'phone-send-to-back');
+      const backTarget = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('[data-testid="phone-sheet-looks"] [data-testid^="phone-look-"]')]
+          .filter(el => el.getAttribute('aria-pressed') === 'false');
+        const el = rows[6];
+        return el ? { id: el.dataset.testid, name: el.querySelector('span span')?.textContent ?? '' } : null;
+      });
+      if (backTarget) await tap(page, backTarget.id);
+      await page.waitForTimeout(2500);
+      const frontAfter = (await page.getByTestId('phone-look-button').innerText()).trim();
+      await tap(page, 'phone-open-looks');
+      const backOn = (await page.getByTestId('phone-back-plate-on').innerText()).trim();
+      const switchAfterPick = await page.getByTestId('phone-send-to-all').getAttribute('aria-pressed');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await tap(page, 'phone-open-mix');
+      const mixSays = await page.getByTestId('phone-mixer-back-look').first().innerText().catch(() => '(no line)');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await tap(page, 'phone-open-looks');
+      await tap(page, 'phone-back-follows-front');
+      const backAfter = (await page.getByTestId('phone-back-plate-on').innerText()).trim();
+      const switchBack = await page.getByTestId('phone-send-to-all').getAttribute('aria-pressed');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      check('a look sent to the back plate from the Looks sheet: the back plate and the Mixer\'s row name it, the front keeps its look, and Follow front puts it back',
+        !!backTarget && backTarget.name !== frontBefore && backSaid === 'Back plate: follows the front'
+        && backOn === `Back plate: ${backTarget.name}` && mixSays.trim() === `On ${backTarget.name}`
+        && frontAfter === frontBefore && backAfter === 'Back plate: follows the front' && switchAfterPick === 'true' && switchBack === 'true',
+        `sent "${backTarget?.name}"; sheet said "${backSaid}", then "${backOn}", then "${backAfter}"; Mixer row "${mixSays.trim()}"; top "${frontBefore}" → "${frontAfter}"; switch on Whole plate after the pick: ${switchAfterPick}, after Follow: ${switchBack}`);
+
       // Clean screen, and a still finger to bring it back.
       // Painting is a moving finger, so a drag over a second leaves the
       // screen clean; only the still one is asked for the controls. Without

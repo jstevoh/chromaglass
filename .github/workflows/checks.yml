@@ -189,6 +189,11 @@ jobs:
       # steepest, the turn-round, the hand, the cut, and the pads wired.
       - name: A row's fade
         run: npm run rowfade
+      # The back plate's own look (PLAN.md §16a): the fold hands plate 1 the
+      # look's solver keys under the live patches and leaves the picture the
+      # front's, the fade is a Go's, Follow lets go, and the pours are wired.
+      - name: The back plate's own look
+        run: npm run backplate
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
         run: npm run setlist
@@ -345,6 +350,11 @@ jobs:
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run lift
+      # A press held in one place (each bubble's) moves the liquid around it,
+      # not the whole plate: the projection's source sums to zero exactly.
+      - name: A held press moves only its own neighbourhood
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run heldpress
       # A press moves the oil out from under the palm with its colour, onto the
       # ring the dye lands on, and keeps all of it (PLAN §15d).
       - name: The press moves the oil
