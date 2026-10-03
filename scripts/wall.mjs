@@ -661,6 +661,18 @@ let failed = 0;
         Which refreshes are missed is decided once per refresh, by its time
         on the shared clock, in a book kept in the show's window that the
         projector reads too, so a refresh one window misses the other does.
+
+        Matched to the nearest entry within half a 60 Hz refresh, not within
+        4 ms, which was first here: on the Mac the two windows' stamps for
+        one refresh are 4 to 8 ms apart on the shared clock (#236's first
+        run: of the book's 64 refreshes none was looked up by both windows,
+        and 30 were entered twice, closer than 8 ms), so each window missed
+        refreshes of its own and the busy machine was not the starved
+        thread it stands for. A cloud session's are under a millisecond
+        apart. How far apart they were is kept (`d`, the wall's stamp less
+        the show's), so the check can say the pairing held: one refresh
+        matched to its neighbour would put `d` a whole refresh away from the
+        rest.
       */
       const host = () => (window.opener && !window.opener.closed && window.opener.__missBook ? window.opener : window);
       window.__busy = 0;
@@ -674,9 +686,13 @@ let failed = 0;
         const h = host();
         if (!(h.__busy > 0) || typeof ts !== 'number') return false;
         const at = performance.timeOrigin + ts;
-        const seen = h.__missBook.find((e) => Math.abs(e.at - at) < 4);
         const who = new URLSearchParams(location.search).has('cast') ? 'wall' : 'show';
-        if (seen) { seen[who] = true; return seen.missed; }
+        let seen = null, nearest = 1000 / 120;
+        for (const e of h.__missBook) { const d = Math.abs(e.at - at); if (d < nearest) { nearest = d; seen = e; } }
+        if (seen) {
+          if (!seen[who]) { seen[who] = true; seen.d = who === 'wall' ? at - seen.at : seen.at - at; }
+          return seen.missed;
+        }
         const entry = { at, missed: h.__busyRand() < h.__busy, [who]: true };
         h.__missBook.push(entry);
         if (h.__missBook.length > 64) h.__missBook.shift();
@@ -921,9 +937,11 @@ let failed = 0;
         /*
           Whether the two windows kept one book of missed refreshes: the
           projector's own book empty (it used the show's), the show's
-          holding refreshes both windows looked up, and no refresh entered
-          twice (two entries closer than half a 60 Hz refresh are one
-          refresh whose times the windows did not match). Not the share of
+          holding refreshes both windows looked up, and the pairing one
+          pairing: how far apart the two windows' stamps were for each
+          refresh both looked up (`d` above) spread over no more than 4 ms,
+          where a refresh matched to its neighbour would spread it over most
+          of one. Not the share of
           refreshes both looked up: a busy Mac hands the two windows
           different refreshes of its own accord (the show 28.3 a second, the
           wall 38.7, on one run), so that share is under one on a book that
@@ -933,11 +951,11 @@ let failed = 0;
         */
         book: (() => {
           const book = window.__missBook;
-          const at = book.map((e) => e.at).sort((x, y) => x - y);
+          const d = book.filter((e) => e.show && e.wall).map((e) => e.d).sort((x, y) => x - y);
           return {
             entries: book.length,
-            both: book.filter((e) => e.show && e.wall).length,
-            twice: at.slice(1).filter((t, k) => t - at[k] < 8).length,
+            both: d.length,
+            apart: d.length ? { least: d[0], most: d[d.length - 1], median: d[d.length >> 1] } : null,
             wallOwn: wallW ? wallW.__missBook.length : null,
           };
         })(),
@@ -1180,8 +1198,8 @@ let failed = 0;
           nothing. And the same refreshes missed in both windows.
         */
         const b = m.book;
-        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.twice <= 2,
-          `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows, ${b.twice} entered twice, the projector's own book ${b.wallOwn ?? '-'}`);
+        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4,
+          `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows${b.apart ? `, the wall's stamp ${f1(b.apart.median)} ms after the show's (${f1(b.apart.least)} to ${f1(b.apart.most)})` : ''}, the projector's own book ${b.wallOwn ?? '-'}`);
       }
       await wall.evaluate(() => { window.__phaseMs = 0; });
       /*
