@@ -9324,6 +9324,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       isMouseDownRef.current = true;
+      // A fresh press's own clock and count, even if no step has run since
+      // the last let go (the step loop's reset needs a step with no hand).
+      dropClockRef.current = 0;
+      dropLaidRef.current = freshLaid();
     };
     const handleMouseUp = (e: MouseEvent) => {
       const drag = aimDragRef.current;
@@ -9412,6 +9416,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (primaryTouchRef.current === null) {
           primaryTouchRef.current = t.identifier;
           isMouseDownRef.current = true;
+          dropClockRef.current = 0;
+          dropLaidRef.current = freshLaid();
           // From here, not from where the last finger lifted: the recorder's
           // first gesture of a touch takes its direction from this.
           lastMousePosRef.current = { ...p };

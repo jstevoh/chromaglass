@@ -1464,9 +1464,10 @@ while this batch's plan was going in (#177), and no cause is known yet:
   both fingers lay on every step from the second touch to the lift, by the code. So
   the check is now two, and the next red says which half: **what each finger laid**,
   by the app's own count (`chromaglassDebug().hands()[i].laid`: steps held, drops,
-  dye handed the solver; the second within two frames' steps of the first and the
-  same dye a step), and **what the plate holds**, the dye under each finger against
-  its mirrors as before, with the balance asked of the dye nearest each finger
+  dye handed the solver; each held to the steps the plate itself took with it down,
+  and the same dye a step for both), and **what the plate holds**, the dye under
+  each finger against its mirrors as before, at least a fifth of its nearest dye
+  still inside its disk, with the balance asked of the dye nearest each finger
   (within three disks, nearer it than the other) instead of one disk, so a pool the
   plate carried off its finger's cell in the 1.9 s is still counted as that finger's.
   *Still open:* why the plate's two pools of the same steps differ by up to 2.5

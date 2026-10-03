@@ -466,6 +466,21 @@ On Oil & Water (Oil Bodies on):
 
 ---
 
+## 19. A held Drop with Drop Height up drops six times a second, not every step
+
+The held Drop's clock stayed at zero on frames of one solver step each, so with
+Drop Height up it let go of a splashing drop on every step (sixty a second at the
+display's rate) until a frame happened to owe two. It now drops as the finger lands
+and then every tenth step. Only Bass Drop (Drop Height 0.9) and Boiling Point (0.7)
+ship with it up, so those two look different under a held Drop now:
+
+- hold the Drop still on each for two seconds: a beat of separate drops, each with
+  its own splash and ring, where it was a near-continuous gush;
+- the pool should be about a tenth of what it used to be for the same hold. Say if
+  the old gush was the look you wanted on either, and it can be a setting instead.
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real
