@@ -155,7 +155,7 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       The step's forces as terminal speeds, the drag, and the mobility.
 
       A.a = (k scale, real seconds this step, the rest gap h0, the rim's
-      radius). k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
+      radius), A.b.x the ferrofluid's viscosity over the clear liquid's. k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
       liquid's kinematic viscosity over the plate's width squared, so the
       drag is in real seconds whatever grid or look clock the plate runs at.
 
@@ -171,8 +171,9 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var prev: texture_2d<f32>;
 @group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(6) var<storage, read_write> mob: array<f32>;
+@group(0) @binding(5) var phase: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(7) var<storage, read_write> mob: array<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -181,7 +182,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let u0 = textureLoad(prev, q, 0).xy;
   let g = textureLoad(sq, q, 0).r;
   let hw = max(g, 0.004);
-  let kdt = A.a.x / (hw * hw) * A.a.y;
+  /*
+    The ferrofluid's own viscosity (A.b.x, its ratio to the clear liquid's;
+    1 with none on the plate). A cell part ferrofluid has the two in its
+    column side by side, and the column's drag is their geometric mean by
+    share, which takes the ratio smoothly from one liquid to the other
+    across the edge. This is what makes a front between them unstable the
+    way a real one is (Saffman–Taylor): where the thinner liquid pushes
+    the thicker, a bump that runs ahead has less drag in front of it and
+    runs further. \`phase\` is 1×1 and empty with none poured.
+  */
+  let share = clamp(textureLoad(phase, min(q, vec2i(textureDimensions(phase)) - 1), 0).r, 0.0, 1.0);
+  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share);
   let ustar = u0 + (uf.xy - u0) * (A.a.x / (A.a.z * A.a.z) * A.a.y);
   let c = 1.0 / (1.0 + kdt);
   var mo = hsGap(g, A.a.z) * c;
