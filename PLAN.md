@@ -57,7 +57,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; 9f–9h, 9j, 9k–9m and 9o–9r open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), the pool it sets down is 9u, open; 9f–9h, 9j, 9k–9m and 9o–9r open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -999,6 +999,38 @@ Open, from building 9i:
   directly as `mixCarry` does. The remote's widest directed Blow at 512² is about
   4000 reads a cell over 28 000 cells. Worth doing if a Mac frame-time reading
   under a held Blow shows it.
+
+- **9s. Picking the Magnet made a black hole in the middle** (**shipped**). Reported
+  by the owner (2026-10-03): "Magnet makes an immediate big black hole in the middle
+  when I select it." Picking the Magnet on a look without a magnet gave the look one
+  (Magnet Strength 0.8, since #155), and a look's magnet sits under the plate at
+  Magnet Across and Up, the middle, from the moment it has strength. So before the
+  hand touched anything, a magnet nobody put there pulled the freshly poured ring of
+  ferrofluid into one pool in the middle: in the lab (Classic's pour, 256²) the disc
+  0.12 round the middle went from 9% of its area black to 54% in a second and all of
+  it in four, holding a fifth of all the ferrofluid, against 9% black with no magnet. Picking a magnet up is
+  taking it in the hand, so now picking it only pours the ferrofluid, and the look
+  gets its magnet from the first hand that holds one (`onMagnetInHand`), set down
+  where that hand lets go, as #159 left it (every hold gives a look with Magnet
+  Strength 0 the 0.8 again). `npm run magnet` asks that the solver is stepped with
+  no magnet until the hand holds it, that the disc's mean ferrofluid stays under 0.3
+  nine seconds on (in the lab 0.10 as poured and after, 0.54 a second into the old
+  magnet and 0.97 by four), measured again if the ferrofluid was laid afresh in the
+  window, and that the magnet let go of has strength. Left: a hold while the show is stopped
+  or draining gives no magnet, because the hand is read in the solver's step; a
+  hold after Start does.
+- **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
+  behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
+  share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
+  the ferrofluid into one flat black pool where the hand let go. A real magnet strong
+  enough to pull a pool across the dish raises Rosensweig domes on it, and the pool
+  is never one flat disc. That is the pull against the lift: a thin-film lab of the
+  Rosensweig instability (2026-10-03, not yet in the repo) found the plate conserves
+  the ferrofluid's area where a real layer conserves its volume, so domes standing up
+  cannot open gaps, and its magnet case piled the pool 0.84 of a capillary length
+  deep before domes came, with the balance of pull and lift left open. It belongs to
+  the standing-domes plate PR that lab is for, not to a retune of the set-down
+  strength here.
 
 ### 10. Playing like a show
 
