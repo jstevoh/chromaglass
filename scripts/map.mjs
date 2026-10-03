@@ -177,6 +177,134 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
   check('every face has area', areas.every(v => v > 0.002), areas.map(v => v.toFixed(4)).join(' '));
 }
 
+// ── What a surface shows (PLAN.md §16b) ─────────────────────────────
+/*
+  A surface picks its source: the wall (the finished frame, as always), the
+  front plate alone, the back plate alone or the film alone. What has to hold
+  without a GPU: a stored setup opens as it was (every surface on the wall,
+  nothing extra drawn), a name this build does not know falls back to the
+  wall, the source reaches the shader's slot for that quad and not its
+  neighbour's, only enabled and visible surfaces ask for a picture to be
+  drawn, and each source takes out exactly the rows it says. The pictures
+  themselves are `npm run mixer` (the lab) and `npm run wall` (the Mac).
+*/
+{
+  const { build } = await import('esbuild');
+  const { tmpdir } = await import('node:os');
+  const { join, dirname } = await import('node:path');
+  const { rmSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const out = join(tmpdir(), `map-sources-${process.pid}.mjs`);
+  await build({
+    stdin: {
+      contents: `
+        export { fillOutputUniforms, SOURCE_INDEX } from './src/gpu/output.ts';
+        export { OUTPUT_WGSL } from './src/gpu/wgsl/output.ts';
+        export { UniformPack } from './src/gpu/uniforms.ts';
+        export { OUTPUT_LAYOUT } from './src/gpu/wgsl/outputFields.ts';
+        export { sourceSettings, SOURCE_OFF } from './src/lib/plateSources.ts';
+        export { sourcesAskedFor, SURFACE_SOURCES } from './src/lib/outputConfig.ts';
+        export { MIX_SOURCE_INFO } from './src/lib/mixer.ts';
+        export { DEFAULT_SETTINGS } from './src/types.ts';
+      `,
+      resolveDir: root, loader: 'ts',
+    },
+    bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
+  });
+  // The output pass's module names WebGPU's usage flags where it is loaded
+  // (through gpu/kit.ts); node has no WebGPU, and nothing here draws, so the
+  // flags are stood in for with the spec's own bit values.
+  globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+  globalThis.GPUBufferUsage ??= { MAP_READ: 1, MAP_WRITE: 2, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256, QUERY_RESOLVE: 512 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  globalThis.GPUMapMode ??= { READ: 1, WRITE: 2 };
+  const m = await import(out);
+  rmSync(out, { force: true });
+
+  const stored = normalizeSurfaces([{ corners: SKEW }, { corners: SKEW, source: 'projector 3' }, { corners: SKEW, source: 'back' }]);
+  check('a stored surface with no source shows the wall, a name this build does not know too, and a known one is kept',
+    stored[0].source === 'wall' && stored[1].source === 'wall' && stored[2].source === 'back',
+    stored.map(x => x.source).join(', '));
+  check('a new surface and a cube\'s faces show the wall',
+    makeSurface().source === 'wall' && makeCube().every(f => f.source === 'wall'));
+
+  const cfg = (surfaces) => normalizeOutput({ ...DEFAULT_OUTPUT, surfaces });
+  const quad = (x, source, extra = {}) => ({ corners: [x, 0.1, x + 0.2, 0.1, x + 0.2, 0.9, x, 0.9], source, ...extra });
+  check('with every surface on the wall nothing extra is asked for',
+    m.sourcesAskedFor(cfg([quad(0, 'wall'), quad(0.3, 'wall')])).length === 0 && m.sourcesAskedFor(DEFAULT_OUTPUT).length === 0);
+  const asked = m.sourcesAskedFor(cfg([quad(0, 'film'), quad(0.25, 'back'), quad(0.5, 'back'), quad(0.75, 'front', { enabled: false })]));
+  check('each source asked for once, in a fixed order, and a switched-off surface asks for nothing',
+    asked.join(' ') === 'back film', asked.join(' '));
+  check('and a surface at no opacity asks for nothing either',
+    m.sourcesAskedFor(cfg([quad(0, 'front', { opacity: 0 })])).length === 0);
+
+  // The source goes into the quad's own slot. Four surfaces, four sources,
+  // the second switched off so the slots and the list disagree: a writer
+  // that indexed by the list, not by the quads drawn, reads wrong here.
+  const pack = new m.UniformPack(m.OUTPUT_LAYOUT);
+  const n = m.fillOutputUniforms(pack, cfg([quad(0, 'back'), quad(0.25, 'front', { enabled: false }), quad(0.5, 'film'), quad(0.75, 'wall')]), 800, 600);
+  const form = pack.get('form');
+  const got = [0, 1, 2].map(i => form[i * 4 + 3]);
+  check('the shader is told each quad\'s source in that quad\'s slot (0 wall, 1 front, 2 back, 3 film)',
+    n === 3 && got.join(' ') === `${m.SOURCE_INDEX.back} ${m.SOURCE_INDEX.film} ${m.SOURCE_INDEX.wall}` && m.SOURCE_INDEX.front === 1 && m.SOURCE_INDEX.back === 2 && m.SOURCE_INDEX.film === 3,
+    `${n} quads, sources ${got.join(' ')}`);
+
+  /*
+    And that slot reaches that texture: the shader's branch on the slot's
+    number to a texture variable, that variable's binding, and the binding
+    the output pass puts each source's picture at. Read from the two sources
+    themselves, because no picture here can see it: the lab reads each
+    source's texture directly, and two projectors with front and back
+    swapped are, to the Mac's check, as different as the right way round.
+  */
+  {
+    const { readFileSync } = await import('node:fs');
+    const wgsl = m.OUTPUT_WGSL;
+    const ts = readFileSync(join(root, 'src/gpu/output.ts'), 'utf8');
+    const varAt = Object.fromEntries([...wgsl.matchAll(/which == (\d+)\) \{ col = textureSampleLevel\((\w+),/g)].map(x => [Number(x[1]), x[2]]));
+    const bindingOf = Object.fromEntries([...wgsl.matchAll(/@binding\((\d+)\) var (\w+): texture_2d/g)].map(x => [x[2], Number(x[1])]));
+    const kindAt = Object.fromEntries([...ts.matchAll(/binding: (\d+), resource: this\.bound\('(\w+)'\)/g)].map(x => [Number(x[1]), x[2]]));
+    const routes = ['front', 'back', 'film'].map(kind => {
+      const n = m.SOURCE_INDEX[kind];
+      const v = varAt[n];
+      return { kind, n, v, reaches: kindAt[bindingOf[v]] };
+    });
+    check('each source\'s slot number reaches that source\'s picture: the shader\'s branch, its binding, the texture bound there',
+      routes.every(r => r.reaches === r.kind) && Object.keys(varAt).length === 3 && !varAt[m.SOURCE_INDEX.wall],
+      routes.map(r => `${r.kind}: ${r.n} → ${r.v} → ${r.reaches}`).join(' · '));
+  }
+
+  /*
+    Each source takes out the rows it names and nothing else, by the Mixer's
+    own level keys, so a renamed level cannot leave a row on. Against a base
+    in which every number is its own non-zero value and every switch is
+    thrown from its default, so a key a source quietly set to 0 (or to
+    anything) cannot hide behind a default that was 0 already.
+  */
+  const base = Object.fromEntries(Object.entries(m.DEFAULT_SETTINGS).map(([k, v], i) =>
+    [k, typeof v === 'number' ? 0.37 + i * 1e-3 : typeof v === 'boolean' ? !v : v]));
+  const level = (id) => m.MIX_SOURCE_INFO[id].level;
+  const zeroed = (kind) => {
+    const got = m.sourceSettings(kind, base);
+    return [...new Set([...Object.keys(base), ...Object.keys(got)])].filter(k => got[k] !== base[k]).sort().join(' ');
+  };
+  check('the front plate alone takes out the back plate and the film, and nothing else',
+    zeroed('front') === [level('back'), level('film')].sort().join(' '), zeroed('front'));
+  check('the back plate alone takes out the front plate, the film and the logo (which goes out on the front plate\'s projector), and nothing else',
+    zeroed('back') === [level('front'), level('film'), level('mark')].sort().join(' '), zeroed('back'));
+  check('the film alone takes out both plates, the lamp rows and the logo, and nothing else',
+    zeroed('film') === ['front', 'back', 'led', 'gel', 'lumia', 'mark'].map(level).sort().join(' '), zeroed('film'));
+  check('and none of them touches the dimmer, so the dimmer and a blackout reach every projector',
+    ['front', 'back', 'film'].every(k => m.sourceSettings(k, { ...base, dimmer: 0.37 }).dimmer === 0.37));
+  // Multiply over the black under the film alone is black: the film alone draws a Multiply film as Add, and only it.
+  const blends = ['own', 'screen', 'add', 'multiply', 'key'].map(b => [b, m.sourceSettings('film', { ...base, filmBlend: b }).filmBlend]);
+  check('the film alone draws a film row on Multiply as Add, the frame itself, and keeps every other blend',
+    blends.every(([b, got]) => got === (b === 'multiply' ? 'add' : b))
+    && ['front', 'back'].every(k => m.sourceSettings(k, { ...base, filmBlend: 'multiply' }).filmBlend === 'multiply'),
+    blends.map(([b, got]) => `${b} → ${got}`).join(' · '));
+}
+
 console.log('');
 const failed = checks.filter(c => !c.ok);
 console.log(`${checks.length - failed.length}/${checks.length} checks passed`);
