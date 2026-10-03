@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a magnet you size and play (PLAN 9x)
+
+- **Picking the Magnet changes nothing on the plate.** It used to pour the
+  look's ring of ferrofluid, a fifth of the plate in black drops round the
+  middle, which read as a giant black hole. The first hold on a plate with no
+  ferrofluid now brings one pool under the hand, which stands into spikes and
+  follows a drag.
+- **Magnet Size** (Settings, the desks' Magnet options, the phone's Magnet
+  panel, MIDI): a coin to a palm. A real magnet scaled: the same field over it,
+  reaching up to twice as far, or half. The performer's, kept across looks.
+
 ### Added — the plate as a thin gap (Thin Gap, PLAN §18a)
 
 - **Thin Gap** (Settings → Squish Plate, off in every look) solves the flow

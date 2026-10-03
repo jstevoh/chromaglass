@@ -524,6 +524,21 @@ Surface Tension low (which made the push strongest):
   plan's next step for it, not a noise;
 - the Finger through a pool: it should carry the dye and not seem to add any.
 
+## 21. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+
+On Classic (a look with no ferrofluid), desk and phone:
+
+- pick the Magnet (M, or its button): the plate should not change at all;
+- touch and hold: a small black pool should appear under the hand and stand up
+  into spikes; drag it, and it should come with you. Say whether it is the right
+  amount of ferrofluid to start with;
+- right-click the Magnet on the desk (or tap it twice on the phone) and move
+  Size: a small magnet raises a few spikes under the fingertip, a big one a wide
+  hedgehog and pulls more gently from further off. Say whether the range is right
+  at both ends;
+- the pool still reads as a black disc with domes round its rim, not domes with
+  colour between them. That is the standing-domes work (PLAN 9t), not this.
+
 ---
 
 ## Reading the frame time while you do it
