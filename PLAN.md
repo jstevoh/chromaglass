@@ -1782,6 +1782,11 @@ while this batch's plan was going in (#177), and no cause is known yet:
   step, so the ratio read how many steps the runner fitted into each move. **Fixed
   in #210:** only the hand's own Pour counts (pushes made in the task that laid its
   dye, nothing through autoInject); the detail line prints what was left out.
+- `bottles.mjs`, "splatter with the Ferrofluid bottle lays ferrofluid along the
+  stroke": red once on #209 (docs only), "not following the hand", 26 pours. It read
+  the pours' own places, and a Splat flings its liquid up to 27 cells from the hand
+  on a 29-cell stroke. **Fixed:** it reads where the hand was at each pour, and asks
+  that the pours land on it on average and that the hand moved along the stroke.
 
 ## Not doing
 
