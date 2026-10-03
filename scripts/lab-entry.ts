@@ -4,7 +4,8 @@
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, thinGapViscosity, FERRO_NU } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
-import { fillPlateUniforms, magnetsOnPlate } from '../src/gpu/plateUniforms';
+import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
+import { sourceSettings } from '../src/lib/plateSources';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
@@ -231,6 +232,18 @@ const api = {
         be told from the right one.
       */
       film?: CanvasImageSource; mark?: CanvasImageSource; backPlate?: boolean; backRotation?: number;
+      /*
+        Projectors' own sources (PLAN.md §16b). Each is the plate's display
+        drawn again with that source's uniforms, after the wall's draw and in
+        the same encoder, as the app's frame does: the source reuses what the
+        wall's draw packed and derived, and one encoder is where two displays
+        could be handed each other's uniforms (every writeBuffer lands before
+        the command buffer runs). With sources asked for, the render gives
+        back `{ wall, front?, back?, film? }` in place of the wall's pixels.
+      */
+      sources?: ('front' | 'back' | 'film')[];
+      /** Draw the wall as it is drawn into a texture (see `flipped` below); with sources, always. */
+      flip?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -247,8 +260,7 @@ const api = {
     if (cam.mark) plate.setSource('mark', cam.mark);
     const [fw, fh] = cam.film ? size2(cam.film) : [0, 0];
     const [mw, mh] = cam.mark ? size2(cam.mark) : [1, 1];
-    fillPlateUniforms(plate.pack, {
-      view: {
+    const view: PlateView = {
         // The plate's clock can be set apart from the solver's, to ask what
         // the picture does with time alone (in `npm run filmlook`, the film's
         // thickness must not drift with it).
@@ -263,24 +275,57 @@ const api = {
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
         mark: cam.mark ? { aspect: mw / Math.max(1, mh) } : null,
         film: cam.film ? { kind: 'file', video: { readyState: 4, videoWidth: fw, videoHeight: fh } } : { kind: 'none', video: null },
-      },
-      fluids: cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }],
-      width: size, height: size, derived: true, grid: l.N,
-    });
+    };
+    const fluids = cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }];
+    fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
-    plate.draw(enc, target.createView(), { width: size, height: size }, cam.backPlate ? [layer, { ...layer, air: null }] : [layer]);
+    const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
+    /*
+      With sources, the wall goes to a texture as the app's does when a
+      projector is on (the output pass reads it), and a texture's rows run the
+      other way from a canvas's, so the display flips (FLIP_Y). The sources are
+      always drawn so. The pictures are turned upright again as they are read,
+      as the output pass does. The dither is laid by the pixel's place on the
+      target, so a flipped picture turned upright is a step or two off an
+      unflipped one here and there: a wall to compare with a source is drawn
+      flipped too (`flip`).
+    */
+    const flipped = cam.flip || !!cam.sources?.length;
+    plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    // As the app fills them: the frame's settings with the other rows at
+    // nothing, no camera and no chain, so each display does its own finish.
+    const owns = (cam.sources ?? []).map((kind) => {
+      fillPlateUniforms(plate.sourcePack(kind), {
+        view: { ...view, settings: sourceSettings(kind, view.settings) }, fluids,
+        width: size, height: size, derived: true, grid: l.N, cameraOn: false, postChain: false,
+      });
+      const tex = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+      plate.drawSource(enc, kind, tex.createView(), { width: size, height: size }, layers, undefined, 'rgba8unorm');
+      return { kind: kind as string, tex };
+    });
     const row = Math.ceil(size * 4 / 256) * 256;
-    const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-    enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
+    const reads = [{ kind: 'wall', tex: target }, ...owns].map(({ kind, tex }) => {
+      const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: row }, [size, size]);
+      return { kind, tex, buf };
+    });
     device.queue.submit([enc.finish()]);
-    await buf.mapAsync(GPUMapMode.READ);
-    const src = new Uint8Array(buf.getMappedRange());
-    const out = new Uint8Array(size * size * 4);
-    for (let y = 0; y < size; y++) out.set(src.subarray(y * row, y * row + size * 4), y * size * 4);
-    buf.unmap(); buf.destroy(); target.destroy(); plate.dispose();
-    return Array.from(out);
+    const pictures: Record<string, number[]> = {};
+    for (const { kind, tex, buf } of reads) {
+      await buf.mapAsync(GPUMapMode.READ);
+      const src = new Uint8Array(buf.getMappedRange());
+      const out = new Uint8Array(size * size * 4);
+      for (let y = 0; y < size; y++) {
+        const from = flipped ? size - 1 - y : y;
+        out.set(src.subarray(from * row, from * row + size * 4), y * size * 4);
+      }
+      buf.unmap(); buf.destroy(); tex.destroy();
+      pictures[kind] = Array.from(out);
+    }
+    plate.dispose();
+    return cam.sources ? pictures : pictures.wall;
   },
 };
 (window as unknown as { lab: typeof api }).lab = api;

@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is within 0.006 of a pool never pressed, and a ragged edge keeps 1.4 times
   the bumps of an even pair when it is the thinner liquid.
 
+### Added — a projector picks its source
+
+- A mapped surface (Settings, Mapping) can show the **front plate alone**, the
+  **back plate alone** or the **film alone** instead of the whole picture, so
+  two projectors can each carry their own plate, the way a light show's did.
+  Each source is graded, blended and dimmed as its Mixer row is on the wall,
+  and a blackout reaches every projector. The default is the whole picture, so
+  a saved rig looks as it did. On the phone: More, Settings, Mapping.
+
 ### Added — the plate as a thin gap (Thin Gap, PLAN §18a)
 
 - **Thin Gap** (Settings → Squish Plate, off in every look) solves the flow

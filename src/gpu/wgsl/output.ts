@@ -26,6 +26,14 @@ ${OUTPUT_STRUCT}
 @group(0) @binding(0) var<uniform> U: Output;
 @group(0) @binding(1) var samp: sampler;
 @group(0) @binding(2) var scene: texture_2d<f32>;
+// What a surface can show instead of the finished frame (PLAN.md §16b,
+// lib/outputConfig.ts SurfaceSource): the front plate alone, the back plate
+// alone, the film alone. Each is the plate's display drawn again into its own
+// texture, stored the way \`scene\` is, so one sample serves all four. A
+// source nobody asked for is bound to \`scene\`, never read.
+@group(0) @binding(3) var frontOnly: texture_2d<f32>;
+@group(0) @binding(4) var backOnly: texture_2d<f32>;
+@group(0) @binding(5) var filmOnly: texture_2d<f32>;
 
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -79,7 +87,13 @@ fn dhash(p: vec2f) -> f32 {
   var srcUv = s.xy + q * s.zw;
   srcUv = mix(srcUv, 1.0 - srcUv, step(U.flip, vec2f(0.0)));
 
-  var col = textureSampleLevel(scene, samp, vec2f(srcUv.x, 1.0 - srcUv.y), 0.0).rgb;
+  // form.w is the surface's source: 0 the wall, 1 front, 2 back, 3 film.
+  let at = vec2f(srcUv.x, 1.0 - srcUv.y);
+  let which = i32(form.w + 0.5);
+  var col = textureSampleLevel(scene, samp, at, 0.0).rgb;
+  if (which == 1) { col = textureSampleLevel(frontOnly, samp, at, 0.0).rgb; }
+  else if (which == 2) { col = textureSampleLevel(backOnly, samp, at, 0.0).rgb; }
+  else if (which == 3) { col = textureSampleLevel(filmOnly, samp, at, 0.0).rgb; }
 
   // ── Blanking ─────────────────────────────────────────────────────
   let fe = max(U.feather, 1e-4);
