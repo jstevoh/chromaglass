@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   panel, MIDI): a coin to a palm. A real magnet scaled: the same field over it,
   reaching up to twice as far, or half. The performer's, kept across looks.
 
+### Added — a projector picks its source
+
+- A mapped surface (Settings, Mapping) can show the **front plate alone**, the
+  **back plate alone** or the **film alone** instead of the whole picture, so
+  two projectors can each carry their own plate, the way a light show's did.
+  Each source is graded, blended and dimmed as its Mixer row is on the wall,
+  and a blackout reaches every projector. The default is the whole picture, so
+  a saved rig looks as it did. On the phone: More, Settings, Mapping.
+
 ### Added — the plate as a thin gap (Thin Gap, PLAN §18a)
 
 - **Thin Gap** (Settings → Squish Plate, off in every look) solves the flow
