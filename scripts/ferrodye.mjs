@@ -5,7 +5,7 @@
  *
  *   npm run ferrodye
  *
- * Steve's references for Ferro Paint, Chemical Bouillon's "Colored I" and
+ * The owner's references for Ferro Paint, Chemical Bouillon's "Colored I" and
  * "II", are black ferrofluid worked through coloured water: the black pushes
  * the colour into cells between its channels and packs it bright along its
  * edges. Watching our Ferro Paint (the watch tool, lab clips) the colours sat

@@ -419,6 +419,13 @@ jobs:
       - name: The hands move the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrohands
+      # Thin Gap: a pressed pool of ferrofluid stays full and spreads by the
+      # volume the glass displaced, comes back on the lift, and a front where
+      # the thinner liquid pushes the thicker fingers (PLAN 15d).
+      # In the open shard: the plate shard is near its timeout.
+      - name: The Press on the ferrofluid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferropress
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
