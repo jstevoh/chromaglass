@@ -709,6 +709,36 @@ try {
         !!target && fadingName === target.name && named === target.name, `picked "${target?.name}", top says "${fadingName}" fading and "${named}" after`);
 
       /*
+        Ben-Day Dots (wgsl/plate.ts benDay), the Roy look's own control, on
+        the Looks sheet: not there on a look that does not print, there once
+        Roy is picked, at Roy's own value, and it moves the setting from 0 to
+        100 % and back without taking itself away at 0.
+      */
+      await tap(page, 'phone-open-looks');
+      // Read with the sheet open, or a closed sheet would read as "hidden".
+      const looksOpen = await visible(page, 'phone-look-roy');
+      const printBefore = await visible(page, 'phone-ben-day');
+      await tap(page, 'phone-look-roy');
+      await page.waitForTimeout(3500);
+      await tap(page, 'phone-open-looks');
+      const printShown = await visible(page, 'phone-ben-day');
+      const printAt = printShown ? (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1] : null;
+      let printTop = null, printBottom = null;
+      if (printShown) {
+        await page.getByTestId('phone-ben-day').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        printBottom = (await visible(page, 'phone-ben-day')) ? (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1] : 'gone';
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        printTop = (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1];
+      }
+      check('Ben-Day Dots is on the Looks sheet for Roy and not before it, at Roy\'s value, and goes to 0 % and 100 % without leaving',
+        looksOpen && printBefore === false && printShown && printAt === '100' && printBottom === '0' && printTop === '100',
+        `before Roy ${!looksOpen ? 'the Looks sheet did not open' : printBefore ? 'shown' : 'hidden'}; on Roy ${printShown ? `at ${printAt} %, then ${printBottom} % and ${printTop} %` : 'missing'}`);
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
         A projector's source (PLAN.md §16b), from the phone: More, Settings,
         Mapping, a shape added, and its source picked. The phone has no
         second screen of its own, but it is the remote at a gig, and the

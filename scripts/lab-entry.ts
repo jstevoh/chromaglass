@@ -171,6 +171,8 @@ const api = {
     // is the default there, not off.
     return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id) };
   },
+  /** Every shipped look's id, for a check that asks something of all of them. */
+  lookIds() { return PRESETS.map(p => p.id); },
   /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */
   pour(shape: PhasePourShape, scale: number) {
     const drops = phasePour(shape, scale);

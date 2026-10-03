@@ -50,6 +50,9 @@ import { stream } from './rng';
 const LIGHT_STACK = new Set([
   'saturationBoost', 'bloom', 'lumia', 'gelWheel', 'secondLamp', 'dimmer',
   'exposure', 'transmission', 'iridescence', 'thicknessOptics', 'spectralOptics',
+  // The comic print (the Roy look): half a print is neither, so it moves
+  // only by hand.
+  'benDay',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

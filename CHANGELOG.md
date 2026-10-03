@@ -78,6 +78,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the drag would be 27% high); ∇·(hu) is 0.0004 of the flux for water and
   0.0042 for glycerine against the old solver's 0.028.
 
+### Added — Roy, 1963, and Ben-Day Dots
+
+- **Roy, 1963**, a look after Roy Lichtenstein: big flat pools of red,
+  yellow and blue on a white light table, printed as a comic panel.
+- **Ben-Day Dots** (`benDay`, Settings → Look; MIDI, the desks, the remote,
+  and the phone's Looks sheet while a look prints): the finished picture
+  read as a printer's inks. Dark is black; anything lit is white paper with
+  the nearest of three inks on it; a pale wash is that ink in even dots on a
+  45° screen fixed to the picture; a strong one is the flat ink; the front
+  plate's shapes and the seams between inks are outlined in black. 0 by
+  default, so no other look changes; Lucky rolls it back to 0 and Evolve
+  leaves it alone.
+- `npm run benday` measures it on a lab plate (a wash prints 242 dots of
+  256 on the lattice, one size to 2.7%, still while the plate turns; a pool
+  is one flat ink, outlined all the way round), in the macOS plate shard.
+
 ### Changed — the phone's dock on small landscape phones, and the top of the plate
 
 - **Under 800 px wide in landscape the dock is two rows**, the ten tools

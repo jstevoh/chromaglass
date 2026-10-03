@@ -2337,6 +2337,19 @@ class FluidSimulation {
         break;
       }
 
+      case 'roy': {
+        // A panel's shapes: a few big flat pools of the three inks, each in a
+        // thin wash of itself twice as wide, so the print (benDay) has solid
+        // ink to outline and a tint round it to lay as dots from the start.
+        const shapes: [number, number, number][] = [[0.3, 0.32, 0.16], [0.68, 0.4, 0.18], [0.42, 0.7, 0.14], [0.75, 0.75, 0.1]];
+        shapes.forEach(([fx, fy, fr], i) => {
+          const c = col(i);
+          this.splatBlob(fx * S, fy * S, S * fr * 1.8, 0.5, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, S * fr, 2.6, c.r, c.g, c.b);
+        });
+        break;
+      }
+
       case 'clock-glass': {
         // Curved glasses gather the liquid in the middle; seed it there, in
         // rings, so the dome has something to hold from the first frame.

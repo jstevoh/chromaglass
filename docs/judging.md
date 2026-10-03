@@ -562,8 +562,6 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
----
-
 ## 22. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
@@ -591,6 +589,21 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
+
+## 23. Roy, 1963: the plate printed as a comic (PLAN 21)
+
+Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
+panel: flat red, yellow and blue on white, a black line round every solid shape
+and where two colours meet, and the pale washes round the shapes as even dots.
+
+- are the dots the right size on the wall (32 rows down the picture), and the line
+  heavy enough? Say if either wants to be bigger or smaller;
+- does it hold up moving: do the dots sit still while the colour slides under them,
+  and does the line stay a line, not a flicker, as the shapes move and merge;
+- Ben-Day Dots (Settings → Look) from 0 to 100 % on Roy, and on Classic: is there a
+  point between where it looks better than either end;
+- zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
+  them to grow with the zoom, as the accidental ones did.
 
 ---
 
