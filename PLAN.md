@@ -92,7 +92,7 @@ Whether to bracket it (Δ within the two idle readings ± the allowance) is a de
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
 
-*Found 2026-09-27, **fixed in #225** (2026-10-03; the Mac's mirror check to confirm):* **the mirror check's "and nowhere else" goes red at
+*Found 2026-09-27, **fixed in #225** (2026-10-03; every mirror line green on the Mac):* **the mirror check's "and nowhere else" goes red at
 exactly its limit on changes that cannot move a pixel.** It was the plate, not the
 check. Six rounds of measurement on the Mac runner found the calm Classic plate
 starting a single plate-wide flow out from the middle (0.63–0.88 of it radial, mean
@@ -127,7 +127,9 @@ holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −
 step, ten steps a press) read 22% on main because its presses were swallowed by the
 unbalanced press source (the dye under them barely moves). Balanced, the same presses
 push the dye, and the pass holds the band to 64% of what grows without it; a variant
-balanced before the clamp reads 74%. It is not at the fronts: masked away from them
+balanced before the clamp reads 74%. The owner chose to re-baseline that line
+(2026-10-03): it now asks for under seven tenths, which still fails a pass weakened by
+a third or more (3.5% a step reads 70.0%, 2.5% 75%, 1% 87%). It is not at the fronts: masked away from them
 (87–95% of the plate kept) the fix reads 62–70% and main 37–38%. The flows with the
 pass on and off are the same (mean |u| 0.462). Rendered in Red Cabbage's closeup at
 2.8x and 8x, neither shows the 45° grate (`/mnt/project-files/mirror-fix/`, outside
@@ -1810,7 +1812,7 @@ while this batch's plan was going in (#177), and no cause is known yet:
   a tenth of 300. It asks the gain against what was there, on a hand path drawn at
   random each run, so a run whose best spot starts full reads low; worth reading
   the gain's spread over the last runs before touching its tenth.
-- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225**, the Mac's run to confirm: the
+- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225**, green on the Mac: the
   region starting to move by itself was the bubbles' press leaking a net source into
   the pressure solve; see the mirror item near the top): on #189 (the Mixer's gel
   and lumia rows, whose default picture renders the same to the byte as main's), 16.3
