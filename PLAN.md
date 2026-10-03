@@ -48,7 +48,7 @@ Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
-| 0 | The dye a tool makes | **Shipped** (#152) |
+| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; real viscous fingering to replace it, open |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
@@ -57,7 +57,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; 9f–9h, 9j, 9k–9m and 9o–9r open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), the pool it sets down is 9u, open; 9f–9h, 9j, 9k–9m and 9o–9r open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -211,13 +211,77 @@ The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
 backtrace, in `macCormack`), with a gathering cell held to the most its upstream
 cells held. The Finger's own velocity was never the source — in the lab it moves
-the plate's total by 0.0% — the fingering push added after the projection was:
-it runs along the dye's gradient, the Finger's carry makes that gradient steep,
+the plate's total by 0.0% — the fingering push added after the projection was
+(taken out since, below): it ran along the dye's gradient, the Finger's carry made that gradient steep,
 and the backtrace copied the dye outward (lab, the Finger's path under the
 push: 636 → 756 against 687 left alone; now 622 → 588 against 612). Holding
 the gathering side matters: carried conservatively, a push up the gradient is
 diffusion run backwards and grew a speck from 1.0 to the 6.0 ceiling in under
 five seconds.
+
+**The fingering push grew a grating, and was what drained the plate** (2026-09-27,
+`npm run grating` §5). Reported on Classic: stripes three to eight cells across at
+every angle, and a quarter of an hour in, red dots in a lattice about ten cells
+apart with labyrinths between them. Not #174's checkerboard (one cell, on the
+grid's diagonals): a push in `forcesB`, set by a look's Polarity, moved the dye
+along its own gradient by a slow noise, and where the noise was negative that is
+diffusion run backwards, which grows a spinodal pattern inside every pool at the
+size the push's gradient sees (a logical cell either side). In the lab, Classic's
+own step on forty pools for ten seconds, 512 under 192, the worst channel's
+share of variance in waves 2.6–16 texels across, in parts of 10,000: 52 as laid,
+107 without the push, 2518 with it, and 819 at a quarter of its strength; the
+plate kept 97% of its dye without the push and 41% with it. Tried on the same
+plate before taking it out (a first look, alpha only, waves 2.6–8 texels, where
+the push read 1895 against 32 without it): carried as a flux (conserves the dye, grows the pattern three times as fast:
+4165), pushing only outward (345, and still losing dye), pushing along the
+contours (3298), and only at a pool's edge (40 at ten seconds; at thirty, 109
+against the stirring's 45, a comb of teeth along every edge and holes drawn into
+pools). On a phone's grid (256, half-float dye) at Velvet Underground's strength
+(Polarity 0.9, 0.22) the same push grows its waves a few cells long, where the
+grid's axes pin them: the crosshatch the owner saw on the iPhone (2.6–5 texels,
+231 against 22 without it; the picture is in the project's files, not the repo,
+at `dye-grating/phone-grid-half-float.png`). None of
+those is the phenomenon (below), so the push is **taken out**,
+on the GPU and the CPU plate alike. The Finger's "adds none" reds were this loss:
+the plate alone lost dye, so a stroke read as adding it; the
+Finger's own lab read −0.2 idle out of 1329 with the push off (finger-lab, 2026-09-27).
+Still to see: the Finger's check on the Mac over a run of builds, and whether the
+looks with Polarity have lost an edge movement the owner liked (docs/judging.md
+§20).
+
+*Found 2026-09-27, not yet done:* **real viscous fingering.** In a Hele-Shaw cell
+(two glasses and a gap b) the flow is Darcy's, u = −(b²/12μ)∇p, and an edge
+between two liquids fingers only where the thinner one is driving into the
+thicker: growth σ(k) = U|k|(μ₂−μ₁)/(μ₁+μ₂) − b²γ|k|³/(12(μ₁+μ₂)), so the surface
+tension γ across the edge sets the finger width (fastest near λ = πb·√(γ/(ΔμU)))
+and a still plate does not finger at all. The solver has the pieces: the gap
+(vel.w, the squeeze), a drag through it (Depth Drag), a Jacobi projection, and
+liquids with a `body` in the liquid field; and a Hele-Shaw thin-gap mode (§18a, #220: Thin Gap,
+off by default) brings the mobility-weighted projection and the gap's
+drag, so this builds on it. Build: a viscosity per liquid carried
+with the dye (water thin, the pools' oil and syrup thick); the gap's drag 12μ/b²
+on the flow, per cell; the projection weighted by the mobility b²/12μ on each face
+(a variable-coefficient Poisson solve, the same Jacobi); and a capillary pressure
+jump γκ at the edge. Then a lift (§10 step 4) fingers because water or air is
+drawn in, a press does not because it is the stable direction, Polarity and Blob
+Surface Tension mean a viscosity contrast and a γ, and `squish.ts`'s drawn spokes
+(a shortcut of the same kind) can go. Checks: a radial lift's finger count against
+the fastest wave for its b, γ and U; a press stays round; a still plate grows
+nothing (`npm run grating` §5 asks that already).
+
+*Found 2026-09-27, not yet done:* **#174's grating may have been this one.** Its
+report was "Red Cabbage at 2.8x", read as the closeup's zoom, and its pixels
+converted to cells at 8.75 px a cell on that reading. 2.8x is the tool's Amount
+(the dock's `2.8×`); a report saved with the camera at 1x reads `shot.zoom 1`,
+and at 1x a cell is about 4.7 px of a Retina screenshot, so its 10–15 px stripes
+were 2–3 cells, not √2. Red Cabbage has Polarity, so the push ran there too. The
+`dampGrid` pass stays (it removes a pattern nothing else does), but its cost on
+the Mac (judging §10) is worth weighing against what it was for.
+
+*Found 2026-09-27, not yet done:* **the owner likes the dots.** A "Roy" look with
+its own control is being built in its own thread from the old push's mechanism
+(anti-diffusion on the dye, a wavelength set by the gradient's reach, bounded by
+the advection's hold and the 6.0 cap).
 
 **This was first because it was red.** `npm run tools` fails on `main` about two
 runs in three, and the deploy is gated on it, so every merge queues behind a coin
@@ -723,7 +787,7 @@ that delivers the idea, and it is the smallest of the three.
 **People as hands** (`sceneHands`). Connected components on the presence mask, the
 largest few kept, matched to last frame's tracks by nearest centroid so each person
 carries a **stable id**. Each track calls `applyGesture`: still → `press`, a palm on
-the glass, so fingering and beat squeeze work on it; moving → `blow` along its velocity;
+the glass, so the beat squeeze works on it; moving → `blow` along its velocity;
 arriving → `drop`. Everything downstream — bubbles, beads, the squeeze film — reacts
 without knowing where the hand came from.
 
@@ -987,6 +1051,38 @@ Open, from building 9i:
   directly as `mixCarry` does. The remote's widest directed Blow at 512² is about
   4000 reads a cell over 28 000 cells. Worth doing if a Mac frame-time reading
   under a held Blow shows it.
+
+- **9s. Picking the Magnet made a black hole in the middle** (**shipped**). Reported
+  by the owner (2026-10-03): "Magnet makes an immediate big black hole in the middle
+  when I select it." Picking the Magnet on a look without a magnet gave the look one
+  (Magnet Strength 0.8, since #155), and a look's magnet sits under the plate at
+  Magnet Across and Up, the middle, from the moment it has strength. So before the
+  hand touched anything, a magnet nobody put there pulled the freshly poured ring of
+  ferrofluid into one pool in the middle: in the lab (Classic's pour, 256²) the disc
+  0.12 round the middle went from 9% of its area black to 54% in a second and all of
+  it in four, holding a fifth of all the ferrofluid, against 9% black with no magnet. Picking a magnet up is
+  taking it in the hand, so now picking it only pours the ferrofluid, and the look
+  gets its magnet from the first hand that holds one (`onMagnetInHand`), set down
+  where that hand lets go, as #159 left it (every hold gives a look with Magnet
+  Strength 0 the 0.8 again). `npm run magnet` asks that the solver is stepped with
+  no magnet until the hand holds it, that the disc's mean ferrofluid stays under 0.3
+  nine seconds on (in the lab 0.10 as poured and after, 0.54 a second into the old
+  magnet and 0.97 by four), measured again if the ferrofluid was laid afresh in the
+  window, and that the magnet let go of has strength. Left: a hold while the show is stopped
+  or draining gives no magnet, because the hand is read in the solver's step; a
+  hold after Start does.
+- **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
+  behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
+  share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
+  the ferrofluid into one flat black pool where the hand let go. A real magnet strong
+  enough to pull a pool across the dish raises Rosensweig domes on it, and the pool
+  is never one flat disc. That is the pull against the lift: a thin-film lab of the
+  Rosensweig instability (2026-10-03, not yet in the repo) found the plate conserves
+  the ferrofluid's area where a real layer conserves its volume, so domes standing up
+  cannot open gaps, and its magnet case piled the pool 0.84 of a capillary length
+  deep before domes came, with the balance of pull and lift left open. It belongs to
+  the standing-domes plate PR that lab is for, not to a retune of the set-down
+  strength here.
 
 ### 10. Playing like a show
 
@@ -1740,6 +1836,11 @@ while this batch's plan was going in (#177), and no cause is known yet:
   step, so the ratio read how many steps the runner fitted into each move. **Fixed
   in #210:** only the hand's own Pour counts (pushes made in the task that laid its
   dye, nothing through autoInject); the detail line prints what was left out.
+- `bottles.mjs`, "splatter with the Ferrofluid bottle lays ferrofluid along the
+  stroke": red once on #209 (docs only), "not following the hand", 26 pours. It read
+  the pours' own places, and a Splat flings its liquid up to 27 cells from the hand
+  on a 29-cell stroke. **Fixed:** it reads where the hand was at each pour, and asks
+  that the pours land on it on average and that the hand moved along the stroke.
 
 ## Not doing
 

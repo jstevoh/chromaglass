@@ -174,6 +174,13 @@ interface LiquidVisualizerProps {
   soundBindings?: readonly SoundBinding[];
   onSoundTrigger?: (binding: SoundBinding) => void;
   /**
+   * A hand has just put a magnet under a look that has none of its own
+   * (magnetStrength 0): the app gives the look the magnet's strength, so
+   * that once let go it stays under the glass where the hand set it down
+   * (magnetFor). Called once per hold, from the frame that first holds it.
+   */
+  onMagnetInHand?: () => void;
+  /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
    * arrives as its own prop instead of riding in `settings` where a preset
@@ -2994,9 +3001,8 @@ class FluidSimulation {
     // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
     if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
 
-    // 7. Immiscibility & fingering
+    // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
     this.applyImmiscibility(p.immiscibility, time, noise2D);
-    if (p.fingering > 0) this.applyFingering(p.fingering, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
     if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
@@ -3150,9 +3156,10 @@ class FluidSimulation {
       }
     }
 
-    // blobSurfaceTension trades cohesion for shear: low tension gives weak
-    // cohesion and strong fingering (amoeba-like elongation and pinching),
-    // high tension the reverse (rounder, self-contained blobs).
+    // blobSurfaceTension is how strongly two colours hold apart
+    // (immiscibility, below). It also set a fingering push, a noise pushing
+    // the dye along its own gradient, which grew a grating in every pool
+    // and is gone (forcesB in wgsl/fluid.ts, and why).
     const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
 /*
@@ -3168,7 +3175,6 @@ class FluidSimulation {
       told the same lie.
     */
     const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
-    const fingering = polarity * 0.15 * (0.4 + (1 - tension) * 1.8);
 
     let smearX = 0, smearY = 0;
     if (settings.glassSmear > 0.2) {
@@ -3319,7 +3325,7 @@ class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, immiscibility, fingering,
+      turbScale, turbDetail, spin, immiscibility,
       /*
         The two glasses (2026-09-21).
 
@@ -3571,28 +3577,6 @@ class FluidSimulation {
         const noiseMod = 1.0 + n * 2.0;
         this.vx[idx] -= colorDiffX * strength * d * noiseMod;
         this.vy[idx] -= colorDiffY * strength * d * noiseMod;
-      }
-    }
-  }
-
-  private applyFingering(strength: number, time: number, noise2D: (x: number, y: number) => number) {
-    for (let j = 1; j < this.size - 1; j++) {
-      for (let i = 1; i < this.size - 1; i++) {
-        const idx = i + j * this.size;
-        const d = this.density[idx];
-        if (d < 0.05) continue;
-        const gradX = (this.density[idx + 1] - this.density[idx - 1]) * 0.5;
-        const gradY = (this.density[idx + this.size] - this.density[idx - this.size]) * 0.5;
-        const gradMagSq = gradX * gradX + gradY * gradY;
-        if (gradMagSq > 0.005) {
-          const gradMag = Math.sqrt(gradMagSq);
-          const nx = gradX / gradMag;
-          const ny = gradY / gradMag;
-          const n = noise2D(i * 0.02, j * 0.02 + time * 0.05);
-          const force = n * strength * gradMag * 4.0;
-          this.vx[idx] -= nx * force;
-          this.vy[idx] -= ny * force;
-        }
       }
     }
   }
@@ -4032,7 +4016,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4840,12 +4824,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const amt = settingsRef.current.phaseAmount ?? 0;
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
+      phaseLaysRef.current++;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);
+  /** How many times the ferrofluid has been laid afresh (layPhase), for the harness: a lay clears what was there. */
+  const phaseLaysRef = useRef(0);
   layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
@@ -5319,6 +5306,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { onManualGestureRef.current = onManualGesture; }, [onManualGesture]);
+  const onMagnetInHandRef = useRef(onMagnetInHand);
+  useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
+  /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
+  const magnetToldRef = useRef(-Infinity);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5601,6 +5592,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           k.env = kickRef.current?.kick ? 1 : k.env * Math.exp(-dtS / 0.8);
           const energy = Math.min(1, currentAudioData.energy);
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
+        }
+        /*
+          A hand bringing a magnet to a look that has none: the look takes
+          it, at the strength the Magnet tool has always given such a look,
+          so that let go it is set down under the glass where the hand left
+          it (placed, below) rather than taken away with the hand.
+
+          Read from the settings as the app holds them, not the folded look:
+          the app answers from its own Magnet Strength, and a sound-learn
+          patch riding the folded one must not decide whether the look has
+          a magnet. And asked again a few times a second for as long as the
+          hand holds it, rather than once a hold: a look fade that lands
+          during the hold sets the strength back to the target look's, and
+          a hold told only once would then set down a magnet with none. The
+          app ignores a call when the look already has its magnet.
+        */
+        if (held && (settingsRef.current.magnetStrength ?? 0) <= 0 && now - magnetToldRef.current > 250) {
+          magnetToldRef.current = now;
+          onMagnetInHandRef.current?.();
         }
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
@@ -9074,6 +9084,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
+          phaseLays: () => phaseLaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
