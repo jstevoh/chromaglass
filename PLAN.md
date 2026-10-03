@@ -101,11 +101,16 @@ step, and the press source was balanced with a plate mean the CPU guessed from t
 gap deltas over a resting gap of 0.03; a held press has squeezed its gap to the
 floor (0.004), where the deltas are clamped away, so the guess was wrong and the
 difference went into the pressure solve as a net source, which a closed plate has
-no answer for. The projection's right-hand side is now made zero-mean exactly on the
-GPU (`divTiles` in `wgsl/fluid.ts`): the glass lifting a hair everywhere to take
-what a press pushed out. `npm run heldpress` (lab, any adapter): a held press's far
-plate once steady 3.99e-3, as fast as while it closed, 0.95 of it radial, before;
-3.1e-5 and −0.03 after. The original report follows.
+no answer for. And on the app's glass the press's memory (`gapMemory`, a 0.22 s
+half-life of remembered squeeze that does not move the gap) was summed into the
+press's own rate every step it was held, so a held press pushed out some three
+hundred times what its gap lost, and went on pushing from a gap already on the
+floor. The projection's right-hand side is now made zero-mean exactly on the GPU
+(`divTiles` in `wgsl/fluid.ts`): the glass lifting a hair everywhere to take what a
+press pushed out. And the memory takes over only once a press has gone, never past
+the floor (`squeezeUpdate`). `npm run heldpress` (lab, Classic's glass): a held
+press's far plate once steady 3.28e-2 on main, as fast as while it closed, half of
+it radial; 4.6e-5 after. The original report follows.
  #191 (PLAN.md only) read
 "Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
 against an allowance of 11.1, at the tool's mirror through the centre
@@ -126,7 +131,10 @@ rather than simulate it: in a real cell a bubble spans the gap and displaces the
 liquid only while it grows, shrinks or moves, and a still one pushes nothing, while
 this keeps a flow going for as long as it sits there. #225 made the solve balance
 them exactly, so they no longer move the whole plate, but they still stir the
-liquid round every bubble. Replace both with the air excluding the liquid by
+liquid round every bubble. And the press's memory (`gapMemory`) still pushes
+liquid after a press without moving the gap, so a release's remembered squeeze is
+liquid from nowhere: a real squeeze film is overdamped and pushes out exactly what
+its gap loses, as fast as the viscous film lets it close. Replace both with the air excluding the liquid by
 itself (the bubble as a region the flow goes round: a no-flux boundary, or the
 Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
 `npm run straw` and `npm run heldpress`, which should then need no press to hold.

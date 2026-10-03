@@ -770,10 +770,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // The dome the two glasses leave when nothing is pressing on them.
   let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
   var gap = s.r;
-  var dhdt = s.g * S.gapMemory;
+  var dhdt = 0.0;
+  var pressed = false;
   if (A.a.x > 0.5) {
     let dg = textureLoad(addT, vec2i(id.xy), 0).a;
     if (dg != 0.0) {
+      pressed = true;
       // A press closes the gap (down to the floor); the one thing that
       // opens it is a press's lift (lib/squish.ts), and that brings the
       // glass back up to where it rests, never past it. Uncapped, at the
@@ -787,6 +789,40 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }
+  }
+  /*
+    The squeeze a press leaves behind (gapMemory): after the press, and
+    never more than the gap has room to give.
+
+    The memory keeps a press's rate going for a while after the press, which
+    is how a press lasts longer than the step it lands on. It does not move
+    the gap, so what it pushes out is liquid from a film that is not getting
+    any thinner, and two ways that went on without end:
+
+    Under a press that is still on. It was added to the press's own rate
+    every step, so a press held on one place summed its rate over the whole
+    half-life (0.22 s of the plate's time, three hundred steps at Classic's
+    dt, many seconds on a slow machine): a cell closing by a little each
+    step pushed out about three hundred times what it lost, and a cell
+    already on the floor, which can close no further, kept pushing all the
+    same. A bubble presses its footprint on every step, so every trapped
+    bubble on a calm Classic plate was a source that never let up, and the
+    plate flowed out from it everywhere: with the default look's glass, a
+    held press's far plate went on at 3.35e-2 once its gap sat on the floor,
+    with -8.5 a second of remembered closing under it (check-skeptic, npm
+    run heldpress), and the bubble's rim, closing a little a step, at
+    several hundred.
+
+    So while a press is on, the source is what the gap really does, as mass
+    conservation says it is; the memory takes over only once the press has
+    gone, from the rate of its last step, and a remembered closing stops
+    when the film can close no further. The remembered opening of a release
+    is left as it was. That the memory pushes liquid without moving the gap
+    at all is still a shortcut, written into PLAN.md.
+  */
+  if (!pressed) {
+    let room = (gap - 0.004) / max(S.dt, 0.0001);
+    dhdt += max(s.g * S.gapMemory, -room);
   }
   // The spring back toward the dome, and its motion counts.
   let g3 = gap + (rest - gap) * S.gapSpring;
