@@ -693,12 +693,16 @@ export class WebGPUFluid {
       ['phaseAdvect', [R32], open.phase],
       ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
-      ['phaseGrid', [R32], open.phase],
+      // The two volume forms (phaseGrid, phaseCHVolume) run only on a thin
+      // gap, which no look opens on: built behind the show, like phaseCarry,
+      // so a ferrofluid look does not wait on them (\`npm run startup\` fails a
+      // pipeline waited for and asked for by none).
+      ['phaseGrid', [R32], false],
       ['phaseRelax', [R32], open.phase],
       ['screenJacobi', [R32], open.phase],
       ['phaseMu', [RG32], open.phase],
       ['phaseCH', [R32], open.phase],
-      ['phaseCHVolume', [R32], open.phase],
+      ['phaseCHVolume', [R32], false],
       ['phaseForce', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
