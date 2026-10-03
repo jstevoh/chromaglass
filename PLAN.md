@@ -122,6 +122,21 @@ sometimes as large as the echo; which of the two is the first thing to settle, f
 the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
 of these costs the owner a by-hand re-run.
 
+*Found 2026-10-03 (#225), open:* **with presses that move the dye, the grid pass
+holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −0.3 in a
+step, ten steps a press) read 22% on main because its presses were swallowed by the
+unbalanced press source (the dye under them barely moves). Balanced, the same presses
+push the dye, and the pass holds the band to 64% of what grows without it; a variant
+balanced before the clamp reads 74%. It is not at the fronts: masked away from them
+(87–95% of the plate kept) the fix reads 62–70% and main 37–38%. The flows with the
+pass on and off are the same (mean |u| 0.462). Rendered in Red Cabbage's closeup at
+2.8x and 8x, neither shows the 45° grate (`/mnt/project-files/mirror-fix/`, outside
+the repo). Open: whether the pass should be stronger where the flow is strong or the
+gap is changing, or whether the dye's conserving advection grows the band itself
+under a strong flow (its divergence by central differences is not the projection's).
+Both renders also show a vertical seam down the middle of the plate, on main as well:
+its own item, unmeasured.
+
 *Found 2026-10-03 (#225), not yet done:* **a still bubble presses the glass.** Every
 step, each bubble lays a standing press of 0.0035 over 0.85 of its radius
 (`LiquidVisualizer`, "A bubble is air between the plates"), which holds the gap
