@@ -80,6 +80,8 @@ const PRESSURE_SWEEPS = 12;
 const MG_CYCLES = 2;
 const MG_SWEEPS = 2;
 const MG_COARSE_SWEEPS = 16;
+/** Workgroups summing the projection's right-hand side for its plate mean (divTiles). */
+const DIV_GROUPS = 64;
 /** The Thickness a thin gap runs at when a look does not set one: a light oil (PLAN §18a). */
 export const THIN_GAP_THICKNESS = 0.45;
 /**
@@ -214,6 +216,17 @@ const MAZE_UNIFORM = 0.45;
   which pours ferrofluid to gather) the pull stays whole: gathering along
   the hand is what `npm run magnet` holds that tool to, and the domes were
   only tuned on the ferrofluid looks. SPIKE_RELAX: see the phase stage.
+
+  The half is a tuning, not physics: a magnet's pull on a ferrofluid does
+  not weaken because peaks have formed. It stands in for what the model
+  lacks, a layer that can stand taller than full: a real Rosensweig peak
+  rises out of the layer and draws the liquid from the valleys into it,
+  while ours is capped at full, so a pool pulled together can only spread
+  sideways and the domes stand shoulder to shoulder, the gaps between them
+  16% of the plate near the magnet (PLAN.md §9f, `npm run domes`). A pull
+  eased further while the hand was held still opened them to 41% and kept
+  a dragged pool following, but it was a second tuning on the first and
+  was dropped; the domes standing up is PLAN.md §9t.
 */
 const SPIKE_PULL = 0.5;
 const SPIKE_FLOW = 2;
@@ -411,6 +424,14 @@ export class WebGPUFluid {
   private readonly curP: PingPong;
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
+  /*
+    What divergence writes, before its plate mean is taken off into `div`
+    (divTiles, divFold, divCentre in wgsl/fluid.ts): the partial sums, and
+    the mean itself.
+  */
+  private readonly divRaw: GPUTexture;
+  private readonly divPartials: GPUBuffer;
+  private readonly divMean: GPUBuffer;
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
   private readonly scratchA: GPUTexture;
@@ -581,8 +602,6 @@ export class WebGPUFluid {
     hundred times the strength moved the interior from 0.67 to 0.62.
   */
   private airCoverPrev = 0;
-  /** The plate's mean of the press source, so the projection has a solution. */
-  private squeezeMean = 0;
   /** How much of a press reaches the flow, from the look's plate pressure. */
   private squeezeGain = 0;
   private lastDt = 1 / 60;
@@ -673,7 +692,12 @@ export class WebGPUFluid {
         seconds after it opens, as mixForce always has been.
       */
       ['mixSmooth', [R32], false],
-      ['bodyAdvect', [dye], false],
+      /*
+        The dye across faces is also how the dye moves wherever the maze
+        flows (the advect dye stage), from the maze's first step, so a look
+        that opens with it waits for it as it waits for mazeForce.
+      */
+      ['bodyAdvect', [dye], open.maze],
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
@@ -723,6 +747,8 @@ export class WebGPUFluid {
     const byName: [string, GPUTextureFormat][] = [
       ['pressureClear', R32], ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
       ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
+      // The projection's right-hand side made zero-mean, every step (divTiles).
+      ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
       ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
     ];
     const keyed = new Map<string, [string, boolean]>();
@@ -793,6 +819,9 @@ export class WebGPUFluid {
     this.curP = pp(this.M, R32, 'current pressure');
     this.grain = opts.float32Filterable ? pp(this.N, RGBA32, 'grain') : null;
     this.div = tex(this.N, R32, 'divergence');
+    this.divRaw = tex(this.N, R32, 'divergence raw');
+    this.divPartials = this.disposer.track(device.createBuffer({ label: 'divergence partials', size: DIV_GROUPS * 4, usage: GPUBufferUsage.STORAGE }));
+    this.divMean = this.disposer.track(device.createBuffer({ label: 'divergence mean', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.curDiv = tex(this.M, R32, 'current divergence');
     this.velForced = tex(this.N, VEL, 'forced velocity');
     this.scratchA = tex(this.N, this.dyeFormat, 'scratch a');
@@ -983,7 +1012,7 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-    this.fill(pass, this.div, [0, 0, 0, 0], this.N);
+    for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
@@ -1024,26 +1053,19 @@ export class WebGPUFluid {
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
     const q = this.device.queue;
     /*
-      What the press just did to the plate as a whole, so its source can be
-      made zero-mean.
-
-      A Neumann problem whose source does not average to zero has no solution
-      for the projection to find — the condition `pressureSelfTest` exists to
-      protect, and the same one the air's standing term already obeys. A press
-      is a net source over the whole plate: liquid is pushed out from under the
-      palm and nothing anywhere absorbs it. Left unbalanced, the solve spends
-      itself on the imbalance and the press arrives as almost nothing, which is
-      what it measured — 0.4% of the dye moved, for a press seventy-five times
-      harder than the tool's own.
-
-      The gap delta rides channel 3 of the velocity deltas (see `flushDeltas`),
-      so the mean is a sum over what was just handed across, and the source it
-      produces is that rate over a resting gap.
+      The press's plate mean used to be worked out here, from the gap deltas
+      just handed across over a resting gap of 0.03, so its source could be
+      made zero-mean: a press is a net source, and a closed plate's pressure
+      has no solution for one (the press arrived as 0.4% of the dye moved
+      before it was balanced at all). That estimate is what leaked. A press
+      held in one place squeezes its gap to the floor, the delta is clamped
+      away there and the gap's spring goes on moving it, so the source the
+      GPU really applies is nothing like this guess, and the difference was a
+      net source over the whole plate that the solve turned into a flow out
+      from the middle (`npm run heldpress`, and the mirror check,
+      `scripts/mirror.mjs`). The mean is now taken on the GPU from the source
+      itself, in project().
     */
-    let gapSum = 0;
-    for (let i = 3; i < velAdd.length; i += 4) gapSum += velAdd[i];
-    const meanGap = gapSum / (this.L * this.L);
-    this.squeezeMean = -(meanGap / Math.max(dt, 1e-4)) / 0.03;
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
@@ -1449,7 +1471,8 @@ export class WebGPUFluid {
       });
     }
     // The maze's own flow (mazeForce), from last step's chemical potential.
-    if (this.mazeReady && this.phaseMuT && (p.magnetSeconds ?? 0) > 0) {
+    const mazeFlow = this.mazeReady && !!this.phaseMuT && (p.magnetSeconds ?? 0) > 0;
+    if (mazeFlow) {
       stage('maze force', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!],
@@ -1612,8 +1635,38 @@ export class WebGPUFluid {
     }, a > 0);
     stage('advect dye', (pass) => {
       /*
-        In a thin gap the dye goes through the faces too, as it does with Oil
-        Bodies (bodyAdvect). The dye is colour per unit of plate, h·C, and
+        Under the maze's flow the dye crosses faces, as the ferrofluid does
+        (phaseAdvect), and not by the backtrace (PLAN.md §9f, `npm run
+        domes`). Reported: where the Magnet parts a pool into domes, the
+        gaps between them showed a dark amber film, not the bright dye the
+        references have between their domes. The dye had not been pushed
+        out (Pushes Dye is off on Magnet Garden); it was lost. mazeForce's
+        flow is strongest at the grid's scale, along every edge of the
+        ferrofluid, and the backtrace thins a cell where such a flow spreads
+        and caps it where it gathers (bodyAdvect has the account, from the
+        oil's surface tension, which does the same): measured in the lab,
+        16 dye patches on 256², a pool of ferrofluid under the Magnet for
+        240 steps, 6% of the plate's dye gone and the dye within 0.08 of the
+        magnet down from 834 to 63; with the maze's flow off, all of it
+        kept. Across faces nothing is made or lost: 71874 → 71879, and 1510
+        within 0.08 (on 384², `npm run domes`: 6% of the plate's dye gone
+        before, 0.1% after).
+
+        In the ferrofluid's substeps (PHASE_SUBSTEPS), each a sixth of the
+        step: a face carries at most 0.45 of a cell a pass, and the magnet's
+        flow reaches more than two cells a step (MAGNET_CELLS), which is why
+        the ferrofluid is substepped. Carried in one pass, the dye would
+        stop at 0.45 of a cell while the ferrofluid went on, and a cell
+        emptied through all four faces could give more than it held, which
+        the floor then makes up: conserved only at low speed (the pre-push
+        review's reading). Whenever the maze flows, which is every look with
+        a Labyrinth and also Classic while the Magnet stands spikes over its
+        ferrofluid (mazeReady); the whole plate's dye then moves this way,
+        not only the dye near the magnet. Every other look's dye moves as
+        it did.
+
+        In a thin gap, when the maze is not flowing, the dye goes through the
+        faces too, as it does with Oil Bodies (bodyAdvect). The dye is colour per unit of plate, h·C, and
         the liquid carries C, so what it obeys is ∂(hC)/∂t + ∇·(hC u) = 0:
         an amount moved across faces by u, which is what the fluxes are. The
         backtrace copies a value and thins it by the flow's spread, held to
@@ -1625,6 +1678,9 @@ export class WebGPUFluid {
         backtrace keeps no sum. Across faces both keep every drop (332.0 and
         336.0, before and after), and the ring lands where the displaced
         volume puts it (100% of the shift, against 85% by backtrace).
+
+        Both at once (a thin gap under a Labyrinth) take the maze's substeps:
+        the same face fluxes, in sixths, so the faster flow is carried too.
       */
       /*
         And in substeps on a thin gap, as many as the step's flow needs
@@ -1632,6 +1688,14 @@ export class WebGPUFluid {
         a step, and a carry that cannot keep up leaves the colour behind.
       */
       if (thin) this.planCarry(pass, disp);
+      if (!bodiesOn && mazeFlow) {
+        const flux = this.arg('dye flux', [0, 0, 0, 0, 0, disp / PHASE_SUBSTEPS, 1, 0]);
+        for (let k = 0; k < PHASE_SUBSTEPS; k++) {
+          this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
+          this.dye.swap();
+        }
+        return;
+      }
       if (!bodiesOn && thin) {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
         return;
@@ -2487,6 +2551,20 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(Math.ceil(count / 64));
   }
 
+  /** As dispatchBuf, over the grid in 8 × 8 tiles, with no args of its own. */
+  private dispatchBuf2(pass: GPUComputePassEncoder, name: string, key: string, resources: (GPUBuffer | GPUTexture)[]): void {
+    const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), ...resources]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   /**
    * One multigrid V-cycle from level `l` down (see `mgRestrict0` in
    * `wgsl/fluid.ts` for why). Smooth, hand the residual to the level below,
@@ -2540,12 +2618,21 @@ export class WebGPUFluid {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero as the standing one does.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
+    this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
         (this.airCover - this.airCoverPrev) * invDt,
-        // The press: its plate-mean, so the source averages to zero, and how
-        // much of it reaches the flow.
-        this.squeezeMean, this.squeezeGain, 0]));
+        // The press: how much of it reaches the flow. Its mean is no longer
+        // guessed here (see divTiles).
+        0, this.squeezeGain, 0]));
+    /*
+      Then the whole right-hand side made to sum to zero, exactly: its plate
+      mean found on the GPU and taken off every cell (divTiles in
+      wgsl/fluid.ts says why that is the closed plate's physics and not a
+      patch). Three small dispatches, against the dozens the solve runs.
+    */
+    this.dispatchBuf(pass, 'divTiles', 'divTiles', this.arg('none', [0, 0, 0, 0]), [this.divRaw, this.divPartials], DIV_GROUPS * 64);
+    this.dispatchBuf(pass, 'divFold', 'divFold', this.arg('div fold', [DIV_GROUPS, 0, 0, 0]), [this.divPartials, this.divMean], 64);
+    this.dispatchBuf2(pass, 'divCentre', 'divCentre', [this.divRaw, this.divMean, this.div]);
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     if (this.pressureSolver === 'multigrid' && this.mg.length > 0) {
