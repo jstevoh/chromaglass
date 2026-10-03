@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+// Temporary: what the calm Classic plate does on its own across mirror.mjs's four drops.
+import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
+import { spawn } from 'node:child_process';
+
+const PORT = 4352;
+const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
+  { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
+const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* gone */ } };
+process.on('exit', stop);
+await new Promise((r) => setTimeout(r, 2500));
+
+const CALM = {
+  turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+  rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0,
+  audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
+};
+const VARIANTS = [
+  { name: 'drops', drop: true, extra: {} },
+  { name: 'no drops', drop: false, extra: {} },
+  { name: 'drops, no evaporation', drop: true, extra: { evaporationRate: 0 } },
+  { name: 'drops, platePressure 0 airVelocity 0', drop: true, extra: { platePressure: 0, airVelocity: 0 } },
+];
+const browser = await launchChromium(chromium);
+try {
+  for (const v of VARIANTS) {
+    const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
+    await page.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* none */ } });
+    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
+    await page.waitForTimeout(8000);
+    await page.evaluate(({ CALM, extra }) => {
+      window.chromaglassSettings?.({ ...CALM, layerCount: 2, ...extra });
+      window.chromaglassRotation?.([0, 0]);
+      window.chromaglassLayer?.(0);
+      window.chromaglassTool?.('dropper');
+    }, { CALM, extra: v.extra });
+    await page.waitForTimeout(3000);
+    const hole = await page.getByTestId('desk-preview').boundingBox();
+    let shots = 0;
+    const state = () => page.evaluate(() => {
+      const d = window.chromaglassDebug?.();
+      const s = d?.settings ?? {};
+      return {
+        t: performance.now() / 1000,
+        layers: (d?.fluids ?? []).map((f) => [f.stepCount, f.meanDensity, f.dt]),
+        sps: d?.solver?.().stepsPerSec, auto: d?.autoEvents,
+        set: [s.dyeBudget, s.evaporationRate, s.platePressure, s.airVelocity, s.automateRate, s.globalSpeed, s.surge, s.damping].map((x) => typeof x === 'number' ? +x.toFixed(4) : x),
+        phrase: (() => { const p = d?.phrase?.(); return p ? { gust: +(p.gust ?? 0).toFixed(2), drive: +(p.drive ?? 0).toFixed(2), lean: +(p.lean ?? 0).toFixed(2), dt: +(p.dt ?? 0).toFixed(4) } : null; })(),
+      };
+    });
+    const shot = async () => {
+      const png = await page.screenshot({ clip: hole });
+      const id = shots++;
+      await page.evaluate(async ({ b64, id }) => {
+        const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
+        const c = new OffscreenCanvas(img.width, img.height); const x = c.getContext('2d');
+        x.drawImage(img, 0, 0);
+        (window.__shots ??= {})[id] = x.getImageData(0, 0, img.width, img.height);
+      }, { b64: png.toString('base64'), id });
+      return { id, st: await state() };
+    };
+    // Whole-preview mean |change| and mean signed change of brightness, and how
+    // much of the preview is lit (a fade darkens; a motion moves light about).
+    const diff = (a, b) => page.evaluate(({ ia, ib }) => {
+      const A = window.__shots[ia], B = window.__shots[ib];
+      let abs = 0, sgn = 0, litA = 0, litB = 0, sumA = 0; const n = A.width * A.height;
+      for (let i = 0; i < A.data.length; i += 4) {
+        const la = A.data[i] + A.data[i + 1] + A.data[i + 2], lb = B.data[i] + B.data[i + 1] + B.data[i + 2];
+        abs += Math.abs(A.data[i] - B.data[i]) + Math.abs(A.data[i + 1] - B.data[i + 1]) + Math.abs(A.data[i + 2] - B.data[i + 2]);
+        sgn += lb - la; sumA += la; if (la > 60) litA++; if (lb > 60) litB++;
+      }
+      return { abs: abs / n, sgn: sgn / n, bright: sumA / n, litA: litA / n, litB: litB / n };
+    }, { ia: a.id, ib: b.id });
+    const fmt = (s) => `t=${s.t.toFixed(1)} sps=${s.sps?.toFixed?.(0)} ${s.layers.map((l) => `[step ${l[0]} mean ${l[1].toFixed(3)} dt ${l[2]?.toFixed?.(4)}]`).join(' ')} phrase=${JSON.stringify(s.phrase)} auto=${JSON.stringify(s.auto)}`;
+    console.log(`\n== ${v.name}  settings [dyeBudget evap platePressure air automate speed surge damping] = ${JSON.stringify((await state()).set)}`);
+    const hx = hole.x + hole.width * 0.75, hy = hole.y + hole.height * 0.75;
+    for (let rep = 0; rep < 7; rep++) {
+      const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
+      if (v.drop && rep < 4) {
+        await page.mouse.move(hx, hy); await page.mouse.down();
+        for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
+        await page.mouse.up();
+      } else {
+        await page.mouse.move(hx, hy);
+        for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
+      }
+      await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
+      await page.waitForTimeout(500);
+      const c = await shot();
+      const d = await diff(a, b), ch = await diff(b, c);
+      console.log(`  rep ${rep + 1}${v.drop && rep < 4 ? ' (drop)' : ''}: drift |${d.abs.toFixed(1)}| signed ${d.sgn.toFixed(1)}  change |${ch.abs.toFixed(1)}| signed ${ch.sgn.toFixed(1)}  bright ${d.bright.toFixed(1)} lit ${(d.litA * 100).toFixed(1)}%→${(ch.litB * 100).toFixed(1)}%`);
+      console.log(`     a ${fmt(a.st)}\n     c ${fmt(c.st)}`);
+      await page.evaluate(() => { window.__shots = {}; });
+    }
+    await page.close();
+  }
+} finally {
+  await browser.close();
+}
+process.exit(0);

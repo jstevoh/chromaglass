@@ -305,7 +305,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [show, tools, plate, open]
+        shard: [diag]  # TEMPORARY diagnostic, reverted before review
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -319,6 +319,9 @@ jobs:
       - name: Build
         id: build
         run: npm run build
+      - name: TEMPORARY mirror diagnostic
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'diag' }}
+        run: node scripts/mirror-diag.mjs && node scripts/mirror.mjs; node scripts/mirror.mjs
       # Every shader compiles, before anything builds a pipeline from one.
       - name: The shaders compile
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
