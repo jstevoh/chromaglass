@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Back goes fully back
+
+- **Back puts the room back too**: the film's and the logo's levels, the
+  dimmer, the Mixer's levels and grades and the microphone's gain fade back
+  to where they were before the Go, with the look, over the same fade. It
+  leaves the machine's setup (the grid, the microphone's latency, the room
+  camera's reading, the set's pacing, where the logo sits, each row's take
+  time). A fader, a Mixer pad or a song's glide moved while the Back runs
+  stays where it is put, and a blackout stays black. Every take still
+  walking stops. Since the Mixer's step 4, Back had kept the room as it was.
+
 ### Changed — the Press on the ferrofluid (PLAN 15d)
 
 - **With Thin Gap on, a pressed pool of ferrofluid stays black and spreads**
