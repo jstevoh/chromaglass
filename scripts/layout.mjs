@@ -177,6 +177,44 @@ try {
   // The cover loop above ends at a phone's width, which has no desk.
   await page.setViewportSize({ width: 1440, height: 900 });
   await settle(1200);
+  /*
+    A tool's options open over everything. Reported by the owner with a
+    screenshot (2026-10-03): the panel opened from the Amount chip, or a
+    right-click on a tool, was drawn inside the desk's own stacking, under
+    the plate, and on the Design desk only its bottom edge showed beneath
+    the canvas. So, on both desks: what is on top at the panel's middle,
+    and at the Magnet's Size slider (the Magnet's own option), is the
+    panel. On main before the fix the middle landed on the plate's frame.
+  */
+  for (const mode of ['design', 'perform']) {
+    await clickOn(`mode-segmented-${mode}`);
+    await settle(1000);
+    const onTop = async (testId) => page.evaluate((id) => {
+      const el = document.querySelector(`[data-testid="${id}"]`);
+      if (!el) return 'absent';
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit && el.closest('[data-testid="tool-options"]') && hit.closest('[data-testid="tool-options"]')
+        ? 'panel' : (hit?.closest('[data-testid]')?.getAttribute('data-testid') ?? hit?.tagName ?? 'nothing');
+    }, testId);
+    const chip = page.getByTestId('tool-amount-chip');
+    let viaChip = 'no chip';
+    if (await chip.count()) {
+      await chip.first().click();
+      await settle(300);
+      viaChip = await onTop('tool-options');
+      await page.mouse.click(5, 5);
+      await settle(300);
+    }
+    await page.getByTestId('tool-segmented-magnet').first().click({ button: 'right' });
+    await settle(300);
+    const sizeOnTop = await onTop('tool-options-size');
+    await page.mouse.click(5, 5);
+    await settle(300);
+    check(`on ${mode}, a tool's options open over the plate, not under it`,
+      viaChip === 'panel' && sizeOnTop === 'panel',
+      `at the panel's middle from the Amount chip: ${viaChip}; at the Magnet's Size from a right-click: ${sizeOnTop}`);
+  }
   await clickOn('mode-segmented-perform');
   await settle(1000);
   for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860]]) {
