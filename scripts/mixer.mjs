@@ -55,6 +55,12 @@
  *      nothing; and the back plate's Own is its Blend Mode, at Screen and at
  *      Multiply (5b, without a GPU: the post chain's finish is told the
  *      logo's blend)
+ *   8. a projector's own source (PLAN.md §16b): the front plate alone, the
+ *      back plate alone and the film alone, drawn in the wall's frame as the
+ *      app draws them, are each exactly the wall with the other rows at 0,
+ *      and none of them moves the wall; the film alone does not show the LED
+ *      ring the front plate's projector shows; and the dimmer at 0 blacks
+ *      every one of them, so a blackout reaches every projector
  *
  * Each rule was held to a broken shader when it was written (a beam that
  * draws nothing, a logo that vanishes when lowered, the ring left lighting
@@ -342,6 +348,34 @@ const shots = await page.evaluate(async (controls) => {
     const moved = c.key.endsWith('Hue') ? 90 : c.none === 1 ? 0.4 : c.max;
     out.each[c.key] = await shot({ ...lit, [c.key]: moved });
   }
+  /*
+    The projectors' sources (8). All three drawn in one frame, as the app
+    draws every source a surface asks for after the wall in one encoder, so a
+    source handed the wall's uniforms, or another source's, is a different
+    picture from its reference. Each reference is the wall with that source's
+    other rows at 0, and each is held apart from the wall below, so an
+    equality between two identical walls cannot pass for one.
+  */
+  const THREE = ['front', 'back', 'film'];
+  // Drawn as into a texture, as the sources are, for the dither's sake (lab-entry.ts).
+  const flat = (set) => lab.render(S, { ...base, ...set }, { ...all, flip: true });
+  out.src = {
+    all: await lab.render(S, base, { ...all, sources: THREE }),
+    wall: await flat({}),
+    front: await flat({ backLevel: 0, filmMix: 0 }),
+    back: await flat({ frontLevel: 0, filmMix: 0 }),
+    film: await flat({ frontLevel: 0, backLevel: 0, markMix: 0 }),
+    // No plate, no film: what the back plate adds to the bare lamp, and what the film does.
+    none: await flat({ frontLevel: 0, backLevel: 0, filmMix: 0 }),
+    black: await flat({ frontLevel: 0, backLevel: 0, markMix: 0, filmMix: 0 }),
+    // The LED ring on in the lamp: the front plate's projector shows it, the film's does not.
+    led: await lab.render(S, { ...base, ledPlatform: true, ledMode: 'rainbow' }, { ...all, sources: THREE }),
+    // A blackout. The logo is laid over the dimmer (finishLight in the plate
+    // shader), so a blackout leaves it lit on the wall, and on the front and
+    // back plates' projectors with it; it is taken off here so black is black.
+    dark: await lab.render(S, { ...base, dimmer: 0, markMix: 0 }, { ...all, sources: THREE }),
+    lit: await lab.render(S, { ...base, markMix: 0 }, { ...all, sources: THREE }),
+  };
   out.eachRest = await shot(lit);
   out.eachNoBack = await shot({ ...lit, backLevel: 0 });
   return out;
@@ -362,6 +396,7 @@ const diff = (a, b, where = () => true) => {
   return { mean: n ? sum / (3 * n) : 0, max, n };
 };
 const f1 = (v) => v.toFixed(1);
+const THREE_KINDS = ['front', 'back', 'film'];
 
 // Where the back plate has dye: what taking it away changes.
 const backDye = (x, y) => { const p = px(shots.def, x, y), q = px(shots.noBack, x, y); return Math.abs(p[0] - q[0]) + Math.abs(p[1] - q[1]) + Math.abs(p[2] - q[2]) > 12; };
@@ -727,6 +762,33 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
   }
   const zeros = Object.keys(shots.blend).map(id => [id, diff(shots.blend[id].zero, shots.blend[id].c).max]);
   check('any blend at a level of next to nothing (0.002, past the shader\'s skip) lays next to nothing', zeros.every(([, m]) => m <= 1), zeros.map(([id, m]) => `${id} ${m}`).join(' · '));
+}
+
+// ── 8. A projector's own source ──────────────────────────────────────
+{
+  const src = shots.src, all = src.all;
+  const wallKept = diff(all.wall, src.wall);
+  check('drawing the three sources in the frame leaves the wall exactly as it was', wallKept.max === 0, `worst ${wallKept.max}`);
+  const front = diff(all.front, src.front), frontApart = diff(src.front, src.wall, backDye), frontFilm = diff(src.front, src.wall, noBackDye);
+  check('the front plate alone is the wall with the back plate and the film at 0, exactly',
+    front.max === 0 && frontApart.mean > 10 && frontFilm.mean > 10,
+    `worst ${front.max}; the wall differs from it by ${f1(frontApart.mean)} a channel where the back plate has dye, ${f1(frontFilm.mean)} where it has none`);
+  const back = diff(all.back, src.back), backDyed = diff(src.back, src.none, backDye), backFront = diff(src.back, src.front, noBackDye);
+  check('the back plate alone is the wall with the front plate and the film at 0, exactly',
+    back.max === 0 && backDyed.mean > 10 && backFront.mean > 10,
+    `worst ${back.max}; its dye ${f1(backDyed.mean)} a channel over the bare lamp, and ${f1(backFront.mean)} off the front plate's picture off its dye`);
+  const film = diff(all.film, src.film), filmShows = diff(src.film, src.black);
+  check('the film alone is the wall with both plates, the lamp\'s rows and the logo at 0, exactly',
+    film.max === 0 && filmShows.mean > 20, `worst ${film.max}; the film ${f1(filmShows.mean)} a channel over black`);
+  const ledFront = diff(src.led.front, all.front), ledFilm = diff(src.led.film, all.film);
+  check('the LED ring lights the front plate\'s projector and not the film\'s', ledFront.mean > 3 && ledFilm.max === 0,
+    `${f1(ledFront.mean)} a channel on the front plate's, worst ${ledFilm.max} on the film's`);
+  // Lit at a dimmer of 1, so black at 0 is the dimmer's doing and not a source that was black already.
+  const lit = THREE_KINDS.map(k => [k, diff(src.lit[k], src.dark[k]).mean]);
+  const darkest = ['wall', ...THREE_KINDS].map(k => [k, src.dark[k].reduce((m, v, i) => (i % 4 === 3 ? m : Math.max(m, v)), 0)]);
+  check('the dimmer at 0 blacks every source, so a blackout reaches every projector',
+    darkest.every(([, m]) => m <= 1) && lit.every(([, m]) => m > 5),
+    `${darkest.map(([k, m]) => `${k} ${m}`).join(' · ')}; lit at 1: ${lit.map(([k, m]) => `${k} ${f1(m)}`).join(' · ')}`);
 }
 
 const failed = checks.filter(c => !c.ok).length;

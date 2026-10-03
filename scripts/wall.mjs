@@ -18,6 +18,9 @@
  *   corner pin  outside the pinned quad is black, inside it is the picture
  *   flip        the picture reverses inside the quad while the quad stays put
  *   grade       gain lifts what is on the wall, and gamma is not gain
+ *   sources     a projector showing the front plate, the back plate or the
+ *               film alone shows that and not the wall (PLAN.md §16b), and
+ *               what each extra picture costs the GPU
  *   one clock   with the projector window open and both windows animating,
  *               the plate draws at most once for each refresh either window
  *               was handed (1.05 times them) and at least 0.9 of what the
@@ -997,7 +1000,7 @@ try {
         && (live.surfaces ?? []).length === (c.surfaces ?? []).length
         && (live.surfaces ?? []).every((s, i) => {
           const w = (c.surfaces ?? [])[i];
-          return w && s.shape === w.shape && s.enabled === w.enabled
+          return w && s.shape === w.shape && s.enabled === w.enabled && (s.source ?? 'wall') === (w.source ?? 'wall')
             && s.corners.every((v, j) => Math.abs(v - w.corners[j]) < 1e-6);
         });
     }, want, { timeout: 20000 });
@@ -1658,6 +1661,65 @@ try {
     const dark = await gridOf();
     check('a shape switched off lights nothing', region(dark, 0, 0, 1, 1) < 0.005,
       `${region(dark, 0, 0, 1, 1).toFixed(4)}`);
+  }
+
+  // ── 7c. A projector's own source (PLAN.md §16b) ──────────────────────
+  //
+  // Two projectors side by side, each the whole picture squeezed into its
+  // own half of the frame, so a cell in the left half and the cell sixteen
+  // columns over are the same place on the plate in the same frame. Every
+  // claim is between the two halves of one frame: across two frames the
+  // liquid has moved, and a difference between them would be the liquid's.
+  // `npm run mixer` holds each source to the exact picture on a lab plate;
+  // this asks whether the app's frame routes each surface to its own
+  // texture on a real GPU, and says what each extra picture costs.
+  {
+    const half = (x0, source) => ({
+      id: `half-${x0}-${source}`, shape: 'rect', corners: [x0, 0, x0 + 0.5, 0, x0 + 0.5, 1, x0, 1],
+      src: [0, 0, 1, 1], enabled: true, opacity: 1, feather: 0, source,
+    });
+    /** Left against right, cell by cell: the mean luminance of each and the mean difference between them. */
+    const halves = async (left, right) => {
+      await withOutput({ surfaces: [half(0, left), half(0.5, right)] });
+      const g = await gridOf();
+      const cols = g.cols / 2;
+      let l = 0, r = 0, d = 0, n = 0;
+      for (let y = 0; y < g.rows; y++) for (let x = 0; x < cols; x++) {
+        const a = g.lum[y * g.cols + x], b = g.lum[y * g.cols + x + cols];
+        l += a; r += b; d += Math.abs(a - b); n++;
+      }
+      return { left: l / n, right: r / n, diff: d / n };
+    };
+    const f3 = (v) => v.toFixed(3);
+    // The control: both halves the wall are the same picture, less the
+    // filtering of two quads a pixel apart.
+    const same = await halves('wall', 'wall');
+    check('two projectors both on the wall show the same picture', same.left > LIT && same.diff < 0.1 * same.left,
+      `left ${f3(same.left)}, right ${f3(same.right)}, apart by ${f3(same.diff)}`);
+    // The film with no film loaded is the bare background: no plate on it.
+    const film = await halves('wall', 'film');
+    check('a projector on the film, with no film playing, shows no plate where the wall shows it',
+      film.left > LIT && film.diff > Math.max(4 * same.diff, 0.3 * film.left),
+      `wall ${f3(film.left)}, film ${f3(film.right)}, apart by ${f3(film.diff)} (the control ${f3(same.diff)})`);
+    // Classic has two plates, turned opposite ways: each alone is lit, and
+    // they are not one picture.
+    const plates = await halves('front', 'back');
+    check('the front plate alone and the back plate alone are each lit, and two different plates',
+      plates.left > LIT && plates.right > LIT && plates.diff > 4 * same.diff,
+      `front ${f3(plates.left)}, back ${f3(plates.right)}, apart by ${f3(plates.diff)} (the control ${f3(same.diff)})`);
+    // What each picture costs: its own display pass, timed under its own
+    // label. Only where the device has timestamps; printed so a run says
+    // what a second and a third picture cost against the wall's.
+    const timed = await page.evaluate(() => {
+      const d = window.chromaglassDebug?.().webgpu;
+      return d ? { on: !!d.timestamps, t: d.timings ?? {} } : null;
+    });
+    if (timed?.on) {
+      const t = timed.t;
+      check('each source is drawn, and timed, as its own pass',
+        typeof t['plate front'] === 'number' && typeof t['plate back'] === 'number' && typeof t.plate === 'number',
+        `wall ${t.plate?.toFixed(2)} ms, front ${t['plate front']?.toFixed(2)} ms, back ${t['plate back']?.toFixed(2)} ms`);
+    }
   }
 
   // ── 8. Back to nothing ─────────────────────────────────────────────

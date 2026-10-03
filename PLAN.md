@@ -64,6 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
+| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#PRB, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
@@ -2987,6 +2988,82 @@ Tool Amount; a second pass at right angles makes the chevron. On the phone each 
 is a rake, and OSC gets `/comb`. *Measure:* a lab check in the manner of
 `npm run ferrohands` (N parallel bands moved a stroke, mass exact), and
 `npm run detail`'s hard-edge share after a two-way comb against the Marbling column.
+
+## 16. Many plates: each projector its own source (rig-plan R1)
+
+Asked for on 2026-09-27 ("Let's build multi-plate next"), after the Mixer's steps 1–5.
+`docs/rig-plan.md` has the why (a light show was several projectors, each its own
+source, beams adding on the screen); this is the running order.
+
+**What there is today** (read from the code, 2026-09-27). Two solvers at most:
+`layerCount` is clamped to 1..2 (`LiquidVisualizer.tsx`, the layer effect), one
+`WebGPUFluid` per layer, the front plate `fluidsRef[0]` and the back plate
+`fluidsRef[1]`, drawn together in one plate pass. The two share one look: each frame's
+settings fold into `patch.global` for the picture and `patch.layer(i)` for each solver
+(`lib/sceneMap.ts`), and `patch.layer(i)` differs from the global only by a scene
+mapping aimed at that layer. The back plate is otherwise the front's twin, turned the
+other way, slowed by Background Loop and thrown by Layer Scale Variety. Every
+projector (`Surface` in `lib/outputConfig.ts`, up to sixteen) samples the one finished
+frame (`gpu/output.ts` binds one `scene` texture), blended over, not added. The grid is
+one size for every layer (`resolveSimResolution` from the quality ladder,
+`lib/platform.ts`), and the plate's bind group and shader are written for two layers
+(`gpu/plate.ts`, `wgsl/plate.ts`'s one "Layer 1" block). The lab runs one solver.
+
+**The decision rig-plan leaves open, taken here as the default:** up to **four**
+plates, and with three or four each runs one rung of the ladder below the grid a
+single plate gets (512 becomes 384 on a local GPU), so four plates cost about what two
+do now. The owner can say otherwise; the ladder is one table.
+
+Each step ships its phone version in the same PR (the rule) and one PR each:
+
+- **16a · The back plate gets its own look.** A look can be sent to the back plate
+  alone ("Go to Back Plate"): the solver's own settings and the colours it pours
+  become the back plate's (`patch.layer(1)` over a per-plate look), while how the
+  plate is drawn and lit stays shared. The desk's cue list and the phone's looks sheet
+  each get the second Go; the Mixer's back row names the look it is on. Check: a node
+  harness on the fold (each solver steps with its own look's settings, the picture's
+  settings stay the front's) and the lab rendering two real solvers from two looks
+  (the lab holds one solver today). The Mac judges the pair.
+- **16b · A projector picks its source. Shipped (#PRB).** A mapped surface (Settings,
+  Mapping; on the phone More, Settings, Mapping, the picker a thumb's size) shows the
+  whole wall (today's frame, and the default, so every saved rig looks as it did), the
+  front plate alone, the back plate alone or the film alone. Each source a surface
+  asks for is the plate's display pass drawn again into its own texture with its own
+  uniforms (`WebGPUPlate.drawSource`): the frame's settings with the Mixer's other rows
+  at 0 (`lib/plateSources.ts`), so a source is graded, blended and dimmed as its row is
+  on the wall, and a blackout or the flash guard reaches every projector. Only the
+  full-screen display is repeated; the solvers, the pack and the derive are the wall's.
+  Nothing is drawn for a source no enabled surface shows. Checks: `npm run map` (40:
+  the routing, the shader's source index, the rows each source leaves out), `npm run
+  mixer` section 8 (6: each source exactly the wall with the other rows at 0, drawn in
+  the wall's frame, and the wall untouched; red when a source reads the wall's
+  uniforms), a phone check (the picker from the phone), and `wall` on the Mac (two
+  projectors side by side, each its own source, and each source's pass timed).
+  Found while building it, not done:
+  - *A source has no post effects and no closeup camera.* The wall's chain (bloom,
+    the photographic presets' lens) runs once, on the wall; a source is the plate as
+    the display pass draws it. Running the chain per source doubles its cost; worth
+    it only if a rig asks.
+  - *The logo stays up in a blackout* on the wall and on each plate's projector: it is
+    laid over the dimmer (`finishLight`), as it always was on the wall. The film alone
+    has no logo.
+  - *Cast and network displays show the wall*: `CastState` carries no surfaces.
+  - *The remote cannot pick a source*, only the laptop and the phone's own Settings.
+  - *What a source costs* is printed by `wall` on the Mac and not yet read against a
+    budget. 16d (four plates) is where it has to be.
+- **16c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
+  and two feathered edges that overlap sum to one rather than to a bright seam.
+  Check: `wall` reads the overlap's brightness against each beam's.
+- **16d · Up to four plates.** `layerCount` to four, the plate's bind group and shader
+  from two layers to N, the ladder's rung per plate as above, the governor told how
+  many plates it is carrying. Check: `startup` and the frame time on the Mac with four
+  (no stop on the opening, no pipeline built on a frame), and the lab with four.
+- **16e · A row per plate in the Mixer** (the Mixer's step 6): each plate its own row,
+  level and grade, reached from the desk, Settings, the phone and the remote.
+
+Not in this batch: R4 (placing a projector by its centre, zoom and turn) and R5 (a rig
+as a document the cue list points at). Slides as a source wait on `docs/slide-plan.md`.
+
 
 ## 17. Hear the set ahead, from files
 

@@ -26,7 +26,8 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
-import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
+import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
+import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
@@ -8812,6 +8813,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // With a chain, the finish happens at the end of it instead.
               postChain: !!post,
             });
+            /*
+              A projector's own source (PLAN.md §16b): the front plate alone,
+              the back plate alone or the film alone, for each one an enabled
+              surface asks for, and nothing at all when every surface shows
+              the wall. Each is filled from the frame's settings with the
+              other rows at nothing (lib/plateSources.ts), with no camera and
+              no chain, so its display pass does its own finish: the dimmer,
+              the flash guard's gain and the logo, as the wall has them.
+            */
+            const sourcesNow = out ? sourcesAskedFor(view.outputCfg) : [];
+            plate.keepSources(sourcesNow);
+            out?.keepSources(sourcesNow);
+            for (const kind of sourcesNow) {
+              fillPlateUniforms(plate.sourcePack(kind), {
+                view: { ...view, settings: sourceSettings(kind, view.settings) }, fluids,
+                width: canvas.width, height: canvas.height,
+                derived: true,
+                grid: fields[0].dye.width,
+                cameraOn: false,
+                postChain: false,
+              });
+            }
             // What the finish needs, taken from the uniforms the plate was
             // just given rather than worked out a second time here: the
             // dimmer with the flash guard folded in, and the mark's fader
@@ -8867,6 +8890,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // filled for; the shader samples by that number.
               if (live[0].dye.width !== fields[0].dye.width) {
                 plate.pack.set('gridSize', live[0].dye.width);
+                for (const kind of sourcesNow) plate.sourcePack(kind).set('gridSize', live[0].dye.width);
               }
               // Where each pass hands the frame on: the projector's texture
               // if there is one, else the canvas; the chain's picture if
@@ -8942,7 +8966,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   markBlend: markBlendNow,
                 }, stage?.profiler.renderPass('finish'), !!out);
               }
-              if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              // Each projector source, from the plates this frame just packed
+              // and derived: only the full-screen display again, timed on its
+              // own so the Mac can say what a second picture costs.
+              if (out) {
+                for (const kind of sourcesNow) {
+                  plate.drawSource(encoder, kind, out.sourceView(kind, size.width, size.height), size, live,
+                    stage?.profiler.renderPass(`plate ${kind}`), stageFormat);
+                }
+                out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              }
               return true;
             };
           }
