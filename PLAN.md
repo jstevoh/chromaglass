@@ -92,9 +92,41 @@ bracket its comment describes ("a Finger that makes dye still has to beat both")
 Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
+*Measured 2026-09-27 over 40 Mac tools shards, and not a flake:* the Finger adds dye
+on a thin plate. The pool the check strokes is laid by holding Drop for 1.5 s of wall
+time, so its size follows the runner's speed: 49 to 279 across the 40. On all 12 pools
+under 150 the stroke added +11 to +21 while the plate alone had lost 1 to 34 before it
+(and gained 7 to 11 after); on settled pools it read about what the plate did alone.
+That is up to a third of a thin pool, §0's fault at a smaller size, and the three reds
+(106 → 127, 50 → 66, 73 → 90) were all thin pools. Bracketing would have made all 40
+pass, which is why it was not done (the check-skeptic review: the after window carries
+the stroke's own aftermath). Two things follow, in order: a control on the Mac (the
+same timing with the Finger picked and no stroke) to settle whether the after window
+is the plate or the stroke; then the advection fix below, which is what makes this
+check green for good. Laying the pool by solver steps rather than milliseconds would
+make it one size every run, but only after the fault is fixed, or it hides it.
 
-*Found 2026-09-27, not yet done:* **the mirror check's "and nowhere else" goes red at
-exactly its limit on changes that cannot move a pixel.** #191 (PLAN.md only) read
+*Found 2026-09-27, **fixed in #225** (2026-10-03; every mirror line green on the Mac):* **the mirror check's "and nowhere else" goes red at
+exactly its limit on changes that cannot move a pixel.** It was the plate, not the
+check. Six rounds of measurement on the Mac runner found the calm Classic plate
+starting a single plate-wide flow out from the middle (0.63–0.88 of it radial, mean
+speed up to 0.34) with the first bubble a drop trapped, and never with Bubbles at 0
+(speed stayed near 0.005). Each bubble presses the glass over its footprint every
+step, and the press source was balanced with a plate mean the CPU guessed from the
+gap deltas over a resting gap of 0.03; a held press has squeezed its gap to the
+floor (0.004), where the deltas are clamped away, so the guess was wrong and the
+difference went into the pressure solve as a net source, which a closed plate has
+no answer for. And on the app's glass the press's memory (`gapMemory`, a 0.22 s
+half-life of remembered squeeze that does not move the gap) was summed into the
+press's own rate every step it was held, so a held press pushed out some three
+hundred times what its gap lost, and went on pushing from a gap already on the
+floor. The projection's right-hand side is now made zero-mean exactly on the GPU
+(`divTiles` in `wgsl/fluid.ts`): the glass lifting a hair everywhere to take what a
+press pushed out. And the memory takes over only once a press has gone, never past
+the floor (`squeezeUpdate`). `npm run heldpress` (lab, Classic's glass): a held
+press's far plate once steady 3.28e-2 on main, as fast as while it closed, half of
+it radial; 4.6e-5 after. The original report follows.
+ #191 (PLAN.md only) read
 "Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
 against an allowance of 11.1, at the tool's mirror through the centre
 (`scripts/mirror.mjs`, the Mac plate shard). It has been red at its limit on other
@@ -103,6 +135,42 @@ comes back now and then, or the allowance is drawn from a drift reading that is
 sometimes as large as the echo; which of the two is the first thing to settle, from
 the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
 of these costs the owner a by-hand re-run.
+
+*Found 2026-10-03 (#225), open:* **with presses that move the dye, the grid pass
+holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −0.3 in a
+step, ten steps a press) read 22% on main because its presses were swallowed by the
+unbalanced press source (the dye under them barely moves). Balanced, the same presses
+push the dye, and the pass holds the band to 64% of what grows without it; a variant
+balanced before the clamp reads 74%. The owner chose to re-baseline that line
+(2026-10-03): it now asks for under 0.68, between the shipped pass (64% lab, 65% Mac)
+and a pass 30% weaker (3.5% a step reads 70.0%, 2.5% 75%, 1% 87%); it leans on
+`npm run heldpress` to catch presses that stop moving the dye. It is not at the fronts: masked away from them
+(87–95% of the plate kept) the fix reads 62–70% and main 37–38%. The flows with the
+pass on and off are the same (mean |u| 0.462). Rendered in Red Cabbage's closeup at
+2.8x and 8x, neither shows the 45° grate (`/mnt/project-files/mirror-fix/`, outside
+the repo). Open: whether the pass should be stronger where the flow is strong or the
+gap is changing, or whether the dye's conserving advection grows the band itself
+under a strong flow (its divergence by central differences is not the projection's).
+Both renders also show a vertical seam down the middle of the plate, on main as well:
+its own item, unmeasured.
+
+*Found 2026-10-03 (#225), not yet done:* **a still bubble presses the glass.** Every
+step, each bubble lays a standing press of 0.0035 over 0.85 of its radius
+(`LiquidVisualizer`, "A bubble is air between the plates"), which holds the gap
+under it at the floor so the dye is pumped out from under it, and the air's own
+standing term in `divergence` does the same with a source where the air is and a
+sink everywhere else. Both are shortcuts that imitate how a trapped bubble looks
+rather than simulate it: in a real cell a bubble spans the gap and displaces the
+liquid only while it grows, shrinks or moves, and a still one pushes nothing, while
+this keeps a flow going for as long as it sits there. #225 made the solve balance
+them exactly, so they no longer move the whole plate, but they still stir the
+liquid round every bubble. And the press's memory (`gapMemory`) still pushes
+liquid after a press without moving the gap, so a release's remembered squeeze is
+liquid from nowhere: a real squeeze film is overdamped and pushes out exactly what
+its gap loses, as fast as the viscous film lets it close. Replace both with the air excluding the liquid by
+itself (the bubble as a region the flow goes round: a no-flux boundary, or the
+Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
+`npm run straw` and `npm run heldpress`, which should then need no press to hold.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -114,7 +182,14 @@ the guard's reading comes back null). The plain frame was unusually dark (0.040,
 against 0.164 for the same plate earlier in the run), so a guess, unmeasured: most of
 its light was in a few bright cells that a 2.2 gain clips at white, which lifts the
 mean far less than the grade. If so, the check should read cells the gain cannot clip
-(below 1/2.2 before the grade) rather than the whole frame's mean.
+(below 1/2.2 before the grade) rather than the whole frame's mean. *Later that day:* over 40 tools
+shards the lift read 1.52 to 1.90 in 37, 1.15 and 1.19 in the two reds, 2.20 and 2.27
+at the top: single odd readings, not a spread, so clipping (which would spread them)
+is the weaker guess. The frame is the flip's stripe plate, not the show's (0.02 to 0.05
+where the keystone before it read 0.05 to 0.19). The wait after a config change counted
+the page's animation frames, not the stage's drawn ones, and did not wait for the guard
+to be off; it now waits for both, and the check prints all seven readings in order, so
+the next red says which frame was odd (this PR).
 
 **Deploys no longer re-measure a tree its PR already passed** (this PR, `npm run
 deploygate`). Measured 2026-09-27, 1 AM to 11 AM PT: 18 red runs, 5 of 16 deploys.
@@ -1771,7 +1846,9 @@ while this batch's plan was going in (#177), and no cause is known yet:
   a tenth of 300. It asks the gain against what was there, on a hand path drawn at
   random each run, so a run whose best spot starts full reads low; worth reading
   the gain's spread over the last runs before touching its tenth.
-- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else": on #189 (the Mixer's gel
+- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225**, green on the Mac: the
+  region starting to move by itself was the bubbles' press leaking a net source into
+  the pressure solve; see the mirror item near the top): on #189 (the Mixer's gel
   and lumia rows, whose default picture renders the same to the byte as main's), 16.3
   past its drift at the hand's left/right mirror cell against an allowance of 16.1.
   The cell's drift climbed drop by drop (3.2, 5.9, 18.3, 49.5) and its change with it
