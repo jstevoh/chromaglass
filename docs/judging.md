@@ -545,7 +545,37 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 
 ---
 
-## 19. Blow's wind (PLAN 15c)
+## 22. The Press on the ferrofluid (PLAN 15d)
+
+A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
+leave it the size it was. Now, with Thin Gap on (Settings → Squish Plate → Thin Gap),
+a pool pressed between the glasses stays black and spreads, the way a drop of paint
+does between two plates, and draws back to its own size when the glass lifts. With
+Thin Gap off nothing has changed.
+
+On Ferro Paint, then Magnet Garden, with Thin Gap on:
+
+- press and hold on a pool: it should spread out under the palm, black all the way,
+  not grey, and stay spread while you hold;
+- let go: it should shrink back to about the pool it was over the next second;
+- press a pool with a ragged edge, at the default Thickness: its edge should push
+  out into the clear liquid in fingers rather than a smooth round front (the
+  ferrofluid is thinner than the default liquid). At Thickness 0 (water) the same
+  press should spread it rounder. Say if either is too weak to see;
+- hold the Magnet under a pool and press over it: the pool should still answer the
+  magnet, more slowly where the glass is down. The spikes under the palm do not yet
+  flatten (they should; PLAN 15d's open items);
+- with Thin Gap on, the ferrofluid now has its own viscosity in the gap, so the pool
+  answers the magnet faster at the default Thickness (about four times) and slower in
+  water (about five times). Say if either feels wrong for the liquid it is in;
+- the frame time with Thin Gap on, in a ferrofluid look (`?debug`,
+  `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
+  where it ran fewer before, plus one small pass. Say if the governor steps down;
+- the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
+
+---
+
+## 23. Blow's wind (PLAN 15c)
 
 The Blow drawn across the plate used to wipe a trail out of the colour. Now it
 pushes the colour along and keeps it. On Classic, with a pool laid:

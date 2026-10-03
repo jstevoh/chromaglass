@@ -63,7 +63,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
@@ -3072,9 +3072,68 @@ judged on the Mac (`docs/judging.md` §18). The only app check of the dye ring's
 is `npm run press`, which is not in CI and sets its settings by writing into the
 debug hook's copy (the pattern `depth` had); worth bringing into the tools shard.
 
-*Open:* **the ferrofluid.** Waits on 9n (Blow and Finger moving the ferrofluid, the
-ferrofluid thread), which builds on `phaseCarry`'s radial mode; a press wants a flat
-take out to the palm's rim on it, as the oil's has.
+**The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
+ferrofluid by area (the flux form in `phaseAdvect`), so under a palm the glass's
+outflow took a share of every cell, and a pool stayed the size it was and went grey:
+its fullest cell fell from 0.96 to 0.48 with Thin Gap on and to 0.67 without (lab, a
+palm pressing the gap to a sixth, ten steps in). A real pool between two glasses keeps its volume:
+pressed, it gets thinner and wider and stays full. A flat take out to the palm's rim,
+as the oil's (`pressMix`), would have been the same fault by hand: it takes a share of
+every cell too. So with Thin Gap on, the ferrofluid moves as a volume, c·h, on the
+thin solve's own face fluxes, and each cell divides by its gap after (`phaseAdvect`,
+`phaseGapSeen`). `npm run ferropress` (lab, 7 checks): pressed over twenty steps to a
+sixth of the gap, the middle of a pool held to 0.6% (0.955 → 0.961, the check allows
+3%; it is a stagnation point), where carried by area the same middle fell to 0.155 at
+twenty steps; its volume kept to 0.13% while the cells
+it fills grew 2.5 times; and after the lift it matches a pool the glass never touched
+to 0.006 in every ring. Two cuts on the way: putting the glass's
+part back as c times the gap's change along the path kept a pool full but grew it 7%
+a press and lift; carrying the volume on the cells' filtered velocities emptied the middle to
+0.53, because that flux carried 18% more out of it than the glass displaced. Only the
+solve's own face flux (the mean of two cells' h·u plus the second difference of
+M_f·ΔP) keeps both.
+
+And the gap's drag takes the ferrofluid's own viscosity, by share (`hsPrep`,
+`FERRO_NU`, 5 mm²/s, a light hydrocarbon ferrofluid's). Which way a front fingers then
+follows the two liquids (Saffman–Taylor): on the default plate (Thickness 0.45, a light
+oil of 22 mm²/s) the ferrofluid is the thinner, so a press pushing it out into the oil
+is the unstable direction, and a bumpy pool's outline keeps more of its bumps (its
+spread over its radius 0.023 → 0.013 against 0.009 for an even pair, `ferropress`
+§5); in water it is the thicker, the press rounds it a little more (0.008), and the
+lift is the unstable one. The same drag sets how fast the ferrofluid answers any
+body force under Thin Gap, the magnet's included: at the default Thickness about 4.4
+times faster than before (its drag is 0.22 of the oil's), in water about 5 times
+slower. That is the real liquid's answer, not a change to the magnet's code; the
+owner's eye on it is in judging §22. The
+phone's Press is the same press on the same solver, and Thin Gap is on its settings
+sheet. Judged on the Mac: `docs/judging.md` §22.
+
+*Open, found building it:*
+- **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
+  carry a press (15b), and dividing by the gap there piled twelve times a pool's volume
+  under the palm (lab). The press moves to Thin Gap ("Press draws liquid back on lift",
+  18a-3): turning Thin Gap on in the ferrofluid looks is what shows this in a show.
+- **The glass flattens the spikes.** A Rosensweig spike stands from a free surface; under
+  a palm pressed to a sixth of the gap there is no room for one, and the field there
+  makes a flat labyrinth instead. The spikes (`spikes.ts`, `phaseMu`'s wells) do not
+  know the gap. For the standing domes (9t), whose thickness field is where a cap by the
+  gap belongs.
+- **The labyrinth's scale follows the gap.** In a Hele-Shaw cell the labyrinth's period
+  goes as the gap times an exponential in the inverse magnetic Bond number (2M²h/σ,
+  Langer, Goldstein and Jackson 1992), so a press (a sixth of the gap) should melt the
+  maze under the palm into a round pool and the lift should bring it back. The maze's
+  period is `MAZE_PERIOD` wherever the glass is.
+- **The lift's fingers do not show.** In water (the ferrofluid five times thicker) the
+  lift is the unstable direction, but the Cahn–Hilliard rounding takes a bumpy edge
+  back faster than the lift grows it (`ferropress` prints 0.024 for both). The
+  interface's tension lives in the separation, not in the flow's pressure, so the
+  fingers' scale is not Saffman–Taylor's own (π·b/√Ca); a capillary pressure jump in
+  the thin solve would make it so.
+- **The separation conserves area, not volume.** `phaseCH`, `phaseRelax` and
+  `phaseSeparate` move the share between cells of different gaps as if they were equal:
+  a full pool's edge sitting across a palm's rim gained 1.6% volume in forty steps held
+  (lab, with the first cut's excess). Small with the solve's own flux; worth a c·h form
+  once the glass moves the ferrofluid often.
 
 *Found 2026-09-27, not done:* **a press can still make dye.** The dye's half of
 `squeezeOut` takes a share of the disc as a GPU multiply and puts into the ring the

@@ -139,7 +139,8 @@
     "rolls": "npm run build && esbuild scripts/rolls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/rolls.mjs && node node_modules/.cache/rolls.mjs",
     "bottles": "npm run build && node scripts/bottles.mjs",
     "fingers": "node scripts/fingers.mjs",
-    "ferrohands": "node scripts/ferrohands.mjs"
+    "ferrohands": "node scripts/ferrohands.mjs",
+    "ferropress": "node scripts/ferropress.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
