@@ -112,6 +112,7 @@
     "straw": "node scripts/straw.mjs",
     "lift": "node scripts/lift.mjs",
     "pressoil": "node scripts/pressoil.mjs",
+    "wind": "node scripts/wind.mjs",
     "thingap": "node scripts/thingap.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",

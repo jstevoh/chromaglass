@@ -350,6 +350,11 @@ jobs:
       - name: The press moves the oil
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run pressoil
+      # A hand's Blow that is not the straw pushes the colour along and keeps
+      # it, the oil going with its colour; it erased it (PLAN §15c).
+      - name: The wind carries the colour
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run wind
       # Thin Gap (PLAN §18a): a push fades at the drag time 12ν/h², a press
       # pushes out the volume it displaces and takes it back when the glass
       # lifts, a tight gap carries what Darcy says, and liquid is conserved
