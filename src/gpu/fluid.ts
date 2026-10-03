@@ -80,6 +80,8 @@ const PRESSURE_SWEEPS = 12;
 const MG_CYCLES = 2;
 const MG_SWEEPS = 2;
 const MG_COARSE_SWEEPS = 16;
+/** Workgroups summing the projection's right-hand side for its plate mean (divTiles). */
+const DIV_GROUPS = 64;
 /** The Thickness a thin gap runs at when a look does not set one: a light oil (PLAN §18a). */
 export const THIN_GAP_THICKNESS = 0.45;
 /**
@@ -395,6 +397,14 @@ export class WebGPUFluid {
   private readonly curP: PingPong;
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
+  /*
+    What divergence writes, before its plate mean is taken off into `div`
+    (divTiles, divFold, divCentre in wgsl/fluid.ts): the partial sums, and
+    the mean itself.
+  */
+  private readonly divRaw: GPUTexture;
+  private readonly divPartials: GPUBuffer;
+  private readonly divMean: GPUBuffer;
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
   private readonly scratchA: GPUTexture;
@@ -559,8 +569,6 @@ export class WebGPUFluid {
     hundred times the strength moved the interior from 0.67 to 0.62.
   */
   private airCoverPrev = 0;
-  /** The plate's mean of the press source, so the projection has a solution. */
-  private squeezeMean = 0;
   /** How much of a press reaches the flow, from the look's plate pressure. */
   private squeezeGain = 0;
   private lastDt = 1 / 60;
@@ -695,6 +703,8 @@ export class WebGPUFluid {
     const byName: [string, GPUTextureFormat][] = [
       ['pressureClear', R32], ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
       ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
+      // The projection's right-hand side made zero-mean, every step (divTiles).
+      ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
       ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
     ];
     const keyed = new Map<string, [string, boolean]>();
@@ -765,6 +775,9 @@ export class WebGPUFluid {
     this.curP = pp(this.M, R32, 'current pressure');
     this.grain = opts.float32Filterable ? pp(this.N, RGBA32, 'grain') : null;
     this.div = tex(this.N, R32, 'divergence');
+    this.divRaw = tex(this.N, R32, 'divergence raw');
+    this.divPartials = this.disposer.track(device.createBuffer({ label: 'divergence partials', size: DIV_GROUPS * 4, usage: GPUBufferUsage.STORAGE }));
+    this.divMean = this.disposer.track(device.createBuffer({ label: 'divergence mean', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.curDiv = tex(this.M, R32, 'current divergence');
     this.velForced = tex(this.N, VEL, 'forced velocity');
     this.scratchA = tex(this.N, this.dyeFormat, 'scratch a');
@@ -940,7 +953,7 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-    this.fill(pass, this.div, [0, 0, 0, 0], this.N);
+    for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
@@ -981,26 +994,19 @@ export class WebGPUFluid {
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
     const q = this.device.queue;
     /*
-      What the press just did to the plate as a whole, so its source can be
-      made zero-mean.
-
-      A Neumann problem whose source does not average to zero has no solution
-      for the projection to find — the condition `pressureSelfTest` exists to
-      protect, and the same one the air's standing term already obeys. A press
-      is a net source over the whole plate: liquid is pushed out from under the
-      palm and nothing anywhere absorbs it. Left unbalanced, the solve spends
-      itself on the imbalance and the press arrives as almost nothing, which is
-      what it measured — 0.4% of the dye moved, for a press seventy-five times
-      harder than the tool's own.
-
-      The gap delta rides channel 3 of the velocity deltas (see `flushDeltas`),
-      so the mean is a sum over what was just handed across, and the source it
-      produces is that rate over a resting gap.
+      The press's plate mean used to be worked out here, from the gap deltas
+      just handed across over a resting gap of 0.03, so its source could be
+      made zero-mean: a press is a net source, and a closed plate's pressure
+      has no solution for one (the press arrived as 0.4% of the dye moved
+      before it was balanced at all). That estimate is what leaked. A press
+      held in one place squeezes its gap to the floor, the delta is clamped
+      away there and the gap's spring goes on moving it, so the source the
+      GPU really applies is nothing like this guess, and the difference was a
+      net source over the whole plate that the solve turned into a flow out
+      from the middle (`npm run heldpress`, and the mirror check,
+      `scripts/mirror.mjs`). The mean is now taken on the GPU from the source
+      itself, in project().
     */
-    let gapSum = 0;
-    for (let i = 3; i < velAdd.length; i += 4) gapSum += velAdd[i];
-    const meanGap = gapSum / (this.L * this.L);
-    this.squeezeMean = -(meanGap / Math.max(dt, 1e-4)) / 0.03;
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
@@ -2426,6 +2432,20 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(Math.ceil(count / 64));
   }
 
+  /** As dispatchBuf, over the grid in 8 × 8 tiles, with no args of its own. */
+  private dispatchBuf2(pass: GPUComputePassEncoder, name: string, key: string, resources: (GPUBuffer | GPUTexture)[]): void {
+    const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), ...resources]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   /**
    * One multigrid V-cycle from level `l` down (see `mgRestrict0` in
    * `wgsl/fluid.ts` for why). Smooth, hand the residual to the level below,
@@ -2479,12 +2499,21 @@ export class WebGPUFluid {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero as the standing one does.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
+    this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
         (this.airCover - this.airCoverPrev) * invDt,
-        // The press: its plate-mean, so the source averages to zero, and how
-        // much of it reaches the flow.
-        this.squeezeMean, this.squeezeGain, 0]));
+        // The press: how much of it reaches the flow. Its mean is no longer
+        // guessed here (see divTiles).
+        0, this.squeezeGain, 0]));
+    /*
+      Then the whole right-hand side made to sum to zero, exactly: its plate
+      mean found on the GPU and taken off every cell (divTiles in
+      wgsl/fluid.ts says why that is the closed plate's physics and not a
+      patch). Three small dispatches, against the dozens the solve runs.
+    */
+    this.dispatchBuf(pass, 'divTiles', 'divTiles', this.arg('none', [0, 0, 0, 0]), [this.divRaw, this.divPartials], DIV_GROUPS * 64);
+    this.dispatchBuf(pass, 'divFold', 'divFold', this.arg('div fold', [DIV_GROUPS, 0, 0, 0]), [this.divPartials, this.divMean], 64);
+    this.dispatchBuf2(pass, 'divCentre', 'divCentre', [this.divRaw, this.divMean, this.div]);
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     if (this.pressureSolver === 'multigrid' && this.mg.length > 0) {
