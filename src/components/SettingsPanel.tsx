@@ -2699,6 +2699,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ magnetHeight: v })}
           settingKey="magnetHeight"
         />
+        {/* The Magnet tool's own size (lib/magnetSize.ts): a coin at the
+            left, a palm at the right, the tool as it always was in the
+            middle. The same field over it, reaching further across. */}
+        <Slider
+          label="Magnet Size"
+          value={settings.magnetSize ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ magnetSize: v })}
+          settingKey="magnetSize"
+        />
         <Slider
           label="Magnet Across"
           value={settings.magnetX ?? 0.5}

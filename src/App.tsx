@@ -1706,41 +1706,41 @@ export default function App() {
   }, [selectedLiquid, presetSeq]);
 
   /*
-    The Magnet brings its ferrofluid. A magnet over a plate with none on it
-    does nothing at all, which read as the tool being broken, so picking it
-    on such a look pours some (the visualizer lays it when the amount rises).
-    The look keeps it, and the Ferrofluid slider takes it away again.
+    The Magnet brings its ferrofluid, and its magnet, with the hand.
 
-    Picking it used to give the look a magnet as well (Magnet Strength 0.8),
-    and a look's magnet sits under the plate at Magnet Across and Up, the
-    middle on every look, from the moment it has strength. So before the hand
-    had touched anything, a magnet nobody put there was pulling the freshly
-    poured ring of ferrofluid into the middle. Reported by the owner: "Magnet
-    makes an immediate big black hole in the middle when I select it." In the
-    lab (Classic's pour, that magnet, 256²) 9% of the disc 0.12 round the
-    middle was black as poured, 54% a second later and all of it in four;
-    with no magnet it stayed at 9%. Picking a magnet up is taking it in the hand: nothing is
-    under the dish until the hand puts it there. So the strength now comes
-    with the first hold (onMagnetInHand, below), and the magnet is set down
-    where that hand lets go of it, as before.
+    A magnet over a plate with none on it does nothing at all, which read as
+    the tool being broken, so picking it on such a look poured the look's
+    ring of ferrofluid. Picking it also gave the look a magnet (Magnet
+    Strength 0.8), which sits under the plate at Magnet Across and Up, the
+    middle, from the moment it has strength, and gathered that ring there
+    before the hand touched anything: the owner's "immediate big black hole
+    in the middle when I select it" (PLAN 9s, which took that magnet away).
+
+    And then, with no magnet: "Magnet still makes a giant black hole as soon
+    as you pick it. That's not what I want. I just want a magnet that I can
+    control the size of that I can interact with." The pour was still the
+    hole. It covers about a fifth of the plate in black drops round the
+    middle, and at a big Ferrofluid Scale they run together across it.
+
+    So picking the Magnet does nothing to the plate. Picking a magnet up is
+    taking it in the hand. The first hold over a bare plate brings both: the
+    visualizer lays a pool under the hand, as big as Magnet Size stands up
+    (magnetFor, lib/magnetSize.ts), and asks for the rest here
+    (onMagnetInHand): Ferrofluid turned up so the plate draws it, and a
+    magnet for the look, so the magnet is set down where the hand lets go of
+    it, as before.
+
+    Every hold asks, so a Magnet Strength set to 0 by hand comes back to 0.8
+    the next time the Magnet is held: holding a magnet under the glass is
+    giving the plate one, and the slider is how it is taken away again
+    between holds.
   */
-  useEffect(() => {
-    if (activeTool !== 'magnet') return;
-    const s = settingsRef.current;
-    if ((s.phaseAmount ?? 0) > 0.002) return;
-    updateSettings({ phaseAmount: 0.6 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool]);
-  /**
-   * The first hand to hold the Magnet over a look with no magnet of its own
-   * gives it one (see above). Every hold does, so a Magnet Strength set to 0
-   * by hand comes back to 0.8 the next time the Magnet is held: holding a
-   * magnet under the glass is giving the plate one, and the slider is how it
-   * is taken away again between holds.
-   */
   const magnetInHand = () => {
-    if ((settingsRef.current.magnetStrength ?? 0) > 0) return;
-    updateSettings({ magnetStrength: 0.8 });
+    const s = settingsRef.current;
+    const patch: Partial<VisualizerSettings> = {};
+    if ((s.magnetStrength ?? 0) <= 0) patch.magnetStrength = 0.8;
+    if ((s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
+    if (Object.keys(patch).length) updateSettings(patch);
   };
 
   /*
@@ -4531,6 +4531,8 @@ export default function App() {
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
             fingering={settings.fingering ?? 0}
             onFingering={(v) => updateSettings({ fingering: v })}
+            magnetSize={settings.magnetSize ?? 0.5}
+            onMagnetSize={(v) => updateSettings({ magnetSize: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes }}
@@ -5054,6 +5056,8 @@ export default function App() {
           onToolAmount={(v) => setToolAmount(activeTool, v)}
           amountOf={(t: string) => toolAmounts[t] ?? 1}
           onAmountFor={setToolAmount}
+          magnetSize={settings.magnetSize ?? 0.5}
+          onMagnetSize={(v) => updateSettings({ magnetSize: v })}
           dyes={trayDyes}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => {
@@ -5129,6 +5133,8 @@ export default function App() {
           onToolAmount={(v) => setToolAmount(activeTool, v)}
           amountOf={(t: string) => toolAmounts[t] ?? 1}
           onAmountFor={setToolAmount}
+          magnetSize={settings.magnetSize ?? 0.5}
+          onMagnetSize={(v) => updateSettings({ magnetSize: v })}
           layer={activeLayer}
           layers={Math.max(1, settings.layerCount)}
           onLayer={setActiveLayer}

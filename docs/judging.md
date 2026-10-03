@@ -543,8 +543,6 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
----
-
 ## 22. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
@@ -572,6 +570,23 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
+
+---
+
+## 23. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+
+On Classic (a look with no ferrofluid), desk and phone:
+
+- pick the Magnet (M, or its button): the plate should not change at all;
+- touch and hold: a small black pool should appear under the hand and stand up
+  into spikes; drag it, and it should come with you. Say whether it is the right
+  amount of ferrofluid to start with;
+- right-click the Magnet on the desk (or tap it twice on the phone) and move
+  Size: a small magnet raises a few spikes under the fingertip, a big one a wide
+  hedgehog and pulls more gently from further off. Say whether the range is right
+  at both ends;
+- the pool still reads as a black disc with domes round its rim, not domes with
+  colour between them. That is the standing-domes work (PLAN 9t), not this.
 
 ---
 

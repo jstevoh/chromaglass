@@ -533,9 +533,10 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: npm run depth
       # The Magnet in the hand (reported: "magnet tool isn't really
-      # working"): picked on a look with no ferrofluid it pours some, and
-      # dragged across the plate the ferrofluid goes with it, against the
-      # same plate left alone.
+      # working", then "a giant black hole as soon as you pick it"): picked
+      # it changes nothing on the plate, the first touch brings a pool under
+      # the hand as big as Magnet Size, a drag carries that pool with it,
+      # and Size reaches the solver.
       - name: The magnet moves the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run magnet

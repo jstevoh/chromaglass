@@ -474,6 +474,7 @@ with.
 | Lucky | Randomize all settings |
 | Dropper tool | Click/tap to add colored dye — and with soap, milk, silicone or glycerine selected, to change what that part of the plate does for the next half-minute |
 | Blow tool | Click/tap to blow air bubbles |
+| Magnet tool | Picking it changes nothing on the plate; hold it and a pool of ferrofluid comes with the hand, stands into spikes over the magnet and follows a drag; let go and the magnet stays there. **Size** (right-click the Magnet on the desk, tap it twice on the phone, or Settings → Magnet Size; MIDI-learnable) makes it a coin to a palm: the same field over it, reaching further |
 | Press tool | Hold to press the top glass: the film thins under the hand and the dye spreads out in a ring; let go and, with **Fingering** up, the ring lifts into radial fingers |
 | Macro zoom | With the closeup on: + and − (or = and _), the wheel over the plate, or the − / + chip below the title, from 1× to 16×; + with the closeup off turns it on at 2× |
 | Dish Spread / Oil Beads / Plate Cells | Settings → Show: each layer its own dish on a black screen; a field of dark-rimmed oil droplets, which **Drops** (0 by default) turns into drops of colour that press flat against each other, gather droplets round the big ones and keep a swallowed drop visible for a while; a fine cell network in the dish core. The Fillmore East, 1969 preset uses all three |

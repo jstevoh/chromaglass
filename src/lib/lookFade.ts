@@ -57,6 +57,10 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   ...MIX_KEYS,
   'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',
   'simResolution',
+  // The magnet in the performer's hand, as the tool's Amount is (kept in the
+  // browser, lib/toolAmount.ts): a look change must not swap the magnet they
+  // are holding for another size.
+  'magnetSize',
 ]);
 
 /**
