@@ -66,7 +66,7 @@ Where each batch stands, as of 2026-09-27:
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
-| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
+| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -3879,6 +3879,30 @@ three green runs sampled, and one `Checks` run wants four Mac jobs at once.
 on the push that takes a PR out of draft. *Measure:* the Mac shards' queue time over
 the next 20 `Checks` runs, against these.
 
+**Shipped 2026-10-03** (the owner asked why ten open PRs were all waiting on CI).
+`npm run macqueue` measured the fifteen hours to 19:14 UTC: 2,747 Mac runner-minutes, of
+which `Checks`' PR shards 1,705 (62%, 341 of them on runs that failed), the gallery 812
+(30%, 28 runs, every one on a push nobody had asked pictures of), deploys 191 (7%) and
+the iPhone build 39. The PR shards waited 19 minutes on average for a runner, and the
+account held five to eight Mac jobs at once through every busy hour, so a gallery run
+was a shard not running. Two changes, neither of which runs less of `Checks`:
+
+- `gallery.yml` runs on `workflow_dispatch` or on a PR labelled `gallery`, once per
+  labelling, as `controls.yml` does. A session can add the label (it gets a 403 on a
+  dispatch); `preset-auditor` now does.
+- `closed.yml` cancels a PR's `Checks` and `iPhone app` runs that are still queued or
+  running when it merges or closes, by joining their concurrency groups. At 19:14, #204
+  had been merged an hour while three of its last push's shards were still queued and
+  running, ahead of the deploy its merge started; 38 runner-minutes in the window went
+  to PRs already merged. It is its own workflow, not a `closed` trigger on `checks.yml`,
+  so the deploy gate can never read a run of it as a green `Checks`.
+  `npm run closedruns` (in Measure) holds the three files' groups to one spelling.
+
+*Measure after:* `npm run macqueue` over a like window once a day's PRs have run: the
+gallery's share should be its labelled runs only, and the shards' mean wait below 19
+minutes for the same number of open PRs. Left for the owner, since only a setting or a
+bill changes it: more Mac runners at once (19g).
+
 ### 19b. Measure is near its timeout, and its first red hides the rest
 
 The ubuntu job averaged 746 s over 14 runs (837 s at most) against `timeout-minutes:
@@ -4003,3 +4027,19 @@ directly, as `checks.yml` already does for some; the strays deleted or wired;
 
 *Fix:* one pass over each in a docs-only PR, at a moment when no other session has these
 lines open (#209 has "What comes next" and the operating rules open today).
+
+### 19g. More Mac runners than the account's hosted ones
+
+Even without the gallery, ten open PRs ask for forty Mac shards of about eleven minutes
+each, about 440 runner-minutes, against a cap of five to eight Mac jobs at a time: an
+hour and a half of queue for the last PR in line. Three ways to add runners, each the
+owner's call: a self-hosted runner on the owner's own Mac (a real GPU and free; but on a
+public repository a fork's pull request could run code on that machine unless
+"Require approval for all outside collaborators" is set under Settings → Actions, and
+`runs-on` would need a label that only same-repository PRs use); GitHub's larger macOS
+runners (paid by the minute, on a Team or Enterprise plan); or fewer, longer shards,
+which costs each PR more wall time to save the setup overhead, under a minute a shard
+today, so not worth it. Also worth having: the deploy gate skipping more often, which
+the owner's "merge behind main" rule (2026-09-28) trades away; 191 deploy minutes in the
+window above.
+

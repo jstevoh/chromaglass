@@ -1,12 +1,29 @@
 name: Preset gallery
 
 # Every preset, photographed on a GPU that presents (docs/presets-plan.md).
-# The presets are judged by eye; this is the eye's evidence. It runs beside
-# Checks, never in the deploy's way, whenever a pull request touches the
-# presets or how looks are laid and faded, and on demand from the Actions tab.
-# The pictures come back as the `preset-gallery` artifact: one JPEG per
-# preset per moment, and gallery/contact.jpg with all of them on one sheet.
-
+# The presets are judged by eye; this is the eye's evidence. It never stands
+# in the deploy's way. The pictures come back as the `preset-gallery`
+# artifact: one JPEG per preset per moment, and gallery/contact.jpg with all
+# of them on one sheet.
+#
+# On request only: Actions → Preset gallery → Run workflow, or on a pull
+# request by labelling it `gallery` (once per labelling, not per push: remove
+# the label and add it again to photograph a later push). A cloud session can
+# label a PR but gets a 403 on `workflow_dispatch`, so the label is how a
+# session asks for pictures.
+#
+# It used to run by itself on every pull-request push whose PR touched the
+# presets, the fade, the plate shader or the solver. A PR's paths are its
+# whole diff, not the push's, and `plate.ts` and `fluid.ts` are the most
+# edited files in the repository, so nearly every push of nearly every PR
+# matched, and a run that had started was never cancelled. Measured over the
+# fifteen hours to 2026-10-03 19:14 UTC through the Actions API: 30 gallery
+# runs at 29 runner-minutes each, 870 of the 2,850 minutes that every macOS
+# job together held a runner, 31% of the Mac time, while `Checks`' four Mac
+# shards per push waited 17 minutes on average for a runner and, at 19:14,
+# 37 Mac jobs sat queued or running at once. Mac runners are capped per
+# account (the busiest hours never held more than five to eight at once), so
+# every gallery run was a Checks shard not running. PLAN.md 19a.
 on:
   workflow_dispatch:
     inputs:
@@ -19,28 +36,21 @@ on:
         required: false
         default: '8,20,40'
   pull_request:
-    paths:
-      - 'src/presets.ts'
-      - 'src/presetPlate.ts'
-      - 'src/constants.ts'
-      - 'src/lib/lookFade.ts'
-      - 'src/lib/beads.ts'
-      - 'src/gpu/wgsl/plate.ts'
-      - 'src/gpu/fluid.ts'
-      - 'src/gpu/wgsl/fluid.ts'
-      - 'scripts/gallery.mjs'
-      - 'scripts/judge.mjs'
-      - '.github/workflows/gallery.yml'
+    types: [labeled]
 
-# A run that is photographing finishes: its sheet is the "before" the next
-# push is compared against. A newer push still replaces one that is waiting.
+# The label is in the group so that labelling a PR `controls` (whose run of
+# this workflow skips its one job) never cancels a gallery that is
+# photographing; a second `gallery` labelling replaces the first's run. A run
+# by hand has no label and gets a group of its own, so a second one (other
+# presets, other moments) never cancels the first.
 concurrency:
-  group: gallery-${{ github.ref }}
-  cancel-in-progress: false
+  group: gallery-${{ github.ref }}-${{ github.event.label.name || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   gallery:
     name: Gallery (macOS)
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'gallery'
     runs-on: macos-15
     timeout-minutes: 45
     steps:
