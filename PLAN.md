@@ -3062,6 +3062,14 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
     a weak GPU pays for the sources a laptop's projectors asked for. A receiver could
     be told which surfaces are its own.
   - *The remote cannot pick a source*, only the laptop and the phone's own Settings.
+  - *Found on this PR's first Mac run:* `wall` §7c was measuring a moment of the plate.
+    On Classic the back plate is laid empty (`layPlate` seeds only the front), so the
+    back source and its reference were both black and the front source was the wall to
+    0.001; and with no film loaded the film alone was black. It now runs on Fillmore
+    East (its back plate laid with its own wash) with the browser's fake camera as the
+    film, and asks that a film is playing before it measures. The same run's "every
+    refresh's own timestamp was believed" is the Mac stamping refreshes up to 2.4 ms
+    ahead; the draw gate's fix from #218 is ported here (it no-ops once #218 lands).
   - *What a source costs* is printed by `wall` on the Mac (`plate front`, `plate back`,
     `plate film` against `plate`), read from this PR's run, and not yet held to a
     budget: each is the whole display pass again at the canvas's size. 16d (four

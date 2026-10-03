@@ -3,7 +3,7 @@ import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
-import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
+import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
@@ -8086,7 +8086,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
-        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks },
+        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks, stampMisses: { ...stampMisses } },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
