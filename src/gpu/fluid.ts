@@ -200,6 +200,17 @@ const MAZE_UNIFORM = 0.45;
   which pours ferrofluid to gather) the pull stays whole: gathering along
   the hand is what `npm run magnet` holds that tool to, and the domes were
   only tuned on the ferrofluid looks. SPIKE_RELAX: see the phase stage.
+
+  The half is a tuning, not physics: a magnet's pull on a ferrofluid does
+  not weaken because peaks have formed. It stands in for what the model
+  lacks, a layer that can stand taller than full: a real Rosensweig peak
+  rises out of the layer and draws the liquid from the valleys into it,
+  while ours is capped at full, so a pool pulled together can only spread
+  sideways and the domes stand shoulder to shoulder, the gaps between them
+  16% of the plate near the magnet (PLAN.md §9f, `npm run domes`). A pull
+  eased further while the hand was held still opened them to 41% and kept
+  a dragged pool following, but it was a second tuning on the first and
+  was dropped; the domes standing up is PLAN.md §9t.
 */
 const SPIKE_PULL = 0.5;
 const SPIKE_FLOW = 2;
@@ -659,7 +670,12 @@ export class WebGPUFluid {
         seconds after it opens, as mixForce always has been.
       */
       ['mixSmooth', [R32], false],
-      ['bodyAdvect', [dye], false],
+      /*
+        The dye across faces is also how the dye moves wherever the maze
+        flows (the advect dye stage), from the maze's first step, so a look
+        that opens with it waits for it as it waits for mazeForce.
+      */
+      ['bodyAdvect', [dye], open.maze],
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
@@ -1412,7 +1428,8 @@ export class WebGPUFluid {
       });
     }
     // The maze's own flow (mazeForce), from last step's chemical potential.
-    if (this.mazeReady && this.phaseMuT && (p.magnetSeconds ?? 0) > 0) {
+    const mazeFlow = this.mazeReady && !!this.phaseMuT && (p.magnetSeconds ?? 0) > 0;
+    if (mazeFlow) {
       stage('maze force', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!],
@@ -1575,8 +1592,38 @@ export class WebGPUFluid {
     }, a > 0);
     stage('advect dye', (pass) => {
       /*
-        In a thin gap the dye goes through the faces too, as it does with Oil
-        Bodies (bodyAdvect). The dye is colour per unit of plate, h·C, and
+        Under the maze's flow the dye crosses faces, as the ferrofluid does
+        (phaseAdvect), and not by the backtrace (PLAN.md §9f, `npm run
+        domes`). Reported: where the Magnet parts a pool into domes, the
+        gaps between them showed a dark amber film, not the bright dye the
+        references have between their domes. The dye had not been pushed
+        out (Pushes Dye is off on Magnet Garden); it was lost. mazeForce's
+        flow is strongest at the grid's scale, along every edge of the
+        ferrofluid, and the backtrace thins a cell where such a flow spreads
+        and caps it where it gathers (bodyAdvect has the account, from the
+        oil's surface tension, which does the same): measured in the lab,
+        16 dye patches on 256², a pool of ferrofluid under the Magnet for
+        240 steps, 6% of the plate's dye gone and the dye within 0.08 of the
+        magnet down from 834 to 63; with the maze's flow off, all of it
+        kept. Across faces nothing is made or lost: 71874 → 71879, and 1510
+        within 0.08 (on 384², `npm run domes`: 6% of the plate's dye gone
+        before, 0.1% after).
+
+        In the ferrofluid's substeps (PHASE_SUBSTEPS), each a sixth of the
+        step: a face carries at most 0.45 of a cell a pass, and the magnet's
+        flow reaches more than two cells a step (MAGNET_CELLS), which is why
+        the ferrofluid is substepped. Carried in one pass, the dye would
+        stop at 0.45 of a cell while the ferrofluid went on, and a cell
+        emptied through all four faces could give more than it held, which
+        the floor then makes up: conserved only at low speed (the pre-push
+        review's reading). Whenever the maze flows, which is every look with
+        a Labyrinth and also Classic while the Magnet stands spikes over its
+        ferrofluid (mazeReady); the whole plate's dye then moves this way,
+        not only the dye near the magnet. Every other look's dye moves as
+        it did.
+
+        In a thin gap, when the maze is not flowing, the dye goes through the
+        faces too, as it does with Oil Bodies (bodyAdvect). The dye is colour per unit of plate, h·C, and
         the liquid carries C, so what it obeys is ∂(hC)/∂t + ∇·(hC u) = 0:
         an amount moved across faces by u, which is what the fluxes are. The
         backtrace copies a value and thins it by the flow's spread, held to
@@ -1588,7 +1635,18 @@ export class WebGPUFluid {
         backtrace keeps no sum. Across faces both keep every drop (332.0 and
         336.0, before and after), and the ring lands where the displaced
         volume puts it (100% of the shift, against 85% by backtrace).
+
+        Both at once (a thin gap under a Labyrinth) take the maze's substeps:
+        the same face fluxes, in sixths, so the faster flow is carried too.
       */
+      if (!bodiesOn && mazeFlow) {
+        const flux = this.arg('dye flux', [0, 0, 0, 0, 0, disp / PHASE_SUBSTEPS, 1, 0]);
+        for (let k = 0; k < PHASE_SUBSTEPS; k++) {
+          this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
+          this.dye.swap();
+        }
+        return;
+      }
       if (!bodiesOn && thin) {
         this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
         this.dye.swap();

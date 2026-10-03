@@ -751,10 +751,18 @@ try {
       await tap(page, 'settings-nav-mapping');
       await tap(page, 'add-surface-rect');
       await tap(page, 'surface-source-back');
-      const sourcePick = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="surface-source-"]')]
-        .map(el => ({ id: el.dataset.testid.slice('surface-source-'.length), h: Math.round(el.getBoundingClientRect().height), on: el.getAttribute('aria-checked') === 'true' })));
+      const picker = (prefix) => page.evaluate((prefix) => [...document.querySelectorAll(`[data-testid^="${prefix}"]`)]
+        .map(el => ({ id: el.dataset.testid.slice(prefix.length), h: Math.round(el.getBoundingClientRect().height), on: el.getAttribute('aria-checked') === 'true' })), prefix);
+      const sourcePick = await picker('surface-source-');
+      // Over before the tap, in the button and the show's config, so a
+      // default of Add with a dead button cannot pass for a working one.
+      const blendBefore = (await picker('surface-blend-')).filter(b => b.on).map(b => b.id).join();
+      const blendLiveBefore = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.blend ?? null);
+      await tap(page, 'surface-blend-add');
+      const blendPick = await picker('surface-blend-');
       // What the renderer reads, not only what the button says.
       const pickedLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.source ?? null);
+      const blendLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.blend ?? null);
       await tap(page, 'surfaces-clear');
       const leftOver = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.length ?? null);
       await page.keyboard.press('Escape');
@@ -763,6 +771,11 @@ try {
         sourcePick.length === 4 && sourcePick.every(b => b.h >= 48) && sourcePick.filter(b => b.on).map(b => b.id).join() === 'back'
         && pickedLive === 'back' && leftOver === 0,
         `${sourcePick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${pickedLive}, ${leftOver} shapes after Clear all`);
+      // And how its light meets the wall (§16c), the same way.
+      check('and its light is set to add as a beam from there: two of 48 px or more, Add on, and the show draws it so',
+        blendBefore === 'over' && blendLiveBefore === 'over'
+        && blendPick.length === 2 && blendPick.every(b => b.h >= 48) && blendPick.filter(b => b.on).map(b => b.id).join() === 'add' && blendLive === 'add',
+        `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
 
       /*
         The back plate's own look (PLAN.md §16a), from the same sheet: the

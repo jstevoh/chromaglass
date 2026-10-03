@@ -28,7 +28,8 @@
   "exclude": [
     "chromaglass",
     "node_modules",
-    "dist"
+    "dist",
+    "desktop"
   ],
   "//strict": "Measured, not aspirational: with @types/react installed this costs zero errors. Without those types it looked like 3774, and 3133 of them were 'no JSX.IntrinsicElements' - the missing declarations, not the code. With strict off, every React API and every JSX element was `any`: useState<VisualizerSettings> handed back an `any` setter, which is why a settings object missing 33 required keys typechecked and shipped, and useRef(map) left the whole MIDI dispatch switch unchecked. One line to dial back if it ever gets in the way."
 }

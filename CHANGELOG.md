@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — beams that add, and tiles with no seam
+
+- A mapped surface's **Light** can be **Add**, a projector's beam, instead of
+  laid over. Two beams of different pictures add where they cross; two
+  carrying one picture blend across their overlap so the join shows no seam.
+  Surfaces stay laid over unless set, so a saved rig looks as it did. On the
+  phone: More, Settings, Mapping.
+
 ### Added — the back plate's own look
 
 - **To Back Plate**: a cued look can be sent to the back plate alone, from the
