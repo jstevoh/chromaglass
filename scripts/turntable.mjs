@@ -25,7 +25,9 @@
  *   7. a hand going round at one turn a second, reported at 60 Hz, reads
  *      2π rad/s to 3%, across the ±π seam without a spike; held still it
  *      stops the dish within a fifth of a second; near the middle it reads
- *      nothing; lifted it lets go.
+ *      nothing; lifted it lets go;
+ *   8. with Auto Spin off and no hand, the turntable and its liquid are
+ *      exactly zero, so a look nobody spins turns as it always did.
  */
 import {
   AutoSpin, SpinHand, SPIN_RATE, SPIN_TEMPO, SPIN_OFF, WATER_NU, THICK_NU, OIL_NU,
@@ -164,6 +166,30 @@ check('water takes twenty times as long as the thick liquid', near(reach(tw) / r
   q.move('remote:0', 0.2, 0, 0);
   q.forgetQuiet(400, 250, 'remote:');
   check('a remote finger that went quiet is let go', !q.held);
+}
+
+// 8
+{
+  /*
+    With Auto Spin off and no hand, the turntable must stay exactly still, not
+    nearly: the frame adds its liquid's turn to the picture's angle every
+    frame, and the swirl runs on any speed over 1e-3, so a residue of 1e-17
+    from a filter that only approaches zero would be a look changed by a
+    feature nobody turned on. Ten minutes at 60 fps, with the look's own
+    flywheel beside it swinging with the music as a sound-routed look's does,
+    to show the two do not leak into each other.
+  */
+  const a = new AutoSpin();
+  let dish = 0, liq = 0, look = 0, angle = 0;
+  const D = (0.04 + 0.25 * 1.2) * 0.8;
+  for (let k = 0; k < 60 * 600; k++) {
+    look = dishFollow(look, 0.03 * Math.sin(k / 40), D, 1 / 60);
+    dish = dishFollow(dish, a.target(SPIN_OFF, 6, 16, { periodMs: 500, nextBeatMs: 1000, nowMs: 900 }, angle), D, 1 / 60);
+    liq = liquidFollow(liq, dish, 1 / 60, tw);
+    angle += dish / 60;
+  }
+  check('with Auto Spin off and no hand, the turntable and its liquid stay exactly still', dish === 0 && liq === 0 && angle === 0,
+    `dish ${dish}, liquid ${liq}, angle ${angle}, beside a look swinging to ${look.toFixed(4)} rad/s`);
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');

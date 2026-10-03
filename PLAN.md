@@ -64,7 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
-| 21 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 21a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (this PR; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §19); 21b–21g open |
+| 21 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 21a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §19); 21b–21h open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2523,7 +2523,7 @@ Asked 2026-09-28: "spin the plate on command, or set it to spin automatically at
 rate (or a rate controlled by some other factor, like music tempo); give me a control
 (like press) and a setting."
 
-**21a, shipped.** The **Spin** tool (N on the desks, a tool on the phone's dock and the
+**21a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the
 remote's pad), and **Auto Spin** (Off, Rate in rev/min either way round, Tempo at a turn
 every 1–64 beats) with **Reverse Spin**, on the sheet, the phone's Play sheet, the
 remote, MIDI and the desks. Off by default, so every look is as it was.
@@ -2576,3 +2576,11 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   forces belong in it (the current grid's thin argument needs the swirl's scale), and
   the swirl's drag k = 12ν/h² is the same Hele-Shaw term, so the two should share
   one gap field.
+- **21h. The look's own turning is still rigid.** A look's motor, the music routed
+  to rotation (eleven shipped looks) and a flick turn the picture as they always
+  have, with the flick's twist term, and not through the dish: sent through the
+  liquid's lag, a thin look's sway was smoothed over three seconds and the swirl ran
+  on every look with music, which is a change to shipped looks nobody has judged.
+  The turntable is a second dish under the look's. Once the lag has been seen on the
+  Mac (`docs/judging.md` §19), put the look's turning on the same dish, retire the
+  twist's flick term, and judge those eleven looks against main.

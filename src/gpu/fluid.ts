@@ -229,8 +229,11 @@ const CURRENT_ITERS = 10;
   liquid: at 1e-3 rad/s the swirl at the rim is under 5e-4 plate widths a
   second, a cell of 768 in three seconds, for as long as the lag lasts. The
   centrifuge: at 0.05 rad/s water's drift outward is 3e-4 plate widths a
-  second at the rim with the heaviest dye, and a look's own slow motor (every
-  shipped look turns at 0.001 rad/s or less) never reaches it.
+  second at the rim with the heaviest dye. Both speeds are the turntable's
+  alone (Auto Spin and the Spin tool): a look's own turning, its motor, the
+  music routed to rotation and a flick, turns the picture rigidly as it
+  always has and never reaches here, so every shipped look leaves both at
+  exactly zero.
 */
 const SWIRL_DISH_MIN = 1e-3;
 const SWIRL_SPIN_MIN = 0.05;
