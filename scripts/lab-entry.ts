@@ -138,6 +138,9 @@ const api = {
   },
   async step(n: number, over: Partial<GpuStepParams> = {}) {
     const l = lab!;
+    // The app runs the old solver until Thin Gap's pipelines are built
+    // (prepareThinGap); the lab measures the thin gap from its first step.
+    if ((over.thinGap ?? 0) > 0.5) await l.solver.prepareThinGap();
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;

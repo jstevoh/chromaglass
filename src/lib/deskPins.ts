@@ -139,6 +139,8 @@ const SECTION_OF: Record<string, string> = {
   filmPhysics: 'camera',
   phaseDisplace: 'physics',
   oilBodies: 'physics',
+  thinGap: 'physics',
+  gapThickness: 'physics',
   pacing: 'automation',
   songFollow: 'automation',
   // The mixer's channel strips, all in its own section.

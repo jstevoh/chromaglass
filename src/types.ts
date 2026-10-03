@@ -335,6 +335,27 @@ export interface VisualizerSettings {
   */
   depthDrag: number;
   /*
+    The plate as a Hele-Shaw cell (PLAN §18a, src/gpu/wgsl/thinGap.ts).
+
+    A switch, 0 or 1. At 1 the flow between the glasses is solved as what it
+    is: a thin layer whose velocity the glass drags back at 12ν/h², so a
+    push lasts as long as the liquid and the gap say (seconds for water in the
+    deep middle of the plate, a tenth of a second for a light oil, nothing for
+    glycerine) instead of the one step the old speed clamp allowed; a
+    pressure solve in which a tight gap carries less than an open one (the
+    mobility h³/12μ); and an open rim, so what a press squeezes out leaves the
+    dish across its edge and comes back when the glass lifts, where the old
+    plate spread it as a uniform sink everywhere. It changes how every look
+    moves and every tool feels, so it is off in every look and waits for the
+    owner to judge it look by look on the projector.
+
+    `gapThickness` is the liquid's viscosity for it, 0 to 1 on a log scale
+    from water (1 mm²/s) to glycerine (about 1000): it sets how long a push
+    lasts. It does nothing while Thin Gap is off.
+  */
+  thinGap: number;
+  gapThickness: number;
+  /*
     The second phase, and the magnet under the glass (H7,
     docs/bubbles-plan.md B).
 
@@ -763,6 +784,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   */
   plateCurve: 0,
   depthDrag: 0,
+  thinGap: 0,               // off: the solver every look was made on
+  gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,
