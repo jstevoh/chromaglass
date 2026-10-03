@@ -425,7 +425,13 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
+        {/*
+          Wrapping: Spin made it five tools and Tilt, wider than a phone's
+          row, and the row that did not wrap widened the page past the
+          screen, so the transport bar's Blackout could not be tapped
+          (`npm run applink`, "linked: ran to the end": 42/43, now 48/48).
+        */}
+        <div className="flex flex-wrap gap-1.5">
           {(['blow', 'drop', 'press', 'finger', 'spin'] as const).map((t) => (
             <button
               key={t}
@@ -658,6 +664,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {(settings?.phaseAmount ?? 0) > 0.001 && (
             <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/*
+            The plate as a thin gap (PLAN §18a), a switch on the slider's two
+            stops, and its liquid's Thickness only while it is on.
+          */}
+          <Slider label="Thin Gap" field="thinGap" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={value('thinGap') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.thinGap ?? 0) > 0.5 && (
+            <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (

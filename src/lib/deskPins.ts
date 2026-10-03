@@ -138,6 +138,8 @@ const SECTION_OF: Record<string, string> = {
   filmPhysics: 'camera',
   phaseDisplace: 'physics',
   oilBodies: 'physics',
+  thinGap: 'physics',
+  gapThickness: 'physics',
   pacing: 'automation',
   songFollow: 'automation',
   spinRpm: 'layers',

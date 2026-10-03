@@ -1697,20 +1697,40 @@ export default function App() {
   /*
     The Magnet brings its ferrofluid. A magnet over a plate with none on it
     does nothing at all, which read as the tool being broken, so picking it
-    on such a look pours some (the visualizer lays it when the amount rises)
-    and gives the magnet enough strength to be felt. The look keeps it, and
-    the Ferrofluid slider takes it away again.
+    on such a look pours some (the visualizer lays it when the amount rises).
+    The look keeps it, and the Ferrofluid slider takes it away again.
+
+    Picking it used to give the look a magnet as well (Magnet Strength 0.8),
+    and a look's magnet sits under the plate at Magnet Across and Up, the
+    middle on every look, from the moment it has strength. So before the hand
+    had touched anything, a magnet nobody put there was pulling the freshly
+    poured ring of ferrofluid into the middle. Reported by the owner: "Magnet
+    makes an immediate big black hole in the middle when I select it." In the
+    lab (Classic's pour, that magnet, 256²) 9% of the disc 0.12 round the
+    middle was black as poured, 54% a second later and all of it in four;
+    with no magnet it stayed at 9%. Picking a magnet up is taking it in the hand: nothing is
+    under the dish until the hand puts it there. So the strength now comes
+    with the first hold (onMagnetInHand, below), and the magnet is set down
+    where that hand lets go of it, as before.
   */
   useEffect(() => {
     if (activeTool !== 'magnet') return;
     const s = settingsRef.current;
-    if ((s.phaseAmount ?? 0) > 0.002 && (s.magnetStrength ?? 0) > 0) return;
-    updateSettings({
-      phaseAmount: Math.max(s.phaseAmount ?? 0, 0.6),
-      magnetStrength: Math.max(s.magnetStrength ?? 0, 0.8),
-    });
+    if ((s.phaseAmount ?? 0) > 0.002) return;
+    updateSettings({ phaseAmount: 0.6 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool]);
+  /**
+   * The first hand to hold the Magnet over a look with no magnet of its own
+   * gives it one (see above). Every hold does, so a Magnet Strength set to 0
+   * by hand comes back to 0.8 the next time the Magnet is held: holding a
+   * magnet under the glass is giving the plate one, and the slider is how it
+   * is taken away again between holds.
+   */
+  const magnetInHand = () => {
+    if ((settingsRef.current.magnetStrength ?? 0) > 0) return;
+    updateSettings({ magnetStrength: 0.8 });
+  };
 
   /*
     A hand on a hardware fader, answered at once and rendered once a frame.
@@ -3678,6 +3698,7 @@ export default function App() {
         soundBindings={midi.map.sound}
         onSoundTrigger={runSoundTrigger}
         onManualGesture={musicIntel.recordGesture}
+        onMagnetInHand={magnetInHand}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
           // open); the shell only re-renders when the engine itself changed.

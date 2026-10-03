@@ -464,7 +464,86 @@ On Oil & Water (Oil Bodies on):
   going straight out: a stripe under the palm should come out as a stripe, not a smear
   round the whole ring. Say if the old even ring looked better.
 
-## 19. Spinning the dish (PLAN 21)
+## 19. Thin Gap: the plate as a thin layer of liquid (PLAN 18a)
+
+Every look moves by a speed clamp: whatever pushes the liquid, it is cut back to
+one small speed at the end of the step, so a push lasts one frame. Thin Gap
+(Settings → Squish Plate, under Depth Drag) replaces the clamp with the drag of two
+glasses a few millimetres apart: a push lasts as long as the liquid and the gap say.
+It is off in every look, and nothing changes until you turn it on. `?set=thinGap=1`
+turns it on for a page load.
+
+On Classic, then Oil & Water, then a look with a Plate Shape:
+
+- turn it on: the plate should keep moving the way the look moves, not freeze or
+  race. The first time in a show it takes a few seconds to switch (its pipelines are
+  built then, off the frame), and there should be no stop while it does. Say if the look's stirring now reads as too strong or too weak;
+- Finger through the colour at Thickness 0 (water), 0.45 (the default, a light oil)
+  and 1 (glycerine): in water the liquid should keep sliding for a second or two
+  after the finger stops; at 1 it should stop the moment the finger does;
+- Press and hold, then let go: the colour should be pushed out by the press and drawn
+  back in when the glass lifts, and under the press the colour should pale (less
+  liquid between the glasses there) and come back as it lifts. At the dish's edge the
+  liquid should go out of the dish, not bunch up against it;
+- on a look with Plate Shape up: where the glasses are tight, the colour should
+  move slower than where they are open;
+- the frame time with it on and off (below): it should be the same or faster;
+- the same on the phone (Settings → Squish Plate → Thin Gap), and a MIDI pad
+  learned to it.
+
+---
+
+## 19. A held Drop with Drop Height up drops six times a second, not every step
+
+The held Drop's clock stayed at zero on frames of one solver step each, so with
+Drop Height up it let go of a splashing drop on every step (sixty a second at the
+display's rate) until a frame happened to owe two. It now drops as the finger lands
+and then every tenth step. Only Bass Drop (Drop Height 0.9) and Boiling Point (0.7)
+ship with it up, so those two look different under a held Drop now:
+
+- hold the Drop still on each for two seconds: a beat of separate drops, each with
+  its own splash and ring, where it was a near-continuous gush;
+- the pool should be about a tenth of what it used to be for the same hold. Say if
+  the old gush was the look you wanted on either, and it can be a setting instead.
+
+## 20. The fingering push taken out (PLAN §0)
+
+Classic drew stripes a few cells across over its pools, and after a while red dots
+in a lattice with labyrinths between them. It was a push, set by Polarity, that
+moved the dye along its own slope by a slow noise, and ran diffusion backwards
+through the inside of every pool. It is gone, on every look.
+
+On Classic, and on Velvet Underground on the iPhone (where it drew a fine
+crosshatch pinned to the grid), and one other look with Polarity up and Blob
+Surface Tension low (which made the push strongest):
+
+- leave it for ten minutes or more: no stripes, dots or labyrinths inside the
+  pools, and the plate should hold its dye rather than thin out;
+- watch a pool's edge: the slow pushing out and drawing back the push added is
+  gone. Say whether you miss it; real fingering, from a lift or a pour, is the
+  plan's next step for it, not a noise;
+- the Finger through a pool: it should carry the dye and not seem to add any.
+
+## 21. A projector picks its source
+
+PLAN.md §16b. With a projector (or a second window) on, open Settings,
+Mapping, add two rectangles side by side, and set one's Source to **Front** and
+the other's to **Back**, on a two-plate look (Classic). Worth looking at:
+
+- each rectangle carries one plate, and the two are the same liquid, turned
+  opposite ways, moving together;
+- **Film** on a surface with a film playing shows the film alone, graded as
+  the Mixer's film row is, with none of the plate's liquid in it;
+- the logo is on the front plate's projector and not the back's;
+- grading a row in the Mixer (the back plate's brightness, say) changes that
+  plate on its own projector as on the wall; the dimmer and a blackout take
+  every projector down;
+- the frame time with two or three sources on against one (`chromaglassDebug()`,
+  `webgpu.timings`: `plate`, `plate front`, `plate back`, `plate film`);
+- whether two plates on two projectors, overlapping on a wall, read as a light
+  show's two projectors is the judgement this is for (16c makes their overlap add).
+
+## 22. Spinning the dish (PLAN 21)
 
 Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
 lab measured the swirl (`npm run dish`), not the picture. On the Mac:

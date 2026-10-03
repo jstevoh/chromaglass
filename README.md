@@ -18,7 +18,7 @@ ones.
 
 ## Features
 
-- **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy, immiscibility and fingering instabilities; MacCormack advection keeps thin filaments alive
+- **Real-time fluid simulation** — incompressible Navier-Stokes (Stam stable fluids) with squeeze-film flow, buoyancy and immiscibility; MacCormack advection keeps thin filaments alive
 - **GPU solver with a frame-time governor** — the whole solve runs as WGSL compute passes on a 256–768² grid; a governor measures the real frame rate and what the GPU spent on it, and picks the largest grid and pixel density the machine holds at 60 fps (Settings → Simulation → Fluid Grid)
 - **Audio-reactive** — Microphone or system audio drives fluid velocity, density, color, rotation, and bubbles via configurable mappings
 - **Beats ahead of the microphone** — a phase-locked beat clock listens to the onsets, settles on the tempo, and once confident fires every kick a little before the onset would be heard, absorbing the real onset when it arrives; a breakdown or silence hands back to plain detection (Settings → Sound → Beat Prediction and Beat Lead)
@@ -400,7 +400,7 @@ permission, so a reload never puts a prompt over the plate.
 
 The solver is Jos Stam's stable-fluids scheme — diffuse, project, advect,
 project — with the extras a liquid light show needs: a Hele-Shaw squeeze-film
-term for the plate pressure, immiscibility and fingering forces, curl-noise
+term for the plate pressure, an immiscibility force between colours, curl-noise
 turbulence and a self-regulating dye budget. Two things are worth knowing:
 
 - **Where it runs.** On the GPU, as a chain of WGSL compute passes — there is
@@ -506,6 +506,7 @@ with.
 | Pushes Dye | Settings → Squish Plate, under the ferrofluid: the black pushes the colour aside where it grows and packs it along its edges; at 0 it is drawn over still dye (on the phone while there is ferrofluid) |
 | Oil Tension | Settings → Squish Plate, under Physics & chemistry: oil and silicone poured on the plate pull into drops that round up and merge, as oil does on water; at 0 they spread as any other liquid |
 | Oil Bodies | Settings → Squish Plate, under Oil Tension: the oil and the water each keep their own colour, so oil drops round up, merge and are dragged as bodies of their own colour; at 0 one dye blends across every edge (on the phone while there is oil) |
+| Thin Gap / Thickness | Settings → Squish Plate, under Depth Drag: the liquid between the glasses moves as a thin layer does, not at a clamped speed. A push lasts as long as the gap and the liquid say (Thickness, from water to glycerine: seconds to nothing), a press pushes out the liquid it displaces across the dish's open rim and draws it back when the glass lifts, and a tight gap carries less than an open one. Off in every look; a switch on MIDI, the desks and the remote (Thickness on the remote while it is on) |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
 | Lamp & Light | Settings → Lamp & Light: light play, lamp motion, hot-spot, second lamp, iridescence, then the other machines — lumia, chemistry, gel wheel, lamp warmth, exposure |
 | Camera | Settings → Camera: light show or photograph, paper colours, lens, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film, film physics (the rainbow to a real soap film's colours, for Thin Film and the bubbles' Iridescence; on the phone while a film is up) |
