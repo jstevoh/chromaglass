@@ -80,8 +80,20 @@ const PRESSURE_SWEEPS = 12;
 const MG_CYCLES = 2;
 const MG_SWEEPS = 2;
 const MG_COARSE_SWEEPS = 16;
+/** Workgroups summing the projection's right-hand side for its plate mean (divTiles). */
+const DIV_GROUPS = 64;
 /** The Thickness a thin gap runs at when a look does not set one: a light oil (PLAN §18a). */
 export const THIN_GAP_THICKNESS = 0.45;
+/**
+ * A ferrofluid's kinematic viscosity, m²/s, in a thin gap (wgsl/thinGap.ts,
+ * hsPrep). A light hydrocarbon ferrofluid of the kind sold for display and
+ * art (6 mPa·s at 1.2 g/cm³, Ferrotec's EFH1 data sheet): five times water,
+ * and a quarter of Thin Gap's default clear liquid (Thickness 0.45, 22
+ * mm²/s, a light oil). So on the default plate the ferrofluid is the
+ * thinner of the two and fingers where it pushes the oil (a press); in
+ * water it is the thicker and fingers where the water pushes it (a lift).
+ */
+export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts), built when it is first turned on. */
 const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient'];
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
@@ -133,7 +145,7 @@ const MAZE_PERIOD = 0.045;
   How much finer Maze Detail can make it: at 1 the period is a third of
   MAZE_PERIOD, 0.015 of the plate.
 
-  Steve's references (Chemical Bouillon's ferrofluid films) run fingers
+  The owner's references (Chemical Bouillon's ferrofluid films) run fingers
   about a sixtieth of the frame wide, and MAZE_PERIOD drew them two to three
   times wider than that in the lab. It stays the default because every look
   made so far was made with it. It cannot just be made smaller, though,
@@ -396,6 +408,14 @@ export class WebGPUFluid {
   private readonly curP: PingPong;
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
+  /*
+    What divergence writes, before its plate mean is taken off into `div`
+    (divTiles, divFold, divCentre in wgsl/fluid.ts): the partial sums, and
+    the mean itself.
+  */
+  private readonly divRaw: GPUTexture;
+  private readonly divPartials: GPUBuffer;
+  private readonly divMean: GPUBuffer;
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
   private readonly scratchA: GPUTexture;
@@ -528,6 +548,7 @@ export class WebGPUFluid {
   /** What the plate draws from the liquids' own physics, packed (see packView). */
   private viewTex: GPUTexture | null = null;
   private blankR: GPUTexture | null = null;
+  private blankPhaseTex: GPUTexture | null = null;
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
@@ -535,6 +556,15 @@ export class WebGPUFluid {
   private psi: PingPong | null = null;
   /** Its chemical potential (phaseMu), kept for the next step's maze force. */
   private phaseMuT: GPUTexture | null = null;
+  /**
+   * The gap the ferrofluid last moved in, a cell at a time, so a step can
+   * tell how far the glass closed on it (phaseAdvect, Thin Gap). Not primed
+   * until a step has written it: a fresh plate, new glasses (Plate Shape)
+   * and a pour onto an empty plate each start it again, so the first step
+   * after one does not read the whole gap as the glass arriving.
+   */
+  private phaseGap: GPUBuffer | null = null;
+  private phaseGapPrimed = false;
   private mazeReady = false;
   /** For the harness: whether the phase stage is running at all. */
   get phaseIsLive(): boolean { return this.phaseLive; }
@@ -550,8 +580,6 @@ export class WebGPUFluid {
     hundred times the strength moved the interior from 0.67 to 0.62.
   */
   private airCoverPrev = 0;
-  /** The plate's mean of the press source, so the projection has a solution. */
-  private squeezeMean = 0;
   /** How much of a press reaches the flow, from the look's plate pressure. */
   private squeezeGain = 0;
   private lastDt = 1 / 60;
@@ -665,6 +693,7 @@ export class WebGPUFluid {
       // The second phase, single-channel, and what it does to the flow.
       ['phaseSplat', [R32], open.phase],
       ['phaseAdvect', [R32], open.phase],
+      ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
       ['phaseRelax', [R32], open.phase],
       ['screenJacobi', [R32], open.phase],
@@ -690,6 +719,8 @@ export class WebGPUFluid {
     const byName: [string, GPUTextureFormat][] = [
       ['pressureClear', R32], ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
       ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
+      // The projection's right-hand side made zero-mean, every step (divTiles).
+      ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
       ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
     ];
     const keyed = new Map<string, [string, boolean]>();
@@ -760,6 +791,9 @@ export class WebGPUFluid {
     this.curP = pp(this.M, R32, 'current pressure');
     this.grain = opts.float32Filterable ? pp(this.N, RGBA32, 'grain') : null;
     this.div = tex(this.N, R32, 'divergence');
+    this.divRaw = tex(this.N, R32, 'divergence raw');
+    this.divPartials = this.disposer.track(device.createBuffer({ label: 'divergence partials', size: DIV_GROUPS * 4, usage: GPUBufferUsage.STORAGE }));
+    this.divMean = this.disposer.track(device.createBuffer({ label: 'divergence mean', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.curDiv = tex(this.M, R32, 'current divergence');
     this.velForced = tex(this.N, VEL, 'forced velocity');
     this.scratchA = tex(this.N, this.dyeFormat, 'scratch a');
@@ -846,6 +880,52 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(w, w);
   }
 
+  /** The gap the ferrofluid has seen, made zero (unprimed) the first time. */
+  private ensurePhaseGap(): GPUBuffer {
+    if (!this.phaseGap) {
+      this.phaseGap = this.disposer.track(this.device.createBuffer({ label: 'phase gap seen', size: Math.max(16, this.N * this.N * 4), usage: GPUBufferUsage.STORAGE }));
+    }
+    return this.phaseGap;
+  }
+
+  /**
+   * phaseAdvect: runPressed's bindings, then the gap, the gap the phase last
+   * saw, and the thin solve's pressure and mobility (a stand-in for each until
+   * Thin Gap has run: the kernel reads them only under it).
+   */
+  private runPhaseAdvect(pass: GPUComputePassEncoder, args: GPUBuffer): void {
+    const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
+    const thin = !!this.hsP && !!this.hsMob;
+    const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      const gap = this.ensurePhaseGap();
+      group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, this.velForced, this.phase.write, this.press, this.squeeze.read, gap,
+        thin ? this.hsP! : gap, thin ? this.hsMob! : gap]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  /** The gap as the phase has now seen it (phaseGapSeen), every step the phase moves, whichever solver. */
+  private runPhaseGapSeen(pass: GPUComputePassEncoder): void {
+    const pipe = this.pipeline('phaseGapSeen', R32);
+    const key = `phaseGapSeen:${this.squeeze.read.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), this.squeeze.read, this.ensurePhaseGap()]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+    this.phaseGapPrimed = true;
+  }
+
   private fill(pass: GPUComputePassEncoder, dst: GPUTexture, value: [number, number, number, number], size: number): void {
     this.run(pass, 'fill', dst, [], this.arg(`fill ${dst.label}`, [...value, size, size, 0, 0]), size);
   }
@@ -889,13 +969,16 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-    this.fill(pass, this.div, [0, 0, 0, 0], this.N);
+    for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
     // toward the dome pumps its liquid inward until the two agree.
     for (const t of [this.squeeze.a, this.squeeze.b]) this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
     this.hsPrimed = false;
+    // The gap the ferrofluid last saw is from before the clear: the next
+    // step must carry it by area until phaseGapSeen has read the new one.
+    this.phaseGapPrimed = false;
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     if (this.grain) {
@@ -927,26 +1010,19 @@ export class WebGPUFluid {
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
     const q = this.device.queue;
     /*
-      What the press just did to the plate as a whole, so its source can be
-      made zero-mean.
-
-      A Neumann problem whose source does not average to zero has no solution
-      for the projection to find — the condition `pressureSelfTest` exists to
-      protect, and the same one the air's standing term already obeys. A press
-      is a net source over the whole plate: liquid is pushed out from under the
-      palm and nothing anywhere absorbs it. Left unbalanced, the solve spends
-      itself on the imbalance and the press arrives as almost nothing, which is
-      what it measured — 0.4% of the dye moved, for a press seventy-five times
-      harder than the tool's own.
-
-      The gap delta rides channel 3 of the velocity deltas (see `flushDeltas`),
-      so the mean is a sum over what was just handed across, and the source it
-      produces is that rate over a resting gap.
+      The press's plate mean used to be worked out here, from the gap deltas
+      just handed across over a resting gap of 0.03, so its source could be
+      made zero-mean: a press is a net source, and a closed plate's pressure
+      has no solution for one (the press arrived as 0.4% of the dye moved
+      before it was balanced at all). That estimate is what leaked. A press
+      held in one place squeezes its gap to the floor, the delta is clamped
+      away there and the gap's spring goes on moving it, so the source the
+      GPU really applies is nothing like this guess, and the difference was a
+      net source over the whole plate that the solve turned into a flow out
+      from the middle (`npm run heldpress`, and the mirror check,
+      `scripts/mirror.mjs`). The mean is now taken on the GPU from the source
+      itself, in project().
     */
-    let gapSum = 0;
-    for (let i = 3; i < velAdd.length; i += 4) gapSum += velAdd[i];
-    const meanGap = gapSum / (this.L * this.L);
-    this.squeezeMean = -(meanGap / Math.max(dt, 1e-4)) / 0.03;
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
@@ -1153,6 +1229,7 @@ export class WebGPUFluid {
     if (maze <= 0.001 && !spikes) this.mazeReady = false;
     const thin = this.thinGapOn(p);
     if (!thin) this.hsPrimed = false;
+    if (!this.phaseLive) this.phaseGapPrimed = false;
     this.thinLive = thin;
     this.writeSim(p, disp);
     const enc = this.device.createCommandEncoder({ label: 'step' });
@@ -1247,6 +1324,7 @@ export class WebGPUFluid {
         }
         this.lastCurve = p.plateCurve;
         this.hsPrimed = false;
+        this.phaseGapPrimed = false;
       } else if (this.lastCurve !== p.plateCurve) {
         this.run(pass, 'gapReshape', this.squeeze.write, [this.squeeze.read],
           this.arg('gap reshape', [this.lastCurve, p.plateCurve, 0, 0]));
@@ -1254,6 +1332,7 @@ export class WebGPUFluid {
         this.lastCurve = p.plateCurve;
         // New glasses, not a press: a thin gap takes the new shape as it is.
         this.hsPrimed = false;
+        this.phaseGapPrimed = false;
       }
       if (!deltasApplied) {
         this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
@@ -1658,10 +1737,18 @@ export class WebGPUFluid {
     stage('phase', (pass) => {
       // With a magnet on, the flow near it can carry the ferrofluid further
       // than one flux step may (0.45 of a cell): so in substeps.
-      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001) ? PHASE_SUBSTEPS : 1;
+      // And under Thin Gap, where a press moves the liquid as fast as the
+      // glass comes down (a cell a step and more round a palm, lab).
+      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001 || thin) ? PHASE_SUBSTEPS : 1;
       // A.b.z: the Rhie–Chow correction on (see phaseAdvect), which needs the
       // projection's pressure to still be the one velForced was made with.
-      const adv = this.arg('phase advect', [0, 0, 0, 0, 0, disp / subs, 1, 0]);
+      /*
+        A.a: under Thin Gap the ferrofluid is carried as a volume, the gap
+        going from what the phase last moved in to the gap now across the
+        substeps (phaseAdvect), so each substep has its own arguments.
+      */
+      const volume = thin && this.phaseGapPrimed && p.phaseVolume !== 0 ? 1 : 0;
+      const adv = (k: number) => this.arg(`phase advect ${k}`, [volume, k / subs, (k + 1) / subs, REST_GAP, 0, disp / subs, 1, 0]);
       /*
         And the grid-scale filter alone after each substep (phaseSeparate
         with no sharpening or tension). The Rhie–Chow correction removes
@@ -1671,11 +1758,12 @@ export class WebGPUFluid {
       */
       const grid = this.arg('phase grid', [0, 0, 0, 0]);
       for (let k = 0; k < subs; k++) {
-        this.runPressed(pass, 'phaseAdvect', this.phase.write, [this.phase.read, this.velForced], adv);
+        this.runPhaseAdvect(pass, adv(k));
         this.phase.swap();
         this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read], grid);
         this.phase.swap();
       }
+      this.runPhaseGapSeen(pass);
       for (let k = 0; k < PHASE_RELAX; k++) {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
         this.phase.swap();
@@ -1990,6 +2078,14 @@ export class WebGPUFluid {
       this.device.queue.submit([enc.finish()]);
     }
     return this.rxn;
+  }
+
+  /** An empty 1×1 phase, for a kernel that reads the ferrofluid when none is on the plate. */
+  private blankPhase(): GPUTexture {
+    if (!this.blankPhaseTex) {
+      this.blankPhaseTex = this.disposer.track(this.device.createTexture({ label: 'blank phase', size: [1, 1], format: R32, usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING }));
+    }
+    return this.blankPhaseTex;
   }
 
   private packView(pass: GPUComputePassEncoder): void {
@@ -2394,6 +2490,20 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(Math.ceil(count / 64));
   }
 
+  /** As dispatchBuf, over the grid in 8 × 8 tiles, with no args of its own. */
+  private dispatchBuf2(pass: GPUComputePassEncoder, name: string, key: string, resources: (GPUBuffer | GPUTexture)[]): void {
+    const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), ...resources]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   /**
    * One multigrid V-cycle from level `l` down (see `mgRestrict0` in
    * `wgsl/fluid.ts` for why). Smooth, hand the residual to the level below,
@@ -2447,12 +2557,21 @@ export class WebGPUFluid {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero as the standing one does.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.div, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
+    this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
         (this.airCover - this.airCoverPrev) * invDt,
-        // The press: its plate-mean, so the source averages to zero, and how
-        // much of it reaches the flow.
-        this.squeezeMean, this.squeezeGain, 0]));
+        // The press: how much of it reaches the flow. Its mean is no longer
+        // guessed here (see divTiles).
+        0, this.squeezeGain, 0]));
+    /*
+      Then the whole right-hand side made to sum to zero, exactly: its plate
+      mean found on the GPU and taken off every cell (divTiles in
+      wgsl/fluid.ts says why that is the closed plate's physics and not a
+      patch). Three small dispatches, against the dozens the solve runs.
+    */
+    this.dispatchBuf(pass, 'divTiles', 'divTiles', this.arg('none', [0, 0, 0, 0]), [this.divRaw, this.divPartials], DIV_GROUPS * 64);
+    this.dispatchBuf(pass, 'divFold', 'divFold', this.arg('div fold', [DIV_GROUPS, 0, 0, 0]), [this.divPartials, this.divMean], 64);
+    this.dispatchBuf2(pass, 'divCentre', 'divCentre', [this.divRaw, this.divMean, this.div]);
     this.clearBuffer(pass, this.press, 'clear pressure');
 
     if (this.pressureSolver === 'multigrid' && this.mg.length > 0) {
@@ -2562,8 +2681,10 @@ export class WebGPUFluid {
     const mob = this.hsMob!;
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM]),
-      [this.vel.read, prev, this.squeeze.read, this.vel.write, mob]);
+    const phase = this.phaseLive ? this.phase.read : this.blankPhase();
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${this.squeeze.read.label}:${phase.label}`,
+      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1, 0, 0, 0]),
+      [this.vel.read, prev, this.squeeze.read, phase, this.vel.write, mob]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,

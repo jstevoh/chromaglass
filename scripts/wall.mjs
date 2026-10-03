@@ -1000,6 +1000,7 @@ try {
       if (!live) return false;
       return live.flipX === c.flipX && live.flipY === c.flipY
         && live.gain === c.gain && live.gamma === c.gamma
+        && (c.flashGuard === undefined || live.flashGuard === c.flashGuard)
         && live.maskTop === c.maskTop && live.maskRight === c.maskRight
         && live.maskBottom === c.maskBottom && live.maskLeft === c.maskLeft
         && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6)
@@ -1010,9 +1011,35 @@ try {
             && s.corners.every((v, j) => Math.abs(v - w.corners[j]) < 1e-6);
         });
     }, want, { timeout: 20000 });
+    /*
+      And drawn with, counted in the stage's own frames, not the browser's.
+
+      Four animation frames were taken to mean the new config had been
+      drawn, and nothing makes that so: the stage draws from the render
+      loop, not from this page's requestAnimationFrame, and on a loaded Mac
+      runner the two need not keep step. A grab taken before the stage drew
+      the config photographs the one before, and the gain check reads that
+      as no lift at all. Over 40 tools
+      shards on 2026-09-27 its lift sat between 1.52 and 1.90 in 37, with
+      two reds at 1.15 and 1.19 (#184's shard, main's deploy of #196) and
+      two highs at 2.20 and 2.27: single odd frames rather than a spread,
+      which is what one reading taken a config early looks like (inferred,
+      not seen; the gain check below now prints every reading so the next
+      one shows which). So the wait also asks the stage for two frames
+      drawn after the config was live, where it can say (webgpu.frames);
+      on a page without it the four animation frames are all there is.
+    */
     await page.evaluate(() => new Promise((done) => {
+      const drawn = () => window.chromaglassDebug?.().webgpu?.frames ?? null;
+      const from = drawn();
+      const start = performance.now();
       let n = 0;
-      const tick = () => (++n >= 4 ? done() : requestAnimationFrame(tick));
+      const tick = () => {
+        n++;
+        const now = drawn();
+        const enough = from === null || now === null ? n >= 4 : n >= 4 && now >= from + 2;
+        if (enough || performance.now() - start > 5000) done(); else requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
     }));
   };
@@ -1482,19 +1509,24 @@ try {
   const bracket = async (cfg, rounds = 3) => {
     let off = 0;
     let on = 0;
+    // Every reading in the order taken, plain and graded alternating, so a
+    // red run says whether one frame was odd or the whole bracket was.
+    const seq = [];
     for (let i = 0; i < rounds; i++) {
       await withOutput({ flashGuard: false });
-      off += meanOver(await gridOf(), () => true);
+      const a = meanOver(await gridOf(), () => true);
       await withOutput({ ...cfg, flashGuard: false });
-      on += meanOver(await gridOf(), () => true);
+      const b = meanOver(await gridOf(), () => true);
+      off += a; on += b; seq.push(a, b);
     }
     await withOutput({ flashGuard: false });
-    off += meanOver(await gridOf(), () => true);
-    return { it: on / rounds, base: off / (rounds + 1) };
+    const z = meanOver(await gridOf(), () => true);
+    off += z; seq.push(z);
+    return { it: on / rounds, base: off / (rounds + 1), seq: seq.map((v) => v.toFixed(3)).join(' ') };
   };
   const gain = await bracket({ gain: 2.2 });
   check('output gain lifts what reaches the wall', gain.it > gain.base * 1.25,
-    `${gain.base.toFixed(3)} -> ${gain.it.toFixed(3)}`);
+    `${gain.base.toFixed(3)} -> ${gain.it.toFixed(3)} (plain, graded, … in order: ${gain.seq})`);
   const gamma = await bracket({ gamma: 2.2 });
   check('output gamma darkens the mid-tones', gamma.it < gamma.base * 0.95,
     `${gamma.base.toFixed(3)} -> ${gamma.it.toFixed(3)}`);
