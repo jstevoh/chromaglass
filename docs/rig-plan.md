@@ -169,7 +169,7 @@ that are still at the wrong scope.
 a settings page with extra steps.
 
 **First slice, built (2026-09-27): the mixer over the sources there already
-are.** Steve asked for it ahead of R1, so the part that does not need several
+are.** The owner asked for it ahead of R1, so the part that does not need several
 live plates went first: the LED ring, the front plate, the back plate, the film
 and the logo, in one stack (`src/lib/mixer.ts`, `MixerPanel.tsx`), on the
 Perform desk's Mixer sheet, in Settings → Live → Mixer, on the phone's Mix sheet
