@@ -174,6 +174,13 @@ interface LiquidVisualizerProps {
   soundBindings?: readonly SoundBinding[];
   onSoundTrigger?: (binding: SoundBinding) => void;
   /**
+   * A hand has just put a magnet under a look that has none of its own
+   * (magnetStrength 0): the app gives the look the magnet's strength, so
+   * that once let go it stays under the glass where the hand set it down
+   * (magnetFor). Called once per hold, from the frame that first holds it.
+   */
+  onMagnetInHand?: () => void;
+  /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
    * arrives as its own prop instead of riding in `settings` where a preset
@@ -4009,7 +4016,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4817,12 +4824,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const amt = settingsRef.current.phaseAmount ?? 0;
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
+      phaseLaysRef.current++;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);
+  /** How many times the ferrofluid has been laid afresh (layPhase), for the harness: a lay clears what was there. */
+  const phaseLaysRef = useRef(0);
   layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
@@ -5296,6 +5306,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { onManualGestureRef.current = onManualGesture; }, [onManualGesture]);
+  const onMagnetInHandRef = useRef(onMagnetInHand);
+  useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
+  /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
+  const magnetToldRef = useRef(-Infinity);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5578,6 +5592,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           k.env = kickRef.current?.kick ? 1 : k.env * Math.exp(-dtS / 0.8);
           const energy = Math.min(1, currentAudioData.energy);
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
+        }
+        /*
+          A hand bringing a magnet to a look that has none: the look takes
+          it, at the strength the Magnet tool has always given such a look,
+          so that let go it is set down under the glass where the hand left
+          it (placed, below) rather than taken away with the hand.
+
+          Read from the settings as the app holds them, not the folded look:
+          the app answers from its own Magnet Strength, and a sound-learn
+          patch riding the folded one must not decide whether the look has
+          a magnet. And asked again a few times a second for as long as the
+          hand holds it, rather than once a hold: a look fade that lands
+          during the hold sets the strength back to the target look's, and
+          a hold told only once would then set down a magnet with none. The
+          app ignores a call when the look already has its magnet.
+        */
+        if (held && (settingsRef.current.magnetStrength ?? 0) <= 0 && now - magnetToldRef.current > 250) {
+          magnetToldRef.current = now;
+          onMagnetInHandRef.current?.();
         }
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
@@ -9051,6 +9084,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
+          phaseLays: () => phaseLaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
