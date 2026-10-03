@@ -305,7 +305,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [diag]  # TEMPORARY diagnostic, reverted before review
+        shard: [show, tools, plate, open]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -319,9 +319,6 @@ jobs:
       - name: Build
         id: build
         run: npm run build
-      - name: TEMPORARY mirror diagnostic
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'diag' }}
-        run: node scripts/mirror-diag.mjs
       # Every shader compiles, before anything builds a pipeline from one.
       - name: The shaders compile
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
@@ -348,6 +345,11 @@ jobs:
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run lift
+      # A press held in one place (each bubble's) moves the liquid around it,
+      # not the whole plate: the projection's source sums to zero exactly.
+      - name: A held press moves only its own neighbourhood
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run heldpress
       # A press moves the oil out from under the palm with its colour, onto the
       # ring the dye lands on, and keeps all of it (PLAN §15d).
       - name: The press moves the oil

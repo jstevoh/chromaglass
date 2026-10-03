@@ -91,8 +91,22 @@ Whether to bracket it (Δ within the two idle readings ± the allowance) is a de
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
 
-*Found 2026-09-27, not yet done:* **the mirror check's "and nowhere else" goes red at
-exactly its limit on changes that cannot move a pixel.** #191 (PLAN.md only) read
+*Found 2026-09-27, **fixed in #225** (2026-10-03; the Mac's mirror check to confirm):* **the mirror check's "and nowhere else" goes red at
+exactly its limit on changes that cannot move a pixel.** It was the plate, not the
+check. Six rounds of measurement on the Mac runner found the calm Classic plate
+starting a single plate-wide flow out from the middle (0.63–0.88 of it radial, mean
+speed up to 0.34) with the first bubble a drop trapped, and never with Bubbles at 0
+(speed stayed near 0.005). Each bubble presses the glass over its footprint every
+step, and the press source was balanced with a plate mean the CPU guessed from the
+gap deltas over a resting gap of 0.03; a held press has squeezed its gap to the
+floor (0.004), where the deltas are clamped away, so the guess was wrong and the
+difference went into the pressure solve as a net source, which a closed plate has
+no answer for. The projection's right-hand side is now made zero-mean exactly on the
+GPU (`divTiles` in `wgsl/fluid.ts`): the glass lifting a hair everywhere to take
+what a press pushed out. `npm run heldpress` (lab, any adapter): a held press's far
+plate once steady 3.99e-3, as fast as while it closed, 0.95 of it radial, before;
+3.1e-5 and −0.03 after. The original report follows.
+ #191 (PLAN.md only) read
 "Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
 against an allowance of 11.1, at the tool's mirror through the centre
 (`scripts/mirror.mjs`, the Mac plate shard). It has been red at its limit on other
@@ -101,6 +115,21 @@ comes back now and then, or the allowance is drawn from a drift reading that is
 sometimes as large as the echo; which of the two is the first thing to settle, from
 the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
 of these costs the owner a by-hand re-run.
+
+*Found 2026-10-03 (#225), not yet done:* **a still bubble presses the glass.** Every
+step, each bubble lays a standing press of 0.0035 over 0.85 of its radius
+(`LiquidVisualizer`, "A bubble is air between the plates"), which holds the gap
+under it at the floor so the dye is pumped out from under it, and the air's own
+standing term in `divergence` does the same with a source where the air is and a
+sink everywhere else. Both are shortcuts that imitate how a trapped bubble looks
+rather than simulate it: in a real cell a bubble spans the gap and displaces the
+liquid only while it grows, shrinks or moves, and a still one pushes nothing, while
+this keeps a flow going for as long as it sits there. #225 made the solve balance
+them exactly, so they no longer move the whole plate, but they still stir the
+liquid round every bubble. Replace both with the air excluding the liquid by
+itself (the bubble as a region the flow goes round: a no-flux boundary, or the
+Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
+`npm run straw` and `npm run heldpress`, which should then need no press to hold.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -1577,7 +1606,9 @@ while this batch's plan was going in (#177), and no cause is known yet:
   a tenth of 300. It asks the gain against what was there, on a hand path drawn at
   random each run, so a run whose best spot starts full reads low; worth reading
   the gain's spread over the last runs before touching its tenth.
-- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else": on #189 (the Mixer's gel
+- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225**, the Mac's run to confirm: the
+  region starting to move by itself was the bubbles' press leaking a net source into
+  the pressure solve; see the mirror item near the top): on #189 (the Mixer's gel
   and lumia rows, whose default picture renders the same to the byte as main's), 16.3
   past its drift at the hand's left/right mirror cell against an allowance of 16.1.
   The cell's drift climbed drop by drop (3.2, 5.9, 18.3, 49.5) and its change with it

@@ -1111,15 +1111,123 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     And the press, as mass conservation says it is: closing a gap of height h
     at a rate dh/dt pushes out −(1/h)(dh/dt) per unit area.
 
-    A.b.y is the plate's mean of that, subtracted for the same reason the air's
-    is — a Neumann problem whose source does not average to zero has no
-    solution for the projection to find, and a press is a net source over the
-    whole plate with nothing to balance it.
+    Not balanced here. It used to have its plate mean taken off (A.b.y),
+    worked out on the CPU from the gap deltas over a resting gap of 0.03, and
+    that estimate was the source of the plate-wide flow the mirror check
+    (scripts/mirror.mjs) kept catching: a press held on one place squeezes its gap to the floor, where
+    the deltas are clamped away and the spring goes on moving the gap, so the
+    rate this line reads over the gap it really has is nothing like the
+    estimate, and the difference went into the solve as a net source over the
+    whole plate. The whole right-hand side is now made zero-mean exactly, on
+    the GPU, after this pass (divTiles, divFold, divCentre), so nothing here
+    has to guess what the plate as a whole is doing.
   */
   let sqv = textureLoad(sq, p, 0);
-  let squeeze = clamp(-sqv.g / max(sqv.r, 0.004) - A.b.y, -60.0, 60.0) * A.b.z;
+  let squeeze = clamp(-sqv.g / max(sqv.r, 0.004), -60.0, 60.0) * A.b.z;
   let q = (rate + standing) * A.a.x + squeeze;
   textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    The projection's right-hand side made to sum to zero over the plate,
+    exactly: the plate's mean of what divergence wrote, taken off every cell.
+
+    The walls are closed (the pressure's ghost cells copy the edge, the
+    velocity's negate it), and on a closed plate the pressure equation has a
+    solution only when its source sums to zero: what is pushed out in one
+    place has to be taken in somewhere else, or the liquid has nowhere to go.
+    The velocity's own divergence always does sum to zero — with the wall's
+    ghost cells, the central differences telescope to nothing. The sources
+    do not: the air arriving, the air standing, and the press each put
+    liquid in where they are, and each was balanced with a mean the CPU
+    worked out from its own idea of the plate (the bubble list's coverage,
+    the gap deltas over a resting gap). Where an idea was wrong the
+    difference was a net source, and the solve's answer to a problem with no
+    solution is a flow out from the middle of the plate that grows each step.
+    That is what failed the mirror check (`scripts/mirror.mjs`) on a calm
+    Classic plate as soon as a drop had trapped a bubble, and `npm run heldpress` holds it.
+
+    Taking off the true mean is the physics, not a patch over it. The plate
+    is a closed cell of liquid between two sheets of glass: a palm pressing
+    the gap shut in one place lifts the glass, a hair, everywhere else, and
+    the liquid it pushed out goes there. A uniform sink over the whole plate
+    is exactly that lift. The air terms keep their own CPU means, which
+    centre them before their clamps; this takes off whatever those missed.
+
+    Two passes to find the mean, the same shape as the plate's stats
+    (`wgsl/stats.ts`): a fixed number of workgroups each sum their stride of
+    the plate, then one sums those. The partial sums stay small, which keeps
+    a 512² plate accurate in 32-bit floats. A third pass writes the centred
+    field where the solve reads it, so neither the smoother nor the
+    multigrid's restriction has to know.
+  */
+  divTiles: `${HEAD}
+@group(0) @binding(2) var raw: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read_write> partials: array<f32>;
+const TILE = 64u;
+var<workgroup> tile: array<f32, 64>;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_id) lid: vec3u,
+        @builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) groups: vec3u) {
+  let n = u32(S.n);
+  let total = n * n;
+  let stride = TILE * groups.x;
+  var sum = 0.0;
+  var i = gid.x;
+  loop {
+    if (i >= total) { break; }
+    sum += textureLoad(raw, vec2i(i32(i % n), i32(i / n)), 0).r;
+    i += stride;
+  }
+  tile[lid.x] = sum;
+  workgroupBarrier();
+  var s = TILE / 2u;
+  loop {
+    if (s == 0u) { break; }
+    if (lid.x < s) { tile[lid.x] += tile[lid.x + s]; }
+    workgroupBarrier();
+    s = s / 2u;
+  }
+  if (lid.x == 0u) { partials[wid.x] = tile[0]; }
+}`,
+
+  // The partials into the plate's mean, in mean[0]. A.a.x = how many partials.
+  divFold: `${HEAD}
+@group(0) @binding(2) var<storage, read> partials: array<f32>;
+@group(0) @binding(3) var<storage, read_write> mean: array<f32>;
+const TILE = 64u;
+var<workgroup> tile: array<f32, 64>;
+@compute @workgroup_size(64)
+fn main(@builtin(local_invocation_id) lid: vec3u) {
+  let count = u32(A.a.x);
+  var sum = 0.0;
+  var i = lid.x;
+  loop {
+    if (i >= count) { break; }
+    sum += partials[i];
+    i += TILE;
+  }
+  tile[lid.x] = sum;
+  workgroupBarrier();
+  var s = TILE / 2u;
+  loop {
+    if (s == 0u) { break; }
+    if (lid.x < s) { tile[lid.x] += tile[lid.x + s]; }
+    workgroupBarrier();
+    s = s / 2u;
+  }
+  if (lid.x == 0u) { mean[0] = tile[0] / (S.n * S.n); }
+}`,
+
+  // The raw right-hand side less its mean, into the texture the solve reads.
+  divCentre: `${HEAD}
+@group(0) @binding(2) var raw: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read> mean: array<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  textureStore(dst, p, vec4f(textureLoad(raw, p, 0).r - mean[0], 0.0, 0.0, 0.0));
 }`,
 
   pressureJacobi: `${HEAD}
