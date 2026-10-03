@@ -143,7 +143,7 @@ const MAZE_PERIOD = 0.045;
   How much finer Maze Detail can make it: at 1 the period is a third of
   MAZE_PERIOD, 0.015 of the plate.
 
-  Steve's references (Chemical Bouillon's ferrofluid films) run fingers
+  The owner's references (Chemical Bouillon's ferrofluid films) run fingers
   about a sixtieth of the frame wide, and MAZE_PERIOD drew them two to three
   times wider than that in the lab. It stays the default because every look
   made so far was made with it. It cannot just be made smaller, though,

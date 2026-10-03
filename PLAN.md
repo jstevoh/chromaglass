@@ -385,7 +385,7 @@ photographs:
 - **Air bubbles are air pockets** (a thick black ring, a clear middle), and soap-film
   colour is faint in transmitted light.
 
-Steve chose "Both": the projector look on the plate and the flipped, many-coloured
+The owner chose "Both": the projector look on the plate and the flipped, many-coloured
 lens in the macro closeup. He then asked for the report's other findings to go into
 the app in its ranked order, on the same PR. The gate becomes: the size range and
 flattened contacts as written, the dark-ring fraction matching the rule above for oil
@@ -1552,7 +1552,7 @@ tempo the taps set is the plain mean of their gaps, so something moved the clock
 after the taps; worth reading whether the clock falls back to the heard beat when a
 frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
 
-Found while building step 4. Changed here, for Steve to confirm: Back reverts the
+Found while building step 4. Changed here, for the owner to confirm: Back reverts the
 look and whatever of the room the change itself moved (Lucky's roll of the
 microphone's Sensitivity and Bass Boost), but no longer the room's settings the hand
 changed after it (the film's level, the Mixer, the dimmer), since each step of a look
@@ -1819,6 +1819,12 @@ freeze (#164) have shipped.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
 pick them up from `docs/roadmap.md` now that step 1 is in.
 
+**This file is too big to read whole** (about 150 KB, 38k tokens; 2026-09-27). Every
+session told to read it carried it in context for the rest of its life, and the
+shipped batches are most of it. CLAUDE.md now says to read one section. The fix is to
+move shipped batches to `docs/plan-shipped.md`, keeping a line each here, in a PR of its
+own when few branches are editing this file (every open branch touches it).
+
 ## Operating rules
 
 - A sandbox has no GPU worth the name, so a WebGPU fallback adapter classifies as
@@ -1829,10 +1835,13 @@ pick them up from `docs/roadmap.md` now that step 1 is in.
   and files.
 - Every new setting is MIDI-learnable, reachable from the phone, and defaults to the
   current behaviour so a preset made today still looks the same tomorrow.
-- Every feature ships its phone version in the same PR, not after (Steve, 2026-09-27).
+- Every feature ships its phone version in the same PR, not after (the owner, 2026-09-27).
 - This plan is kept current: every PR that ships a batch step marks it shipped here,
   and anything found along the way that should be fixed or added goes in as an item,
-  in the batch it belongs to or a new one (Steve, 2026-09-27).
+  in the batch it belongs to or a new one (the owner, 2026-09-27).
+- The repository is public, so it names no one: "the owner", not a name, email or
+  machine (2026-09-27). Squash-merge commits made on GitHub still carry the merging
+  account's email unless that account keeps its email private in GitHub's settings.
 
 ## 12. ChromaGlass in the App Store and Google Play
 
@@ -1895,7 +1904,7 @@ Both listings say the show flashes, and that the flash guard (`src/lib/flashGuar
 limits it. Free is simplest on both: a price or in-app purchase adds agreements, tax
 forms and a 15 % cut.
 
-**Running order.** Steps marked *(owner)* need Steve's phone, card or account.
+**Running order.** Steps marked *(owner)* need the owner's phone, card or account.
 
 1. **Smoke test the site on both phones** *(owner)*: chromaglass.web.app in Safari on
    an iOS 26 iPhone and in Chrome on a recent Android phone. Does the plate start,
@@ -1978,7 +1987,7 @@ passes a frame, with a pressure solve, which means porting the solver back to GL
 That is the native rewrite `beyond-web.md` argues against. Streaming the plate into
 the host gives the VJ the same layer without it.
 
-**The wrapper comes first** (Steve, 2026-09-27: "Would a good option be to create a
+**The wrapper comes first** (the owner, 2026-09-27: "Would a good option be to create a
 small native wrapper that allows us to integrate into other VJ apps and have a
 complete cached system?" Yes, and he asked for it in the plan). It is one small
 native shell that does three jobs:
@@ -1998,7 +2007,7 @@ The web app stays the core: every change lands on the site first, and the wrappe
 picks it up in its next build. `detectTier()` already reads Electron as the
 `native` tier. It is about 150 MB to download, which a show laptop doesn't mind.
 
-**Running order.** Steps marked *(owner)* need Steve's Mac and a VJ app on it.
+**Running order.** Steps marked *(owner)* need the owner's Mac and a VJ app on it.
 
 1. **The wrapper** (one PR): an Electron app for the Mac with the built site inside
    it (offline from the first launch), the show server started with it, the show
@@ -2007,7 +2016,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    network off and sees a lit plate. *Not started.*
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
-   the plate as a layer in Resolume or VDMX on Steve's Mac, with the delay measured
+   the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
    against the plate's own frame. *Not started.*
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
@@ -2947,7 +2956,7 @@ Only liquids with a hand-written carry actually move under a tool: the dye (Fing
 `carryDye`, Press's `squeezeOut`) and the oil (Finger's `carryMix`). A likely fix is
 to feed a hand's velocity into the lasting current (`cur`, capped at 0.75 of a cell a
 step, which remembers for about a hundred steps) instead of the clamped field. That
-would carry every field alike. It changes how every tool feels, so it goes to Steve
+would carry every field alike. It changes how every tool feels, so it goes to the owner
 first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
 these numbers.
 
@@ -2956,7 +2965,7 @@ these numbers.
 A moving Blow multiplies the dye under it by 0.8 every step, which clears it, and
 its push is the one-step push of 15b. `npm run tools` checks "Blow clears dye from
 under it", so the check asserts the eraser. Whether wind should push the colour
-aside instead is a question for Steve, taken with 15b.
+aside instead is a question for the owner, taken with 15b.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 

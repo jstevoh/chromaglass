@@ -1058,7 +1058,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   /*
     Where the ferrofluid is, dye is not: it is pushed aside (Ferro Pushes Dye).
 
-    Steve's reference for Ferro Paint is Chemical Bouillon's "Colored I" and
+    The owner's reference for Ferro Paint is Chemical Bouillon's "Colored I" and
     "II": black ferrofluid worked through coloured water, and the black
     carries the colour. It pushes it into cells between its channels and
     packs it bright along its edges. On the plate as it was, the ferrofluid
