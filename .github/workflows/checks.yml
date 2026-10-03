@@ -460,6 +460,12 @@ jobs:
       - name: The mixer's order and grades
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run mixer
+      # Beams: two projectors of different sources add where they cross, two
+      # carrying one picture sum to it across their overlap with no seam
+      # (the projector's pass on pictures made to order, to the pixel).
+      - name: Beams add, and the seam goes
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run beams
       # Ferro Paint pours its ferrofluid over the whole plate, so after it has
       # played the black is worked through nearly every part of the colour;
       # every other look pours exactly what it did.

@@ -117,6 +117,7 @@
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
+    "beams": "node scripts/beams.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
     "backplate": "node scripts/backplate.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",
