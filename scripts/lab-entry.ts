@@ -137,7 +137,15 @@ const api = {
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
   },
-  async step(n: number, over: Partial<GpuStepParams> = {}) {
+  /*
+    `flushed` says the first of these steps follows a flush, as the app's
+    loop says it (`gpu.step(p, applied)`): the gap then takes its press and
+    its spring in the one update the flush ran, not a second spring-only
+    update in the step as well. Every check before `npm run heldpress`
+    stepped without it, and a press held step after step then had its gap
+    sprung twice a step, a local opening the app never has.
+  */
+  async step(n: number, over: Partial<GpuStepParams> = {}, flushed = false) {
     const l = lab!;
     // The app runs the old solver until Thin Gap's pipelines are built
     // (prepareThinGap); the lab measures the thin gap from its first step.
@@ -145,7 +153,7 @@ const api = {
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
-      l.solver.step(p, false);
+      l.solver.step(p, flushed && k === 0);
       l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
