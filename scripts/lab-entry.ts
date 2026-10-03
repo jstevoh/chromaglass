@@ -191,6 +191,8 @@ const api = {
   },
   async field(which: 'dye' | 'vel' | 'oilDye') { return Array.from(await lab!.solver.readField(which)); },
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /** The spun dish's swirl on its own grid (readSwirl): `npm run dish`. */
+  async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
   /** The oil's half of a press, through the app's own function (squeezeOut): mirror cells, N across. */

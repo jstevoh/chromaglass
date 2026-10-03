@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — spin the plate
+
+- **The Spin tool** (N on the desks, a tool on the phone's dock and the
+  remote's pad) turns the dish under the hand: drag round the middle and
+  the glass goes round with the pointer, let go and it coasts on the
+  plate's drag, hold still and it stops.
+- **Auto Spin**: Off, **Rate** (rev/min, ±45, signed for the way round) or
+  **Tempo** (a turn every 1 to 64 beats, locked to the beat so a knock is
+  taken back), with **Reverse Spin**. On the sheet, the phone's Play sheet,
+  the remote, MIDI (and a pad for Reverse and Auto Spin: Next) and the
+  desks. Off by default, so every look is as it was.
+- **The liquid follows the glass as a real liquid does**: it lags by the
+  drag time h²/12ν of the gap (water 3 s, a thick liquid 0.15 s, oil
+  0.06 s), a pressed palm or a domed plate grips it where the gap is tight,
+  and spun, dense dye is flung outward and oil drawn in. `npm run dish`
+  (the lab) and `npm run turntable` (node).
+- **The phone's landscape dock is one row from 860 px** (was 800): the
+  tools' side is eleven buttons now, and at 844 one row put them at 47 px.
+  The desks' tool row wraps inside its column at 1024 rather than running
+  under the rides.
+
 ### Changed — Back goes fully back
 
 - **Back puts the room back too**: the film's and the logo's levels, the

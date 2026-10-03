@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
-/* A landscape phone wide enough for the dock's ten tools and five sheets on
-   one row with every button at the 48 px a thumb needs: under about 800 px
-   the tools fell to 42 px (740 wide) and 35 px (667), so there the dock goes
-   to two rows (PhoneStage). `npm run phone` measures both sides of it. */
-@custom-variant wide-land (@media (orientation: landscape) and (min-width: 800px));
+/* A landscape phone wide enough for the dock's tools and five sheets on one
+   row with every button at the 48 px a thumb needs: under about 800 px the
+   ten buttons of the tools' side fell to 42 px (740 wide) and 35 px (667),
+   so there the dock goes to two rows (PhoneStage). Spin (PLAN.md §21) made
+   the tools' side eleven buttons, and eleven at 48 px, their gaps, the
+   sheets' 264 px and the padding need 856 px: at 800 they were 43 px and at
+   an 844 phone 47. So the row now starts at 860, where a 852 phone takes the
+   two rows the 812s already did, and a 915 or a 932 keeps its one.
+   `npm run phone` measures both sides of it. */
+@custom-variant wide-land (@media (orientation: landscape) and (min-width: 860px));
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap");
 
 /* Chromaglass · Modern tool UI · design tokens

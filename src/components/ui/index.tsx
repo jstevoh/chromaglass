@@ -97,11 +97,18 @@ export function Segmented<T extends string>({
    * Freeze and Drain off a 1024 screen without it; and once the middle column
    * stopped growing to fit, the full-size row ran 70px past it at 1280 and
    * the rides column was painted over the Amount chip.
+   *
+   * And a compact row wraps inside its own box rather than run past the
+   * column it is in. Spin (PLAN.md §21) made the desks' tools ten, and at
+   * 1024 the row measured 454 px in a middle column of 408: the rides column
+   * was painted over Magnet and Spin. Two lines of tools cost the preview
+   * one button's height at that width and nothing at 1280 and up, where the
+   * ten fit on one (481 px in 664).
    */
   compact?: boolean;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-border bg-elevated p-0.5" role="tablist" data-testid={testId}>
+    <div className={`inline-flex rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''}`} role="tablist" data-testid={testId}>
       {options.map(([id, label, kbd]) => (
         <button
           key={id}

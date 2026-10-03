@@ -543,6 +543,36 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
+## 22. Spinning the dish (PLAN 21)
+
+Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
+lab measured the swirl (`npm run dish`), not the picture. On the Mac:
+
+- the Spin tool (N): drag round the middle. The glass should go round with the
+  pointer, coast when you let go and stop when you hold still. On Classic (thick)
+  the picture should follow almost at once; on a thin look (Viscosity thin) the
+  liquid should visibly trail the glass for a couple of seconds, then catch up;
+- press (P) and hold with a spinning dish: the liquid under the palm should go round
+  with the glass while the rest lags, a whirl round the palm;
+- on Oil & Water, spun: the oil bodies should go round with the glass and the water
+  between them lag, and after a while of spinning hard (Spin Rate 30 or more), the
+  heavy dye should creep outward and the oil in;
+- Auto Spin at Rate 6: a slow, even turn; Reverse Spin turns it back through a stop,
+  not a jump;
+- Auto Spin at Tempo, 16 beats a turn, with music: the dish should turn once every
+  four bars and stay with the music; a flick with the Spin tool knocks it off and
+  it should come back to the beat within a bar or two, not settle somewhere new;
+- the phone: the Spin tool with one finger round the middle, and Auto Spin on the
+  Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
+
+Say if the lag is too long or too short to read as a liquid, and whether the swirl a
+press makes is visible or wants more.
+
+```
+?set=spinAuto=1;spinRpm=12     a dish turning at 12 rev/min, anticlockwise
+?set=spinAuto=2;spinBeats=8    a turn every 8 beats of the music
+```
+
 ---
 
 ## 22. The Press on the ferrofluid (PLAN 15d)
