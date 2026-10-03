@@ -3043,7 +3043,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     Water looks and bring back a cheap advection if it shows.
   - **18a-7, the rim follows the dish.** The open rim is the plate's inscribed circle;
     with Dish Spread (two dishes) or a round-dish vignette each dish has its own edge,
-    and the solver does not know it.
+    and the solver does not know it. And the inscribed circle touches the square's four
+    sides, where the box's wall, not the open rim, meets the liquid: a flow across the
+    plate is stopped at those four points (a lab probe of a uniform push read the speed
+    at the wall down to 0.54 of the rest and a sideways jet of 1.9 beside it), and the
+    pressure that takes it out reaches the middle for two steps (`npm run thingap`
+    prints that first step). The rim should sit a cell or two inside the square, or the
+    cells outside it count as open too.
   - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
     which leaves a small checkerboard at a floored dent's edge; the advections'
     Rhie–Chow faces are given c·P, exact only where the drag is even; and the face

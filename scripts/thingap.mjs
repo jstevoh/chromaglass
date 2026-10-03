@@ -20,7 +20,9 @@
  *   1. A push lasts the drag time. A uniform push across the plate decays by
  *      1/(1 + kΔt) a step, k = 12ν/h² at the rest gap (0.03 of a 0.2 m
  *      plate), at two thicknesses, to 3%: the rate is fitted to the speed
- *      in the middle of the plate over ten steps. And on a plate pressed
+ *      in the middle of the plate over the nine steps after the push has
+ *      met the box, and the step it lands in must carry between 0.9 and 2
+ *      times the drag's rate (the box's start on top). And on a plate pressed
  *      evenly to half the gap, four times the rate, to 3%: the drag goes as
  *      1/h², which is the claim everything else here rests on. A disc of dye
  *      carried by the push goes as far as the thickness says: the thin
@@ -103,14 +105,23 @@ try {
 
     // 1. A push lasts the drag time.
     /*
-      The push is laid as the lab lays one, 1 − d²/r², and at r = 5 plates
-      that is 2% weaker at the corners than in the middle: a field with a
-      divergent part, which the thin gap's projection takes out over the
-      first two steps (the middle's speed fell 1.5% more than the drag in
-      the first step and 0.7% more in the second, and then by exactly the
-      drag; on Metal that put the ten-step fit 3.4% over, CI run
-      36370603193). At r = 50 it is flat to 0.02%, so what the fit sees is
-      the drag alone. The old solver keeps the r = 5 push: it feeds no fit,
+      What the fit reads is the speed in the middle of the plate, step by
+      step, and the drag is the rate it falls once the push is a flow the
+      dish can hold. The first steps are not that. The push is laid as the
+      lab lays one, 1 − d²/r², which at r = 5 plates is 2% weaker at the
+      corners than in the middle, so it is laid at r = 50, flat to 0.02%.
+      And even flat it runs into the box: the rim is the circle inscribed in
+      the square, and where it touches the square's sides across the push,
+      at x = 0 and x = 1, the wall stops the flow. A probe of the first step
+      read the speed at x = 0.04 down to 0.54 and a sideways speed of 1.9 at
+      the right-hand wall, against 0.957 everywhere away from those points;
+      the pressure that takes this out reaches the middle, which fell 1.2%
+      past the drag in the first step and 0.6% in the second (kΔt 0.0504 for
+      0.0441), and by the drag alone after it, to the half float's grain.
+      Fitted from the first reading, that start put the ten-step rate 1.3%
+      over in software and 3.6% over on Metal (0.0457, CI run 37095698733).
+      So the fit starts at the second reading, when the push has met the
+      box, and the step the push lands in is held to its own bound below. The old solver keeps the r = 5 push: it feeds no fit,
       only the travel control below, and a flat push in its closed box is
       pure gradient that any projection removes whole, so it would read 0
       whatever its clamp did; at r = 5 it reads what the header says.
@@ -252,14 +263,24 @@ try {
   // THINGAP_DEBUG=1 prints every sample check 5 took.
   if (process.env.THINGAP_DEBUG) console.log(JSON.stringify(r.cons, (k, v) => typeof v === 'number' ? +v.toPrecision(3) : v));
   // 1.
-  const decay = (s) => Math.exp(Math.log(s[10] / s[0]) / 10);
+  // Fitted from the second reading on: see where the push is laid (1.).
+  // speeds[k] is read after k + 1 steps, so the fit spans steps 3 to 11.
+  // The step the push lands in is not in the fit, so it is held apart: the
+  // push is 1 in the middle, its rate there is 1/speeds[0] − 1, and it must
+  // carry the drag and no more than the box's start on top of it, between
+  // 0.9 and 2 times the drag's rate. In software it reads 1.30× for the thin
+  // liquid (the box's 0.013) and 1.11× for the thick; a drag skipped on that
+  // step reads 0.3×, one applied twice 2.3×.
+  const decay = (s) => Math.exp(Math.log(s[10] / s[1]) / 9);
+  const landed = (s) => 1 / s[0] - 1;
   for (const name of ['thin', 'thick']) {
     const k = name === 'thin' ? r.k.thin : r.k.thick;
     const got = decay(r.push[name].speeds);
     const rateGot = 1 / got - 1, rateWant = k / 60;
+    const land = landed(r.push[name].speeds) / rateWant;
     check(`a push on the ${name === 'thin' ? 'thinner' : 'thicker'} liquid fades at its drag rate, 12ν/h² at the rest gap`,
-      Math.abs(rateGot / rateWant - 1) < 0.03,
-      `kΔt ${rateGot.toFixed(4)} a step against ${rateWant.toFixed(4)}; ${r.push[name].speeds[0].toFixed(3)} → ${r.push[name].speeds[10].toFixed(3)} over ten steps`);
+      Math.abs(rateGot / rateWant - 1) < 0.03 && land > 0.9 && land < 2,
+      `kΔt ${rateGot.toFixed(4)} a step against ${rateWant.toFixed(4)}; ${r.push[name].speeds[1].toFixed(3)} → ${r.push[name].speeds[10].toFixed(3)} over nine steps; the step it landed in ${land.toFixed(2)}× the drag's rate, with the box's start`);
   }
   {
     const h = r.push.halved;
