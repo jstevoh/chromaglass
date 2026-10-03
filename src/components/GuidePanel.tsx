@@ -296,7 +296,7 @@ const SECTIONS: Section[] = [
           ['Turbulence Scale / Detail', <>Multi-octave curl noise added to the velocity field. Scale is how strong, Detail is how many octaves — structure from whole-blob motion down to ripple and filament trails.</>],
           ['Sharpness', <>How hard the boundary between two dyes is held. High values keep a boundary a boundary instead of letting diffusion soften it into a gradient.</>],
           ['Granulation / Grain Fineness', <>Pigment that separates the way real pigment does, and travels <Em>with</Em> the dye rather than sitting on the screen. Fineness up is smaller grain.</>],
-          ['Blob Surface Tension', <>Trades cohesion against shear. Low gives amoeba-like elongation and pinching; high gives rounder, self-contained blobs. Scaled by Polarity — see the interaction section.</>],
+          ['Blob Surface Tension', <>How hard two colours hold apart at their edge. High keeps each colour to itself with a clean edge between; low lets them run into each other. Scaled by Polarity — see the interaction section.</>],
           ['Dye Budget', <>How full the plate is allowed to get. As it fills toward saturation, evaporation ramps up hard, so injection and removal find an equilibrium with empty glass left. A saturated plate has no boundaries and reads as a flat colour wash.</>],
           ['Edge Relief', <>The meniscus: the little bright lip where dye meets clear glass.</>],
           ['Lacing', <>The dark dendritic threads that outline a boundary, drawn by the strain across it.</>],
@@ -534,11 +534,10 @@ const SECTIONS: Section[] = [
 
         <H>Polarity × Blob Surface Tension</H>
         <P>
-          Polarity is the master: it scales <Em>both</Em> the cohesion that rounds a blob and the
-          fingering that tears it. Blob Surface Tension then splits that budget between
-          them — high is round and self-contained, low is elongated and pinching. With
-          Polarity at zero, Blob Surface Tension does nothing at all, which is the most
-          common reason a slider appears dead.
+          Polarity is the master: it sets how hard two colours hold apart at all, and Blob
+          Surface Tension sets how much of that each edge gets — high is a clean, held
+          edge, low lets the colours bleed. With Polarity at zero, Blob Surface Tension
+          does nothing at all, which is the most common reason a slider appears dead.
         </P>
 
         <H>Turbulence × Momentum × Advection</H>

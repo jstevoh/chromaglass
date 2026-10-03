@@ -2887,6 +2887,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ depthDrag: v })}
           settingKey="depthDrag"
         />
+        {/*
+          The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
+          two stops, as Layers is, so a MIDI button and a desk can hold it
+          too. Thickness is how long a push lasts in it, so it only shows
+          while it is on.
+        */}
+        <Slider
+          label="Thin Gap"
+          value={settings.thinGap ?? 0}
+          min={0}
+          max={1}
+          step={1}
+          onChange={(v: number) => onUpdate({ thinGap: v })}
+          settingKey="thinGap"
+        />
+        {(settings.thinGap ?? 0) > 0.5 && (
+          <Slider
+            label="Thickness"
+            value={settings.gapThickness ?? 0.45}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(v: number) => onUpdate({ gapThickness: v })}
+            settingKey="gapThickness"
+          />
+        )}
         <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}
