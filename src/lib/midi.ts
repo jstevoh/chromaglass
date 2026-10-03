@@ -270,7 +270,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Pacing is not a master, but like them the patch bay does not ride it:
 // see NOT_A_TARGET in sceneMap.ts.
 // Nor the Mixer rows' fade times: see the same list there.
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow',
+// Nor Thin Gap, which switches the solver: see the same list there.
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
@@ -513,6 +514,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
+  // The plate as a thin gap (PLAN §18a). A switch, stepped, so a pad or the
+  // top half of a fader turns it on; and the liquid's thickness in it on a
+  // fader, because thinning the liquid mid-song is a gesture: pushes start
+  // to coast and the plate loosens.
+  { key: 'thinGap',         label: 'Thin Gap',         min: 0, max: 1, step: 1 },
+  { key: 'gapThickness',    label: 'Thickness',        min: 0, max: 1 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.

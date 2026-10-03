@@ -107,6 +107,15 @@ export interface GpuStepParams {
   plateCurve: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
   depthDrag: number;
+  /**
+   * The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): over 0.5, the
+   * flow between the glasses has the gap's drag and a variable-mobility
+   * projection with an open rim, in place of the speed clamp. Off (0) is the
+   * solver every look was made on.
+   */
+  thinGap?: number;
+  /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
+  gapThickness?: number;
   /** How fast the plates spring back toward that dome, per step. */
   gapSpring: number;
   /** How much of a press's squeeze survives into the next step. */

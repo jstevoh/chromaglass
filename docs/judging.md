@@ -464,7 +464,49 @@ On Oil & Water (Oil Bodies on):
   going straight out: a stripe under the palm should come out as a stripe, not a smear
   round the whole ring. Say if the old even ring looked better.
 
-## 19. The fingering push taken out (PLAN §0)
+## 19. Thin Gap: the plate as a thin layer of liquid (PLAN 18a)
+
+Every look moves by a speed clamp: whatever pushes the liquid, it is cut back to
+one small speed at the end of the step, so a push lasts one frame. Thin Gap
+(Settings → Squish Plate, under Depth Drag) replaces the clamp with the drag of two
+glasses a few millimetres apart: a push lasts as long as the liquid and the gap say.
+It is off in every look, and nothing changes until you turn it on. `?set=thinGap=1`
+turns it on for a page load.
+
+On Classic, then Oil & Water, then a look with a Plate Shape:
+
+- turn it on: the plate should keep moving the way the look moves, not freeze or
+  race. The first time in a show it takes a few seconds to switch (its pipelines are
+  built then, off the frame), and there should be no stop while it does. Say if the look's stirring now reads as too strong or too weak;
+- Finger through the colour at Thickness 0 (water), 0.45 (the default, a light oil)
+  and 1 (glycerine): in water the liquid should keep sliding for a second or two
+  after the finger stops; at 1 it should stop the moment the finger does;
+- Press and hold, then let go: the colour should be pushed out by the press and drawn
+  back in when the glass lifts, and under the press the colour should pale (less
+  liquid between the glasses there) and come back as it lifts. At the dish's edge the
+  liquid should go out of the dish, not bunch up against it;
+- on a look with Plate Shape up: where the glasses are tight, the colour should
+  move slower than where they are open;
+- the frame time with it on and off (below): it should be the same or faster;
+- the same on the phone (Settings → Squish Plate → Thin Gap), and a MIDI pad
+  learned to it.
+
+---
+
+## 19. A held Drop with Drop Height up drops six times a second, not every step
+
+The held Drop's clock stayed at zero on frames of one solver step each, so with
+Drop Height up it let go of a splashing drop on every step (sixty a second at the
+display's rate) until a frame happened to owe two. It now drops as the finger lands
+and then every tenth step. Only Bass Drop (Drop Height 0.9) and Boiling Point (0.7)
+ship with it up, so those two look different under a held Drop now:
+
+- hold the Drop still on each for two seconds: a beat of separate drops, each with
+  its own splash and ring, where it was a near-continuous gush;
+- the pool should be about a tenth of what it used to be for the same hold. Say if
+  the old gush was the look you wanted on either, and it can be a setting instead.
+
+## 20. The fingering push taken out (PLAN §0)
 
 Classic drew stripes a few cells across over its pools, and after a while red dots
 in a lattice with labyrinths between them. It was a push, set by Polarity, that

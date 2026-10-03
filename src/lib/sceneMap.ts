@@ -62,7 +62,12 @@ import { MIX_FADE_KEYS } from './mixer';
 // And the Mixer rows' fade times (lib/mixFade.ts): App reads one when its row's
 // take button is pressed, from the app's settings, so a patch on it would show
 // in the bay and change nothing.
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow',
+/*
+  Thin Gap is a solver mode, not an amount (PLAN §18a): a patch riding it
+  would switch the plate's physics every time the sound crossed half, so it
+  is held by hand, a pad or a desk, and its Thickness is what a patch rides.
+*/
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
@@ -107,6 +112,8 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',
+  // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
+  'thinGap', 'gapThickness',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
   'vorticityConfinement', 'oilTension', 'oilBodies', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   /*
