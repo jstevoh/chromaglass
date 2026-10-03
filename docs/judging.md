@@ -562,6 +562,18 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
+## 22. Colour between the domes
+
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
+
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
+
 ---
 
 ## 22. The Press on the ferrofluid (PLAN 15d)

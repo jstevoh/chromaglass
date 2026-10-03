@@ -419,6 +419,13 @@ jobs:
       - name: The hands move the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrohands
+      # Where the held magnet parts a pool into domes, the water between them
+      # keeps its dye and the plate draws it bright; the maze's flow makes or
+      # loses none of the plate's dye. In the open shard: the plate shard is
+      # near its timeout.
+      - name: Colour between the ferrofluid's domes
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run domes
       # Thin Gap: a pressed pool of ferrofluid stays full and spreads by the
       # volume the glass displaced, comes back on the lift, and a front where
       # the thinner liquid pushes the thicker fingers (PLAN 15d).
