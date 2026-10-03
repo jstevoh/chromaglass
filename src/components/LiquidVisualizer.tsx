@@ -2994,9 +2994,8 @@ class FluidSimulation {
     // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
     if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
 
-    // 7. Immiscibility & fingering
+    // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
     this.applyImmiscibility(p.immiscibility, time, noise2D);
-    if (p.fingering > 0) this.applyFingering(p.fingering, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
     if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
@@ -3150,9 +3149,10 @@ class FluidSimulation {
       }
     }
 
-    // blobSurfaceTension trades cohesion for shear: low tension gives weak
-    // cohesion and strong fingering (amoeba-like elongation and pinching),
-    // high tension the reverse (rounder, self-contained blobs).
+    // blobSurfaceTension is how strongly two colours hold apart
+    // (immiscibility, below). It also set a fingering push, a noise pushing
+    // the dye along its own gradient, which grew a grating in every pool
+    // and is gone (forcesB in wgsl/fluid.ts, and why).
     const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
 /*
@@ -3168,7 +3168,6 @@ class FluidSimulation {
       told the same lie.
     */
     const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
-    const fingering = polarity * 0.15 * (0.4 + (1 - tension) * 1.8);
 
     let smearX = 0, smearY = 0;
     if (settings.glassSmear > 0.2) {
@@ -3319,7 +3318,7 @@ class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, immiscibility, fingering,
+      turbScale, turbDetail, spin, immiscibility,
       /*
         The two glasses (2026-09-21).
 
@@ -3571,28 +3570,6 @@ class FluidSimulation {
         const noiseMod = 1.0 + n * 2.0;
         this.vx[idx] -= colorDiffX * strength * d * noiseMod;
         this.vy[idx] -= colorDiffY * strength * d * noiseMod;
-      }
-    }
-  }
-
-  private applyFingering(strength: number, time: number, noise2D: (x: number, y: number) => number) {
-    for (let j = 1; j < this.size - 1; j++) {
-      for (let i = 1; i < this.size - 1; i++) {
-        const idx = i + j * this.size;
-        const d = this.density[idx];
-        if (d < 0.05) continue;
-        const gradX = (this.density[idx + 1] - this.density[idx - 1]) * 0.5;
-        const gradY = (this.density[idx + this.size] - this.density[idx - this.size]) * 0.5;
-        const gradMagSq = gradX * gradX + gradY * gradY;
-        if (gradMagSq > 0.005) {
-          const gradMag = Math.sqrt(gradMagSq);
-          const nx = gradX / gradMag;
-          const ny = gradY / gradMag;
-          const n = noise2D(i * 0.02, j * 0.02 + time * 0.05);
-          const force = n * strength * gradMag * 4.0;
-          this.vx[idx] -= nx * force;
-          this.vy[idx] -= ny * force;
-        }
       }
     }
   }
