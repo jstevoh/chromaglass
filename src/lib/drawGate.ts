@@ -132,11 +132,28 @@ const GAPS = 8;
  * believed: a second. A callback held up behind a long draw, a collection or
  * another window's frame runs late but keeps its refresh's time, and that is
  * the whole point; a stamp older than a second is a clock that is not this
- * one. And never later than now, beyond the 2 ms that two windows' time
- * origins, rounded as browsers round them, can disagree by.
+ * one. And no later than one refresh of the fastest display ahead of now.
+ *
+ * That bound was 2 ms, on the belief that in Chrome a refresh's timestamp is
+ * never ahead of now and that 2 ms covers two windows' time origins rounded
+ * as browsers round them. The Mac runners say otherwise: `npm run wall`
+ * failed on four of one PR's five Mac runs with one to six stamps a run
+ * turned down, and once the fallbacks were told apart (`stampMisses` below)
+ * every one of them was ahead of now, the worst by 2.4 ms in every reading,
+ * none of them stale. Which clock runs ahead, the show's own frame or the
+ * wall's converted one, the page-wide count does not say (a Mac's display
+ * link stamping a frame with the refresh it is for would do it; inferred,
+ * not measured). It does not matter to the gate: an offer is turned down
+ * within 0.6 of a refresh of the last draw precisely so that a clock a
+ * millisecond or two early still counts as the refresh it belongs to, and a
+ * stamp up to a 240 Hz refresh ahead is still that refresh's at any rate the
+ * gate works to. Further ahead than that it would be naming the next one, so
+ * it is not believed. Turning a real stamp down is not the safe side either:
+ * the fallback stamps with the time the callback ran, which is the stamping
+ * that let a slow frame's second clock draw too.
  */
 const STAMP_OLDEST_MS = 1000;
-const STAMP_AHEAD_MS = 2;
+const STAMP_AHEAD_MS = REFRESH_MIN_MS;
 
 /**
  * The time to offer a frame at (ms, on this window's clock): its refresh's
@@ -146,6 +163,11 @@ export function refreshStamp(ts: unknown, now: number): number {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return now;
   if (ts > now + STAMP_AHEAD_MS || ts < now - STAMP_OLDEST_MS) {
     stampFallbacks++;
+    const ahead = ts > now;
+    const by = Math.abs(ts - now);
+    if (ahead) { stampMisses.ahead++; stampMisses.aheadMs = Math.max(stampMisses.aheadMs, by); }
+    else { stampMisses.stale++; stampMisses.staleMs = Math.max(stampMisses.staleMs, by); }
+    stampMisses.lastAt = now;
     return now;
   }
   return ts;
@@ -154,14 +176,26 @@ export function refreshStamp(ts: unknown, now: number): number {
 /**
  * How many timestamps `refreshStamp` did not believe, for `?debug`. A
  * fallback is stamping at the time the callback ran, which is the stamping
- * that let a slow frame's second clock draw too; in Chrome a refresh's
- * timestamp is never ahead of now (the second pre-push review measured the
- * show's 0.2 to 0.7 ms behind, the wall's converted one 6.3 to 6.9 ms), so
- * this should read 0. On another browser, or a wall whose time origin is
+ * that let a slow frame's second clock draw too. Headless on Linux a
+ * refresh's timestamp was never ahead of now (the second pre-push review
+ * measured the show's 0.2 to 0.7 ms behind, the wall's converted one 6.3 to
+ * 6.9 ms); on the Mac runners some were, by up to 2.4 ms, which the bound
+ * above now believes. So this should read 0. On another browser, or a wall whose time origin is
  * converted wrong, it is the one place that says so. A missing timestamp
  * (a call that is not an animation frame) is not counted.
  */
 export let stampFallbacks = 0;
+/**
+ * The same fallbacks told apart, for `?debug` and `npm run wall`: stamps
+ * ahead of now (a clock ahead of this one) and stamps older than a second
+ * (a callback held up that long, or a wall whose time origin was converted
+ * wrong: the wall opens after the show, so a missing or reversed conversion
+ * puts its stamps seconds behind, not ahead), each with the worst gap seen and when the last one was. The
+ * check went red on one PR's Mac runs with a single fallback, three runs
+ * out of three, and the total alone could not say which bound it was or
+ * when; this does not change what is believed, only what is reported.
+ */
+export const stampMisses = { ahead: 0, aheadMs: 0, stale: 0, staleMs: 0, lastAt: 0 };
 
 export class DrawGate {
   /** When anything was last drawn (ms). */

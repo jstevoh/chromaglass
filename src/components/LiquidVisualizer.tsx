@@ -3,7 +3,7 @@ import { fingerCarry, blowCarry } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
-import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
+import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
@@ -26,7 +26,8 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
-import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
+import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
+import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
@@ -173,6 +174,13 @@ interface LiquidVisualizerProps {
    */
   soundBindings?: readonly SoundBinding[];
   onSoundTrigger?: (binding: SoundBinding) => void;
+  /**
+   * A hand has just put a magnet under a look that has none of its own
+   * (magnetStrength 0): the app gives the look the magnet's strength, so
+   * that once let go it stays under the glass where the hand set it down
+   * (magnetFor). Called once per hold, from the frame that first holds it.
+   */
+  onMagnetInHand?: () => void;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -4040,7 +4048,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4848,12 +4856,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const amt = settingsRef.current.phaseAmount ?? 0;
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
+      phaseLaysRef.current++;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);
+  /** How many times the ferrofluid has been laid afresh (layPhase), for the harness: a lay clears what was there. */
+  const phaseLaysRef = useRef(0);
   layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
@@ -5327,6 +5338,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { onManualGestureRef.current = onManualGesture; }, [onManualGesture]);
+  const onMagnetInHandRef = useRef(onMagnetInHand);
+  useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
+  /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
+  const magnetToldRef = useRef(-Infinity);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5609,6 +5624,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           k.env = kickRef.current?.kick ? 1 : k.env * Math.exp(-dtS / 0.8);
           const energy = Math.min(1, currentAudioData.energy);
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
+        }
+        /*
+          A hand bringing a magnet to a look that has none: the look takes
+          it, at the strength the Magnet tool has always given such a look,
+          so that let go it is set down under the glass where the hand left
+          it (placed, below) rather than taken away with the hand.
+
+          Read from the settings as the app holds them, not the folded look:
+          the app answers from its own Magnet Strength, and a sound-learn
+          patch riding the folded one must not decide whether the look has
+          a magnet. And asked again a few times a second for as long as the
+          hand holds it, rather than once a hold: a look fade that lands
+          during the hold sets the strength back to the target look's, and
+          a hold told only once would then set down a magnet with none. The
+          app ignores a call when the look already has its magnet.
+        */
+        if (held && (settingsRef.current.magnetStrength ?? 0) <= 0 && now - magnetToldRef.current > 250) {
+          magnetToldRef.current = now;
+          onMagnetInHandRef.current?.();
         }
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
@@ -8116,7 +8150,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
-        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks },
+        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks, stampMisses: { ...stampMisses } },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
@@ -8455,6 +8489,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let stage: WebGPUStage | null = null;
     let camera: WebGPUCamera | null = null;
     let projector: WebGPUOutput | null = null;
+    /** The projector sources last frame drew, to scope the frame a new one is built on. */
+    let sourcesBefore = '';
     let probe: WebGPUFrameProbe | null = null;
     let chain: WebGPUPostChain | null = null;
     /** The compositor, so the cleanup releases it by name rather than leaving it to the device's destroy (S13). */
@@ -8843,6 +8879,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // With a chain, the finish happens at the end of it instead.
               postChain: !!post,
             });
+            /*
+              A projector's own source (PLAN.md §16b): the front plate alone,
+              the back plate alone or the film alone, for each one an enabled
+              surface asks for, and nothing at all when every surface shows
+              the wall. Each is filled from the frame's settings with the
+              other rows at nothing (lib/plateSources.ts), with no camera and
+              no chain, so its display pass does its own finish: the dimmer,
+              the flash guard's gain and the logo, as the wall has them.
+            */
+            const sourcesNow = out ? sourcesAskedFor(view.outputCfg) : [];
+            // A source picked mid-show allocates two canvas-sized textures on
+            // its first frame (the output's and the plate's second target):
+            // scope that frame, as a new projector's is, so running out of
+            // memory there steps the governor down rather than blacking every
+            // projector with a bind group that fails each frame.
+            const sourcesKey = sourcesNow.join(' ');
+            if (sourcesKey !== sourcesBefore) { if (sourcesNow.some(k => !sourcesBefore.split(' ').includes(k))) scopeSoon = 2; sourcesBefore = sourcesKey; }
+            plate.keepSources(sourcesNow);
+            out?.keepSources(sourcesNow);
+            for (const kind of sourcesNow) {
+              fillPlateUniforms(plate.sourcePack(kind), {
+                view: { ...view, settings: sourceSettings(kind, view.settings) }, fluids,
+                width: canvas.width, height: canvas.height,
+                derived: true,
+                grid: fields[0].dye.width,
+                cameraOn: false,
+                postChain: false,
+              });
+            }
             // What the finish needs, taken from the uniforms the plate was
             // just given rather than worked out a second time here: the
             // dimmer with the flash guard folded in, and the mark's fader
@@ -8898,6 +8963,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // filled for; the shader samples by that number.
               if (live[0].dye.width !== fields[0].dye.width) {
                 plate.pack.set('gridSize', live[0].dye.width);
+                for (const kind of sourcesNow) plate.sourcePack(kind).set('gridSize', live[0].dye.width);
               }
               // Where each pass hands the frame on: the projector's texture
               // if there is one, else the canvas; the chain's picture if
@@ -8973,7 +9039,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   markBlend: markBlendNow,
                 }, stage?.profiler.renderPass('finish'), !!out);
               }
-              if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              // Each projector source, from the plates this frame just packed
+              // and derived: only the full-screen display again, timed on its
+              // own so the Mac can say what a second picture costs.
+              if (out) {
+                for (const kind of sourcesNow) {
+                  plate.drawSource(encoder, kind, out.sourceView(kind, size.width, size.height), size, live,
+                    stage?.profiler.renderPass(`plate ${kind}`), stageFormat);
+                }
+                out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              }
               return true;
             };
           }
@@ -9082,6 +9157,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
+          phaseLays: () => phaseLaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;

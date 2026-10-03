@@ -524,7 +524,26 @@ Surface Tension low (which made the push strongest):
   plan's next step for it, not a noise;
 - the Finger through a pool: it should carry the dye and not seem to add any.
 
-## 21. The Press draws the liquid back when you let go (Thin Gap, PLAN 18a)
+## 21. A projector picks its source
+
+PLAN.md §16b. With a projector (or a second window) on, open Settings,
+Mapping, add two rectangles side by side, and set one's Source to **Front** and
+the other's to **Back**, on a two-plate look (Classic). Worth looking at:
+
+- each rectangle carries one plate, and the two are the same liquid, turned
+  opposite ways, moving together;
+- **Film** on a surface with a film playing shows the film alone, graded as
+  the Mixer's film row is, with none of the plate's liquid in it;
+- the logo is on the front plate's projector and not the back's;
+- grading a row in the Mixer (the back plate's brightness, say) changes that
+  plate on its own projector as on the wall; the dimmer and a blackout take
+  every projector down;
+- the frame time with two or three sources on against one (`chromaglassDebug()`,
+  `webgpu.timings`: `plate`, `plate front`, `plate back`, `plate film`);
+- whether two plates on two projectors, overlapping on a wall, read as a light
+  show's two projectors is the judgement this is for (16c makes their overlap add).
+
+## 22. The Press draws the liquid back when you let go (Thin Gap, PLAN 18a)
 
 With Thin Gap on, the Press no longer moves the colour out to a ring by hand: the
 glass bends into a bowl under the palm, the liquid it squeezes out carries the
@@ -547,8 +566,8 @@ On Classic, then Oil & Water (Oil Bodies), then the look you play most:
   opening along them (the colour is drawn in by the flow, not pushed);
 - the frame time while pressing (below): the colour's carry runs in up to 33 short
   substeps for the few steps the glass is closing fastest, and in one otherwise;
-- and which looks to turn it on in. It changes how every look moves, so it stays
-  off in all of them until you say which.
+- the owner picked every look (2026-10-03); that is its own PR, and until it lands
+  Thin Gap is off in every look.
 
 ---
 
