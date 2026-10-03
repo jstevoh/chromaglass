@@ -49,11 +49,11 @@
  *      solve counted the gap twice and the palm went round at 0.045 against
  *      the old plate's 0.53;
  *   9. and a plate nobody spins steps exactly as without the spin's numbers:
- *      a pressed plate, its liquid moving, stepped with the spin fields at
- *      zero and stepped without them, gives the same flow and the same dye
- *      to the bit, on the old plate and with Thin Gap on. The flow is asked
- *      to be moving first, so two still plates cannot pass it (the first
- *      version compared two plates with nothing moving at all).
+ *      a pressed plate, its liquid set moving by a push, stepped with the
+ *      spin fields at zero and stepped without them, gives the same flow and
+ *      the same dye to the bit, on the old plate and with Thin Gap on. The
+ *      flow is asked to be moving first, so two still plates cannot pass it
+ *      (the first version compared two plates with nothing moving at all).
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI,
  * a Linux box's software WebGPU anywhere else.
@@ -168,10 +168,22 @@ try {
       }
       return s / Math.max(1, n);
     };
-    const pressed = async (extra, over) => {
+    /*
+      `kick` sets the liquid moving for check 9, with a finger's push across
+      the palm. That check first leaned on the press itself to move the flow,
+      which it did only through the leak #225 closed (a held press set the
+      whole old plate flowing): with that gone the old plate under a still
+      palm is still, 0 everywhere, and two still plates prove nothing. A push
+      is motion the solver is meant to carry, so it stays whatever becomes
+      of the press. Check 8 is left without it: its grip is read against an
+      unpushed plate.
+    */
+    const pressed = async (extra, over, kick = false) => {
       await lab.create(256, 192); await lab.step(1, extra);
       for (let k = 0; k < 6; k++) { lab.squish(0.65 * 192, 96, 12, 0.004, 0, 'press'); lab.flush(); await lab.step(1, extra); }
-      lab.dye(0.6, 0.5, 0.08, [1, 1, 1], 1); lab.flush();
+      lab.dye(0.6, 0.5, 0.08, [1, 1, 1], 1);
+      if (kick) lab.vel(0.5, 0.5, 0.1, [0.09, 0.03, 0, 0]);
+      lab.flush();
       await lab.step(60, { ...extra, ...over });
       return { vel: await lab.field('vel'), dye: await lab.field('dye') };
     };
@@ -180,8 +192,8 @@ try {
     for (const [name, extra] of [['old', { gapSpring: 0 }], ['thin', { gapSpring: 0, thinGap: 1 }]]) {
       const spun = await pressed(extra, spin(A, 0, THICK));
       out.grip[name] = { palm: az(spun.vel, 0.65, 0.5, 0.02), away: az(spun.vel, 0.35, 0.5, 0.04) };
-      const bare = await pressed(extra, {});
-      const zero = await pressed(extra, spin(0, 0, THICK));
+      const bare = await pressed(extra, {}, true);
+      const zero = await pressed(extra, spin(0, 0, THICK), true);
       let dv = 0, dd = 0;
       for (let k = 0; k < bare.vel.length; k++) dv = Math.max(dv, Math.abs(bare.vel[k] - zero.vel[k]));
       for (let k = 0; k < bare.dye.length; k++) dd = Math.max(dd, Math.abs(bare.dye[k] - zero.dye[k]));
