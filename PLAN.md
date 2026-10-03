@@ -2953,18 +2953,19 @@ debug hook's copy (the pattern `depth` had); worth bringing into the tools shard
 ferrofluid by area (the flux form in `phaseAdvect`), so under a palm the glass's
 outflow took a share of every cell, and a pool stayed the size it was and went grey:
 its fullest cell fell from 0.96 to 0.48 with Thin Gap on and to 0.67 without (lab, a
-palm pressing the gap to a sixth). A real pool between two glasses keeps its volume:
+palm pressing the gap to a sixth, ten steps in). A real pool between two glasses keeps its volume:
 pressed, it gets thinner and wider and stays full. A flat take out to the palm's rim,
 as the oil's (`pressMix`), would have been the same fault by hand: it takes a share of
 every cell too. So with Thin Gap on, the ferrofluid moves as a volume, c·h, on the
 thin solve's own face fluxes, and each cell divides by its gap after (`phaseAdvect`,
 `phaseGapSeen`). `npm run ferropress` (lab, 7 checks): pressed over twenty steps to a
-sixth of the gap, the middle of a pool held to 3% (0.955 → 0.961; it is a stagnation
-point), where carried by area it fell to 0.155; its volume kept to 0.1% while the cells
+sixth of the gap, the middle of a pool held to 0.6% (0.955 → 0.961, the check allows
+3%; it is a stagnation point), where carried by area the same middle fell to 0.155 at
+twenty steps; its volume kept to 0.13% while the cells
 it fills grew 2.5 times; and after the lift it matches a pool the glass never touched
 to 0.006 in every ring. Two cuts on the way: putting the glass's
 part back as c times the gap's change along the path kept a pool full but grew it 7%
-a press; carrying the volume on the cells' filtered velocities emptied the middle to
+a press and lift; carrying the volume on the cells' filtered velocities emptied the middle to
 0.53, because that flux carried 18% more out of it than the glass displaced. Only the
 solve's own face flux (the mean of two cells' h·u plus the second difference of
 M_f·ΔP) keeps both.
@@ -2975,8 +2976,12 @@ follows the two liquids (Saffman–Taylor): on the default plate (Thickness 0.45
 oil of 22 mm²/s) the ferrofluid is the thinner, so a press pushing it out into the oil
 is the unstable direction, and a bumpy pool's outline keeps more of its bumps (its
 spread over its radius 0.023 → 0.013 against 0.009 for an even pair, `ferropress`
-§4); in water it is the thicker, the press rounds it a little more (0.008), and the
-lift is the unstable one. The
+§5); in water it is the thicker, the press rounds it a little more (0.008), and the
+lift is the unstable one. The same drag sets how fast the ferrofluid answers any
+body force under Thin Gap, the magnet's included: at the default Thickness about 4.4
+times faster than before (its drag is 0.22 of the oil's), in water about 5 times
+slower. That is the real liquid's answer, not a change to the magnet's code; the
+owner's eye on it is in judging §21. The
 phone's Press is the same press on the same solver, and Thin Gap is on its settings
 sheet. Judged on the Mac: `docs/judging.md` §21.
 

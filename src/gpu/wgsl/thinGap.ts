@@ -155,7 +155,8 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       The step's forces as terminal speeds, the drag, and the mobility.
 
       A.a = (k scale, real seconds this step, the rest gap h0, the rim's
-      radius), A.b.x the ferrofluid's viscosity over the clear liquid's. k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
+      radius), A.b.x the ferrofluid's viscosity over the clear liquid's.
+      k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
       liquid's kinematic viscosity over the plate's width squared, so the
       drag is in real seconds whatever grid or look clock the plate runs at.
 

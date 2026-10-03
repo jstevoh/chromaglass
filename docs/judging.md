@@ -544,6 +544,12 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
 - hold the Magnet under a pool and press over it: the pool should still answer the
   magnet, more slowly where the glass is down. The spikes under the palm do not yet
   flatten (they should; PLAN 15d's open items);
+- with Thin Gap on, the ferrofluid now has its own viscosity in the gap, so the pool
+  answers the magnet faster at the default Thickness (about four times) and slower in
+  water (about five times). Say if either feels wrong for the liquid it is in;
+- the frame time with Thin Gap on, in a ferrofluid look (`?debug`,
+  `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
+  where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
 ---

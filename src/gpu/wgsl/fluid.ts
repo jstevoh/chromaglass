@@ -731,9 +731,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   /*
     The gap the ferrofluid has now seen, for the next step's phaseAdvect to
-    carry its volume from. Its own pass, after
-    every substep, because phaseAdvect reads its neighbours' and a pass that
-    read and wrote it would race.
+    carry its volume from. One pass after all the substeps (they mix this
+    and the squeeze texture by their share of the step), and its own pass
+    because phaseAdvect reads its neighbours' and a pass that read and
+    wrote it would race.
   */
   phaseGapSeen: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
