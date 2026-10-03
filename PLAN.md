@@ -61,7 +61,7 @@ Where each batch stands, as of 2026-09-27:
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §23); steps 2 to 6 not started |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c–16e not started |
@@ -2140,7 +2140,19 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    it (offline from the first launch), the show server started with it, the show
    window opened on the projector with no click needed, background throttling off,
    and a macOS build on the CI runner. A check loads the packaged app with the
-   network off and sees a lit plate. *Not started.*
+   network off and sees a lit plate. **Shipped** (2026-09-27): `desktop/` (its
+   README has the build, the signing secrets and the first launch), the check
+   `npm run desktop` run on the packed app by `.github/workflows/desktop.yml` on a
+   Mac, which also builds the `.dmg` (Actions → Mac app → Run workflow). The server
+   is `server/remote-server.js` unchanged, imported by the app; the app keeps its
+   show key between launches; `useProjector` sends the show to a projector with no
+   gesture when `isDesktopApp()`, and the app fills the projector's screen itself.
+   Measured in a cloud session before and after: with a stand-in second screen, no
+   projector window opened before, one opened in full screen after; without the
+   app's fill, the wall showed the click hint and the laptop the title-bar chip.
+   **Owed:** the Mac look (`docs/judging.md` §23), and signing it with the owner's
+   Developer ID (the secrets in `desktop/README.md`); until then macOS asks once in
+   Privacy & Security before it opens.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
@@ -2176,6 +2188,43 @@ network):
   records (File System Access).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
+
+**Found building step 1** (2026-09-27):
+
+- The app's storage is its own, like a second browser: presets, MIDI maps and
+  settings saved in Chrome are not in it, and moving them is one file at a time
+  (each preset's download button, the MIDI map). One "take everything with you"
+  file (every user preset, the MIDI and sound-learn maps, the set list, the room's
+  settings), written in Chrome and opened in the app, would make the move one step.
+  The same file is a backup before a gig.
+- The storage belongs to the origin, port included: if port 3000 is taken when the
+  app opens (a `npm run show` still running), the app moves to 3001 and opens with
+  none of its saved looks. It says so in Show → Show Server Details…, but a
+  performer would not look there. Either warn in the show window, or give the app
+  its own origin (a custom protocol for the show window, with the relay still on
+  the port), which needs `relayInfo()` to learn the relay's address another way.
+- Built for Apple silicon only. An Intel Mac needs an `x64` (or universal) target in
+  `desktop/electron-builder.config.cjs`, about doubling the build.
+- The icon is the website's (`public/icon-512.png`), a flat square in the Dock. A
+  Mac icon has its own shape and shadow (a 1024 px `.icns`).
+- No updates in the app: a new version is a new download from Actions. Once it is
+  signed, `electron-updater` from GitHub Releases on a `desktop-v*` tag (which
+  `desktop.yml` already builds on) would let the app offer the new show itself.
+- The hidden-window lines are judged only where a window in a bare Electron is seen
+  to slow down when minimised or covered: never under xvfb (no window manager), and
+  on CI's Mac runner only if its window server really hides a minimised window.
+  The first run's control, a window inside the app, stayed visible at 46 frames/s
+  minimised because the app's switches reach every window in its process. Where
+  it is not measured, it is `docs/judging.md` §23 on the owner's Mac.
+- In a cloud session `npm run desktop` can fail "the run finished" on a 30 s
+  `page.reload` timeout, after software WebGPU starves the page (its covered-window
+  reading shows 2 s of timers taking about 54 s, and once the GPU process exited).
+  Measured on 2026-10-03 in one container: 3 of 6 runs failed this way after main's
+  #231 and #233 came in, and 1 of 4 failed on the head before them. So it is the
+  container, not those PRs. The Mac runner has never shown it. Worth fixing: a
+  check that times out because its machine is slow says nothing about the app.
+  Wait for the reload on the page's own first frame rather than `load`, or say
+  "skip" when the covered reading shows the page was starved, as the lit plate does.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
@@ -2630,6 +2679,13 @@ and comes back; a stubbed `getScreenDetails` with a fake `screenschange` in
   unregisters every service worker and deletes every cache (`src/main.tsx`): offline,
   that turns one missing file into a site that cannot be reloaded at all.
 - The fonts come from Google (`src/index.css`), which the worker does not handle.
+  *Found building the Mac app (§13 step 1), 2026-09-27:* they do not, anywhere. The
+  `@import url(https://fonts.googleapis.com/…)` comes after `@custom-variant`, and
+  CSS ignores an `@import` after any other rule, so the build drops it (`dist/assets`
+  has no `googleapis`) and Geist and Geist Mono never load: every page shows the
+  fallback fonts. `npm run desktop` saw no request leave the app. Serving the two
+  fonts from the site fixes the look and the offline half at once; which one the
+  designs were judged in is for the owner's eyes.
 - Song ID and lyrics fetch with no timeout (`fingerprint.ts`, `lyrics.ts`), and one
   busy flag gates the local fingerprint match, the song-end detector and the remote
   ID together (`useMusicIntelligence.ts`), so a request that hangs on venue Wi-Fi

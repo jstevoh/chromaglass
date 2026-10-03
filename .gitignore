@@ -39,3 +39,6 @@ scratch/
 gallery/
 controls/
 film/
+
+# The Mac app's packed builds (npm run mac-app)
+desktop/release/
