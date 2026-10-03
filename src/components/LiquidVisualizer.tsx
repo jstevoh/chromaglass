@@ -41,6 +41,7 @@ import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
+import { BackLook } from '../lib/backLook';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
@@ -159,6 +160,12 @@ interface LiquidVisualizerProps {
   toolAmount?: number;
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
+  /**
+   * The back plate's own look was let go of without anyone pressing Follow
+   * the front: a render began or ended (see `resetStamps`). So the desk, the
+   * phone and the Mixer stop saying the back plate is on a look it is not on.
+   */
+  onBackLookCleared?: () => void;
   /**
    * Where the tempo comes from when it is not the microphone: a MIDI clock,
    * a tapped tempo, a typed one. A ref for the same reason the room's reading
@@ -721,6 +728,14 @@ export interface LiquidVisualizerHandle {
   adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
   handoff: (seconds: number) => void;
+  /**
+   * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
+   * follow the front again. Over `seconds`: its solver settings fade the way
+   * a Go's do, its old dye thins and the look's own is laid in, and from then
+   * on it pours the look's dyes, styles and liquids while the front pours
+   * its own. `extras` is a user preset's dyes, as for `adoptPreset`.
+   */
+  sendBack: (presetId: string | null, look: VisualizerSettings | null, seconds: number, name?: string | null, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
@@ -4029,7 +4044,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
-  isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
+  isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -4113,6 +4128,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
   const paletteWindowRef = useRef<{ size: number | null; lead: number }>({ size: null, lead: 0 });
   const journeyRef = useRef({ lead: 0, lastAt: -1 });
+  /*
+    The back plate's own look (PLAN.md §16a; the why is in lib/backLook.ts).
+
+    Two halves. How it moves is `backLookRef`, which the patch bay folds in as
+    the back plate's base, so the solver for layer 1 steps with the look's
+    settings and every patch still rides them. What it pours is
+    `backDyesRef`: the look's dyes, pour styles and liquids, which every pour
+    aimed at plate 1 reads through `harmonyOf` and its two siblings instead
+    of the front's refs. Null is the back plate following the front, which is
+    every show until someone presses Go to Back Plate, so nothing here changes
+    a plate that never asks for it.
+
+    While the back plate has dyes of its own a front Go is the front's: its
+    handoff thins and lays plate 0 only. It thinned every plate before, which
+    was right for twins and would wipe a back plate that had just been given
+    a look of its own.
+  */
+  const backLookRef = useRef(new BackLook());
+  const backDyesRef = useRef<{ id: string; contract: number[] | null; harmony: number[]; styles: string[]; liquids: string[] } | null>(null);
+  const backHandoffRef = useRef<{ start: number; dur: number; last: number; poured: number; seed: Float32Array[] | null } | null>(null);
+  /** The fold's per-plate bases, one array reused: [front (always its own fold), back]. */
+  const platesScratchRef = useRef<(VisualizerSettings | null)[]>([null, null]);
+  /** The palette plate `layer` pours from. A palette the user pinned wins on every plate. */
+  const harmonyOf = (layer: number): number[] => {
+    const own = layer >= 1 ? backDyesRef.current : null;
+    return own ? (harmonyLockRef.current ?? own.harmony) : harmonyRef.current;
+  };
+  const stylesOf = (layer: number): string[] => (layer >= 1 && backDyesRef.current ? backDyesRef.current.styles : injectStyleRef.current);
+  const liquidsOf = (layer: number): string[] => (layer >= 1 && backDyesRef.current ? backDyesRef.current.liquids : plateLiquidsRef.current);
   /**
    * The working harmony for the current contract: the sequencer's window if
    * it set one, else the hue journey's window (one dye short of the contract,
@@ -4292,7 +4336,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     thins to a little under half and six pours of the new palette arrive
     through the second half, so the colours change hands with the settings.
   */
-  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null } | null>(null);
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null; plates?: number } | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -4535,6 +4579,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** What the catch-up rule allowed last frame, for the debug readout. */
   const catchUpRef = useRef(4);
   const onEngineStatusRef = useRef(onEngineStatus);
+  const onBackLookClearedRef = useRef(onBackLookCleared);
+  onBackLookClearedRef.current = onBackLookCleared;
   const outputCfgRef = useRef(output);
   outputCfgRef.current = output;
   const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
@@ -4595,7 +4641,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const S = GRID_SIZE;
     const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
-    const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
+    const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyOf(layer));
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
     // And the amount set for this tool, on top of how hard this hand pressed.
     const kTool = toolAmountRef.current;
@@ -4755,7 +4801,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (presetId === 'fillmore-1969') fluid.seedPreset('fillmore-wash', noise2D);
   };
 
-  const layPlate = (presetId: string) => {
+  const layPlate = (presetId: string, layBack = false) => {
     /*
       The plate's dice start again, from (seed, stream, this look), before
       anything below draws, so the numbers this look is laid with do not
@@ -4771,11 +4817,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     restartStreams(`look:${presetId}`, 'plate.');
     laidPresetRef.current = presetId;
-    for (const fluid of fluidsRef.current) fluid.clearAll();
+    /*
+      A back plate with a look of its own (§16a) is not the front's to lay: a
+      cut on the front (the preset strip, a MIDI preset step, a user look)
+      leaves it, its angle and its spin exactly as they were, as a Go on the
+      front does. Only a plate that has to be laid again whatever it held
+      (the device lost with nothing carried across, `layBack`) lays it too,
+      from its own look.
+    */
+    const keepBack = !!backDyesRef.current && !layBack;
+    const laid = keepBack ? fluidsRef.current.slice(0, 1) : fluidsRef.current;
+    for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
     chemRef.current.reset();
-    rotationAnglesRef.current = rotationAnglesRef.current.map(() => DICE.lay.angle());
-    spinVelRef.current = spinVelRef.current.map(() => 0);
+    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
+    spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
     const fluid = fluidsRef.current[0];
@@ -4812,7 +4868,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
       layPhaseRef.current(presetId);
     }
-    for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
+    for (const later of laid.slice(1)) {
+      // Laid again with a look of its own: from that look, and its handover,
+      // if one was running, is over (the plate it was rising into is gone).
+      const own = backDyesRef.current;
+      if (own) {
+        backHandoffRef.current = null;
+        const seeded = later.seedPreset(own.id, noise2D);
+        if (!own.contract && seeded.length > 0) own.harmony = seeded;
+        for (let i = 0; i < 15; i++) doseLiquid(later, own.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
+      } else laySecondPlate(later, presetId);
+    }
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
     // The plate is laid with its liquids as well as its dye, rather than
@@ -5042,6 +5108,42 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const now = showNow();
       handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null };
     },
+    sendBack: (presetId, look, seconds, name = null, extras) => {
+      // Not while a render has the plate (a pad pressed mid-render): the
+      // render owns both plates until it hands back (see `resetStamps`).
+      if (stageRef.current) { onBackLookClearedRef.current?.(); return; }
+      const now = showNow();
+      if (presetId === null || !look) {
+        // Following the front again: the solver settings fade back to the
+        // front's, and from now the back plate pours the front's dyes. What
+        // is on it stays; the front's pours take it over the way a stage
+        // change does, rather than a wipe.
+        backLookRef.current.send(null, settingsRef.current, now, seconds);
+        backDyesRef.current = null;
+        backHandoffRef.current = null;
+        return;
+      }
+      // A user preset's dyes, registered as `adoptPreset` does, without
+      // touching the front's refs.
+      if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
+      if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
+      if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
+      const contract = PRESET_CONTRACTS[presetId] ?? null;
+      backDyesRef.current = {
+        id: presetId,
+        contract,
+        // The front's sequencer windows and hue journey are the front's; the
+        // back plate takes its look's dyes whole, as a look laid fresh does.
+        // A look with no dyes of its own takes what its seed lays (below).
+        harmony: contract ? (contract.length <= 3 ? windowOf(contract, null, 0) : harmonyWithin(contract)) : harmonyRef.current,
+        styles: PRESET_INJECT_STYLES[presetId] || ['drop'],
+        liquids: PRESET_LIQUIDS[presetId] ?? [],
+      };
+      backLookRef.current.send(look, settingsRef.current, now, seconds, presetId, name);
+      // The same handover a Go gives the front, over at least a second: a
+      // cut to a look on a plate full of the last one reads as a glitch.
+      backHandoffRef.current = { start: now, dur: Math.max(1, seconds) * 1000, last: now, poured: 0, seed: null };
+    },
     setPaletteWindow: (size: number | null, lead: number) => {
       paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
       if (harmonyLockRef.current) return;
@@ -5268,12 +5370,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           break;
         }
         case 'motion': { // fast streaks in the current harmony
-          const c = harmonyColor(harmonyRef.current);
+          const c = harmonyColor(harmonyOf(activeLayerRef.current));
           af.autoInject('streak', rx(), rx(), amt, c.r, c.g, c.b, Math.min(1, energy + 0.3));
           break;
         }
         default: {
-          const c = harmonyColor(harmonyRef.current);
+          const c = harmonyColor(harmonyOf(activeLayerRef.current));
           af.autoInject('drop', rx(), rx(), amt, c.r, c.g, c.b, energy);
         }
       }
@@ -5345,7 +5447,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
           }
         }
-        if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
+        // A back plate built for a look of its own is built by a Go to Back
+        // Plate on a one-plate look (App keeps it on the stage for as long as
+        // it has the look), and that Go's handover lays it.
+        if (i > 0 && !backDyesRef.current && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
@@ -5528,7 +5633,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
       }, settingsRef.current.layerCount ?? 1, showNow(),
       // Sound learn's mappings: the rig's, not the look's, folded the same way.
-      soundLearnRef.current.patchesOf(soundBindingsRef.current));
+      soundLearnRef.current.patchesOf(soundBindingsRef.current),
+      // The back plate's own look, when it has one (§16a): its base, which
+      // the patches then ride. Null, which is every show that never sends it
+      // one, leaves the fold exactly as it was.
+      (platesScratchRef.current[1] = backLookRef.current.base(settingsRef.current, showNow()), platesScratchRef.current));
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
       // setting the render pass reads is global whatever it was aimed at,
@@ -6590,8 +6699,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + DICE.evolve.int(3), 4 * GRID_SCALE);
                   }
                 } else {
-                  const color = harmonyColor(harmonyRef.current);
-                  const styles = injectStyleRef.current;
+                  const li = fluidsRef.current.indexOf(af);
+                  const color = harmonyColor(harmonyOf(li));
+                  const styles = stylesOf(li);
                   const style = DICE.evolve.pick(styles);
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
@@ -6600,7 +6710,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   af.addTemp(rx, ry, 0.3 + trebleBoost * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
-                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.25 + energy * 0.25);
+                  doseLiquid(af, liquidsOf(li), rx, ry, 0.25 + energy * 0.25);
                 }
               }
             }
@@ -6718,7 +6828,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // in at the rate it thins, so what is left of the old look at
               // the end is HANDOFF_KEEP and the new look is all the rest.
               const lambda = -Math.log(HANDOFF_KEEP);
-              for (const fluid of fluidsRef.current) fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
+              // The plates this Go is for: all of them, or only the front
+              // while the back plate has a look of its own (see backDyesRef).
+              // Decided on the handover's first frame and kept: a Follow the
+              // front pressed half way through must not start thinning plate
+              // 1 with no seed of this look to rise into it.
+              h.plates ??= backDyesRef.current ? 1 : fluidsRef.current.length;
+              const handed = fluidsRef.current.slice(0, h.plates);
+              for (const fluid of handed) fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
               const id = livePresetRef.current;
               const lead = fluidsRef.current[0];
               /*
@@ -6735,9 +6852,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 new look is all but HANDOFF_KEEP of the plate.
               */
               if (!h.seeds) {
-                for (const fluid of fluidsRef.current) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
                 chemRef.current.reset();
-                h.seeds = fluidsRef.current.map((fluid, i) => {
+                h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
                   if (i === 0) {
                     let seeded: number[] = [];
@@ -6750,7 +6867,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 h.dosed = 1;
               }
               const share = Math.min(1, lambda * dtMs / h.dur);
-              h.seeds.forEach((seed, i) => { if (seed) fluidsRef.current[i]?.addSeedShare(seed, share); });
+              h.seeds.forEach((seed, i) => { if (seed && i < handed.length) fluidsRef.current[i]?.addSeedShare(seed, share); });
               // The second phase, once, half way: it is a body, not a wash.
               if (h.dosed === 1 && p >= 0.5) {
                 h.dosed = 2;
@@ -6766,7 +6883,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const due = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.5)) * HANDOFF_POURS + 1e-6);
               while (h.poured < Math.min(due, HANDOFF_POURS)) {
                 h.poured++;
-                const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
+                const fluid = handed[h.poured % Math.max(1, handed.length)];
                 if (!fluid) break;
                 const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
                 const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
@@ -6780,24 +6897,75 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
           }
 
+          // ── The back plate taking a look of its own (§16a) ──
+          /*
+            The front's handover above, for plate 1 alone: its dye thins to
+            HANDOFF_KEEP over the fade while the look's seed rises into it,
+            then the look's palette is poured through the second half. Its
+            chemistry and liquids are cleared at the start, as the front's
+            are, and the room's chemistry field is left alone because it is
+            the front's. Waits, rather than running out, while plate 1 is
+            still being built: App raises the plate count on the same press.
+          */
+          {
+            const h = backHandoffRef.current;
+            const dyes = backDyesRef.current;
+            const fluid = fluidsRef.current[1];
+            if (h && dyes && isActiveRef.current && drainFrameRef.current === 0) {
+              const nowMs = showNow();
+              if (!fluid) { h.start = nowMs; h.last = nowMs; }
+              else {
+                const p = Math.min(1, (nowMs - h.start) / h.dur);
+                const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
+                h.last = nowMs;
+                const lambda = -Math.log(HANDOFF_KEEP);
+                fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
+                if (!h.seed) {
+                  if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry();
+                  fluid.liquid.clear();
+                  let seeded: number[] = [];
+                  h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });
+                  if (!dyes.contract && seeded.length > 0) dyes.harmony = seeded;
+                  for (let i = 0; i < 4; i++) {
+                    doseLiquid(fluid, dyes.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
+                  }
+                }
+                fluid.addSeedShare(h.seed, Math.min(1, lambda * dtMs / h.dur));
+                const due = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.5)) * HANDOFF_POURS + 1e-6);
+                while (h.poured < Math.min(due, HANDOFF_POURS)) {
+                  h.poured++;
+                  const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                  const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                  const color = harmonyColor(harmonyOf(1));
+                  fluid.autoInject(DICE.lay.pick(dyes.styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                  fluid.addTemp(rx, ry, 1.2);
+                  doseLiquid(fluid, dyes.liquids, rx, ry, 0.8);
+                }
+                if (p >= 1) backHandoffRef.current = null;
+              }
+            }
+          }
+
           // ── Seed trigger ───────────────────────────────────────
           if (seedCountRef.current > lastSeedCount.current && drainFrameRef.current === 0) {
             lastSeedCount.current = seedCountRef.current;
             macroCamRef.current.reset();
             harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
-            const styles = injectStyleRef.current;
-            for (const fluid of fluidsRef.current) {
+            fluidsRef.current.forEach((fluid, li) => {
+              // Each plate from its own look's dyes (§16a); the front's for a
+              // back plate that follows it.
+              const styles = stylesOf(li);
               for (let i = 0; i < 8; i++) {
                 const rx = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
-                const color = harmonyColor(harmonyRef.current);
+                const color = harmonyColor(harmonyOf(li));
                 const style = DICE.lay.pick(styles);
                 fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
-                doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 1.4);
+                doseLiquid(fluid, liquidsOf(li), rx, ry, 1.4);
               }
-            }
+            });
           }
 
           if (isActiveRef.current && drainFrameRef.current === 0) {
@@ -6819,7 +6987,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               injPts.forEach((pt, idx) => {
                 const px = Math.floor(pt.x), py = Math.floor(pt.y);
                 if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
-                  const c = harmonyCycle(harmonyRef.current, time * 0.25 + idx * 1.4);
+                  const c = harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.25 + idx * 1.4);
                   af.addDensity(px, py, 0.05, c.r, c.g, c.b);
                   af.addTemp(px, py, 0.02);
                 }
@@ -6845,7 +7013,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (impact > 0.01 && currentAudioData.volume > 3) {
                 // Each audio feature carries a different color from the harmony,
                 // so bass, mids and swells paint distinguishable hues.
-                const colFor = (off: number) => harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI + off);
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.3 + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
                 const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
 
@@ -6867,7 +7035,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
-                  const aStyles = injectStyleRef.current;
+                  const aStyles = stylesOf(activeLayerRef.current);
                   const aStyle = () => DICE.music.pick(aStyles);
 
                   // Center pulse — scales with density mapping
@@ -6915,7 +7083,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     // leave the rest of the plate clean.
                     {
                       const da = DICE.music.angle();
-                      doseLiquid(activeFluid, plateLiquidsRef.current,
+                      doseLiquid(activeFluid, liquidsOf(activeLayerRef.current),
                         centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
                     }
                   }
@@ -7299,7 +7467,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               finally a visible range: about a turn every fifteen seconds at
               half, and a flick's worth at the top.
             */
-            const asked = Math.max(0, currentSettings.rotationSpeed ?? 0);
+            // This plate's own motor: `rotationSpeed` is a solver key, so a
+            // back plate with a look of its own (§16a), or a patch aimed at
+            // one plate, turns that dish at its own speed, not the front's.
+            const asked = Math.max(0, patch.layer(l).rotationSpeed ?? 0);
             const motorRate = asked <= 0.1
               ? asked * 0.01
               : 0.001 + Math.pow((asked - 0.1) / 0.9, 2) * 2.4;
@@ -7347,7 +7518,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const motor = rotationSpeed * dirMod;
             const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
-              * (1 + (currentSettings.platePressure ?? 0) * 0.8);
+              * (1 + (patch.layer(l).platePressure ?? 0) * 0.8);
             /*
               The range was measured and widened. At (0.15 + drag*3) a flicked
               plate lost three-quarters of its speed in 2s at the slowest
@@ -7824,6 +7995,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       magnetWalkAtRef.current = 0;
       magnetHandRef.current = null;
       handoffRef.current = null;
+      /*
+        The back plate's own look (§16a), let go of. A render lays its look on
+        every plate, as the look says, from its seed: a back plate on a look of
+        the evening's is not something a render can reproduce, and its fade and
+        handover are stamped on the live clock, which the film's clock (2^20 ms
+        in) would put either all at once or twenty minutes in the future. On the
+        way out the plate is the film's last frame, which is the front's look
+        on both plates, so the back plate follows the front from there too.
+      */
+      if (backLookRef.current.active || backDyesRef.current) {
+        backLookRef.current.clear();
+        backDyesRef.current = null;
+        backHandoffRef.current = null;
+        onBackLookClearedRef.current?.();
+      }
       externalTiltRef.current = { x: 0, y: 0, at: -1e9 };
       journeyRef.current.lastAt = -1;
       flashRef.current.reset();
@@ -8669,7 +8855,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (glLostRef.current) {
         const kept = plateKeptRef.current;
         plateKeptRef.current = false;
-        if (!kept) layPlateRef.current(livePresetRef.current);
+        if (!kept) layPlateRef.current(livePresetRef.current, true);
         glLostRef.current = false;
         setGlLost(false);
         crashLog.recovered(`a new device (${s.gpu.label}), ${kept ? 'the plate carried across' : `${livePresetRef.current} laid again`}`);
