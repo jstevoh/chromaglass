@@ -12,7 +12,9 @@
  * all. So this goes the way a visitor does, through the keyboard and the
  * mouse, on a look that has no ferrofluid of its own:
  *
- *   1. picking the Magnet pours ferrofluid, rather than doing nothing
+ *   1. picking the Magnet pours ferrofluid, rather than doing nothing, and
+ *      puts no magnet under the plate until a hand holds it (the owner's
+ *      "immediate big black hole in the middle when I select it")
  *   2. dragging it across the plate carries the ferrofluid with it, measured
  *      as the centre of mass moving toward the hand, against the same plate
  *      left alone for the same time (the flow moves the phase too)
@@ -98,6 +100,48 @@ try {
   check('picking the Magnet on a look without ferrofluid pours some',
     amountAfter > 0.002 && poured.total > Math.max(0.01, before.total * 2),
     `setting ${amountBefore} → ${amountAfter}, covering ${(before.total * 100).toFixed(1)}% → ${(poured.total * 100).toFixed(1)}% of the plate`);
+  /*
+    1b. And nothing else until a hand holds it.
+
+    Reported by the owner: "Magnet makes an immediate big black hole in the
+    middle when I select it." Picking it gave the look a magnet (Magnet
+    Strength 0.8), and a look's magnet sits under the plate at Magnet Across
+    and Up, the middle, from the moment it has strength: it pulled the
+    poured ring into one black pool there before the hand touched the plate.
+    In the lab the disc 0.12 round the middle went from 9% of its area black
+    to all of it in four seconds under it, and stayed at 9% with none.
+
+    Asked twice. What the solver is stepped with, read from the step itself:
+    no magnet at all, which holds on any adapter. And how dark the middle is
+    nine seconds on, still untouched: the mean of the ferrofluid over the
+    disc 0.12 round it, which is what the owner saw. The ring is poured round
+    the middle and leaves it nearly clear; in the lab the disc's mean was
+    about a tenth as poured and stayed there with no magnet, and with the old
+    magnet went past half in a second and to all of it in four. The bar is
+    0.3. Judged on the disc itself rather than as a share of all the
+    ferrofluid: the phase is full at 1, so a share has a ceiling of the
+    disc's area over the plate's cover, which a bigger pour would bring
+    under any bar.
+
+    One window, from the pick's reading to the end of the settle below, in
+    which the ferrofluid was laid once. A new solver (the governor moving the
+    grid, a lost device) clears the phase and pours the ring again, which
+    would wipe a pool the old magnet had gathered and pass a magnet that is
+    there; so a window with a fresh lay in it is measured again, and the
+    pool would have nine seconds to gather in that one too.
+  */
+  const middle = { x: 0.5, y: 0.5 };
+  const pickedStep = await page.evaluate(() => {
+    const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep;
+    return { strength: st ? +st.magnetStrength : null, magnets: d.magnets?.().length ?? null };
+  });
+  check('picked, and not yet touched, the Magnet puts no magnet under the plate',
+    pickedStep.strength === 0 && pickedStep.magnets === 0,
+    `the solver is stepped with magnet strength ${pickedStep.strength}, ${pickedStep.magnets} magnets on the plate`);
+  /** The mean of the ferrofluid over the disc 0.12 round the middle (0 clear, 1 black), and on what grid. */
+  const middleMean = async () => { const r = await phase(middle); return { mean: r.total >= 0 ? r.near / 1e4 / (Math.PI * 0.12 * 0.12) : -1, n: r.n }; };
+  const lays = () => page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
+  let middleStart = await middleMean(), laysStart = await lays();
 
   /*
     Hold the plate still under the hand for the drag. Classic turns, and the
@@ -136,8 +180,21 @@ try {
     went 121 -> 189 at the hand's spot in six seconds (CI, on a commit that
     does not touch the magnet), more than the drag then added over its
     window, and the check failed on the control rather than on the magnet.
+    That was measured while picking the Magnet still put a magnet under the
+    middle (1b), so some of that gathering was probably that magnet's.
   */
-  await page.waitForTimeout(9000);
+  let middleEnd = null, laysEnd = null;
+  for (let k = 0; k < 3; k++) {
+    await page.waitForTimeout(9000);
+    middleEnd = await middleMean(); laysEnd = await lays();
+    if (laysEnd === laysStart && middleEnd.n === middleStart.n) break;
+    console.log(`     the ferrofluid was laid again (lays ${laysStart} → ${laysEnd}, grid ${middleStart.n} → ${middleEnd.n}) while the middle was watched; again`);
+    middleStart = middleEnd; laysStart = laysEnd;
+  }
+  // 1b's second half (above): no pool in the middle with no hand on the plate.
+  check('and the ferrofluid poured round the middle does not gather into it',
+    laysStart >= 0 && laysEnd === laysStart && middleEnd.n === middleStart.n && middleEnd.mean >= 0 && middleEnd.mean < 0.3,
+    `the disc 0.12 round the middle, mean ferrofluid ${middleStart.mean.toFixed(3)} at the start, ${middleEnd.mean.toFixed(3)} nine seconds on with no hand on the plate (0.3 is the bar; laid ${laysStart} → ${laysEnd} times, grid ${middleStart.n} → ${middleEnd.n})`);
 
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
@@ -365,8 +422,15 @@ try {
   const letGo = await readStep();
   const away = left && home ? Math.hypot(clamp(left.x) - home.x, clamp(left.y) - home.y) : 0;
   const off = left && letGo ? Math.hypot(letGo.x - clamp(left.x), letGo.y - clamp(left.y)) : Infinity;
+  /*
+    And it is a magnet, not just a place: on a look with no magnet of its
+    own, the hand's first hold gives the look one (onMagnetInHand), so the
+    one set down has strength. Since the Magnet stopped bringing a magnet
+    when picked (1b), a hold that failed to give it one would leave the
+    look's strength at 0, and the step at 0 too, which asLook alone passes.
+  */
   check('let go of, the magnet stays where the hand left it',
-    away > 0.3 && asLook(letGo) && off < 0.02,
+    away > 0.3 && asLook(letGo) && off < 0.02 && letGo.strength > 0,
     `the hand left it at ${left ? `${left.x.toFixed(2)},${left.y.toFixed(2)}` : 'nowhere'}, ${away.toFixed(2)} from the look's; ` +
     `two seconds after letting go the solver was given ${fmt(letGo)} (the look alone: strength ${letGo?.lookStrength.toFixed(2)} height ${letGo?.lookHeight.toFixed(3)})`);
 

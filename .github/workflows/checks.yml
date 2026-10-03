@@ -350,6 +350,13 @@ jobs:
       - name: The press moves the oil
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run pressoil
+      # Thin Gap (PLAN §18a): a push fades at the drag time 12ν/h², a press
+      # pushes out the volume it displaces and takes it back when the glass
+      # lifts, a tight gap carries what Darcy says, and liquid is conserved
+      # where the gap changes; each against the old solver.
+      - name: The thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run thingap
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
@@ -483,8 +490,11 @@ jobs:
       # The show opens without stopping (scripts/startup.mjs): what the look
       # opens with is built before it opens and the rest behind it, none is
       # built on a frame, no two frames are more than two seconds apart but
-      # the one stop Chromium makes starting its GPU (held to the old way's),
-      # and the plate moves for good no later than it did the old way. On a shard
+      # for the time Chromium holds the page's whole thread while it starts
+      # its GPU (no frame, timer or long task of the page's, not begun where
+      # a promise it awaits settled, in the first three seconds; held to
+      # 4.5 s), and the plate
+      # moves for good no later than it did the old way. On a shard
       # of its own, because it empties the Mac's shader cache, and one after
       # another check would find it warm; depth, first on the tools shard,
       # is how the nine-second freeze was found and still sees it cold.

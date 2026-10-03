@@ -102,12 +102,33 @@ aiming a projector thinks in **where it points**, **how big it is**, and
 they *derive* the quad. The quad stays underneath for keystone, which is a
 separate act done once at load-in.
 
+*Added 2026-09-28:* **a load-in test card.** Keystone, masks and the output's gain and
+gamma are set today against a moving plate. A card drawn in the output pass, so it goes
+through the flip, the corner pin and the masks: numbered corner markers, the mask
+guides, a focus star, and a 0–255 step ramp (where PLAN.md 14i's banding would show).
+The card's switch and four corner nudges on the phone, so the operator can stand at the
+screen: neither `PhoneStage` nor `RemoteControl` has the corner pin today. Later the
+camera fits the corners itself, through R6's register mode. **Measure:** `npm run wall`:
+the card's markers land where the pin puts the corners, and the ramp keeps 256 distinct
+steps at a gain and a gamma of 1.
+
 ### R5 · The rig is a document
 
 A rig is a configuration of several projectors, and it is the thing a show is
 built on. It saves, recalls and cues: "all four up", "kill two and three",
 "cross-fade one into four". The cue list and sequencer already exist and point
 at looks; they want to point at rigs.
+
+*Added 2026-09-28:* **the show kit, one file.** A spare laptop at soundcheck needs more
+than the set list, which already carries its presets and sequences. The MIDI map is its
+own file; the Wall's settings live only in `localStorage` (`outputConfig.ts`); Art-Net
+and the show key are the server's environment; custom liquids are their own files; song
+maps and song shows are in IndexedDB (`musicDb.ts`). One `.chromaglass-show.json` that
+exports and imports all of it makes a laptop that dies at soundcheck cost a minute, and
+the iPhone app could open one and play the set itself over an HDMI adapter, as the last
+resort. It is a rig document's first half: R5's rigs then live in it. **Measure:**
+export on one browser profile, import on a clean one, and the set list, the wall's
+masks and the MIDI map read the same (`npm run setlist`, `npm run wall`).
 
 ### R7 · The mixer: one surface for the stack
 
@@ -168,6 +189,21 @@ row (step 3): each row but the front plate keeps its own way in as Own and can
 be set to screen, add, multiply or key instead, which is R3's additive light
 made a choice per source rather than the whole rig's default. What is still
 R1's: a row per projector, once there is more than one live plate.
+
+### R8 · The room's lights are fixtures
+
+*Proposed 2026-09-28.* The show already drives Art-Net (`server/artnet.js`): each
+layer's colour and a master, laid on a universe, and `npm run lights` checks the bytes.
+The master's own fault, that it follows the dye rather than the wall, is PLAN.md 14q.
+Past that, a rig's lights are places, not one colour: an LED bar under the screen, pars
+either side, a strip round the booth. A fixture gets a region of the delivered frame and
+takes that region's colour (pixel mapping, from the probe's tiles, PLAN.md 14r), so the
+light round the screen carries on what is at its edge. sACN (E1.31) beside Art-Net,
+since many consoles and LED controllers speak only that; an optional pulse on Accent
+the One, under the flash guard. On the phone, a Room Lights level and a kill, both
+learnable. **Measure:** `npm run lights` with a plate red on the left and blue on the
+right: the left fixture's bytes red, the right's blue, and an sACN packet a receiver
+decodes.
 
 ## Order, and why
 
