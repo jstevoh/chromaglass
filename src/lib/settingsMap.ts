@@ -161,7 +161,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   // section three screens deep, and cutting a picture into shapes is a job of
   // its own.
   { id: 'mapping', name: 'Mapping', category: 'stage',
-    terms: 'projection mapping map shapes surfaces circle ellipse triangle rectangle diamond cube box panel pillar cut out quad corners dark between' },
+    terms: 'projection mapping map shapes surfaces circle ellipse triangle rectangle diamond cube box panel pillar cut out quad corners dark between source front plate back plate film alone light add beam beams over edge blend blending seam overlap tile tiles' },
   /*
     A section rather than a row under the wall, because loading a mark and
     placing it is a job somebody does once before doors and then leaves alone,

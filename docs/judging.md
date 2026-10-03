@@ -405,6 +405,25 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
+## 17. The back plate's own look
+
+PLAN.md §16a. On the desk, cue a look with two plates in mind (Oil & Water on
+the front, say), press Go, then cue a different one (Boiling Point, Ferro
+Paint) and press **To Back Plate**. Worth looking at:
+
+- over the fade, the back plate's liquid changes how it moves and what colour
+  it pours while the front keeps its own; nothing cuts, and the front does not
+  thin or re-lay;
+- the Mixer's Back Plate row says "On" and the look's name; grading it and
+  moving it in the stack behave as before;
+- a Go on the front (and a cut from the preset strip) leaves the back plate on
+  its look;
+- **Follow Front** fades the back plate back into the front's twin; on a
+  one-plate front look the back plate goes when that fade lands;
+- the same from the phone: the looks sheet's Back plate switch, then a look;
+- whether two looks on two plates read as two projectors or as a muddle is
+  the judgement this is for.
+
 ---
 
 ## 16. The Magnet pulls a pool out in fingers
@@ -543,35 +562,17 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
-## 22. Spinning the dish (PLAN 21)
+## 22. Colour between the domes
 
-Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
-lab measured the swirl (`npm run dish`), not the picture. On the Mac:
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
 
-- the Spin tool (N): drag round the middle. The glass should go round with the
-  pointer, coast when you let go and stop when you hold still. On Classic (thick)
-  the picture should follow almost at once; on a thin look (Viscosity thin) the
-  liquid should visibly trail the glass for a couple of seconds, then catch up;
-- press (P) and hold with a spinning dish: the liquid under the palm should go round
-  with the glass while the rest lags, a whirl round the palm;
-- on Oil & Water, spun: the oil bodies should go round with the glass and the water
-  between them lag, and after a while of spinning hard (Spin Rate 30 or more), the
-  heavy dye should creep outward and the oil in;
-- Auto Spin at Rate 6: a slow, even turn; Reverse Spin turns it back through a stop,
-  not a jump;
-- Auto Spin at Tempo, 16 beats a turn, with music: the dish should turn once every
-  four bars and stay with the music; a flick with the Spin tool knocks it off and
-  it should come back to the beat within a bar or two, not settle somewhere new;
-- the phone: the Spin tool with one finger round the middle, and Auto Spin on the
-  Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
-
-Say if the lag is too long or too short to read as a liquid, and whether the swirl a
-press makes is visible or wants more.
-
-```
-?set=spinAuto=1;spinRpm=12     a dish turning at 12 rev/min, anticlockwise
-?set=spinAuto=2;spinBeats=8    a turn every 8 beats of the music
-```
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
 
 ---
 
@@ -602,6 +603,50 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
+
+## 23. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
+## 24. Spinning the dish (PLAN 21)
+
+Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
+lab measured the swirl (`npm run dish`), not the picture. On the Mac:
+
+- the Spin tool (N): drag round the middle. The glass should go round with the
+  pointer, coast when you let go and stop when you hold still. On Classic (thick)
+  the picture should follow almost at once; on a thin look (Viscosity thin) the
+  liquid should visibly trail the glass for a couple of seconds, then catch up;
+- press (P) and hold with a spinning dish: the liquid under the palm should go round
+  with the glass while the rest lags, a whirl round the palm;
+- on Oil & Water, spun: the oil bodies should go round with the glass and the water
+  between them lag, and after a while of spinning hard (Spin Rate 30 or more), the
+  heavy dye should creep outward and the oil in;
+- Auto Spin at Rate 6: a slow, even turn; Reverse Spin turns it back through a stop,
+  not a jump;
+- Auto Spin at Tempo, 16 beats a turn, with music: the dish should turn once every
+  four bars and stay with the music; a flick with the Spin tool knocks it off and
+  it should come back to the beat within a bar or two, not settle somewhere new;
+- the phone: the Spin tool with one finger round the middle, and Auto Spin on the
+  Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
+
+Say if the lag is too long or too short to read as a liquid, and whether the swirl a
+press makes is visible or wants more.
+
+```
+?set=spinAuto=1;spinRpm=12     a dish turning at 12 rev/min, anticlockwise
+?set=spinAuto=2;spinBeats=8    a turn every 8 beats of the music
+```
 
 ---
 

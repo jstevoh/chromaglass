@@ -78,6 +78,15 @@ export interface PhoneStageProps {
   onLook: (id: string) => void;
   onRandomLook: () => void;
   onRevert: (() => void) | null;
+  /**
+   * The back plate's own look (PLAN.md §16a): a look sent to the back plate
+   * alone, what it is on (null while it follows the front), and the way back
+   * to twins. The desk's To Back Plate, as a switch at the top of the looks
+   * sheet, because on a phone the list is the cue.
+   */
+  onBackLook?: (id: string) => void;
+  backLook?: string | null;
+  onBackFollowsFront?: () => void;
   // The hand
   tool: PhoneTool;
   onTool: (t: PhoneTool) => void;
@@ -175,7 +184,7 @@ export interface PhoneStageProps {
     draw, at the phone's sizes, so the order and the grades are one thumb
     away like everything else here.
   */
-  mixer: { settings: VisualizerSettings; onSetting: (patch: Partial<VisualizerSettings>) => void; hasFilm: boolean; hasMark: boolean; takes?: MixTakes };
+  mixer: { settings: VisualizerSettings; onSetting: (patch: Partial<VisualizerSettings>) => void; hasFilm: boolean; hasMark: boolean; takes?: MixTakes; backLook?: string | null };
   // The rest
   onSettings: () => void;
   onSongs: () => void;
@@ -243,6 +252,8 @@ export function PhoneStage(p: PhoneStageProps) {
   const [amountOpen, setAmountOpen] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
   const close = () => setSheet(null);
+  /** Where a look picked in the looks sheet goes: the whole plate, or the back plate alone. */
+  const [lookTo, setLookTo] = useState<'all' | 'back'>('all');
   const open = (s: SheetName) => { setAmountOpen(false); setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
@@ -545,6 +556,35 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
           </div>
+          {p.onBackLook && (
+            <div className="mt-3">
+              <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="group" aria-label="Send a look to">
+                {([['all', 'Whole plate'], ['back', 'Back plate']] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setLookTo(v)}
+                    aria-pressed={lookTo === v}
+                    data-testid={`phone-send-to-${v}`}
+                    className={`h-10 rounded-md text-[14px] ${lookTo === v ? 'bg-accent-bg text-accent-text' : 'text-muted active:bg-active'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-1 flex min-h-[40px] items-center justify-between gap-2">
+                <span className="truncate text-[12px] text-dim" data-testid="phone-back-plate-on">Back plate: {p.backLook ?? 'follows the front'}</span>
+                {p.backLook && (
+                  <button
+                    onClick={() => { p.onBackFollowsFront?.(); setLookTo('all'); }}
+                    data-testid="phone-back-follows-front"
+                    className="h-10 shrink-0 rounded-md border border-border px-3 text-[13px] text-text-2 active:bg-active"
+                  >
+                    Follow front
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>
@@ -554,7 +594,14 @@ export function PhoneStage(p: PhoneStageProps) {
                   return (
                     <button
                       key={l.id}
-                      onClick={() => { p.onLook(l.id); close(); }}
+                      onClick={() => {
+                        // The switch is for one look: it goes back to Whole plate
+                        // once that look is sent, so a pick an hour later is not
+                        // sent to the back plate by a switch nobody remembers.
+                        if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
+                        else p.onLook(l.id);
+                        close();
+                      }}
                       aria-pressed={on}
                       data-testid={`phone-look-${l.id}`}
                       className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? 'border-accent-border bg-accent-bg' : 'border-transparent active:bg-active'}`}
@@ -724,6 +771,7 @@ export function PhoneStage(p: PhoneStageProps) {
             hasMark={p.mixer.hasMark}
             onFade={p.mixer.takes?.onFade}
             fading={p.mixer.takes?.fading}
+            backLook={p.mixer.backLook}
             touch
             testId="phone-mixer"
           />

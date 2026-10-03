@@ -63,6 +63,12 @@ export type MidiAction =
    */
   | 'cue-next' | 'cue-prev' | 'go' | 'revert'
   /**
+   * The back plate's own look (PLAN.md §16a): send the cued look to the back
+   * plate alone, and let it follow the front again. The second projector's
+   * Go, on the pad next to the first.
+   */
+  | 'go-back-plate' | 'back-follows-front'
+  /**
    * The tempo, by hand. Four taps on a pad is what every VJ reaches for when
    * the room is fighting the microphone.
    */
@@ -404,6 +410,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record Performance',
   'scene-toggle': 'Watch the Room',
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
+  'go-back-plate': 'Go to Back Plate', 'back-follows-front': 'Back Plate Follows Front',
   'tap-tempo': 'Tap Tempo', 'tempo-clear': 'Tempo: Listen Again',
   'bank-next': 'Bank +', 'bank-prev': 'Bank \u2212',
   'mix-raise-led': 'Mixer: Raise LED Ring', 'mix-raise-back': 'Mixer: Raise Back Plate',
