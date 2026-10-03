@@ -3070,10 +3070,12 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
     film, and asks that a film is playing before it measures. The same run's "every
     refresh's own timestamp was believed" is the Mac stamping refreshes up to 2.4 ms
     ahead; the draw gate's fix from #218 is ported here (it no-ops once #218 lands).
-  - *What a source costs* is printed by `wall` on the Mac (`plate front`, `plate back`,
-    `plate film` against `plate`), read from this PR's run, and not yet held to a
-    budget: each is the whole display pass again at the canvas's size. 16d (four
-    plates) is where a budget has to be.
+  - *What a source costs is not measured yet.* `wall` times each source's pass
+    (`plate front`, `plate back`, `plate film` against `plate`) where the GPU has
+    timestamp queries, and the Mac runner's has none: #226's green run printed "skip
+    each source's cost". Each is the whole display pass again at the canvas's size.
+    It needs reading on the owner's Mac (`chromaglassDebug()`, docs/judging.md §21)
+    before 16d (four plates), which is where a budget has to be.
 - **16c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
   and two feathered edges that overlap sum to one rather than to a bright seam.
   Check: `wall` reads the overlap's brightness against each beam's.
