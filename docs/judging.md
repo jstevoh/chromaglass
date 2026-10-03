@@ -464,7 +464,7 @@ On Oil & Water (Oil Bodies on):
   going straight out: a stripe under the palm should come out as a stripe, not a smear
   round the whole ring. Say if the old even ring looked better.
 
-## 19. Roy, 1963: the plate printed as a comic (PLAN 19)
+## 19. Roy, 1963: the plate printed as a comic (PLAN 21)
 
 Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
 panel: flat red, yellow and blue on white, a black line round every solid shape
@@ -476,7 +476,7 @@ and where two colours meet, and the pale washes round the shapes as even dots.
   and does the line stay a line, not a flicker, as the shapes move and merge;
 - Ben-Day Dots (Settings → Look) from 0 to 100 % on Roy, and on Classic: is there a
   point between where it looks better than either end;
-- zoom in to 2.8x: the dots stay the size they were (PLAN 19c). Say if you want
+- zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
   them to grow with the zoom, as the accidental ones did.
 
 ---
