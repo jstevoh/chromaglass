@@ -5,7 +5,7 @@
  *
  *   npm run maze
  *
- * Steve's references (Chemical Bouillon's ferrofluid films) run fingers
+ * The owner's references (Chemical Bouillon's ferrofluid films) run fingers
  * about a sixtieth of the frame wide, and the maze as it was drew them two
  * to three times wider. Maze Detail divides the maze's period (MAZE_PERIOD,
  * in src/gpu/fluid.ts) by up to three. What this asks is whether the

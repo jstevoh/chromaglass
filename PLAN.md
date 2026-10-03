@@ -59,11 +59,11 @@ Where each batch stands, as of 2026-09-27:
 | 8 | The desk | **Shipped** |
 | 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), the pool it sets down is 9u, open; 9f–9h, 9j, 9k–9m and 9o–9r open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
-| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 |
+| 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
@@ -93,9 +93,41 @@ bracket its comment describes ("a Finger that makes dye still has to beat both")
 Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
 for the check's owner, taken with §0's "what the check should mean" below, since on
 the positive side it is looser whenever the larger idle reading is the negative one.
+*Measured 2026-09-27 over 40 Mac tools shards, and not a flake:* the Finger adds dye
+on a thin plate. The pool the check strokes is laid by holding Drop for 1.5 s of wall
+time, so its size follows the runner's speed: 49 to 279 across the 40. On all 12 pools
+under 150 the stroke added +11 to +21 while the plate alone had lost 1 to 34 before it
+(and gained 7 to 11 after); on settled pools it read about what the plate did alone.
+That is up to a third of a thin pool, §0's fault at a smaller size, and the three reds
+(106 → 127, 50 → 66, 73 → 90) were all thin pools. Bracketing would have made all 40
+pass, which is why it was not done (the check-skeptic review: the after window carries
+the stroke's own aftermath). Two things follow, in order: a control on the Mac (the
+same timing with the Finger picked and no stroke) to settle whether the after window
+is the plate or the stroke; then the advection fix below, which is what makes this
+check green for good. Laying the pool by solver steps rather than milliseconds would
+make it one size every run, but only after the fault is fixed, or it hides it.
 
-*Found 2026-09-27, not yet done:* **the mirror check's "and nowhere else" goes red at
-exactly its limit on changes that cannot move a pixel.** #191 (PLAN.md only) read
+*Found 2026-09-27, **fixed in #225** (2026-10-03; every mirror line green on the Mac):* **the mirror check's "and nowhere else" goes red at
+exactly its limit on changes that cannot move a pixel.** It was the plate, not the
+check. Six rounds of measurement on the Mac runner found the calm Classic plate
+starting a single plate-wide flow out from the middle (0.63–0.88 of it radial, mean
+speed up to 0.34) with the first bubble a drop trapped, and never with Bubbles at 0
+(speed stayed near 0.005). Each bubble presses the glass over its footprint every
+step, and the press source was balanced with a plate mean the CPU guessed from the
+gap deltas over a resting gap of 0.03; a held press has squeezed its gap to the
+floor (0.004), where the deltas are clamped away, so the guess was wrong and the
+difference went into the pressure solve as a net source, which a closed plate has
+no answer for. And on the app's glass the press's memory (`gapMemory`, a 0.22 s
+half-life of remembered squeeze that does not move the gap) was summed into the
+press's own rate every step it was held, so a held press pushed out some three
+hundred times what its gap lost, and went on pushing from a gap already on the
+floor. The projection's right-hand side is now made zero-mean exactly on the GPU
+(`divTiles` in `wgsl/fluid.ts`): the glass lifting a hair everywhere to take what a
+press pushed out. And the memory takes over only once a press has gone, never past
+the floor (`squeezeUpdate`). `npm run heldpress` (lab, Classic's glass): a held
+press's far plate once steady 3.28e-2 on main, as fast as while it closed, half of
+it radial; 4.6e-5 after. The original report follows.
+ #191 (PLAN.md only) read
 "Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
 against an allowance of 11.1, at the tool's mirror through the centre
 (`scripts/mirror.mjs`, the Mac plate shard). It has been red at its limit on other
@@ -104,6 +136,42 @@ comes back now and then, or the allowance is drawn from a drift reading that is
 sometimes as large as the echo; which of the two is the first thing to settle, from
 the per-drop numbers it already prints. A thread cannot re-run a job (403), so each
 of these costs the owner a by-hand re-run.
+
+*Found 2026-10-03 (#225), open:* **with presses that move the dye, the grid pass
+holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −0.3 in a
+step, ten steps a press) read 22% on main because its presses were swallowed by the
+unbalanced press source (the dye under them barely moves). Balanced, the same presses
+push the dye, and the pass holds the band to 64% of what grows without it; a variant
+balanced before the clamp reads 74%. The owner chose to re-baseline that line
+(2026-10-03): it now asks for under 0.68, between the shipped pass (64% lab, 65% Mac)
+and a pass 30% weaker (3.5% a step reads 70.0%, 2.5% 75%, 1% 87%); it leans on
+`npm run heldpress` to catch presses that stop moving the dye. It is not at the fronts: masked away from them
+(87–95% of the plate kept) the fix reads 62–70% and main 37–38%. The flows with the
+pass on and off are the same (mean |u| 0.462). Rendered in Red Cabbage's closeup at
+2.8x and 8x, neither shows the 45° grate (`/mnt/project-files/mirror-fix/`, outside
+the repo). Open: whether the pass should be stronger where the flow is strong or the
+gap is changing, or whether the dye's conserving advection grows the band itself
+under a strong flow (its divergence by central differences is not the projection's).
+Both renders also show a vertical seam down the middle of the plate, on main as well:
+its own item, unmeasured.
+
+*Found 2026-10-03 (#225), not yet done:* **a still bubble presses the glass.** Every
+step, each bubble lays a standing press of 0.0035 over 0.85 of its radius
+(`LiquidVisualizer`, "A bubble is air between the plates"), which holds the gap
+under it at the floor so the dye is pumped out from under it, and the air's own
+standing term in `divergence` does the same with a source where the air is and a
+sink everywhere else. Both are shortcuts that imitate how a trapped bubble looks
+rather than simulate it: in a real cell a bubble spans the gap and displaces the
+liquid only while it grows, shrinks or moves, and a still one pushes nothing, while
+this keeps a flow going for as long as it sits there. #225 made the solve balance
+them exactly, so they no longer move the whole plate, but they still stir the
+liquid round every bubble. And the press's memory (`gapMemory`) still pushes
+liquid after a press without moving the gap, so a release's remembered squeeze is
+liquid from nowhere: a real squeeze film is overdamped and pushes out exactly what
+its gap loses, as fast as the viscous film lets it close. Replace both with the air excluding the liquid by
+itself (the bubble as a region the flow goes round: a no-flux boundary, or the
+Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
+`npm run straw` and `npm run heldpress`, which should then need no press to hold.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -115,7 +183,14 @@ the guard's reading comes back null). The plain frame was unusually dark (0.040,
 against 0.164 for the same plate earlier in the run), so a guess, unmeasured: most of
 its light was in a few bright cells that a 2.2 gain clips at white, which lifts the
 mean far less than the grade. If so, the check should read cells the gain cannot clip
-(below 1/2.2 before the grade) rather than the whole frame's mean.
+(below 1/2.2 before the grade) rather than the whole frame's mean. *Later that day:* over 40 tools
+shards the lift read 1.52 to 1.90 in 37, 1.15 and 1.19 in the two reds, 2.20 and 2.27
+at the top: single odd readings, not a spread, so clipping (which would spread them)
+is the weaker guess. The frame is the flip's stripe plate, not the show's (0.02 to 0.05
+where the keystone before it read 0.05 to 0.19). The wait after a config change counted
+the page's animation frames, not the stage's drawn ones, and did not wait for the guard
+to be off; it now waits for both, and the check prints all seven readings in order, so
+the next red says which frame was odd (this PR).
 
 **Deploys no longer re-measure a tree its PR already passed** (this PR, `npm run
 deploygate`). Measured 2026-09-27, 1 AM to 11 AM PT: 18 red runs, 5 of 16 deploys.
@@ -386,7 +461,7 @@ photographs:
 - **Air bubbles are air pockets** (a thick black ring, a clear middle), and soap-film
   colour is faint in transmitted light.
 
-Steve chose "Both": the projector look on the plate and the flipped, many-coloured
+The owner chose "Both": the projector look on the plate and the flipped, many-coloured
 lens in the macro closeup. He then asked for the report's other findings to go into
 the app in its ranked order, on the same PR. The gate becomes: the size range and
 flattened contacts as written, the dark-ring fraction matching the rule above for oil
@@ -1528,7 +1603,7 @@ version in the same PR (see the operating rules below).
    The phone's Mix sheet is its own layout (step 1) and is unchanged.
 6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
    each projector's plate is a row, with its own grade at the projector's scope (R2).
-   This is the large one; it waits on R1.
+   This is the large one; it waits on R1, and is §16e.
 
 Found while shipping step 2, not yet done: #189's deploy (main 41ad65e) went red on
 the Mac show shard's `qa` at two checks that passed on the same tree in the PR's run an
@@ -1553,13 +1628,25 @@ tempo the taps set is the plain mean of their gaps, so something moved the clock
 after the taps; worth reading whether the clock falls back to the heard beat when a
 frame comes more than 250 ms after the last (`beatClock.setExternal`'s window).
 
-Found while building step 4. Changed here, for Steve to confirm: Back reverts the
-look and whatever of the room the change itself moved (Lucky's roll of the
-microphone's Sensitivity and Bass Boost), but no longer the room's settings the hand
-changed after it (the film's level, the Mixer, the dimmer), since each step of a look
-fade keeps the room as it is now; that is RIG_KEYS' own rule, but Back used to undo a
-film's level changed after the Go. If Back should undo those too, it wants its own
-path rather than the look fade's. Not done here: a take pressed during a Go wins over
+Found while building step 4, and settled: step 4 made Back keep the room's settings
+the hand changed after the Go (the film's level, the Mixer, the dimmer), since each
+step of a look fade kept the room as it was. The owner asked for Back to go fully back
+(2026-09-27), so it has its own path now, **done** (#204): a Back fades the wall's
+part of the room back with the look (`backStep`), leaves the machine's setup
+(`SETUP_KEYS`: the grid, the microphone's latency and prediction, the room camera's
+reading, the set's pacing, the logo's place, each row's take time), anything a hand, a
+pad or a song writes while the Back runs, and the dimmer in a blackout, and stops every
+take still walking. `npm run rowfade` 48 → 58: a Go, the hand's moves after it and a
+Back: film, dimmer, a row's grade and the microphone back as they were (all four stayed
+put through the Go's step, the control), the look's 24 changed settings back, the setup
+left, no tick more than a smooth two seconds allows, a ride and a blackout during the
+Back held, a take stopped (left running, it walks the film to 0 under the Back), and
+every writer of the wall's settings marked. The pre-push review found the blackout,
+the Mixer's order and blend pads and a running glide written over by a Back, and the
+check-skeptic eleven broken Backs that passed the first checks; all fixed and red
+now. Still true: a Back after a new song's own look rewinds the room to when that
+song began, which "fully back" means but may surprise after an unattended change.
+Not done here: a take pressed during a Go wins over
 the Go for that row, but a hand on the gel wheel's or the lumia's slider during a Go
 still does not (the Go's next step puts the look's level back), and inside a sequence
 a take on the gel or the lumia during a stage's glide is stopped by the glide's next
@@ -1760,7 +1847,9 @@ while this batch's plan was going in (#177), and no cause is known yet:
   a tenth of 300. It asks the gain against what was there, on a hand path drawn at
   random each run, so a run whose best spot starts full reads low; worth reading
   the gain's spread over the last runs before touching its tenth.
-- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else": on #189 (the Mixer's gel
+- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225**, green on the Mac: the
+  region starting to move by itself was the bubbles' press leaking a net source into
+  the pressure solve; see the mirror item near the top): on #189 (the Mixer's gel
   and lumia rows, whose default picture renders the same to the byte as main's), 16.3
   past its drift at the hand's left/right mirror cell against an allowance of 16.1.
   The cell's drift climbed drop by drop (3.2, 5.9, 18.3, 49.5) and its change with it
@@ -1820,6 +1909,12 @@ freeze (#164) have shipped.
 Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
 pick them up from `docs/roadmap.md` now that step 1 is in.
 
+**This file is too big to read whole** (about 150 KB, 38k tokens; 2026-09-27). Every
+session told to read it carried it in context for the rest of its life, and the
+shipped batches are most of it. CLAUDE.md now says to read one section. The fix is to
+move shipped batches to `docs/plan-shipped.md`, keeping a line each here, in a PR of its
+own when few branches are editing this file (every open branch touches it).
+
 ## Operating rules
 
 - A sandbox has no GPU worth the name, so a WebGPU fallback adapter classifies as
@@ -1830,10 +1925,13 @@ pick them up from `docs/roadmap.md` now that step 1 is in.
   and files.
 - Every new setting is MIDI-learnable, reachable from the phone, and defaults to the
   current behaviour so a preset made today still looks the same tomorrow.
-- Every feature ships its phone version in the same PR, not after (Steve, 2026-09-27).
+- Every feature ships its phone version in the same PR, not after (the owner, 2026-09-27).
 - This plan is kept current: every PR that ships a batch step marks it shipped here,
   and anything found along the way that should be fixed or added goes in as an item,
-  in the batch it belongs to or a new one (Steve, 2026-09-27).
+  in the batch it belongs to or a new one (the owner, 2026-09-27).
+- The repository is public, so it names no one: "the owner", not a name, email or
+  machine (2026-09-27). Squash-merge commits made on GitHub still carry the merging
+  account's email unless that account keeps its email private in GitHub's settings.
 
 ## 12. ChromaGlass in the App Store and Google Play
 
@@ -1896,7 +1994,7 @@ Both listings say the show flashes, and that the flash guard (`src/lib/flashGuar
 limits it. Free is simplest on both: a price or in-app purchase adds agreements, tax
 forms and a 15 % cut.
 
-**Running order.** Steps marked *(owner)* need Steve's phone, card or account.
+**Running order.** Steps marked *(owner)* need the owner's phone, card or account.
 
 1. **Smoke test the site on both phones** *(owner)*: chromaglass.web.app in Safari on
    an iOS 26 iPhone and in Chrome on a recent Android phone. Does the plate start,
@@ -1979,7 +2077,7 @@ passes a frame, with a pressure solve, which means porting the solver back to GL
 That is the native rewrite `beyond-web.md` argues against. Streaming the plate into
 the host gives the VJ the same layer without it.
 
-**The wrapper comes first** (Steve, 2026-09-27: "Would a good option be to create a
+**The wrapper comes first** (the owner, 2026-09-27: "Would a good option be to create a
 small native wrapper that allows us to integrate into other VJ apps and have a
 complete cached system?" Yes, and he asked for it in the plan). It is one small
 native shell that does three jobs:
@@ -1999,7 +2097,7 @@ The web app stays the core: every change lands on the site first, and the wrappe
 picks it up in its next build. `detectTier()` already reads Electron as the
 `native` tier. It is about 150 MB to download, which a show laptop doesn't mind.
 
-**Running order.** Steps marked *(owner)* need Steve's Mac and a VJ app on it.
+**Running order.** Steps marked *(owner)* need the owner's Mac and a VJ app on it.
 
 1. **The wrapper** (one PR): an Electron app for the Mac with the built site inside
    it (offline from the first launch), the show server started with it, the show
@@ -2008,7 +2106,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    network off and sees a lit plate. *Not started.*
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
-   the plate as a layer in Resolume or VDMX on Steve's Mac, with the delay measured
+   the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
    against the plate's own frame. *Not started.*
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
@@ -2948,7 +3046,7 @@ Only liquids with a hand-written carry actually move under a tool: the dye (Fing
 `carryDye`, Press's `squeezeOut`) and the oil (Finger's `carryMix`). A likely fix is
 to feed a hand's velocity into the lasting current (`cur`, capped at 0.75 of a cell a
 step, which remembers for about a hundred steps) instead of the clamped field. That
-would carry every field alike. It changes how every tool feels, so it goes to Steve
+would carry every field alike. It changes how every tool feels, so it goes to the owner
 first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
 these numbers.
 
@@ -2957,7 +3055,7 @@ these numbers.
 A moving Blow multiplies the dye under it by 0.8 every step, which clears it, and
 its push is the one-step push of 15b. `npm run tools` checks "Blow clears dye from
 under it", so the check asserts the eraser. Whether wind should push the colour
-aside instead is a question for Steve, taken with 15b.
+aside instead is a question for the owner, taken with 15b.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
@@ -2988,9 +3086,68 @@ judged on the Mac (`docs/judging.md` §18). The only app check of the dye ring's
 is `npm run press`, which is not in CI and sets its settings by writing into the
 debug hook's copy (the pattern `depth` had); worth bringing into the tools shard.
 
-*Open:* **the ferrofluid.** Waits on 9n (Blow and Finger moving the ferrofluid, the
-ferrofluid thread), which builds on `phaseCarry`'s radial mode; a press wants a flat
-take out to the palm's rim on it, as the oil's has.
+**The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
+ferrofluid by area (the flux form in `phaseAdvect`), so under a palm the glass's
+outflow took a share of every cell, and a pool stayed the size it was and went grey:
+its fullest cell fell from 0.96 to 0.48 with Thin Gap on and to 0.67 without (lab, a
+palm pressing the gap to a sixth, ten steps in). A real pool between two glasses keeps its volume:
+pressed, it gets thinner and wider and stays full. A flat take out to the palm's rim,
+as the oil's (`pressMix`), would have been the same fault by hand: it takes a share of
+every cell too. So with Thin Gap on, the ferrofluid moves as a volume, c·h, on the
+thin solve's own face fluxes, and each cell divides by its gap after (`phaseAdvect`,
+`phaseGapSeen`). `npm run ferropress` (lab, 7 checks): pressed over twenty steps to a
+sixth of the gap, the middle of a pool held to 0.6% (0.955 → 0.961, the check allows
+3%; it is a stagnation point), where carried by area the same middle fell to 0.155 at
+twenty steps; its volume kept to 0.13% while the cells
+it fills grew 2.5 times; and after the lift it matches a pool the glass never touched
+to 0.006 in every ring. Two cuts on the way: putting the glass's
+part back as c times the gap's change along the path kept a pool full but grew it 7%
+a press and lift; carrying the volume on the cells' filtered velocities emptied the middle to
+0.53, because that flux carried 18% more out of it than the glass displaced. Only the
+solve's own face flux (the mean of two cells' h·u plus the second difference of
+M_f·ΔP) keeps both.
+
+And the gap's drag takes the ferrofluid's own viscosity, by share (`hsPrep`,
+`FERRO_NU`, 5 mm²/s, a light hydrocarbon ferrofluid's). Which way a front fingers then
+follows the two liquids (Saffman–Taylor): on the default plate (Thickness 0.45, a light
+oil of 22 mm²/s) the ferrofluid is the thinner, so a press pushing it out into the oil
+is the unstable direction, and a bumpy pool's outline keeps more of its bumps (its
+spread over its radius 0.023 → 0.013 against 0.009 for an even pair, `ferropress`
+§5); in water it is the thicker, the press rounds it a little more (0.008), and the
+lift is the unstable one. The same drag sets how fast the ferrofluid answers any
+body force under Thin Gap, the magnet's included: at the default Thickness about 4.4
+times faster than before (its drag is 0.22 of the oil's), in water about 5 times
+slower. That is the real liquid's answer, not a change to the magnet's code; the
+owner's eye on it is in judging §22. The
+phone's Press is the same press on the same solver, and Thin Gap is on its settings
+sheet. Judged on the Mac: `docs/judging.md` §22.
+
+*Open, found building it:*
+- **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
+  carry a press (15b), and dividing by the gap there piled twelve times a pool's volume
+  under the palm (lab). The press moves to Thin Gap ("Press draws liquid back on lift",
+  18a-3): turning Thin Gap on in the ferrofluid looks is what shows this in a show.
+- **The glass flattens the spikes.** A Rosensweig spike stands from a free surface; under
+  a palm pressed to a sixth of the gap there is no room for one, and the field there
+  makes a flat labyrinth instead. The spikes (`spikes.ts`, `phaseMu`'s wells) do not
+  know the gap. For the standing domes (9t), whose thickness field is where a cap by the
+  gap belongs.
+- **The labyrinth's scale follows the gap.** In a Hele-Shaw cell the labyrinth's period
+  goes as the gap times an exponential in the inverse magnetic Bond number (2M²h/σ,
+  Langer, Goldstein and Jackson 1992), so a press (a sixth of the gap) should melt the
+  maze under the palm into a round pool and the lift should bring it back. The maze's
+  period is `MAZE_PERIOD` wherever the glass is.
+- **The lift's fingers do not show.** In water (the ferrofluid five times thicker) the
+  lift is the unstable direction, but the Cahn–Hilliard rounding takes a bumpy edge
+  back faster than the lift grows it (`ferropress` prints 0.024 for both). The
+  interface's tension lives in the separation, not in the flow's pressure, so the
+  fingers' scale is not Saffman–Taylor's own (π·b/√Ca); a capillary pressure jump in
+  the thin solve would make it so.
+- **The separation conserves area, not volume.** `phaseCH`, `phaseRelax` and
+  `phaseSeparate` move the share between cells of different gaps as if they were equal:
+  a full pool's edge sitting across a palm's rim gained 1.6% volume in forty steps held
+  (lab, with the first cut's excess). Small with the solve's own flux; worth a c·h form
+  once the glass moves the ferrofluid often.
 
 *Found 2026-09-27, not done:* **a press can still make dye.** The dye's half of
 `squeezeOut` takes a share of the disc as a GPU multiply and puts into the ring the
@@ -3011,6 +3168,61 @@ Soap, milk, silicone and glycerine push the plate through the same clamped veloc
 the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured. Also
 minor, in `performGesture`: a remote Finger is half as strong as the mouse's, and a
 remote Blow never makes a straw bubble.
+
+## 16. Many plates: each projector its own source (rig-plan R1)
+
+Asked for on 2026-09-27 ("Let's build multi-plate next"), after the Mixer's steps 1–5.
+`docs/rig-plan.md` has the why (a light show was several projectors, each its own
+source, beams adding on the screen); this is the running order.
+
+**What there is today** (read from the code, 2026-09-27). Two solvers at most:
+`layerCount` is clamped to 1..2 (`LiquidVisualizer.tsx`, the layer effect), one
+`WebGPUFluid` per layer, the front plate `fluidsRef[0]` and the back plate
+`fluidsRef[1]`, drawn together in one plate pass. The two share one look: each frame's
+settings fold into `patch.global` for the picture and `patch.layer(i)` for each solver
+(`lib/sceneMap.ts`), and `patch.layer(i)` differs from the global only by a scene
+mapping aimed at that layer. The back plate is otherwise the front's twin, turned the
+other way, slowed by Background Loop and thrown by Layer Scale Variety. Every
+projector (`Surface` in `lib/outputConfig.ts`, up to sixteen) samples the one finished
+frame (`gpu/output.ts` binds one `scene` texture), blended over, not added. The grid is
+one size for every layer (`resolveSimResolution` from the quality ladder,
+`lib/platform.ts`), and the plate's bind group and shader are written for two layers
+(`gpu/plate.ts`, `wgsl/plate.ts`'s one "Layer 1" block). The lab runs one solver.
+
+**The decision rig-plan leaves open, taken here as the default:** up to **four**
+plates, and with three or four each runs one rung of the ladder below the grid a
+single plate gets (512 becomes 384 on a local GPU), so four plates cost about what two
+do now. The owner can say otherwise; the ladder is one table.
+
+Each step ships its phone version in the same PR (the rule) and one PR each:
+
+- **16a · The back plate gets its own look.** A look can be sent to the back plate
+  alone ("Go to Back Plate"): the solver's own settings and the colours it pours
+  become the back plate's (`patch.layer(1)` over a per-plate look), while how the
+  plate is drawn and lit stays shared. The desk's cue list and the phone's looks sheet
+  each get the second Go; the Mixer's back row names the look it is on. Check: a node
+  harness on the fold (each solver steps with its own look's settings, the picture's
+  settings stay the front's) and the lab rendering two real solvers from two looks
+  (the lab holds one solver today). The Mac judges the pair.
+- **16b · A projector picks its source.** A `Surface` gains a source: the whole wall
+  (today's frame, the default), the front plate alone, the back plate alone, or the
+  film. The plate pass draws each source a projector asks for into its own texture
+  and the output binds each surface to its own; the cost of a second plate pass is
+  measured on the Mac before it ships. Output settings on the desk and the phone.
+  Check: `npm run map` for the routing, and `wall` on the Mac reading each surface's
+  own picture.
+- **16c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
+  and two feathered edges that overlap sum to one rather than to a bright seam.
+  Check: `wall` reads the overlap's brightness against each beam's.
+- **16d · Up to four plates.** `layerCount` to four, the plate's bind group and shader
+  from two layers to N, the ladder's rung per plate as above, the governor told how
+  many plates it is carrying. Check: `startup` and the frame time on the Mac with four
+  (no stop on the opening, no pipeline built on a frame), and the lab with four.
+- **16e · A row per plate in the Mixer** (the Mixer's step 6): each plate its own row,
+  level and grade, reached from the desk, Settings, the phone and the remote.
+
+Not in this batch: R4 (placing a projector by its centre, zoom and turn) and R5 (a rig
+as a document the cue list points at). Slides as a source wait on `docs/slide-plan.md`.
 
 
 ### 15f. The Comb: marbling's rake, as a tool (proposed 2026-09-28)
