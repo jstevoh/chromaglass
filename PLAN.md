@@ -2196,6 +2196,15 @@ network):
   The first run's control, a window inside the app, stayed visible at 46 frames/s
   minimised because the app's switches reach every window in its process. Where
   it is not measured, it is `docs/judging.md` §23 on the owner's Mac.
+- In a cloud session `npm run desktop` can fail "the run finished" on a 30 s
+  `page.reload` timeout, after software WebGPU starves the page (its covered-window
+  reading shows 2 s of timers taking about 54 s, and once the GPU process exited).
+  Measured on 2026-10-03 in one container: 3 of 6 runs failed this way after main's
+  #231 and #233 came in, and 1 of 4 failed on the head before them. So it is the
+  container, not those PRs. The Mac runner has never shown it. Worth fixing: a
+  check that times out because its machine is slow says nothing about the app.
+  Wait for the reload on the page's own first frame rather than `load`, or say
+  "skip" when the covered reading shows the page was starved, as the lit plate does.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
