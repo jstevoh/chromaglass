@@ -543,6 +543,20 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
+## 22. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
 ---
 
 ## Reading the frame time while you do it

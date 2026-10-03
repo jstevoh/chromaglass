@@ -64,7 +64,7 @@ Where each batch stands, as of 2026-09-27:
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
-| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c–16e not started |
+| 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16a, the back plate's own look, built but never opened as a PR and its branch lost, so to be rebuilt; 16c, beams add and the seam goes, **shipped** (#PRD, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
@@ -3113,9 +3113,38 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
     each source's cost". Each is the whole display pass again at the canvas's size.
     It needs reading on the owner's Mac (`chromaglassDebug()`, docs/judging.md §21)
     before 16d (four plates), which is where a budget has to be.
-- **16c · Beams add, and the seam goes.** A surface can add instead of lay over (R3),
-  and two feathered edges that overlap sum to one rather than to a bright seam.
-  Check: `wall` reads the overlap's brightness against each beam's.
+- **16c · Beams add, and the seam goes. Shipped (#PRD).** A mapped surface's Light is
+  Over (laid over what is under it by its opacity, as every surface was, and the
+  default, so a stored rig looks as it did) or Add, a beam (Settings, Mapping; on the
+  phone More, Settings, Mapping). Two beams crossing add whole: the overlap a light
+  show was played on. Where they are one picture carried by two projectors (the same
+  source, showing the same point of it there, tiles lined up with an overlap) they are
+  edge-blended: across the overlap each gives the share of how far inside it the point
+  is, so the two sum to the picture whatever the overlap's width, with no bright seam
+  and no dark one, and a feather shapes only the edges no other tile covers. One
+  pipeline, premultiplied colour with the colour clamped first, so over is the old
+  pass byte for byte at every gain, and the quads stay one draw. Check: `npm run
+  beams` (8, the projector's pass on software WebGPU with pictures made to order:
+  over byte for byte against a second lab built with the old pass at gains 1 to 3;
+  two sources summed; tiles sharing by depth, read with one at half so the shares
+  show, across and stacked, against a plain crossfade and against one laid over;
+  crossing beams of one picture summed; all four feathered edges; a beam over a
+  lit surface and at gain 2; red on six broken shaders: no clamp, no flip, depth
+  blind to height, no shares, shares for any point, the alpha factor), `map` (44:
+  the stored default, the blend in its slot, a stale slot cleared), and the phone
+  check (Over before, Add after, in the button and the show's config). The pass
+  itself needs no Mac: it reads its pictures, not the plate.
+  Found while building it, not done:
+  - *Two projectors of one picture stacked for brightness are blended, not doubled*
+    (the same point of the same source is one picture). A stacked pair would need its
+    own switch.
+  - *The blend is in the canvas's values*, which is light for one projector carrying
+    every surface. Two physical projectors each with its own gamma would want the
+    shares in linear light.
+  - *Tiles are lined up by hand, by corners* (R4 is placing a projector by its centre,
+    zoom and turn); the blend allows two texels of slack.
+  - *Crossing beams over 1 clip* in the canvas: two bright pictures crossing are
+    white where they add past it.
 - **16d · Up to four plates.** `layerCount` to four, the plate's bind group and shader
   from two layers to N, the ladder's rung per plate as above, the governor told how
   many plates it is carrying. Check: `startup` and the frame time on the Mac with four
