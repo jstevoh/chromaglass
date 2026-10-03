@@ -458,10 +458,25 @@ try {
     const on = await readRun('lift', at);
     await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
 
-    // How far out the press moved the colour, and how much of that the lift brought back beyond what the idle pool's mean did on its own.
-    const drift = idle[1].mean - idle[2].mean;
-    const outOf = (r) => r[1].mean - r[0].mean;
-    const backOf = (r) => (outOf(r) > 0 ? (r[1].mean - r[2].mean - drift) / outOf(r) : 0);
+    /*
+      Net of the pool's own spreading, both ways. The second Mac run, timed in
+      the plate's seconds, read the pressed pool 0.050 → 0.079 → 0.080: the
+      colour seemed not to come back at all. But the idle pool, a fresh drop
+      still settling, spread 0.016 further out in those three seconds on its
+      own, and must have spread through the hold as well. So the press's
+      push is what the pressed pool did over the hold less what the idle pool
+      did over the same plate seconds, and the lift's return is what it did
+      after less what the idle pool did then (the check above, the hover's,
+      learnt the same about a settling pool). Measured that way the lab's
+      colour under the palm (`npm run presslift`) is 77% back at 3 s; the
+      bar is half. And the push has to be real: the colour's mean distance
+      grows by a fifth more than the idle pool's, which is the film under the
+      palm thinned by a third (the colour moving with its liquid stretches by
+      √(h₀/h)); the lab's press grows it ×2.13.
+    */
+    const pushOf = (r) => (r[1].mean - r[0].mean) - (idle[1].mean - idle[0].mean);
+    const backOf = (r) => (pushOf(r) > 0 ? ((r[1].mean - r[2].mean) - (idle[1].mean - idle[2].mean)) / pushOf(r) : 0);
+    const pushed = (r) => pushOf(r) > 0.2 * r[0].mean;
     const ratio = (a, b) => (a.total > 0 ? b.total / a.total : 0);
     const idleOk = idle[0].total > 5 && ratio(on[0], idle[0]) > 0.5 && ratio(on[0], idle[0]) < 2;
     const pressKept = ratio(on[0], on[1]), liftKept = ratio(on[1], on[2]);
@@ -469,11 +484,11 @@ try {
     const timing = timed ? `; waited ${waits.join(', ')}` : `; the plate did not step through every wait: ${waits.join(', ')}`;
     const idleNote = idleOk ? '' : ` (the idle control had no pool to compare: ${idle[0].total.toFixed(0)} of colour against the pressed pool's ${on[0].total.toFixed(0)})`;
     check('Press on a thin gap pushes the colour out from under the palm',
-      thin && timed && idleOk && on[0].total > 5 && outOf(on) > 0.03 && pressKept >= idlePress - 0.05,
-      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${on[0].mean.toFixed(3)} → ${on[1].mean.toFixed(3)} of the plate held down, ${(pressKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idlePress * 100).toFixed(0)}%${idleNote}${timing}`);
+      thin && timed && idleOk && on[0].total > 5 && pushed(on) && pressKept >= idlePress - 0.05,
+      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${on[0].mean.toFixed(3)} → ${on[1].mean.toFixed(3)} of the plate held down, the idle pool's ${idle[0].mean.toFixed(3)} → ${idle[1].mean.toFixed(3)}: pushed ${pushOf(on).toFixed(3)} net, against a fifth of ${on[0].mean.toFixed(3)}; ${(pressKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idlePress * 100).toFixed(0)}%${idleNote}${timing}`);
     check('and draws it back when the hand lets go, where the Press as it was did not',
-      thin && timed && idleOk && outOf(on) > 0.03 && backOf(on) >= 0.5 && liftKept >= idleLift - 0.05 && outOf(off) > 0.03 && backOf(off) < 0.5,
-      `${on[1].mean.toFixed(3)} → ${on[2].mean.toFixed(3)} three of the plate's seconds after letting go, less the idle pool's own ${drift.toFixed(3)}: ${(backOf(on) * 100).toFixed(0)}% of the way back to ${on[0].mean.toFixed(3)}, ${(liftKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idleLift * 100).toFixed(0)}%; with Thin Gap off (the control) ${off[0].mean.toFixed(3)} → ${off[1].mean.toFixed(3)} → ${off[2].mean.toFixed(3)}, ${(backOf(off) * 100).toFixed(0)}% back${idleNote}`);
+      thin && timed && idleOk && pushed(on) && backOf(on) >= 0.5 && liftKept >= idleLift - 0.05 && pushed(off) && backOf(off) < 0.5,
+      `${on[1].mean.toFixed(3)} → ${on[2].mean.toFixed(3)} three of the plate's seconds after letting go, the idle pool's ${idle[1].mean.toFixed(3)} → ${idle[2].mean.toFixed(3)}: ${(backOf(on) * 100).toFixed(0)}% of the way back to ${on[0].mean.toFixed(3)}, ${(liftKept * 100).toFixed(0)}% of the colour kept against the idle pool's ${(idleLift * 100).toFixed(0)}%; with Thin Gap off (the control) ${off[0].mean.toFixed(3)} → ${off[1].mean.toFixed(3)} → ${off[2].mean.toFixed(3)}, pushed ${pushOf(off).toFixed(3)} net, ${(backOf(off) * 100).toFixed(0)}% back${idleNote}`);
     console.log(`     the Press's waits, in the plate's seconds: ${waits.join(', ')}`);
   }
 } finally {
