@@ -18,10 +18,14 @@ import { OUTPUT_LAYOUT } from './wgsl/outputFields';
 import { OUTPUT_WGSL } from './wgsl/output';
 import {
   MAX_SURFACES, composeOntoPin, cornerPinMatrix,
-  type OutputConfig, type SurfaceShape,
+  type OutputConfig, type SurfaceShape, type SurfaceSource,
 } from '../lib/outputConfig';
 
 const SHAPE_INDEX: Record<SurfaceShape, number> = { rect: 0, ellipse: 1, triangle: 2, diamond: 3 };
+/** As the shader counts them (`form.w`). */
+export const SOURCE_INDEX: Record<SurfaceSource, number> = { wall: 0, front: 1, back: 2, film: 3 };
+/** A source drawn by the plate again, rather than the finished frame. */
+export type PlateSource = Exclude<SurfaceSource, 'wall'>;
 
 /**
  * Every quad of a frame into the buffer at once, and how many there are.
@@ -47,6 +51,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     shape: SurfaceShape,
     feather: number,
     opacity: number,
+    source: SurfaceSource = 'wall',
   ) => {
     if (n >= MAX_SURFACES) return;
     const m = cornerPinMatrix(corners);
@@ -58,7 +63,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     pack.setAt('cornerAB', at, corners[0], corners[1], corners[2], corners[3]);
     pack.setAt('cornerCD', at, corners[4], corners[5], corners[6], corners[7]);
     pack.setAt('src', at, src[0], src[1], src[2], src[3]);
-    pack.setAt('form', at, SHAPE_INDEX[shape], feather, opacity, 0);
+    pack.setAt('form', at, SHAPE_INDEX[shape], feather, opacity, SOURCE_INDEX[source]);
     n++;
   };
 
@@ -73,7 +78,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     for (const s of surfaces) {
       if (!s.enabled || s.opacity <= 0) continue;
       const placed = composeOntoPin(s.corners, cfg.corners);
-      if (placed) quad(placed, s.src, s.shape, s.feather, s.opacity);
+      if (placed) quad(placed, s.src, s.shape, s.feather, s.opacity, s.source);
     }
   }
   // Everything past the last quad still has to hold something: a uniform
@@ -120,6 +125,10 @@ export class WebGPUOutput {
 
   private scene: GPUTexture | null = null;
   private sceneSize = [0, 0];
+  /** A plate source's own picture (§16b), made the first frame a surface asks for it. */
+  private readonly sources = new Map<PlateSource, { tex: GPUTexture; size: [number, number] }>();
+  /** The sources drawn this frame; one not drawn is bound to the scene and never read. */
+  private drawn = new Set<PlateSource>();
 
   /**
    * The projection, built before the show opens (`gpu/prepare.ts`). A show
@@ -161,6 +170,40 @@ export class WebGPUOutput {
   }
 
   /**
+   * Where a plate source (§16b) is drawn this frame, in the scene's format and
+   * size, so the one sample in the shader reads it the way it reads the wall.
+   * Asking for it is what marks it drawn: the plate draws into the view it is
+   * handed, and `draw` binds only what was asked for this frame.
+   */
+  sourceView(kind: PlateSource, width: number, height: number): GPUTextureView {
+    let got = this.sources.get(kind);
+    if (!got || got.size[0] !== width || got.size[1] !== height) {
+      if (got) this.disposer.release(got.tex);
+      got = {
+        tex: this.disposer.track(this.device.createTexture({
+          label: `projector ${kind}`, size: [width, height], format: this.format,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        })),
+        size: [width, height],
+      };
+      this.sources.set(kind, got);
+    }
+    this.drawn.add(kind);
+    return got.tex.createView();
+  }
+
+  /**
+   * Let go of the sources no surface asks for any more, so a projector moved
+   * back to the wall does not keep a canvas-sized texture for the rest of the
+   * night.
+   */
+  keepSources(asked: readonly PlateSource[]): void {
+    for (const [kind, got] of this.sources) {
+      if (!asked.includes(kind)) { this.disposer.release(got.tex); this.sources.delete(kind); }
+    }
+  }
+
+  /**
    * The projection, onto `target`. `quads` is what `fillOutputUniforms`
    * counted: one instance each, in the order the surfaces were given, which
    * is the order the blending needs.
@@ -195,15 +238,26 @@ export class WebGPUOutput {
           { binding: 0, resource: { buffer: this.ubo } },
           { binding: 1, resource: this.sampler },
           { binding: 2, resource: this.scene.createView() },
+          { binding: 3, resource: this.bound('front') },
+          { binding: 4, resource: this.bound('back') },
+          { binding: 5, resource: this.bound('film') },
         ],
       }));
       pass.draw(6, quads);
     }
     pass.end();
+    this.drawn = new Set();
+  }
+
+  /** A source's picture if it was drawn this frame, else the scene (never sampled: no surface asks for it). */
+  private bound(kind: PlateSource): GPUTextureView {
+    const got = this.drawn.has(kind) ? this.sources.get(kind) : undefined;
+    return (got ? got.tex : this.scene!).createView();
   }
 
   dispose(): void {
     this.disposer.dispose();
+    this.sources.clear();
     this.scene = null;
     this.sceneSize = [0, 0];
   }

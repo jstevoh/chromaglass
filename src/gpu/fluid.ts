@@ -81,6 +81,10 @@ const PRESSURE_SWEEPS = 12;
 const MG_CYCLES = 2;
 const MG_SWEEPS = 2;
 const MG_COARSE_SWEEPS = 16;
+/** The Thickness a thin gap runs at when a look does not set one: a light oil (PLAN §18a). */
+export const THIN_GAP_THICKNESS = 0.45;
+/** The thin gap's kernels (wgsl/thinGap.ts), built when it is first turned on. */
+const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient'];
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
 /*
@@ -233,6 +237,41 @@ const DYE_ITERS = 4;
 const GRID_DAMP = 0.05;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
 const MAX_SPEED = 0.002;
+/*
+  The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): its real size.
+
+  The drag between two glasses is 12ν/h², which needs the gap in metres.
+  The gap field is in plate widths (0.03 at rest in the middle), so the
+  plate needs a width: an overhead projector's stage takes a clock glass of
+  about eight inches, 0.2 m, which puts the rest gap at 6 mm in the middle
+  and the tightest the squeeze allows (0.004) at 0.8 mm. The same 0.03 is
+  the unit the mobility is written in, so M is about c on an open plate.
+*/
+const PLATE_METRES = 0.2;
+const REST_GAP = 0.03;
+/*
+  The dish's rim, in plate widths from the middle: the plate's inscribed
+  circle, which is all the picture ever shows of it (plate.ts keeps both
+  dishes inside it). Past it the liquid is open to the air.
+*/
+const OPEN_RIM = 0.5;
+/*
+  The liquid's thickness, as a kinematic viscosity in m²/s, from the
+  Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
+  at 1, on a log scale, which is how viscosities are spread: a light mineral
+  oil sits near 0.45, a heavy one near 0.6, olive oil near 0.63, syrup at
+  the top. The drag time h²/12ν in the middle of the plate is then about
+  three seconds for water, a tenth of a second at 0.45, and a millisecond
+  for glycerine.
+*/
+export function thinGapViscosity(thickness: number): number {
+  return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
+}
+/** The drag time ρh²/12μ, in seconds, at the plate's rest gap, for a Thickness. */
+export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
+  const h = gap * PLATE_METRES;
+  return (h * h) / (12 * thinGapViscosity(thickness));
+}
 /*
   How hard the magnet pulls the liquid where the ferrofluid is, per unit of
   magnetic energy gradient, in real seconds (phaseForce). Calibrated in the
@@ -425,6 +464,28 @@ export class WebGPUFluid {
     never pours any pays nothing.
   */
   private mix: PingPong | null = null;
+  /*
+    The thin-gap solver's own storage (PLAN §18a), made the first time a
+    plate is stepped with Thin Gap on: the velocity before the step's forces,
+    the mobility a cell (row-major, negative past the rim), and the mobility
+    on each coarse level of the multigrid.
+  */
+  private hsPrev: GPUTexture | null = null;
+  private hsMob: GPUBuffer | null = null;
+  private hsP: GPUBuffer | null = null;
+  /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
+  private hsReady = false;
+  private hsBuilding: Promise<void> | null = null;
+  private hsMobC: GPUBuffer[] = [];
+  private hsFaceC: GPUBuffer[] = [];
+  /** The gap as the last thin step left it, a cell at a time: its change is the press (hsDivergence). */
+  private hsGap: GPUBuffer | null = null;
+  /** False until a thin step has recorded the gap, and again whenever the glasses are re-laid rather than pressed. */
+  private hsPrimed = false;
+  /** V-cycles a thin solve takes: the old solver's count, which leaves under 2% of the flow's divergence (`npm run thingap`). */
+  private readonly hsCycles = MG_CYCLES;
+  /** Whether the last step ran as a thin gap: the next frame's deltas are imposed, not added. */
+  private thinLive = false;
   /*
     Oil Bodies: the oil's own share of the dye (see bodyPartition), in the
     dye's format, made the first step a plate has oil on it with Oil Bodies
@@ -620,6 +681,8 @@ export class WebGPUFluid {
     const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
     for (const [name, formats, now] of byFormat) for (const f of formats) add(`${name}:${f}`, kernel(name, f), now);
     for (const [name, f] of byName) add(name, kernel(name, f), true);
+    // The thin gap's kernels are not here: they are built when it is first
+    // turned on (prepareThinGap), so no show pays for them at its opening.
     // The splats' deltas brought up to the grid, every step.
     for (const f of [RGBA32, R32] as GPUTextureFormat[]) add(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f), true);
     // A tool, a pour: the splats, always into the full-float deltas. And the
@@ -775,10 +838,15 @@ export class WebGPUFluid {
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
     f[0] = this.N; f[1] = this.L; f[2] = p.dt; f[3] = p.time; f[4] = disp; f[5] = p.visc;
-    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.immiscibility; f[9] = p.fingering;
+    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.immiscibility; f[9] = 0;
     f[10] = p.vibIntensity; f[11] = p.vibFrequency; f[12] = p.drip; f[13] = p.air;
     f[14] = p.smearX; f[15] = p.smearY;
-    f[16] = p.damping; f[17] = p.heatDecay; f[18] = MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
+    /*
+      A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
+      neither damps nor clamps it: only the heat decays there.
+    */
+    const thin = this.thinGapOn(p);
+    f[16] = thin ? 1 : p.damping; f[17] = p.heatDecay; f[18] = thin ? 1000 : MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
     i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
     f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = p.twist;
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
@@ -812,6 +880,7 @@ export class WebGPUFluid {
     // At the dome's own shape, not flat: a plate filled flat then sprung
     // toward the dome pumps its liquid inward until the two agree.
     for (const t of [this.squeeze.a, this.squeeze.b]) this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
+    this.hsPrimed = false;
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     if (this.grain) {
@@ -1012,7 +1081,7 @@ export class WebGPUFluid {
     }
     this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
-    this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
     this.vel.swap();
     this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, 0, 0, 0]));
     this.squeeze.swap();
@@ -1067,6 +1136,9 @@ export class WebGPUFluid {
     const m2f = 0.16 + (HAND_SCREEN - 0.16) * spikeAmt;
     const mazeK = { m2: m2f * kk, alpha: ((1 + m2f) * kk) ** 2 };
     if (maze <= 0.001 && !spikes) this.mazeReady = false;
+    const thin = this.thinGapOn(p);
+    if (!thin) this.hsPrimed = false;
+    this.thinLive = thin;
     this.writeSim(p, disp);
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
@@ -1159,16 +1231,26 @@ export class WebGPUFluid {
           this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
         }
         this.lastCurve = p.plateCurve;
+        this.hsPrimed = false;
       } else if (this.lastCurve !== p.plateCurve) {
         this.run(pass, 'gapReshape', this.squeeze.write, [this.squeeze.read],
           this.arg('gap reshape', [this.lastCurve, p.plateCurve, 0, 0]));
         this.squeeze.swap();
         this.lastCurve = p.plateCurve;
+        // New glasses, not a press: a thin gap takes the new shape as it is.
+        this.hsPrimed = false;
       }
       if (!deltasApplied) {
         this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
         this.squeeze.swap();
       }
+      /*
+        A thin gap stops here: the gap is the liquid's mobility and its rate
+        is the press, both read by the thin-gap projection, and the film's
+        own pressure below adds a pure gradient that a projection deletes
+        (wgsl/fluid.ts, divergence). Kept as it was otherwise.
+      */
+      if (thin) return;
       /*
         Five red-black sweeps where this was ten Jacobi passes.
 
@@ -1220,6 +1302,14 @@ export class WebGPUFluid {
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
     }, visc.some((v) => v > 0));
+
+    /*
+      A thin gap keeps the velocity from before the forces, so it can read
+      what they asked for as a speed to drive the liquid to (hsPrep).
+    */
+    stage('thin gap keep', (pass) => {
+      this.run(pass, 'scaleDye', this.ensureThinGap(), [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+    }, thin);
 
     // 4. Project, 5. advect velocity by itself, 6. project again
     /*
@@ -1319,24 +1409,60 @@ export class WebGPUFluid {
       this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(1, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
       this.vel.swap();
     }, (p.vorticity ?? 0) > 0.001);
-    stage('project 1', (pass) => this.project(pass));
-    stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
-    stage('project 2', (pass) => this.project(pass));
+    /*
+      A thin gap takes the stirring in with the other forces, before the
+      solve, so it lasts through the drag time like any push and the flow it
+      makes conserves liquid; then one projection with the drag in it, and no
+      self-advection or second projection (the header of wgsl/thinGap.ts,
+      "What the step no longer does", says why they can go and what it costs).
+    */
+    if (thin) {
+      stage('forces', (pass) => {
+        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
+        this.vel.swap();
+      });
+      /*
+        And the lasting current with them. On the old plate the current is a
+        speed laid over the flow after both projections, divergence-free in
+        u, which in a gap is not liquid conserved: stirred with a current,
+        glycerine's |∇·(hu)| came to 0.0093 of its flux where without one it
+        was 0.0030 (npm run thingap). Here it goes in as the other forces do,
+        a speed the liquid is driven to against the glass, and the solve
+        makes it conserve liquid with everything else. The rock, the twist,
+        the buoyancy and the lamp's pull still come from the current's own
+        solver (PLAN §18a has their move into this field as forces).
+      */
+      stage('current', (pass) => {
+        this.stepCurrent(pass);
+        this.run(pass, 'addCurrent', this.vel.write, [this.vel.read, this.cur.read, this.squeeze.read], this.arg('current grid thin', [0, this.M, 0, 0]));
+        this.vel.swap();
+      });
+      stage('thin gap', (pass) => {
+        this.thinProject(pass, p, disp);
+        // What the dye rides is the flow itself: the current is in it now.
+        this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+      });
+    } else {
+      stage('project 1', (pass) => this.project(pass));
+      stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
+      stage('project 2', (pass) => this.project(pass));
 
-    // 6.5–8.7 The post-projection forces
-    stage('forces', (pass) => {
-      this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
-      this.vel.swap();
-    });
+      // 6.5–8.7 The post-projection forces
+      stage('forces', (pass) => {
+        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
+        this.vel.swap();
+      });
+    }
 
-    // 8.9. The lasting current, and the flow the dye rides
+    // 8.9. The lasting current, and the flow the dye rides (a thin gap took
+    // its current in before the solve, above).
     stage('current', (pass) => {
       this.stepCurrent(pass);
       // The gap rides along: the plate's depth is a mobility on the flow that
       // carries the dye (F), and this is the field that carries it.
       this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read],
         this.arg('current grid', [0, this.M, p.depthDrag, 0]));
-    });
+    }, !thin);
 
     // 9. Dye: diffuse, then advect through the forced velocity
     const a = p.dt * p.diff * n2;
@@ -1370,6 +1496,26 @@ export class WebGPUFluid {
       }
     }, a > 0);
     stage('advect dye', (pass) => {
+      /*
+        In a thin gap the dye goes through the faces too, as it does with Oil
+        Bodies (bodyAdvect). The dye is colour per unit of plate, h·C, and
+        the liquid carries C, so what it obeys is ∂(hC)/∂t + ∇·(hC u) = 0:
+        an amount moved across faces by u, which is what the fluxes are. The
+        backtrace copies a value and thins it by the flow's spread, held to
+        e^±0.5 a step so one bad texel cannot flood a cell, and under a press
+        the flow leaving a closing gap spreads past that hold: a disc of dye
+        under a press laid in one step went from 332 to 656 (npm run thingap).
+        Divided by the depth, carried as C and multiplied back, the disc
+        gained 13% and a ring round a press laid over ten steps 12%, since a
+        backtrace keeps no sum. Across faces both keep every drop (332.0 and
+        336.0, before and after), and the ring lands where the displaced
+        volume puts it (100% of the shift, against 85% by backtrace).
+      */
+      if (!bodiesOn && thin) {
+        this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+        this.dye.swap();
+        return;
+      }
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
       /*
         With Oil Bodies, the dye and the oil's share of it cross the same
@@ -2280,6 +2426,155 @@ export class WebGPUFluid {
     pass.setBindGroup(0, ggroup);
     pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
     this.vel.swap();
+  }
+
+  /**
+   * Whether this step runs the plate as a Hele-Shaw cell (PLAN §18a). It
+   * needs the multigrid's levels, which every grid the ladder builds has.
+   */
+  private thinGapOn(p: GpuStepParams): boolean {
+    const want = (p.thinGap ?? 0) > 0.5 && this.mg.length > 0;
+    if (want && !this.hsReady) { void this.prepareThinGap(); return false; }
+    return want;
+  }
+
+  /**
+   * The thin gap's pipelines, built off the frame one at a time, the first
+   * time it is asked for; the plate runs the old way until they are in.
+   *
+   * Not in \`prepare\`'s list, not even behind the show. Behind the show a
+   * compile costs the frames it takes (gpu/prepare.ts): the page draws
+   * between compiles, not during them, so every pipeline there is paid for
+   * by every show's first seconds, and on a slow runner the WebGPU smoke's
+   * "the stage starts" (thirty frames in thirty seconds) went red with these
+   * twelve added (run 36367898896: 31 frames drawn by 37 s after load, where
+   * another PR's green run that hour had drawn 852; that runner was slow
+   * all round, so how much was these twelve is not known). Thin Gap is off
+   * in every look, so a show that never turns it on should not pay for it;
+   * one that does runs the old way for as long as the twelve compiles take
+   * (about three seconds at prepare.ts's 0.23 s each on CI's Mac), rather
+   * than stopping on the frame to build them.
+   */
+  prepareThinGap(): Promise<void> {
+    if (!this.hsBuilding) {
+      this.hsBuilding = (async () => {
+        for (const name of THIN_GAP_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, kernel(name, 'rgba16float'));
+        // The snapshot before the forces, and the copy the dye rides, both into the velocity's format.
+        await this.pipelines.prepareCompute(`scaleDye:${VEL}`, kernel('scaleDye', VEL));
+        this.hsReady = true;
+      })();
+    }
+    return this.hsBuilding;
+  }
+
+  /** The thin-gap solver's storage, made once; returns the velocity snapshot. */
+  private ensureThinGap(): GPUTexture {
+    if (!this.hsPrev) {
+      this.hsPrev = this.disposer.track(this.device.createTexture({
+        label: 'thin gap before forces', size: [this.N, this.N], format: VEL,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+      const buf = (label: string, n: number) => this.disposer.track(this.device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.hsMob = buf('thin gap mobility', this.N);
+      // The thin solve's own P, packed as the old solver's pressure is. hsGradient
+      // hands the advections c·P in that one (wgsl/thinGap.ts, hsGradient).
+      this.hsP = buf('thin gap pressure', this.N);
+      this.hsGap = buf('thin gap before', this.N);
+      this.hsMobC = this.mg.map((lv) => buf(`thin gap rim ${lv.n}`, lv.n));
+      // Each coarse level's faces: every cell's east face, then every cell's north.
+      this.hsFaceC = this.mg.map((lv) => this.disposer.track(this.device.createBuffer({ label: `thin gap faces ${lv.n}`, size: Math.max(16, 2 * lv.n * lv.n * 4), usage: GPUBufferUsage.STORAGE })));
+    }
+    return this.hsPrev;
+  }
+
+  /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
+  private hsRun(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count?: number): void {
+    const pipe = this.pipelines.computePipeline(`${name}:thin`, kernel(name, 'rgba16float'));
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...resources]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    if (count === undefined) {
+      const w = Math.ceil(this.N / 8);
+      pass.dispatchWorkgroups(w, w);
+    } else {
+      pass.dispatchWorkgroups(Math.ceil(count / 64));
+    }
+  }
+
+  /**
+   * One step of the plate as a Hele-Shaw cell (wgsl/thinGap.ts): the forces
+   * read as terminal speeds and the drag, the mobility, the right-hand side,
+   * a variable-coefficient multigrid with the rim held open, and the
+   * velocity the step ends with.
+   */
+  private thinProject(pass: GPUComputePassEncoder, p: GpuStepParams, disp: number): void {
+    const prev = this.ensureThinGap();
+    const mob = this.hsMob!;
+    const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM]),
+      [this.vel.read, prev, this.squeeze.read, this.vel.write, mob]);
+    this.vel.swap();
+    const invDt = 1 / Math.max(this.lastDt, 1e-4);
+    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+      this.arg('thin divergence', [this.airPush, invDt, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) * invDt, 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
+      [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!]);
+    this.hsPrimed = true;
+    // Each coarse level's faces and rim, from the level above it.
+    for (let l = 0; l < this.mg.length; l++) {
+      const fineN = l === 0 ? this.N : this.mg[l - 1].n;
+      const cells = l === 0 ? mob : this.hsMobC[l - 1];
+      // Level 0 has no face buffer (its faces are its cells' harmonic means), so its
+      // cells fill the slot too: read twice is allowed, read and written in one dispatch is not.
+      const faces = l === 0 ? mob : this.hsFaceC[l - 1];
+      this.hsRun(pass, 'hsCoarsen', `hsCoarsen:${l}`, this.arg(`thin coarsen ${l}`, [fineN, l === 0 ? 1 : 0, 0, 0]),
+        [cells, faces, this.hsMobC[l], this.hsFaceC[l]], this.mg[l].n * this.mg[l].n);
+    }
+    this.clearBuffer(pass, this.hsP!, 'clear pressure');
+    for (let c = 0; c < this.hsCycles; c++) this.hsCycle(pass, 0);
+    this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
+      [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);
+    this.vel.swap();
+  }
+
+  /** One V-cycle of the thin gap's variable-coefficient multigrid, as `vcycle` is for the old one. */
+  private hsCycle(pass: GPUComputePassEncoder, l: number): void {
+    const mob = this.hsMob!;
+    const smooth = (level: number, sweeps: number) => {
+      for (let k = 0; k < sweeps; k++) {
+        for (const parity of [0, 1]) {
+          if (level === 0) {
+            this.hsRun(pass, 'hsSmooth0', `hsSmooth0:${parity}`, this.arg(`pressure ${parity}`, [parity, 0, 0, 0]), [this.div, this.hsP!, mob], this.N * (this.N / 2));
+          } else {
+            const lv = this.mg[level - 1];
+            this.hsRun(pass, 'hsSmooth', `hsSmooth:${level}:${parity}`, this.arg(`mg smooth ${level} ${parity}`, [lv.n, parity, 0, 0]),
+              [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], lv.n * Math.ceil(lv.n / 2));
+          }
+        }
+      }
+    };
+    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS); return; }
+    smooth(l, MG_SWEEPS);
+    const below = this.mg[l];
+    if (l === 0) {
+      this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
+    } else {
+      const here = this.mg[l - 1];
+      this.hsRun(pass, 'hsRestrict', `hsRestrict:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);
+    }
+    this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
+    this.hsCycle(pass, l + 1);
+    if (l === 0) {
+      this.hsRun(pass, 'hsProlong0', 'hsProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.hsP!, mob], this.N * this.N);
+    } else {
+      const here = this.mg[l - 1];
+      this.hsRun(pass, 'hsProlong', `hsProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
+    }
+    smooth(l, MG_SWEEPS);
   }
 
   /** The lasting current: forces, then its own projection, on the M grid. */

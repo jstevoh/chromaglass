@@ -312,7 +312,8 @@ try {
     const idleWindow = async (ms) => {
       const p = await snap('wIdle0'); await settle(ms); await snap('wIdle1');
       const a = await measure('wIdle0', p), b = await measure('wIdle1', p);
-      return { total: b.total - a.total, cx: b.cx - a.cx, cy: b.cy - a.cy };
+      const steps = await page.evaluate(() => window.__toolSnaps.wIdle1.step - window.__toolSnaps.wIdle0.step);
+      return { total: b.total - a.total, cx: b.cx - a.cx, cy: b.cy - a.cy, steps };
     };
     const wIdle = await idleWindow(2500);
     const steps0 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
@@ -325,14 +326,41 @@ try {
     const wa = await measure('wind0', w0p), wb = await measure('wind1', w0p);
     const toB = (dx, dy) => (dx * dirB.x + dy * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
     const wAlong = toB(wb.cx - wa.cx, wb.cy - wa.cy);
-    const idleAlong = Math.max(Math.abs(toB(wIdle.cx, wIdle.cy)), Math.abs(toB(wIdleAfter.cx, wIdleAfter.cy)));
+    /*
+      The plate's own drift, signed, at the larger of the two rates toward
+      where the stroke went, over the solver steps the stroke spanned. The
+      first version took the larger drift either way (the absolute value) of
+      each window as it came. On CI that failed a wind that ran 40 wind steps
+      and carried 34.7 of colour: its middle moved 2.09% of the plate toward
+      B against 2.50% "left alone", from a pool of 56, and that printout never
+      said which way the plate had drifted. Two things were wrong with it,
+      and the check-skeptic review found the second:
+      - a drift away from B was charged against the wind, though it can only
+        hide a push, never fake one; only a drift toward B can pass a wind
+        that pushed nothing, so that is the one the stroke has to beat;
+      - the windows are not the same length. Each idle window is one 2.5 s
+        wait, but the stroke's is 2.5 s of waits plus the tool pick, 32
+        pointer round trips and React, so a plate drifting steadily toward B
+        at CI's 2.5% a window passes a wind that does nothing once the
+        stroke's window is about 8% longer. So each window is counted in the
+        steps it spanned (stepIndex, kept with the dye, as the Hover check
+        above does), and the drift is scaled to the stroke's span.
+      Both windows' drifts are printed signed, so the next failure says which
+      way the plate was going.
+    */
+    const strokeSteps = await page.evaluate(() => window.__toolSnaps.wind1.step - window.__toolSnaps.wind0.step);
+    const stepsOk = wIdle.steps > 0 && wIdleAfter.steps > 0 && strokeSteps > 0;
+    const idleB = toB(wIdle.cx, wIdle.cy), idleBAfter = toB(wIdleAfter.cx, wIdleAfter.cy);
+    const idleAlong = Math.max(idleB / Math.max(1, wIdle.steps), idleBAfter / Math.max(1, wIdleAfter.steps)) * strokeSteps;
+    const pct = (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
     const straw = (steps1?.straw ?? 0) - (steps0?.straw ?? 0), wind = (steps1?.wind ?? 0) - (steps0?.wind ?? 0);
     const carried = (steps1?.carried ?? 0) - (steps0?.carried ?? 0);
     console.log(`     the stroke ran ${wind} wind steps and ${straw} straw steps; the wind carried ${carried.toFixed(1)} of colour`);
     check('Blow drawn across a pool is the wind, and the wind carries colour', wind > straw && carried > 1,
       `${wind} wind steps against ${straw} straw, ${carried.toFixed(1)} carried`);
-    check('and pushes the colour along', wa.total > 20 && wAlong > 0.002 + idleAlong,
-      `centre of mass moved ${(wAlong * 100).toFixed(2)}% of the plate toward where the stroke went, against ${(idleAlong * 100).toFixed(2)}% left alone, from a pool of ${wa.total.toFixed(0)}`);
+    check('and pushes the colour along', stepsOk && wa.total > 20 && wAlong > 0.002 + idleAlong,
+      !stepsOk ? `the plate did not step through every window (${wIdle.steps}, ${strokeSteps}, ${wIdleAfter.steps} steps)`
+        : `centre of mass moved ${pct(wAlong)} of the plate toward where the stroke went over ${strokeSteps} steps, against ${pct(idleB)} over ${wIdle.steps} before and ${pct(idleBAfter)} over ${wIdleAfter.steps} after left alone (${pct(idleAlong)} at the faster rate toward it over the stroke's steps), from a pool of ${wa.total.toFixed(0)}`);
     const lowIdle = Math.min(wIdle.total, wIdleAfter.total);
     check('and keeps it rather than erasing it', wa.total > 20 && (wb.total - wa.total) - lowIdle > -(0.1 * wa.total + 5),
       `${wa.total.toFixed(0)} → ${wb.total.toFixed(0)}, against ${wIdle.total >= 0 ? '+' : ''}${wIdle.total.toFixed(0)} before and ${wIdleAfter.total >= 0 ? '+' : ''}${wIdleAfter.total.toFixed(0)} after with the plate left alone as long`);
