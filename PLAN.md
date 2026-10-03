@@ -65,6 +65,7 @@ Where each batch stands, as of 2026-09-27:
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac, the ferrofluid's half open (9n, which it waited on, shipped in #206); 15b, 15c, 15e open |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
+| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -133,6 +134,24 @@ phone's two-finger Drop on #186's deploy (B 81 against 2/0/0, fine by eye), `qa`
 #189's deploy with no WebGPU adapter in 10 s, and `startup`'s GPU-start stop at 3.52 s
 against 3.5 on #194. Each wants what §0 asks of the Finger: find whether the check or
 the product is wrong, from the numbers it prints.
+
+*Read 2026-09-28, on #216's show shard, a docs-only tree:* "the tapped beat drives the
+show's clock" read a beat every 401.7 ms against 404.1 ms tapped, its second red, after
+#195's 396.6 against 401.4; the runs of #203 and #211 on the same code read 405.8
+against 405.8 and 403.2 against 403.2. The clock is not the suspect §11 names:
+`setExternal` is handed the tap's reading right before `update` on every frame, with the
+same `now`, so every frame ends on the tempo source's own period, and nothing in the
+check clears the tap (only Tempo: Listen Again does). The two numbers come from two
+stopwatches. The check stamps each tap in the page just before `chromaglassAction('tap-tempo')`, and the app stamps it again
+inside `tapTempo`, so a pause between the two stamps (a collection, or the first call
+into `runAction` on a busy runner) lands in one and not the other. Both reds read the
+app's mean shorter, which is what a late first stamp does, by 14.4 and 7.2 ms over the
+three gaps, where the check allows 6. This is read in the code, not run. *Proposed:*
+`chromaglassDebug()` returns the tempo source's reading. The check then asks that the
+clock's period is that period to within 0.5 ms (the feature: the tap drives the clock).
+Separately, allowing for dispatch, it asks that the app's taps are the harness's
+(a tap dropped or doubled moves the mean by a third or more). The `check-skeptic` holds
+both halves red.
 
 The dye's advection now thins
 where the flow spreads and thickens where it gathers (the Jacobian of the
@@ -507,6 +526,13 @@ What it leaves open: "press the big dish" and "drop the lead dye" have no matchi
 learned mappings do not reach a Cast or network display (triggers do). The downbeat is also what batch 10's accent
 selection (step 3) needs.
 
+*Found 2026-09-28, not done:* the downbeat exists now (the bar grid's one, #184, Accent
+the One), but sound learn still fires `bar` on every fourth beat it has counted since
+the clock locked (`beatIndex % 4`, `soundLearn.ts`), so "Each bar" lands on whichever
+beat the lock began on. Take the bar grid's one when the grid is sure of it (its own
+0.15), and the count only when it is not. *Measure:* `npm run learn` with a song whose
+lock begins on beat 3: the bar fires on the one.
+
 **Shutter** (`shutter`, camera pass). Their trail buffer is a generic VJ smear laid
 over everything. Here it belongs in the camera, where it is physically motivated: the
 photographs that the Photograph style is built from are long exposures, and their light
@@ -519,6 +545,17 @@ real lens does. Off in the light-show style, on by default in the Photograph pre
 for a look you want to keep; a link is for the other case, showing someone a look right
 now, between the laptop, the phone and anyone you want to send it to. Opening one sets
 the look only: the projector window, the remote and the show server are untouched.
+
+**An ear per input channel** (*proposed 2026-09-28*). The show hears one input and
+splits it into kick, snare and bass by what the spectrum suggests (`audioFeatures.ts`).
+A band's desk can send more than that: the kick mic, the bass DI, the vocal bus and a
+room mic, on separate channels of one interface. Open the input with its
+`channelCount` and a `ChannelSplitter`, and make each channel a named source beside
+the analyser's: the kick's onset from the kick mic, the vocal bus for the lyrics and
+for presence, the room mic's roar as a sound-learn source. Browsers differ above two
+channels, so it is surest in the Mac app (§13 step 1). The phone's Sound sheet gets a
+meter and an on/off per channel. *Measure:* `npm run bands` on a four-channel file with
+a kick on channel 1 only: the kick onset follows channel 1, not the mix.
 
 ### 6. Render a song
 
@@ -573,6 +610,17 @@ live take. Two Metal runs of the same code on the same seeds read Classic's moti
 half-life as 1.0 s and then 11.3 s, because a live take's frames depend on the frame
 clock. Judge a live-motion change by its range leaving the old range, not by a median
 moving.
+
+*Proposed 2026-09-28:* **record the whole set, render it afterwards.** A take today is
+the gestures painted with the laptop's primary pointer, at about 15 Hz
+(`performanceTake.ts`; "Feed the performance recorder" in `LiquidVisualizer.tsx`): no
+settings, no Go or Back, no Mixer takes, blackout or tempo, and no phone, OSC or
+gamepad hands. Log all of it with the seed, write the audio to disk as it plays, and
+afterwards render the set through the existing Render path at 1080p or 4K. As the
+caution above says, it would be the same decisions, not the same pixels. The phone's
+hands already go through `performGesture`, so they are logged with the rest, and its
+Record toggle arms "log the set". *Measure:* `npm run render` of a logged two-minute
+set holds the live log's Go times and look names.
 
 ### 7. The room in the plate: the camera as a sensor
 
@@ -742,6 +790,15 @@ projection.
 muscle memory is most of what playing an instrument is. Design mode exists so nothing
 is *taken away*, and the desk is judged on whether a show can be played from it, not on
 whether it is tidier.
+
+*Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
+picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
+pick lists). `gallery.yml` already photographs every preset; ship those photographs as
+thumbnails, and have Save Look keep a still of the plate in the preset file, sent to a
+receiver once rather than in every cast state (the lesson of S0's logo, in
+`docs/stability-plan.md`). The phone's Looks sheet, where rows are smallest, gains most.
+*Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
+row; the cast state's size is unchanged.
 
 ### 9. Ferrofluid after the references
 
@@ -1272,6 +1329,18 @@ The steps, most visible first. Each is one PR with its own check, and every step
 Small things that ride along with the steps: drops with a coloured rim lined up in
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
 event, and one big organiser over a field of small drops at about a 10:1 size range.
+
+*Proposed 2026-09-28:* **Go on the music.** A Go is immediate and its fade is in seconds
+(`sendLook` → `fadeSettingsTo`; a set item's `fade` is seconds), while the Mixer's takes
+already fade in bars (`barsToMs`, #195). A performer wants the change to land on the
+music: Go on the next bar, in 4, 8 or 16 bars, or at the next section the song's shape
+hears (`barGrid`'s one, `songShape`), with the fade in bars. Beside it a **T-bar**: a
+learnable fader, and one on the phone, that scrubs the fade from the look playing to the
+one armed, by hand, with soft takeover, and a Go that completes it. It is the hand's side
+of §17's anticipation. On the phone a long press on Go arms "on the bar" with a ring
+counting down, and the Looks sheet gets the T-bar. *Measure:* `npm run setlist` for the
+arming and the count; `npm run downbeat`'s song for a Go that lands within a frame of the
+one; `npm run desk` for the T-bar's soft takeover.
 
 ### 11. The mixer
 
@@ -2349,6 +2418,291 @@ one piece a PR, each with `lint`, `panel`, `desk`, `phone`, `wall` and the Mac's
 `React.memo` on the panels only where a render count (the one 14f adds) shows a panel
 rendering for props it does not use.
 
+*Found 2026-09-28, not done:* a second reading of the code, this time for what a
+stranger on the network, a stale callback or a knocked device does to a set: the show
+server, the ear, the desk and the shell, read as the pass above was, against the plans
+first. What it found in the recovery paths is `docs/stability-plan.md` S14–S21, the GPU
+step's cost `docs/webgpu-plan.md` H2c, the report Worker's limits `docs/crash-plan.md`,
+the room's lights, a load-in card and the show kit `docs/rig-plan.md` (R4, R5, R8), and
+the checks and the build §19.
+
+### 14m. Anyone on the venue's network can drive the show
+
+**Read in the code** (`server/remote-server.js` unless named).
+
+- The show key is four random digits (`SHOW_KEY`), about 13 bits, compared with `!==`,
+  and a wrong `hello` only closes that socket: nothing counts failures or slows the next
+  try. Through `npm run tunnel` the 9,000 keys fall in minutes.
+- On the LAN it need not be guessed. `/remote-info.json` hands the key to any request
+  without `x-forwarded-for` or `cf-connecting-ip` (`isLocalRequest`), which is every
+  device on the venue's Wi-Fi, not only the machine `remoteProtocol.ts` says it is for.
+  The socket checks no Origin or Host either, so a web page open on any phone in the
+  room can reach `ws://<laptop>:3000/remote-ws`.
+- With the key, a `hello` as `display` receives every phone's commands, and can push
+  `state` and `cast` to the phones and to the network display on the wall, set the
+  Art-Net `lights`, and toggle Record and Blackout.
+- Frames are taken up to the `ws` default of 100 MiB (`new WebSocketServer({ server,
+  path })`); the 512 KB limit is checked after the frame is buffered and made a string.
+  A socket that never says hello is never closed, and nothing caps connections. A few
+  large frames stop the Node process, and every phone, network display, OSC and Art-Net
+  with it.
+- A restart with the generated key answers every phone and network display `denied`,
+  and `useRemoteLink.ts` stops retrying for good on that, though the server's comment
+  says it is restartable mid-show.
+- Art-Net in reads every universe but its own output (`packet.universe ===
+  artnet.universe` is the only filter) into one `seen` map, so on a rig with four
+  universes each mapped setting jumps between their values. A non-numeric `ARTNET_RATE`
+  makes the rate `NaN`, and `setInterval(…, NaN)` sends every millisecond.
+
+*Fix:* the key only to a loopback `req.socket.remoteAddress`, and an Origin check on the
+upgrade; a longer key from `crypto.randomInt`, compared with `timingSafeEqual`, and an
+address locked out after a few wrong hellos; a display key apart from the phones', so a
+phone's key cannot take the display role; `maxPayload: 512 * 1024`, a 5 s deadline for
+the hello and a cap per address; the generated key kept in a file beside the server, so
+a restart keeps it; an input universe, and the `ARTNET_*` numbers validated. The phone's
+join and the iPhone app's laptop remote (`appLink.ts`) must keep working.
+
+Once the server has roles, a **guest key** is a small step (*proposed*): a key whose
+socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto a
+chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
+tablet, a second projectionist, or at a party the audience's phones through a QR code
+on a card.
+
+*Measure:* extend `npm run remotemix`: a request from a LAN address gets no key; three
+wrong keys lock the address out; a 1 MB frame is refused without the process growing; a
+silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
+socket's `patch` is dropped.
+
+### 14n. One malformed message can end the plate
+
+**Read in the code; the chain was followed by hand, not run.** The display applies a
+remote `patch` as it comes (`case 'patch': queuePatch(message.settings)` →
+`updateSettings`, `App.tsx`): any key, of any type. `{"simResolution":"x"}` gives
+`Math.round("x")`, `NaN`, in `resolveSimResolution` (`LiquidVisualizer.tsx`); `new
+WebGPUFluid(device, NaN)` throws on `createTexture`, and the catch calls
+`governor.failRung()`, which marks the rung failed forever (`governor.ts`). Each rung in
+turn fails the same way, until the plate stands on "no WebGPU": a one-way door in the
+sense of `docs/stability-plan.md`. A phone on an older build that sends a renamed or
+retyped key does the same by accident. The OSC path already drops non-finite numbers
+(`oscToMessage`'s `num()`); the socket does not. Two more doors of the kind:
+
+- a MIDI map file's setting binding keeps any key and, for a key not in
+  `LEARNABLE_BY_KEY`, its own `min` and `max` unchecked (`parseMidiMap`, `midi.ts`),
+  where `parseSoundBindings` drops unknown keys;
+- gestures: `dx`/`dy` sent as strings become `NaN` in the CPU velocity
+  (`blowDirected`), and every distinct `drop.color` string becomes a key in `hexCache`
+  (`constants.ts`), which never forgets one.
+
+*Fix:* one `sanitizePatch` against the settings registry (known keys, the default's
+`typeof`, finite numbers clamped to the setting's range), used by the socket, the MIDI
+map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` bounded.
+*Measure:* a node check beside `npm run remotemix` that sends `simResolution: "x"`, a
+`NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
+governor's ladder and the cache as they were.
+
+### 14o. The song-ID Worker is open to anyone
+
+**Read in the code.** `server/fingerprint-worker.js` answers any origin
+(`Access-Control-Allow-Origin: *`) with no key and no rate limit, and its URL is built
+into the public bundle (`VITE_FINGERPRINT_PROXY_URL`, `deploy.yml`). Anyone who reads
+the bundle can identify songs on the owner's AudD or ACRCloud account, from a script or
+from their own site. It also parses the whole multipart body (`request.formData()`)
+before its 2 MB check. The report Worker already has what this one lacks
+(`ALLOWED_ORIGINS`, a per-address limit in KV; `docs/crash-plan.md`).
+
+*Fix:* the same origin list and per-address limit (per /64 on IPv6), a refusal on
+`Content-Length` before parsing, and a daily ceiling that answers "busy" rather than
+spending. The show's own origins (the site, the show server, the Mac app) stay allowed.
+*Measure:* a node harness in the manner of `npm run report-worker`: a foreign origin
+refused, the 31st request in an hour refused, a 3 MB body refused before `formData()`.
+
+### 14p. Show night runs whatever merged last
+
+**Read in the code.** `npm run show` is `npm run update && npm run remote`, and `update`
+is `git pull origin main && npm install && npm run build`. `main` takes several
+sessions' merges a day, each as soon as its checks are green (CLAUDE.md), and each
+deploys to the site. So the laptop at soundcheck builds whatever landed an hour before,
+much of it marked "not yet seen on the Mac" in the running order above, and the hosted
+site can change under a show that is playing from it. 14k's mixed versions at the
+projector are a symptom of this; this is the cause.
+
+*Fix:* a `show-*` tag, cut when the owner has judged a build on the Mac; `npm run show`
+checks out the newest tag unless asked for `main`, and prints which; one command to roll
+back to the tag before; a Firebase channel that serves the tag, for a show played from
+the site; the Mac app (§13 step 1) bundles a tag, not `main`. *Measure:* `npm run show`
+in a scratch clone with a tag behind `main` builds the tag's tree; the cast hello's
+version (14k) matches it.
+
+### 14q. The room's lights do not follow the wall
+
+**Read in the code** (the `lights` effect in `App.tsx`; `server/artnet.js`). Every
+50 ms the show sends each layer's mean colour and `master = blackout ? 0 : min(1, fill ×
+1.6)`: how much dye the plate holds. It does not see the Dimmer, Pacing's fades toward
+black (which ride the flash-gain uniform, not a setting), the flash guard, the Mixer's
+levels or the output gain. So in Light Show Night the pars stay up through a near-black
+scene the wall has faded into, and Blackout cuts them at once while the wall fades over
+a second. The colour is a mean, so a magenta-and-cyan plate lights the room grey, the
+fault the roadmap names for `sceneSense`. The flash guard does not reach them (14r).
+
+*Fix:* send the master the wall shows (dimmer, pacing gain, blackout's fade, the guard's
+gain, the output gain), and the dominant colour rather than the mean, from the probe's
+tiles (14r). Fixtures with places, and sACN, are rig-plan R8. *Measure:* a check on the
+master the App sends, beside `npm run lights` (which checks the bytes): at Dimmer 0.2,
+through a Pacing fade to black and a blackout's fade, the master follows the wall's
+brightness within a frame; a two-colour plate sends one of its colours, not grey.
+
+### 14r. The flash guard reads one number for the whole wall
+
+**Read in the code.** `flashGuard.ts` watches the frame's mean luminance (`probeTiles`
+folds every pixel into one sum, `wgsl/probe.ts`). The photosensitivity guidance it is
+written against counts a flash over a quarter of the screen: a flash of 0.4 over a
+quarter of the wall reads 0.1 as a mean, at the line, and a smaller patch never counts.
+The separate rule for saturated red is not implemented, and nothing looks at
+high-contrast patterns, of which Ferro Maze (a black labyrinth on a white table, 9d) is
+the case. The room's lights (14q) are not guarded. And the probe divides an older
+frame's sum by the current frame's pixel count (`probe.ts`), so after a pixel-ratio rung
+change (1.5× to 1×) one reading is 2.25× too bright and then drops back, which the guard
+counts as a flash.
+
+*Fix, after 14i's decode to linear light:* keep the probe's per-workgroup partials as
+tiles; luminance and a red ratio per tile, counted over quarter-wall windows; the pixel
+count kept with its sum; the same gain on the Art-Net master. No control on the phone,
+by design; the guard's line on the desk and the phone names the rule that is holding.
+*Measure:* `npm run wall`'s traces with a quarter-wall flash of 0.4 at 5 Hz (counted), a
+full-wall red flash (counted by the red rule) and a 1.5× to 1× rung change (not counted).
+
+### 14s. The ear: the input picker, Safari's second song, and song ID
+
+**Measured in headless Chromium on 2026-09-28 where it says so; the rest read in the
+code.**
+
+- *The input picker never changes the input.* `chooseAudioInput` (`App.tsx`) is
+  memoised on `[audioSource]` alone, and calls the `handleSourceChange` of the render in
+  which the source last changed, when `audioStream` was still `null` and `audioInputId`
+  the old one. Measured with fake devices: picking Input 1 and then Input 2 made three
+  `getUserMedia` calls, none with a `deviceId`, and all three tracks stayed live. The
+  interface picked at soundcheck is not the one the show hears until a reload, and each
+  pick leaves another microphone open. Hold the handler and the stream in refs, and pass
+  the id.
+- *On Safari and iOS, every song after the first is silence to the ear.* Without
+  `captureStream`, `musicStream` hands back the one `MediaStreamDestination`'s stream;
+  `startMusic`, `handleSourceChange` and `toggleMusic` stop `audioStream`'s tracks, and
+  then the same ended stream is handed out again. Measured in Chromium with
+  `captureStream` deleted: the analyser's source was live after the first shelf track
+  and ended after the second; the track-end advance goes the same way. Inferred for
+  Safari: that context is made in `oncanplay`, outside a gesture, and never resumed.
+  Never stop the destination's own tracks; resume it from the play gesture.
+- *Song ID can switch itself off for the session.* Its silence branch sets `busyRef` and
+  awaits `finalizeListen` with no `finally` (`useMusicIntelligence.ts`), unlike the two
+  branches beside it: one throw leaves identification, the local match and the song-end
+  detector off. A failed `decodeAudioData` in `songMap.ts` and an error in `capturePcm`
+  (`fingerprint.ts`) each leave an `AudioContext` open. (14h's shared busy flag is the
+  same flag, hung by a request rather than a throw.)
+
+*Measure:* a browser check with Chromium's fake devices (the second input is opened by
+its id, the first one's track ends); the same with `captureStream` removed (the source
+is live after the third track); `npm run music` with a `finalizeListen` that throws once
+(identification runs again).
+
+### 14t. The clock and the controller
+
+**Read in the code.**
+
+- *The beat clock can hold half tempo for good.* Locked at twice the period, an onset
+  between beats has `k = Math.round(0.5) = 1` and an error of half the period, outside
+  the 0.3 window: −0.08. The next, on the beat: +0.15. It gains 0.07 every two beats and
+  never halves (`beatClock.ts`). A half-note intro at 150 bpm, then four on the floor,
+  drives `musicPace` at 75 for the song, and sound learn's bars are eight beats long.
+  This is the clock's own; §10 step 3's half tempo above 148 bpm is the bar grid's.
+  Halve when most off-beat onsets land near half the period, and double the same way;
+  a half-note intro in `npm run kicks`.
+- *MIDI timecode's full-frame locates cannot arrive.* MIDI is opened with `sysex: false`
+  (`useMidi.ts`), and a browser withholds SysEx without it, so the `0xF0` branch and
+  `TimecodeReader.full` never run in the app. `README.md` says both are read, and
+  `timecode.ts` counts on full frames for a backward shuttle; `npm run timecode` tests
+  the reader and not the hook, which is why it is green. Ask for SysEx when timecode is
+  chosen (it prompts), or say in the README that only quarter frames are read, and
+  check the hook's path.
+- *A controller's lights stay dark after a replug.* The LED cache is cleared on
+  `[enabled, ports.output, map.name]`, and `onstatechange` only refreshes the ports and
+  rewires the inputs. With the output on auto, a knocked cable or a power-cycled APC
+  comes back dark and stays dark until each value changes. Clear the cache, and soft
+  takeover, when an output connects. (§14's opening counts a MIDI replug as handled;
+  that is the inputs.)
+- *Continue starts the bar again.* `App.tsx` sends Start and Continue alike to
+  `clockStart`, which resets the pulse count (`tempo.ts`), and Song Position Pointer
+  (0xF2) is dropped by `parseMidi`: a DAW that continues mid-bar leaves the phase up to
+  three quarters of a beat off. (Start and a clock dropout are 14e's.) 14-bit pairs and
+  NRPN (CC 99/98/6/38) are not decoded either, so learn and auto-map bind the coarse
+  byte or the parameter number.
+- *The decks already know the bar* (*proposed*). Pioneer's Pro DJ Link (a CDJ's beat
+  packets carry the beat within the bar and the tempo) and Denon's StageLinQ are on the
+  network the show server already listens on for OSC and Art-Net. They give the true
+  downbeat and tempo, which the ear gets wrong (half tempo above ~148, the one slow to
+  come), and a track-load or on-air event that can stand in for fingerprinting at a new
+  song. Ableton Link (§13 step 5) gives tempo and phase but not the track's bar one. A
+  `server/prolink.js` beside `artnet.js`, into the beat clock as an outside source with
+  14e's lead; "Decks" as a tempo source in the Sound sheet, on the phone too. The
+  protocols are documented by their users, not their makers, which is the risk.
+
+*Measure:* `npm run kicks` with a half-note intro (the tempo is 150 by the chorus);
+`npm run timecode` through the hook with a SysEx full frame; a reconnected output is
+sent every lit pad again; Continue after a Song Position of bar 3, beat 2 lands there.
+
+### 14u. The desk and the shell
+
+**Measured in headless Chromium at 1440×900 on 2026-09-28 where it says so; the rest
+read in the code.**
+
+- *The preview frame stops following the hole.* `usePreviewFrame.ts` observes
+  `ref.current` once per `[enabled]`, and the desk stays up across Esc and a Perform ↔
+  Design switch, so a new hole is never observed. Measured: after clean screen and Esc
+  the frame stays at 0,0,1440,900 while the hole is at 288,104,824,706; a click on the
+  preview lands on the hole, and every tool does nothing until a resize. After a switch,
+  clean screen leaves the plate as the 824×706 box in a black window, wrong exactly when
+  the laptop's screen is the show. A callback ref that observes what it is attached to.
+- *Evolve wanders around the look before.* Only `applyPreset` and `updateSettings` move
+  `driftAnchor` or drop `driftGlide` keys; `fadeSettingsTo` (Go), `revertLook` (Back),
+  the sequencer's stages and `rideSetting` (a MIDI fader) do not. `driftLook` holds each
+  dial within 20 % of its travel of the anchor, and skips a dial the anchor has at 0.
+  Measured with the real `driftLook` over 100 drifts: 1,496 of 1,560 preset-to-preset
+  Gos pull a dial more than a quarter of its travel off the new look, or switch on a
+  dial it had off (stardust-collapse to poster-1969: nine switched on, ten pulled);
+  re-anchored at the Go, none. A fader is also fought by a glide in flight. Re-anchor at
+  the end of a look fade, and treat a ride as a hand's write.
+- *⌘S never saves over the open look.* The keyboard's ⌘S opens the save sheet
+  (`setShowSave(true)`) where the desk's button calls `saveLook()`, and it matches before
+  the shifted branch, so ⇧⌘S never runs (`App.tsx`). Measured: the button wrote over
+  "Mine"; ⌘S offered "Mine copy".
+- *A sequence in the set list reads "missing" on every load.* The `cues` memo reads
+  `sequencerRef.current`, which is assigned further down the same render, and its
+  dependencies do not change on load. Go still plays it; the list says `slow-build · seq
+  · missing`. Measured.
+- *One storage read can stop the app starting.* `localStorage.getItem(
+  'chromaglass-palette-lock')` in a `useState` initialiser has no `try`, where every
+  read around it has one; with the site's storage blocked (Chrome with the site's
+  cookies blocked, some private windows) it is the one throw, and Boot says "ChromaGlass
+  could not start". Measured.
+- *Two hands on the phone's clean screen bring the controls back.* The long press's
+  `down` overwrites its timer without clearing it (`App.tsx`), so the first finger's
+  700 ms can no longer be cancelled once a second finger lands.
+- *Renders nobody needs* (beside 14f): `useImperativeHandle` in `LiquidVisualizer.tsx`
+  has no dependencies, so its handle of about seventy methods is rebuilt on every App
+  render (30 a second through a look fade); `<audio onTimeUpdate>` re-renders the App
+  about four times a second while a song plays; `getLiveEngineStatus` is passed inline,
+  so Settings' 1 s tick is re-armed by every App render and does not tick while the App
+  renders fast.
+- *After 14f's sound half (#211):* the cast's feed now listens to the ear itself, but
+  `useSongChange` still has no dependency list, so the song-gap detector is sampled at
+  the App's render rate, now about 11 a second (it was about 70). A tenth of a second
+  may be fine enough for a gap between songs; if it is not, it wants the ear's
+  `onReading`, as the cast's feed has.
+
+*Measure:* `npm run desk` and `npm run layout` for the frame after Esc and after a
+switch (the frame is the hole; a click on the preview reaches the plate); a node check
+over `driftLook` for the 1,560 pairs, re-anchored; `npm run setlist` for the sequence's
+name; `npm run phone` for two fingers; a load with storage blocked in `npm run panel`.
+
 ## 15. Every tool on every liquid
 
 Asked 2026-09-27 ("Shouldn't blowing and finger also move around the ferrofluid?",
@@ -2471,6 +2825,20 @@ the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured. A
 minor, in `performGesture`: a remote Finger is half as strong as the mouse's, and a
 remote Blow never makes a straw bubble.
 
+
+### 15f. The Comb: marbling's rake, as a tool (proposed 2026-09-28)
+
+Marbling is one of this plan's three reference columns (5.6 % of pixels on a hard edge
+and a contrast of 6.5, against our 2.4 % and 0.8), and its structure comes from a rake
+drawn through the colour: the nonpareil, the chevron, the bouquet. There are nine tools
+and no comb (`DESK_TOOLS`, `desk/tools.ts`). 15b found that only a hand-written,
+conserving carry actually moves liquid under a tool, and 9n (#206) and 15d (#210) have
+built that carry for the ferrofluid and the oil. A Comb is N parallel carries a stroke,
+on the dye, the oil bodies and the ferrofluid alike, with the tine count and spacing on
+Tool Amount; a second pass at right angles makes the chevron. On the phone each finger
+is a rake, and OSC gets `/comb`. *Measure:* a lab check in the manner of
+`npm run ferrohands` (N parallel bands moved a stroke, mass exact), and
+`npm run detail`'s hard-edge share after a two-way comb against the Marbling column.
 
 ## 17. Hear the set ahead, from files
 
@@ -2983,3 +3351,150 @@ per-channel absorbance. Acid and base as signed equivalents. BZ and Liesegang. T
 ferrofluid's pull as ∇|B|² with Langevin saturation, and the Ohta–Kawasaki labyrinth.
 The drops' and bubbles' aperture optics, shapes set by the gap, Paterson relaxation and
 Laplace-arc walls. The Airy thin-film table.
+
+## 19. The checks, the build and the plan itself
+
+Found 2026-09-28 by reading `.github/workflows/`, `scripts/` and the build, and by
+reading 14 recent `Checks` runs and 96 `gallery.yml` runs through the Actions API.
+Nothing is built. The first two cost the most: they are much of why a deploy took 37 to
+77 minutes on 2026-09-27. (Numbered 19 because 16 and 18 are in flight, in #204 and
+#207.)
+
+### 19a. `gallery.yml` holds the Mac runners
+
+`gallery.yml` photographs every preset on a Mac on every pull-request push that touches
+`src/gpu/wgsl/plate.ts`, `src/gpu/fluid.ts` or `src/gpu/wgsl/fluid.ts`, the three most
+edited files, and a run that has started is never cancelled (`cancel-in-progress:
+false`, so that its sheet is the next push's "before"). It ran 96 times from 2026-09-26
+to 2026-09-28, 79 of them to the end at 28 to 29 runner-minutes each: about 38 Mac-hours
+in two days. Meanwhile `Checks`' Mac shards waited 218 to 3,869 s for a runner in the
+three green runs sampled, and one `Checks` run wants four Mac jobs at once.
+
+*Fix:* start it by label or by hand, as `controls.yml` is for the same reason, or once
+on the push that takes a PR out of draft. *Measure:* the Mac shards' queue time over
+the next 20 `Checks` runs, against these.
+
+### 19b. Measure is near its timeout, and its first red hides the rest
+
+The ubuntu job averaged 746 s over 14 runs (837 s at most) against `timeout-minutes:
+15`, where CLAUDE.md says about a minute, `checks.yml` half a minute, and `README.md`
+and `scripts/check.mjs` a minute for `npm run check`. By the runs' step times the long
+steps are `drops` (166 s), `phone` (134), `shape` (98), `downbeat` (97), `bands` (48),
+`kicks` (43) and `pacing` (37). Its thirty-odd steps have no `if: ${{ !cancelled() }}`,
+so the first red step skips all the rest, where the Mac shards were built to run every
+check whatever failed before it.
+
+Two cheap gates belong in it as well. `npm run wgsl` runs on SwiftShader and is the fast
+shader gate, but runs today only on the Mac `show` shard, behind its queue. And `node
+--check` over `scripts/*.mjs`, `server/*.js` and `dc.mjs` takes 3.7 s: `tsc` parses only
+a handful of the harnesses, so a syntax error in a Mac-only one is found after the Mac
+queue.
+
+*Fix:* two or three parallel ubuntu jobs (the audio harnesses, the browser ones, the
+rest), `!cancelled()` on every step, the two gates, and the docs made true. *Measure:*
+the job's wall time, and a step broken on purpose early on that still lets the later
+ones report.
+
+### 19c. Checks that can pass without measuring, and checks nothing runs
+
+- `crash.mjs` waits 20 s for the GPU to draw, with `.catch(() => false)`; if it does
+  not, the screenshot, loss, recovery, stall and fatal checks print `skip`, and the exit
+  counts only FAILs. On a Mac runner that comes up with no adapter (§0 records one, on
+  #189's deploy) the tools shard is green having tested none of them. `PHONE_GPU`,
+  `SQUEEZE_GPU` and the `bands` rule under `CI` turn such a skip into a FAIL;
+  `CRASH_GPU=1` on the shard would (`docs/crash-plan.md`).
+- Thirty scripts in `package.json` run in no workflow. Most are hunts, benchmarks or
+  tools for a hand, which is right. Four are not: `shelf` (CLAUDE.md asks for it on
+  every sound change, and it is the only check on `plateDrone` and on the music's
+  CORS), `sw` (the service worker's black-screen guard, and 14h's measure), `bubbles`,
+  and `songs` (pure node, 15 checks in 0.05 s). `README.md` says every push to main runs
+  its ten harnesses; `detail` is in no workflow.
+- `scripts/check.mjs` finds the Measure steps by their `npm run` lines, so it leaves out
+  `remotemix`, which Measure runs as `node … scripts/remotemix.mjs`.
+- No harness reaches `songMap` and its worker, `plateDrone`, `controllerSurface`,
+  `evolution`, `fingerprint`, `lyrics`, `musicDb`, `castProtocol` or `videoSense`
+  (followed through every harness's imports with esbuild's metafile), and none opens
+  `?cast`, so `CastDisplay` has no check (S15 in `docs/stability-plan.md` needs one).
+
+*Fix:* `CRASH_GPU=1`; `songs` into Measure; `shelf`, `sw` and `bubbles` on a Mac shard,
+or written into CLAUDE.md as by hand; `check.mjs` reading `scripts/*.mjs` paths as well
+as `npm run` names. Each new check held red by the `check-skeptic`.
+
+### 19d. The build and what it ships
+
+- The main route loads about 527 KB of script gzipped (1.68 MB raw): the App's chunk
+  236 KB, the engine's 186, React's 66. Only the routes are lazy (`main.tsx`: the App,
+  the remote, the cast). `motion` is 42 KB of it, for 53 simple uses in six components;
+  the phone's stage, the guide, the recorder, the MIDI panel and controller surface, the
+  designer and Settings could each load when first opened. Do it after 14h's precache,
+  since every lazy chunk is one more file that can be missing at a venue with no
+  internet.
+- No source maps are built, and the engine's chunk is named after its first module,
+  `castProtocol-*.js`: a crash report's `App-*.js:1:NNNNN` cannot be read back to the
+  code, and a GPU crash reads as a fault in "castProtocol" (`docs/crash-plan.md`).
+- No workflow sets `permissions:`, so every job runs with the repository's default token
+  scope, which `actions/checkout` leaves in `.git/config` while a PR's own scripts run;
+  `FirebaseExtended/action-hosting-deploy@v0` is a movable tag handed the Hosting
+  service account. Pull requests from forks get no secrets (`pull_request`, not
+  `pull_request_target`), which is right.
+- `package.json` has no `engines` where the harnesses need Node 22.6 or later (type
+  stripping), and `README.md` says 18. `autoprefixer` is unused (no PostCSS config, and
+  Tailwind 4 prefixes for itself); `vite`, `@vitejs/plugin-react` and
+  `@tailwindcss/vite` are build tools listed as dependencies; several are a major
+  version behind (vite, TypeScript, the React plugin, lucide).
+- The Geist font's `@import` is dropped by the build; that is in #207, with 14h's fonts.
+
+*Fix:* `sourcemap: 'hidden'`, the maps kept as a deploy artifact and not served, and
+`manualChunks` naming the engine `engine`; `permissions: contents: read` at the top of
+every workflow, and the Firebase action pinned to a commit; `engines` and the README;
+the dependencies moved or dropped. *Measure:* the built chunks' names, and a report's
+frame read back through its map by the `crash-triage` skill.
+
+### 19e. The harnesses as code
+
+Shared helpers exist and are used (`chromium.mjs` by 54 scripts, and `lab`, `frame`,
+`judge`, `layoutProbe`, `media-read`), but 80 scripts define their own `check()`, 46
+start their own `vite preview`, 40 wait a fixed two to four seconds for a server rather
+than asking it, and 12 copy the same port probe. Default ports collide: 4351 is four
+scripts' default (`bottles`, `moving`, `render-app` and `mirror.mjs`), 4331 three
+(`crash`, `ears`, `stages`) and 4326 three (`fx`, `shots`, `sw`), which matters when a
+session runs two at once. On the Mac shards seven checks called through `npm run`
+(`webgpu`, `qa`, `fx`, `magnet`, `depth`, `wall`, `startup`) build again after the
+shard's own build, about 6 s each; in Measure `layout`, `phone` and `applink` each build,
+while `remotemix` depends without saying so on an earlier step having built `dist/`.
+`dc.mjs` at the root and `scripts/_diag.mjs` are wired to nothing, and `dc.mjs`
+hard-codes `/opt/pw-browsers/chromium`, which `chromium.mjs` exists to avoid.
+`actionlint`, which CLAUDE.md asks for on a workflow change, is in no image and no job.
+
+*Fix:* a `scripts/harness.mjs` with `serve()` (port 0, polled until it answers) and
+`check()`/`summary()`, taken up by new scripts first; the shards calling scripts
+directly, as `checks.yml` already does for some; the strays deleted or wired;
+`actionlint` in Measure.
+
+### 19f. The plan and the docs, out of step with the code
+
+- "What comes next" (2026-09-26) still says the Mixer's steps 2 and 5 are small and step
+  3 is next (2 to 5 have shipped, #189 to #196), that batch 10's steps 4 to 7 are to
+  come (4 and 5 shipped, #185 and #179), and never mentions §12 onwards.
+- "Nothing is built" stands in the openings of §12 and §14, whose own items say
+  otherwise (§12's step 4 and 4a built; 14a, 14c and 14d shipped). The running order's
+  row 14 lists 14a to 14d only, and §17 has no row.
+- §12's table says `public/sw.js` "already caches the build" for Android offline; 14h
+  says, rightly, that it saves nothing ahead of time. §13's first "found along the way"
+  point repeats 14h's first.
+- The Mac checks that went red once on trees that did not touch them are written in
+  both §0 and §11 (the Finger's "adds none", the mirror's "nowhere else", `startup`'s
+  3.52 s): one list would say which are still open.
+- `docs/roadmap.md` is headed "Updated 2026-09-20", lists §3's drops as in flight
+  (shipped, #163), the rig as not begun with R7 to come (R7 is §11, shipped), and Stage
+  1's "the press and the lift" as open (§10 step 4, #185).
+- `docs/judging.md` has two §10s and two §16s; §12 and CLAUDE.md cite §16 for the
+  iPhone, and 9i cites §16 for the Magnet's fingers.
+- `docs/webgpu-plan.md` counts about 101 dispatches a step and `docs/evaluation-2026-09.md`
+  24 Jacobi iterations; the multigrid's step is 440 to 530 (`docs/webgpu-plan.md` H2c).
+- `README.md` still asks for the laptop window to be kept visible "since the browser
+  stops drawing a hidden window"; the projector window drives the frames now, and the
+  ear hears behind it (14a).
+
+*Fix:* one pass over each in a docs-only PR, at a moment when no other session has these
+lines open (#209 has "What comes next" and the operating rules open today).
