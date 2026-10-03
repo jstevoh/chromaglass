@@ -3501,13 +3501,17 @@ its frame rate live. "Free" means no new passes or texture reads.
     so measure what the 0.45-a-cell clamp leaves behind instead: the pool's edge
     against where its volume puts it. `phaseRelax` still keeps Σc, not Σc·h
     (under 0.1% in that check).
-  - **The app's let-go check reads a pool still spreading.** On the Mac (run
-    37134289958) the pressed pool read 0.047 → 0.077 → 0.076 of the plate from the
-    palm, and the idle pool 0.051 → 0.066 → 0.082: the fresh drop spreads 0.016 in
-    three seconds on its own, as much as the press's whole net push (0.015), so
-    the return (112% net) is read against a moving baseline. Lay a pool that has
-    stopped spreading (a longer settle, or a flat lay rather than a drop) so the
-    press's push and return are most of what moves.
+  - **The app's let-go check read a pool still spreading** (fixed in this PR,
+    not yet green on the Mac). On run 37134289958 the pressed pool read 0.047 →
+    0.077 → 0.076 from the palm and the idle pool 0.051 → 0.066 → 0.082: the check
+    passed at 112% net while the pressed colour never came in (a press frozen at
+    the lift reads 107% against that idle pool, check-skeptic). Run 37145038742
+    read 20% (pressed 0.062 → 0.094 → 0.098, the idle pool on the old solver).
+    Now the pool settles eight of the plate's seconds, the thin press is taken
+    net of an idle pool on the thin gap that starts where it did, a frozen press
+    has to read under half and the pressed colour's own mean has to fall. If it
+    is red after that, the app is not drawing the colour back as the lab does
+    (presslift: 77% under the palm at 3 s), and that is the next thing to find.
   - **The substeps' ceiling.** 33 substeps of 0.4 cover 13 cells a step; the
     Press at 1× on 384² asks 8. A Press at 2× Amount on a 512² solver, or a
     machine-starved step (a longer step's spring), can ask more, and past it the
