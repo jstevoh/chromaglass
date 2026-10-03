@@ -143,7 +143,10 @@
     "fingers": "node scripts/fingers.mjs",
     "ferrohands": "node scripts/ferrohands.mjs",
     "domes": "node scripts/domes.mjs",
-    "ferropress": "node scripts/ferropress.mjs"
+    "ferropress": "node scripts/ferropress.mjs",
+    "desktop": "npm run build && node scripts/desktop.mjs",
+    "app": "npm run build && npm --prefix desktop start",
+    "mac-app": "npm run build && npm --prefix desktop run dist"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
