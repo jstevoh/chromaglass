@@ -1071,7 +1071,11 @@ Open, from building 9i:
   it on the hand and carried it 87–90%, bare plate or dyed, so the cause is in the
   app and not the step. `npm run magnet` now prints the pool as laid, the solver's
   magnet through the first second and a half, the plate's turn, the step count and
-  the automation's hands, so a recurrence names it.
+  the automation's hands, so a recurrence names it. Main's deploys went red on
+  both magnet checks after 9s: `npm run magnet`'s "poured round the middle does not
+  gather into it" (the ring pour this item takes away) and `scripts/ferro.mjs`'s
+  "not at its mirror", whose two arms ran on two grids when the governor moved the
+  solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
 - **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
   solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
   its face than a dipole, and a bigger one at the same gap is somewhat stronger at
