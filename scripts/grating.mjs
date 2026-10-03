@@ -30,7 +30,7 @@
  *      diffusion or none, and the reported spread around it within five
  *   2. on a pressed plate like the reported one, the grid-scale ripple the
  *      presses make is held down against the same plate with the pass off
- *      (to seven tenths since the press source was balanced; see there)
+ *      (to 0.68 since the press source was balanced; see there)
  *   3. what is not grid noise stays: lines and edges along either axis
  *      exactly; a hard disc's edge as hard, with no ring beside it; a soft
  *      blob; diagonal texture four and six cells across
@@ -211,7 +211,7 @@ try {
     });
   }, [N, { ...STILL, platePressure: 0.35, gridDamp }]);
   /*
-    Held to seven tenths, not the third it was written with (re-baselined
+    Held under 0.68, not the third it was written with (re-baselined
     with the owner's word, 2026-10-03, in the PR that balanced the press
     source). The third was measured on a plate whose presses did almost
     nothing: the press's source was balanced by a guess at its plate mean
@@ -226,18 +226,26 @@ try {
     the fix reads under a third: one that balanced only before the gap's
     clamp read 74%, and measured away from the moving fronts the fix still
     reads 62 to 70% (main 37 to 38% there), so it is not the fronts' own
-    edges. The renders of Red Cabbage's pressed closeup at 2.8x and 8x show
+    edges (both measured by hand on the PR, not kept here; PLAN.md's item
+    has them). The renders of Red Cabbage's pressed closeup at 2.8x and 8x show
     no 45-degree grate with the fix.
 
     What the line still asks is that the pass is there and at strength: in
-    the lab the pass at 3.5% a step reads 70.0%, at 2.5% 75%, at 1.5% 82%,
-    at 1% 87% and off 100%, so a pass weakened by a third or more fails it.
+    the lab the pass at 3.5% a step (30% weaker) reads 70.0%, at 2.5% 75%,
+    at 1.5% 82% and at 1% 87%, so the limit sits between the 64% the pass
+    reads as it ships (65% on the Mac) and a pass 30% weaker.
+
+    It cannot tell a pass that works from presses that stopped moving the
+    dye: were the press source to go unbalanced again, this plate would
+    read near the old 22% and pass the more easily. That is what the
+    held-press check (`scripts/heldpress.mjs`) guards, and this line leans
+    on it.
     Whether the pass should hold more of this band against moving fronts is
     a PLAN.md item (the grid pass against presses that move the dye).
   */
   const off = await pressed(0), on = await pressed(undefined);
   const ratio = Math.max(...on.map((v, c) => v / off[c]));
-  check('on a pressed plate, the grid-scale ripple is held under seven tenths of what grows without the pass', ratio < 0.7,
+  check('on a pressed plate, the grid-scale ripple is held under 0.68 of what grows without the pass', ratio < 0.68,
     `${on[3].toExponential(2)} of the dye against ${off[3].toExponential(2)} after ten seconds, worst channel ${pc(ratio)}`);
 
   // ── 3. The liquid's own detail stays ──────────────────────────────

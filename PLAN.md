@@ -128,8 +128,9 @@ step, ten steps a press) read 22% on main because its presses were swallowed by 
 unbalanced press source (the dye under them barely moves). Balanced, the same presses
 push the dye, and the pass holds the band to 64% of what grows without it; a variant
 balanced before the clamp reads 74%. The owner chose to re-baseline that line
-(2026-10-03): it now asks for under seven tenths, which still fails a pass weakened by
-a third or more (3.5% a step reads 70.0%, 2.5% 75%, 1% 87%). It is not at the fronts: masked away from them
+(2026-10-03): it now asks for under 0.68, between the shipped pass (64% lab, 65% Mac)
+and a pass 30% weaker (3.5% a step reads 70.0%, 2.5% 75%, 1% 87%); it leans on
+`npm run heldpress` to catch presses that stop moving the dye. It is not at the fronts: masked away from them
 (87–95% of the plate kept) the fix reads 62–70% and main 37–38%. The flows with the
 pass on and off are the same (mean |u| 0.462). Rendered in Red Cabbage's closeup at
 2.8x and 8x, neither shows the 45° grate (`/mnt/project-files/mirror-fix/`, outside
