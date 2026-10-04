@@ -25,7 +25,7 @@ export const BASE: GpuStepParams = {
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
   platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
   air: 0, evapFactor: 1, time: 0, currentDamp: 0.98, currentBuoy: 0, rockX: 0, rockY: 0, currentGrav: 0,
-  twist: 0, meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
+  meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
 } as GpuStepParams;
 
 /** Numbers as IEEE half floats, for writing an rgba16float texture. */

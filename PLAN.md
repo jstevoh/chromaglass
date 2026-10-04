@@ -166,7 +166,8 @@ Judged in this order, because these gate code:
 
 Then the rest of `docs/judging.md` in its own order, an area a sitting (the looks, the
 Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
-with each PR's preview URL (0.9) so a look is judged before it merges. The owner's account steps sit here too: **S8-on** (switch the crash reports on),
+with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-smoke**, the site on two Windows PCs, by hand (§13).
+The owner's account steps sit here too: **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts), **13.1-sign** (the Mac app's
 Developer ID).
 
@@ -234,7 +235,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
-  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22j** (~~22h~~ #252, ~~22k~~ #258). Painters: **21b**, **21d**. The
+  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 
@@ -242,9 +243,11 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 
 - **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
   **12.7**, **12.8**; **12.4a**; later **12.9**.
-- **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13.5** OSC out and Link,
+- **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
+  **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out and Link,
   **13-port**, **13-intel**, **13-icon**, **13-update** (after signing), then **13.2**
-  Syphon, **13.3** NDI and Spout, **13.6** video in.
+  Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
+  MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
@@ -298,11 +301,11 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, the first touch bringing a pool under the hand, with Magnet Size, 9x, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v and carrying the ferrofluid across a new solver 9w, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v and carrying the ferrofluid across a new solver 9w, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 6 not started |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 8 not started (7, a DAW bridge plugin, and 8, a native renderer core for later, added 2026-10-04); Windows (13-win-smoke, -app, -sign) planned 2026-10-04, never run on a PC |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
@@ -310,7 +313,7 @@ Where each batch stands, as of 2026-09-27:
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
-| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`). 22k, what the swirl costs on the music looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22j open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1046,6 +1049,26 @@ Open, from building 9i:
   gather into it" (the ring pour this item takes away) and `scripts/ferro.mjs`'s
   "not at its mirror", whose two arms ran on two grids when the governor moved the
   solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
+- **9y. The Magnet brings no ferrofluid** (**shipped**). Asked by the owner
+  (2026-10-04), on the build with 9x live: "Why does the magnet add ferrofluid? It
+  should only work on ferrofluid that is already there." 9x's first touch on a bare
+  plate laid a pool under the hand (`magnetFor`) and the app turned Ferrofluid up to
+  draw it; a new solver was given that pool again at the magnet. All three are gone,
+  on every path (desk, phone fingers, MIDI and the remote all hold the magnet through
+  `magnetFor`): a magnet is a field, and over a dish with none in it a real one moves
+  nothing. The hold still gives the look its magnet (Magnet Strength 0.8, so it is
+  set down where the hand lets go), and turns Ferrofluid up only when the solver has
+  ferrofluid to draw (`phaseIsLive`: poured, then hidden by the amount at 0 or a look
+  with none), since turned up over a bare plate the frame loop's "turned up on a bare
+  plate" pour would lay the look's ring. Magnet Size is the magnet's own size and
+  reach. Every look that shows ferrofluid (Magnet Garden, Ferro Maze, Ferro Paint)
+  pours its own when it is laid; none relied on the Magnet's pool. `npm run magnet`
+  now asks that a hold on a bare plate lays nothing (none in the solver, no look's
+  pour, Ferrofluid still down) while giving the look its magnet; that a pool poured
+  as the bottle pours it is drawn by the hold, not added to, and carried by the
+  drag; and that a new grid lays nothing on a bare plate, picked and untouched or
+  held. Found along the way: ferrofluid poured by hand is not what a new solver gets
+  back; it gets the look's ring while Ferrofluid is up (9w).
 - **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
   solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
   its face than a dipole, and a bigger one at the same gap is somewhat stronger at
@@ -1060,9 +1083,11 @@ Open, from building 9i:
   a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
   weakly at the edge of its reach than a real one.
 - **9w. Carry the ferrofluid across a new solver.** The dye is carried when the
-  governor moves the grid; the phase is not. The look's ring is poured again, and the
-  Magnet's pool laid again where the magnet is (9x), so a pool dragged into a
-  shape loses that shape at a grid move. Read the phase back and write it into the
+  governor moves the grid; the phase is not. The look's ring is poured again while
+  Ferrofluid is up, so a pool dragged into a shape loses that shape at a grid move,
+  and ferrofluid poured by hand from the bottle (on Classic, say) comes back as the
+  look's ring, ferrofluid nobody poured. (9x laid the Magnet's own pool again at the
+  magnet; 9y took that pool out with the rest of the Magnet's laying.) Read the phase back and write it into the
   new grid as the dye is.
 
 ### 10. Playing like a show
@@ -2057,7 +2082,7 @@ Asked on 2026-09-27: "Integrate into popular VJ software." It came up alongside
 "have we reached the point where we need to grow beyond the web?" The answer to that
 (project files, `beyond-web/beyond-web.md`) was *not yet for the show itself*.
 Handing video to another app was the one place a page cannot go. Step 1, the Mac app,
-is built (#207); steps 2 to 6 are not.
+is built (#207); steps 2 to 8 are not.
 
 **What integration means here.** A VJ app (Resolume Arena and Avenue, VDMX,
 TouchDesigner, MadMapper, Millumin, OBS) meets ChromaGlass in four ways, and each one
@@ -2069,12 +2094,17 @@ takes a different route:
 | **Control in** | The VJ app or its controller plays ChromaGlass | OSC, which the show server already hears on UDP 9000 (`server/remote-server.js`, `oscToMessage`: `/chromaglass/setting/<key>`, `/action/<name>`, `/preset/<id>`, `/blow`, `/drop`, `/press`, `/tilt`, `/dye`) | The web app plus `npm run show`. Written up and templated, not built again |
 | **Tempo** | One beat shared by everything | Ableton Link, which Resolume, VDMX and TouchDesigner all speak. MIDI clock already comes in (`src/lib/midi.ts`) | A page cannot join Link. The show server can |
 | **Video in** | A VJ app's output as a ChromaGlass source | Syphon, Spout or NDI, arriving as a camera | **Today:** any virtual camera (OBS Virtual Camera, NDI Webcam Input), picked like a camera. **Properly:** the wrapper (step 6) |
+| **A DAW** | Logic or Ableton playing ChromaGlass from the song: its audio, its tempo and transport, and automation lanes moving settings | MIDI from the DAW: clock, Start, Stop and Continue, and MIDI timecode's quarter frames are already read (`src/lib/midi.ts`), and CC from an automation lane reaches any setting through MIDI learn | **Today:** the DAW's output into a loopback device (BlackHole, Loopback) picked as the input, and its MIDI out through the Mac's IAC bus (not written up, never tried end to end; 14s's input picker bug bites here). **Properly:** a bridge plugin (step 7) |
 
 **Not doing: a plugin inside the VJ app.** FFGL (Resolume) and ISF (VDMX, MadMapper)
 run OpenGL fragment shaders inside the host. The plate is dozens of WebGPU compute
 passes a frame, with a pressure solve, which means porting the solver back to GLSL.
-That is the native rewrite `beyond-web.md` argues against. Streaming the plate into
-the host gives the VJ the same layer without it.
+That is the native rewrite `beyond-web.md` argues against (kept for later as step 8).
+Streaming the plate into the host gives the VJ the same layer without it.
+The same holds for drawing the plate inside a DAW plugin's window (asked 2026-10-04,
+about an ad for a visualiser sold as an AU/VST plugin plus a standalone app): a
+plugin's window is a native view, and the plate needs Chromium's WebGPU and Web MIDI.
+Step 7 is the part of that idea that fits: a plugin that draws nothing.
 
 **The wrapper comes first** (the owner, 2026-09-27: "Would a good option be to create a
 small native wrapper that allows us to integrate into other VJ apps and have a
@@ -2132,6 +2162,80 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    does. *Not started.*
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
    (§11), not through a virtual camera. *Not started.*
+
+7. **A DAW bridge plugin** (asked 2026-10-04; two or three PRs, after step 2): an
+   AU and VST3 plugin for Logic and Ableton that draws nothing and plays the running
+   app (the Mac app of step 1, which is the "standalone" half) over the show server
+   on localhost. It carries three things MIDI from a DAW carries badly or not at all:
+   - *Automation.* A fixed bank of automatable parameters (say 32 slots, so the DAW
+     sees a stable list), each bound to a setting, a preset or an action by the same
+     learn flow and binding map as MIDI learn (§5), at full resolution rather than
+     CC's 128 steps, named in the DAW's lane by what they are bound to.
+   - *Transport.* The host's tempo, play state and bar position every block, into the
+     beat clock the way MIDI clock goes in (`beatClock.setExternal`), with the bar's
+     phase exact rather than counted from 24 pulses, and a locate that lands a set
+     list's cue where the song is (what 14t's missing Song Position Pointer and full
+     MTC frames are for over MIDI).
+   - *Audio.* The track or sidechain the plugin sits on, as PCM to the app's one ear,
+     so kicks, bands, Audio Impact and song shape read the DAW's own mix with no
+     loopback device; and the host's latency report, so the ear can line the kick up
+     with the picture (14e).
+   Built in JUCE (C++), the AU validated with `auval` and both formats built on the
+   macOS runner, signed and notarised with the same Developer ID secrets the Mac app
+   waits on. The app side is a bridge link in the show server, which a node fake of
+   the plugin can check with no DAW: slots move settings, transport moves the clock,
+   PCM moves the bands. *Measure:* a settings move written in the fake arrives within
+   one frame; a tempo change reaches `musicPace` within a beat; the fake's kick and
+   the plate's kick within 14e's window. Then *(owner)*: Logic and Ableton on the
+   owner's Mac, an automation lane playing a look change on the bar. The phone rule:
+   the link's switch and its slot bindings are in the More sheet.
+   Before any of it, the MIDI route in the table above, tried once in Logic and
+   Ableton and written up with step 4. *Not started.*
+
+8. **Later: one renderer core, native as well as on the web** (asked 2026-10-04,
+   the owner: "add it to the plan for later"). Not scheduled: it is what the plate
+   drawing *inside* a host would need (a DAW plugin's window, a Resolume FFGL effect,
+   a TouchDesigner operator), which steps 2 to 7 do without. Sized on main that day:
+   the renderer is about 9.2k lines of WGSL (26 compute, 11 fragment and 8 vertex
+   entry points) and 8.4k lines of TypeScript in `src/gpu/`; what decides each frame
+   (settings, presets, sound, MIDI, the Mixer, the tools, much of it in
+   `LiquidVisualizer.tsx`) is most of the other 62k lines; and 96 of the 135 scripts
+   in `scripts/` drive a browser. The route that does not fork the show: `src/gpu/`
+   ported to Rust on wgpu, whose WGSL is ours nearly as written, built to
+   WebAssembly on WebGPU for the site and natively for a plugin, with the web app
+   still the brain and handing the core a frame's settings and splats. One kernel
+   group at a time, each held to the lab's numbers (`physics`, `derive`, `maze` and
+   the rest) on both builds. What it would buy beyond hosts: shaders shipped
+   compiled (most of the opening is compiling, 14v), the projector's frame timing,
+   120 Hz and HDR (H4) in our hands, and CoreMIDI on the iPhone and iPad. Not frame
+   speed: Chrome's WebGPU already runs on Metal (inferred, not measured). Start only
+   when the owner wants the plate drawn inside a host. *Not started.*
+
+**Windows** (asked 2026-10-04, the owner: "let's add windows plans"). Nothing here has
+ever run on a Windows PC. Chrome and Edge on Windows have WebGPU (on Direct3D 12), Web
+MIDI and the Window Management API, so the site should play as it does on a Mac, but
+CI's GPU checks run only on the Mac runners (the free Windows runners have no GPU,
+and no more runners are being added), so NVIDIA, AMD and Intel graphics, Direct3D's
+shader compiler and Windows' audio inputs are all unmeasured. In this order:
+
+- **13-win-smoke** *(owner or a tester, beside Wave 2)*: the site in Chrome on two
+  PCs, one with NVIDIA graphics and one with Intel integrated graphics: the opening's
+  time to the first step, frames a second on Classic and on the heaviest look, a
+  projector on a second screen, a USB audio interface picked by the input picker, a
+  MIDI controller learned, and a crash report sent from the corner dot. What it finds
+  becomes items here. It gates the rest, and should come before any paid beta.
+- **13-win-app** (one PR): the Mac app built for Windows too: a `win` target (NSIS
+  installer, x64) in `desktop/electron-builder.config.cjs`, a Windows job in
+  `desktop.yml` that packs it and runs `npm run desktop -- --packaged` (the lit-plate
+  and hidden-window lines skip there as under xvfb, with no GPU), and `desktop/main.js`
+  read for anything only a Mac does (the projector's fill, the show key's folder,
+  the menu). Then *(owner or tester)*: the installed app on a PC with a projector.
+- **13-win-sign** *(owner)*: a Windows code-signing certificate, as secrets the Windows
+  job signs with. Unsigned, SmartScreen warns people off the installer, as macOS does
+  for the unsigned Mac app (13.1-sign).
+- **13.3**'s Spout out then lands on this build, and **13-update**'s updates serve both.
+- Selling it, if that is chosen, needs nothing Windows-only: a licence key checked
+  offline works the same in both apps.
 
 Until step 2 lands, the plate still reaches a VJ app the way it can today: OBS
 captures the projector window and sends it on through its Syphon or NDI plugin, and a
@@ -3779,7 +3883,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     at a time against `finger`, `wind`, `pressoil`, `ferrohands`, `tools`.
   - **18a-4, the current into the field.** The lasting current (`cur`) is fed into the
     thin solve as a force, but it still has its own solver on the M grid; its forces
-    (rock, twist, buoyancy, centre gravity) belong in the main field, and then the
+    (rock, buoyancy, centre gravity) belong in the main field, and then the
     current's solver and its 0.4 ms go.
   - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
     step, so the displaced volume leaves in one step, faster than the dye's face
@@ -5064,11 +5168,56 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   time, so the swirl runs while they play; on deep-ocean and neon-coral-reef (thick)
   it is 0.003 rad and 0.0025 rad/s. Looks with no music and a motor (most) end Ωτ, a
   few thousandths of a radian, behind. Looks that do not turn are unchanged to the bit.
-- **22j. The look's motor still stirs the middle.** The twist's motor half
-  (`rotationSpeed` × CUR_TWIST round the middle) is kept because every look is tuned
-  against it, but a dish turning steadily under its liquid drags the liquid round with
-  it and leaves nothing to stir once the liquid has caught up. Replace it with the dish
-  (the swirl already carries what the glass does), and retune the looks that lean on it.
+- ~~**22j. The look's motor still stirs the middle.**~~ **Shipped** (#261). The
+  Rotation Speed dial stirred the current round the middle as well as turning the
+  dish: `rotationSpeed` × 30 in the solver's units, a swirl w(r)² fastest at the
+  centre and nothing at the rim (w = 1 − smoothstep(0, 0.5, r)), on the look's own
+  clock. A dish turning steadily under its liquid drags it round through the gap until
+  it turns with the glass, and leaves nothing to stir, so the stir is gone from the
+  solver (GPU and CPU) and the dish does what the glass does (22h's dishFrame and the
+  swirl). Its speed is ω(r) = 30 · dial · w(r)² · dt · Advection · 190/192 · 60
+  rad/s, and the lab held the stir to that before it went (thin gap and old plate
+  alike, within 2% from r = 0.05 to 0.35): acid-trip's 0.87 rad/s at r = 0.05 where
+  the formula says 0.89, 0.95 at the centre, against its motor's 0.001; Classic's
+  0.0019 at the centre against 0.00008. On every look with a motor the stir moved the liquid
+  twenty to a thousand times faster than the motor turned the dish. So each look's
+  dial was moved up the dial to turn its dish at the mean speed the stir and the old
+  motor gave the liquid in the projector's 16:9 window (the plate is drawn at 1.5
+  times the window's width, so the window is the middle ±1/3 by ±3/16 of the plate;
+  the stir's mean speed there is that of a rigid turn at 0.322 of its centre's), on the look's clock at rest, for the front plate: acid-trip 0.1 → 0.421
+  (0.306 rad/s, a turn every 20 s), cyberpunk 0.05 → 0.287 and stardust-collapse
+  0.06 → 0.282 (0.10 rad/s), boiling-point 0.218, timbre-shifter 0.202, fractal-dream
+  0.187, solar-flare 0.183 (0.02–0.04 rad/s), the rest 0.008 to 0.156 (under 0.01
+  rad/s), each to 3% of its target (`presets.ts`, the note above the list). And the
+  music's sway no longer carries the motor: with a band routed to rotation gone quiet
+  the sway is −0.8, which reversed the dial's share with the band's; harmless at a
+  thousandth of a radian a second, it would have turned acid-trip backwards at 0.24
+  rad/s in every quiet bar (`lookMotor`, `npm run turntable` 15). Lucky's dial rolls
+  0 to 0.2 (was 0.025). A dish whose motor is over about 1.25e-3 rad/s now starts
+  the swirl in its first steps (the liquid lags the dish as it comes up to speed), so
+  the opening waits for `spinSwirl` on those eighteen looks (`lookOpensSpinning` in
+  `gpu/opening.ts`; `npm run startup` found six of them asking for it unbuilt). Judged on the Mac, `docs/judging.md` §28.
+- **22l. Nothing winds the middle against the rim now.** The stir was a differential
+  rotation, and some looks read by it (galaxy's spiral arms; its preset said so). A
+  steady dish under one liquid cannot make one; what does in a real show is a second,
+  smaller glass pressed into the middle and turned against the dish: under it the
+  liquid is sheared between two glasses and goes round at about the mean of their
+  speeds (Couette flow through the gap), outside it at the dish's, so the middle winds
+  against the rim along the top glass's edge. If the owner misses the spiral (§28),
+  build that as a tool or a setting, with the drag worked out from the gap as the
+  swirl's is, not as a stir.
+- **22m. What the retune left behind.** (1) The stir sped up and slowed with the
+  look's clock (the phrase's lean, the tempo's pace, a scene's swell, the Speed dial);
+  a motor does not, so a look whose clock leans a long way turns a little less with
+  its swells than it did. (2) The match is the front plate's; a back plate whose
+  Background Loop slows its clock had a slower stir, and now turns its dish as fast as
+  the front's. (3) Saved looks, scenes and set lists written before keep their old
+  dial (0.1 and under) and so lose most of their turn: a load could move an old
+  look's dial the way the presets were moved (it needs the look's Speed and Advection,
+  which a saved look has). (4) Since the motor is most of what turns acid-trip,
+  cyberpunk and stardust-collapse, their liquid turns faster than 0.05 rad/s all the
+  time and the swirl's centrifuge runs on every step there, not only while they play
+  (22k measured what that costs: under a fifth of a percent of the GPU).
 - ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and
   cut** (#258). Since 22h a music look's dish sways under its liquid, so Ω − ω_l is over the
   swirl's 1e-3 rad/s floor nearly all the time: on CI's Mac, with the built-in band playing,
@@ -5083,7 +5232,7 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   |---|---|---|---|
   | phone, nine looks (median) | 105 µs a step | 45 µs | 0.07% (14 steps/s) |
   | laptop, nine looks (median) | 272 µs | 75 µs | 0.17% (22 steps/s) |
-  | Acid Trip, Cyberpunk, Stardust Collapse at #261's motors, phone | 97–110 µs | 41–51 µs | 0.07–0.08% |
+  | Acid Trip, Cyberpunk, Stardust Collapse at #261's motors (set by hand on the build before it), phone | 97–110 µs | 41–51 µs | 0.07–0.08% |
 
   So it was never a frame-rate problem: under 1% of the GPU's time before, under 0.2% now,
   and the frame rate alone cannot see either. The same page alternated swirl on and off
@@ -5102,7 +5251,7 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   (Thin Gap off) keeps its projection, because nothing after the swirl projects it there.
 
   The floor stays a speed. Set from the travel it makes in a drag time, it would have saved
-  steps; at a twentieth of a percent of the GPU there is nothing worth saving, and a lower
+  steps; at under a fifth of a percent of the GPU there is nothing worth saving, and a lower
   floor would only run the swirl on more of a song.
 
   Found along the way:

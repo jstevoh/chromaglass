@@ -14,6 +14,27 @@ const DEFAULT_MAPPINGS: AudioMappings = {
   rotation: 'none',
 };
 
+/*
+  Rotation Speed, retuned when the motor's stir went (PLAN 22j).
+
+  The dial turned the dish slowly and, until 22j, also stirred the current
+  round the middle at thirty times the dial in the solver's units: a swirl
+  fastest at the centre and gone by the rim, on the look's own clock (its
+  Speed and Advection). On most looks that stir moved the liquid in view
+  twenty to a thousand times faster than the motor turned the dish; on
+  acid-trip it turned the middle at 0.95 rad/s against a motor of 0.001. A
+  real dish turning steadily drags its liquid round with it through the gap
+  and leaves nothing to stir, so the stir went, and each look's dial was moved
+  up to turn the dish as fast as the stir and the old motor together moved
+  the liquid in view: the same mean speed over the projector's 16:9 window
+  (the plate is drawn at 1.5 times the window's width, so the window is the
+  middle ±1/3 by ±3/16 of it, and the stir's mean speed there is a rigid
+  turn's at 0.322 of the stir's centre), on the look's
+  clock at rest (no phrase, tempo or scene lean), for the front plate. So a
+  look turns about as much as it did, but as a whole, rigidly, with the
+  glass: the middle no longer winds itself into a spiral against the rim.
+  That is the difference to judge (docs/judging.md §28).
+*/
 export const PRESETS: Preset[] = [
   {
     id: 'classic',
@@ -25,7 +46,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',       // additive glow — colors brighten where they overlap
       gooeyEffect: 0.65,         // organic, rounded blob edges
-      rotationSpeed: 0.008,      // barely perceptible rotation keeps it alive
+      rotationSpeed: 0.07,       // the dish's motor; was 0.008 with a stir in the middle (PLAN 22j)
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
       diffusionRate: 0,          // measured: the bleed cost more edge than it bought
@@ -70,7 +91,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',      // additive light — stars brighten where they overlap
       gooeyEffect: 0.15,         // low goo — sharper points of light, less blobby
-      rotationSpeed: 0.035,      // visible rotation creates spiral arms
+      rotationSpeed: 0.132,      // the dish's motor; was 0.035 with a stir in the middle (PLAN 22j)
       centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
       ledPlatform: true,
       diffusionRate: 0.00004,    // extremely low — pinpoints of light stay sharp
@@ -117,7 +138,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'overlay',
       gooeyEffect: 0.8,
-      rotationSpeed: 0.01,
+      rotationSpeed: 0.087,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.8,
       ledPlatform: true,
       ledMode: 'ocean',
@@ -160,7 +181,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.1,
-      rotationSpeed: 0.05,
+      rotationSpeed: 0.287,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
       ledPlatform: true,
       ledMode: 'cyberpunk',
@@ -199,7 +220,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'exclusion',
       gooeyEffect: 0.3,
-      rotationSpeed: 0.1,
+      rotationSpeed: 0.421,      // the dish's motor; was 0.1 with a stir in the middle (PLAN 22j)
       centerGravity: 0.6,
       ledPlatform: true,
       ledMode: 'single',
@@ -254,7 +275,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.6,
-      rotationSpeed: 0.01,
+      rotationSpeed: 0.146,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.4,
       ledPlatform: false,
       diffusionRate: 0.0002,
@@ -291,7 +312,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.3,
-      rotationSpeed: 0.03,
+      rotationSpeed: 0.202,      // the dish's motor; was 0.03 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
       ledPlatform: true,
       ledMode: 'rainbow',
@@ -330,7 +351,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.7,
-      rotationSpeed: 0.02,
+      rotationSpeed: 0.218,      // the dish's motor; was 0.02 with a stir in the middle (PLAN 22j)
       centerGravity: 0.1,
       ledPlatform: true,
       ledMode: 'single',
@@ -378,7 +399,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'multiply',
       gooeyEffect: 0.15,
-      rotationSpeed: 0.01,
+      rotationSpeed: 0.125,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
       ledPlatform: true,
       ledMode: 'single',
@@ -419,7 +440,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.6,
-      rotationSpeed: 0.008,
+      rotationSpeed: 0.085,      // the dish's motor; was 0.008 with a stir in the middle (PLAN 22j)
       centerGravity: 0.05,
       ledPlatform: true,
       ledMode: 'single',
@@ -465,7 +486,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.3,
-      rotationSpeed: 0.015,
+      rotationSpeed: 0.183,      // the dish's motor; was 0.015 with a stir in the middle (PLAN 22j)
       centerGravity: 0.7,
       ledPlatform: true,
       ledMode: 'single',
@@ -504,7 +525,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.85,
-      rotationSpeed: 0.006,
+      rotationSpeed: 0.067,      // the dish's motor; was 0.006 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
@@ -546,7 +567,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.2,
-      rotationSpeed: 0.04,
+      rotationSpeed: 0.187,      // the dish's motor; was 0.04 with a stir in the middle (PLAN 22j)
       centerGravity: 0.9,
       ledPlatform: false,
       ledMode: 'single',
@@ -589,7 +610,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'overlay',
       gooeyEffect: 0.75,
-      rotationSpeed: 0.005,
+      rotationSpeed: 0.023,      // the dish's motor; was 0.005 with a stir in the middle (PLAN 22j)
       centerGravity: 0.35,
       ledPlatform: true,
       ledMode: 'single',
@@ -634,7 +655,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.55,
-      rotationSpeed: 0.012,
+      rotationSpeed: 0.131,      // the dish's motor; was 0.012 with a stir in the middle (PLAN 22j)
       centerGravity: 0.0,
       ledPlatform: true,
       ledMode: 'single',
@@ -676,7 +697,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.05,
-      rotationSpeed: 0.06,
+      rotationSpeed: 0.282,      // the dish's motor; was 0.06 with a stir in the middle (PLAN 22j)
       centerGravity: 0.95,
       // Glitter wants a night sky. On the rainbow wheel, with the dye dried
       // and diffused away, the frame was the wheel and nothing else.
@@ -726,7 +747,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.003,
+      rotationSpeed: 0.0084,     // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.0,
       ledPlatform: false,
       ledMode: 'single',
@@ -817,7 +838,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.7,
-      rotationSpeed: 0.05,
+      rotationSpeed: 0.137,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
@@ -1188,7 +1209,7 @@ export const PRESETS: Preset[] = [
       blendMode: 'screen',
       gooeyEffect: 0.2,
       postBlurRadius: 0.12,
-      rotationSpeed: 0.004,
+      rotationSpeed: 0.156,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.05,
       ledPlatform: true,
       ledMode: 'single',
@@ -1489,7 +1510,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.3,
-      rotationSpeed: 0.004,
+      rotationSpeed: 0.116,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.08,
       ledPlatform: false,
       ledMode: 'single',
@@ -1547,7 +1568,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.55,
-      rotationSpeed: 0.006,
+      rotationSpeed: 0.109,      // the dish's motor; was 0.006 with a stir in the middle (PLAN 22j)
       centerGravity: 0.0,
       ledPlatform: false,
       ledMode: 'single',
@@ -1615,7 +1636,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.003,
+      rotationSpeed: 0.063,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
@@ -1657,7 +1678,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.003,
+      rotationSpeed: 0.038,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
@@ -1698,7 +1719,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.003,
+      rotationSpeed: 0.019,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
@@ -1740,7 +1761,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.003,
+      rotationSpeed: 0.019,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
@@ -1776,7 +1797,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.55,
-      rotationSpeed: 0.004,
+      rotationSpeed: 0.045,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.2,
       ledPlatform: true,
       ledMode: 'single',
@@ -1825,7 +1846,7 @@ export const PRESETS: Preset[] = [
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.6,
-      rotationSpeed: 0.01,
+      rotationSpeed: 0.11,       // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: false,
       ledMode: 'single',
@@ -1872,7 +1893,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.012,
+      rotationSpeed: 0.123,      // the dish's motor; was 0.012 with a stir in the middle (PLAN 22j)
       centerGravity: 0.1,
       ledPlatform: false,
       ledMode: 'single',
@@ -1932,7 +1953,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.002,
+      rotationSpeed: 0.018,      // the dish's motor; was 0.002 with a stir in the middle (PLAN 22j)
       centerGravity: 0.2,
       ledPlatform: true,
       ledMode: 'single',
@@ -1982,7 +2003,7 @@ export const PRESETS: Preset[] = [
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.55,
-      rotationSpeed: 0.003,
+      rotationSpeed: 0.033,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
