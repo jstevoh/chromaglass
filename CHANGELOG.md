@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the Magnet moves only the ferrofluid that is there (PLAN 9y)
+
+- **The Magnet brings no ferrofluid.** Its first touch on a plate with none used
+  to lay a pool under the hand. Now it moves only ferrofluid poured from the
+  bottle or laid by the look, and over a bare plate it does nothing visible, as
+  a real magnet under an empty dish. Magnet Size is the magnet's own size.
+
 ### Added — the lamp through the dye (PLAN 18b)
 
 - **Lamp Ground** (`lampGround`, Settings → Lamp & Light; MIDI, the desks, the
