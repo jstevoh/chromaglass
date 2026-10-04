@@ -216,8 +216,19 @@ try {
     `${e(bubbles.closing.speed)} against ${e(still.speed)} with nothing on the plate`);
   check('and once the bubbles sit still, the far plate is nearly still', bubbles.speed < bubbles.closing.speed / 20 && bubbles.peak < 3e-4,
     `${e(bubbles.speed)} (peak ${e(bubbles.peak)}, under 3e-4 to pass), against ${e(bubbles.closing.speed)} as they arrived (under a twentieth)`);
-  check('and not flowing out from them or from the middle', Math.abs(bubbles.outward) < 0.5 && Math.abs(bubbles.fromPress) < 0.5,
-    `${bubbles.outward.toFixed(2)} of the far flow is radial about the middle, ${bubbles.fromPress.toFixed(2)} about the bubbles (under 0.5 to pass)`);
+  /*
+    The direction asked as a flow, not as a fraction. What is left once the
+    bubbles sit still is their presses' own push on the liquid round them,
+    and at a six-hundredth of the leak's speed its direction is whatever that
+    push happens to be: on the Mac 0.59 of it pointed away from the bubbles,
+    at 7.7e-6 (4.6e-6 of outward flow), where the lab read 0.26. The leak was
+    a flow straight out at the arrival's own speed: 4.57e-3, 0.79 of it out
+    from them, 3.6e-3 of outward flow, 0.71 of what the arrival made. So the
+    outward part of the far flow is held to a fiftieth of the arrival's.
+  */
+  const outFlow = Math.max(Math.abs(bubbles.outward), Math.abs(bubbles.fromPress)) * bubbles.speed;
+  check('and not flowing out from them or from the middle', outFlow < bubbles.closing.speed / 50,
+    `${e(outFlow)} of it flows straight out (${bubbles.outward.toFixed(2)} of the far flow about the middle, ${bubbles.fromPress.toFixed(2)} about the bubbles), against ${e(bubbles.closing.speed)} as they arrived (under a fiftieth)`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
