@@ -88,7 +88,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **0.1** ~~**19j** (E, S): a merge that changes no file the site is built from deploys nothing
   and waits for nothing. Eight of the last thirty merges changed no site file, and a
   docs-only merge still ran the whole Mac; #245, which wrote this order, waited 79
-  minutes.~~ #PRNUM (3 of those 30 answer `nothing`; the other five rightly carried a site
+  minutes.~~ #253 (3 of those 30 answer `nothing`; the other five rightly carried a site
   change that was not yet live)
 - **0.2** **19i** (E, M): a green Mac result carries across a merge of main that is disjoint
   from the PR's own site files. Those pushes were 56 % of the PRs' Mac minutes and 16
@@ -4360,7 +4360,7 @@ PR over the next 25 PRs, against 125 and 4.1. *Size:* M.
 
 ### 19j. A merge with no site change deploys nothing
 
-**Shipped** (#PRNUM). Eight of the last thirty merges changed no file the site is built from
+**Shipped** (#253). Eight of the last thirty merges changed no file the site is built from
 (`reach.mjs --site`): docs, check scripts, workflows. A docs-only merge still ran every Mac
 shard on its deploy (rule 3, because its PR skipped them): 84bb112 (#245) went live 79
 minutes after its merge; a check-only merge cost eight minutes of Measure.
