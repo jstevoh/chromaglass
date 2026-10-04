@@ -85,10 +85,11 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 313; a PR runs its checks about four times; the account's five Mac runners were 87 to
 91 % busy; and 14 of 26 failed jobs re-run by hand went green with nothing changed.
 
-- **0.1** **19j** (E, S): a merge that changes no file the site is built from deploys nothing
-  and waits for nothing. Ten of the last thirty merges changed no site file, and a
-  docs-only merge still runs the whole Mac (63 to 111 minutes); #245, which wrote this
-  order, is one.
+- **0.1** ~~**19j** (E, S): a merge that changes no file the site is built from deploys nothing
+  and waits for nothing. Eight of the last thirty merges changed no site file, and a
+  docs-only merge still ran the whole Mac; #245, which wrote this order, waited 79
+  minutes.~~ #253 (3 of those 30 answer `nothing`; the other five rightly carried a site
+  change that was not yet live)
 - **0.2** **19i** (E, M): a green Mac result carries across a merge of main that is disjoint
   from the PR's own site files. Those pushes were 56 % of the PRs' Mac minutes and 16
   of their 29 reds; this is the largest saving in the file.
@@ -4378,16 +4379,27 @@ PR over the next 25 PRs, against 125 and 4.1. *Size:* M.
 
 ### 19j. A merge with no site change deploys nothing
 
-Ten of the last thirty merges changed no file the site is built from (`reach.mjs --site`):
-docs, check scripts, workflows. A docs-only merge still runs every Mac shard on its deploy
-(rule 3, because its PR skipped them): d027626 took 111 minutes to go live behind a
-53-minute Mac queue, 54f2d25 took 63. A check-only merge costs eight minutes of Measure.
+**Shipped** (#253). Eight of the last thirty merges changed no file the site is built from
+(`reach.mjs --site`): docs, check scripts, workflows. A docs-only merge still ran every Mac
+shard on its deploy (rule 3, because its PR skipped them): 84bb112 (#245) went live 79
+minutes after its merge; a check-only merge cost eight minutes of Measure.
 
-*Fix:* rule 6 in `deploygate.sh`. When no site file differs from the commit that is live,
-the tree that is live already passed every check; the deploy says so and stops, and the
-concurrency group is free for the merges behind it. A changed check script still ran on its
-own PR. *Measure:* `npm run deploygate -- --history 30` (10 of 30 answer "nothing to
-deploy"). *Size:* S.
+*Fix, shipped:* rule 6 in `deploygate.sh`. When no site file differs from the commit that is
+live (the head of the last green deploy run to start before this one, on any branch, so a
+re-run of an old deploy counts by when it ran), the deploy answers `nothing`, checks and
+publishes nothing, and is green in seconds, so the concurrency group is free for the merges
+behind it. A change to the gate or `reach.mjs` always deploys, and a filter that fails never
+reads as "no site file". A changed check script still ran on its own PR; a run by hand still
+checks and deploys, and is now how a changed `VITE_*` secret goes live. *Measured:* `npm run deploygate -- --history 30` gave 5 `true`, 16
+`disjoint`, 9 `false` before; 5, 14, 8 and 3 `nothing` after (84bb112, 3586ead, e199bd3:
+together 95 minutes of deploy time, 79 of them behind the Mac). `vite build` of each of the
+three and of the commit live before it gave the same 25 files byte for byte; a site merge
+(87b06a6) differed in 8. The other five non-site merges did not qualify, rightly: two were
+runs cancelled before they started (a newer merge took their place in the queue), and three
+followed a site change whose run was cancelled or red, so theirs was the deploy that put it
+up (d027626's 111 minutes, which this section first counted as a docs-only wait, were three
+PRs' site changes going out). The gain grows with 19i and 0.3: fewer red or superseded
+deploys leave more docs merges directly on top of a live commit.
 
 ### 19k. One manifest of checks
 
