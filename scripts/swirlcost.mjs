@@ -15,9 +15,9 @@
  * governor (`gpu=mid`, what a visitor's laptop gets), and reads two things.
  *
  * What the swirl stage costs the GPU, timed directly
- * (`chromaglassDebug().webgpu.benchSwirl`): twenty and a hundred and twenty
+ * (`chromaglassDebug().webgpu.benchSwirl`): twenty and a thousand and twenty
  * swirl stages back to back on the plate's own textures, submit to done,
- * three times each inside an animation frame, the quickest of each, and the
+ * five times each inside an animation frame, the quickest of each, and the
  * slope between them (which leaves out the submit's fixed cost and whatever
  * of the frame the queue was still doing). Once as a thin plate runs it now
  * (one dispatch, PLAN 22k) and once with the thirteen it ran before, which
@@ -132,9 +132,20 @@ const benchOf = async (page) => {
   const out = {};
   for (const thin of [true, false]) {
     const t = [];
-    for (const n of [20, 120]) {
+    /*
+      Twenty and a thousand and twenty, the quickest of five each. The
+      queue's "done" comes back on the browser's own tick, not the moment
+      the GPU finishes, so each timing carries up to a frame or two of
+      lateness: on the laptop's layout, at 20 and 220, three looks in
+      twelve read a negative slope (one at minus 223 µs a stage) and the
+      rest scattered by two to one (#258). A thousand stages of the swirl is
+      tens to hundreds of milliseconds of the GPU's work, which that
+      lateness cannot swamp, and the quickest of five drops the tries that
+      also caught a hitch.
+    */
+    for (const n of [20, 1020]) {
       let best = Infinity;
-      for (let k = 0; k < 3; k++) {
+      for (let k = 0; k < 5; k++) {
         const ms = await page.evaluate(({ n, thin }) => new Promise((resolve) => requestAnimationFrame(() => {
           const b = window.chromaglassDebug().webgpu?.benchSwirl;
           if (!b) { resolve(null); return; }
@@ -144,7 +155,7 @@ const benchOf = async (page) => {
       }
       t.push(best);
     }
-    out[thin ? 'one' : 'thirteen'] = (t[1] - t[0]) / 100;
+    out[thin ? 'one' : 'thirteen'] = (t[1] - t[0]) / 1000;
   }
   return out;
 };
@@ -231,10 +242,11 @@ for (const name of screens) {
   check(`${name}: the swirl ran on most steps where it was let run`, ranLow.length === 0,
     rs.map((r) => `${r.look} ${(r.ran * 100).toFixed(0)}%`).join(', '));
   check(`${name}: and on none where it was held off`, rs.every((r) => r.ranOff === 0));
-  const one = mean(rs.map((r) => r.bench.one)), thirteen = mean(rs.map((r) => r.bench.thirteen));
+  const median = (xs) => { const v = [...xs].sort((a, b) => a - b); return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2; };
+  const one = median(rs.map((r) => r.bench.one)), thirteen = median(rs.map((r) => r.bench.thirteen));
   const sps = mean(rs.map((r) => r.stepsPerSec));
-  const s1 = mean(rs.map((r) => r.shareOne)), s13 = mean(rs.map((r) => r.shareThirteen));
-  console.log(`\n  ${name}: over ${rs.length} looks at ${sps.toFixed(0)} steps/s, the swirl stage is ${(one * 1000).toFixed(1)} µs a step now ` +
+  const s1 = median(rs.map((r) => r.shareOne)), s13 = median(rs.map((r) => r.shareThirteen));
+  console.log(`\n  ${name}: over ${rs.length} looks at ${sps.toFixed(0)} steps/s, the swirl stage is ${(one * 1000).toFixed(1)} µs a step now (the looks' median) ` +
     `and was ${(thirteen * 1000).toFixed(1)} µs (${(s1 * 100).toFixed(2)}% and ${(s13 * 100).toFixed(2)}% of the GPU's second, on the steps that ran it); ` +
     `${mean(rs.map((r) => r.fpsOn)).toFixed(1)} fps with it, ${mean(rs.map((r) => r.fpsOff)).toFixed(1)} without\n`);
 }
