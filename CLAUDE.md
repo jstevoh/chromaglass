@@ -4,10 +4,12 @@ A liquid light show: a WebGPU fluid solver (`src/gpu/`, shaders in `src/gpu/wgsl
 drawn as a projected plate, played from a Perform desk, built on a Design desk,
 driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 
-Before starting anything that is not a bug fix, read the part of `docs/roadmap.md`
-(engine) and `PLAN.md` (the plate's running order) that the work touches: `grep -n
-'^##' PLAN.md` for the map, then `sed -n` the section. Not the whole file: `PLAN.md`
-is about 38k tokens, and see "Keeping a session small" for why that matters.
+Before starting anything that is not a bug fix, read `PLAN.md`'s **Order of work**
+(its first section: which step is next, in which lane) and then only the section your
+step names: `grep -n '^##' PLAN.md` for the map, then `sed -n` the section. Not the
+whole file: `PLAN.md` is about 75k tokens, and see "Keeping a session small" for why
+that matters. Shipped batches are in `docs/plan-shipped.md`; the engine's own order is
+in `docs/roadmap.md`.
 `docs/judging.md` lists what needs the owner's eyes on a real GPU.
 
 ## How work is done here
