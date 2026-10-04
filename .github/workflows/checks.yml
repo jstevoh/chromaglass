@@ -623,6 +623,13 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
+      # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
+      # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
+      # twice the dye lets through the square, a gel and the back plate filter
+      # through the dye. In the open shard: the plate shard is near its timeout.
+      - name: The lamp through the dye
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run lamp
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print
@@ -718,6 +725,14 @@ jobs:
       - name: The sound's renders, with a plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/renders.mjs
+      # Audio Impact 0 holds the music's bubbles back too (scripts/kickbubbles.mjs,
+      # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
+      # and its kicks used to drop air near the middle whatever the dial said.
+      # On the laptop and the phone at 0, and at the default, where they still
+      # must. About two minutes.
+      - name: Audio Impact 0 drops no bubbles
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/kickbubbles.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a
