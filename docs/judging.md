@@ -853,6 +853,22 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
 
+## 33. The intro while the show opens (PLAN 14v)
+
+Open the site in a private window (a cold cache) on the Mac, and once on a phone.
+
+- From the very first moment the mark turns slowly over three pools of blue, teal
+  and green, with "Warming the lamp" breathing under the name. When the desk
+  arrives the intro should shrink into the plate's preview without a jump in the
+  swirl, and never cover the desk's controls.
+- **Say whether the swirl stops** for a few seconds near the start (Chromium starting
+  the GPU may freeze it; PLAN 14v's open item). A still picture is acceptable; a stall
+  that reads as a crash is not.
+- When the plate is ready the intro should fade into it in about a second, with the
+  plate already moving underneath; it should never sit over a plate that is ready.
+- A key or a click on the intro skips it to the black plate; a click on the desk
+  does not. The projector window and the phone remote never show it.
+
 ---
 
 ## Reading the frame time while you do it

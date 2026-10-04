@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -57,6 +57,7 @@ import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
+import { adoptIntro, introOut, introPlateFrame } from '../lib/intro';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -4136,6 +4137,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** Where the intro goes once the plate is on the page: just above the canvas, under everything else in the frame. */
+  const introSlotRef = useRef<HTMLDivElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
   /*
     The noise a look is laid with and the CPU turbulence stirs by.
@@ -4411,6 +4414,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const glLostRef = useRef(false);
   /** Why there is no GPU to draw with, for the "needs WebGPU" screen. */
   const [gpuFailure, setGpuFailure] = useState<GpuFailure | null>(null);
+  // The intro over the plate (lib/intro.ts): taken into the plate's frame as
+  // soon as there is one, and gone the moment there is a reason to say why
+  // there will be no plate, which it would otherwise cover.
+  useLayoutEffect(() => { adoptIntro(introSlotRef.current); }, []);
+  useEffect(() => { if (gpuFailure) introOut('failure'); }, [gpuFailure]);
   const [glLost, setGlLost] = useState(false);
   const [glEpoch, setGlEpoch] = useState(0);
   /** The look that is on the plate, so a rebuild can put the same one back. */
@@ -8214,6 +8222,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           fxFrame: fxFrameRef.current,
           fxSeed: fxSeedRef.current,
         }, fluidsRef.current) ?? null;
+        // The intro was covering for this frame: the first with a step in it,
+        // or the first at all when the show opens paused. The fade begins on
+        // the frame the plate is presented, so the plate is never held back.
+        introPlateFrame((fluidsRef.current[0]?.stepCount ?? 0) > 0 || !isActiveRef.current);
 
         /*
           The projector window, in this task (docs/webgpu-plan.md, P3).
@@ -10236,6 +10248,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
+      {/* The intro's place (lib/intro.ts); empty, and so not there at all, once it has gone. */}
+      <div ref={introSlotRef} className="absolute inset-0 pointer-events-none empty:hidden" data-testid="intro-slot" />
       {/*
         A caption rather than a black rectangle. The recovery is automatic and
         usually takes well under a second, but a projector that goes dark with
