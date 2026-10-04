@@ -321,6 +321,14 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-6** The Magnet lays a fixed grid of spikes. Desk, phone. Draft #247 deletes the
   lattice (9t); thread "Magnet without the grid".
 
+- **QA-12** Pressing Hold on the zoom chip makes the closeup jump; it should stay exactly
+  where it is. Hold aims the camera at the stored aim (`macroAimX/Y`), not where the
+  camera is: under Follow or Auto the camera has ridden away from the aim, so Hold eases
+  it back there fast (`aimed()` in `src/lib/macroCamera.ts`, rate 6 + 6 × chase). The chip
+  only sets `macroCamera` (`src/App.tsx`, `macro-camera-hold`). Fix: on switching to
+  Hold, write the camera's current centre into the aim. Desk, phone
+  (`PhoneStage.tsx`), and it shows on the wall.
+
 **Tier 3. On the wall, it looks wrong.**
 
 - **QA-7** Looks read as pixelated, "very digital", on a laptop. Wall, desk. Draft #267.
