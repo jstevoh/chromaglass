@@ -273,11 +273,11 @@ const CURRENT_ITERS = 10;
   liquid: at 1e-3 rad/s the swirl at the rim is under 5e-4 plate widths a
   second, a cell of 768 in three seconds, for as long as the lag lasts. The
   centrifuge: at 0.05 rad/s water's drift outward is 3e-4 plate widths a
-  second at the rim with the heaviest dye. Both speeds are the turntable's
-  alone (Auto Spin and the Spin tool): a look's own turning, its motor, the
-  music routed to rotation and a flick, turns the picture rigidly as it
-  always has and never reaches here, so every shipped look leaves both at
-  exactly zero.
+  second at the rim with the heaviest dye. Since 22h (#252) the look's own
+  turning is on the same dish, so a look with music routed to rotation sways
+  its dish under its liquid and runs the swirl on most steps while it plays
+  (PLAN 22k: what that costs, `npm run swirlcost`); a look nobody turns
+  leaves both at exactly zero.
 */
 const SWIRL_DISH_MIN = 1e-3;
 const SWIRL_SPIN_MIN = 0.05;
@@ -458,9 +458,10 @@ export class WebGPUFluid {
   /**
    * For `npm run swirlcost` (PLAN 22k): the same plate with the swirl held
    * off, to read what it costs, and how many steps ran it of how many were
-   * taken. Never set by the app.
+   * taken. Never set by the app. On the class, so a solver the ladder builds
+   * mid-measurement is held off too.
    */
-  swirlHeldOff = false;
+  static swirlHeldOff = false;
   readonly swirlCount = { steps: 0, ran: 0 };
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
@@ -1680,7 +1681,7 @@ export class WebGPUFluid {
       plate it is laid over the flow after both projections, as the current
       is, and it is divergence-free already (stepSwirl projects it).
     */
-    const swirlOn = this.swirlWanted(p) && !this.swirlHeldOff;
+    const swirlOn = this.swirlWanted(p) && !WebGPUFluid.swirlHeldOff;
     this.swirlCount.steps++;
     if (swirlOn) this.swirlCount.ran++;
     stage('swirl', (pass) => {

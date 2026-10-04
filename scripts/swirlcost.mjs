@@ -60,7 +60,7 @@ const SCREENS = {
 const which = argOf('screen', process.env.SWIRLCOST_SCREEN ?? 'both');
 const screens = which === 'both' ? ['laptop', 'phone'] : [which];
 const WINDOW_MS = Number(argOf('window', 4000));
-const ORDER = [true, false, false, true];
+const ORDER = [true, false, false, true, true, false];
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -91,6 +91,8 @@ const snap = (page) => page.evaluate(() => {
     steps: counts.reduce((a, c) => a + (c?.steps ?? 0), 0),
     ran: counts.reduce((a, c) => a + (c?.ran ?? 0), 0),
     dish: d.fluids?.[0]?.lastStep?.spinDish ?? null,
+    timestamps: d.webgpu?.timestamps ?? null,
+    gpu: d.webgpu?.label ?? null,
     band: typeof window.__band === 'function' ? window.__band() : null,
     phone: !!document.querySelector('[data-testid="phone-stage"]'),
   };
@@ -137,7 +139,7 @@ const stagesOf = async (page) => {
 };
 
 const results = [];
-const browser = await launchChromium(chromium, { args: ['--enable-webgpu-developer-features'] });
+const browser = await launchChromium(chromium, { args: ['--enable-webgpu-developer-features', '--enable-dawn-features=allow_unsafe_apis'] });
 try {
   for (const name of screens) {
     const screen = SCREENS[name];
@@ -167,6 +169,7 @@ try {
       const stages = await stagesOf(page);
       const last = await snap(page);
       results.push({ screen: name, look, windows, stages, band: last.band, phone: last.phone });
+      if (look === LOOKS[0]) console.log(`  ${name}: ${last.gpu}, GPU timestamps ${last.timestamps}`);
       if (process.env.SWIRLCOST_VERBOSE) console.log(JSON.stringify({ windows, stages, last }));
       const ons = windows.filter((w) => w.on), offs = windows.filter((w) => !w.on);
       const row = {
