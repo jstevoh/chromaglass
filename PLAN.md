@@ -95,7 +95,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
-  (19h-2, #240), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
+  (19h-2, #240, found: the old push), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
   on thin pools (0-finger), the wall's gain (0-wallgain), `qa` with no adapter
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
@@ -3998,6 +3998,11 @@ like day (`npm run macqueue -- --hours 24` for the time).
 - **19h-2. The phone's second finger lays a third as much as the first, or nothing.** "A 23
   steps, B 11 steps" with both down; the same pixels land on different cells run to run.
   Reads as a multi-touch Drop bug. Handoff: `handoff/ci-overhaul/phone-two-finger-drop.md`.
+  **Found (#240): not a multi-touch bug.** The one-finger-at-a-third reds were the fingering
+  push #222 took out, which threw away up to 60 % of a held pool by where and when it was
+  laid; `grating`'s §6 holds two Drops at ten moments and reads the old push 0.40 apart,
+  today's 1.00. The rarer case of both fingers low at once is still open (batch 11's
+  two-finger entry), and `phone` now prints what the plate gained of what it was handed.
 - **19h-3. The deploy's second Mac run. Shipped in the same PR, the owner's choice
   ("Skip if no overlap", 2026-10-04).** Every merge behind main (the owner's rule since
   2026-09-28) re-ran all four shards on the deploy: 14 of the last 20 merges, about 50
