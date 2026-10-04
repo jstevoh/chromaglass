@@ -853,6 +853,31 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
 
+## 33. Several areas of interest: Velvet Underground, Lumia and Cell Bloom (PLAN 25a)
+
+The owner found Velvet Underground, Lumia and Cell Bloom underwhelming, with one area of
+interest. All three are now built on areas of the dish (`src/lib/plateAreas.ts`): a few places apart
+on the plate, each with its own liquid and dye, where the look's hands and its music
+land. Every other look plays as before.
+
+- **Velvet Underground**, with music: three pools apart on deep violet. Top left, a
+  magenta glycerine pool the mids circle; right, a raspberry well where every kick
+  lands (its ring, its push and a drop of soap, which carries the colour off the
+  surface into a ring); low in the middle, ultramarine syrup that glitters with the
+  treble. Say whether the three stay three for a few minutes or run together, and
+  whether the dark between them is too much (Dye Budget, now 0.45, sets it).
+- **Lumia**, without a beat: three veils of colour in different parts of a nearly
+  clear plate, under Wilfred's folded light. The light layer is unchanged; say if it
+  now covers the veils too much (the Lumia slider), or if the veils are too faint.
+- **Cell Bloom**: three small pools turning slowly under the magnifier on violet,
+  packed with paint cells (none were drawn at its zoom before). Say if the cells
+  are too big now (Cell Size, 0.6) or the pools drift out of the frame.
+- The Go into any of the three and the sequencer stepping onto it should pour into
+  the same places.
+- **Fillmore East, 1969** (PLAN 25g): its two plates now fill the screen rather than
+  sitting as two dishes on black. Say if the two plates over each other read too busy
+  without the black between them.
+
 ---
 
 ## Reading the frame time while you do it
