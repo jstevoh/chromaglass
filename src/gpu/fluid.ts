@@ -605,12 +605,13 @@ export class WebGPUFluid {
   /*
     Last frame's coverage, so the rate term can be made zero-mean.
 
-    The standing term has the plate's air fraction subtracted because a
-    Neumann problem whose source does not average to zero has no solution for
-    the projection to find — the condition pressureSelfTest exists to
-    protect. The rate term never had the same treatment, and it is the
-    suspect for why pushing the air source harder has bought so little: a
-    hundred times the strength moved the interior from 0.67 to 0.62.
+    A Neumann problem whose source does not average to zero has no solution
+    for the projection to find, the condition pressureSelfTest exists to
+    protect. The air's rate (a bubble arriving or leaving) is the only air
+    source left: the standing one, which poured liquid out of every still
+    bubble for as long as it lasted, is gone (see divergence in
+    wgsl/fluid.ts), and the coverage it was balanced with is passed on but
+    no longer read there.
   */
   private airCoverPrev = 0;
   /** How much of a press reaches the flow, from the look's plate pressure. */
@@ -2659,7 +2660,7 @@ export class WebGPUFluid {
   private project(pass: GPUComputePassEncoder): void {
     const none = this.arg('none', [0, 0, 0, 0]);
     // The fifth number is the mean of the rate term over the plate, which the
-    // kernel subtracts so that term averages to zero as the standing one does.
+    // kernel subtracts so that term averages to zero.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,

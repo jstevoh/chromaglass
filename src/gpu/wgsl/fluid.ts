@@ -1242,28 +1242,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
   /*
-    Two terms, and the second is the one that empties a bubble.
+    One term: the air arriving, and only while it arrives.
 
-    The rate — how much air arrived since last frame — is the physical one: a
-    growing bubble displaces liquid, a popping one lets it back. It is also
-    only there while the bubble is *changing*, and a bubble that has arrived
-    and sits still has no rate at all. Measured on its own it moved the
-    interior from 0.70 to 0.67, which is nothing.
+    The rate (how much air arrived since last frame) is the physical source:
+    a growing bubble displaces liquid, a popping one lets it back. A bubble
+    that has arrived and sits still has no rate at all, and that is right.
+    Between two glasses a still bubble pushes nothing anywhere; the liquid
+    is simply not where the air is.
 
-    So there is a standing term as well: a source everywhere the air is, a
-    sink everywhere it is not, which keeps liquid flowing out of a bubble and
-    around it for as long as it is there. A.a.z is the fraction of the
-    plate that is air, subtracted so the two balance — a source that does not
-    average to zero has no solution for the projection to find, which is the
-    Neumann condition pressureSelfTest exists to protect.
+    There used to be a second, "standing" term beside it: a source everywhere
+    the air was and a sink everywhere it was not, (air - the plate's air
+    fraction) times 30 every step, put there to empty a bubble's middle of
+    dye, because the rate alone left it full (0.70 to 0.67). It never could
+    empty the middle (a radial source's velocity is zero at its centre, see
+    airExclude, which is what empties it now), and what it did do was pour
+    liquid out of every bubble for as long as the bubble lasted, with the
+    rest of the plate as the sink. That is a flow out over the whole plate
+    that never stops. On the Mac, four bubbles the simulated band left near
+    the middle of a calm Classic plate took its mean speed from 1.3 to 40 to
+    138 (a thousandth of a unit), 0.70 of it straight out from them, and that
+    is what kept failing the drop check's "and nowhere else"
+    (scripts/mirror.mjs). In the lab the same four bubbles, held still with
+    their presses on, kept the far plate at 4.57e-3 once steady, 0.79 of it
+    straight out from them, as fast as when they arrived; without the
+    standing term, 1.83e-5. npm run heldpress holds it.
   */
   /*
-    Zero-mean, as the standing term below already is.
+    Zero-mean.
 
     A source the projection solves has to average to zero over the plate or
     there is no solution to find, which is the Neumann condition
-    pressureSelfTest protects. The standing term has the air fraction taken
-    off for exactly that reason and this one never did: while a bubble grows
+    pressureSelfTest protects. This one never did: while a bubble grows
     it is a net source over the whole plate with nothing to balance it, and
     the solve spends itself on the imbalance rather than on the shape.
 
@@ -1271,7 +1280,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     changing, and the CPU has it from the bubble list for nothing.
   */
   let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
-  let standing = (now - A.a.z) * 30.0;
   /*
     And the press, as mass conservation says it is: closing a gap of height h
     at a rate dh/dt pushes out −(1/h)(dh/dt) per unit area.
@@ -1289,7 +1297,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let sqv = textureLoad(sq, p, 0);
   let squeeze = clamp(-sqv.g / max(sqv.r, 0.004), -60.0, 60.0) * A.b.z;
-  let q = (rate + standing) * A.a.x + squeeze;
+  let q = rate * A.a.x + squeeze;
   textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));
 }`,
 
@@ -1303,7 +1311,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     place has to be taken in somewhere else, or the liquid has nowhere to go.
     The velocity's own divergence always does sum to zero — with the wall's
     ghost cells, the central differences telescope to nothing. The sources
-    do not: the air arriving, the air standing, and the press each put
+    do not: the air arriving and the press each put
     liquid in where they are, and each was balanced with a mean the CPU
     worked out from its own idea of the plate (the bubble list's coverage,
     the gap deltas over a resting gap). Where an idea was wrong the
@@ -1316,8 +1324,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     is a closed cell of liquid between two sheets of glass: a palm pressing
     the gap shut in one place lifts the glass, a hair, everywhere else, and
     the liquid it pushed out goes there. A uniform sink over the whole plate
-    is exactly that lift. The air terms keep their own CPU means, which
-    centre them before their clamps; this takes off whatever those missed.
+    is exactly that lift. The air's rate keeps its own CPU mean, which
+    centres it before its clamp; this takes off whatever that missed.
 
     Two passes to find the mean, the same shape as the plate's stats
     (`wgsl/stats.ts`): a fixed number of workgroups each sum their stride of

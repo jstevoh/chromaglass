@@ -256,12 +256,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
   let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
-  let standing = (now - A.a.z) * 30.0;
+  // No standing air term: a still bubble pushes nothing (see divergence in wgsl/fluid.ts).
   let g = textureLoad(sq, p, 0).r;
   let k = p.x + p.y * n;
   let dh = select((g - gapBefore[k]) / A.a.w * A.b.y, 0.0, A.b.z > 0.5);
   gapBefore[k] = g;
-  let q = (rate + standing) * A.a.x - dh;
+  let q = rate * A.a.x - dh;
   var b = -div / S.n + q / (S.n * S.n);
   if (!(abs(b) < 1e30)) { b = 0.0; }
   textureStore(dst, p, vec4f(b, 0.0, 0.0, 0.0));
