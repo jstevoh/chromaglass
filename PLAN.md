@@ -2891,8 +2891,13 @@ for, and the GPU was asked for only after they had arrived and drawn.
   to 4.5 s in whatever was compiling, once with nothing asked yet. So
   `buildInTurn` now compiles one render pipeline at a time, the display still
   first, the other lanes taking kernels beside it. So what the page asks does move
-  when Chromium's hold at the GPU's start ends: it can lengthen it. Its Mac numbers
-  (the hold, the display's compile alone, the first step) go here once read.
+  when Chromium's hold at the GPU's start ends: it can lengthen it. On #254's Mac run
+  (37200639755) the hold was 2.91 s from 1.01 s (4.98 s on the red deploy; 1.92 to
+  4.98 s on the seven runs since #249), the first step 10.21 s (7.96 to 14.19 s).
+  The display still took 3.46 s, settling at 3.9 s with the two kernels beside it,
+  which also took 3.46 s each: whatever is in flight under Chromium's GPU start
+  ends with it. So one run says the change is not worse and passes 4b with room;
+  whether it narrows the spread needs the next deploys' readings.
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure
@@ -2976,7 +2981,11 @@ from a fresh pool in the plate's middle each time, and each has to beat the wind
 before it by 0.002: a drift the wind did not make helps one stroke as much as it
 holds back the other, and from the middle a drift toward the middle moves neither. The windows after are
 printed in halves for both; if they turn round with the wind, the drift is the
-wind's.
+wind's. On #254's Mac run (37200639755): out to the right +2.33% against +0.20% to
+beat, out to the left +1.48%, both with -0.00% before; after it +0.16% then +0.14%
+right and +0.26% then +0.15% left, each toward its own stroke's end, so the drift
+after does turn round with the wind. Not yet seen: the line failing on a wind with
+its carry turned off.
 
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
