@@ -8,9 +8,12 @@
 // workflow what another workflow's group is. If checks.yml or ios.yml ever
 // spells its group differently, closed.yml joins a group nobody is in, its
 // jobs go green, and the Mac queue fills with merged PRs again without a word.
-// So this reads the three files and evaluates each group the way GitHub would
-// for a pull request event, `github.workflow` being the workflow's `name:` and
-// `github.ref` the same placeholder in all three, and fails when they differ.
+// So this reads the three files and evaluates each group the way GitHub does:
+// `github.workflow` is the workflow's `name:`; in a PR's own run `github.ref`
+// is refs/pull/<n>/merge, but in the closed event of a merged PR it is the
+// base branch (seen on #234's merge, whose jobs joined
+// checks-Checks-refs/heads/main and stopped nothing), so closed.yml must spell
+// the ref from `github.event.pull_request.number`. It fails when they differ.
 //
 // It also holds the gallery to its trigger. The gallery photographed every
 // preset for 29 Mac-minutes on nearly every push of nearly every PR (a PR's
@@ -66,14 +69,16 @@ function parse(text) {
   return { name, groups, text };
 }
 
-// A group as GitHub evaluates it for a pull request event. Any expression but
-// these two would differ between the PR's run and the closed event's (a sha,
-// an event name), or is one this cannot evaluate, so it is refused outright.
-const REF = 'refs/pull/123/merge';
-const evaluate = (group, workflowName) => {
+// A group as GitHub evaluates it, for a PR's own run (`pr`) or for the closed
+// event of that PR once merged (`closed`). Any expression but these would
+// differ between the two (a sha, an event name), or is one this cannot
+// evaluate, so it is refused outright.
+const N = '123';
+const evaluate = (group, workflowName, side) => {
   const out = group
     ?.replace(/\$\{\{\s*github\.workflow\s*\}\}/g, workflowName)
-    .replace(/\$\{\{\s*github\.ref\s*\}\}/g, REF);
+    .replace(/\$\{\{\s*github\.ref\s*\}\}/g, side === 'pr' ? `refs/pull/${N}/merge` : 'refs/heads/main')
+    .replace(/\$\{\{\s*github\.event\.(pull_request\.)?number\s*\}\}/g, N);
   return out?.includes('${{') ? `unevaluable: ${out}` : out;
 };
 
@@ -108,8 +113,8 @@ for (const [id, target, file] of [['checks', checks, 'checks.yml'], ['ios', ios,
   if (!theirs?.group || !ours?.group) continue;
   // The group closed.yml writes is evaluated with closed.yml's own name, since
   // that is what `github.workflow` is in its run; it must not use it.
-  const want = evaluate(theirs.group, target.name);
-  const have = evaluate(ours.group, closed.name);
+  const want = evaluate(theirs.group, target.name, 'pr');
+  const have = evaluate(ours.group, closed.name, 'closed');
   check(have === want && !/unevaluable/.test(have), `closed.yml's ${id} job joins ${file}'s group`, `${have} vs ${want}`);
   check(ours.cancel === 'true', `closed.yml's ${id} job cancels what is running there`, `cancel-in-progress: ${ours.cancel}`);
 }

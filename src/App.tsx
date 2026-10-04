@@ -28,7 +28,7 @@ import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
@@ -116,8 +116,8 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
 /** The letter printed on each tool, and the tool it picks. */
-const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet'> = {
-  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet',
+const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin'> = {
+  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet', n: 'spin',
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
@@ -578,7 +578,7 @@ export default function App() {
     setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
   }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet'>('dropper');
+  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
   // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
@@ -3014,6 +3014,8 @@ export default function App() {
       case 'seed':            setSeedCount(prev => prev + 1); break;
       case 'spin-front':      flickPlate(0); break;
       case 'spin-back':       flickPlate(1); break;
+      case 'spin-reverse':    updateSettings({ spinRpm: -(settingsRef.current.spinRpm ?? 6) }); break;
+      case 'spin-auto':       updateSettings({ spinAuto: (Math.round(settingsRef.current.spinAuto ?? 0) + 1) % 3 }); break;
       case 'clear':           setClearTrigger(prev => prev + 1); break;
       case 'drain':           setDrainTrigger(prev => prev + 1); break;
       case 'lucky':           triggerLucky(); break;
@@ -3215,6 +3217,10 @@ export default function App() {
           break;
         case 'finger':
           visualizerRef.current?.applyGesture({ tool: 'finger', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+          break;
+        // The pad's finger on the dish (PLAN §22): the dish turns under it.
+        case 'spin':
+          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount, id: message.id });
           break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
@@ -4221,6 +4227,7 @@ export default function App() {
                       { id: 'press' as const, icon: Hand, label: 'Press' },
                       { id: 'finger' as const, icon: Fingerprint, label: 'Finger' },
                       { id: 'magnet' as const, icon: Magnet, label: 'Magnet' },
+                      { id: 'spin' as const, icon: RotateCw, label: 'Spin' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
                         key={id}
@@ -4593,6 +4600,7 @@ export default function App() {
             onClear={() => setClearTrigger(n => n + 1)}
             onDrain={() => setDrainTrigger(n => n + 1)}
             onSpin={() => flickPlate(activeLayer)}
+            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
@@ -4635,6 +4643,8 @@ export default function App() {
             onThinGap={(v) => updateSettings({ thinGap: v })}
             pressLift={settings.plateSpring ?? 0.35}
             onPressLift={(v) => updateSettings({ plateSpring: v })}
+            benDay={settings.benDay ?? 0}
+            onBenDay={(v) => updateSettings({ benDay: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}

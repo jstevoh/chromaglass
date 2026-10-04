@@ -17,7 +17,7 @@
  *
  *   the choice    a phone gets the phone layout; a narrow laptop window, an
  *                 iPad and `?phone=0` do not (lib/phone.ts, run directly)
- *   every mode    all nine tools and every sheet's button are on screen at
+ *   every mode    all ten tools and every sheet's button are on screen at
  *                 once, at 48 pixels or more, uncovered, and each one works
  *   the plate     at least two thirds of a portrait screen is the plate, not
  *                 controls (half in landscape)
@@ -37,7 +37,7 @@
  *
  * The last two need the plate running. A runner with no WebGPU shows the
  * "needs WebGPU" screen instead and attaches no hands, so there they are
- * reported as not run, and `PHONE_GPU=1` (the tools shard in checks.yml)
+ * reported as not run, and `PHONE_GPU=1` (the open shard in checks.yml)
  * makes them required. `PW_WEBGPU=1` runs the fingers here in software; the
  * dye needs readbacks the software adapter does not give the app.
  */
@@ -132,7 +132,7 @@ const tap = async (page, testId) => { await page.getByTestId(testId).first().tap
 const visible = (page, testId) => page.getByTestId(testId).first().isVisible().catch(() => false);
 const box = (page, testId) => page.getByTestId(testId).first().boundingBox();
 
-const TOOLS = ['dropper', 'spray', 'splatter', 'pour', 'streak', 'blow', 'press', 'finger', 'magnet'];
+const TOOLS = ['dropper', 'spray', 'splatter', 'pour', 'streak', 'blow', 'press', 'finger', 'magnet', 'spin'];
 const DOCK = [...TOOLS.map(t => `phone-tool-${t}`), 'phone-open-dye', 'phone-open-looks', 'phone-open-sound', 'phone-open-play', 'phone-open-mix', 'phone-open-more'];
 
 try {
@@ -144,7 +144,7 @@ try {
     await ctx.close();
   }
 
-  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['the breakpoint', 800, 360, 0.5], ['under the breakpoint', 799, 360, 0.5], ['a small landscape', 740, 360, 0.5], ['the smallest landscape', 667, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
+  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['a wide landscape', 932, 430, 0.5], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['the breakpoint', 860, 390, 0.5], ['under the breakpoint', 859, 390, 0.5], ['a small landscape', 740, 360, 0.5], ['the smallest landscape', 667, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
     const { ctx, page } = await phonePage(w, h);
     const up = await visible(page, 'phone-stage');
     check(`${label} ${w}×${h}: the phone layout is up`, up);
@@ -155,24 +155,25 @@ try {
     // Every mode in reach at once: on screen, a thumb's size, uncovered.
     const boxes = await Promise.all(DOCK.map(id => box(page, id)));
     const off = DOCK.filter((id, i) => !boxes[i] || boxes[i].x < 0 || boxes[i].y < 0 || boxes[i].x + boxes[i].width > w + 0.5 || boxes[i].y + boxes[i].height > h + 0.5);
-    check(`${label}: all nine tools and the six sheets are on screen at once`, off.length === 0, off.length ? `off screen: ${off.join(', ')}` : `${DOCK.length} buttons`);
+    check(`${label}: all ten tools and the six sheets are on screen at once`, off.length === 0, off.length ? `off screen: ${off.join(', ')}` : `${DOCK.length} buttons`);
     const small = DOCK.filter((id, i) => boxes[i] && Math.min(boxes[i].width, boxes[i].height) < 48);
     check(`${label}: each is 48 px or more`, small.length === 0,
       small.length ? small.map(id => { const b = boxes[DOCK.indexOf(id)]; return `${id} ${Math.round(b.width)}×${Math.round(b.height)}`; }).join(', ')
         : `smallest ${Math.round(Math.min(...boxes.filter(Boolean).map(b => Math.min(b.width, b.height))))} px`);
     /*
-      One row where it fits, two where it does not: a landscape phone 800 px
-      wide or more has the tools and the sheets side by side, since height is
+      One row where it fits, two where it does not: a landscape phone 860 px
+      wide or more (800 until Spin made the tools' side eleven buttons) has the tools and the sheets side by side, since height is
       what the plate is short of there, and a narrower one has the sheets
       under the tools (where one row put the tools at 42 px on a 740 and 35
       on a 667). Portrait is always two. Read from where the Dye and the
       Looks buttons sit, the last tool and the first sheet.
     */
-    if (boxes[9] && boxes[10]) {
-      const oneRow = Math.abs(boxes[9].y + boxes[9].height / 2 - (boxes[10].y + boxes[10].height / 2)) < 8;
-      const wantOne = w > h && w >= 800;
+    const [lastTool, firstSheet] = [boxes[TOOLS.length], boxes[TOOLS.length + 1]];
+    if (lastTool && firstSheet) {
+      const oneRow = Math.abs(lastTool.y + lastTool.height / 2 - (firstSheet.y + firstSheet.height / 2)) < 8;
+      const wantOne = w > h && w >= 860;
       check(`${label}: the dock is ${wantOne ? 'one row' : 'two rows'}`, oneRow === wantOne,
-        `the tools' row at ${Math.round(boxes[9].y)}, the sheets' at ${Math.round(boxes[10].y)}`);
+        `the tools' row at ${Math.round(lastTool.y)}, the sheets' at ${Math.round(firstSheet.y)}`);
     }
     /*
       The strip across the top between the look and the three buttons is the
@@ -740,6 +741,36 @@ try {
       const named = (await page.getByTestId('phone-look-button').innerText()).trim();
       check('a look picked in the Looks sheet is the look named at the top, during its fade and after it',
         !!target && fadingName === target.name && named === target.name, `picked "${target?.name}", top says "${fadingName}" fading and "${named}" after`);
+
+      /*
+        Ben-Day Dots (wgsl/plate.ts benDay), the Roy look's own control, on
+        the Looks sheet: not there on a look that does not print, there once
+        Roy is picked, at Roy's own value, and it moves the setting from 0 to
+        100 % and back without taking itself away at 0.
+      */
+      await tap(page, 'phone-open-looks');
+      // Read with the sheet open, or a closed sheet would read as "hidden".
+      const looksOpen = await visible(page, 'phone-look-roy');
+      const printBefore = await visible(page, 'phone-ben-day');
+      await tap(page, 'phone-look-roy');
+      await page.waitForTimeout(3500);
+      await tap(page, 'phone-open-looks');
+      const printShown = await visible(page, 'phone-ben-day');
+      const printAt = printShown ? (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1] : null;
+      let printTop = null, printBottom = null;
+      if (printShown) {
+        await page.getByTestId('phone-ben-day').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        printBottom = (await visible(page, 'phone-ben-day')) ? (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1] : 'gone';
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        printTop = (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1];
+      }
+      check('Ben-Day Dots is on the Looks sheet for Roy and not before it, at Roy\'s value, and goes to 0 % and 100 % without leaving',
+        looksOpen && printBefore === false && printShown && printAt === '100' && printBottom === '0' && printTop === '100',
+        `before Roy ${!looksOpen ? 'the Looks sheet did not open' : printBefore ? 'shown' : 'hidden'}; on Roy ${printShown ? `at ${printAt} %, then ${printBottom} % and ${printTop} %` : 'missing'}`);
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*
         A projector's source (PLAN.md §16b), from the phone: More, Settings,

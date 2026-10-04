@@ -171,7 +171,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'mark', name: 'Logo & Titles', category: 'stage',
     terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
   { id: 'layers', name: 'Plates & LED', category: 'stage',
-    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick' },
+    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick auto spin turntable dish rpm tempo beats a turn reverse spin' },
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];
