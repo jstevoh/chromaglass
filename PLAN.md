@@ -67,6 +67,7 @@ Where each batch stands, as of 2026-09-27:
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
+| 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -4203,3 +4204,58 @@ today, so not worth it. Also worth having: the deploy gate skipping more often, 
 the owner's "merge behind main" rule (2026-09-28) trades away; 191 deploy minutes in the
 window above.
 
+## 21. Looks after painters
+
+The owner, 2026-09-27, over a screenshot of Classic at 2.8x covered in red dots on
+white by accident: "kinda cool, Roy Lichtenstein type style ... let's reserve this
+effect for a particular preset and a particular control." What makes the dots on
+Classic is another thread's to find and stop; this section is the effect on purpose.
+
+**Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
+the desks, the remote, and the phone's Looks sheet while a look prints) that reads the
+finished picture as a comic printer would: dark is black, anything lit is white paper
+with one of three process inks on it (red, yellow, blue, whichever the hue is
+nearest), a pale wash is that ink laid as even Ben-Day dots on a 45° screen fixed to
+the picture (32 rows down it), and a strong one is the flat ink. The front plate's
+shapes are outlined in black from its dye, a pen's width (a ring of taps round each
+pixel), and so are the seams where two inks meet. Only Roy turns it up: big flat
+pools of the three primaries in thin washes of themselves on a white light table,
+milk and ink so the shapes keep their own edges, and nothing that shades (no gloss,
+hot-spot, beads, bubbles or closeup texture). `npm run benday` measures the print on
+a lab plate: a wash is 242 separate dots against 256 on the lattice, one size to
+2.7%, fixed while the plate turns; a pool is one flat ink with a line all the way
+round it and a line where red meets yellow; and only Roy prints.
+
+Open:
+
+- **21a. Judge it on the Mac** (docs/judging.md §24): the dots' size on a wall, the
+  line's weight, and whether it holds up moving at 60 fps. The lab shows still frames.
+- **21b. The line is drawn round the front plate only.** It needs the dye, and it is
+  drawn from the front plate's; a second plate, the film and the lamps are printed
+  (dots and inks) but not outlined. Roy has one plate, so it does not show there.
+- **21c. The dots do not grow with the zoom.** The screen is fixed to the picture,
+  as a print's is; the owner's accidental dots at 2.8x were about twice the size.
+  If a bigger dot is wanted in the closeup, the pitch could follow the zoom.
+- **21d. More painters.** The same print with other inks is the start of more looks
+  after painters (a Warhol screen print's off-register blocks, Riley's black and
+  white, Rothko's soft fields); none is planned yet.
+
+
+*Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
+runs, `npm run wall`'s "every refresh's own timestamp was believed" read 2, 4, 4, 5, 5
+and then 1, 1, 1, 1, 3 fallbacks across its five two-window cases, while #207's run on
+the same base read 0; the same harness in a cloud session reads 0 on this branch, and
+the plate's display pipeline compiles in the same time with and without the print
+(SwiftShader, 2.0–2.4 s both). `stampFallbacks` is a page-wide total, so one early
+fallback turns every later case red, and it did not say which bound tripped. This PR
+now counts them apart (`stampMisses`), and the next Mac run said which: 4 to 6, every
+one ahead of now, the worst by 2.4 ms in every case, none stale. The draw gate had
+believed a stamp only up to 2 ms ahead, on the belief that Chrome never stamps a
+refresh ahead of now; it now believes up to one 240 Hz refresh (4.2 ms), which the
+gate's 0.6-of-a-refresh margin already treats as the same refresh. Still open for
+§14b: which clock runs ahead (the show's frames or the wall's converted ones; the
+count is page-wide), and whether the 2.4 ms is a Mac display link stamping the refresh
+a frame is for (inferred, not measured). And the line catches a wrongly converted wall
+only because the harness opens the wall five seconds after the show (the conversion's
+error is that gap, caught by the one-second stale bound); with under a second between
+them it would pass. The harness should check its own gap is over a second.
