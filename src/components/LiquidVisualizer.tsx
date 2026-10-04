@@ -30,7 +30,7 @@ import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
-import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast } from '../lib/turntable';
+import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
@@ -263,7 +263,6 @@ function particleFlowScale(fluid: { dt: number } | undefined, s: VisualizerSetti
 const CUR_BUOY = 0.3;    // × buoyancy × tanh(20 × temperature): the heat field is small, ~0.03 on average
 const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (density − mean)
 const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
-const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the centre
 /*
   How much of a blow is swirl rather than push.
 
@@ -3514,22 +3513,21 @@ class FluidSimulation {
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
-        A stir round the middle at the look's motor setting, kept because
-        every look is tuned against it (PLAN 22j names it as the shortcut it
-        is: a dish turning steadily under its liquid drags it round with it,
-        and leaves nothing to stir once the liquid has caught up).
-
-        It had a second half, the plate's motion the motor did not ask for,
-        what a flick put there, scaled by how hard the glass was pressed: a
-        stand-in for the glass dragging its liquid, there because the flick
-        turned the picture rigidly and nothing else moved the liquid. The
-        flick now turns the dish under the liquid (PLAN 22h, dishFrame), the
-        liquid follows it through the gap with its own drag time and the
-        swirl grips it where the glass is pressed close, which is that drag
-        itself, so the stand-in went: kept, it would have dragged the liquid
-        twice.
+        No stir for the look's motor (PLAN 22j). The current had one, a
+        swirl round the middle at rotationSpeed × 30, fastest at the centre
+        and nothing at the rim: a stand-in from when the motor turned the
+        picture rigidly and nothing else made the liquid go round. The motor
+        turns the dish now (22h, dishFrame), and a dish turning steadily
+        under its liquid drags it round through the gap until it turns with
+        the glass, after which there is nothing left to stir: the picture
+        turns, and the liquid in it is still. What the glass does to the
+        liquid while it catches up, or where a palm, a dome or oil grips it
+        harder than the bulk, is the swirl's (spinSwirl), worked out from the
+        gap's drag. The stir was most of what turned some looks (acid-trip's
+        middle at 0.95 rad/s against its motor's 0.001), so their motors
+        were turned up to move the liquid in view as fast (presets.ts, the
+        note on Rotation Speed).
       */
-      twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1) * CUR_TWIST,
       /*
         The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
         frame that turns with the liquid, the liquid's own speed (the
@@ -3559,7 +3557,6 @@ class FluidSimulation {
   private stepCurrent(p: GpuStepParams) {
     const M = this.CM, S = this.size;
     const cvx = this.cvx, cvy = this.cvy, cpr = this.cpr, cdv = this.cdv;
-    const sm = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
     for (let j = 1; j < M - 1; j++) {
       for (let i = 1; i < M - 1; i++) {
         const k = i + j * M;
@@ -3570,9 +3567,6 @@ class FluidSimulation {
         const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
         const r = Math.sqrt(tx * tx + ty * ty);
         if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
-        const w = 1 - sm(0, 0.5, r);
-        const tw = p.twist * w * w;
-        fx += tw * ty; fy -= tw * tx;
         // Relax toward the flow the forces ask for (see the GPU twin).
         let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
         let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
@@ -5557,10 +5551,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // Layers alternate direction, as they do for the motor, so a flick on the
     // back plate turns the other way and the two shear against each other.
     const dir = l % 2 === 0 ? 1 : -1;
-    // Up to about six-tenths of a turn a second at full strength, which is
-    // sixty times what the rotationSpeed slider can ask for at its top. That
-    // is deliberate: the slider is a drift that keeps a plate alive, and a
-    // flick is meant to be seen.
+    // Up to about six-tenths of a turn a second at full strength, about the
+    // speed the rotationSpeed slider asks for at its top (lookMotorRate) and
+    // twelve times the fastest look's motor: a flick is meant to be seen.
     const top = 2 * Math.PI * 0.6;
     const add = dir * Math.max(0, Math.min(2, strength)) * (settingsRef.current.spinImpulse ?? 0.5) * top;
     if (Number.isFinite(add)) spinVelRef.current[l] = (spinVelRef.current[l] ?? 0) + add;
@@ -7624,6 +7617,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (isActiveRef.current) {
             let rotationMod = 0;
             let dirMod = l % 2 === 0 ? 1 : -1;
+            /*
+              The motor's own way round, which the music does not sway.
+
+              `dirMod` below becomes the music's sway on a look with a band
+              routed to rotation, and it crosses zero: with the band quiet
+              (every feature near 0) it is 0.4 − 1.2 = −0.8, the plate pushed
+              backwards. That is the music's push, and it used to carry the
+              motor with it, which cost nothing while the motor was a
+              thousandth of a radian a second. Since the motor's stir went
+              onto the dish (PLAN 22j) the motor is most of what turns
+              acid-trip (0.31 rad/s), and a quiet bar would have turned that
+              whole dish backwards at a quarter of a radian a second. A motor
+              holds its way round whatever the band does; the band's share
+              keeps its sway exactly as it had it.
+            */
+            let motorWay = dirMod;
 
             if (currentAudioData && currentSettings.audioMappings) {
               const mappedFeature = currentSettings.audioMappings.rotation;
@@ -7652,8 +7661,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               the projectionist's move, one motor under the whole wall.
             */
             const dirChoice = currentSettings.spinDirection ?? 0;
-            if (dirChoice > 0.5) dirMod = Math.abs(dirMod);
-            else if (dirChoice < -0.5) dirMod = -Math.abs(dirMod);
+            if (dirChoice > 0.5) { dirMod = Math.abs(dirMod); motorWay = 1; }
+            else if (dirChoice < -0.5) { dirMod = -Math.abs(dirMod); motorWay = -1; }
 
             /*
               A hand on a dish is never a motor.
@@ -7698,34 +7707,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 seconds of watching never caught one.
               */
               dirMod *= 1 + w * wander * 3.4;
+              motorWay *= 1 + w * wander * 3.4;
             }
 
             /*
-              The top of this dial used to be one turn every thirteen minutes.
-
-              `rotationSpeed` ran `v * 0.01`, so the whole slider reached
-              0.01 rad/s — measured at 0.011 rad over 1.4 s with the dial at
-              0.8, against 1.885 rad/s for a flick. It was a motor that kept a
-              plate alive and could not be seen doing it, and asking for a
-              plate that visibly turns was asking for travel this dial did not
-              have.
-
-              Every shipped look sits at 0.1 or below (most under 0.012), so
-              the bottom tenth is kept exactly as it was — `v * 0.01`, the same
-              arithmetic, the same numbers — and the ninety per cent above it,
-              which nothing has ever used, is where the speed now lives. The
-              two halves meet at 0.001 rad/s, so there is no step at the join,
-              and the square keeps fine control at the slow end of what is
-              finally a visible range: about a turn every fifteen seconds at
-              half, and a flick's worth at the top.
+              The dial as a speed, rad/s (lookMotorRate, lib/turntable.ts,
+              which says why it bends at a tenth).
             */
             // This plate's own motor: `rotationSpeed` is a solver key, so a
             // back plate with a look of its own (§16a), or a patch aimed at
             // one plate, turns that dish at its own speed, not the front's.
             const asked = Math.max(0, patch.layer(l).rotationSpeed ?? 0);
-            const motorRate = asked <= 0.1
-              ? asked * 0.01
-              : 0.001 + Math.pow((asked - 0.1) / 0.9, 2) * 2.4;
+            const motorRate = lookMotorRate(asked);
 
             /*
               How hard the music pushes, kept off by default.
@@ -7739,7 +7732,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const audioDepth = Math.max(0, Math.min(1, currentSettings.spinAudioDepth ?? 0));
 
             // Use realDt only — never timeMultiplier, which spikes with audio energy
-            const rotationSpeed = motorRate + Math.abs(rotationMod) * (0.3 + audioDepth * 26);
+            const musicSpeed = Math.abs(rotationMod) * (0.3 + audioDepth * 26);
             /*
               An angle that accumulates cannot be allowed to go non-finite.
 
@@ -7754,8 +7747,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             /*
               The plate as a flywheel.
 
-              `rotationSpeed` is the motor: the speed the plate is *asked* to
-              hold, and the flywheel relaxes toward it rather than being set
+              `motor` is the motor: the speed the plate is *asked* to
+              hold (the dial's, its way round, and the music's push), and the flywheel relaxes toward it rather than being set
               to it. With the motor at zero — which is most looks — a flick
               spins the plate up and the bed it rests on brings it back to
               rest, which is the whole point.
@@ -7768,7 +7761,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               friction term as well: without it a flicked plate creeps for
               ever at a speed too small to see and too large to be stopped.
             */
-            const motor = rotationSpeed * dirMod;
+            const motor = lookMotor(motorRate, motorWay, musicSpeed, dirMod);
             const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
               * (1 + (patch.layer(l).platePressure ?? 0) * 0.8);
             /*

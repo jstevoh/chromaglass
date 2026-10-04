@@ -736,8 +736,9 @@ export class WebGPUFluid {
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
       ['addCurrent', [VEL], true],
-      // The spun dish (PLAN §22): no look spins at opening, so built behind.
-      ['spinSwirl', [VEL], false],
+      // The spun dish (PLAN §22): waited for when the look's own motor starts
+      // its dish ahead of its liquid at opening (PLAN 22j, opening.ts).
+      ['spinSwirl', [VEL], open.spin],
       ['decayDye', [dye], true],
       ['decayVel', [VEL], true],
       ['packView', ['rgba32uint'], true],
@@ -1130,7 +1131,7 @@ export class WebGPUFluid {
     const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : p.damping; f[17] = p.heatDecay; f[18] = thin ? 1000 : MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
     i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
-    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = p.twist;
+    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
     f[28] = p.rockX; f[29] = p.rockY;
     f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
@@ -1766,8 +1767,8 @@ export class WebGPUFluid {
         glycerine's |∇·(hu)| came to 0.0093 of its flux where without one it
         was 0.0030 (npm run thingap). Here it goes in as the other forces do,
         a speed the liquid is driven to against the glass, and the solve
-        makes it conserve liquid with everything else. The rock, the twist,
-        the buoyancy and the lamp's pull still come from the current's own
+        makes it conserve liquid with everything else. The rock, the
+        buoyancy and the lamp's pull still come from the current's own
         solver (PLAN §18a has their move into this field as forces).
       */
       stage('current', (pass) => {

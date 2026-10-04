@@ -236,7 +236,7 @@ try {
     out.dent = dent;
 
     // 5. Liquid is conserved where the gap changes.
-    const stir = { turbScale: 1, turbDetail: 3, spin: 0.03, plateCurve: 0.8, gapSpring: 0.02, twist: 0.02, currentGrav: 0.02, maxCurrent: 0.05 };
+    const stir = { turbScale: 1, turbDetail: 3, spin: 0.03, plateCurve: 0.8, gapSpring: 0.02, currentGrav: 0.02, maxCurrent: 0.05 };
     const cons = {};
     for (const [name, over] of [['old', stir], ['water', { ...stir, thinGap: 1, gapThickness: 0 }], ['glycerine', { ...stir, thinGap: 1, gapThickness: 1 }]]) {
       await lab.create(N, N);
