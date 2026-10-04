@@ -93,7 +93,7 @@ export interface Prepared {
   /**
    * Each build as it went: its key, and the stretch of the opening's wall
    * time charged to it (from ms from load, for ms): one at a time, from its
-   * ask to its settle; two at a time, from its ask or the last settle,
+   * ask to its settle; several at a time, from its ask or the last settle,
    * whichever was later, so the stretches never overlap (`buildInTurn`).
    * What `npm run startup` holds a stop against: a stop that one build spans
    * end to end is that build's.
@@ -119,8 +119,8 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
 }
 
 /**
- * How many of the opening's builds are in flight at once. Two, and only for
- * the half the show waits for.
+ * How many of the opening's builds are in flight at once. Three, and only
+ * for the half the show waits for.
  *
  * What was reported: the show takes a long time to load. What was measured:
  * on CI's Mac, with the shader cache emptied, the plate sat black on its
@@ -132,12 +132,21 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
  *
  * One at a time was chosen against all at once (above): all at once
  * compiled faster, 0.12 s a pipeline against 0.22, but the page waited
- * behind every queued compile and drew nothing for 8.6 s. Two at a time sits
- * between: the page waits behind at most two, and the compiler has the next
- * one in hand while the GPU runs the last one's first use (`firstUse` in
- * `gpu/kit.ts` waits for the GPU each time), which one at a time left idle
- * on every pipeline. The half built behind the show stays one at a time:
- * there a compile costs the running show frames, and nobody is waiting.
+ * behind every queued compile and drew nothing for 8.6 s. A few at a time
+ * sits between: the page waits behind at most that few, and the compiler
+ * has the next one in hand while the GPU runs the last one's first use
+ * (`firstUse` in `gpu/kit.ts` waits for the GPU each time), which one at a
+ * time left idle on every pipeline.
+ *
+ * Two at a time, on the same Mac (run 37172629037): the fifty in 10.86 s.
+ * The first of them, `fluid/fill`, sits under Chromium starting the GPU
+ * whatever the count (2.5 to 3.7 s); the forty-nine after it took 7.17 s
+ * against 8.93 and 9.17 s one at a time, a fifth less, and the longest
+ * wait for a frame anywhere in the opening was 0.67 s, under the 2 s an
+ * audience would see. Three is the next step toward all at once's 0.12 s,
+ * still waiting behind no more than three compiles (about 0.7 s). The half
+ * built behind the show stays one at a time: there a compile costs the
+ * running show frames, and nobody is waiting.
  *
  * `?lanes=N` (1 to 8) changes it, from the query string alone, so a machine
  * can be timed both ways: `?lanes=1` is the old opening.
@@ -145,7 +154,7 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
 const OPENING_LANES = (() => {
   let asked: number | null = null;
   try { asked = Number(new URLSearchParams(window.location.search).get('lanes') ?? NaN); } catch { /* no window */ }
-  return asked !== null && Number.isInteger(asked) && asked >= 1 && asked <= 8 ? asked : 2;
+  return asked !== null && Number.isInteger(asked) && asked >= 1 && asked <= 8 ? asked : 3;
 })();
 
 /**

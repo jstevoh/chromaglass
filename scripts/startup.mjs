@@ -156,14 +156,18 @@ const OPENINGS_BUDGET_S = Number(process.env.STARTUP_OPENINGS_BUDGET ?? 360);
  * to 1.5 times as long a pipeline as each other, the same pipelines on the
  * same runner a minute apart, and on the three reds the show's compile was
  * the slower by 22 to 31 per cent (12.9 to 16.8 s of it). The page's own
- * part, what the show waited for beyond the old way's list included, was
- * 0.91 to 1.85 s in the show and 1.09 to 2.26 s in the control, and the
- * show's less the control's -0.89 to +0.27 s on every one of the seventy,
- * the three reds +0.01, +0.27 and +0.07 (replayed from what each run
- * printed, each build's time approximated from the total; waitOf). So
- * that is what is held to the old way's, and a second is above every run
- * read: the eighty-seven the show once waited for add forty pipelines of
- * its own, nine seconds of them.
+ * part, what the show waited for beyond the old way's list included, less
+ * the control's read -0.90 to +0.31 s on every one of the seventy (mean
+ * -0.13, sd 0.22), the three reds +0.05, +0.31 and +0.09 (replayed from
+ * what each run printed, a proxy: each build's time approximated from the
+ * total, the control's longest frame stop taken for the one waitOf picks). So that is what is held to the old way's, and a second is
+ * above every run read: the eighty-seven the show once waited for add
+ * forty pipelines of its own, nine seconds of them. The first cut read
+ * the old way's compile off its steps' stop, and went red on #218's
+ * deploy (37167643240) the first time a control froze before its first
+ * step was counted: no stop in its steps, so nothing priced, and the
+ * show's 1.14 s held to the control's whole 19.59 s as "not cold". Its
+ * frames' stop (2.16 to 19.78 s) prices it: 2.0 s its own, the show's 1.14.
  */
 const STEADY_SLACK_S = Number(process.env.STARTUP_STEADY_SLACK ?? 1);
 /**
@@ -739,11 +743,18 @@ async function open(query, looks) {
           // A stop still going when this reads: not moving for good at all.
           return ts.length && now - ts[ts.length - 1] > maxGap * 1000 ? null : from;
         })(),
-        // Every stretch of more than MAX_GAP_S without a step, [from, how
-        // long]: the old way's is its freeze, the GPU compiling on the frame
-        // what its first step asked for, which 1b prices (waitOf).
-        stepStops: (() => {
-          const ts = changes(3);
+        /*
+          Every stretch of more than MAX_GAP_S without an animation frame,
+          [from, how long], in performance.now()'s seconds: the old way's
+          freeze, the GPU compiling on the frame what its first step asked
+          for, which 1b prices (waitOf). Frames and not steps: on the
+          deploy of #218 (run 37167643240) the control's first step asked
+          for its pipelines and the frames stopped from 2.16 s to 19.78 s
+          before the step was ever counted, so its steps never stopped at
+          all, and the steps are only sampled every quarter second besides.
+        */
+        frameStopsRaw: (() => {
+          const ts = window.__startupFrames.filter((t) => t <= now);
           const out = [];
           for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > maxGap * 1000) out.push([ts[i - 1] / 1000, (ts[i] - ts[i - 1]) / 1000]);
           return out;
@@ -976,19 +987,22 @@ const gpuTime = (o) => {
   control's read -4.08 to +1.28 s over the seventy runs). Any further request,
   a device lost and asked for again, is the page's own.
 
-  The old way's compile is the stop in its steps that the builds it made on
-  its frames sat in: each control read asked for them on its first step and
-  stopped once, 0.25 to 0.42 s later, until it was moving for good. A stop
-  begun more than a second after the last of them is not theirs. The show's
+  The old way's compile is the stop in its frames that the builds it made on
+  its frames sat in, from where it began to moving for good: on the seventy
+  runs read it began 0.03 to 0.18 s after the first step, and on #218's
+  deploy before the first step was counted at all (frameStopsRaw). The show's
   is how long each of the same pipelines took to build ahead, one at a time,
   its first build under that name only (`gpu/prepare.ts`). Both include each
   pipeline's first use, which the old way paid on its frames as well
   (`gpu/kit.ts`, firstUse). What the show waited for beyond the old way's
   list is not priced out: it is the show's own wait.
 
-  The steps are sampled every quarter second and the builds timed to the
-  millisecond, so the two own waits are each good to about a quarter second;
-  the seventy runs' differences (-0.89 to +0.27 s) were read with that in.
+  Moving for good is read off steps sampled every quarter second, on both
+  sides, so the two own waits are each good to about a quarter second. The
+  seventy runs' logs printed only each control's longest frame stop and each
+  show's whole build, so the replay of them (-0.90 to +0.31 s) is a proxy
+  for this rule; every run now
+  prints the stop it chose and where it began, to read it against.
 */
 const waitOf = (x, oldWay) => {
   if (x.steadyFrom == null) return null;
@@ -1001,7 +1015,7 @@ const waitOf = (x, oldWay) => {
     .map(([, a, b]) => [a, Math.min(b ?? steady, steady)]).sort((p, q) => p[0] - q[0]);
   let chromium = 0, end = 0;
   for (const [a, b] of asks) { const from = Math.max(a, end); if (b > from) chromium += b - from; end = Math.max(end, b); }
-  let compile = 0, count = 0;
+  let compile = 0, count = 0, at = null, stops = null;
   if (x.prepared) {
     const seen = new Set();
     for (const [key, at, ms] of x.prepared.builds ?? []) {
@@ -1011,19 +1025,50 @@ const waitOf = (x, oldWay) => {
       count++;
     }
   } else {
+    // The stops in its frames that the builds it made on its frames sat in,
+    // summed, each as it reads once Chromium's part is taken off: from the
+    // end of Chromium's requests at the earliest, so a first step built
+    // inside the device's own hold is not counted twice, and only to the
+    // frames' return, the quarter second to the next counted step being the
+    // page's own on both sides. A build sits in the stop that holds it, or,
+    // held by none, in one begun within the second after it (the frame it
+    // was asked for in may close before the GPU stops the next); a stop no
+    // build sat in is not the compile, however long or near the builds, so
+    // a runner's stall is not priced as compile. What is left of a stop
+    // under a quarter second, the steps' own resolution, is not one.
+    //
+    // On this PR's own first Mac run (run 37171671783) the control's frames
+    // stopped through Chromium's handover of the device with its first
+    // build in that stop, then from 4.76 s for 12.10 s while it built the
+    // other 47. The first cut took the first stop alone, which less
+    // Chromium's hold read 0.01 s of compile, and the show's 12.48 s
+    // building the same 48 read as 917 times slower. Summed and not the
+    // longest, so a compile split over two stops is not read as half.
     const built = (x.ledger?.onFrame ?? []).map((e) => e.at / 1000).filter((t) => t <= steady);
-    const first = Math.min(...built), last = Math.max(...built);
-    for (const [at, len] of x.stepStops ?? []) {
-      const from = at + t0;
-      if (!built.length || from >= steady || from > last + 1 || from + len < first) continue;
-      compile += Math.min(len, steady - from);
+    const raw = (x.frameStopsRaw ?? []).filter(([from]) => from < steady);
+    const holds = raw.map(() => 0);
+    for (const t of built) {
+      let i = raw.findIndex(([from, len]) => t >= from && t <= from + len);
+      if (i < 0) i = raw.findIndex(([from]) => from > t && from <= t + 1);
+      if (i >= 0) holds[i]++;
+    }
+    stops = raw.map(([s, len], i) => {
+      const from = Math.max(s, end);
+      const n = Math.max(0, Math.min(s + len, steady) - from);
+      return { from: from - t0, len: n, builds: holds[i], taken: holds[i] > 0 && n >= 0.25 };
+    });
+    for (const st of stops.filter((st) => st.taken)) {
+      compile += st.len;
       count++;
+      at ??= [st.from, st.len];
     }
   }
-  return { steady: steady - t0, chromium, compile, shared: count, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', own: steady - t0 - chromium - compile };
+  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', stops, own: steady - t0 - chromium - compile };
 };
 const sayWait = (w) => (w == null ? 'never moving for good'
-  : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}), ${w.own.toFixed(2)} s the page's own`);
+  : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
+    // Every stop its frames made, so a pick that is wrong reads off the log.
+    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it${st.taken ? ', priced' : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, held = null) => {
   // Whether the page's own thread was busy through a gap (a long task
