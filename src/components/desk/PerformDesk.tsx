@@ -109,6 +109,15 @@ interface PerformDeskProps {
   /** Double-click a row: send it now, without arming it first. */
   onCueNow: (id: string) => void;
   onGo: () => void;
+  /**
+   * The cued look to the back plate alone (PLAN.md §16a), what the back
+   * plate is on (a look's name, or null while it follows the front), and the
+   * way back to twins. Optional so a desk built without a back plate still
+   * compiles; App always passes them.
+   */
+  onGoBackPlate?: () => void;
+  backLook?: string | null;
+  onBackFollowsFront?: () => void;
   onBack: (() => void) | null;
   onBlackout: () => void;
   blackout: boolean;
@@ -391,6 +400,41 @@ export function PerformDesk(p: PerformDeskProps) {
           >
             {next ? `Go to ${next.name}` : 'Nothing cued'}
           </Button>
+          {/* The second projector's Go (§16a): the same cued look, to the
+              back plate only. Quieter than Go, because Go is the one a hand
+              should find in the dark. The row says what the back plate is on,
+              so an operator can tell a back plate following the front from
+              one that was given a look an hour ago. */}
+          {p.onGoBackPlate && (
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                full height={36}
+                onClick={p.onGoBackPlate}
+                disabled={!next || next.kind === 'sequence'}
+                midiKey="action:go-back-plate"
+                testId="go-back-plate-button"
+                title={next ? `Send ${next.name} to the back plate only: its liquid and its colours, over the fade` : 'Cue a look first'}
+              >
+                {next ? 'To Back Plate' : 'Back Plate'}
+              </Button>
+              {p.backLook ? (
+                <Button
+                  height={36}
+                  onClick={() => p.onBackFollowsFront?.()}
+                  midiKey="action:back-follows-front"
+                  testId="back-follows-front-button"
+                  title={`The back plate is on ${p.backLook}. Press to have it follow the front again.`}
+                >
+                  Follow Front
+                </Button>
+              ) : null}
+            </div>
+          )}
+          {p.onGoBackPlate && (
+            <p className="mt-1 truncate text-[12px] text-faint" data-testid="back-plate-on">
+              Back plate: {p.backLook ?? 'follows the front'}
+            </p>
+          )}
           <div className="mt-2 flex gap-2">
             <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} midiKey="action:revert" testId="back-button">Back</Button>
             {/* Inverted while it is on: a blacked-out room is exactly when
@@ -647,7 +691,7 @@ export function PerformDesk(p: PerformDeskProps) {
         */
         <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={RIDES_WIDTH - 8} height={900} testId="mixer-sheet" docked>
           <div className="min-h-0 w-full overflow-y-auto px-3 py-3">
-            <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} onFade={p.takes?.onFade} fading={p.takes?.fading} testId="desk-mixer" />
+            <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} onFade={p.takes?.onFade} fading={p.takes?.fading} backLook={p.onGoBackPlate ? (p.backLook ?? null) : undefined} testId="desk-mixer" />
           </div>
         </Sheet>,
         document.body,

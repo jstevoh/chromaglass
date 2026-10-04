@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const workflow = readFileSync(new URL('../.github/workflows/checks.yml', import.meta.url), 'utf8');
-const measure = /^ {2}measure:\n([\s\S]*?)^ {2}\S/m.exec(workflow)?.[1] ?? '';
+const measure = /^ {2}measure-part:\n([\s\S]*?)^ {2}\S/m.exec(workflow)?.[1] ?? '';
 const fromCi = [...measure.matchAll(/^\s+run: npm run ([\w:-]+)\s*$/gm)].map(m => m[1]);
 // An empty list would be a green run that checked nothing: a renamed job, a
 // reindented file. Say so instead.

@@ -405,6 +405,25 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
+## 17. The back plate's own look
+
+PLAN.md §16a. On the desk, cue a look with two plates in mind (Oil & Water on
+the front, say), press Go, then cue a different one (Boiling Point, Ferro
+Paint) and press **To Back Plate**. Worth looking at:
+
+- over the fade, the back plate's liquid changes how it moves and what colour
+  it pours while the front keeps its own; nothing cuts, and the front does not
+  thin or re-lay;
+- the Mixer's Back Plate row says "On" and the look's name; grading it and
+  moving it in the stack behave as before;
+- a Go on the front (and a cut from the preset strip) leaves the back plate on
+  its look;
+- **Follow Front** fades the back plate back into the front's twin; on a
+  one-plate front look the back plate goes when that fade lands;
+- the same from the phone: the looks sheet's Back plate switch, then a look;
+- whether two looks on two plates read as two projectors or as a muddle is
+  the judgement this is for.
+
 ---
 
 ## 16. The Magnet pulls a pool out in fingers
@@ -543,6 +562,18 @@ the other's to **Back**, on a two-plate look (Classic). Worth looking at:
 - whether two plates on two projectors, overlapping on a wall, read as a light
   show's two projectors is the judgement this is for (16c makes their overlap add).
 
+## 22. Colour between the domes
+
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
+
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
+
 ---
 
 ## 22. The Press on the ferrofluid (PLAN 15d)
@@ -573,9 +604,103 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
+## 23. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
 ---
 
-## 23. Blow's wind (PLAN 15c)
+## 23. The Mac app, on the Mac and on a projector
+
+The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
+server in one Electron app. CI opens the packed app on its Mac runner and
+measures it (`npm run desktop`): offline, a lit plate, OSC, a projector with
+no click (a stand-in second screen), and quitting. What only a real Mac with
+a real projector can say. Get it from Actions → *Mac app* → *Run workflow*,
+or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
+
+- Wi-Fi off before opening it: the show opens and plays, and the music
+  shelf plays its songs;
+- the plate at 60 fps against the same look in Chrome (`?debug`'s
+  `frameMs`): the app is the same Chromium, so a difference is a finding;
+- a projector plugged in *before* opening: the show is on it in full screen
+  with no title bar and no click. Unplug and plug back in: it comes back.
+  Settings → Wall → Ask: the chip is back, and Auto again sends it;
+- the laptop window covered by another app, and minimised: the wall keeps
+  moving, and the sound still moves it;
+- Show → Show Server Details…: the phone's address works, the key is the same
+  after quitting and reopening, and a phone linked before the restart
+  relinks by itself;
+- OSC from Resolume or TouchDesigner to UDP 9000, and Art-Net if the rig is
+  there;
+- the MIDI controller: works with no prompt;
+- the lid closed with the projector as the only screen: the show stays up;
+- the projector's full screen is macOS's own. With System Settings → Desktop
+  & Dock → "Displays have separate Spaces" off, a full-screen window takes
+  every display, so the laptop's screen may go black too. Say which it is on
+  your Mac; if it does, the app should use a borderless window over the
+  projector's screen instead.
+
+## 24. Roy, 1963: the plate printed as a comic (PLAN 21)
+
+Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
+panel: flat red, yellow and blue on white, a black line round every solid shape
+and where two colours meet, and the pale washes round the shapes as even dots.
+
+- are the dots the right size on the wall (32 rows down the picture), and the line
+  heavy enough? Say if either wants to be bigger or smaller;
+- does it hold up moving: do the dots sit still while the colour slides under them,
+  and does the line stay a line, not a flicker, as the shapes move and merge;
+- Ben-Day Dots (Settings → Look) from 0 to 100 % on Roy, and on Classic: is there a
+  point between where it looks better than either end;
+- zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
+  them to grow with the zoom, as the accidental ones did.
+
+## 25. Spinning the dish (PLAN 22)
+
+Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
+lab measured the swirl (`npm run dish`), not the picture. On the Mac:
+
+- the Spin tool (N): drag round the middle. The glass should go round with the
+  pointer, coast when you let go and stop when you hold still. On Classic (thick)
+  the picture should follow almost at once; on a thin look (Viscosity thin) the
+  liquid should visibly trail the glass for a couple of seconds, then catch up;
+- press (P) and hold with a spinning dish: the liquid under the palm should go round
+  with the glass while the rest lags, a whirl round the palm;
+- on Oil & Water, spun: the oil bodies should go round with the glass and the water
+  between them lag, and after a while of spinning hard (Spin Rate 30 or more), the
+  heavy dye should creep outward and the oil in;
+- Auto Spin at Rate 6: a slow, even turn; Reverse Spin turns it back through a stop,
+  not a jump;
+- Auto Spin at Tempo, 16 beats a turn, with music: the dish should turn once every
+  four bars and stay with the music; a flick with the Spin tool knocks it off and
+  it should come back to the beat within a bar or two, not settle somewhere new;
+- the phone: the Spin tool with one finger round the middle, and Auto Spin on the
+  Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
+
+Say if the lag is too long or too short to read as a liquid, and whether the swirl a
+press makes is visible or wants more.
+
+```
+?set=spinAuto=1;spinRpm=12     a dish turning at 12 rev/min, anticlockwise
+?set=spinAuto=2;spinBeats=8    a turn every 8 beats of the music
+```
+
+---
+
+---
+
+## 26. Blow's wind (PLAN 15c)
 
 The Blow drawn across the plate used to wipe a trail out of the colour. Now it
 pushes the colour along and keeps it. On Classic, with a pool laid:

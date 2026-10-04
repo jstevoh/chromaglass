@@ -36,6 +36,12 @@ export type MidiAction =
    * does nothing.
    */
   | 'spin-front' | 'spin-back'
+  /**
+   * Auto Spin from a pad (PLAN §22): turn the dish the other way round, and
+   * step the motor Off, Rate, Tempo. A reverse is a moment in a song, the
+   * drop where the whole wall turns back on itself, and a moment wants a pad.
+   */
+  | 'spin-reverse' | 'spin-auto'
   | 'play-toggle' | 'automate-toggle' | 'overlays-toggle' | 'macro-toggle'
   | 'seq-play-pause' | 'seq-next' | 'seq-prev' | 'seq-stop'
   | 'preset-next' | 'preset-prev'
@@ -56,6 +62,12 @@ export type MidiAction =
    * three moves the desk has: arm the next look, send it, take it back.
    */
   | 'cue-next' | 'cue-prev' | 'go' | 'revert'
+  /**
+   * The back plate's own look (PLAN.md §16a): send the cued look to the back
+   * plate alone, and let it follow the front again. The second projector's
+   * Go, on the pad next to the first.
+   */
+  | 'go-back-plate' | 'back-follows-front'
   /**
    * The tempo, by hand. Four taps on a pad is what every VJ reaches for when
    * the room is fighting the microphone.
@@ -391,12 +403,14 @@ export function targetLabel(t: MidiTarget, presetName?: (id: string) => string |
 export const ACTION_LABELS: Record<MidiAction, string> = {
   'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Randomise',
   'spin-front': 'Spin Front Plate', 'spin-back': 'Spin Back Plate',
+  'spin-reverse': 'Reverse Spin', 'spin-auto': 'Auto Spin: Next',
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
   'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record Performance',
   'scene-toggle': 'Watch the Room',
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
+  'go-back-plate': 'Go to Back Plate', 'back-follows-front': 'Back Plate Follows Front',
   'tap-tempo': 'Tap Tempo', 'tempo-clear': 'Tempo: Listen Again',
   'bank-next': 'Bank +', 'bank-prev': 'Bank \u2212',
   'mix-raise-led': 'Mixer: Raise LED Ring', 'mix-raise-back': 'Mixer: Raise Back Plate',
@@ -453,6 +467,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
+  // The Roy look's own: the plate printed as a comic, a knob to print it by.
+  { key: 'benDay',          label: 'Ben-Day Dots',     min: 0, max: 1 },
   { key: 'lightPlay',       label: 'Light Play',       min: 0, max: 1 },
   { key: 'lampMotion',      label: 'Lamp Motion',      min: 0, max: 1 },
   { key: 'lampHotspot',     label: 'Hot-Spot',         min: 0, max: 1 },
@@ -528,6 +544,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // same reason: a DJ set wants the scenes on the drops, a band that plays
   // through its changes may want them planned.
   { key: 'songFollow',      label: 'Follow the Song',  min: 0, max: 1 },
+  // The dish's own motor (PLAN §22). The Rate is a knob because a turntable's
+  // speed is ridden: slowed into a breakdown, wound up into a drop, and through
+  // zero to turn it back. The mode and the beats a turn are stepped choices.
+  { key: 'spinRpm',         label: 'Spin Rate',        min: -45, max: 45 },
+  { key: 'spinAuto',        label: 'Auto Spin',        min: 0, max: 2, step: 1 },
+  { key: 'spinBeats',       label: 'Beats a Turn',     min: 1, max: 64, step: 1 },
   /*
     The mixer (lib/mixer.ts): each source's level and its four grade controls.
     Learnable because they are what a video mixer's channel strip is, and a

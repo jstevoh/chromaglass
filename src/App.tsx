@@ -26,9 +26,9 @@ import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DronePa
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
-import { targetLook, evolvedLook, lookStep, roomMoved, roomBack, RIG_KEYS, DEFAULT_FADE_SECONDS, type RoomMove } from './lib/lookFade';
+import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
@@ -88,7 +88,7 @@ import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
 import { blendKey, nextBlend, raiseInMix, MIX_SOURCE_INFO, type MixMover, type MixSource } from './lib/mixer';
-import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
+import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
@@ -116,8 +116,8 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
 /** The letter printed on each tool, and the tool it picks. */
-const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet'> = {
-  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet',
+const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin'> = {
+  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet', n: 'spin',
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
@@ -578,7 +578,7 @@ export default function App() {
     setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
   }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet'>('dropper');
+  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
   // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
@@ -1025,11 +1025,31 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /*
+    The back plate's own look (PLAN.md §16a), or null while it follows the
+    front. Show state, not a setting: it is which dish the second projector
+    has on it tonight, the way the Mixer's order is the rig's, and a saved
+    look does not carry it. The visualizer holds the fade and the dyes; this
+    is what the desk, the phone and the Mixer's back row show. `leaving` is a
+    Follow the front still fading: the back plate stays on the stage until it
+    lands, so on a one-plate front look it fades into the front's settings
+    instead of vanishing on the press.
+  */
+  const [backLook, setBackLook] = useState<{ id: string; name: string; leaving?: boolean } | null>(null);
+  /** The name the desk, the phone and the Mixer show for the back plate: none while it follows the front or is fading back to it. */
+  const backLookName = backLook && !backLook.leaving ? backLook.name : null;
+  /**
+   * The plates on the stage: the look's count, and never fewer than two while
+   * the back plate has a look of its own. What the layer pickers offer, so the
+   * back plate a look was sent to can be picked and painted on.
+   */
+  const stageLayers = Math.max(1, settings.layerCount ?? 1, backLook ? 2 : 1);
+
   useEffect(() => {
-    if (activeLayer >= settings.layerCount) {
-      setActiveLayer(Math.max(0, settings.layerCount - 1));
+    if (activeLayer >= stageLayers) {
+      setActiveLayer(Math.max(0, stageLayers - 1));
     }
-  }, [settings.layerCount, activeLayer]);
+  }, [stageLayers, activeLayer]);
 
   const [calibrateNonce, setCalibrateNonce] = useState(0);
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
@@ -1342,10 +1362,13 @@ export default function App() {
 
   // Overlay music-driven parameters onto the user's settings for rendering only
   // (the settings state itself is untouched, so preset detection keeps working).
-  const effectiveSettings = useMemo(
-    () => musicIntel.overrides ? { ...settings, ...musicIntel.overrides } : settings,
-    [settings, musicIntel.overrides],
-  );
+  // And a back plate with a look of its own is on the stage whatever the front
+  // look's plate count says: a Go on the front to a one-plate look would
+  // otherwise drop the plate someone had just sent a look to.
+  const effectiveSettings = useMemo(() => {
+    const s = musicIntel.overrides ? { ...settings, ...musicIntel.overrides } : settings;
+    return (s.layerCount ?? 1) < stageLayers ? { ...s, layerCount: stageLayers } : s;
+  }, [settings, musicIntel.overrides, stageLayers]);
 
   // Pin the visualizer's palette to the track's harmony (with evolution drift)
   // — unless the user has locked a palette themselves.
@@ -1397,8 +1420,17 @@ export default function App() {
   */
   const rowFades = useRef(new RowFades()).current;
   const [rowFading, setRowFading] = useState<Partial<Record<MixSource, FadeWay>>>({});
+  /*
+    And when each setting was last written from outside a look fade, for a
+    Back to leave what was written after it began (lib/lookFade's backStep):
+    a Back fades the room's levels back, and a fader ridden while it runs is
+    the later hand.
+  */
+  const laterWrites = useRef(new LaterWrites()).current;
   const handOnLevels = (keys: Iterable<string>) => {
-    if (rowFades.handOn(keys)) setRowFading(rowFades.running());
+    const list = [...keys];
+    laterWrites.mark(list, showNow());
+    if (rowFades.handOn(list)) setRowFading(rowFades.running());
   };
   /*
     A new look sets the levels that belong to a look, the gel wheel's and the
@@ -1407,7 +1439,9 @@ export default function App() {
     walks writing one setting would fight a tick at a time.
   */
   const lookTakesLevels = () => {
-    handOnLevels(LOOK_LEVEL_KEYS);
+    // Not handOnLevels: the look is not a later hand, and a Back must not
+    // hold the gel and the lumia where they are because its own fade began.
+    if (rowFades.handOn(LOOK_LEVEL_KEYS)) setRowFading(rowFades.running());
     rowFades.forget(['gel', 'lumia']);
   };
 
@@ -1752,6 +1786,7 @@ export default function App() {
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
     ride.write(String(key), value);
     setDocDirty(true);
+    laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
     if (rideFrame.current) return;
     rideFrame.current = requestAnimationFrame(() => {
@@ -1817,7 +1852,7 @@ export default function App() {
   // the fade would arrive in three steps.)
   const lookFadeRef = useRef<ShowIntervalHandle | null>(null);
   /** The look before the last Go, so one step back is always available. */
-  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings; room?: RoomMove } | null>(null);
+  const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
   /*
     The phone (components/phone/PhoneStage.tsx, lib/phone.ts): a touch screen
@@ -2058,26 +2093,34 @@ export default function App() {
     tick keeps them as they are now, and keeps a row taken from its button
     since the Go began as it is too (lib/lookFade's lookStep says why).
   */
-  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number) => {
+  /*
+    A Back (`back`) is the one fade that puts the room back too: it is undo,
+    and the owner asked for it to go fully back (lib/lookFade's backStep).
+    What a hand wrote after the Back began is left where the hand put it,
+    and so is whatever `hold` names (the dimmer, while a blackout is on).
+  */
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
     const from = settingsRef.current;
-    if (seconds <= 0) { setSettings(prev => lookStep(from, to, 1, prev)); setFading(0); return; }
+    const step = lookFadeStep(back);
+    if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
     const ms = seconds * 1000;
     lookFadeRef.current = showInterval(() => {
       const t = Math.min(1, (showNow() - started) / ms);
       // A take pressed since the Go began (the gel's or the lumia's, whose
-      // level the look also sets) is left to its button, to the Go's end.
-      const taken = rowFades.levelsTakenSince(started);
+      // level the look also sets) is left to its button, to the Go's end;
+      // and on a Back, anything else written since it began.
+      const taken = back ? [...rowFades.levelsTakenSince(started), ...laterWrites.since(started), ...hold] : rowFades.levelsTakenSince(started);
       if (t >= 1) {
         if (lookFadeRef.current) clearShowInterval(lookFadeRef.current);
         lookFadeRef.current = null;
-        setSettings(prev => lookStep(from, to, 1, prev, taken));
+        setSettings(prev => step(from, to, 1, prev, taken));
         setFading(0);
         return;
       }
-      setSettings(prev => lookStep(from, to, t, prev, taken));
+      setSettings(prev => step(from, to, t, prev, taken));
       setFading(t);
     }, 33, 'look-fade');
     // lookTakesLevels closes over nothing that changes: the one RowFades and
@@ -2120,6 +2163,56 @@ export default function App() {
     if (look) sendLook(look, seconds);
   }, [fadeSeconds, sendLook]);
 
+  /*
+    Go to Back Plate (PLAN.md §16a): the cued look to the back plate alone.
+
+    The same look a Go would send, resolved over the live settings the same
+    way (`targetLook`), handed to the visualizer, which takes from it only
+    what the back plate owns: its solver settings and its dyes. The front
+    plate, the picture and the cue list's live row are untouched; the cue is
+    spent, as a Go spends it. A cued sequence is a whole show, not a dish, so
+    it has no back-plate Go.
+  */
+  const backLeavingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendBack = useCallback((next: ArmedLook | null, seconds: number) => {
+    if (backLeavingTimer.current) { clearTimeout(backLeavingTimer.current); backLeavingTimer.current = null; }
+    if (!next) {
+      visualizerRef.current?.sendBack(null, null, seconds);
+      // Kept on the stage while it fades back (see `leaving`), then let go.
+      setBackLook(b => (b && seconds > 0 ? { ...b, leaving: true } : null));
+      if (seconds > 0) backLeavingTimer.current = setTimeout(() => { backLeavingTimer.current = null; setBackLook(null); }, seconds * 1000);
+      return;
+    }
+    if (next.sequence) return;
+    const up = isUserPresetId(next.id) ? userPresetsRef.current.find(p => p.id === next.id) : null;
+    visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), seconds, next.name, up
+      ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null }
+      : undefined);
+    setBackLook({ id: next.id, name: next.name });
+    setCued(null);
+  }, []);
+
+  const goBackPlate = useCallback((seconds?: number) => {
+    if (cued && !cued.sequence) sendBack(cued, seconds ?? cued.fade ?? fadeSeconds);
+  }, [cued, fadeSeconds, sendBack]);
+
+  /** The same, for a look picked straight from a list (the phone's looks sheet). */
+  const backLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
+    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
+    const built = PRESETS.find(p => p.id === presetId);
+    const look = up ? { id: presetId, name: up.name, settings: up.settings }
+      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+    if (look) sendBack(look, seconds);
+  }, [fadeSeconds, sendBack]);
+
+  const backFollowsFront = useCallback(() => sendBack(null, fadeSeconds), [fadeSeconds, sendBack]);
+  /** The visualizer let go of the back look on its own (a render began or ended). */
+  const backLookCleared = useCallback(() => {
+    if (backLeavingTimer.current) { clearTimeout(backLeavingTimer.current); backLeavingTimer.current = null; }
+    setBackLook(null);
+  }, []);
+  useEffect(() => () => { if (backLeavingTimer.current) clearTimeout(backLeavingTimer.current); }, []);
+
   /** One step back, at the same fade. The fastest fix mid-show is undo. */
   const revertLook = useCallback(() => {
     const prev = previousLook.current;
@@ -2127,13 +2220,15 @@ export default function App() {
     previousLook.current = null;
     if (prev.id) adoptPreset(prev.id);
     visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
-    fadeSettingsTo(prev.settings, fadeSeconds);
-    // The room the change itself moved (Lucky's microphone roll), where the
-    // hand has not moved it since; the fade keeps the room as it is.
-    if (prev.room) {
-      const back = roomBack(prev.room, settingsRef.current);
-      if (Object.keys(back).length) setSettings(s => ({ ...s, ...back }));
-    }
+    // A take still walking stops where it is: the Back puts every row's level
+    // back and was pressed later, and two walks writing one setting would
+    // fight a tick at a time. Every row, not only the ones whose level moved
+    // since the Go: the Back writes them all, a row at its old level included.
+    if (rowFades.handOn(FADE_LEVEL_KEYS)) setRowFading(rowFades.running());
+    // A blackout on stays on: a Back that faded the dimmer up would light the
+    // wall with the Blackout button still lit.
+    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
   useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
@@ -2359,7 +2454,7 @@ export default function App() {
 
   const triggerLucky = () => {
     const next = luckyLook(settings, liquidTypes.map(t => t.color));
-    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current, room: roomMoved(settingsRef.current, next) };
+    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
     // A look coming in, like a Go's: a take on the gel or the lumia stops.
     lookTakesLevels();
     setSettings(next);
@@ -2684,6 +2779,7 @@ export default function App() {
       const k = Math.min(1, (showNow() - began) / ms);
       const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       setSettings(prev => ({ ...prev, dimmer: from + (to - from) * e }));
+      laterWrites.mark(['dimmer'], showNow());
       if (k >= 1 && fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
     }, 16, 'dimmer-fade');
   }, []);
@@ -2844,12 +2940,14 @@ export default function App() {
   */
   const raiseMix = (id: MixMover) => {
     setSettings(prev => ({ ...prev, mixOrder: raiseInMix(prev.mixOrder, id) }));
+    laterWrites.mark(['mixOrder'], showNow());
     setDocDirty(true);
   };
   /** A row's blend, one along (lib/mixer.ts, nextBlend), from the state being updated for the same reason. */
   const stepBlend = (id: MixMover) => {
     const key = blendKey(id);
     setSettings(prev => ({ ...prev, [key]: nextBlend(prev[key]) }));
+    laterWrites.mark([String(key)], showNow());
     setDocDirty(true);
   };
   /*
@@ -2866,6 +2964,25 @@ export default function App() {
     const bar = visualizerRef.current?.songShape().bar;
     return fadeTempo(tempoRef.current?.bpm ?? 0, bar?.period ?? 0, bar?.beatConfidence ?? 0);
   };
+  /*
+    The check's window on the takes (`npm run phone`): when the page has put an
+    array at `window.__cgFadeLog`, every level a take writes is pushed there
+    with the moment it was worked out, on the page's own clock. The check used
+    to judge the fade's steps from the level slider, but a slider shows what
+    React last rendered, and on a loaded page a render lands late and the next
+    one catches up: a fade moving at the curve's own speed read as a jump (the
+    numbers are in scripts/phone.mjs). The moment each level is worked out is
+    the time its step can fairly be held to, and the gap between them is
+    where a slowed timer shows. It is `performance.now()`, not the `now` the
+    fade was handed, so a fade handed the wrong time still shows as the jump
+    it is. Nothing is kept when no array is there, as in every show.
+  */
+  const traceFade = (levels: Partial<Record<MixSource, number>>) => {
+    const log = (window as unknown as { __cgFadeLog?: unknown }).__cgFadeLog;
+    if (!Array.isArray(log)) return;
+    const at = performance.now();
+    for (const [row, v] of Object.entries(levels)) log.push([at, row, v]);
+  };
   const fadeRow = (id: MixSource) => {
     const cur = settingsRef.current as unknown as Record<string, unknown>;
     const levelKey = String(MIX_SOURCE_INFO[id].level);
@@ -2874,12 +2991,14 @@ export default function App() {
     const glide = glidesRef.current.get(levelKey);
     if (glide) { clearShowInterval(glide); glidesRef.current.delete(levelKey); }
     const first = rowFades.press(id, level, barsToMs(fadeBarsOf(settingsRef.current, id), fadeBpm()), showNow());
+    traceFade({ [id]: first });
     if (first !== level) setSettings(prev => ({ ...prev, [levelKey]: first }));
     setDocDirty(true);
     setRowFading(rowFades.running());
     if (rowFadeTimer.current || !rowFades.isFading(id)) return;
     rowFadeTimer.current = showInterval(() => {
       const levels = rowFades.step(showNow());
+      traceFade(levels);
       const patch = Object.fromEntries(Object.entries(levels).map(([row, v]) => [String(MIX_SOURCE_INFO[row as MixSource].level), v]));
       if (Object.keys(patch).length) setSettings(prev => ({ ...prev, ...patch }));
       const running = rowFades.running();
@@ -2895,6 +3014,8 @@ export default function App() {
       case 'seed':            setSeedCount(prev => prev + 1); break;
       case 'spin-front':      flickPlate(0); break;
       case 'spin-back':       flickPlate(1); break;
+      case 'spin-reverse':    updateSettings({ spinRpm: -(settingsRef.current.spinRpm ?? 6) }); break;
+      case 'spin-auto':       updateSettings({ spinAuto: (Math.round(settingsRef.current.spinAuto ?? 0) + 1) % 3 }); break;
       case 'clear':           setClearTrigger(prev => prev + 1); break;
       case 'drain':           setDrainTrigger(prev => prev + 1); break;
       case 'lucky':           triggerLucky(); break;
@@ -2924,6 +3045,8 @@ export default function App() {
       // only from this laptop's keyboard.
       case 'go':              goLook(); break;
       case 'revert':          revertLook(); break;
+      case 'go-back-plate':   goBackPlate(); break;
+      case 'back-follows-front': backFollowsFront(); break;
       case 'cue-next':        stepCue(1); break;
       case 'cue-prev':        stepCue(-1); break;
       case 'tap-tempo':       tapTempo(); break;
@@ -3095,6 +3218,10 @@ export default function App() {
         case 'finger':
           visualizerRef.current?.applyGesture({ tool: 'finger', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
           break;
+        // The pad's finger on the dish (PLAN §22): the dish turns under it.
+        case 'spin':
+          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount, id: message.id });
+          break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
           break;
@@ -3141,6 +3268,9 @@ export default function App() {
       const k = Math.min(1, (showNow() - started) / (seconds * 1000));
       const e = k * k * (3 - 2 * k);
       setSettings(p => ({ ...p, [key]: k >= 1 ? to : from + (to - from) * e, ...(k >= 1 ? atEnd ?? {} : {}) }));
+      // Every tick, not only the first: a glide still walking when a Back is
+      // pressed is the later writer, and the Back leaves it be.
+      laterWrites.mark([String(key), ...(k >= 1 ? Object.keys(atEnd ?? {}) : [])], showNow());
       if (k >= 1) { clearShowInterval(timer); timers.delete(String(key)); }
     }, 33, `glide:${String(key)}`);
     timers.set(String(key), timer);
@@ -3235,6 +3365,7 @@ export default function App() {
       glidesRef.current.clear();
       if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
       rowFades.clear();
+      laterWrites.clear();
       setRowFading({});
       driftGlide.current.clear();
       aimTick.current = 0;
@@ -3257,6 +3388,7 @@ export default function App() {
         glidesRef.current.clear();
         if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
         rowFades.clear();
+        laterWrites.clear();
         renderHoldRef.current = false;
         flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); setRowFading({}); });
         driftAnchor.current = kept.anchor;
@@ -3402,7 +3534,7 @@ export default function App() {
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
     action: runAction,
     cycleDye: (dir) => selectDye((selectedDyeIndex < 0 ? 0 : selectedDyeIndex) + dir),
-    cycleLayer: (dir) => setActiveLayer(l => Math.max(0, Math.min(settings.layerCount - 1, l + dir))),
+    cycleLayer: (dir) => setActiveLayer(l => Math.max(0, Math.min(stageLayers - 1, l + dir))),
   });
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
@@ -3678,6 +3810,7 @@ export default function App() {
     <div className={`relative w-full ${phone ? 'h-[100dvh]' : 'h-screen'} bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
         ref={visualizerRef}
+        onBackLookCleared={backLookCleared}
         audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         onAim={aimMacro}
@@ -4094,6 +4227,7 @@ export default function App() {
                       { id: 'press' as const, icon: Hand, label: 'Press' },
                       { id: 'finger' as const, icon: Fingerprint, label: 'Finger' },
                       { id: 'magnet' as const, icon: Magnet, label: 'Magnet' },
+                      { id: 'spin' as const, icon: RotateCw, label: 'Spin' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
                         key={id}
@@ -4320,7 +4454,7 @@ export default function App() {
                     <span className="text-[8px] uppercase tracking-widest font-bold opacity-40">Layers</span>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    {Array.from({ length: settings.layerCount }).map((_, idx) => (
+                    {Array.from({ length: stageLayers }).map((_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setActiveLayer(idx)}
@@ -4438,6 +4572,9 @@ export default function App() {
               if (pool.length) goLookNow(stream('phone.look').pick(pool).id);
             }}
             onRevert={previousLook.current ? revertLook : null}
+            onBackLook={(id) => backLookNow(id)}
+            backLook={backLookName}
+            onBackFollowsFront={backFollowsFront}
             tool={activeTool}
             onTool={setActiveTool}
             amount={toolAmount}
@@ -4457,12 +4594,13 @@ export default function App() {
             onEvolve={setIsAutomated}
             evolveSpeed={settings.automateRate ?? 0}
             onEvolveSpeed={(v) => updateSettings({ automateRate: v })}
-            layers={settings.layerCount}
+            layers={stageLayers}
             activeLayer={activeLayer}
             onLayer={setActiveLayer}
             onClear={() => setClearTrigger(n => n + 1)}
             onDrain={() => setDrainTrigger(n => n + 1)}
             onSpin={() => flickPlate(activeLayer)}
+            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
@@ -4501,9 +4639,11 @@ export default function App() {
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
             fingering={settings.fingering ?? 0}
             onFingering={(v) => updateSettings({ fingering: v })}
+            benDay={settings.benDay ?? 0}
+            onBenDay={(v) => updateSettings({ benDay: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
-            mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes }}
+            mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
@@ -4578,6 +4718,7 @@ export default function App() {
         {showSettings && (
           <SettingsPanel
             mixTakes={mixTakes}
+            backLook={backLookName}
             songDetection={musicSettings.enabled}
             onSongDetection={(on) => updateMusicSettings({ enabled: on })}
             settings={settings}
@@ -4995,6 +5136,9 @@ export default function App() {
             if (look) sendLook(look, look.fade ?? fadeSeconds);
           }}
           onGo={() => goLook()}
+          onGoBackPlate={() => goBackPlate()}
+          backLook={backLookName}
+          onBackFollowsFront={backFollowsFront}
           onBack={previousLook.current ? revertLook : null}
           onBlackout={toggleBlackout}
           blackout={blackout}
@@ -5016,7 +5160,7 @@ export default function App() {
           onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
-          layers={Math.max(1, settings.layerCount)}
+          layers={stageLayers}
           onLayer={setActiveLayer}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
@@ -5100,7 +5244,7 @@ export default function App() {
           amountOf={(t: string) => toolAmounts[t] ?? 1}
           onAmountFor={setToolAmount}
           layer={activeLayer}
-          layers={Math.max(1, settings.layerCount)}
+          layers={stageLayers}
           onLayer={setActiveLayer}
           // Two: the compositor draws the lead plate and one behind it, and a
           // third was simulated in full — a whole solver's GPU time — and never shown.

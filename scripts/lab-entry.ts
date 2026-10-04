@@ -6,6 +6,8 @@ import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
+import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
+import { normalizeOutput } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
@@ -137,7 +139,15 @@ const api = {
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
   },
-  async step(n: number, over: Partial<GpuStepParams> = {}) {
+  /*
+    `flushed` says the first of these steps follows a flush, as the app's
+    loop says it (`gpu.step(p, applied)`): the gap then takes its press and
+    its spring in the one update the flush ran, not a second spring-only
+    update in the step as well. Every check before `npm run heldpress`
+    stepped without it, and a press held step after step then had its gap
+    sprung twice a step, a local opening the app never has.
+  */
+  async step(n: number, over: Partial<GpuStepParams> = {}, flushed = false) {
     const l = lab!;
     // The app runs the old solver until Thin Gap's pipelines are built
     // (prepareThinGap); the lab measures the thin gap from its first step.
@@ -145,7 +155,7 @@ const api = {
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
-      l.solver.step(p, false);
+      l.solver.step(p, flushed && k === 0);
       l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
@@ -163,6 +173,8 @@ const api = {
     // is the default there, not off.
     return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id) };
   },
+  /** Every shipped look's id, for a check that asks something of all of them. */
+  lookIds() { return PRESETS.map(p => p.id); },
   /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */
   pour(shape: PhasePourShape, scale: number) {
     const drops = phasePour(shape, scale);
@@ -191,6 +203,8 @@ const api = {
   },
   async field(which: 'dye' | 'vel' | 'oilDye') { return Array.from(await lab!.solver.readField(which)); },
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /** The spun dish's swirl on its own grid (readSwirl): `npm run dish`. */
+  async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
   /** The oil's half of a press, through the app's own function (squeezeOut): mirror cells, N across. */
@@ -248,6 +262,62 @@ const api = {
   WebGPUPlate,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
+  /**
+   * The projector's pass alone (gpu/output.ts), on pictures made to order:
+   * each source a ramp from one colour to another, left to right, or top to
+   * bottom with a third entry 'y' (a flat colour when the two are the same),
+   * `cfg` the output config as Settings stores it. For `npm run beams`
+   * (PLAN.md §16c): with a picture whose every pixel is known, what two
+   * beams give where they cross can be read against what each gives alone.
+   *
+   * The pictures are written the way the app's passes leave the frame for
+   * the projector, rows the other way up from a canvas (the display's
+   * FLIP_Y), so the projection of a whole picture is the picture upright:
+   * the ramp's first colour at the top. Gives back the pixels and how many
+   * quads the pass drew, so a check can tell its surfaces from the full
+   * frame the pass falls back to when there are none.
+   */
+  async projector(size: number, cfg: unknown, pictures: Partial<Record<'wall' | 'front' | 'back' | 'film', [number[], number[], 'y'?]>>) {
+    const device = lab!.solver['device'] as GPUDevice;
+    const out = new WebGPUOutput(device, 'rgba8unorm');
+    const quads = fillOutputUniforms(out.pack, normalizeOutput(cfg), size, size);
+    const enc = device.createCommandEncoder();
+    const ramp = (view: GPUTextureView, [a, b, axis]: [number[], number[], 'y'?]) => {
+      const v = (c: number[]) => `vec3f(${c.map(x => x.toFixed(6)).join(', ')})`;
+      const module = device.createShaderModule({ code: `
+        @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+          let p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+          return vec4f(p[i], 0.0, 1.0);
+        }
+        @fragment fn fs(@builtin(position) at: vec4f) -> @location(0) vec4f {
+          return vec4f(mix(${v(a)}, ${v(b)}, ${axis === 'y' ? `1.0 - at.y / ${size.toFixed(1)}` : `at.x / ${size.toFixed(1)}`}), 1.0);
+        }` });
+      const pipe = device.createRenderPipeline({
+        layout: 'auto', vertex: { module, entryPoint: 'vs' },
+        fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+        primitive: { topology: 'triangle-list' },
+      });
+      const pass = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
+      pass.setPipeline(pipe); pass.draw(3); pass.end();
+    };
+    ramp(out.sceneView(size, size), pictures.wall ?? [[0, 0, 0], [0, 0, 0]]);
+    for (const kind of ['front', 'back', 'film'] as const) {
+      const p = pictures[kind];
+      if (p) ramp(out.sourceView(kind, size, size), p);
+    }
+    const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+    out.draw(enc, target.createView(), quads);
+    const row = Math.ceil(size * 4 / 256) * 256;
+    const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
+    device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const src = new Uint8Array(buf.getMappedRange());
+    const px = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) px.set(src.subarray(y * row, y * row + size * 4), y * size * 4);
+    buf.unmap(); buf.destroy(); target.destroy(); out.dispose();
+    return { pixels: Array.from(px), quads };
+  },
   /**
    * The finished picture of the lab's plate, as the app would draw it with
    * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is

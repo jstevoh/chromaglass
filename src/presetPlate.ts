@@ -52,6 +52,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
+  'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 16, 17],       // the colours a Super 8 cartridge loved
   'clock-glass':        [23, 7, 20],            // the second projector: emerald, purple, cobalt
   'oil-on-water':       [0, 1],
@@ -116,6 +117,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
   'ferro-maze':         ['pour'],
   'ferro-paint':        ['drop', 'pour'],
+  'roy':                ['pour', 'drop'],         // big flat shapes, and a drop now and then to break one
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
 };
@@ -213,6 +215,9 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'magnet-garden':      ['water', 'oil'],
   'ferro-maze':         ['water', 'oil'],
   'ferro-paint':        ['water', 'oil', 'water'],
+  // Poster, 1969's pair: two dyes that hold their own edge and refuse to
+  // blend into a third, so a shape stays one ink with a line round it.
+  'roy':                ['milk', 'ink'],
   'home-movie':         ['water', 'water', 'soap'],
   // Syrup finds the low point of a curved glass, which is the middle.
   'clock-glass':        ['water', 'syrup'],

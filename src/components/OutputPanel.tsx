@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
 import {
-  DEFAULT_OUTPUT, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_SHAPES, SURFACE_SOURCES,
+  DEFAULT_OUTPUT, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
-  type OutputConfig, type Surface, type SurfaceShape, type SurfaceSource,
+  type OutputConfig, type Surface, type SurfaceBlend, type SurfaceShape, type SurfaceSource,
 } from '../lib/outputConfig';
 
 /**
@@ -41,6 +41,12 @@ const SOURCE_HINTS: Record<SurfaceSource, string> = {
   front: 'The front plate alone, lit as the Mixer lights it, without the back plate or the film',
   back: 'The back plate alone, over the bare lamp: a second projector with only the back dish in it',
   film: 'The film alone, without the plates or the lamp',
+};
+
+const BLEND_LABELS: Record<SurfaceBlend, string> = { over: 'Over', add: 'Add' };
+const BLEND_HINTS: Record<SurfaceBlend, string> = {
+  over: 'Laid over what is under it, as a slide over a slide',
+  add: 'Added to what is under it, as a second projector\'s beam: brighter where different pictures cross, and blended without a seam where two carry the same picture',
 };
 
 /**
@@ -574,6 +580,25 @@ export function MappingPanel({ output, onChange }: {
                   data-testid={`surface-source-${k}`}
                 >
                   {SOURCE_LABELS[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* How its light meets the wall (§16c): over, or added as a beam. */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[12px] text-white/40">Light</span>
+            <div className="flex flex-1 gap-1" role="radiogroup" aria-label="How this surface's light meets the wall" data-testid="surface-blend">
+              {SURFACE_BLENDS.map(k => (
+                <button
+                  key={k}
+                  role="radio"
+                  aria-checked={active.blend === k}
+                  onClick={() => patchSurface(active.id, { blend: k })}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.blend === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  title={BLEND_HINTS[k]}
+                  data-testid={`surface-blend-${k}`}
+                >
+                  {BLEND_LABELS[k]}
                 </button>
               ))}
             </div>

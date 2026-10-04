@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — spin the plate
+
+- **The Spin tool** (N on the desks, a tool on the phone's dock and the
+  remote's pad) turns the dish under the hand: drag round the middle and
+  the glass goes round with the pointer, let go and it coasts on the
+  plate's drag, hold still and it stops.
+- **Auto Spin**: Off, **Rate** (rev/min, ±45, signed for the way round) or
+  **Tempo** (a turn every 1 to 64 beats, locked to the beat so a knock is
+  taken back), with **Reverse Spin**. On the sheet, the phone's Play sheet,
+  the remote, MIDI (and a pad for Reverse and Auto Spin: Next) and the
+  desks. Off by default, so every look is as it was.
+- **The liquid follows the glass as a real liquid does**: it lags by the
+  drag time h²/12ν of the gap (water 3 s, a thick liquid 0.15 s, oil
+  0.06 s), a pressed palm or a domed plate grips it where the gap is tight,
+  and spun, dense dye is flung outward and oil drawn in. `npm run dish`
+  (the lab) and `npm run turntable` (node).
+- **The phone's landscape dock is one row from 860 px** (was 800): the
+  tools' side is eleven buttons now, and at 844 one row put them at 47 px.
+  The desks' tool row wraps inside its column at 1024 rather than running
+  under the rides.
+
+### Added — beams that add, and tiles with no seam
+
+- A mapped surface's **Light** can be **Add**, a projector's beam, instead of
+  laid over. Two beams of different pictures add where they cross; two
+  carrying one picture blend across their overlap so the join shows no seam.
+  Surfaces stay laid over unless set, so a saved rig looks as it did. On the
+  phone: More, Settings, Mapping.
+
+### Added — the back plate's own look
+
+- **To Back Plate**: a cued look can be sent to the back plate alone, from the
+  desk (under Go), the phone's looks sheet (a Whole plate / Back plate switch)
+  or a controller. The back plate's liquid moves as that look says and pours
+  that look's colours, liquids and pour styles, while the front plate and how
+  both are drawn stay as they were. **Follow Front** fades it back to the
+  front's twin. The Mixer's Back Plate row says which look it is on.
+
+### Changed — Back goes fully back
+
+- **Back puts the room back too**: the film's and the logo's levels, the
+  dimmer, the Mixer's levels and grades and the microphone's gain fade back
+  to where they were before the Go, with the look, over the same fade. It
+  leaves the machine's setup (the grid, the microphone's latency, the room
+  camera's reading, the set's pacing, where the logo sits, each row's take
+  time). A fader, a Mixer pad or a song's glide moved while the Back runs
+  stays where it is put, and a blackout stays black. Every take still
+  walking stops. Since the Mixer's step 4, Back had kept the room as it was.
+
 ### Changed — the Press on the ferrofluid (PLAN 15d)
 
 - **With Thin Gap on, a pressed pool of ferrofluid stays black and spreads**
@@ -57,6 +106,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pressed disc carries what Darcy says to 5% for water (a mobility without
   the drag would be 27% high); ∇·(hu) is 0.0004 of the flux for water and
   0.0042 for glycerine against the old solver's 0.028.
+
+### Added — Roy, 1963, and Ben-Day Dots
+
+- **Roy, 1963**, a look after Roy Lichtenstein: big flat pools of red,
+  yellow and blue on a white light table, printed as a comic panel.
+- **Ben-Day Dots** (`benDay`, Settings → Look; MIDI, the desks, the remote,
+  and the phone's Looks sheet while a look prints): the finished picture
+  read as a printer's inks. Dark is black; anything lit is white paper with
+  the nearest of three inks on it; a pale wash is that ink in even dots on a
+  45° screen fixed to the picture; a strong one is the flat ink; the front
+  plate's shapes and the seams between inks are outlined in black. 0 by
+  default, so no other look changes; Lucky rolls it back to 0 and Evolve
+  leaves it alone.
+- `npm run benday` measures it on a lab plate (a wash prints 242 dots of
+  256 on the lattice, one size to 2.7%, still while the plate turns; a pool
+  is one flat ink, outlined all the way round), in the macOS plate shard.
 
 ### Changed — the phone's dock on small landscape phones, and the top of the plate
 
