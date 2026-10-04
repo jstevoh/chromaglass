@@ -1120,13 +1120,23 @@ async function instrumentsControl() {
     const each = ['after a fetch', 'after a Blob'].map((what, i) => {
       const t = x.busy[i];
       if (t == null) return { what, ok: false, say: `${what}: never ran` };
-      const ownMs = read.settledStarts.filter(([a]) => Math.abs(a * 1000 - t) < 100).reduce((n, [, len]) => n + len * 1000, 0);
+      /*
+        The page's own either way it can be seen: a silent stretch kept as
+        its code after an await, or a long task. Chromium on CI's Mac
+        reported this page's code after each await as a long task, so its
+        first run read neither (run 37170402977, "the page's own 0.00 s,
+        held 0.00 s, named as a script 0.70 s"); the cloud's reported none.
+      */
+      const over = (a, b) => Math.max(0, Math.min(t + 700, b) - Math.max(t, a));
+      const longMs = x.raw.long.reduce((n, [a, d]) => n + over(a, a + d), 0);
+      const ownMs = read.settledStarts.filter(([a]) => Math.abs(a * 1000 - t) < 100).reduce((n, [, len]) => n + len * 1000, 0) + longMs;
       const heldMs = read.held.reduce((n, [a, len]) => n + Math.max(0, Math.min(t + 700, (a + len) * 1000) - Math.max(t, a * 1000)), 0);
       const named = Math.max(0, ...x.loaf.flatMap((f) => f[5] ?? []).filter(([a]) => Math.abs(a - t) < 50).map(([, d]) => d));
       return { what, ok: ownMs >= 650 && heldMs < 50 && named >= 650,
-        say: `${what}: the page's own ${(ownMs / 1000).toFixed(2)} s, held ${(heldMs / 1000).toFixed(2)} s, named as a script ${(named / 1000).toFixed(2)} s` };
+        say: `${what}: the page's own ${(ownMs / 1000).toFixed(2)} s (${(longMs / 1000).toFixed(2)} s of it a long task), held ${(heldMs / 1000).toFixed(2)} s, named as a script ${(named / 1000).toFixed(2)} s` };
     });
-    return { ok: each.every((e) => e.ok), say: each.map((e) => e.say).join('; ') };
+    const seen = `long tasks ${x.heldSeen.longOk ? 'seen' : 'not seen'}, the timer every ${x.heldSeen.tickMedian == null ? 'never' : `${x.heldSeen.tickMedian.toFixed(0)} ms`}`;
+    return { ok: each.every((e) => e.ok), say: `${each.map((e) => e.say).join('; ')} (${seen})` };
   } catch (e) {
     return { ok: false, say: `the control did not run: ${String(e?.message ?? e).split('\n')[0]}` };
   } finally {
