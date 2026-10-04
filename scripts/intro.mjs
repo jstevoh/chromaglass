@@ -139,6 +139,10 @@ async function open(query, { viewport = { width: 1440, height: 900 }, phone = fa
   const context = await browser.newContext({ viewport, ...(phone ? { isMobile: true, hasTouch: true, deviceScaleFactor: 3 } : {}) });
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log(`   page error: ${e.message}`));
+  // What the app says of its own opening ("ChromaGlass: …", a warning when
+  // the pipelines were not all built ahead), kept to print beside a failure.
+  page.cgSaid = [];
+  page.on('console', (m) => { if (/ChromaGlass/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   if (slow) {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Network.enable');
@@ -249,10 +253,15 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     turned on some frame before it left (or left within two frames of the
     last of them).
   */
-  const opening = await page.evaluate(() => {
-    const p = window.chromaglassDebug?.()?.pipelines?.()?.prepares?.find((x) => x.stage === 'opening');
-    return p ? { at: p.at, end: p.at + p.ms } : null;
+  await waitFor(page, () => !!window.chromaglassDebug?.()?.pipelines?.()?.prepares?.some((x) => x.stage === 'opening'), null, 10000);
+  const log = await page.evaluate(() => {
+    const d = window.chromaglassDebug?.();
+    const all = d?.pipelines?.()?.prepares;
+    const p = all?.find((x) => x.stage === 'opening');
+    return { opening: p ? { at: p.at, end: p.at + p.ms } : null, stages: all ? all.map((x) => x.stage) : null, debug: d ? Object.keys(d).length : null, pipelines: typeof d?.pipelines };
   });
+  const opening = log.opening;
+  if (!opening) console.log(`     no opening to read: ${log.debug ?? 'no'} debug keys, pipelines ${log.pipelines}, prepares ${JSON.stringify(log.stages)}; ${at.renders?.length ?? 0} render compiles seen in all; the app said ${JSON.stringify(page.cgSaid)}`);
   const renders = opening ? (at.renders ?? []).filter(([a]) => a >= opening.at && a <= opening.end) : [];
   const inCompile = (t) => renders.some(([a, e]) => t > a && (e === null || t < e));
   const during = (at.moving ?? []).filter(([t]) => inCompile(t));
