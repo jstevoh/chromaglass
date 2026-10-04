@@ -215,6 +215,41 @@ try {
       viaChip === 'panel' && sizeOnTop === 'panel',
       `at the panel's middle from the Amount chip: ${viaChip}; at the Magnet's Size from a right-click: ${sizeOnTop}`);
   }
+  /*
+    A layer added and taken off from the Design desk, on every look.
+
+    Reported by the owner: layers could be added on some presets and not
+    others, and taken off on none. The desk's plus showed only while a look
+    had one layer and there was no minus, so on a two-layer look (Classic,
+    which this page opens on) there was nothing beside the layer tabs. What
+    the desk offers turns on the look's layer count alone, and every
+    built-in carries one or two, so taking Classic's second layer off and
+    putting it back walks both states a preset can open in. Measured: the
+    tabs, and which of the two buttons is beside them, after each press. A
+    press that did nothing leaves the tabs as they were and fails.
+  */
+  {
+    await clickOn('mode-segmented-design');
+    await settle(800);
+    const deskLayers = () => page.evaluate(() => ({
+      tabs: document.querySelectorAll('[data-testid^="layer-segmented-"]').length,
+      add: !!document.querySelector('[data-testid="add-layer"]'),
+      off: !!document.querySelector('[data-testid="remove-layer"]:not([disabled])'),
+    }));
+    const says = (st) => `${st.tabs} tab${st.tabs === 1 ? '' : 's'}${st.add ? ', +' : ''}${st.off ? ', −' : ''}`;
+    const opened = await deskLayers();
+    if (opened.off) await clickOn('remove-layer');
+    await settle(500);
+    const taken = await deskLayers();
+    if (taken.add) await clickOn('add-layer');
+    await settle(500);
+    const added = await deskLayers();
+    check('the Design desk takes a layer off a two-layer look and puts it back',
+      opened.tabs === 2 && !opened.add && opened.off
+      && taken.tabs === 1 && taken.add && !taken.off
+      && added.tabs === 2 && !added.add && added.off,
+      `${says(opened)} → ${says(taken)} → ${says(added)}`);
+  }
   await clickOn('mode-segmented-perform');
   await settle(1000);
   for (const [w, h] of [[1440, 900], [1280, 860], [1024, 860]]) {

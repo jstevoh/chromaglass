@@ -112,6 +112,10 @@ export interface PhoneStageProps {
   layers: number;
   activeLayer: number;
   onLayer: (i: number) => void;
+  /** Put a back layer on this look (there are at most two). */
+  onAddLayer: () => void;
+  /** Take the back layer off; absent while the back plate has a look of its own. */
+  onRemoveLayer?: () => void;
   onClear: () => void;
   onDrain: () => void;
   onSpin: () => void;
@@ -810,19 +814,34 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}
               display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
           </div>
-          {p.layers > 1 && (
-            <>
-              <SectionLabel>The plate your fingers work</SectionLabel>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${p.layers}, minmax(0, 1fr))` }}>
-                {Array.from({ length: p.layers }).map((_, i) => (
-                  <button key={i} onClick={() => p.onLayer(i)} aria-pressed={p.activeLayer === i} data-testid={`phone-layer-${i}`}
-                    className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
-                    {i === 0 ? 'Front' : i === 1 ? 'Back' : `Layer ${i + 1}`}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {/*
+            The plates, on every look. This section was here only on a look
+            with two, as a picker, so the phone could neither give a look a
+            back plate nor take one off (the owner reported the desk's half of
+            the same gap). Now it is always here: the picker when there are
+            two, with a button beside it that takes the back one off, and on a
+            one-plate look a button that adds it.
+          */}
+          <SectionLabel>{p.layers > 1 ? 'The plate your fingers work' : 'Plates'}</SectionLabel>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: p.layers > 1 ? `repeat(${p.layers}, minmax(0, 1fr)) auto` : '1fr' }}>
+            {p.layers > 1 && Array.from({ length: p.layers }).map((_, i) => (
+              <button key={i} onClick={() => p.onLayer(i)} aria-pressed={p.activeLayer === i} data-testid={`phone-layer-${i}`}
+                className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                {i === 0 ? 'Front' : i === 1 ? 'Back' : `Layer ${i + 1}`}
+              </button>
+            ))}
+            {p.layers > 1 ? (
+              <button onClick={p.onRemoveLayer} disabled={!p.onRemoveLayer} data-testid="phone-remove-layer"
+                className="h-12 rounded-lg border border-border bg-elevated px-4 text-[14px] text-text-2 disabled:opacity-60">
+                {p.onRemoveLayer ? 'Take off back' : 'Back has a look'}
+              </button>
+            ) : (
+              <button onClick={p.onAddLayer} data-testid="phone-add-layer"
+                className="h-12 rounded-lg border border-border bg-elevated px-4 text-left text-[14px] text-text-2">
+                + Add a back plate
+              </button>
+            )}
+          </div>
           <SectionLabel>Turn the dish by itself</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5" data-testid="phone-spin-auto">
             {(['Off', 'Rate', 'Tempo'] as const).map((name, mode) => (
