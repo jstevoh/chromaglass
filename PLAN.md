@@ -158,7 +158,7 @@ Judged in this order, because these gate code:
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
   look's own turning; **21c** dots and zoom; **3-highlight**; **18i** timed pops;
-  **0-bandbubbles** (#238).
+  ~~**0-bandbubbles**~~ #PRNUM (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
 - **2.6** **P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).
   Recommended: delete; it unblocks 3.2.
@@ -429,8 +429,8 @@ itself (the bubble as a region the flow goes round: a no-flux boundary, or the
 Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
 `npm run straw` and `npm run heldpress`, which should then need no press to hold.
 
-*Found 2026-10-04 (#238), not yet done, the owner's call:* **the simulated band's
-kicks release bubbles whatever Audio Impact says.** The first click on a browser that
+*Found 2026-10-04 (#238); **shipped #PRNUM (0-bandbubbles)**:* **the simulated band's
+kicks released bubbles whatever Audio Impact said.** The first click on a browser that
 never chose a sound source starts the band (`App.tsx`, the first visit's wake), and
 from then on a kick may release bubbles into the densest dye near the middle of the
 plate (`LiquidVisualizer`, "A few bubbles at a time"). Audio Impact 0 and every
@@ -438,6 +438,25 @@ mapping set to none leave that on, which is how the drop check's calm plate came
 have bubbles at all; the check now chooses silence (`scripts/mirror.mjs`). Whether
 Audio Impact 0 should mean the music touches nothing, bubbles included, is a look
 question: gating them would change only plates set to 0.
+**Shipped:** the owner asked for the fix (2026-10-04), taken as: Audio Impact 0 means the music drops
+no bubbles; the first click still starts the band. A kick's odds of releasing air now
+follow the dye ring's own scale, impact over its default (0.45), capped at the
+default: unchanged at 0.45 and above (the same draws, so a render at the default is
+the same render), thinning with the fader below it, none at 0. The phone's Sound Drive
+is the same setting. `npm run kickbubbles` (Mac, open shard) plays it as a first visit
+does, on the laptop and the phone at 0 (no release over at least 15 kicks that reached
+the bubbles' decision) and at Classic's own 0.55 (drive 1, a share of kicks near the old
+45%), with `chromaglassDebug().musicBubbles()` counting the frame's own chances,
+releases, Audio Impact and Bubbles.
+*Found along the way, not done:* a song's chorus lifts Audio Impact by 0.2 for the plate
+(`useMusicIntelligence`, music library tracks only), so a fader at 0 is 0.2 in a
+chorus, for every reaction behind it, not only the bubbles. Whether 0 should hold
+through a chorus is a look question.
+Still reaching the plate from the band at Audio Impact 0, each behind a dial of its
+own and left as it is: Soap Bursts on the beat (Soap Flow), Rock and the rhythm plate
+(Plate Rock, Beat Squeeze), the maze breathing on a kick (Ferro Labyrinth), the
+camera's beat (Macro Sync), and the look's pace (Tempo Sync). Whether any of those
+should also answer to Audio Impact is a later look question, not done here.
 
 *Found 2026-10-04 (#238), not yet done:* **with the band playing, the ferrofluid
 poured round Classic's middle drifts into it.** Picking the Magnet on Classic pours a

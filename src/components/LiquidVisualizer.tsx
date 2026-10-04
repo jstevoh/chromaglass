@@ -4595,6 +4595,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * kicks the band played).
    */
   const heardKicksRef = useRef({ n: 0, lastAt: null as number | null });
+  /**
+   * What the music did with its chances to release air, for
+   * `chromaglassDebug().musicBubbles()` (`npm run kickbubbles`): the kicks
+   * that reached the decision with room on the plate, the ones that released
+   * air, the releases on a held bass note, and the Audio Impact, drive and
+   * Bubbles the frame itself last used (the plate's settings, which a song's
+   * chorus can lift above the App's).
+   */
+  const musicBubblesRef = useRef({ chances: 0, kicks: 0, held: 0, impact: NaN, drive: NaN, amount: NaN });
   /*
     Sound learn, read by the loop through refs like every other live prop: the
     bindings change when the map does, the trigger handler on every render of
@@ -7527,7 +7536,34 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // the oil is the thing the references actually show.
               const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
-              if (currentAudioData && room && ((onset && DICE.music.float() < 0.45 * bubbleAmt) || (bass01 > 0.5 && DICE.music.float() < 0.003 * bubbleAmt))) {
+              /*
+                And only as hard as Sound Drive lets the music reach the
+                plate. Every other reaction to the music (the centre pulse,
+                the bursts, the ring of dye on a kick, the liquids it doses)
+                sits behind Audio Impact; these did not, so at 0, with every
+                other reaction still, a fresh browser's first click started
+                the built-in band and its kicks went on dropping air near the
+                middle (found by the mirror check: 29 kicks over four drops,
+                four bubbles near the middle, and the middle of the preview
+                moving by itself from the second drop on). The odds follow
+                the dye ring's own scale, impact over 0.45, up to 0.45 and no
+                further: from 0.45 up (the defaults are 0.6, Classic's 0.55) a
+                kick is as likely to release air as it always was, and the
+                draws are the same draws in the same order, so a render there
+                is the same render; below it the air thins with the fader, and
+                at 0 the music releases none. The look's Bubbles setting still
+                says how many the plate may carry, and the straw still blows
+                its own.
+              */
+              const impactNow = currentSettings.audioImpact ?? 0.45;
+              const drive = Math.min(1, Math.max(0, impactNow) / 0.45);
+              const mb = musicBubblesRef.current;
+              mb.impact = impactNow; mb.drive = drive; mb.amount = bubbleAmt;
+              if (currentAudioData && room && onset) mb.chances++;
+              const kickAir = !!currentAudioData && room && onset && DICE.music.float() < 0.45 * bubbleAmt * drive;
+              const heldAir = !kickAir && !!currentAudioData && room && bass01 > 0.5 && DICE.music.float() < 0.003 * bubbleAmt * drive;
+              if (kickAir || heldAir) {
+                if (kickAir) mb.kicks++; else mb.held++;
                 const dens = fluidsRef.current[0]?.readDensity;
                 let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
                 for (let t = 0; t < 6; t++) {
@@ -8721,6 +8757,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         kicks: () => kickCountRef.current,
         /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
         heardKicks: () => heardKicksRef.current.n,
+        /** The music's chances to release air and what it did with them (see `musicBubblesRef`): none released at Audio Impact 0. */
+        musicBubbles: () => ({ ...musicBubblesRef.current }),
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,

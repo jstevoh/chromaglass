@@ -710,6 +710,14 @@ jobs:
       - name: The sound's renders, with a plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/renders.mjs
+      # Audio Impact 0 holds the music's bubbles back too (scripts/kickbubbles.mjs,
+      # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
+      # and its kicks used to drop air near the middle whatever the dial said.
+      # On the laptop and the phone at 0, and at the default, where they still
+      # must. About two minutes.
+      - name: Audio Impact 0 drops no bubbles
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/kickbubbles.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a
