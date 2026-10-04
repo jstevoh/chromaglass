@@ -273,11 +273,12 @@ const CURRENT_ITERS = 10;
   liquid: at 1e-3 rad/s the swirl at the rim is under 5e-4 plate widths a
   second, a cell of 768 in three seconds, for as long as the lag lasts. The
   centrifuge: at 0.05 rad/s water's drift outward is 3e-4 plate widths a
-  second at the rim with the heaviest dye. Both speeds are the turntable's
-  alone (Auto Spin and the Spin tool): a look's own turning, its motor, the
-  music routed to rotation and a flick, turns the picture rigidly as it
-  always has and never reaches here, so every shipped look leaves both at
-  exactly zero.
+  second at the rim with the heaviest dye. Since 22h (#252) the look's own
+  turning is on the same dish, so a look with music routed to rotation sways
+  its dish under its liquid and runs the swirl on most steps while it plays
+  (PLAN 22k: what that costs, `npm run swirlcost`), and since 22j (#261)
+  a look whose motor turns its liquid past the centrifuge's floor runs it on
+  every step; a look nobody turns leaves both at exactly zero.
 */
 const SWIRL_DISH_MIN = 1e-3;
 const SWIRL_SPIN_MIN = 0.05;
@@ -488,6 +489,14 @@ export class WebGPUFluid {
   private swirlLive = false;
   /** Seconds the swirl runs on after its forcing stops, so what it made can die away. */
   private swirlTail = 0;
+  /**
+   * For `npm run swirlcost` (PLAN 22k): the same plate with the swirl held
+   * off, to read what it costs, and how many steps ran it of how many were
+   * taken. Never set by the app. On the class, so a solver the ladder builds
+   * mid-measurement is held off too.
+   */
+  static swirlHeldOff = false;
+  readonly swirlCount = { steps: 0, ran: 0 };
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
   /*
@@ -644,6 +653,13 @@ export class WebGPUFluid {
   private viewTex: GPUTexture | null = null;
   private blankR: GPUTexture | null = null;
   private blankPhaseTex: GPUTexture | null = null;
+  /** The hands in the liquid (applyDeltas' \`hands\`), on the CPU's grid and on the solver's, made when a hand first touches a thin gap. */
+  private cpuHandTex: GPUTexture | null = null;
+  private handTex: GPUTexture | null = null;
+  /** Whether the next step has a hand in it: the hands are laid each step they move, and gone the step after. */
+  private handLive = false;
+  /** The fastest hand laid for the next step, in the hands' cells a step (the ferrofluid's substeps follow it). */
+  private handFastest = 0;
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
@@ -736,8 +752,9 @@ export class WebGPUFluid {
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
       ['addCurrent', [VEL], true],
-      // The spun dish (PLAN §22): no look spins at opening, so built behind.
-      ['spinSwirl', [VEL], false],
+      // The spun dish (PLAN §22): waited for when the look's own motor starts
+      // its dish ahead of its liquid at opening (PLAN 22j, opening.ts).
+      ['spinSwirl', [VEL], open.spin],
       ['decayDye', [dye], true],
       ['decayVel', [VEL], true],
       ['packView', ['rgba32uint'], true],
@@ -773,7 +790,8 @@ export class WebGPUFluid {
         flows (the advect dye stage), from the maze's first step, so a look
         that opens with it waits for it as it waits for mazeForce.
       */
-      ['bodyAdvect', [dye], open.maze],
+      ['bodyAdvect', [dye], open.maze && !open.thinGap],
+      ['bodyAdvectThin', [dye], open.maze && open.thinGap],
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
@@ -1052,6 +1070,25 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(w, w);
   }
 
+  /**
+   * A carry on a thin gap through the solve's own faces (THIN_FACE in
+   * wgsl/fluid.ts), in one pass: runPressed's bindings with the solve's P in
+   * place of the pressure, then the gap and the mobility.
+   */
+  private runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
+    const pipe = this.pipeline(name, dst.format);
+    const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
   /** The gap the ferrofluid has seen, made zero (unprimed) the first time. */
   private ensurePhaseGap(): GPUBuffer {
     if (!this.phaseGap) {
@@ -1130,7 +1167,7 @@ export class WebGPUFluid {
     const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : p.damping; f[17] = p.heatDecay; f[18] = thin ? 1000 : MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
     i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
-    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = p.twist;
+    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
     f[28] = p.rockX; f[29] = p.rockY;
     f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
@@ -1197,7 +1234,7 @@ export class WebGPUFluid {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -1216,6 +1253,17 @@ export class WebGPUFluid {
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+    if (hands) {
+      if (!this.handTex) {
+        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        this.cpuHandTex = this.disposer.track(this.device.createTexture({ label: 'hands (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+        this.handTex = this.disposer.track(this.device.createTexture({ label: 'hands', size: [this.N, this.N], format: RGBA32, usage }));
+      }
+      q.writeTexture({ texture: this.cpuHandTex! }, hands, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+      let fastest = 0;
+      for (let k = 0; k < hands.length; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
+      this.handFastest = fastest;
+    }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
     this.writeSplatArgs(0);
@@ -1226,6 +1274,9 @@ export class WebGPUFluid {
     this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
     this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
+    if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
+    // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
+    if (hands) this.handLive = true;
     this.foldDeltas(pass);
     pass.end();
     q.submit([enc.finish()]);
@@ -1393,6 +1444,21 @@ export class WebGPUFluid {
   step(p: GpuStepParams, deltasApplied: boolean): void {
     const N = this.N;
     const disp = stepDisplacement(p.dt, p.advection, N);
+    // The hands laid for this step, and for no other (applyDeltas).
+    const hands = this.handLive ? this.handTex : null;
+    const handCells = this.handLive ? this.handFastest * N / this.L : 0;
+    this.handLive = false;
+    /*
+      The substeps a hand in the liquid needs of the carries that take a
+      fixed number (the ferrofluid's, and the colour's under a maze's flow):
+      a Finger on a thin gap carries the liquid it touches at the hand's own
+      speed (hsPrep), and a brisk hand is several cells a step on the
+      solver's grid, past what six substeps of 0.45 may carry, so a pool
+      under a fast stroke was left behind it (\`npm run fingerflow\`). 0.4 a
+      substep, as the colour's own plan (CARRY_COURANT), only for the steps
+      a hand is down.
+    */
+    const handSubs = Math.max(PHASE_SUBSTEPS, Math.min(CARRY_SUBSTEPS, Math.ceil(handCells / CARRY_COURANT)));
     // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
     /*
@@ -1739,7 +1805,9 @@ export class WebGPUFluid {
       plate it is laid over the flow after both projections, as the current
       is, and it is divergence-free already (stepSwirl projects it).
     */
-    const swirlOn = this.swirlWanted(p);
+    const swirlOn = this.swirlWanted(p) && !WebGPUFluid.swirlHeldOff;
+    this.swirlCount.steps++;
+    if (swirlOn) this.swirlCount.ran++;
     stage('swirl', (pass) => {
       if (swirlOn) { this.stepSwirl(pass, p, thin); return; }
       for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
@@ -1766,8 +1834,8 @@ export class WebGPUFluid {
         glycerine's |∇·(hu)| came to 0.0093 of its flux where without one it
         was 0.0030 (npm run thingap). Here it goes in as the other forces do,
         a speed the liquid is driven to against the glass, and the solve
-        makes it conserve liquid with everything else. The rock, the twist,
-        the buoyancy and the lamp's pull still come from the current's own
+        makes it conserve liquid with everything else. The rock, the
+        buoyancy and the lamp's pull still come from the current's own
         solver (PLAN §18a has their move into this field as forces).
       */
       stage('current', (pass) => {
@@ -1776,7 +1844,7 @@ export class WebGPUFluid {
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
-        this.thinProject(pass, p, disp);
+        this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
         this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
       });
@@ -1889,15 +1957,17 @@ export class WebGPUFluid {
       */
       if (thin) this.planCarry(pass, disp);
       if (!bodiesOn && mazeFlow) {
-        const flux = this.arg('dye flux', [0, 0, 0, 0, 0, disp / PHASE_SUBSTEPS, 1, 0]);
-        for (let k = 0; k < PHASE_SUBSTEPS; k++) {
-          this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
+        // The maze's sixths, or as many as a hand in the liquid needs (handSubs), as the ferrofluid takes.
+        const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, thin ? REST_GAP : 0]);
+        for (let k = 0; k < handSubs; k++) {
+          if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, flux);
+          else this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
         }
         return;
       }
       if (!bodiesOn && thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
@@ -1909,12 +1979,13 @@ export class WebGPUFluid {
       */
       const od = this.oilDye!;
       if (bodiesFresh) for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-      const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
       if (thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, adv);
-        this.carrySubsteps(pass, 'bodyAdvect', od, adv);
+        const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
         return;
       }
+      const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
       this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], adv);
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
@@ -1992,7 +2063,8 @@ export class WebGPUFluid {
       // than one flux step may (0.45 of a cell): so in substeps.
       // And under Thin Gap, where a press moves the liquid as fast as the
       // glass comes down (a cell a step and more round a palm, lab).
-      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001 || thin) ? PHASE_SUBSTEPS : 1;
+      // And as many as a hand in it needs (handSubs).
+      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001 || thin) ? handSubs : 1;
       // A.b.z: the Rhie–Chow correction on (see phaseAdvect), which needs the
       // projection's pressure to still be the one velForced was made with.
       /*
@@ -2113,7 +2185,7 @@ export class WebGPUFluid {
       const m = mix!;
       if (this.mixLive) {
         // The oil with its colour: in the dye's substeps on a thin gap (carryPlan).
-        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         else {
           this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
           m.swap();
@@ -2631,6 +2703,39 @@ export class WebGPUFluid {
   }
 
   /**
+   * What the swirl stage costs the GPU, for `npm run swirlcost` (PLAN 22k):
+   * `reps` swirl stages, as a thin plate runs it (`thin`) or as the old
+   * plate does, encoded back to back in one pass and timed from submit to
+   * the queue's done, in milliseconds.
+   *
+   * Timed this way because CI's Mac grants no timestamp queries (the
+   * profiler reads nothing there, measured on #258), and the frame rate
+   * alone could not see it: two runs of the nine looks read the swirl at
+   * 2 fps of 41 and at nothing of 30, each look's own pair scattered by
+   * five frames either way. It waits for the queue to empty first, so the
+   * frame's own work is not timed with it, and the caller times two counts
+   * of reps and takes the slope, which leaves out the submit's fixed cost.
+   *
+   * On the plate's own swirl textures, with a made-up drive: on the thin
+   * plate what it writes is overwritten by the next step that runs the
+   * swirl, and the next step that does not empties it (swirlLive).
+   */
+  async benchSwirl(reps: number, thin: boolean): Promise<number> {
+    const p = { spinDish: 0.01, spinLiquid: 0.02, spinTau: 3, spinNu: 1e-6, magnetSeconds: 1 / 60, spinDyeWeight: 0.5 } as GpuStepParams;
+    const enc = this.device.createCommandEncoder({ label: 'bench swirl' });
+    const pass = enc.beginComputePass({ label: 'bench swirl' });
+    for (let k = 0; k < reps; k++) this.stepSwirl(pass, p, thin);
+    pass.end();
+    this.swirlLive = true;
+    // Behind whatever the frame has already queued, so it is not timed with it.
+    await this.device.queue.onSubmittedWorkDone();
+    const t0 = performance.now();
+    this.device.queue.submit([enc.finish()]);
+    await this.device.queue.onSubmittedWorkDone();
+    return performance.now() - t0;
+  }
+
+  /**
    * The spun dish's swirl (spinSwirl), read back whole on its own grid: m × m
    * velocities (x, y), plate widths a second, in the frame turning with the
    * liquid. For `npm run dish`, not for a frame.
@@ -2930,6 +3035,25 @@ export class WebGPUFluid {
     ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
       Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT]), this.M);
     this.swirl.swap();
+    /*
+      A thin gap stops here, at one dispatch where it was thirteen (PLAN 22k).
+
+      There the swirl field is the dish's drive, a speed at the rest gap
+      (spinSwirl's thin branch, which keeps no state), and it goes into the
+      flow before the thin solve, which makes the whole flow conserve liquid
+      with the gap in it: ∇·(h u) = 0, by its own multigrid. Projecting the
+      drive first, by ten Jacobi sweeps of ∇·u = 0 on the current's grid, did
+      a weaker version of the same job with the wrong operator. Where the gap
+      is even the solve takes away exactly what it took away; where a press
+      or a dome makes it uneven what it took away is a gradient of u, not of
+      hu, and handing the solve the drive as it is lets the right projection
+      decide. Since #252 the nine thin music looks run the swirl on most of
+      their steps while the band plays; this is the part of it that did
+      nothing the solve after it does not do. The old plate has no solve
+      after it that sees the swirl (it is laid over the projected flow), so
+      it keeps its own projection.
+    */
+    if (thin) return;
     const m = this.arg('current grid', [0, this.M, 0, 0]);
     this.run(pass, 'curDivergence', this.swirlDiv, [this.swirl.read], m, this.M);
     for (let k = 0; k < CURRENT_ITERS; k++) {
@@ -3056,8 +3180,9 @@ export class WebGPUFluid {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       this.hsMob = buf('thin gap mobility', this.N);
-      // The thin solve's own P, packed as the old solver's pressure is. hsGradient
-      // hands the advections c·P in that one (wgsl/thinGap.ts, hsGradient).
+      // The thin solve's own P, packed as the old solver's pressure is. The thin
+      // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
+      // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
       this.hsGap = buf('thin gap before', this.N);
       this.hsMobC = this.mg.map((lv) => buf(`thin gap rim ${lv.n}`, lv.n));
@@ -3077,8 +3202,8 @@ export class WebGPUFluid {
    */
   private planCarry(pass: GPUComputePassEncoder, disp: number): void {
     this.ensureThinGap();
-    this.hsRun(pass, 'carryCourant', `carryCourant:${this.velForced.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, 0]),
-      [this.velForced, this.press, this.carryMost!]);
+    this.hsRun(pass, 'carryCourant', `carryCourant:${this.velForced.label}:${this.squeeze.read.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
+      [this.velForced, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!]);
     this.hsRun(pass, 'carryPlan', 'carryPlan', this.arg('carry plan', [CARRY_COURANT, CARRY_SUBSTEPS, Math.ceil(this.N / 8), CARRY_PAIRS]),
       [this.carryMost!, this.carryInd!, this.carrySub!], 1);
   }
@@ -3094,10 +3219,10 @@ export class WebGPUFluid {
     const kernelName = `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
     const group = (src: GPUTexture, dst: GPUTexture) => {
-      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}`;
+      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}:${this.squeeze.read.label}`;
       let g = this.groups.get(key);
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.press, this.carrySub!]);
+        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!]);
         this.groups.set(key, g);
       }
       return g;
@@ -3157,7 +3282,7 @@ export class WebGPUFluid {
    * a variable-coefficient multigrid with the rim held open, and the
    * velocity the step ends with.
    */
-  private thinProject(pass: GPUComputePassEncoder, p: GpuStepParams, disp: number): void {
+  private thinProject(pass: GPUComputePassEncoder, p: GpuStepParams, disp: number, hands: GPUTexture | null): void {
     const prev = this.ensureThinGap();
     const mob = this.hsMob!;
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
@@ -3174,10 +3299,11 @@ export class WebGPUFluid {
       (0.25): a look's smear moves its colour as fast as it did, and now
       moves the liquid it is in with it.
     */
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}`,
+    const hand = hands ?? this.blankPhase();
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}`,
       this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, 0.25 * p.smearX, 0.25 * p.smearY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, this.vel.write, mob]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,

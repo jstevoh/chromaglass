@@ -16,6 +16,7 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
 import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
+import { layFinger, handEdge } from '../src/lib/handSolid';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
@@ -25,7 +26,7 @@ export const BASE: GpuStepParams = {
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
   platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
   air: 0, evapFactor: 1, time: 0, currentDamp: 0.98, currentBuoy: 0, rockX: 0, rockY: 0, currentGrav: 0,
-  twist: 0, meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
+  meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
 } as GpuStepParams;
 
 /** Numbers as IEEE half floats, for writing an rgba16float texture. */
@@ -43,6 +44,8 @@ function halves(data: number[]): ArrayBuffer {
 type Lab = {
   solver: WebGPUFluid; L: number; N: number; time: number; cellClock: number;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
+  /** The hands laid this step (layFinger), or null with none down. */
+  hands: Float32Array | null;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -57,7 +60,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1) };
+    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null };
     return { N, L };
   },
   /** A soft disc of dye (absorbances r, g, b; density d) at (x, y) in plate units, radius r. */
@@ -155,8 +158,22 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
+    l.hands = null;
+  },
+  /**
+   * A Finger in the liquid on a thin gap, laid as the app lays one
+   * (lib/handSolid.ts): at grid cell (x, y) of the L × L plate, `r` cells
+   * in radius, having moved (mx, my) cells this step. Held for the step
+   * after the next flush.
+   */
+  /** How the finger's χ falls off at its rim, in cells of the L-cell plate (handEdge). */
+  handEdge,
+  finger(x: number, y: number, r: number, mx: number, my: number, edge?: number) {
+    const l = lab!;
+    if (!l.hands) l.hands = new Float32Array(l.L * l.L * 4);
+    return layFinger(l.hands, l.L, x, y, r, mx, my, edge);
   },
   /*
     `flushed` says the first of these steps follows a flush, as the app's

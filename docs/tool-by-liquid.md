@@ -10,7 +10,7 @@ Read from the code on `main` (6c6d17e); the velocity numbers were measured in th
 | Spray | ✓ | ✗ colour only | ✗ | ✗ | ✓ | ✓ |
 | Splat | ✓ | ✗ colour only | ✗ | ✗ | ✓ | ✓ |
 | Streak | ✓ | ✗ colour only | ✗ | ✗ | ✓ | ✓ |
-| Finger | ✓ carries it (CPU carry) | ✓ carries the oil with its colour | ✗ doesn't move it (Ferrofluid thread, PLAN 9n) | ✓ stirs them together | ~ pops the ones under it and shoves the rest outward, not along the stroke | ✓ |
+| Finger | ✓ on Thin Gap the flow carries it (a solid in the liquid, 15b); with Thin Gap off, a CPU carry | ✓ carries the oil with its colour (the flow, on Thin Gap) | ✓ the flow on Thin Gap (15b); a carry with it off (9n) | ✓ stirs them together | ~ pops the ones under it and shoves the rest outward, not along the stroke | ✓ |
 | Blow, moving | ✓ pushes it along, keeping it (15c; it erased it, ×0.8 a step) | ✓ the oil goes with its colour (15c) | ✓ (9n) | ✗ | ✓ | ✓ |
 | Blow, held still | ✓ straw bubble pushes colour aside; off the straw, a puff blows it out onto a ring (15c) | ~ | ✓ (9n) | ✗ | ✓ grows one | ✓ |
 | Press | ✓ pushes colour into a ring | ✓ the oil goes with its colour, onto the same ring (15d) | ✗ ferrofluid doesn't move | ✗ | ✓ | ✓ |
@@ -18,7 +18,7 @@ Read from the code on `main` (6c6d17e); the velocity numbers were measured in th
 
 ## Why so many ✗s have one cause
 
-Every liquid rides one velocity field, and the tools' pushes barely reach it. The field is held to a speed limit (`MAX_SPEED` 0.002, src/gpu/fluid.ts) that the idle plate already runs at. So a tool's push lasts one step and then gets cut back to idle. Only liquids with their own hand-written carry actually move: the dye (Finger, Press) and the oil (Finger, Press). The ferrofluid and the liquid chemistry have no carry.
+Every liquid rides one velocity field, and the tools' pushes barely reach it. The field is held to a speed limit (`MAX_SPEED` 0.002, src/gpu/fluid.ts) that the idle plate already runs at. So a tool's push lasts one step and then gets cut back to idle. Only liquids with their own hand-written carry actually move: the dye (Finger, Press) and the oil (Finger, Press). The ferrofluid and the liquid chemistry have no carry. (Written before Thin Gap: on a thin gap there is no clamp, and the Finger is a solid in the solve whose flow carries every liquid, PLAN 15b, `npm run fingerflow`.)
 
 Lab result: dragging fingerDrag's velocity 30 cells across a dye+ferrofluid disc moves the dye's centre 0.17 cells and the ferrofluid's 0.20. With the speed limit lifted, those are 0.56 and 0.63. At the hand's own speed with no swirl, they are 0.87 and 1.09. Leaving the plate alone moves neither.
 

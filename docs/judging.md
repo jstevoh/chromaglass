@@ -718,6 +718,21 @@ lab measured the swirl (`npm run dish`), not the picture. On the Mac:
   their sway is now through the water (within 2° of where it was) and the swirl runs
   while they play. Say if any of them reads worse, and whether the frame rate dropped.
 
+- the look's motor without its stir (PLAN 22j): the Rotation Speed dial used to stir
+  the middle of the plate round as well as turning the dish, a swirl fastest at the
+  centre and still at the rim, so the middle wound itself into a spiral. The stir is
+  gone: a dish turning steadily drags its liquid round with it and then nothing in
+  the liquid moves against anything else. Each look's dial was turned up so its dish
+  turns the liquid in view about as fast as the stir did, but now the whole picture
+  goes round together, rim included. Against the last deploy before this one, watch
+  the ones that moved most: Acid Trip (a turn every 20 s now), Cyberpunk and Stardust
+  Collapse (about a minute), Boiling Point, Timbre Shifter, Solar Flare, Fractal Dream
+  (three to five minutes), and Galaxy and Classic, which turned so slowly the change
+  is mostly the spiral that is no longer wound. Say which ones lost something they
+  need: a real way to wind the middle against the rim is a second, smaller glass
+  turned against the dish (PLAN 22l). Quiet bars no longer turn a music look's dish
+  backwards (the band's sway still does when it is playing).
+
 Say if the lag is too long or too short to read as a liquid, and whether the swirl a
 press makes is visible or wants more.
 
@@ -840,6 +855,35 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
   nothing should look different.
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
+
+---
+
+## 33. The Finger drags the liquid (PLAN 15b)
+
+The Finger used to move the colour by a hand-written carry, a little taken from behind
+it and put a hop ahead, while the push it gave the liquid itself did nothing. Now it is
+a solid in the liquid: what it touches moves at your hand's speed, the liquid round it
+parts to let it through, and the flow carries the colour, the oil and the ferrofluid
+together. It changes how the Finger feels. On Classic:
+
+- draw the Finger slowly across bands or blobs of colour: the colour on its path should
+  be pulled along it in chevrons, the way a stylus pulls marbling, and the colour a
+  little to either side should bend back the other way as the hand passes;
+- draw it fast, then stop: the liquid should stop with the hand within a fraction of a
+  second, not coast on;
+- draw it through a pool on a ferrofluid look (Magnet Garden, or any with ferrofluid):
+  the pool should be drawn out after the hand into a tongue and, once the hand lifts,
+  pull itself back into a rounder drop at the tongue's head;
+- on Oil & Water: an oil body should go with the hand, its colour inside it;
+- on a thick look (Thickness high) the drag should reach less far round the finger
+  than on a thin one;
+- on the phone, drag a finger across the plate with the Finger tool: the same;
+- the remote's pad Finger (the phone driving the laptop): say if it stutters;
+- the frame time while dragging over ferrofluid: its carry takes more substeps while a
+  fast hand is down.
+
+Say if the Finger now feels too strong, too sticky (a blob that rides along under the
+hand), or not enough like a finger in liquid.
 
 ---
 

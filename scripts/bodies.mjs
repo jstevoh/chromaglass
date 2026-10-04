@@ -31,9 +31,11 @@
  * The plate: 192² (the lab's display size, so the dye is read back cell for
  * cell), seven oil drops and a strip of nine overlapping ones, amber inside
  * the oil and teal in the water, laid from the oil actually on the plate so
- * the colour starts exactly where its liquid is. Then 360 steps with the top
- * glass turning (twist) and Oil Tension 0.9: the strip rounds, drops that
- * touch merge, and the whole plate turns. Amber and teal are told apart by
+ * the colour starts exactly where its liquid is. Then 360 steps with Oil
+ * Tension 0.9: the strip rounds and drops that touch merge. (It had the
+ * look's motor stirring the middle too, until PLAN 22j took that stir out of
+ * the solver; it moved nothing this measures, the plate moving 51.4% with it
+ * and 51.6% without.) Amber and teal are told apart by
  * their absorbances (teal takes red, amber blue), solved per cell from the
  * red and blue channels; "open water" is a cell under 0.05 oil and "inside a
  * body" over 0.95, the band between is the edge and belongs to neither.
@@ -162,7 +164,7 @@ try {
       amberConc: amberBody / cBody, tealConc: tealWater / wWater, cs };
   }, { N, TEAL, AMBER });
 
-  const stir = { oilTension: 0.9, twist: 0.02, maxCurrent: 0.01, currentDamp: 0.97 };
+  const stir = { oilTension: 0.9, maxCurrent: 0.01, currentDamp: 0.97 };
   const arm = async (bodies) => {
     await lay(bodies);
     const start = await read();
@@ -272,7 +274,8 @@ try {
       for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) { const c = m.data[(i + j * 128) * 4]; t += c; x += c * (i + 0.5) / 128; y += c * (j + 0.5) / 128; }
       return { t, x: x / t, y: y / t }; };
     const a = await cm();
-    // Ten drags to the right through the drop's middle, as fingerDrag hands them over.
+    // Ten drags to the right through the drop's middle, as fingerDrag hands them over with Thin Gap off
+    // (on a thin gap the Finger is a solid and the flow carries the oil: `npm run fingerflow`).
     for (let k = 0; k < 10; k++) s.carryMix(0.4 + k * 0.01, 0.35, 0.06, 1, 0, 0.5, 2 / 128);
     const b = await cm();
     return { moved: b.x - a.x, across: b.y - a.y, kept: b.t / a.t };

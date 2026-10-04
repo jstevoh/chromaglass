@@ -455,7 +455,17 @@ const solver = cls < 0 ? '' : panel0.slice(cls, (() => {
 })());
 check('the solver can be found to read', solver.length > 2000, `${solver.length} characters`);
 
-const readsInSolver = new Set([...solver.matchAll(/settings\.([A-Za-z0-9_]+)/g)].map(m => m[1]));
+/*
+  And the plate's own dish. The frame turns each plate's dish from that
+  plate's settings, `patch.layer(l).rotationSpeed`, and outside the solver's
+  class: since PLAN 22j the solver has no use for the motor at all (it used to
+  stir the current with it). One plate's motor is still that plate's, so a
+  key the frame reads per plate counts as the solver's would.
+*/
+const readsInSolver = new Set([
+  ...[...solver.matchAll(/settings\.([A-Za-z0-9_]+)/g)].map(m => m[1]),
+  ...[...panel0.matchAll(/patch\.layer\(l\)\.([A-Za-z0-9_]+)/g)].map(m => m[1]),
+]);
 const phantom = [...PER_LAYER].filter(k => !readsInSolver.has(k));
 check('every per-plate setting is one the solver actually reads', phantom.length === 0,
   phantom.length
@@ -1177,8 +1187,10 @@ check('and neither starts over the limit',
     .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()))
     .map(f => readFileSync(join(root, 'src', f), 'utf8'))
     .join('\n');
+  // `patch.layer(l)` is the frame reading one plate's settings (its dish's
+  // motor, since PLAN 22j took the motor out of the solver).
   const unread = Object.keys(DEFAULT_SETTINGS)
-    .filter(k => !new RegExp(`\\b${RECEIVERS}\\s*\\??\\.${k}\\b`).test(body));
+    .filter(k => !new RegExp(`(?:\\b${RECEIVERS}|\\bpatch\\.layer\\(l\\))\\s*\\??\\.${k}\\b`).test(body));
   check('every setting is read by something that renders',
     unread.length === 0,
     unread.length ? `${unread.join(', ')} — nothing in src reads it; delete it or wire it`

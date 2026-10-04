@@ -58,12 +58,22 @@
  *      round at the half that is left, with the water's drag time; and a
  *      hand holding a flicked dish still (the turntable exactly against the
  *      look) has the dish at exactly zero every frame and the water at rest,
- *      exactly, when the drag time says, τ ln(2/LIQUID_REST), to a frame.
+ *      exactly, when the drag time says, τ ln(2/LIQUID_REST), to a frame;
+ *  15. the look's motor holds its way round whatever the band does (PLAN
+ *      22j): with a band routed to rotation and gone quiet (every feature
+ *      0, a sway of 0.4 − 1.2 = −0.8) acid-trip's dial still turns the dish
+ *      forwards at the dial's speed, where the sway used to carry it
+ *      backwards; the band's own share is the sway times the push, as it
+ *      always was, at any sway; the dial is `v × 0.01` to the bit in its
+ *      bottom tenth and has no step at 0.1; and the frame hands the dial
+ *      and the band to the motor apart (read from its source, as `npm run
+ *      backplate` reads the plate's own motor).
  */
 import {
   AutoSpin, SpinHand, SPIN_RATE, SPIN_TEMPO, SPIN_OFF, WATER_NU, THICK_NU, OIL_NU,
-  carrierViscosity, dishFollow, dishFrame, dragSeconds, liquidFollow, LIQUID_REST,
+  carrierViscosity, dishFollow, dishFrame, dragSeconds, liquidFollow, LIQUID_REST, lookMotor, lookMotorRate,
 } from '../src/lib/turntable.ts';
+import { readFileSync } from 'node:fs';
 
 let bad = 0;
 const check = (name, ok, detail = '') => {
@@ -320,8 +330,9 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
 
 // 12
 {
-  // acid-trip's motor, the fastest a shipped look asks for: 0.1 × 0.01 rad/s.
-  const M = 0.001;
+  // acid-trip's motor, the fastest a shipped look asks for (Rotation Speed
+  // 0.421 since PLAN 22j moved its stir onto the dish; 0.1 × 0.01 rad/s before).
+  const M = lookMotorRate(0.421);
   let look = 0, liq = 0, rigid = 0, angle = 0;
   for (let k = 0; k < 60 * 120; k++) {
     look = dishFollow(look, M, BED, 1 / 60);
@@ -378,6 +389,40 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
   check('a hand holding a flicked dish still: the dish is still and the water comes to rest when its drag time says',
     moved === 0 && l2 === 0 && Math.abs(t - want) < 1 / 60 + 1e-9,
     `${moved} frames the dish moved; at rest after ${t.toFixed(2)} s, τ ln(2/LIQUID_REST) = ${want.toFixed(2)} s`);
+}
+
+// 15
+{
+  const rate = lookMotorRate(0.421);
+  // acid-trip's band (energy) gone quiet: rotationMod = 0, sway (0 − 0.4) × 3 + 0.4.
+  const quiet = lookMotor(rate, 1, 0, 0.4 + (0 - 0.4) * 3);
+  check('a look\'s motor turns its dish its own way round when the band routed to rotation goes quiet',
+    quiet === rate && rate > 0.3, `${quiet.toFixed(4)} rad/s, the dial's ${rate.toFixed(4)} (the sway alone would have made it ${(rate * -0.8).toFixed(4)})`);
+  let worst = 0;
+  for (const music of [0, 0.002, 0.013, 0.05]) for (const sway of [-0.8, -0.1, 0, 0.4, 1.3, 2.2]) {
+    worst = Math.max(worst, Math.abs(lookMotor(0, 1, music, sway) - music * sway), Math.abs(lookMotor(rate, -1, music, sway) - (music * sway - rate)));
+  }
+  check('and the band\'s own share is its push times its sway, as it always was', worst < 1e-15, `largest difference ${worst}`);
+  const low = [0, 0.003, 0.05, 0.1].every((v) => lookMotorRate(v) === v * 0.01);
+  check('the dial is v × 0.01 in its bottom tenth and has no step at 0.1', low && near(lookMotorRate(0.1 + 1e-9), 0.001, 1e-6),
+    `${lookMotorRate(0.1)} and ${lookMotorRate(0.1 + 1e-9)} rad/s either side of 0.1`);
+  const src = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+  /*
+    And the frame wires it so. The call's shape alone would pass with the
+    sway put back into the motor's way inside the band's block, so every
+    assignment to motorWay in the code is read too: it starts as the plate's
+    sign and only Spin Direction and the wander may change it.
+  */
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const ways = [...code.matchAll(/motorWay\s*([*+\-/]?=)\s*([^;]+);/g)].map((m) => `${m[1]} ${m[2].trim()}`);
+  const allowed = ['= dirMod', '= 1', '= -1', '*= 1 + w * wander * 3.4'];
+  const begin = code.indexOf('let motorWay = dirMod;');
+  const band = code.indexOf('if (currentAudioData && currentSettings.audioMappings)', begin);
+  check('the frame hands the dial and the band to the motor apart',
+    /const motor = lookMotor\(motorRate, motorWay, musicSpeed, dirMod\)/.test(code)
+    && /const motorRate = lookMotorRate\(asked\)/.test(code) && !/\btwist\b/.test(code)
+    && begin > 0 && band > begin && ways.length === 4 && ways.every((w) => allowed.includes(w)),
+    `motorWay set ${ways.length} times: ${ways.join(' · ')}`);
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');
