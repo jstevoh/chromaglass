@@ -2787,6 +2787,19 @@ these numbers.
 
 **Shipped** (#215): Blow's wind carries the colour and the oil the way the hand went, rather than erasing them (`npm run wind`, `npm run tools`). Its follow-ups are 15f and 15g. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+**Fixed after it shipped (2026-10-04): a drag began with a straw.** Main's deploy
+after #230 went red on `tools`' "keeps it rather than erasing it": a Blow drawn
+across a pool of 229 left 175, with 5 straw steps among its 49 wind steps. A press
+has no move before it, so "no move in 150 ms" made every step between the press
+and the first reported move a straw step, and the straw's bubble takes the dye
+under it off the plate while it sits there (`airExclude`; the plate's budget
+servo returns it later). At the Mac runner's 10–30 frames a second that was 2 to
+7 straw steps a stroke, and on a slow frame rate a moving hand whose moves came a
+frame apart read as held too. The press now counts as a move, and the straw needs
+the hand held both 150 ms and three frames with no move (`BLOW_STRAW_FRAMES`).
+`tools` asks that the stroke blows no straw before its first move
+(`blowSteps.strawFirst`), and prints the stroke's straw steps under "keeps it".
+
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
 The owner's standing rule (2026-09-28): build from the chemistry and physics of the
