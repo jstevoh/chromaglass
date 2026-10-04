@@ -530,6 +530,13 @@ jobs:
       - name: The Press comes back on a thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run presslift
+      # The Finger on a thin gap as a solid in the liquid: what it touches
+      # moves at the hand's speed, the colour, the ferrofluid and the oil on
+      # its path go with it by the flow alone, nothing is lost, and the
+      # liquid stops with the hand.
+      - name: The Finger drags the liquid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run fingerflow
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
@@ -578,7 +585,9 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingers
       # The Finger and Blow carry the ferrofluid, as they carry the dye; the
-      # tools' push alone (all they did before) leaves it where it was.
+      # tools' push alone (all they did before) leaves it where it was. The
+      # Finger's half is its carry with Thin Gap off; on a thin gap (every
+      # look) the Finger is a solid and `npm run fingerflow` checks it.
       - name: The hands move the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrohands

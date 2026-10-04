@@ -301,6 +301,16 @@ const GRID_DAMP = 0.05;
 /** The CPU solver's hard speed limit, in plate units per unit time. */
 const MAX_SPEED = 0.002;
 /*
+  How hard a hand holds the liquid it touches (hsPrep): the penalised
+  solid's drag toward the hand's speed, in units of the cell's own drag.
+  At 40 the liquid where the hand fills the cell goes at 40/41 of the hand's
+  speed whatever its thickness. Higher holds closer to it and makes the
+  hand's cells a steeper jump in mobility for the pressure solve (c falls
+  as 1/(1 + 40)); lower lets the liquid slip through the hand: at 5 a stroke
+  carried bands of colour half as far (\`npm run fingerflow\`, lab).
+*/
+const HAND_GRIP = 40;
+/*
   The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): its real size.
 
   The drag between two glasses is 12ν/h², which needs the gap in metres.
@@ -607,6 +617,13 @@ export class WebGPUFluid {
   private viewTex: GPUTexture | null = null;
   private blankR: GPUTexture | null = null;
   private blankPhaseTex: GPUTexture | null = null;
+  /** The hands in the liquid (applyDeltas' \`hands\`), on the CPU's grid and on the solver's, made when a hand first touches a thin gap. */
+  private cpuHandTex: GPUTexture | null = null;
+  private handTex: GPUTexture | null = null;
+  /** Whether the next step has a hand in it: the hands are laid each step they move, and gone the step after. */
+  private handLive = false;
+  /** The fastest hand laid for the next step, in the hands' cells a step (the ferrofluid's substeps follow it). */
+  private handFastest = 0;
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
@@ -1160,7 +1177,7 @@ export class WebGPUFluid {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -1179,6 +1196,17 @@ export class WebGPUFluid {
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+    if (hands) {
+      if (!this.handTex) {
+        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        this.cpuHandTex = this.disposer.track(this.device.createTexture({ label: 'hands (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+        this.handTex = this.disposer.track(this.device.createTexture({ label: 'hands', size: [this.N, this.N], format: RGBA32, usage }));
+      }
+      q.writeTexture({ texture: this.cpuHandTex! }, hands, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+      let fastest = 0;
+      for (let k = 0; k < hands.length; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
+      this.handFastest = fastest;
+    }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
     this.writeSplatArgs(0);
@@ -1189,6 +1217,9 @@ export class WebGPUFluid {
     this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
     this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
+    if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
+    // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
+    if (hands) this.handLive = true;
     this.foldDeltas(pass);
     pass.end();
     q.submit([enc.finish()]);
@@ -1356,6 +1387,21 @@ export class WebGPUFluid {
   step(p: GpuStepParams, deltasApplied: boolean): void {
     const N = this.N;
     const disp = stepDisplacement(p.dt, p.advection, N);
+    // The hands laid for this step, and for no other (applyDeltas).
+    const hands = this.handLive ? this.handTex : null;
+    const handCells = this.handLive ? this.handFastest * N / this.L : 0;
+    this.handLive = false;
+    /*
+      The substeps a hand in the liquid needs of the carries that take a
+      fixed number (the ferrofluid's, and the colour's under a maze's flow):
+      a Finger on a thin gap carries the liquid it touches at the hand's own
+      speed (hsPrep), and a brisk hand is several cells a step on the
+      solver's grid, past what six substeps of 0.45 may carry, so a pool
+      under a fast stroke was left behind it (\`npm run fingerflow\`). 0.4 a
+      substep, as the colour's own plan (CARRY_COURANT), only for the steps
+      a hand is down.
+    */
+    const handSubs = Math.max(PHASE_SUBSTEPS, Math.min(CARRY_SUBSTEPS, Math.ceil(handCells / CARRY_COURANT)));
     // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
     /*
@@ -1710,7 +1756,7 @@ export class WebGPUFluid {
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
-        this.thinProject(pass, p, disp);
+        this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
         this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
       });
@@ -1823,8 +1869,9 @@ export class WebGPUFluid {
       */
       if (thin) this.planCarry(pass, disp);
       if (!bodiesOn && mazeFlow) {
-        const flux = this.arg('dye flux', [0, 0, 0, 0, 0, disp / PHASE_SUBSTEPS, 1, 0]);
-        for (let k = 0; k < PHASE_SUBSTEPS; k++) {
+        // The maze's sixths, or as many as a hand in the liquid needs (handSubs), as the ferrofluid takes.
+        const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, 0]);
+        for (let k = 0; k < handSubs; k++) {
           this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
         }
@@ -1926,7 +1973,8 @@ export class WebGPUFluid {
       // than one flux step may (0.45 of a cell): so in substeps.
       // And under Thin Gap, where a press moves the liquid as fast as the
       // glass comes down (a cell a step and more round a palm, lab).
-      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001 || thin) ? PHASE_SUBSTEPS : 1;
+      // And as many as a hand in it needs (handSubs).
+      const subs = this.phaseLive && (p.magnetStrength > 0.0001 || maze > 0.001 || thin) ? handSubs : 1;
       // A.b.z: the Rhie–Chow correction on (see phaseAdvect), which needs the
       // projection's pressure to still be the one velForced was made with.
       /*
@@ -3087,15 +3135,17 @@ export class WebGPUFluid {
    * a variable-coefficient multigrid with the rim held open, and the
    * velocity the step ends with.
    */
-  private thinProject(pass: GPUComputePassEncoder, p: GpuStepParams, disp: number): void {
+  private thinProject(pass: GPUComputePassEncoder, p: GpuStepParams, disp: number, hands: GPUTexture | null): void {
     const prev = this.ensureThinGap();
     const mob = this.hsMob!;
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     const phase = this.phaseLive ? this.phase.read : this.blankPhase();
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${this.squeeze.read.label}:${phase.label}`,
-      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1, 0, 0, 0]),
-      [this.vel.read, prev, this.squeeze.read, phase, this.vel.write, mob]);
+    const hand = hands ?? this.blankPhase();
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}`,
+      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
+        1 / Math.max(this.L * disp, 1e-9), HAND_GRIP, 0]),
+      [this.vel.read, prev, this.squeeze.read, phase, hand, this.vel.write, mob]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,

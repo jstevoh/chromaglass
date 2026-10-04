@@ -155,7 +155,7 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       The step's forces as terminal speeds, the drag, and the mobility.
 
       A.a = (k scale, real seconds this step, the rest gap h0, the rim's
-      radius), A.b.x the ferrofluid's viscosity over the clear liquid's.
+      radius), A.b.x the ferrofluid's viscosity over the clear liquid's, A.b.y and A.b.z the hands' (below).
       k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
       liquid's kinematic viscosity over the plate's width squared, so the
       drag is in real seconds whatever grid or look clock the plate runs at.
@@ -173,8 +173,9 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
 @group(0) @binding(3) var prev: texture_2d<f32>;
 @group(0) @binding(4) var sq: texture_2d<f32>;
 @group(0) @binding(5) var phase: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(7) var<storage, read_write> mob: array<f32>;
+@group(0) @binding(6) var hand: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(8) var<storage, read_write> mob: array<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -195,13 +196,55 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let share = clamp(textureLoad(phase, min(q, vec2i(textureDimensions(phase)) - 1), 0).r, 0.0, 1.0);
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share);
-  let ustar = u0 + (uf.xy - u0) * (A.a.x / (A.a.z * A.a.z) * A.a.y);
-  let c = 1.0 / (1.0 + kdt);
+  var ustar = u0 + (uf.xy - u0) * (A.a.x / (A.a.z * A.a.z) * A.a.y);
+  /*
+    A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
+    layer, and the liquid it touches moves with it. Brinkman's penalised
+    solid: inside the hand the liquid feels a second drag, toward the hand's
+    own velocity rather than toward rest, so this cell's implicit update is
+    u = (u* + K·Δt·U) / (1 + k·Δt + K·Δt). It is in the solve and not laid
+    over the velocity beforehand, because the mobility h·c carries it into
+    the pressure: where the hand grips, c is small, so the pressure that
+    makes the flow conserve liquid barely moves the liquid there, and the
+    liquid round the hand is what gives way (the flow past a moving
+    obstacle). Laid over beforehand, as the deltas did, the solve took the
+    divergent half of a disc moving through still liquid straight back out,
+    and with it nearly all of the push.
+
+    \`hand\` is (Σ χ·U, Σ χ), U in the hands' cells a step (CPU grid), χ how
+    much of the cell the hand fills; a cell two hands share takes their mean
+    velocity. A.b.y turns cells a step into the solver's velocity (1/(L·disp)),
+    A.b.z is the grip K·Δt where χ is 1, over the cell's own drag. 1×1 and empty with no hand down.
+  */
+  let hs = textureLoad(hand, min(q, vec2i(textureDimensions(hand)) - 1), 0);
+  let chi = clamp(hs.z, 0.0, 1.0);
+  // In units of the cell's own drag, so the hand wins over a thick liquid
+  // (the ferrofluid's, glycerine's) as surely as over water: a solid's speed
+  // does not depend on what it moves through.
+  let grip = chi * A.b.z * (1.0 + kdt);
+  if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) * A.b.y; }
+  let c = 1.0 / (1.0 + kdt + grip);
   var mo = hsGap(g, A.a.z) * c;
   // Past the rim the liquid is open to the air: p is held at zero there.
   let d = uvOf(id) - vec2f(0.5);
   if (length(d) >= A.a.w) { mo = -mo; }
   mob[q.x + q.y * n] = mo;
+  /*
+    Under a hand what is stored is u* + K·Δt·U, which the gradient takes
+    back down by c, and at a brisk hand's speed it is past VEL_BOUND: the
+    bound cut a hand at five cells a step to 2.8 (\`npm run fingerflow\`).
+    So the hand's cells are bounded at what the half float holds instead;
+    elsewhere the speed stays held to VEL_BOUND as it was.
+  */
+  if (grip > 0.0) {
+    var o = vec4f(ustar, uf.z, uf.w);
+    if (!finite4(vec4f(o.xyz, 0.0))) { o = vec4f(0.0); }
+    let sp = length(o.xy);
+    if (sp > 60000.0) { o = vec4f(o.xy * (60000.0 / sp), o.z, o.w); }
+    o.z = clamp(o.z, -VEL_BOUND, VEL_BOUND);
+    textureStore(dst, q, o);
+    return;
+  }
   textureStore(dst, q, safeVel(vec4f(ustar, uf.z, uf.w)));
 }`,
 
