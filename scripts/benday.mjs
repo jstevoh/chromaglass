@@ -142,13 +142,22 @@ try {
   // ── 2. A pale wash prints as even dots ─────────────────────────────
   /*
     Two washes, both in the tint's band (coverage 0.22 to 0.55, read at 0):
-    0.14 reads about 255,165,165 and 0.16 about 255,140,140. Ben-Day dots are
+    0.10 reads about 255,166,166 and 0.11 about 255,142,142. Ben-Day dots are
     one size in both; a halftone's would be about a fifth bigger in the
     deeper one, which is what tells the two apart (on one wash a halftone's
     dots are one size too).
+
+    They were 0.14 and 0.16 until the pigment's grain moved after the gooey
+    curve (PLAN 1a). The lab draws without the solver's grain field, so the
+    plate reads one blank grain value everywhere, a factor of about 0.75; in
+    front of the curve that thinned every wash by a quarter before the curve
+    steepened it four times, and 0.14 landed pale. Behind the curve the same
+    factor is a quarter of the optical depth, and 0.14 reads 255,88,88, past
+    the band. The washes are the same tints as before, laid thinner; nothing
+    the print is asked changed.
   */
   const washes = [];
-  for (const d of [0.14, 0.16]) {
+  for (const d of [0.10, 0.11]) {
     const lay = [[0.5, 0.5, 1.2, RED, d]];
     const on = await render(lay);
     const off = await render(lay, { benDay: 0 });
@@ -204,7 +213,8 @@ try {
   // ── 3. The screen's dots, not the glass's ──────────────────────────
   // A plate turned under the screen: a lattice fixed to the glass would turn
   // with it (13.9% of the pixels kept, tried).
-  const lumpy = [[0.5, 0.5, 1.2, RED, 0.13], [0.3, 0.6, 0.25, RED, 0.03], [0.7, 0.35, 0.3, RED, 0.02]];
+  // Its densities scaled with the washes' (see there): a pale lumpy tint.
+  const lumpy = [[0.5, 0.5, 1.2, RED, 0.095], [0.3, 0.6, 0.25, RED, 0.02], [0.7, 0.35, 0.3, RED, 0.015]];
   const turned0 = await render(lumpy, {}, { rotation: 0 });
   const turned1 = await render(lumpy, {}, { rotation: 0.35 });
   let both = 0, either = 0;
