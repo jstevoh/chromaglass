@@ -87,7 +87,7 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // Lighter still, and polar enough to go into water rather than sit on it.
   { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Light and thin: it rises through water and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
     behaviour: { weight: -0.2, polarity: -0.15 } },
-  { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.25,heatAmount: 0.0,
+  { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.3, heatAmount: 0.0,
     behaviour: { weight: 0.02, polarity: 0.2 } },
   // The heavy one, and it is sugar in water, so it is polar: it sinks through
   // water without refusing to mix with it.
@@ -966,7 +966,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmDrive: 0,
   filmImpact: 0,
   lampWarmth: 0,
-  transmission: 0.5,          // halfway: thick pools deep and thin washes pale, without crushing a dense blue to black
+  transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,
   fingering: 0,
   // A few. The plate is oil on water and the reference for the whole look is a

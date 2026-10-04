@@ -5,7 +5,7 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
+import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
 import { sizedMagnet } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
@@ -57,6 +57,7 @@ import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
+import { dyeAbsorbances } from '../lib/dye';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -600,7 +601,7 @@ const SIM_MAX_CATCHUP = (() => {
              beat's ring, treble sparks, the squeeze, a bubble on the kick, a
              soap burst.
     liquids  which bottle a dose comes from (`doseLiquid`).
-    palette  which three of a look's dyes are the working set (`harmonyWithin`;
+    palette  which of a look's dyes are the working set (`harmonyWithin`;
              `harmonyColor` and `pickHarmony` draw from the same stream).
     chem     where a reaction is seeded: the BZ waves and Boyle's chemistry.
     pour     where a paced scene's flood lands (`pour` on the handle), so a
@@ -851,12 +852,12 @@ export interface LiquidVisualizerHandle {
 }
 
 
-/** A working harmony drawn from inside a contract: the whole set when small, else three of it. */
+/** A working harmony drawn from inside a contract: the whole set when small, else WORKING_DYES of it. */
 const harmonyWithin = (contract: number[]): number[] => {
-  if (contract.length <= 3) return contract;
+  if (contract.length <= WORKING_DYES) return contract;
   const pool = [...contract];
   const out: number[] = [];
-  while (out.length < 3) out.push(pool.splice(DICE.palette.int(pool.length), 1)[0]);
+  while (out.length < WORKING_DYES) out.push(pool.splice(DICE.palette.int(pool.length), 1)[0]);
   return out;
 };
 
@@ -869,7 +870,7 @@ const harmonyWithin = (contract: number[]): number[] => {
 const windowOf = (contract: number[], size: number | null, lead: number): number[] => {
   const n = contract.length;
   if (n === 0) return contract;
-  const w = Math.max(1, Math.min(n, size ?? (n <= 3 ? n : 3)));
+  const w = Math.max(1, Math.min(n, size ?? Math.min(n, WORKING_DYES)));
   const out: number[] = [];
   const start = ((Math.round(lead) % n) + n) % n;
   for (let i = 0; i < w; i++) out.push(contract[(start + i) % n]);
@@ -1737,10 +1738,11 @@ class FluidSimulation {
     // Store log-space absorptions for Scott Burns geometric mean mixing.
     // At render time: channel = exp(-densityChannel / density)
     // This gives r1^w1 * r2^w2 weighted mixing — physically correct subtractive colorimetry.
-    const eps = 0.002;
-    this.densityR[index] += amount * (-Math.log(Math.max(eps, r)));
-    this.densityG[index] += amount * (-Math.log(Math.max(eps, g)));
-    this.densityB[index] += amount * (-Math.log(Math.max(eps, b)));
+    // The absorbance is a real dye's, never a perfect filter's (lib/dye.ts).
+    const [ar, ag, ab] = dyeAbsorbances(r, g, b);
+    this.densityR[index] += amount * ar;
+    this.densityG[index] += amount * ag;
+    this.densityB[index] += amount * ab;
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
@@ -4248,14 +4250,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /**
    * The working harmony for the current contract: the sequencer's window if
    * it set one, else the hue journey's window (one dye short of the contract,
-   * so the walk is visible), else the whole set.
+   * so the walk is visible, and at most WORKING_DYES), else the whole set.
    */
   const harmonyFromContract = (contract: number[], journeyOn: boolean): number[] => {
     const pw = paletteWindowRef.current;
     const lead = pw.lead + journeyRef.current.lead;
     if (pw.size !== null) return windowOf(contract, pw.size, lead);
-    if (journeyOn && contract.length >= 3) return windowOf(contract, Math.max(2, contract.length - 1), lead);
-    return contract.length <= 3 ? windowOf(contract, null, lead) : harmonyWithin(contract);
+    if (journeyOn && contract.length >= 3) return windowOf(contract, dyesOnPlate(contract.length, true), lead);
+    return contract.length <= WORKING_DYES ? windowOf(contract, null, lead) : harmonyWithin(contract);
   };
   const bubblesRef = useRef(new BubbleField(GRID_SIZE));
   /** The last values handed to the bubble uniforms, for the harness. */
@@ -5286,7 +5288,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The front's sequencer windows and hue journey are the front's; the
         // back plate takes its look's dyes whole, as a look laid fresh does.
         // A look with no dyes of its own takes what its seed lays (below).
-        harmony: contract ? (contract.length <= 3 ? windowOf(contract, null, 0) : harmonyWithin(contract)) : harmonyRef.current,
+        harmony: contract ? (contract.length <= WORKING_DYES ? windowOf(contract, null, 0) : harmonyWithin(contract)) : harmonyRef.current,
         styles: PRESET_INJECT_STYLES[presetId] || ['drop'],
         liquids: PRESET_LIQUIDS[presetId] ?? [],
       };

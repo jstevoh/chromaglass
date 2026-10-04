@@ -18,7 +18,7 @@ screen capture.
 **The show.** Twenty-odd filmed liquid light shows, from the Joshua Light Show's 1969
 *Liquid Loops* to a band's show in 2023, were measured with the watch tool
 (`npm run watch`) on 2026-09-26. Real shows move in swells and scenes, spend a third
-or more of the time near black, hold two or three hues a frame, and do not follow the
+or more of the time near black, hold two or three hues a frame (the owner wants more, 18l), and do not follow the
 kick. Ours is equally busy all the time, which `src/lib/phrasing.ts` measured and
 stopped short of fixing. Batch 10 is that thread; its yardstick is the table there.
 
@@ -1188,7 +1188,7 @@ The yardstick, measured on the footage at four samples a second:
 | Scene change | every 15–30 s |
 | Share of time calm | 20–40 % |
 | Near-black | 30–60 % on average, ranging from 3 % to 90 % over a set |
-| Hues in a frame | 2–3, one family leading, the family changing by scene |
+| Hues in a frame | 2–3, one family leading, the family changing by scene (the owner, 2026-10-04, wants more: five dyes of a family on the plate, 18l) |
 | Motion against loudness | r ≈ 0 at the beat; about 0.4 over 20 s windows |
 | Edges | two regimes: soft washes under 1 %, sharp drop and cell fields about 15 % |
 | Hard cuts | none |
@@ -3661,6 +3661,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
 | 18k | Smaller ones | Small | Free to small | See each |
+| 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (this PR); real dye spectra (18l-1) after |
 
 ### 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 
@@ -4357,6 +4358,78 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **The ferrofluid's spikes are placed** on a fixed hexagonal lattice
   (`src/gpu/wgsl/spikes.ts`) rather than emerging from the Rosensweig instability.
   Noted for the ferrofluid thread (9f onward), not audited further here.
+
+### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
+
+- **What was reported** (the owner, 2026-10-04): "in general there just aren't enough
+  colors in the presets. I want a lot of color subtlety between color gradients."
+- **What was measured** (the lab, each look's own dyes on one seeded, sheared plate,
+  rendered through the plate shader; distinct colours are 5° of hue by four steps of
+  saturation and of value, each holding 0.1% of the lit pixels): three causes.
+  - *Two dyes on the plate.* Most looks carried two or three dyes, from §10's "2–3 hues
+    a frame", and the hue walk shows one fewer than the set (`harmonyFromContract`), so
+    most looks had two dyes on the plate at once; a look without the walk drew three.
+  - *Perfect filters.* `addDensity`, the splat records and the picture pour read a
+    palette colour as the dye's transmission with a floor of 0.002, and half the
+    palette sits on the gamut's corners, a channel at 0 and one at 1. That is a filter
+    that passes all or nothing of each band, which has one colour at every depth
+    (1ⁿ = 1, 0ⁿ = 0): each pool was one flat colour from rim to core, Transmission
+    could only change its opacity (on Classic's plate, Transmission at 1 alone: 68
+    distinct colours to 66), and a sixth of a blocking dye in a mixture killed a
+    channel (the hue change bunched 43–51% into the outer fifth of a mix of yellow and
+    hot pink, amber and hot pink, purple and blue, orange and red).
+  - *A grade that clips.* The saturation grade (1.45 on most looks) clamped each channel
+    on its own: with it at 1, Classic's plate showed 75 colours against 62, Velvet
+    Underground's 79 against 57.
+  - Not the cause: the gooey edge (no consistent change), and the mixing law itself
+    (geometric mean of transmissions, which is the physics).
+- **Shipped** (this PR): the dye's absorbance is a real dye's, held between 4% and 96%
+  transmission per band at one unit (`src/lib/dye.ts`, every place a poured colour becomes
+  dye: drops, strokes, the picture pour, the CPU engine; a colour clear in every band,
+  white, stays clear liquid; the bead drops' own lens colour in `plate.ts` already had a
+  4% floor and keeps its own conversion);
+  Transmission's default is 1, so the colour follows the dye's depth (Beer–Lambert:
+  thin washes pale, deep pools saturate and their hue shifts, a deep yellow amber, a
+  deep pink crimson); 27 of the 41 looks carry five to seven dyes as a family of
+  neighbouring hues and an accent, and five are on the plate at once (`WORKING_DYES`,
+  `dyesOnPlate`); the grade pushes
+  along the line from grey and eases in before the gamut's edge, so it keeps the hue.
+  Ink lays 0.3 a drop where it laid 0.25: with a red that is no longer a perfect filter,
+  a drop of Cherry Red into a yellow plate read 1.48 times as red as green against
+  `npm run plate`'s bar of 1.5 (that check now uses the app's conversion, not its own copy).
+  The Slow Build sequence opens on one of Classic's dyes, then three, then five. The phone
+  draws the same plate and palettes. `npm run colours` (CI, open shard) holds
+  it (9 checks; 2 of them pass on the old plate, the presence ones): most looks five dyes
+  or more and five on every six-dye plate, six dyes strictly paler thin and more
+  saturated deep (old: 0.95/0.99/0.98 for yellow, now 0.69/0.96/1.00), a pure blue
+  letting 4.2% of red and green through (old 0.2%), a deep yellow toward orange from the
+  depth, four neighbouring pairs walking (net hue change in the outer tenth at each end
+  39–48% of the whole on the old dyes, 25–28% now, at most a third asked), the grade
+  within 3° of hue at the 95th percentile (old clamp 6.2°, now 0.3°).
+  Left as they were: Velvet Underground, Lumia, Cell Bloom and the Fillmores (areas of
+  their own, "More going on in every look"), Sensual Laboratory (on the lamp, #262),
+  Clock Glass and the ferrofluid looks (their own pass), Roy's three inks, and the looks
+  whose liquids or chemistry make the colour. Judging: docs/judging.md (the owner's eyes
+  on every look, on the Mac).
+- **18l-1. Real dye spectra (the shortcut kept).** Still three bands: a dye's colour is
+  three transmissions, and the 4%/96% limits stand in for the tails of a real absorption
+  band. Spectral Optics' six bands cannot reproduce the palette's saturated colours (its
+  bands are too wide: hot pink comes out 0.66/0.32/0.41), so it is no replacement as
+  it stands. The real thing is each dye's absorption spectrum (smooth bands, fitted so
+  the dye at one unit is its palette colour) mixed wavelength by wavelength and summed
+  through the CIE matching functions, which turns yellow over blue green as paint does;
+  it needs either more dye channels in the solver or a smooth three-coefficient basis
+  for the absorbance that stays closed under mixing.
+- **18l-2. The packed dye caps absorbance at 8.** `packDye` stores each channel
+  √(d/8) in 8 bits and clamps at 8, so a dense pool of a dye that blocks a band
+  (absorbance 3.2 per unit now, 6.2 before) saturates that channel's store at a density
+  of 2.5 and the decode's per-unit colour lets the band back in. Belongs with 14i's
+  float dye for the plate (and the pixelation work, #267).
+- **18l-3. The thin floor.** The decode still clamps the depth it draws at 0.35 to 4,
+  so the thinnest wash is not paler than a third of a unit and the deepest core not
+  deeper than four; inside that range the colour is the stored absorbance exactly. A
+  thinner floor reads as a milky halo on the black ground; on the lamp ground (18b) the
+  depth is not clamped.
 
 ### Kept, named as dials or looks
 

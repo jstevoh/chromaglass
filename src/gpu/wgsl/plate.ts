@@ -206,6 +206,47 @@ fn throughScaled(through: vec3f, k: f32) -> vec3f {
 }
 
 /*
+  The look's saturation grade, which keeps the hue (PLAN 18l).
+
+  It was mix(luma, c, s) and then a clamp of each channel to 0..1. Most
+  looks grade at 1.45, and the dye's colours already sit near the edge of
+  what the screen can show, so the push carried most of them past it, and
+  the clamp then cut each channel on its own: a soft orange and a deeper
+  one both landed on the same clipped orange, an amber leaning to yellow
+  turned yellow, and every in-between hue a mixture had made was pressed
+  flat onto the gamut's edge. Measured in the lab with the grade at 1
+  against 1.45, the plate showed a fifth to two fifths more distinct
+  colours (Classic 62 to 75, Velvet Underground 57 to 79).
+
+  So the push is along the line from grey to the colour, and as that line
+  reaches the edge of the gamut it eases in short of it (a smooth minimum
+  of the asked push and the most that fits, with no channel cut on its
+  own), so the hue and the brightness stay and two colours that were
+  different stay different. Where the push fits with room to spare it is
+  the push asked for, to a fraction of a percent (at twice the room it is
+  0.3% short). Light already at or past the edge before the grade (a
+  highlight lifted above 1) gets no push, and its channels clamp as they
+  always did; a gradient crossing the edge stays a gradient (an early
+  return to the old push there made a step of 48 bytes in the blue between
+  a red of 0.999 and one of 1.0, the pre-push review).
+*/
+fn saturate3(c: vec3f, s: f32) -> vec3f {
+  let l = clamp(dot(c, vec3f(0.299, 0.587, 0.114)), 0.0, 1.0);
+  let d = c - vec3f(l);
+  let asked = clamp(vec3f(l) + d * s, vec3f(0.0), vec3f(1.0));
+  if (s <= 1.0) { return asked; }
+  // The largest push that keeps every channel inside 0..1.
+  var room = 1e6;
+  for (var i = 0; i < 3; i++) {
+    if (d[i] > 1e-5) { room = min(room, (1.0 - l) / d[i]); }
+    if (d[i] < -1e-5) { room = min(room, l / -d[i]); }
+  }
+  // A smooth minimum of the push asked and the room, never under no push.
+  let k = max(1.0, s / pow(1.0 + pow(s / room, 6.0), 1.0 / 6.0));
+  return clamp(vec3f(l) + d * k, vec3f(0.0), vec3f(1.0));
+}
+
+/*
   The rims, lines, cells, gloss and the closeup's detail are drawn on the
   dye's tint (the meniscus darkens it, the boundary line brightens it). On a
   lamp ground the tint is not what is drawn, so what they did is carried
@@ -2940,8 +2981,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Saturation grade ──────────────────────────────────────────────
-  let luma = dot(outColor, vec3f(0.299, 0.587, 0.114));
-  outColor = clamp(mix(vec3f(luma), outColor, U.saturation), vec3f(0.0), vec3f(1.0));
+  outColor = saturate3(outColor, U.saturation);
 
   // ── Ben-Day dots: the finished picture, printed as a comic (benDay) ──
   if (U.benDay > 0.001) {

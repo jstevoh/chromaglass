@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — more colours in the looks, and the hues between them (PLAN 18l)
+
+- Most looks carry five or six dyes of one family of neighbouring hues, and five
+  are on the plate at once, where most showed two.
+- A dye is a real dye rather than a perfect filter: a thin wash is a pale tint of
+  it, a deep pool saturates and shifts (a deep yellow goes amber), and two colours
+  meeting walk through the hues between them. Transmission defaults to 1.
+- The saturation grade keeps the hue instead of clipping each channel.
+- `npm run colours` checks all three.
+
 ### Changed — the spun dish's swirl on a thin plate is one pass, not thirteen (PLAN 22k)
 
 - Since a look's own turning went onto the dish, the nine thin looks with music

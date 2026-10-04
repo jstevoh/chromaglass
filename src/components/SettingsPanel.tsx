@@ -1619,7 +1619,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             and thick pools deep, and overlaps darken. */}
         <Slider
           label="Light Through Dye"
-          value={settings.transmission ?? 0.5}
+          value={settings.transmission ?? 1}
           min={0}
           max={1.0}
           step={0.05}

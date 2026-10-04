@@ -3484,7 +3484,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * would have been; above the threshold it deposits colour the way
    * `addDensity` does — absorption in rgb, density in a.
    *
-   * A.a = (amount, threshold, 0, 0), A.b.rgb = −log(colour).
+   * A.a = (amount, threshold, 0, 0), A.b.rgb = the dye's absorbance (lib/dye.ts).
    */
   depositChem: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var dye: texture_2d<f32>;

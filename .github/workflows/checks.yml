@@ -630,6 +630,12 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # More colours (PLAN 18l): most looks carry five dyes and five are on the
+      # plate; a dye is paler thin than deep and a deep yellow turns orange; two
+      # neighbouring dyes meeting walk between their hues; the grade keeps hue.
+      - name: Enough colours, and the hues between them
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run colours
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print

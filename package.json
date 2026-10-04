@@ -130,6 +130,7 @@
     "grating": "node scripts/grating.mjs",
     "benday": "node scripts/benday.mjs",
     "lamp": "node scripts/lamp.mjs",
+    "colours": "node scripts/colours.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
     "beams": "node scripts/beams.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",

@@ -17,11 +17,13 @@
  * years still means what it meant.
  */
 
+import { DYE_ABSORBANCE_WGSL } from '../../lib/dye';
+
 const SPLAT_STRUCT = /* wgsl */ `
 struct Splat {
   // x, y and radius in logical cells; w is the kind: 0 disc, 1 line.
   a: vec4f,
-  // What it deposits: −log(colour) × amount in rgb, density in a.
+  // What it deposits: the dye's absorbance (lib/dye.ts) × amount in rgb, density in a.
   b: vec4f,
   // vx, vy, temperature, and the change in the plate gap.
   c: vec4f,
@@ -103,6 +105,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * A.count is 1 here; the box and the strength ride in the uniform's tail.
    */
   pourImage: `${SPLAT_STRUCT}
+${DYE_ABSORBANCE_WGSL}
 @group(0) @binding(1) var<storage, read> splats: array<Splat>;
 @group(0) @binding(2) var dye: texture_storage_2d<rgba32float, write>;
 @group(0) @binding(3) var src: texture_2d<f32>;
@@ -124,8 +127,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // absorption. s.d.x is the strength, s.b.a the floor under it, s.d.y the flip.
   let luma = dot(px.rgb, vec3f(0.299, 0.587, 0.114));
   let amount = (s.b.a + s.d.x * luma) * px.a;
-  let eps = vec3f(0.002);
-  let absorb = -log(max(px.rgb, eps));
+  let absorb = dyeAbsorbance(px.rgb);
   textureStore(dye, vec2i(id.xy), vec4f(absorb * amount, amount));
 }`,
 

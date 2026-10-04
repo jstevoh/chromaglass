@@ -244,7 +244,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));
-  pack.set('transmission', clamp01(s.transmission ?? 0.5));
+  pack.set('transmission', clamp01(s.transmission ?? 1));
   // The dimmer, with the flash guard's correction folded in. Riding the
   // dimmer rather than adding a pass is what lets one implementation
   // cover the laptop, the projector, a network display and the
