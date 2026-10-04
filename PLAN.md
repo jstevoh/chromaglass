@@ -2865,7 +2865,22 @@ for, and the GPU was asked for only after they had arrived and drawn.
   display's, the derive's and the air's first draws, 2.06 s each and all at once,
   every lane idle while the GPU warmed. So a first use is now handed to the GPU and
   not waited for in its lane; the opening waits once for all of them at the end
-  (`useWait`, printed by `startup`).
+  (`useWait`, printed by `startup`). On the next Mac run (37192204661): first uses
+  1.17 s of lane time (was 6.31), the one wait at the end 0.00 s, built ahead 0.49 →
+  10.16 s and first step 10.69 s (was 11.54 s on this PR's first run, the same
+  opening), no frame gap over 0.62 s. The lanes now spend 27.4 of their 29 s
+  compiling, so what is left is the compiles themselves: 48 of them, the first three
+  under Chromium's 2.9 s GPU start.
+- *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
+  opening is the sum of its compiles over three: 0.33 s median each with three in
+  flight. The solver's small kernels are each a full compile however little they do
+  (most are 4–6 kB of source, the shared Sim struct and a few lines); pairs that run
+  one after the other on the same cells (`decayDye` and `decayVel`, the multigrid's
+  restrict and zero) could be one dispatch writing both, which is fewer compiles and
+  fewer dispatches a step. Each fusion changes the solver's step, so each wants
+  `physics`, `thingap` and the Mac's frame time, not just `startup`.
+- *Chromium's GPU start.* All three first builds sat 3.4 s under it (2.9 s held, run
+  37192204661), whatever they were. Nothing the page asks changes when it ends.
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure
