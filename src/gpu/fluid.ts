@@ -455,6 +455,13 @@ export class WebGPUFluid {
   private swirlLive = false;
   /** Seconds the swirl runs on after its forcing stops, so what it made can die away. */
   private swirlTail = 0;
+  /**
+   * For `npm run swirlcost` (PLAN 22k): the same plate with the swirl held
+   * off, to read what it costs, and how many steps ran it of how many were
+   * taken. Never set by the app.
+   */
+  swirlHeldOff = false;
+  readonly swirlCount = { steps: 0, ran: 0 };
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
   /*
@@ -1673,7 +1680,9 @@ export class WebGPUFluid {
       plate it is laid over the flow after both projections, as the current
       is, and it is divergence-free already (stepSwirl projects it).
     */
-    const swirlOn = this.swirlWanted(p);
+    const swirlOn = this.swirlWanted(p) && !this.swirlHeldOff;
+    this.swirlCount.steps++;
+    if (swirlOn) this.swirlCount.ran++;
     stage('swirl', (pass) => {
       if (swirlOn) { this.stepSwirl(pass, p, thin); return; }
       for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);

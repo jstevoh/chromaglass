@@ -9658,6 +9658,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
               return on;
             },
+            /**
+             * The spun dish's swirl held off (`on` false) or let run, for
+             * `npm run swirlcost` (PLAN 22k), and every layer's count of the
+             * steps taken and the steps that ran it since the page opened.
+             */
+            swirl: (on?: boolean) => fluidsRef.current.map((f) => {
+              if (!(f.gpu instanceof WebGPUFluid)) return null;
+              if (on !== undefined) f.gpu.swirlHeldOff = !on;
+              return { ...f.gpu.swirlCount, heldOff: f.gpu.swirlHeldOff };
+            }),
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,
