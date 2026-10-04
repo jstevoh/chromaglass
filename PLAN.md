@@ -250,6 +250,8 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
+- **7.5** Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
+  **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, then **23.7**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 
 ### One home for work written twice
@@ -2234,8 +2236,8 @@ shader compiler and Windows' audio inputs are all unmeasured. In this order:
   job signs with. Unsigned, SmartScreen warns people off the installer, as macOS does
   for the unsigned Mac app (13.1-sign).
 - **13.3**'s Spout out then lands on this build, and **13-update**'s updates serve both.
-- Selling it, if that is chosen, needs nothing Windows-only: a licence key checked
-  offline works the same in both apps.
+- Selling it (§23) needs nothing Windows-only: a licence key checked offline works
+  the same in both apps.
 
 Until step 2 lands, the plate still reaches a VJ app the way it can today: OBS
 captures the projector window and sends it on through its Syphon or NDI plugin, and a
@@ -5230,3 +5232,93 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   the middle a small move is a large angle. A hand's real torque is its friction
   times its lever arm: weight each hand by its radius and let a thick liquid's drag
   push back (22e).
+
+## 23. Selling it: the site free, the app paid
+
+*Asked 2026-10-04: which features should leave the free web app and stay in a paid
+version. The owner chose the split below the same day. Nothing is gated yet; this
+section is the order to build it in.*
+
+**The rule.** The website keeps the whole plate and is the demo: anyone who opens it
+sees the best ChromaGlass there is, on their own laptop and one projector. What is
+paid is what turns the plate into a show rig, and most of that is what a page cannot
+do at all, so the paid side is mostly the Mac app (§13 step 1), and the Windows app
+after it (13-win-app), rather than features cut from the site.
+
+**Why so little leaves the site.** The source is public and BUSL lets anyone run
+their own copy and change it, so a gate on the website is a nudge, not a lock. It
+still works, because nearly everyone uses the hosted site rather than building from
+source: gates go in the hosted site's build, and the code stays in the repo. What the
+app does natively (the show server with no terminal, video out, offline, the
+projector with no click, writing to disk) needs no enforcement at all. Two things
+cost the owner money on every use, song ID now and any cloud storage later, so they
+sit behind the key.
+
+**Order.** None of it before Wave 1, a judging pass (Wave 2), the signed Mac app
+(13.1-sign) and a free beta with a few VJs. Then the steps below, then charging.
+
+### The split
+
+| Feature | Free website | Paid app | Why |
+|---|---|---|---|
+| Every look, preset and photograph | ✓ | ✓ | The look is what sells it; a weaker demo loses the sale. |
+| Solver quality, grid and governor | ✓ | ✓ | Hobbling the picture makes the site a worse advert. |
+| Every tool and every liquid | ✓ | ✓ | Playing with the liquid is a first visit's "wow". |
+| Design desk; your own presets as files | ✓ | ✓ | People invest in it, and their presets carry into the app. |
+| Microphone, system audio, file player, beat clock, band in the box | ✓ | ✓ | Sound-reactivity is the core promise. |
+| MIDI controller, MIDI learn, tap tempo | ✓ | ✓ | A VJ tries it with their own controller before buying. |
+| One projector on HDMI (Cast → Second display) | ✓ | ✓ | A party or a first gig on the site is the best advert. |
+| Projector found and sent to with no click, back after a knocked cable | | ✓ | A page needs a gesture; this is gig reliability. |
+| The Mixer's stack on one plate | ✓ | ✓ | It is part of the look. |
+| Two or more projectors, each its own plate (§16) | | ✓ | Only multi-screen rigs need it, and they are paying jobs. |
+| Show Sequencer and set lists | ✓ | ✓ | Free to try; a cap on a site set list's length can come later. |
+| Lyrics overlay (LRCLIB) | ✓ | ✓ | A free service and a good party trick. |
+| Song ID | manual tag only | ✓ | Every lookup costs the owner money. |
+| Song maps, per-track identity, history | ✓ | ✓ | Work from a manual tag at no cost. |
+| Your own logo on the wall | ChromaGlass mark | ✓ | A club or a band putting its name up is a paying use. |
+| Record | short clips, small mark | full length, no mark, to disk | The site holds the take in memory anyway (§13 found along the way). |
+| Render a song | 720p, small mark | full resolution, no mark | A finished video is a paid use. |
+| Phone and tablet remote, network display | | ✓ | Needs the show server, which the app has built in. |
+| OSC in | | ✓ | The same show server; pro integration. |
+| Art-Net: the room's lights follow the plate | | ✓ | The same show server; only venues have DMX. |
+| Syphon, Spout, NDI out (13.2, 13.3) | | ✓ | Impossible from a page; the main reason to buy a native app. |
+| DAW bridge plugin (13.7) | | ✓ | It talks to the app, not the site. |
+| Works offline at a venue | best effort | ✓ | The app bundles the build. |
+| The room camera driving the plate | ✓ | ✓ | A demo moment that costs nothing. |
+| iPhone app playing the show itself (§12) | free | | Store rules take a cut of an in-app sale; keep it a demo. |
+| iPhone app as the laptop's remote | | via the laptop's key | The laptop's licence covers its remote, so no store sale. |
+
+### How it unlocks
+
+- **Bought once through a merchant of record** (Paddle or Lemon Squeezy), which runs
+  the checkout, VAT and sales tax and emails a licence key. No accounts and no
+  logins; those wait until something syncs to the cloud (presets, set lists).
+- **The key is a signed token** the app checks against a public key built into it, so
+  it works with no internet at the gig: activated once online, two machines per key,
+  moved from a settings page.
+- **One price with a year of updates**, the usual shape for VJ software. A
+  subscription would need the key to expire and the app to call home, which fights
+  the offline promise; if the owner wants one, it is a separate decision.
+
+### Steps
+
+- **23.1** *(owner)*: the merchant account, the price and the checkout page.
+- **23.2** (one PR, lane B): a hosted-site build flag that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link, off in the app and in a
+  local `npm run dev`. *Measure:* a check that loads the site build and the app
+  build and lists which controls each shows, against the table.
+- **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
+  well as an allowed origin, and the site's manual tag stays. *Measure:* in the
+  manner of `npm run report-worker`: no key refused, a bad signature refused, a good
+  key answered.
+- **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
+  and the two-machine count, an "unlicensed" app that runs as the site does. Lands
+  in the Windows app with 13-win-app. *Measure:* `npm run desktop` with a good, a
+  bad and no key.
+- **23.5** (one PR, lane B): the site's Record capped to a short clip and Render to
+  720p, each with a small mark the Mixer cannot hide; the app's untouched. *Measure:*
+  a take from each, its length, size and the mark's pixels.
+- **23.6** (one PR, lane B, after 23.2): the site's logo layer shows the ChromaGlass
+  mark only; your own logo is the app's.
+- **23.7** *(owner)*: the free beta, then charging. Later, if wanted, the same key
+  pasted into the site unlocks it there too (bypassable from source, which is fine).
