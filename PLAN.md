@@ -772,9 +772,10 @@ were a ragged fringe of single lit and dark flecks, at the governed rung and the
 The cause was granulation (on at 0.5 in every look) scaling the opacity *before* the gooey
 contrast curve, which is steepest at the edge's half opacity, so every grain there became
 fully on or off. **Shipped:** the grain is drawn after the edge, as optical depth
-(`grainedDepth`, wgsl/plate.ts). `npm run grainedge`: flecks at the edges 3–15% of the edge
-pixels in the five looks it was found on, 0–0.04% after, every look under 0.5%; the bodies
-keep their grain. The owner's eyes on a laptop: `docs/judging.md` §34.
+(`grainedDepth`, wgsl/plate.ts). `npm run grainedge`, seven looks in the lab: flecks (edge pixels
+moved over 40 levels in a channel) 6–35% before, 0–0.61% after, every look held under 2%;
+the bodies keep a grain that is a texture, weaker than before inside thick pools, where
+the dye already stops nearly all the light. The owner's eyes on a laptop: `docs/judging.md` §34.
 
 Found with it, open:
 

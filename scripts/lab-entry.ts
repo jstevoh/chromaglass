@@ -435,6 +435,11 @@ const api = {
     fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
+    // Asked for the grain and there is none (an adapter without
+    // float32-filterable): the plate would read a blank 1×1 texture and draw
+    // one grain value everywhere, which a check of the grain would take for
+    // a grain. Say so instead.
+    if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
     const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
