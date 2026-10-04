@@ -1625,7 +1625,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   p[x + y * n] = (b[x + y * n] + s) * 0.25;
 }`,
 
-  // A.a.x = cells to zero.
+  /*
+    A.a.x = cells to zero. Level 0's packed pressure too, between
+    projections (`clearBuffer`), with A.a.x its n²: that had a kernel of its
+    own, `pressureClear`, the same zeroing with the count read off the
+    Sim, and every show waited for it to compile before it opened. A kernel
+    is a compile of about a fifth of a second on a cold Mac whatever it does
+    (`gpu/prepare.ts`), so two that do one thing are one.
+  */
   mgZero: `${HEAD}
 @group(0) @binding(2) var<storage, read_write> p: array<f32>;
 @compute @workgroup_size(64)
@@ -1634,7 +1641,15 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   p[id.x] = 0.0;
 }`,
 
-  // Add the coarse correction, bilinear between cell centres. A.a.x = fine n.
+  /*
+    Add the coarse correction, bilinear between cell centres. A.a.x = fine n;
+    A.a.y = 1 when the fine level is level 0, whose buffer is packed red and
+    black (`pressureRedBlack`), so cell (x, y) is a different word there.
+    Level 0 had a kernel of its own, `mgProlong0`, the same arithmetic but
+    for that index, and the opening waited for its compile as for this one's
+    (`mgZero` above on why two are one). Which index is one uniform branch,
+    the same for every thread of every dispatch.
+  */
   mgProlong: `${HEAD}
 @group(0) @binding(2) var<storage, read> e: array<f32>;
 @group(0) @binding(3) var<storage, read_write> p: array<f32>;
@@ -1652,40 +1667,12 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let f = c - vec2f(c0);
   let v = mix(mix(ec(c0.x, c0.y, m), ec(c0.x + 1, c0.y, m), f.x),
               mix(ec(c0.x, c0.y + 1, m), ec(c0.x + 1, c0.y + 1, m), f.x), f.y);
-  p[i] = p[i] + v;
-}`,
-
-  // The same into level 0's packed buffer.
-  mgProlong0: `${HEAD}
-@group(0) @binding(2) var<storage, read> e: array<f32>;
-@group(0) @binding(3) var<storage, read_write> pr: array<f32>;
-fn ec(x: i32, y: i32, m: i32) -> f32 { return e[clamp(x, 0, m - 1) + clamp(y, 0, m - 1) * m]; }
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let n = i32(S.n);
-  let m = n / 2;
-  let i = i32(id.x);
-  if (i >= n * n) { return; }
-  let x = i % n;
-  let y = i / n;
-  let c = (vec2f(f32(x), f32(y)) + 0.5) * 0.5 - 0.5;
-  let c0 = vec2i(floor(c));
-  let f = c - vec2f(c0);
-  let v = mix(mix(ec(c0.x, c0.y, m), ec(c0.x + 1, c0.y, m), f.x),
-              mix(ec(c0.x, c0.y + 1, m), ec(c0.x + 1, c0.y + 1, m), f.x), f.y);
-  let half = n / 2;
-  let k = ((x + y) & 1) * n * half + y * half + (x >> 1);
-  pr[k] = pr[k] + v;
-}`,
-
-  /** Zero the pressure buffer between projections, as the Jacobi's fill did. */
-  pressureClear: `${HEAD}
-@group(0) @binding(2) var<storage, read_write> pr: array<f32>;
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let n = u32(S.n);
-  if (id.x >= n * n) { return; }
-  pr[id.x] = 0.0;
+  var k = i;
+  if (A.a.y > 0.5) {
+    let half = n / 2;
+    k = ((x + y) & 1) * n * half + y * half + (x >> 1);
+  }
+  p[k] = p[k] + v;
 }`,
 
   /** `gradientSubtract`, reading the pressure from the buffer the sweeps wrote. */

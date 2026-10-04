@@ -781,8 +781,8 @@ export class WebGPUFluid {
     // The ones asked for by name alone, each with the one format it writes:
     // the pressure solve and the squeeze, which every step runs.
     const byName: [string, GPUTextureFormat][] = [
-      ['pressureClear', R32], ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
-      ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
+      ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
+      ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32],
       // The projection's right-hand side made zero-mean, every step (divTiles).
       ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
       ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
@@ -2607,15 +2607,22 @@ export class WebGPUFluid {
     }
   }
 
-  /** Zero one of the packed pressure buffers, as the Jacobi's `fill` did. */
+  /**
+   * Zero one of the packed pressure buffers, as the Jacobi's `fill` did, with
+   * the multigrid's own zeroing (`mgZero` in `wgsl/fluid.ts` on why not a
+   * kernel of its own).
+   */
   private clearBuffer(pass: GPUComputePassEncoder, buf: GPUBuffer, key: string): void {
-    const pipe = this.pipelines.computePipeline('pressureClear', kernel('pressureClear', 'r32float'));
+    const pipe = this.pipelines.computePipeline('mgZero', kernel('mgZero', 'r32float'));
     let group = this.groups.get(key);
     if (!group) {
       // The Sim, then the Args, then the buffer: every kernel here takes
       // bindings 0 and 1 from HEAD whether it reads them or not, and a group
-      // that skips the Args puts the pressure on a uniform slot.
-      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), buf]);
+      // that skips the Args puts the pressure on a uniform slot. The Args
+      // under a name of their own and written once: a buffer is written
+      // before the command buffer runs, so two values under one name in a
+      // step would both read the last.
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('clear pressure', [this.N * this.N, 0, 0, 0]), buf]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -2699,7 +2706,8 @@ export class WebGPUFluid {
     this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
     this.vcycle(pass, l + 1);
     if (l === 0) {
-      this.dispatchBuf(pass, 'mgProlong0', 'mgProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.press], this.N * this.N);
+      // Into level 0's packed buffer (A.a.y = 1): `mgProlong` in wgsl/fluid.ts.
+      this.dispatchBuf(pass, 'mgProlong', 'mgProlong0', this.arg('mg prolong 0', [this.N, 1, 0, 0]), [below.p, this.press], this.N * this.N);
     } else {
       const here = this.mg[l - 1];
       this.dispatchBuf(pass, 'mgProlong', `mgProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p], here.n * here.n);

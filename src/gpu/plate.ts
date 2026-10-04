@@ -141,9 +141,12 @@ export class WebGPUPlate {
   static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'plate');
     return [
+      // The display first: the opening asks for render pipelines first and
+      // in this order, and it is the longest compile of the show's opening
+      // (`gpu/prepare.ts`).
+      cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
       ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
-      cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
       // Into a texture rather than the canvas: the camera's, in the canvas's
       // format, and the film stock's picture.
       ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),

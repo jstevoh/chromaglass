@@ -985,6 +985,35 @@ const underWay = (o, g) => {
 };
 
 /*
+  Where each build of the opening spent its time, from its own ask: the
+  compiler, or its first use (`firstUse` and `firstDraw` in gpu/kit.ts,
+  which wait for the GPU). Printed on every run, not judged. The opening's
+  `builds` are charged wall time without overlap, which says what held the
+  page but not what a build cost, three being in flight at once; this is
+  each build's own, overlaps and all, so its sums run to about three times
+  the opening. What it is for: choosing the next cut at the opening
+  (PLAN.md 14v). Fewer kernels saves compiles; first uses waited for one
+  at a time would be cut by waiting once for all of them.
+*/
+const splitAhead = (o) => {
+  const raw = o.prepared?.raw ?? [];
+  if (!raw.length) return 'each build ahead from its own ask: not recorded';
+  const part = (what, i) => {
+    const xs = raw.filter((r) => r[i] != null).map((r) => [r[0], r[i]]).sort((a, b) => b[1] - a[1]);
+    if (!xs.length) return `no ${what}`;
+    const sum = xs.reduce((t, [, ms]) => t + ms, 0);
+    const med = xs[Math.floor(xs.length / 2)][1];
+    return `${xs.length} ${what} in ${(sum / 1000).toFixed(2)} s all told (median ${(med / 1000).toFixed(3)} s; slowest ${xs.slice(0, 5).map(([k, ms]) => `${k} ${(ms / 1000).toFixed(2)} s`).join(', ')})`;
+  };
+  // The order they were asked in, which gpu/prepare.ts sets: the first few.
+  // From `keys`, the list the lanes take from in turn, and not from `raw`'s
+  // times, rounded to the millisecond, where the first three tie and fall
+  // back to the order they finished in.
+  const order = (o.prepared?.keys ?? []).slice(0, 4).join(', ');
+  return `each build ahead from its own ask: ${part('compiled', 2)}; ${part('first used', 3)}; asked first: ${order}`;
+};
+
+/*
   What the GPU was doing through the stop: each submit from a second before
   the first step to three after it, and the time the GPU spent on it (from
   when it was handed over, or when the GPU finished the one before, to when
@@ -1295,6 +1324,7 @@ try {
       + `; long animation frames of 0.2 s or more in the first ${HELD_BY_S + 3} s (printed, not judged): ${loafs.length ? loafs.map(fmtLoaf).join(', ') : 'none'}`
       + `, the page's timer every ${held.seen.tickMedian == null ? 'never' : `${held.seen.tickMedian.toFixed(0)} ms`} (no more than ${TICK_OK_MS})`);
   console.log(`     ${underWay(o, o.frames)}`);
+  console.log(`     ${splitAhead(o)}`);
   for (const line of gpuTime(o)) console.log(`     ${line}`);
   /*
     The quarter seconds round the first step, on every run, with what the

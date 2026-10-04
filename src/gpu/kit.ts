@@ -220,31 +220,33 @@ export class PipelineCache {
    * mid-way) is left for the frame to build the old way, which is also where
    * its error is reported the way every other one is.
    */
-  async prepareCompute(name: string, code: string, entryPoint = 'main', use = false): Promise<boolean> {
+  async prepareCompute(name: string, code: string, entryPoint = 'main', use = false, times?: BuildTimes): Promise<boolean> {
     const bySource = this.computeSlot(name, entryPoint);
     if (bySource.has(code)) return true;
     try {
       const p = await this.device.createComputePipelineAsync(this.computeDescriptor(name, code, entryPoint));
+      if (times) times.compiled = performance.now();
       if (bySource.has(code)) return true;
       bySource.set(code, p);
       if (this.ledger) this.ledger.ahead++;
-      if (use) await firstUse(this.device, p, code);
+      if (use) { await firstUse(this.device, p, code); if (times) times.used = performance.now(); }
       return true;
     } catch { return false; /* built on the frame instead (above) */ }
   }
 
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
-  async prepareRender(name: string, make: RenderRecipe, use = false): Promise<boolean> {
+  async prepareRender(name: string, make: RenderRecipe, use = false, times?: BuildTimes): Promise<boolean> {
     if (this.render.has(name)) return true;
     try {
       // The sources it is made of, for the scraps its first draw binds.
       const codes = new Set<string>();
       const desc = make((code) => { codes.add(code); return this.module(code, name); });
       const p = await this.device.createRenderPipelineAsync({ label: name, ...desc });
+      if (times) times.compiled = performance.now();
       if (this.render.has(name)) return true;
       this.render.set(name, p);
       if (this.ledger) this.ledger.ahead++;
-      if (use) await firstDraw(this.device, p, desc, [...codes]);
+      if (use) { await firstDraw(this.device, p, desc, [...codes]); if (times) times.used = performance.now(); }
       return true;
     } catch { return false; /* built on the frame instead */ }
   }
@@ -252,12 +254,12 @@ export class PipelineCache {
   /** `prepareCompute`, handed over to be asked for later (see `Prep`). */
   computePrep(name: string, code: string, later = false): Prep {
     // Used once ahead only when the show opens with it: see firstUse.
-    return { key: `${this.scope}/${name}`, later, build: () => this.prepareCompute(name, code, 'main', !later) };
+    return { key: `${this.scope}/${name}`, kind: 'compute', later, build: (times) => this.prepareCompute(name, code, 'main', !later, times) };
   }
 
   /** `prepareRender`, handed over to be asked for later (see `Prep`). */
   renderPrep(name: string, make: RenderRecipe, later = false): Prep {
-    return { key: `${this.scope}/${name}`, later, build: () => this.prepareRender(name, make, !later) };
+    return { key: `${this.scope}/${name}`, kind: 'render', later, build: (times) => this.prepareRender(name, make, !later, times) };
   }
 
   private computeSlot(name: string, entryPoint: string): Map<string, GPUComputePipeline> {
@@ -431,11 +433,26 @@ async function firstDraw(device: GPUDevice, pipeline: GPURenderPipeline, desc: G
 export interface Prep {
   /** `scope/name`, as the ledger writes it. */
   key: string;
+  /**
+   * A compute pipeline or a render pipeline: `gpu/prepare.ts` asks for the
+   * render pipelines first, the plate's display among them being the one
+   * compile that runs for seconds where the rest run for tenths.
+   */
+  kind: 'compute' | 'render';
   /** Built behind the show once it has opened, not before. */
   later: boolean;
-  /** Whether it is in the cache once this settles. */
-  build(): Promise<boolean>;
+  /** Whether it is in the cache once this settles; `times`, when given, is stamped as it goes. */
+  build(times?: BuildTimes): Promise<boolean>;
 }
+
+/**
+ * When a build ahead got past each of its two parts, as `performance.now()`:
+ * the compile, then its first use (`firstUse`, `firstDraw`), which only the
+ * opening's half has. Unset for a part that did not happen (already in the
+ * cache, refused, or built behind the show). What `npm run startup` splits
+ * the opening's time by, to say which of the two the next cut should go at.
+ */
+export interface BuildTimes { compiled?: number; used?: number }
 
 /** A render pipeline's descriptor, given a way to get a shader module for a source. */
 export type RenderRecipe = (module: (code: string) => GPUShaderModule) => GPURenderPipelineDescriptor;
