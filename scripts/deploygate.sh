@@ -22,7 +22,13 @@
 #   1. the pushed commit came from a merged PR (a squash names one);
 #   2. a `Checks` run for the pull_request event on that PR's head concluded
 #      success (every shard: a run's conclusion is its worst job's);
-#   3. the commit that run tested has the same git tree as the pushed commit.
+#   3. that run ran the Mac shards. Since PLAN.md 19h a PR that changes only
+#      files no Mac shard reads (PLAN.md, the docs, the skills, a workflow
+#      that never runs one) skips them and its `WebGPU (macOS)` still goes
+#      green. Its tree's code is whatever main's was, and main's last deploy
+#      may have been red, so a skipped run proves nothing about the Mac and
+#      the deploy runs them itself;
+#   4. the commit that run tested has the same git tree as the pushed commit.
 #      A pull_request run tests GitHub's merge of the head into its base, and
 #      `checks.yml` writes that merge's SHA into the run's title, so this is
 #      the same tree read directly, not inferred. It closes the case a head
@@ -51,7 +57,7 @@
 #   (`npm run deploygate -- --history 20`)
 #
 # Needs curl and jq. Uses $GH_TOKEN when set (CI). The repository is public, so
-# it runs unauthenticated too, but a replay makes about six calls a merge
+# it runs unauthenticated too, but a replay makes about seven calls a merge
 # against an hourly limit of 60 without a token: GH_TOKEN=$(gh auth token).
 set -euo pipefail
 # Without this an API error inside $(…) is swallowed and reads as an empty
@@ -94,6 +100,14 @@ judge() {
       echo "false #$pr's head ${head:0:7} has no green Checks run"; continue
     fi
     while read -r url tested; do
+      # The four shards by name, every one green: a run that skipped them, or
+      # ran fewer, is not a Mac run. A new shard in checks.yml goes here too.
+      shards=$(api "actions/runs/${url##*/}/jobs?per_page=100&filter=latest" \
+        | jq -r '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
+          | if . == ["open=success", "plate=success", "show=success", "tools=success"] then "ran" else (join(",") | if . == "" then "none" else . end) end')
+      if [ "$shards" != ran ]; then
+        echo "false #$pr's run $url did not run the Mac shards ($shards)"; continue
+      fi
       if [ "$tested" != - ]; then
         ttree=$(treeof "$tested")
         if [ -n "$ttree" ] && [ "$ttree" = "$tree" ]; then

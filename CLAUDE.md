@@ -76,6 +76,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
+| `.github/workflows/checks.yml`, `scripts/reach.mjs` | `npm run reach`, `npm run closedruns`, `actionlint`; `npm run macqueue -- --hours 24` for the Mac time before and after |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
@@ -86,9 +87,14 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
 deploy:
 
-- **Measure** (ubuntu, ~1 min): typecheck and the node harnesses.
+- **Measure** (ubuntu, three parts side by side, ~5 min each): typecheck, every script
+  parsing, the shaders compiling on SwiftShader, and the node harnesses.
+- **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
+  `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
+  that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the
+  Mac shards (Measure still runs), and the deploy gate never trusts such a run.
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
-  jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is.
+  jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
 - A deploy skips the checks when main's new tree is the exact tree its PR's
   `Checks` run passed on (the PR's head contained main when it merged;
   `scripts/deploygate.sh`). Otherwise the deploy runs them in full. So bring
