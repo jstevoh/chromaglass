@@ -620,19 +620,22 @@ both with Light on **Add**:
 
 ---
 
-## 25. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+## 25. The Magnet: it moves only the ferrofluid that is there, and its Size (PLAN 9x, 9y)
 
 On Classic (a look with no ferrofluid), desk and phone:
 
 - pick the Magnet (M, or its button): the plate should not change at all;
-- touch and hold: a small black pool should appear under the hand and stand up
-  into spikes; drag it, and it should come with you. Say whether it is the right
-  amount of ferrofluid to start with;
+- touch and hold on the bare plate: nothing should appear. The Magnet brings no
+  ferrofluid (the owner: "it should only work on ferrofluid that is already
+  there");
+- pick the Ferrofluid bottle and drop some with the Dropper, then pick the Magnet
+  and hold it over the drops: they should stand up into spikes; drag, and they
+  should come with you;
 - right-click the Magnet on the desk (or tap it twice on the phone) and move
   Size: a small magnet raises a few spikes under the fingertip, a big one a wide
   hedgehog and pulls more gently from further off. Say whether the range is right
   at both ends;
-- the pool still reads as a black disc with domes round its rim, not domes with
+- a pool still reads as a black disc with domes round its rim, not domes with
   colour between them. That is the standing-domes work (PLAN 9t), not this.
 
 ---
@@ -714,6 +717,21 @@ lab measured the swirl (`npm run dish`), not the picture. On the Mac:
   Flare, Fractal Dream, Stardust Collapse) against the last deploy before this one:
   their sway is now through the water (within 2° of where it was) and the swirl runs
   while they play. Say if any of them reads worse, and whether the frame rate dropped.
+
+- the look's motor without its stir (PLAN 22j): the Rotation Speed dial used to stir
+  the middle of the plate round as well as turning the dish, a swirl fastest at the
+  centre and still at the rim, so the middle wound itself into a spiral. The stir is
+  gone: a dish turning steadily drags its liquid round with it and then nothing in
+  the liquid moves against anything else. Each look's dial was turned up so its dish
+  turns the liquid in view about as fast as the stir did, but now the whole picture
+  goes round together, rim included. Against the last deploy before this one, watch
+  the ones that moved most: Acid Trip (a turn every 20 s now), Cyberpunk and Stardust
+  Collapse (about a minute), Boiling Point, Timbre Shifter, Solar Flare, Fractal Dream
+  (three to five minutes), and Galaxy and Classic, which turned so slowly the change
+  is mostly the spiral that is no longer wound. Say which ones lost something they
+  need: a real way to wind the middle against the rim is a second, smaller glass
+  turned against the dish (PLAN 22l). Quiet bars no longer turn a music look's dish
+  backwards (the band's sway still does when it is playing).
 
 Say if the lag is too long or too short to read as a liquid, and whether the swirl a
 press makes is visible or wants more.

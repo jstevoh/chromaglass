@@ -3250,8 +3250,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           The plate as a flywheel.
 
           Rotation Speed above is a motor: it asks for a speed and the plate
-          holds it, and every preset sets it low because it is there to keep a
-          plate alive rather than to be seen. A flick is the other thing a
+          holds it. Most presets set it low, a turn every few minutes or hours,
+          and a few music looks turn visibly (acid-trip once every twenty
+          seconds) since the motor's stir in the middle became the dish's turn
+          (PLAN 22j). A flick is the other thing a
           plate does — spun by hand and left to slow down — so it is a press
           and not a value, and it goes to one plate at a time because the two
           turn opposite ways and shearing them by hand is the point.

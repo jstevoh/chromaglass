@@ -144,8 +144,14 @@ export function luckyLook(
       now been reported three times — the first half being a zoom that should
       have been held and was not. Twice the looks' top leaves room to surprise
       without leaving the vocabulary.
+
+      Since PLAN 22j the dial's bottom tenth no longer stirs the middle, it
+      only turns the dish (at a thousandth of a radian a second at most), and
+      the looks were moved up the dial to keep their turn: most now sit
+      between 0.02 and 0.2, a turn every few hours to one every three minutes. The
+      dice keep to that, not to the three fast music looks above it.
     */
-    rotationSpeed: rand() * 0.025,
+    rotationSpeed: rand() * 0.2,
     centerGravity: rand(),
     ledPlatform: rand() > 0.5,
     ledMode: ledModes[Math.floor(rand() * ledModes.length)],

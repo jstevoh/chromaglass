@@ -770,6 +770,14 @@ jobs:
       - name: The magnet moves the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run magnet
+      # The ferrofluid poured round Classic's middle, watched with the band
+      # playing and its bubbles on the plate (PLAN.md, found by #238): on the
+      # thin gap it gathers no more than in silence; the old plate, whose
+      # bubbles still press the glass, is shown to drift, so the instrument
+      # sees what it was built for. About a minute and a half.
+      - name: The band leaves the ferrofluid where it was poured
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: node scripts/ferrodrift.mjs
       # Every other tool in the hand (asked for: "check all of the tools to
       # make sure they work in expected ways"): each does what it says and
       # nothing else, and hovering does nothing (scripts/tools.mjs).

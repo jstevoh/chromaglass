@@ -26,6 +26,7 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -62,6 +63,46 @@ export interface Opening {
    * since no preset does.
    */
   thinGap: boolean;
+  /**
+   * The spun dish's swirl (spinSwirl, PLAN §22), when the look's own motor
+   * sets its dish turning faster than its liquid in the opening's first
+   * seconds (lookOpensSpinning). Added with PLAN 22j, which put the motor's
+   * old stir onto the dish: `npm run startup` then found galaxy, cyberpunk,
+   * acid-trip, timbre-shifter, boiling-point and solar-flare asking for it
+   * at their first steps, with no list naming it.
+   */
+  spin: boolean;
+}
+
+/**
+ * Whether a look's dish runs ahead of its liquid in its first three seconds
+ * by enough to start the swirl, on the frame's own flywheel: the dish comes
+ * up to the motor on its bed (dishFollow, at the frame's drag rate, the
+ * `bed` and `dragRate` lines where the frame turns each plate) and the
+ * liquid follows it with its drag time (liquidFollow). The swirl starts at
+ * 1e-3 rad/s between them (SWIRL_DISH_MIN in fluid.ts) or 0.05 rad/s of
+ * the liquid's own (SWIRL_SPIN_MIN); this asks for four fifths of either,
+ * looser as the rest of this file is. The dish takes its motor's speed within
+ * a few frames (the bed's dry friction), so for a moment any liquid lags it
+ * by most of that speed: water for seconds, the thick liquid for a tenth of
+ * one, by 0.8 of it at the frame's step. So a look starts the swirl at
+ * opening when its motor is over about 1.25e-3 rad/s, thin or thick; Classic's
+ * 0.0007 lags by 0.00056 and never does, galaxy's 0.004 lags by all of it.
+ */
+export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
+  const motor = lookMotorRate(s.rotationSpeed ?? 0);
+  if (!(motor > 0)) return false;
+  const viscosity = s.viscosity ?? DEFAULT_SETTINGS.viscosity;
+  const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + (s.platePressure ?? DEFAULT_SETTINGS.platePressure ?? 0) * 0.8);
+  const dragRate = (0.04 + (s.spinDrag ?? DEFAULT_SETTINGS.spinDrag ?? 0.25) * 1.2) * bed;
+  const tau = dragSeconds(carrierViscosity(viscosity));
+  let dish = 0, liquid = 0;
+  for (let k = 0; k < 180; k++) {
+    dish = dishFollow(dish, motor, dragRate, 1 / 60);
+    liquid = liquidFollow(liquid, dish, 1 / 60, tau);
+    if (Math.abs(dish - liquid) > 8e-4 || Math.abs(liquid) > 0.04) return true;
+  }
+  return false;
 }
 
 export function openingOf(s: Partial<VisualizerSettings>): Opening {
@@ -78,5 +119,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     camera: on(s.camera),
     stock: on(s.stock),
     thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
+    spin: lookOpensSpinning(s),
   };
 }
