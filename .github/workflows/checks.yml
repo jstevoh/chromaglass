@@ -382,6 +382,15 @@ jobs:
       - name: The phone
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run phone
+      # The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served
+      # with Brotli over a slowed network, and the page asks for the app's
+      # chunks alongside its entry and for the GPU before the app has
+      # arrived, while the remote and a cast fetch no App chunk. The order is
+      # what is judged, so no GPU is needed and a runner's speed cannot move
+      # it.
+      - name: The load
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run loadtime
       # The iPhone app as the laptop's remote (src/lib/appLink.ts): a real
       # relay, a stand-in laptop and the app's page from another origin. No
       # plate needed, so it runs here rather than on a Mac.

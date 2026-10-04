@@ -65,7 +65,36 @@ function settles<T>(p: Promise<T>, what: string): Promise<T> {
   });
 }
 
+/**
+ * The first request, asked for while the app's own code is still arriving.
+ *
+ * What was reported: the show takes a long time to load. Before this the
+ * page asked for the GPU only once the app's chunks (about 550 kB
+ * compressed) had downloaded, been run and drawn their first render, and
+ * only then did Chromium start the GPU, which on CI's Mac holds the page for
+ * 1.2 to 2.8 s (`npm run startup`'s "held" line). `main.tsx` calls this
+ * before it imports the app, so that start-up and the download happen
+ * together; the stage's first `requestGpu` takes the answer. Measured with
+ * `npm run loadtime` on a throttled network: see there.
+ *
+ * Only the first request is taken this way. Every later one (a lost device
+ * replaced, "Try again") asks afresh, as before.
+ */
+let early: Promise<Gpu | GpuFailure> | null = null;
+export function requestGpuEarly(): void {
+  if (!early) early = askGpu();
+}
+
 export async function requestGpu(): Promise<Gpu | GpuFailure> {
+  if (early) {
+    const got = early;
+    early = null;
+    return got;
+  }
+  return askGpu();
+}
+
+async function askGpu(): Promise<Gpu | GpuFailure> {
   if (typeof navigator === 'undefined' || !('gpu' in navigator) || !navigator.gpu) {
     return { failure: 'no-webgpu', detail: 'navigator.gpu is missing' };
   }

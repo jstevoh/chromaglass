@@ -3,12 +3,20 @@ import {createRoot} from 'react-dom/client';
 import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
+import { requestGpuEarly } from './gpu/device';
 
 // The black box, first: whatever goes wrong from here on has a line
 // (docs/crash-plan.md).
 installCrashLog();
 
 const params = new URLSearchParams(window.location.search);
+const show = !params.has('remote') && !params.has('cast');
+// The GPU, asked for now, while the app's chunks are still downloading:
+// Chromium's start of it takes seconds on a cold Mac, and was waiting for
+// them (gpu/device.ts). Not for the remote, which draws no plate, nor a
+// cast, which mirrors the show's canvas when it can and asks for its own
+// GPU only when it cannot.
+if (show) requestGpuEarly();
 // The phone loads only the control surface — no visualizer, no solver.
 const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))

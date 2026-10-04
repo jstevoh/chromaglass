@@ -422,7 +422,7 @@ async function firstDraw(device: GPUDevice, pipeline: GPURenderPipeline, desc: G
 
 /**
  * One pipeline to build ahead, not yet asked for: `gpu/prepare.ts` asks for
- * them one at a time (see there), so an owner hands over the asking, not a
+ * them in turn, a few at a time (see there), so an owner hands over the asking, not a
  * build already under way. With the key the ledger knows it by, so a harness
  * can hold what a look asked for against what was built before it opened;
  * and whether the show can open without it (`gpu/prepare.ts` on why the
