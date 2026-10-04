@@ -4553,8 +4553,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
   const blowDirRef = useRef<BlowDir | undefined>(undefined);
-  /** The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`. */
-  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0 });
+  /**
+   * The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`.
+   * `directed` counts the wind steps that had a way to go (a move within BLOW_DIR_HOLD_MS) and
+   * `carries` the ones whose carry ran (a fresh dye reading), so a stroke that pushed little says
+   * whether the wind lost its direction or waited on readings.
+   */
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0, directed: 0, carries: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -6711,8 +6716,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // The wind: it carries the colour (and an oil body's oil)
                   // the way the hand last went, as the ferrofluid above, or
                   // out from under it held still; it used to erase it.
-                  blowStepsRef.current.carried += af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  blowStepsRef.current.carried += carried;
                   blowStepsRef.current.wind++;
+                  if (going) blowStepsRef.current.directed++;
+                  if (carried > 0) blowStepsRef.current.carries++;
                   if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                     bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                   }
