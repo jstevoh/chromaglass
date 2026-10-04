@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The spinning dish's CPU half (src/lib/turntable.ts, PLAN.md §21), in node:
+ * The spinning dish's CPU half (src/lib/turntable.ts, PLAN.md §22), in node:
  * the liquid's lag behind the dish, Auto Spin's rate and its tempo lock, and
  * the hand on the Spin tool. The swirl the solver makes of the same numbers
  * is `npm run dish`.

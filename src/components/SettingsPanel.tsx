@@ -1131,6 +1131,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ colourBody: v })}
           settingKey="colourBody"
         />
+        {/* The plate printed as a comic: flat inks, black outlines, the tints in even dots. The Roy look's own control. */}
+        <Slider
+          label="Ben-Day Dots"
+          value={settings.benDay ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ benDay: v })}
+          settingKey="benDay"
+        />
         <Slider
           label="Glossiness"
           value={settings.glossiness}
@@ -3231,7 +3241,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           ))}
         </div>
         {/*
-          Auto Spin (PLAN §21): the dish turned by a motor of its own, at a
+          Auto Spin (PLAN §22): the dish turned by a motor of its own, at a
           rate or at the tempo. Stepped like Spin Direction, since it is three
           answers. The Rate is signed: its sign is the way round, and Reverse
           flips it (a pad can too, as Reverse Spin), so reversing a dish in

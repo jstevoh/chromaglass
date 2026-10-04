@@ -156,7 +156,7 @@ export interface GpuStepParams {
   meanDensity: number;
   maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
   /**
-   * The spinning dish (PLAN.md §21, lib/turntable.ts, `spinSwirl` in
+   * The spinning dish (PLAN.md §22, lib/turntable.ts, `spinSwirl` in
    * wgsl/fluid.ts). The solver works in a frame turning with the liquid's
    * bulk; these say how the dish and the liquid move against that frame.
    * All absent or zero and the swirl never runs: a plate nobody spins steps

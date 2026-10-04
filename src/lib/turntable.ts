@@ -1,5 +1,5 @@
 /**
- * The spinning dish (PLAN.md §21): the dish, the liquid in it, the hand that
+ * The spinning dish (PLAN.md §22): the dish, the liquid in it, the hand that
  * turns it and the motor that can turn it on its own.
  *
  * What was asked for: "spin the plate on command, or set it to spin

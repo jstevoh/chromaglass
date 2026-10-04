@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The spun dish's liquid, on the GPU solver alone (scripts/lab.mjs): the
- * swirl that `spinSwirl` makes, held to the physics it claims (PLAN.md §21).
+ * swirl that `spinSwirl` makes, held to the physics it claims (PLAN.md §22).
  *
  *   npm run dish
  *

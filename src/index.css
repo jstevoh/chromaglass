@@ -3,7 +3,7 @@
 /* A landscape phone wide enough for the dock's tools and five sheets on one
    row with every button at the 48 px a thumb needs: under about 800 px the
    ten buttons of the tools' side fell to 42 px (740 wide) and 35 px (667),
-   so there the dock goes to two rows (PhoneStage). Spin (PLAN.md §21) made
+   so there the dock goes to two rows (PhoneStage). Spin (PLAN.md §22) made
    the tools' side eleven buttons, and eleven at 48 px, their gaps, the
    sheets' 264 px and the padding need 856 px: at 800 they were 43 px and at
    an 844 phone 47. So the row now starts at 860, where a 852 phone takes the

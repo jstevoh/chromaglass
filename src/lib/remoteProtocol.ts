@@ -166,7 +166,7 @@ export type RemoteMessage =
    */
   | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
   /**
-   * A finger on the dish (the Spin tool, PLAN §21): the dish turns under it
+   * A finger on the dish (the Spin tool, PLAN §22): the dish turns under it
    * as it goes round the middle, and holds still while it holds still. Sent
    * all the time the finger is down, since a finger that stops is a brake;
    * the display lets go a quarter of a second after the last one. `id` is

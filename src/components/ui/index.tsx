@@ -99,7 +99,7 @@ export function Segmented<T extends string>({
    * the rides column was painted over the Amount chip.
    *
    * And a compact row wraps inside its own box rather than run past the
-   * column it is in. Spin (PLAN.md §21) made the desks' tools ten, and at
+   * column it is in. Spin (PLAN.md §22) made the desks' tools ten, and at
    * 1024 the row measured 454 px in a middle column of 408: the rides column
    * was painted over Magnet and Spin. Two lines of tools cost the preview
    * one button's height at that width and nothing at 1280 and up, where the

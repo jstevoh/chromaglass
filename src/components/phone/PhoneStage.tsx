@@ -54,7 +54,7 @@ const TOOLS: { id: PhoneTool; label: string; icon: ComponentType<{ size?: number
   { id: 'press', label: 'Press', icon: Hand },
   { id: 'finger', label: 'Finger', icon: Fingerprint },
   { id: 'magnet', label: 'Magnet', icon: Magnet },
-  // The dish under the finger (PLAN §21): go round the middle and it turns.
+  // The dish under the finger (PLAN §22): go round the middle and it turns.
   { id: 'spin', label: 'Spin', icon: RotateCw },
 ];
 
@@ -117,7 +117,7 @@ export interface PhoneStageProps {
   onSpin: () => void;
   onLucky: () => void;
   /*
-    Auto Spin (PLAN §21): the dish's own motor, Off, Rate or Tempo, its rate
+    Auto Spin (PLAN §22): the dish's own motor, Off, Rate or Tempo, its rate
     in rev/min (signed: the sign is the way round) and, in Tempo, the beats
     a turn. On the Play sheet beside the flick, since a turning dish is
     something played, not set up.
@@ -178,6 +178,13 @@ export interface PhoneStageProps {
    */
   fingering: number;
   onFingering: (v: number) => void;
+  /**
+   * Ben-Day Dots (wgsl/plate.ts benDay): the plate printed as a comic, the
+   * Roy look's own control. On the Looks sheet when it opens on a printed
+   * plate, because it is part of the look rather than a hand.
+   */
+  benDay: number;
+  onBenDay: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -250,11 +257,15 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
   const [amountOpen, setAmountOpen] = useState(false);
+  // Whether the Looks sheet opened on a printed plate: its Ben-Day slider
+  // stays for as long as the sheet is up, so taking it to 0 does not take
+  // the slider away from under the thumb.
+  const [printing, setPrinting] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
   const close = () => setSheet(null);
   /** Where a look picked in the looks sheet goes: the whole plate, or the back plate alone. */
   const [lookTo, setLookTo] = useState<'all' | 'back'>('all');
-  const open = (s: SheetName) => { setAmountOpen(false); setSheet(cur => (cur === s ? null : s)); };
+  const open = (s: SheetName) => { setAmountOpen(false); if (s === 'looks') setPrinting(p.benDay > 0.001); setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
 
@@ -394,7 +405,7 @@ export function PhoneStage(p: PhoneStageProps) {
         landscape every row is the 48 px a thumb needs and no more, and the
         gaps are 4 px, since the second row costs the plate its height.
 
-        Spin made it ten tools and the bottle (PLAN §21): six across in
+        Spin made it ten tools and the bottle (PLAN §22): six across in
         portrait, still two rows (59 px each at 390), and all eleven in a
         landscape row (55 px at 667). Beside the sheets they were 43 px at
         800 wide and 47 on an 844 phone, so the side-by-side row now starts
@@ -556,6 +567,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
           </div>
+          {(printing || p.benDay > 0.001) && (
+            <div className="mt-3">
+              <Slider label="Ben-Day Dots" value={p.benDay} min={0} max={1} step={0.05} onChange={p.onBenDay}
+                display={`${Math.round(p.benDay * 100)}%`} touch testId="phone-ben-day" midiKey="setting:benDay" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim">The plate printed as a comic: flat inks, black lines, the pale washes in dots.</p>
+            </div>
+          )}
           {p.onBackLook && (
             <div className="mt-3">
               <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="group" aria-label="Send a look to">

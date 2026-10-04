@@ -884,7 +884,7 @@ class FluidSimulation {
    */
   plateSpin = 0;
   /**
-   * The turntable under the dish (PLAN.md §21, lib/turntable.ts): how fast
+   * The turntable under the dish (PLAN.md §22, lib/turntable.ts): how fast
    * Auto Spin and a hand on the Spin tool turn the dish, and how fast the
    * liquid's bulk follows it with the drag time of a thin gap, in radians a
    * second. The picture turns at `plateSpin` plus `liquidSpin`, and the
@@ -896,7 +896,7 @@ class FluidSimulation {
   /**
    * How fast the liquid really goes round, for the centrifuge: the look's
    * turn and the turntable's liquid together, while the turntable is
-   * turning; zero otherwise, so a look nobody spins is no centrifuge (21h).
+   * turning; zero otherwise, so a look nobody spins is no centrifuge (22h).
    * Not the turntable's liquid alone: a hand held still on a flicked plate
    * stops the picture by turning the turntable against the flick, and the
    * liquid it holds still is flung nowhere.
@@ -2360,6 +2360,19 @@ class FluidSimulation {
         break;
       }
 
+      case 'roy': {
+        // A panel's shapes: a few big flat pools of the three inks, each in a
+        // thin wash of itself twice as wide, so the print (benDay) has solid
+        // ink to outline and a tint round it to lay as dots from the start.
+        const shapes: [number, number, number][] = [[0.3, 0.32, 0.16], [0.68, 0.4, 0.18], [0.42, 0.7, 0.14], [0.75, 0.75, 0.1]];
+        shapes.forEach(([fx, fy, fr], i) => {
+          const c = col(i);
+          this.splatBlob(fx * S, fy * S, S * fr * 1.8, 0.5, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, S * fr, 2.6, c.r, c.g, c.b);
+        });
+        break;
+      }
+
       case 'clock-glass': {
         // Curved glasses gather the liquid in the middle; seed it there, in
         // rings, so the dome has something to hold from the first frame.
@@ -3462,7 +3475,7 @@ class FluidSimulation {
         + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
           * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
       /*
-        The spun dish (PLAN §21, lib/turntable.ts): the dish's speed in the
+        The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
         frame that turns with the liquid, the liquid's own speed (the
         centrifuge), the bulk's drag time at the rest gap, and the liquid.
         All but the last are zero on a dish nobody spins, and the swirl
@@ -4318,7 +4331,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const spinVelRef = useRef<number[]>([]);
   const lastFlickRef = useRef(0);
   /*
-    The turntable (PLAN.md §21, lib/turntable.ts), one per layer, beside the
+    The turntable (PLAN.md §22, lib/turntable.ts), one per layer, beside the
     look's own flywheel above: the dish's speed (Auto Spin and the Spin
     tool), the liquid's bulk speed following it (added to the picture's
     turn), the dish's angle (for Tempo's lock), Auto Spin's motor, and the
@@ -7599,7 +7612,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // can be dragged round by it (the twist in paramsFor).
             if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
             /*
-              The turntable (PLAN §21, lib/turntable.ts): a dish of its own
+              The turntable (PLAN §22, lib/turntable.ts): a dish of its own
               under the look's, turned by Auto Spin and by a hand on the Spin
               tool, with the same bed and drag as the look's flywheel.
 
@@ -7612,7 +7625,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               only what is new goes through the physics, and with Auto Spin
               off and no hand on the dish every number here is zero and the
               plate is today's to the bit. Moving the look's own turning onto
-              the dish too is PLAN 21h, once it has been seen on the Mac.
+              the dish too is PLAN 22h, once it has been seen on the Mac.
 
               Auto Spin's direction is the plate's (which layer, Spin
               Direction) and the Rate's sign, and nothing else: the music's
@@ -9623,7 +9636,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return { x: Math.floor(p.x), y: Math.floor(p.y) };
     };
     /*
-      A hand on the Spin tool (PLAN §21): where it is from the dish's middle
+      A hand on the Spin tool (PLAN §22): where it is from the dish's middle
       as the audience sees it, in plate widths. The plate's cells turn with
       the liquid (`rotationAnglesRef`), so the point is turned back out by
       that angle; the hand's angle is then the room's, and its speed round

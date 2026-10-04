@@ -491,7 +491,7 @@ export interface VisualizerSettings {
   /** How hard one flick hits, as a fraction of a turn a second. */
   spinImpulse: number;
   /*
-    Auto Spin (PLAN.md §21, lib/turntable.ts): a motor of its own under the
+    Auto Spin (PLAN.md §22, lib/turntable.ts): a motor of its own under the
     dish, on top of the look's Rotation Speed.
 
     `spinAuto` is 0 Off, 1 Rate, 2 Tempo. Off is the default and what every
@@ -572,6 +572,8 @@ export interface VisualizerSettings {
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;
+  /** Ben-Day dots: the finished picture printed as a comic, flat inks with the tints in even dots (the Roy look). 0 is off. */
+  benDay?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -894,6 +896,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
+  benDay: 0,                // no print: only the Roy look lays Ben-Day dots
   dyeBudget: 0.85,
   edgeRelief: 0.4,
   lacing: 0,

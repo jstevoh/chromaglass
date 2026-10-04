@@ -37,7 +37,7 @@ export type MidiAction =
    */
   | 'spin-front' | 'spin-back'
   /**
-   * Auto Spin from a pad (PLAN §21): turn the dish the other way round, and
+   * Auto Spin from a pad (PLAN §22): turn the dish the other way round, and
    * step the motor Off, Rate, Tempo. A reverse is a moment in a song, the
    * drop where the whole wall turns back on itself, and a moment wants a pad.
    */
@@ -467,6 +467,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
+  // The Roy look's own: the plate printed as a comic, a knob to print it by.
+  { key: 'benDay',          label: 'Ben-Day Dots',     min: 0, max: 1 },
   { key: 'lightPlay',       label: 'Light Play',       min: 0, max: 1 },
   { key: 'lampMotion',      label: 'Lamp Motion',      min: 0, max: 1 },
   { key: 'lampHotspot',     label: 'Hot-Spot',         min: 0, max: 1 },
@@ -542,7 +544,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // same reason: a DJ set wants the scenes on the drops, a band that plays
   // through its changes may want them planned.
   { key: 'songFollow',      label: 'Follow the Song',  min: 0, max: 1 },
-  // The dish's own motor (PLAN §21). The Rate is a knob because a turntable's
+  // The dish's own motor (PLAN §22). The Rate is a knob because a turntable's
   // speed is ridden: slowed into a breakdown, wound up into a drop, and through
   // zero to turn it back. The mode and the beats a turn are stepped choices.
   { key: 'spinRpm',         label: 'Spin Rate',        min: -45, max: 45 },

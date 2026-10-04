@@ -158,6 +158,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   });
 
   const settings = state?.settings;
+  /*
+    Ben-Day Dots is shown while the plate prints (the Roy look), and kept
+    through a thumb taking it to 0, which would otherwise lose the slider it
+    was on (the look then matches no preset, so its id reads null). Another
+    look picked puts it away, so it stays the one look's control.
+  */
+  const printed = useRef(false);
+  const printedOn = useRef<string | null>(null);
+  {
+    const pid = state?.activePresetId ?? null;
+    if ((settings?.benDay ?? 0) > 0.001) { printed.current = true; if (pid) printedOn.current = pid; }
+    else if (pid && pid !== printedOn.current) printed.current = false;
+  }
   const value = useCallback(
     <K extends keyof VisualizerSettings>(key: K): VisualizerSettings[K] | undefined =>
       (localValues[key] ?? settings?.[key]) as VisualizerSettings[K] | undefined,
@@ -263,7 +276,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     const amount = pressureOf(e);
     if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
     else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount }); }
-    // A finger on the dish (PLAN §21): it turns under the finger, and the
+    // A finger on the dish (PLAN §22): it turns under the finger, and the
     // finger held still keeps sending (below), because a still hand is a brake.
     else if (kind === 'spin') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: e.pointerId }); }
     else if (kind === 'finger') {
@@ -317,7 +330,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   */
   useEffect(() => {
     /*
-      And a finger held still on the dish keeps holding it (PLAN §21): the
+      And a finger held still on the dish keeps holding it (PLAN §22): the
       display lets go of a remote hand a quarter of a second after it last
       heard from it, so a finger that stops would otherwise let the dish
       coast on under it instead of stopping it.
@@ -633,7 +646,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
           {/*
-            The dish's own turning (PLAN.md §21): Auto Spin's mode and its
+            The dish's own turning (PLAN.md §22): Auto Spin's mode and its
             rate, so the phone in a hand across the room can set the plate
             going and stop it without walking back to the laptop. Beats a
             Turn stays on the laptop and the phone's Play sheet: it is set
@@ -665,6 +678,13 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {(settings?.phaseAmount ?? 0) > 0.001 && (
             <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/*
+            And Ben-Day Dots while the plate prints (the Roy look): how much
+            of a comic it is, for a thumb.
+          */}
+          {printed.current && (
+            <Slider label="Ben-Day Dots" field="benDay" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             The plate as a thin gap (PLAN §18a), a switch on the slider's two

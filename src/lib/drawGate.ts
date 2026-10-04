@@ -103,6 +103,28 @@
  * giving these windows, and one draw per tick of it is all anyone can see.
  * Before either clock has two offers to measure, 60 Hz.
  *
+ * Why a clock's own next refresh is never turned down, whatever the refresh
+ * reads. The gate is there to stop the two clocks drawing one refresh twice;
+ * one clock's consecutive offers are consecutive refreshes of its own display
+ * (one animation frame a refresh), never the same one. Turning one down
+ * because of that clock's own last draw, or because of a draw by the other
+ * clock whose refresh this clock has already offered for, is the wall
+ * costing the show a frame it would have drawn alone. And on a busy machine
+ * it did: a window handed only some of its refreshes has gaps of one, two or
+ * three refreshes, the median of them reads two, the gate's 0.6 of that is
+ * 1.2 refreshes, and the show's next frame one refresh after its own draw was
+ * turned down with nothing drawn in its place. `npm run wall` on the Mac
+ * runners, 53 runs: with both clocks on one refresh the gate drew 24.3 a
+ * second while the show's window was handed 28.3 (0.86), and 24.4 of 28.3,
+ * and 34.8 where the wall's window was handed 38.7; its arithmetic on a 60 Hz
+ * display missing refreshes, 0.75 of what either window alone would have
+ * drawn at worst, and 0.99 with this rule. So
+ * an offer within 0.6 of a refresh of the last draw is turned down only when
+ * that draw was the other clock's and it is this clock's first offer since:
+ * one turned down per clock per draw, which is all that one refresh holds.
+ * An offer stamped within a 240 Hz refresh of its own clock's last one is
+ * that same refresh again, and is judged as before.
+ *
  * A clock that has stopped (the show window covered, the projector closed) is
  * forgotten after `CLOCK_FRESH_MS`: its gaps are dropped, and its first gap
  * when it starts again, which is the time it was stopped, is not a refresh.
@@ -202,6 +224,12 @@ export class DrawGate {
   lastDraw = -Infinity;
   private readonly lastOffer: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
+  /**
+   * Whether each clock has offered since the last draw (or made it): its one
+   * refresh that draw stands for is spent, so its next offer is a refresh of
+   * its own (see "a clock's own next refresh" above).
+   */
+  private readonly spent: Record<DrawSource, boolean> = { frame: false, ask: false };
   /** Offers drawn and turned down, by who offered them. For the check and `?debug`. */
   readonly drawn: Record<DrawSource, number> = { frame: 0, ask: 0 };
   readonly skipped: Record<DrawSource, number> = { frame: 0, ask: 0 };
@@ -240,11 +268,22 @@ export class DrawGate {
     this.lastOffer[source] = now;
     // Gated only while the other clock is running too: one clock alone, the
     // show with no wall or the wall with the show covered, draws every tick.
-    if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now)) {
+    // And never this clock's own next refresh (see above).
+    const ownNext = this.spent[source] && gap >= REFRESH_MIN_MS;
+    if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now) && !ownNext) {
+      // An offer stamped behind the last draw (its callback ran late, after
+      // the other clock's next refresh) is an earlier refresh, not the one
+      // that draw stands for, so it does not spend it: else this clock's
+      // next offer, in the drawn refresh, would draw it again (the second
+      // pre-push review: 4.9 % of refreshes drawn twice with one ask in
+      // twenty late, 0 with this).
+      this.spent[source] = now >= this.lastDraw - REFRESH_MIN_MS;
       this.skipped[source]++;
       return false;
     }
     this.lastDraw = now;
+    this.spent.frame = source === 'frame';
+    this.spent.ask = source === 'ask';
     this.drawn[source]++;
     return true;
   }

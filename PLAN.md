@@ -62,12 +62,13 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §23); steps 2 to 6 not started |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
-| 21 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 21a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §24); 21b–21i open |
+| 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §25); 22b–22i open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -2403,7 +2404,8 @@ second display's clock. On this tree, one run each:
 | draws of 11.7 ms, both on one refresh | 72.3 (2.0× the 36.1 the held thread managed) | 68.7 (1.3×) | 60.0 (1.0×) |
 | covered, projector's frames ragged | 61 of 121 asks drawn | 120 of 120 | 120 of 120 |
 
-With every phase: at least 0.9 times what the show drew alone (a gate turning
+With every phase: at least 0.9 times what the show drew alone (since 14b-2 below,
+what either window was handed in the same two seconds; a gate turning
 everything down drew 0.0, one at 1.3 of a refresh 29.9 to 39.9, against 53.8), and
 about one offer turned down a refresh (59.8 to 60.3 a second), which is what says both
 clocks were running. `npm run ears` 26/26 (123 asks read over 123 frames asked for).
@@ -2433,8 +2435,42 @@ slot count reads a Mac that does is still owed to the Mac's `tools` shard.
 14c together (the governor fed real intervals now, and a ladder built from the stage),
 and nobody has seen it happen on the Mac.
 
+*14b-2, the gate on a busy machine (shipped 2026-10-03).* `wall`'s floor went red on
+starved Mac runners (#231: 36.4 drawn against 37.7; once 23.3 against 25.0) with the
+draw gate untouched. Two things were wrong. The floor was 0.9 of what the show drew
+alone at the start of the run, a different two seconds on a runner whose rate moves by
+a third, so it judged the runner more than the gate. Judged against what either window
+was handed in the same seconds, the 53 Mac runs of 2026-09-28 to 10-03 read 0.86 to
+1.0, and the three under 0.9 were the gate: both clocks on one refresh, 24.3 drawn a
+second where the show's own window was handed 28.3 (and 24.4 of 28.3; 34.8 where the wall's was handed 38.7). A
+window handed only some refreshes has gaps of one, two or three, the gate's median of
+them read two, its 0.6 of that 1.2 refreshes, and the show's next frame one refresh
+after its own draw was turned down with nothing in its place: the wall costing the
+show frames on exactly the machines least able to spare them. Now a clock's own next
+refresh is never turned down (one turned down per clock per draw, which is all one
+refresh holds), and the floor is 0.9 of the more of the two windows' frames handed in
+the same seconds. `npm run wall` makes the busy machine on purpose (half the
+refreshes missed by both windows together, checked to be the same ones; a cloud
+browser misses none under load): the gate as it was drew 23.4 of 29.4 handed with both
+clocks on one refresh and 26.0 of 29.5 half a refresh apart (both red), now 29.5 of
+29.5 at each; in its
+arithmetic on a 60 Hz display missing refreshes, 0.75 of either window alone at worst
+before and 0.99 after, never more than one draw a slot. The regular-clock sweep is
+unchanged (28 and 20 a second, 120/60, 11.7 ms draws).
+
 *Found along the way, not done:*
 
+- *On a busy machine the wall repeats frames the show missed.* The gate still works to
+  the median gap of a clock, which a window missing refreshes reads as two or three, so
+  an ask in a refresh the show missed is turned down when it comes under 1.2 refreshes
+  after the last draw. `npm run wall` on its busy machine three quarters of a refresh
+  behind drew 35.0 for 44.0 slots served (0.8), and the Mac runs 0.68 to 0.91 of the
+  slots. The floor does
+  not catch it (each window still gets its own frames) and the ceiling allows it. Taking
+  the refresh from the shortest gap that recurs, as `wall` measures the display,
+  brings it to 0.90 to 0.95 in the arithmetic, at the cost of up to a quarter more draws on a
+  machine already short of time; whether the wall's smoothness is worth that is the
+  owner's call. Measure: the busy phase's draws against its slots.
 - *A 120 Hz laptop with a 60 Hz projector draws 120 a second.* The gate works to the
   faster display so that neither window gets fewer frames than it would alone, which
   keeps the desk at 120 on a ProMotion screen; but every draw carries the mirror
@@ -4059,16 +4095,17 @@ ones report.
   (followed through every harness's imports with esbuild's metafile), and none opens
   `?cast`, so `CastDisplay` has no check (S15 in `docs/stability-plan.md` needs one).
 
-- `wall`'s "at least 0.9 times what the show drew on its own" goes red on a starved
-  Mac runner: on #231's run (2026-10-03, a diff that does not touch the draw gate) the
-  wall 0.75 of a refresh behind drew 36.4 a second against a floor of 37.7, 0.9 of the
-  41.9 the faster window was handed, while the show's own window was handed only 37.9
-  of a 60.2 Hz display; an earlier run read 23.3 against 25.0. The floor takes the
-  faster window's rate, so when the harness's two windows are handed unequal rates by
-  a busy machine it can ask for more draws than the show's own frames offered. Whether
-  the floor should be the rate of the window that offers the draws, or the gate really
-  loses draws when the windows drift apart, is not yet known; read the per-window
-  offers in the log of the next red run before touching it.
+- ~~`wall`'s "at least 0.9 times what the show drew on its own" goes red on a starved
+  Mac runner~~ **Fixed 2026-10-03 (§14b-2):** the floor was measured against a different
+  two seconds than it judged, and the gate on a starved machine really did turn down the
+  show's own next frame; both fixed, and `wall` now makes the busy machine itself.
+- `render-app`'s "the live loop draws again after every render" wants more than 5
+  frames in the half second after each render, and read 5 after render M (music
+  playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
+  dozen runs read M 10 to 26 and once A 11. A starved runner can stall the loop for
+  a moment after a render, so the line judges the runner as well as the loop. What it
+  means to ask is whether the loop resumes at all: count frames until a fixed number
+  have been drawn, with a long limit, rather than frames in a fixed half second.
 
 *Fix:* `CRASH_GPU=1`; `songs` into Measure; `shelf`, `sw` and `bubbles` on a Mac shard,
 or written into CLAUDE.md as by hand; `check.mjs` reading `scripts/*.mjs` paths as well
@@ -4168,13 +4205,69 @@ today, so not worth it. Also worth having: the deploy gate skipping more often, 
 the owner's "merge behind main" rule (2026-09-28) trades away; 191 deploy minutes in the
 window above.
 
-## 21. Spin the plate
+## 21. Looks after painters
+
+The owner, 2026-09-27, over a screenshot of Classic at 2.8x covered in red dots on
+white by accident: "kinda cool, Roy Lichtenstein type style ... let's reserve this
+effect for a particular preset and a particular control." What makes the dots on
+Classic is another thread's to find and stop; this section is the effect on purpose.
+
+**Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
+the desks, the remote, and the phone's Looks sheet while a look prints) that reads the
+finished picture as a comic printer would: dark is black, anything lit is white paper
+with one of three process inks on it (red, yellow, blue, whichever the hue is
+nearest), a pale wash is that ink laid as even Ben-Day dots on a 45° screen fixed to
+the picture (32 rows down it), and a strong one is the flat ink. The front plate's
+shapes are outlined in black from its dye, a pen's width (a ring of taps round each
+pixel), and so are the seams where two inks meet. Only Roy turns it up: big flat
+pools of the three primaries in thin washes of themselves on a white light table,
+milk and ink so the shapes keep their own edges, and nothing that shades (no gloss,
+hot-spot, beads, bubbles or closeup texture). `npm run benday` measures the print on
+a lab plate: a wash is 242 separate dots against 256 on the lattice, one size to
+2.7%, fixed while the plate turns; a pool is one flat ink with a line all the way
+round it and a line where red meets yellow; and only Roy prints.
+
+Open:
+
+- **21a. Judge it on the Mac** (docs/judging.md §24): the dots' size on a wall, the
+  line's weight, and whether it holds up moving at 60 fps. The lab shows still frames.
+- **21b. The line is drawn round the front plate only.** It needs the dye, and it is
+  drawn from the front plate's; a second plate, the film and the lamps are printed
+  (dots and inks) but not outlined. Roy has one plate, so it does not show there.
+- **21c. The dots do not grow with the zoom.** The screen is fixed to the picture,
+  as a print's is; the owner's accidental dots at 2.8x were about twice the size.
+  If a bigger dot is wanted in the closeup, the pitch could follow the zoom.
+- **21d. More painters.** The same print with other inks is the start of more looks
+  after painters (a Warhol screen print's off-register blocks, Riley's black and
+  white, Rothko's soft fields); none is planned yet.
+
+
+*Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
+runs, `npm run wall`'s "every refresh's own timestamp was believed" read 2, 4, 4, 5, 5
+and then 1, 1, 1, 1, 3 fallbacks across its five two-window cases, while #207's run on
+the same base read 0; the same harness in a cloud session reads 0 on this branch, and
+the plate's display pipeline compiles in the same time with and without the print
+(SwiftShader, 2.0–2.4 s both). `stampFallbacks` is a page-wide total, so one early
+fallback turns every later case red, and it did not say which bound tripped. This PR
+now counts them apart (`stampMisses`), and the next Mac run said which: 4 to 6, every
+one ahead of now, the worst by 2.4 ms in every case, none stale. The draw gate had
+believed a stamp only up to 2 ms ahead, on the belief that Chrome never stamps a
+refresh ahead of now; it now believes up to one 240 Hz refresh (4.2 ms), which the
+gate's 0.6-of-a-refresh margin already treats as the same refresh. Still open for
+§14b: which clock runs ahead (the show's frames or the wall's converted ones; the
+count is page-wide), and whether the 2.4 ms is a Mac display link stamping the refresh
+a frame is for (inferred, not measured). And the line catches a wrongly converted wall
+only because the harness opens the wall five seconds after the show (the conversion's
+error is that gap, caught by the one-second stale bound); with under a second between
+them it would pass. The harness should check its own gap is over a second.
+
+## 22. Spin the plate
 
 Asked 2026-09-28: "spin the plate on command, or set it to spin automatically at some
 rate (or a rate controlled by some other factor, like music tempo); give me a control
 (like press) and a setting."
 
-**21a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the
+**22a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the
 remote's pad), and **Auto Spin** (Off, Rate in rev/min either way round, Tempo at a turn
 every 1–64 beats) with **Reverse Spin**, on the sheet, the phone's Play sheet, the
 remote, MIDI and the desks. Off by default, so every look is as it was.
@@ -4209,37 +4302,37 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
 
 **Shortcuts, named so they are replaced:**
 
-- **21b. The swirl is not carried by its own flow.** τU/L is about 1 for water spun
+- **22b. The swirl is not carried by its own flow.** τU/L is about 1 for water spun
   hard, so the swirl's inertia matters there; it is integrated in place. Advect it
   with the velocity (a semi-Lagrangian step, as the current is).
-- **21c. Coriolis is left out.** In a flat gap it is a pure gradient for a
+- **22c. Coriolis is left out.** In a flat gap it is a pure gradient for a
   divergence-free flow and the projection takes it; with a varying gap a sliver is
   left. Add 2ω_l ẑ×u where h varies, and measure what it changes.
-- **21d. The CPU solver gets the bulk lag and not the swirl.** Where there is no
+- **22d. The CPU solver gets the bulk lag and not the swirl.** Where there is no
   WebGPU, `FluidSimulation`'s own step (`LiquidVisualizer.tsx`) turns the picture
   with the liquid but has no swirl; give it `spinSwirl`'s few lines.
-- **21e. The liquid's drag on the dish is ignored.** The dish is a flywheel with its
+- **22e. The liquid's drag on the dish is ignored.** The dish is a flywheel with its
   own drag (the plate's old spin), not slowed by the liquid it drags; a thick liquid
   should brake a flicked dish harder than water.
-- **21f. The performance recorder does not record a Spin hand.** A spin from the tool
+- **22f. The performance recorder does not record a Spin hand.** A spin from the tool
   replays as nothing; Auto Spin is a setting, so it replays.
-- **21g. With Thin Gap on (18a, #220).** The swirl field hands the thin solve the
+- **22g. With Thin Gap on (18a, #220).** The swirl field hands the thin solve the
   dish's drive as a speed at the rest gap, a/k0, and the solve's own drag 12ν/h²
   brings the liquid to a/k and makes it conserve liquid (`npm run dish`: a pressed
   palm 0.607 against the old plate's 0.534, away from it 0.006 of that; handed the
   integrated swirl it counted the gap twice and the palm read 0.045). Properly the
   dish's drag is a force in the thin solve's own momentum balance (A(k − k0)ẑ×r beside
   18a-2's forces), with no swirl field at all.
-- **21h. The look's own turning is still rigid.** A look's motor, the music routed
+- **22h. The look's own turning is still rigid.** A look's motor, the music routed
   to rotation (eleven shipped looks) and a flick turn the picture as they always
   have, with the flick's twist term, and not through the dish: sent through the
   liquid's lag, a thin look's sway was smoothed over three seconds and the swirl ran
   on every look with music, which is a change to shipped looks nobody has judged.
   The turntable is a second dish under the look's. Once the lag has been seen on the
-  Mac (`docs/judging.md` §24), put the look's turning on the same dish, retire the
+  Mac (`docs/judging.md` §25), put the look's turning on the same dish, retire the
   twist's flick term, and judge those eleven looks against main.
-- **21i. The hand reads its angle, not its grip.** A hand turns the dish at its
+- **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
   angular speed round the middle, held to a turn and a half a second, because near
   the middle a small move is a large angle. A hand's real torque is its friction
   times its lever arm: weight each hand by its radius and let a thick liquid's drag
-  push back (21e).
+  push back (22e).

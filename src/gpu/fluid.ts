@@ -244,7 +244,7 @@ const BZ_GRID = 256;
 const LIES_GRID = 128;
 const CURRENT_ITERS = 10;
 /*
-  The spun dish's swirl (spinSwirl, PLAN.md §21).
+  The spun dish's swirl (spinSwirl, PLAN.md §22).
 
   It runs while the dish and its liquid are moving against each other, or
   the liquid is turning fast enough to be a centrifuge, and then for five of
@@ -674,7 +674,7 @@ export class WebGPUFluid {
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
       ['addCurrent', [VEL], true],
-      // The spun dish (PLAN §21): no look spins at opening, so built behind.
+      // The spun dish (PLAN §22): no look spins at opening, so built behind.
       ['spinSwirl', [VEL], false],
       ['decayDye', [dye], true],
       ['decayVel', [VEL], true],
@@ -1545,7 +1545,7 @@ export class WebGPUFluid {
       this.vel.swap();
     }, (p.vorticity ?? 0) > 0.001);
     /*
-      8.8. The spun dish's swirl (PLAN §21): only while something spins.
+      8.8. The spun dish's swirl (PLAN §22): only while something spins.
       Worked out ahead of either solve, because it reads nothing they write
       and a thin gap takes it in before its solve, with the current: the
       swirl is a speed the dish's drag holds the liquid to against the

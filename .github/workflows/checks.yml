@@ -71,7 +71,7 @@ jobs:
         run: npm run desk
 
       # The spinning dish's CPU half: the liquid's lag behind the glass, Auto
-      # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §21).
+      # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22).
       - name: The turntable
         run: npm run turntable
 
@@ -374,7 +374,7 @@ jobs:
         run: npm run pressoil
       # A spun dish drags its liquid round through the gap, harder where the
       # gap is tight, flings the heavy dye out and draws the oil in; with
-      # nothing spinning the flow is a still plate's to the bit (PLAN §21).
+      # nothing spinning the flow is a still plate's to the bit (PLAN §22).
       - name: The spinning dish
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run dish
@@ -470,6 +470,11 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
+      # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
+      # the screen, a pool one flat ink outlined in black, and only Roy prints.
+      - name: The Ben-Day print
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run benday
       # The mixer: each source moved lands only where that source is (the
       # film under the back plate, the logo under the film), the LED ring
       # passes the front plate from lamp to beam, every grade does what its

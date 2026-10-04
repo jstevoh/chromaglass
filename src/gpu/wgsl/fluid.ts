@@ -1972,7 +1972,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    The spun dish, in the frame that turns with its liquid (PLAN.md §21,
+    The spun dish, in the frame that turns with its liquid (PLAN.md §22,
     lib/turntable.ts, which says why the picture turns with the liquid and
     not the glass). On the current's grid; its projection is the current's
     own three passes on its own textures.
@@ -2016,7 +2016,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     pressure takes all of it. Added as a force it would be deleted by an
     exact projection and kept in part by ten sweeps, which is a flow that is
     not there. (In a gap of varying depth hw, not w, is what has no
-    divergence, and a sliver of the Coriolis force survives; PLAN §21 has it.)
+    divergence, and a sliver of the Coriolis force survives; PLAN §22 has it.)
 
     Integrated exactly over the step for a force held through it:
     w = a/k + (w − a/k) e^(−k dt), which is stable for any k, down to the
