@@ -57,18 +57,18 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, the first touch bringing a pool under the hand, with Magnet Size, 9x, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v and carrying the ferrofluid across a new solver 9w, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §23); steps 2 to 6 not started |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 6 not started |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones) |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
-| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §25); 22b–22i open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28); 22b–22i open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -690,6 +690,74 @@ Open, from building 9i:
   deep before domes came, with the balance of pull and lift left open. It belongs to
   the standing-domes plate PR that lab is for, not to a retune of the set-down
   strength here.
+- **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
+  (**shipped**). Reported by the owner (2026-10-03), on the build with 9s live:
+  "Magnet still makes a giant black hole as soon as you pick it. That's not what I
+  want. I just want a magnet that I can control the size of that I can interact
+  with." The page is network-first in the service worker, so it was not a stale
+  build: the pour was the hole. Picking the Magnet poured the look's ring
+  (`phasePour`), 22% of the plate in black drops round the middle at Classic's Scale
+  and 27% at Scale 0.8, where the drops run together across it (lab, 256²; the
+  disc 0.12 round the middle 9% black, then 29%). Now picking it changes nothing on
+  the plate. The first touch on a plate with no ferrofluid brings one pool under the
+  hand (`magnetFor`), 0.09 of the plate in radius at the tool's own size, about 1%
+  of the plate; the app turns Ferrofluid up so it is drawn and gives the look its
+  magnet (`onMagnetInHand`), and the pool goes with the hand (lab: laid at 0.30 and
+  dragged to 0.60, its centre ended at 0.58). **Magnet Size** (`magnetSize`, 0–1,
+  0.5 the tool as it was; `lib/magnetSize.ts`) sets how big the hand's magnet is,
+  held and set down: k = 0.5 to 2 times the size, the dipole k times deeper with k³
+  the strength, which is a real magnet scaled (magnetostatics has no length of its
+  own): the same field share over it, reaching k times as far (the pull is weaker
+  than a scaled magnet's at a big Size, see 9v), so the spikes' patch and
+  the pool it brings are k times as wide (lab: 0.3%, 1.1% and 4.6% of the plate at k
+  0.5, 1 and 2). It is the performer's, kept across looks (`RIG_KEYS`) and never
+  drifted, on the Settings sheet, the desks' Magnet options (right-click the Magnet)
+  and the phone's Magnet panel (tap the Magnet twice), and MIDI-learnable. The
+  governor's new solver gets the pool back where the magnet is, not the look's ring,
+  and nothing at all while the Magnet is picked and untouched.
+  The tools' options (right-click a tool) opened beneath the plate on the Design desk,
+  only their bottom edge showing under the canvas; they go to the page's body now.
+  `npm run magnet` asks that picking pours nothing and puts no magnet under the
+  plate, nine seconds on too; that the first touch brings one pool under the hand
+  and draws it; that a drag carries it at least half way to where the hand ends;
+  that Size reaches the solver's step as height ×k and strength ×k³; and, on its own
+  page with the governor held at 512² (`rung=2`) and stepped down on purpose
+  (`stepDownFrames`) twice, that a new grid
+  lays nothing on an untouched plate and only the hand's pool, once, at the magnet
+  moved from where the pool was poured (another PR's run caught main's ring laid again by the governor, lays 1 → 2,
+  grid 384² → 256²). `npm run
+  phone` asks that Size is under the Magnet's Amount and moves the setting. The
+  pool still reads as a black disc with domes round its rim, because the plate
+  cannot open gaps between domes yet: that is 9t's standing-domes plate PR.
+  Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off
+  the hand 1.5 s after the touch, before the drag, and the drag then left it behind
+  (46% of the way). The lab replaying that run's own step, magnet path and pool kept
+  it on the hand and carried it 87–90%, bare plate or dyed, so the cause is in the
+  app and not the step. `npm run magnet` now prints the pool as laid, the solver's
+  magnet through the first second and a half, the plate's turn, the step count and
+  the automation's hands, so a recurrence names it. Main's deploys went red on
+  both magnet checks after 9s: `npm run magnet`'s "poured round the middle does not
+  gather into it" (the ring pour this item takes away) and `scripts/ferro.mjs`'s
+  "not at its mirror", whose two arms ran on two grids when the governor moved the
+  solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
+- **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
+  solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
+  its face than a dipole, and a bigger one at the same gap is somewhat stronger at
+  the glass, not equal; the dipole's saturation (`MAGNET_BSAT`) stands in for the
+  flat face today. Replace `magnetEnergy` (and `spikeAmp`, which must agree) with a
+  finite disc's field (a disc of radius a at depth g: the on-axis field
+  Br/2 · (1 − g/√(g² + a²)) and its off-axis form), with Size setting a.
+  And put the saturation in field units: `MAGNET_BSAT` is a number in the
+  dipole's geometric units, so the k-deeper dipole sits lower on the curve than
+  the magnet it stands for and pulls less than the 1/k a scaled magnet does
+  (lib/magnetSize.ts: at Size 0.9, 0.47 of it one height out and 0.33 at one and
+  a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
+  weakly at the edge of its reach than a real one.
+- **9w. Carry the ferrofluid across a new solver.** The dye is carried when the
+  governor moves the grid; the phase is not. The look's ring is poured again, and the
+  Magnet's pool laid again where the magnet is (9x), so a pool dragged into a
+  shape loses that shape at a grid move. Read the phase back and write it into the
+  new grid as the dye is.
 
 ### 10. Playing like a show
 
@@ -1715,7 +1783,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    Measured in a cloud session before and after: with a stand-in second screen, no
    projector window opened before, one opened in full screen after; without the
    app's fill, the wall showed the click hint and the laptop the title-bar chip.
-   **Owed:** the Mac look (`docs/judging.md` §23), and signing it with the owner's
+   **Owed:** the Mac look (`docs/judging.md` §26), and signing it with the owner's
    Developer ID (the secrets in `desktop/README.md`); until then macOS asks once in
    Privacy & Security before it opens.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
@@ -1780,7 +1848,7 @@ network):
   on CI's Mac runner only if its window server really hides a minimised window.
   The first run's control, a window inside the app, stayed visible at 46 frames/s
   minimised because the app's switches reach every window in its process. Where
-  it is not measured, it is `docs/judging.md` §23 on the owner's Mac.
+  it is not measured, it is `docs/judging.md` §26 on the owner's Mac.
 - In a cloud session `npm run desktop` can fail "the run finished" on a 30 s
   `page.reload` timeout, after software WebGPU starves the page (its covered-window
   reading shows 2 s of timers taking about 54 s, and once the GPU process exited).
@@ -2743,12 +2811,97 @@ would carry every field alike. It changes how every tool feels, so it goes to th
 first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
 these numbers.
 
-### 15c. Blow's wind erases colour rather than pushing it
+### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
-A moving Blow multiplies the dye under it by 0.8 every step, which clears it, and
-its push is the one-step push of 15b. `npm run tools` checks "Blow clears dye from
-under it", so the check asserts the eraser. Whether wind should push the colour
-aside instead is a question for the owner, taken with 15b.
+A moving Blow multiplied the dye under it by 0.8 every step, which cleared it, and
+its push is the one-step push of 15b. So did a second finger's Blow on the phone, a
+Blow on a plate that is not the lead, and every remote hand's (a directed blow
+thinned 15% a step at its middle). Now a hand's Blow that is not the straw is the
+wind (`blowWind`): it carries the colour the way the hand went, a take and a put as
+the Finger's carry, with the ferrofluid's numbers (`blowCarry`), so the colour and
+the ferrofluid go the same way. Held still (a puff that is not the straw) it blows
+the colour out from under it onto the Press's ring. With Oil Bodies the oil goes
+with its colour, along (`carryMix`) or onto the same ring (`pressOil`), cell for
+cell. Measured in the lab (`npm run wind`, 30 readings of a Blow drawn a sixth of
+the plate from a pool's middle): the old eraser kept 78.7% of the pool (a remote
+hand's directed one the same) and moved its middle 1.05% of the plate backwards; the
+wind keeps 100.0% and moves it 1.06% the wind's way (2.71% for a remote hand's wider
+one). `npm run tools` on the Mac now draws a Blow across a pool through the real
+pointer and asks that the stroke ran as the wind (the pointer's Blow counts its
+straw and wind steps and what the wind carried, `blowSteps` in `chromaglassDebug`),
+that the colour goes along and that it is kept.
+
+A held puff lands the oil on the Press's ring, and the ring's kernel worked out what
+each ring cell gets from the formula (1 / K), which a small palm's ring does not tile:
+a puff six cells across lost 3.3% of the oil it moved on the Mac (`npm run wind` went
+red on it). The kernel is now handed the share counted on its own grid, as the
+colour's is counted on the mirror's (`pressShare`), and the Press's own oil, which
+lost up to 1% of a press the same way, now keeps all of it (`npm run pressoil`:
+32768.0 → 32768.0 in the middle, off it and in a corner).
+
+The straw is now chosen by whether the hand has moved in the last 150 ms (the
+clock the ferrofluid's wind already used), not by whether it moved this step. Asked
+per step, a drag blew the straw on every step after a frame's first and on every
+frame the pointer did not report a move, so a drag left a string of straw bubbles
+and ran the wind a step a frame at best. The show's own puffs (a pour's burst, the
+automation's breath, a bubble's pop) still clear the dye under them, as their look.
+
+### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
+
+The owner's standing rule (2026-09-28): build from the chemistry and physics of the
+liquids, not from a picture of their result. 15c is a shortcut by that rule, and so
+are the carries it copied. The wind moves the colour, the oil and the ferrofluid
+directly, a take from under the hand and a put a hop ahead (`blowDye`, `blowOil`,
+`blowCarry`), because the flow cannot carry them: a tool's push is cut back to idle
+at the end of the step it was added in (15b). The Finger (`carryDye`, `carryMix`,
+`fingerCarry`) and the Press (`pressDye`, `pressMix`) do the same. It keeps the
+colour and moves it the right way, and it is not what air on a liquid does.
+
+What air blown on a thin layer does, and what the plate would need:
+
+- **Shear.** Air moving over the surface drags it with a tangential stress, about
+  tau = 1/2 rho_air C_f U^2 along the jet (C_f a few thousandths for a wall jet).
+  In a layer this thin the flow is viscous (lubrication), so the stress drives a
+  Couette profile: the surface moves at tau h / mu and the depth-mean at
+  tau h / (2 mu), in proportion to the depth. A deep pool moves more than a thin
+  film under the same breath, and a thick oil (glycerine) less than water. The
+  plate's depth-mean velocity should take tau h / (2 mu) as a force that lasts as
+  long as the breath does, not a disc of velocity that the clamp removes.
+- **Pressure.** Where the jet meets the surface it presses a dimple, about
+  1/2 rho_air U^2 at the stagnation point, which pushes liquid out from under the
+  nozzle (a Poiseuille flow, -h^2 grad p / (3 mu) depth-mean). That is a held
+  puff's ring, and it is the Press's physics at a smaller pressure: it belongs in
+  the gap field the Press already squeezes (`squeeze`, `applySquish`), not in a
+  ring map.
+- **The film.** The layer's thickness moves with its own flow,
+  dh/dt + div(h u) = 0: it thins where the air hits and piles up in a bow wave
+  where the wind stops. Colour, oil and ferrofluid are then carried by that one
+  flow, conserved by the advection, and the carries can go.
+
+Depends on 15b: the tool's force has to reach a flow that remembers it (the lasting
+current `cur`, or the clamp lifted for forced flow), which changes how every tool
+feels, so it goes to the owner first. When it lands, `npm run wind` is the check:
+with the carries deleted, the colour kept and moved along by the flow alone, and the
+oil with it, against the same bars. Then the same for the Finger (a solid dragged
+through the layer: no-slip on the finger, the wake behind it) and the Press
+(squeeze flow from the gap, which the solver half models already).
+
+### 15f. Found with 15c
+
+- The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and
+  a carry with no colour under it never marks the mirror spent. So a Finger over a
+  body with no colour under it carries the oil every step at a share sized for one
+  carry a reading. The Press (15d) and now the Blow keep the oil on its own clock
+  (`oilPressAfter`); the Finger should too.
+- The Press's ring (`pressDye`) keeps 99.4% of a pool of colour a puff blows out over
+  30 readings, not all of it: a nearest-cell gather does not tile a small ring
+  exactly, and the counted stretch that makes a flat plate exact does not on an
+  uneven one. Small next to the 21% the eraser lost, but a ring that splits each
+  palm cell exactly among the cells that read it would keep all of it.
+- A remote hand's Blow (performGesture: the phone as the laptop's remote, a pen, OSC,
+  a replayed take) goes through the same `blowWind`, but no check drives it through
+  the app: `npm run wind` runs the functions it calls, and `npm run tools` only the
+  mouse. A gesture sent through the remote's link in `tools` would close it.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
@@ -2811,9 +2964,9 @@ lift is the unstable one. The same drag sets how fast the ferrofluid answers any
 body force under Thin Gap, the magnet's included: at the default Thickness about 4.4
 times faster than before (its drag is 0.22 of the oil's), in water about 5 times
 slower. That is the real liquid's answer, not a change to the magnet's code; the
-owner's eye on it is in judging §22. The
+owner's eye on it is in judging §23. The
 phone's Press is the same press on the same solver, and Thin Gap is on its settings
-sheet. Judged on the Mac: `docs/judging.md` §22.
+sheet. Judged on the Mac: `docs/judging.md` §23.
 
 *Open, found building it:*
 - **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
@@ -3896,7 +4049,7 @@ round it and a line where red meets yellow; and only Roy prints.
 
 Open:
 
-- **21a. Judge it on the Mac** (docs/judging.md §24): the dots' size on a wall, the
+- **21a. Judge it on the Mac** (docs/judging.md §27): the dots' size on a wall, the
   line's weight, and whether it holds up moving at 60 fps. The lab shows still frames.
 - **21b. The line is drawn round the front plate only.** It needs the dye, and it is
   drawn from the front plate's; a second plate, the film and the lamps are printed
@@ -3996,7 +4149,7 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   liquid's lag, a thin look's sway was smoothed over three seconds and the swirl ran
   on every look with music, which is a change to shipped looks nobody has judged.
   The turntable is a second dish under the look's. Once the lag has been seen on the
-  Mac (`docs/judging.md` §25), put the look's turning on the same dish, retire the
+  Mac (`docs/judging.md` §28), put the look's turning on the same dish, retire the
   twist's flick term, and judge those eleven looks against main.
 - **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
   angular speed round the middle, held to a turn and a half a second, because near

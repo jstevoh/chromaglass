@@ -55,7 +55,19 @@ try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
   page.on('console', m => { const t = m.text(); if (/error|invalid/i.test(t)) console.log('  [page]', t.slice(0, 150)); });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+  /*
+    On one grid (sim=384), as bottles.mjs and magnet.mjs pin theirs. The
+    quality governor moving the solver between arms gives the next arm a new
+    grid, and the shares below were made grid-proof (the pour's own amount)
+    but the centre of mass was not: main's deploy of 5203979 went red on
+    "gathers where the magnet is, not at its mirror" with the magnet-off arm
+    poured on 384² (13825) and the magnet arm on 256² (6144), the magnet
+    arm's mass 0.258 from the magnet against 0.257 for the plate with none.
+    The same line on a run that stayed on 384²: 0.245 against 0.273. Two
+    grids are two plates, and the check compares one plate with and without
+    a magnet.
+  */
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=384${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
   const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);

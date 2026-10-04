@@ -11,8 +11,8 @@ Read from the code on `main` (6c6d17e); the velocity numbers were measured in th
 | Splat | ✓ | ✗ colour only | ✗ | ✗ | ✓ | ✓ |
 | Streak | ✓ | ✗ colour only | ✗ | ✗ | ✓ | ✓ |
 | Finger | ✓ carries it (CPU carry) | ✓ carries the oil with its colour | ✗ doesn't move it (Ferrofluid thread, PLAN 9n) | ✓ stirs them together | ~ pops the ones under it and shoves the rest outward, not along the stroke | ✓ |
-| Blow, moving | ~ mostly erases dye (×0.8 a step) rather than pushing it | ✗ oil stays put | ✗ (9n) | ✗ | ✓ | ✓ |
-| Blow, held still | ✓ straw bubble pushes colour aside | ~ | ✗ (9n) | ✗ | ✓ grows one | ✓ |
+| Blow, moving | ✓ pushes it along, keeping it (15c; it erased it, ×0.8 a step) | ✓ the oil goes with its colour (15c) | ✓ (9n) | ✗ | ✓ | ✓ |
+| Blow, held still | ✓ straw bubble pushes colour aside; off the straw, a puff blows it out onto a ring (15c) | ~ | ✓ (9n) | ✗ | ✓ grows one | ✓ |
 | Press | ✓ pushes colour into a ring | ✓ the oil goes with its colour, onto the same ring (15d) | ✗ ferrofluid doesn't move | ✗ | ✓ | ✓ |
 | Magnet | nothing (right) | nothing (right) | ✓ | nothing (right) | nothing (right) | nothing (right) |
 
@@ -34,6 +34,6 @@ These go through a second copy of the tools (`performGesture`), and that copy ha
 
 1. Pour, Spray, Splat and Streak ignore the bottle. With Ferrofluid or Oil selected, they lay coloured dye and no liquid. Fixed (PLAN 15a, `npm run bottles`).
 2. Remote and replayed hands lay no liquid from the Dropper, and their Pour pushes downhill. Fixed with 1 (PLAN 15a); the show's own pour is unchanged.
-3. Blow and Finger don't move the ferrofluid, and Blow's wind erases colour instead of pushing it. The cause is the speed limit above. 9n in the Ferrofluid thread; the lab numbers are sent there.
+3. Blow and Finger don't move the ferrofluid, and Blow's wind erases colour instead of pushing it. The cause is the speed limit above. The ferrofluid is 9n (#206); the wind carries the colour and the oil now (15c, `npm run wind`).
 4. Press moved the colour out of an oil body and left the oil behind: fixed (15d, `npm run pressoil`). It still doesn't move the ferrofluid, which waits on 9n.
 5. Soap, milk, silicone and glycerine push the plate through the same limited velocity. `npm run liquids` checks them on a stand-in plate, never on the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured.
