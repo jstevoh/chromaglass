@@ -3692,14 +3692,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     passed at 112% net while the pressed colour never came in (a press frozen at
     the lift reads 107% against that idle pool, check-skeptic). Run 37145038742
     read 20% (pressed 0.062 → 0.094 → 0.098, the idle pool on the old solver).
-    Now the pool settles eight of the plate's seconds, the thin press is taken
-    net of an idle pool on the thin gap that starts where it did, a frozen press
-    has to read under half and the pressed colour's own mean has to fall. If it
-    is red after that, the app is not drawing the colour back as the lab does
-    (presslift: 77% under the palm at 3 s), and that is the next thing to find.
-    Run 37148523629 with these: the thin press 0.083 → 0.116 → 0.109, 62% back
-    net of its idle pool (a frozen press 33%); red only on the Thin Gap off
-    control, whose pool was laid wider than its idle one (0.105 against 0.072).
+    Runs 37148523629 to 37163762683 then showed the separate idle pool starting
+    15 to 40% from its press's, and Classic's own flow drifting a settled pool out
+    0.004 of the plate a second, half the press's push over the lift's three
+    seconds. The press itself read 62%, 98%, 97% and 99% back net of drift. Now
+    each pool is its own control (its drift measured before the hand), on the
+    calm plate (mirror.mjs's CALM), with a quarter of the push back before any
+    drift is credited and a press frozen at the lift reading under half.
   - **On the Mac the thin Press barely clears the colour from under the palm.**
     The share of the colour within 0.05 of the palm went 76% → 69% held → 68%
     after the lift (its idle pool 78% → 76% → 72%; Thin Gap off 72% → 1%). The

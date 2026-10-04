@@ -465,7 +465,23 @@ try {
       the fifth Mac run laid its pools straight after a change of Thin Gap
       with less colour and further out than the others.
     */
-    await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
+    /*
+      On the calm plate (scripts/mirror.mjs's CALM: no turbulence, no sound
+      driving the flow, no rocking, rain or spin), where anything the hand
+      did not do stands out. On Classic as it plays, a pool settled twelve
+      seconds still drifted out 0.0041 of the plate a second, so over the
+      three seconds after the lift the drift (0.012) was half the press's
+      whole push (0.023, run 37163762683): a press frozen at the lift read
+      54%, and the check could not tell. The Press is the same Press; the
+      plate's own stirring, which no lift can undo, is what is taken away.
+      Put back after.
+    */
+    const before = await page.evaluate(() => ({ ...window.chromaglassSettings?.() }));
+    await page.evaluate(() => window.chromaglassSettings?.({
+      thinGap: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+      rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0,
+      audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
+    }));
     await settle(3000);
     // The Press as the owner has it, Thin Gap off.
     const at = await pressLift('off');
@@ -481,7 +497,7 @@ try {
     }
     await settle(3000);
     const on = await readRun('lift', await pressLift('lift'));
-    await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
+    await page.evaluate((b) => window.chromaglassSettings?.({ ...b, thinGap: 0 }), before);
 
     /*
       Net of the pool's own drift. `drift` is how far its mean moved a
