@@ -39,6 +39,10 @@
  *      grating of stripes, dots and labyrinths in the pools, and the plate
  *      keeps its dye: the old fingering push, put back in a lab of its own,
  *      is the control (the comment above section 5 says why)
+ *   6. two fingers holding the Drop, as the phone's check holds them, each
+ *      keep a pool of what they laid, the two alike: the same push took
+ *      one held pool to a third of the other's on the Mac (the phone's
+ *      two-finger Drop reds; the comment above section 6 has them)
  *
  * Every measure is taken in all four of the dye's channels and the worst one
  * judged: the grating is colour (blue and white over violet), so a pass that
@@ -418,7 +422,7 @@ const CLASSIC = {
   sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, spin: 0.013, immiscibility: 0.02296,
   phaseSharp: 0.35, phaseTension: 0.18, gapSpring: 0.0003, gapMemory: 0.998, platePressure: 0.25,
   vibIntensity: 0.0048, vibFrequency: 0.288, drip: 0.15, currentDamp: 0.988, currentBuoy: 0.12, currentGrav: 0.03,
-  twist: 0.24, meanDensity: 0.38, maxCurrent: 16.7, gravityReach: 0.21,
+  meanDensity: 0.38, maxCurrent: 16.7, gravityReach: 0.21,   // no twist: the motor's stir went in PLAN 22j
 };
 const FN = 512, HALF = 300, LO = 2.6, HI = 16;
 /*
@@ -516,10 +520,91 @@ const measure = (r) => ({
   start: Math.max(...r.start.band), mid: Math.max(...r.mid.band), end: Math.max(...r.end.band),
   kept: r.end.total.map((t, c) => t / r.start.total[c]),
 });
+/*
+  ── 6. Two held Drops keep their dye, alike ──────────────────────────
+
+  The phone's check (`npm run phone`, PHONE_GPU=1 on the Mac) holds two
+  fingers on the Drop for 1.2 s and asks for a pool under each, the two
+  within 0.4 of each other. It went red with one finger's pool at about a
+  third of the other's while both had laid the same dye on the same steps:
+  A 69 to B 229 and A 236 to B 84 on main's deploys of 2026-10-03 (05:11 and
+  06:06 UTC), A 197 to B 72 on a branch at 07:57, and four times on
+  2026-09-27/28 (PLAN.md, batch 11). Every one of them ran on a tree from
+  before #222 took this push out (08:38 UTC 2026-10-03); in the 80-odd Mac
+  runs of the line since and 146 holds of a diagnostic on the Mac (PR #240),
+  not one. The push moves dye up its own gradient where its noise is
+  negative, a held pool is the steepest gradient on the plate, and the
+  advection's hold and cap throw away what it piles up; where the noise is
+  positive the pool keeps its dye. So which finger lost hung on where the
+  plate's angle put each finger in the noise, and when: it looked like a
+  flake because it was a place and a moment.
+
+  Replayed here on the phone's grid (256) at two of those runs' cells (the
+  07:57 branch run's, and the first run's of 2026-10-03), each at ten
+  moments of the show's clock 15 s apart, since the noise drifts with it (the lab's
+  plate starts at 0, so without `setTime` every replay would be the same
+  first second). The step is the one the check asks for: Classic with the
+  motor off (it no longer stirs the current anyway, PLAN 22j), silent (spin 0, Classic's vibration at silence,
+  0.0036), no turbulence or rain, the current's ceiling recomputed for the
+  app's dt as the app does, at the dt the phone's plate stepped at in the
+  diagnostic (0.0011). What a held Drop lays is the app's with Water in the
+  bottle and Amount 1 (the hands loop in LiquidVisualizer: radius
+  round(3 × 1.5) = 5 cells, 0.6 at the middle falling as the square, in
+  Water's colour as addDensity logs it, heat 0.05 the same way): 7.9 a step, which is what the red lines print. Laid on
+  30 steps and read 17 later, the steps a red run's plate took in its 1.2 s
+  hold and 0.7 s after; the disk is the check's own (0.06 of the grid).
+
+  Measured (the lab on SwiftShader, 2026-10-04): as it is, every pool kept
+  191 or 192 of the 237 laid, at both places and all ten moments, the two
+  of a pair 1.00 of each other. With the push back the pools read 82 to
+  238, a pair as uneven as 94 to 235 (0.40, the phone's own red line) and
+  four of the twenty under 0.6. The control asks for half, so it goes red
+  if the push no longer splits held pools at all, not on where in its noise
+  the twenty land.
+*/
+const HELD = [[[81, 45], [68, 120]], [[113, 46], [76, 126]]];
+const MOMENTS = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135];
+const HELD_DT = 0.0011;
+const HELD_STEP = {
+  ...CLASSIC, turbScale: 0, spin: 0, vibIntensity: 0.0036, drip: 0, dt: HELD_DT,
+  maxCurrent: 0.75 / (HELD_DT * CLASSIC.advection * 190), meanDensity: 0.012,
+};
+const held = (page) => page.evaluate(async ([pairs, moments, over]) => {
+  const L = 192, rows = [];
+  for (const pair of pairs) for (const t0 of moments) {
+    await lab.create(256, L);
+    lab.setTime(t0);
+    const laid = [0, 0];
+    for (let s = 0; s < 47; s++) {
+      if (s < 30) for (const [h, [cx, cy]] of pair.entries()) {
+        const rr = 5, amt = 0.6, heat = 0.05, dye = new Array(L * L * 4).fill(0), vel = new Array(L * L * 4).fill(0);
+        for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) {
+          const d = Math.hypot(dx, dy); if (d > rr) continue;
+          const w = (1 - d / rr) ** 2, k = ((cx + dx) + (cy + dy) * L) * 4;
+          dye[k] += amt * w * 1.32; dye[k + 1] += amt * w * 0.63; dye[k + 3] += amt * w;
+          vel[k + 2] += heat * w;
+          laid[h] += amt * w;
+        }
+        lab.addDye(dye);
+        lab.addVel(vel);
+      }
+      lab.flush(over.dt);
+      await lab.step(1, over, true);
+    }
+    const f = await lab.field('dye');
+    const disk = ([cx, cy]) => { let t = 0; for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - cx, y - cy) < 0.06 * L) t += Math.max(0, f[(x + y * L) * 4 + 3]); return t; };
+    rows.push({ pair, t0, laid, under: pair.map(disk) });
+  }
+  return rows;
+}, [HELD, MOMENTS, HELD_STEP]);
+const heldRuns = {};
 const runs = {};
 for (const [name, plugins] of [['asIs', []], ['old', [oldPush(0.16485)]], ['weak', [oldPush(0.16485 / 4)]]]) {
   const l = await openLab({ plugins, tag: plugins.length ? plugins[0].name.replace(/\./g, '_') : '' });
-  try { runs[name] = measure(await pools(l.page)); } finally { await l.close(); }
+  try {
+    runs[name] = measure(await pools(l.page));
+    if (name !== 'weak') heldRuns[name] = await held(l.page);
+  } finally { await l.close(); }
 }
 const { asIs, old, weak } = runs;
 const g = (m) => `${m.start.toFixed(0)} laid, ${m.mid.toFixed(0)} at 5 s, ${m.end.toFixed(0)} at 10 s; dye kept ${m.kept.map((k) => `${(k * 100).toFixed(1)}%`).join(' ')}`;
@@ -542,6 +627,19 @@ check('and no pattern left at the level the push leaves', asIs.end < 4 * asIs.st
 const worstKept = asIs.kept.reduce((w, k) => (Math.abs(k - 1) > Math.abs(w - 1) ? k : w), 1);
 check('and keeps the plate\'s dye, neither losing nor making it', Math.abs(worstKept - 1) < 0.05,
   `worst channel ${(worstKept * 100).toFixed(1)}% of what was laid (the weak control: ${(Math.min(...weak.kept) * 100).toFixed(1)}%, the old push: ${(Math.min(...old.kept) * 100).toFixed(1)}%)`);
+
+const heldText = (rows) => HELD.map((pair) => `${pair.map((c) => `(${c})`).join(' ')}: ${rows.filter((r) => r.pair === pair || String(r.pair) === String(pair)).map((r) => r.under.map((u) => u.toFixed(0)).join('/')).join(', ')}`).join('; ');
+const whole = (rows) => rows.length === HELD.length * MOMENTS.length && rows.every((r) => r.laid.every((v) => v > 200) && r.under.every(Number.isFinite));
+const evenness = (rows) => Math.min(...rows.map((r) => Math.min(...r.under) / Math.max(...r.under)));
+const keeps = (rows) => Math.min(...rows.flatMap((r) => r.under.map((u, i) => u / r.laid[i])));
+console.log(`   held Drops, each pool's dye at each moment (${heldRuns.asIs[0]?.laid[0].toFixed(0)} laid each):`);
+console.log(`     as it is: ${heldText(heldRuns.asIs)}`);
+console.log(`     control:  ${heldText(heldRuns.old)}`);
+check('the control: with the old push, at some place and moment one held Drop keeps under half of what the other does',
+  whole(heldRuns.old) && evenness(heldRuns.old) < 0.5, `the weakest pair ${evenness(heldRuns.old).toFixed(2)} of each other`);
+check('two held Drops keep their dye alike at every place and moment: within 0.9 of each other, and over 0.6 of what they laid',
+  whole(heldRuns.asIs) && evenness(heldRuns.asIs) >= 0.9 && keeps(heldRuns.asIs) > 0.6,
+  `the weakest pair ${evenness(heldRuns.asIs).toFixed(2)} of each other, the least kept ${keeps(heldRuns.asIs).toFixed(2)} (the old push: ${evenness(heldRuns.old).toFixed(2)} and ${keeps(heldRuns.old).toFixed(2)})`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} failed` : `\nall ${checks.length} ok`);

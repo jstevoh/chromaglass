@@ -44,6 +44,18 @@
  * as the app does, and measures them there.
  */
 
+/**
+ * The glass's spring back toward rest, a fraction a step, from Press Lift
+ * (`plateSpring`, 0..1) and how long a step is (`seconds`). The half-life
+ * is 2.2 × (1 − Press Lift) + 0.12 of whatever `seconds` is counted in:
+ * the app hands the old solver its look's step (Speed × 0.2, not seconds)
+ * and a thin gap the show's real seconds (LiquidVisualizer, deriveStep).
+ * Shared so `npm run presslift` springs the lab's glass as the app does.
+ */
+export function glassSpring(plateSpring: number, seconds: number): number {
+  return 1 - Math.pow(0.5, seconds / Math.max(0.02, 2.2 * (1 - plateSpring) + 0.12));
+}
+
 /** A pause this long between presses is a release (ms): the same mark that told one press from the next. */
 export const RELEASE_MS = 150;
 /** How long the glass takes to come back up far enough to finger, in seconds of show. */
@@ -139,10 +151,33 @@ function onSpoke(theta: number, sp: Spokes) {
  *   press, so the fingers start from the rim the press piled, not inside it.
  * - `splash`: the press as it was drawn before, fingers on the way down, for
  *   a drop's impact.
+ *
+ * `thin` is a plate run as a thin gap (Thin Gap, PLAN §18a), where the
+ * glass is all a hand lays and the flow does the rest. There the gap the
+ * press closes carries the liquid out and the gap the lift opens draws it
+ * back, so the strokes' own pushes and their dye multiplies (the cleared
+ * centre, the piled rim, the lift's inward push along its spokes) would
+ * move the colour a second time: a press lays only its dent, a lift only
+ * its opening. Only those two so far: the other strokes (a drop's splash)
+ * still lay their pushes and multiplies on a thin gap, a PLAN 18a item.
+ * And the press's dent is a bowl, not a disc:
+ *
+ * A palm on a sheet of glass bends it. The glass is a plate clamped where
+ * the liquid round the press holds it, under a load over the palm, and a
+ * clamped circular plate under an even load deflects as (1 − r²/R²)²: as
+ * deep in the middle as its stiffness lets it, sloping to nothing at the
+ * edge with no kink (Timoshenko, a clamped plate's uniform load). The same
+ * volume as a flat disc of the same depth is laid with a middle three times
+ * as deep (the bowl holds a third of its cylinder), and the shader then
+ * closes it as a film under a load closes (squeezeUpdate, h³). The flat
+ * discs were a drawing, and on a thin gap their edges are steps in the gap,
+ * which the collocated grid carries colour across badly (PLAN 18a-8): in the
+ * lab, before the film closed as h³, the colour under the palm's middle
+ * piled against the inner disc's step until the dye's ceiling clipped it.
  */
 export function squishDisc(
   S: number, x: number, y: number, radius: number, amount: number, fingering: number,
-  stroke: Stroke, pile: number, cell: SquishCell,
+  stroke: Stroke, pile: number, cell: SquishCell, thin = false,
 ): void {
   // A whole cell: a fractional centre makes every index fractional, and a
   // typed array drops those writes silently (Beat Squeeze, PLAN §10 step 4).
@@ -187,7 +222,13 @@ export function squishDisc(
           look's spring 0.078 and ten.
           `npm run lift` holds all of it.
         */
-        cell(idx, amount * 0.5 * w, -(i / dist) * push, -(j / dist) * push, 1);
+        if (thin) cell(idx, amount * 0.5 * w, 0, 0, 1);
+        else cell(idx, amount * 0.5 * w, -(i / dist) * push, -(j / dist) * push, 1);
+        continue;
+      }
+      if (thin && stroke === 'press') {
+        const q = 1 - d2 / r2;
+        cell(idx, -3 * amount * q * q, 0, 0, 1);
         continue;
       }
       let a = amount, vx = 0, vy = 0, mul = 1;
@@ -378,7 +419,7 @@ export const KICK_RELEASE = 1 / 3;
  * `npm run lift` drives this on that plate (`npm run squeeze` in the app).
  */
 export class KickRelease {
-  private list: { x: number; y: number; radii: number[]; amount: number; age: number; given: number }[] = [];
+  private list: { x: number; y: number; radii: number[]; amount: number; age: number; given: number; thin: boolean }[] = [];
   /** Release steps laid, over every kick: for a check to see the release run. */
   steps = 0;
   /** Kicks pressed, each owed a release: for the same check. */
@@ -386,10 +427,10 @@ export class KickRelease {
   /** The gap given back, summed over every cell written: the plate's check sets it against the depth its kicks pressed. */
   given = 0;
 
-  /** A kick pressed `amount` into each disc of `radii` (cells) about (x, y). */
-  kick(x: number, y: number, radii: number[], amount: number): void {
+  /** A kick pressed `amount` into each disc of `radii` (cells) about (x, y), on a thin gap (`thin`, a bowl: squishDisc) or not. */
+  kick(x: number, y: number, radii: number[], amount: number, thin = false): void {
     if (!(amount > 0) || radii.length === 0) return;
-    this.list.push({ x: Math.round(x), y: Math.round(y), radii: radii.slice(), amount, age: 0, given: 0 });
+    this.list.push({ x: Math.round(x), y: Math.round(y), radii: radii.slice(), amount, age: 0, given: 0, thin });
     this.kicks++;
   }
 
@@ -403,7 +444,8 @@ export class KickRelease {
       const owed = k.amount * Math.min(1, (k.age - KICK_HOLD) / KICK_RELEASE) - k.given;
       if (!(owed > 0)) continue;
       k.given += owed;
-      for (const r of k.radii) squishDisc(S, k.x, k.y, r, -owed, 0, 'press', 0, (idx, g, vx, vy, m) => { this.given += g; cell(idx, g, vx, vy, m); });
+      // In the shape it was pressed in, so what comes back is what went.
+      for (const r of k.radii) squishDisc(S, k.x, k.y, r, -owed, 0, 'press', 0, (idx, g, vx, vy, m) => { this.given += g; cell(idx, g, vx, vy, m); }, k.thin);
       this.steps++;
     }
     this.list = this.list.filter((k) => k.given < k.amount * (1 - 1e-9));

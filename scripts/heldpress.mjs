@@ -71,6 +71,18 @@ const AMOUNT = 0.0035, RADIUS = 5;
 const AT = [56, 64];
 const SETTLE = 240, WATCH = 120;
 /*
+  And the bubbles a drop's music traps: the four the Mac found near the middle
+  of a calm Classic plate (scripts/mirror.mjs, PR #238's measuring run), at
+  their plate fractions, with radii in cells of the app's 384 grid. A bubble
+  sitting still between two glasses pushes no liquid anywhere. The air's
+  "standing" source in the projection made each one pour liquid out for as
+  long as it lasted, the rest of the plate the sink: in this lab, held still
+  with their presses on, the far plate went on at 4.57e-3 once steady, 0.79 of
+  it out from them, about as fast as when they arrived (5.07e-3); without that
+  source, 1.83e-5.
+*/
+const BUBBLES = [[0.47, 0.56, 2.0], [0.49, 0.55, 2.0], [0.55, 0.65, 3.7], [0.53, 0.61, 6.5]];
+/*
   On Classic's glass, as the app works it out from the look and the step
   (LiquidVisualizer, "The two glasses"): its spring, its plate pressure and
   its dome, and the press's memory, whose half-life is 0.22 s of the plate's
@@ -92,9 +104,17 @@ const { page, close } = await openLab();
 try {
   const over = glass(await page.evaluate(() => lab.look('classic').settings));
   console.log(`  Classic's glass at dt ${DT}: spring ${over.gapSpring.toExponential(2)}, memory ${over.gapMemory.toFixed(5)}, pressure ${over.platePressure}, dome ${over.plateCurve}`);
-  const run = (press) => page.evaluate(async ({ press, AMOUNT, RADIUS, AT, SETTLE, WATCH, over }) => {
+  const run = (press, trapped = false) => page.evaluate(async ({ press, trapped, AMOUNT, RADIUS, AT, BUBBLES, SETTLE, WATCH, over }) => {
     await lab.create(256, 192);
     const L = 192;
+    // The trapped bubbles: their air on the plate, held still, each with the
+    // press LiquidVisualizer lays on its footprint. Measured about where they are.
+    if (trapped) {
+      const packed = new Float32Array(BUBBLES.length * 4);
+      BUBBLES.forEach(([x, y, r], i) => packed.set([x, y, r / 384, 1], i * 4));
+      lab.solver().setBubbles(packed, BUBBLES.length, 0.25, new Float32Array(BUBBLES.length * 4));
+      AT = [BUBBLES.reduce((a, b) => a + b[0], 0) / BUBBLES.length * L, BUBBLES.reduce((a, b) => a + b[1], 0) / BUBBLES.length * L];
+    }
     // The far plate: every cell more than a third of the plate from the press.
     const far = (v) => {
       let mag = 0, out = 0, fromPress = 0, n = 0;
@@ -113,6 +133,7 @@ try {
     const hold = async (steps) => {
       for (let k = 0; k < steps; k++) {
         if (press) lab.squish(AT[0], AT[1], RADIUS, AMOUNT, 0, 'press', 0);
+        if (trapped) for (const [x, y, r] of BUBBLES) if (r >= 1.2) lab.squish(Math.round(x * L), Math.round(y * L), Math.max(1, r * 0.85 / 2), AMOUNT, 0, 'press', 0);
         lab.flush(over.dt);
         await lab.step(1, over, true);
       }
@@ -135,11 +156,17 @@ try {
       gap = sq.gap[gx + gy * n];
       rate = sq.rate[gx + gy * n];
     }
-    return { closing, speed, outward, fromPress, peak, gap, rate };
-  }, { press, AMOUNT, RADIUS, AT, SETTLE, WATCH, over });
+    // How much of the plate the solver reads as air it is pushing on: a
+    // bubble that never reached the field (too small for the grid, a
+    // setBubbles that stopped landing) would leave the stillness below green
+    // with nothing on the plate to be still about.
+    const air = trapped ? lab.solver().airDisplacing : 0;
+    return { closing, speed, outward, fromPress, peak, gap, rate, air };
+  }, { press, trapped, AMOUNT, RADIUS, AT, BUBBLES, SETTLE, WATCH, over });
 
   const still = await run(false);
   const held = await run(true);
+  const bubbles = await run(false, true);
   const e = (x) => x.toExponential(2);
   console.log(`  no press:   far speed ${e(still.speed)} (peak ${e(still.peak)}), outward ${still.outward.toFixed(2)}`);
   console.log(`  held press: far speed ${e(held.speed)} (peak ${e(held.peak)}), outward ${held.outward.toFixed(2)} (from the press ${held.fromPress.toFixed(2)}); while closing ${e(held.closing.speed)}; gap under it ${held.gap?.toFixed(4)}, its rate ${held.rate?.toFixed(3)} a second`);
@@ -179,6 +206,29 @@ try {
   check('and not flowing in or out, from the middle of the plate or from the press',
     Math.abs(held.outward) < 0.5 && Math.abs(held.fromPress) < 0.5,
     `${held.outward.toFixed(2)} of the far flow is radial about the middle, ${held.fromPress.toFixed(2)} about the press (under 0.5 to pass)`);
+  console.log(`  trapped bubbles: far speed ${e(bubbles.speed)} (peak ${e(bubbles.peak)}), outward ${bubbles.outward.toFixed(2)} (from the bubbles ${bubbles.fromPress.toFixed(2)}); as they arrived ${e(bubbles.closing.speed)}`);
+  check('the trapped bubbles are on the plate as air the solver pushes on', bubbles.air > 0.0005,
+    `${(100 * bubbles.air).toFixed(3)}% of the plate is air`);
+  // Their arrival and their presses closing are the physical push (a bubble
+  // appearing displaces liquid, a closing gap pushes it out), so that is the
+  // yardstick, as the closing press is above.
+  check('a trapped bubble arriving moves the far plate', bubbles.closing.speed > 4 * Math.max(still.speed, 1e-7),
+    `${e(bubbles.closing.speed)} against ${e(still.speed)} with nothing on the plate`);
+  check('and once the bubbles sit still, the far plate is nearly still', bubbles.speed < bubbles.closing.speed / 20 && bubbles.peak < 3e-4,
+    `${e(bubbles.speed)} (peak ${e(bubbles.peak)}, under 3e-4 to pass), against ${e(bubbles.closing.speed)} as they arrived (under a twentieth)`);
+  /*
+    The direction asked as a flow, not as a fraction. What is left once the
+    bubbles sit still is their presses' own push on the liquid round them,
+    and at a six-hundredth of the leak's speed its direction is whatever that
+    push happens to be: on the Mac 0.59 of it pointed away from the bubbles,
+    at 7.7e-6 (4.6e-6 of outward flow), where the lab read 0.26. The leak was
+    a flow straight out at the arrival's own speed: 4.57e-3, 0.79 of it out
+    from them, 3.6e-3 of outward flow, 0.71 of what the arrival made. So the
+    outward part of the far flow is held to a fiftieth of the arrival's.
+  */
+  const outFlow = Math.max(Math.abs(bubbles.outward), Math.abs(bubbles.fromPress)) * bubbles.speed;
+  check('and not flowing out from them or from the middle', outFlow < bubbles.closing.speed / 50,
+    `${e(outFlow)} of it flows straight out (${bubbles.outward.toFixed(2)} of the far flow about the middle, ${bubbles.fromPress.toFixed(2)} about the bubbles), against ${e(bubbles.closing.speed)} as they arrived (under a fiftieth)`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

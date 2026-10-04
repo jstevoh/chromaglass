@@ -1499,8 +1499,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
         <Info>
-          One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything.
+          One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything. Lamp Ground is what the dye is seen on: at 0 the dye glows on black, as a light show's slides always were drawn here; at 1 the lamp shines up through it, as a projector does, so clear liquid is the lamp's white and dense dye deepens and then goes dark.
         </Info>
+        {/* The lamp under the dish shining up through the dye (PLAN 18b), or the dye as light on black. */}
+        <Slider
+          label="Lamp Ground"
+          value={settings.lampGround ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampGround: v })}
+          settingKey="lampGround"
+        />
         <Slider
           label="Light Play"
           value={settings.lightPlay ?? 0}
@@ -2921,14 +2931,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         */}
         <Slider
           label="Thin Gap"
-          value={settings.thinGap ?? 0}
+          value={settings.thinGap ?? 1}
           min={0}
           max={1}
           step={1}
           onChange={(v: number) => onUpdate({ thinGap: v })}
           settingKey="thinGap"
         />
-        {(settings.thinGap ?? 0) > 0.5 && (
+        {(settings.thinGap ?? 1) > 0.5 && (
           <Slider
             label="Thickness"
             value={settings.gapThickness ?? 0.45}
@@ -3226,8 +3236,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           The plate as a flywheel.
 
           Rotation Speed above is a motor: it asks for a speed and the plate
-          holds it, and every preset sets it low because it is there to keep a
-          plate alive rather than to be seen. A flick is the other thing a
+          holds it. Most presets set it low, a turn every few minutes or hours,
+          and a few music looks turn visibly (acid-trip once every twenty
+          seconds) since the motor's stir in the middle became the dish's turn
+          (PLAN 22j). A flick is the other thing a
           plate does — spun by hand and left to slow down — so it is a press
           and not a value, and it goes to one plate at a time because the two
           turn opposite ways and shearing them by hand is the point.

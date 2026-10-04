@@ -382,6 +382,15 @@ jobs:
       - name: The phone
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run phone
+      # The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served
+      # with Brotli over a slowed network, and the page asks for the app's
+      # chunks alongside its entry and for the GPU before the app has
+      # arrived, while the remote and a cast fetch no App chunk. The order is
+      # what is judged, so no GPU is needed and a runner's speed cannot move
+      # it.
+      - name: The load
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run loadtime
       # The iPhone app as the laptop's remote (src/lib/appLink.ts): a real
       # relay, a stand-in laptop and the app's page from another origin. No
       # plate needed, so it runs here rather than on a Mac.
@@ -435,12 +444,15 @@ jobs:
   # and 11.3 with #218's Ben-Day print (63 s on its PR's runs), show 8.8 →
   # about 9.8 with the mixer), and they do not run at all for a change
   # that reaches none of them (the `reach` job above).
+  #
+  # The tools shard also takes the Press's let-go on a thin gap with its two
+  # controls (about 35 s more; #228).
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     needs: reach
     if: ${{ needs.reach.outputs.mac == 'true' }}
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -512,6 +524,20 @@ jobs:
       - name: The thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run thingap
+      # The app's own Press on a thin gap: the ring goes out as far as the
+      # displaced volume says with every drop kept, the colour's carry takes
+      # the substeps it needs, and it comes back when the glass lifts.
+      - name: The Press comes back on a thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run presslift
+      # The plate's forces as forces on a thin gap (PLAN 18a-2): a body force
+      # (Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity
+      # says, Glass Smear is the glass sliding and Updraft a draught's shear,
+      # each against the old reading it replaced.
+      - name: The forces are forces
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 4
+        run: npm run forces
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
@@ -604,6 +630,13 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
+      # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
+      # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
+      # twice the dye lets through the square, a gel and the back plate filter
+      # through the dye. In the open shard: the plate shard is near its timeout.
+      - name: The lamp through the dye
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run lamp
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print
@@ -699,6 +732,24 @@ jobs:
       - name: The sound's renders, with a plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/renders.mjs
+      # Audio Impact 0 holds the music's bubbles back too (scripts/kickbubbles.mjs,
+      # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
+      # and its kicks used to drop air near the middle whatever the dial said.
+      # On the laptop and the phone at 0, and at the default, where they still
+      # must. About two minutes.
+      - name: Audio Impact 0 drops no bubbles
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/kickbubbles.mjs
+      # A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md
+      # 22h): the look's own turning goes through the liquid's drag time like
+      # the Spin tool's, the picture turns with the liquid, and the flick no
+      # longer stirs the current with a term of its own. It reads the plate's
+      # refs, not its frames, but the frame loop only steps on a GPU that
+      # draws. About twenty-five seconds, on the tools shard, the shortest by
+      # the medians above.
+      - name: A flicked plate's liquid trails the glass
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: node scripts/flick.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a

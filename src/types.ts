@@ -345,9 +345,20 @@ export interface VisualizerSettings {
     pressure solve in which a tight gap carries less than an open one (the
     mobility h³/12μ); and an open rim, so what a press squeezes out leaves the
     dish across its edge and comes back when the glass lifts, where the old
-    plate spread it as a uniform sink everywhere. It changes how every look
-    moves and every tool feels, so it is off in every look and waits for the
-    owner to judge it look by look on the projector.
+    plate spread it as a uniform sink everywhere.
+
+    It is on in every look. That breaks the rule that a new default keeps
+    today's look (PLAN.md, Operating rules), and on purpose: the owner was asked (2026-10-03)
+    whether to turn it on in no look yet, in Classic only, or in every look,
+    knowing that every look would then move the thin-gap way before anyone
+    had seen it at 60 fps, and picked every look, so that the Press draws the
+    liquid back when it lifts wherever it is played. With it off, a press
+    squeezed the liquid out into a sink spread over the whole plate, and on
+    the lift about a third of it came back: "the release from pressing ends up
+    wiping all the liquids down the drain" (the owner, 2026-10-04). That
+    pick is the exception, not a new rule. Off is still here, a switch away,
+    for any look that turns out to need the old plate (PLAN §18a), and no
+    preset sets it, so this line is every look's.
 
     `gapThickness` is the liquid's viscosity for it, 0 to 1 on a log scale
     from water (1 mm²/s) to glycerine (about 1000): it sets how long a push
@@ -581,6 +592,13 @@ export interface VisualizerSettings {
   colourBody?: number;
   /** Ben-Day dots: the finished picture printed as a comic, flat inks with the tints in even dots (the Roy look). 0 is off. */
   benDay?: number;
+  /**
+   * The ground the dye is seen on (PLAN 18b): 0 the dye painted as light over
+   * black, as every look was drawn; 1 the lamp under the dish shining up
+   * through it (Beer–Lambert), so clear liquid is the lamp's white and dense
+   * dye saturates and then goes dark. Not in the photograph, which has paper.
+   */
+  lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -808,7 +826,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   */
   plateCurve: 0,
   depthDrag: 0,
-  thinGap: 0,               // off: the solver every look was made on
+  thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
@@ -905,6 +923,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,                // no print: only the Roy look lays Ben-Day dots
+  lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
   lacing: 0,

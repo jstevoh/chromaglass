@@ -85,7 +85,30 @@ try {
   for (const sc of RUN) {
     const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-    await page.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* none */ } });
+    /*
+      And a chosen silence, before the page loads. The first drop is the
+      page's first pointerdown, and on a browser that has never chosen a
+      sound source that gesture starts the simulated band (App.tsx, the
+      first visit's wake). CALM holds the music's own reactions still, but
+      the band's kicks released bubbles into the densest dye near the middle
+      of the plate whatever Audio Impact said, and from the second drop on
+      the middle of the preview moved by itself. On the Mac, with the band
+      let start: 29 kicks over the four drops, four bubbles near the middle
+      from the second, and the middle cells' drift 1.7 1.6 16.3 12.8, against
+      cells that sat at their drift with the band off. Audio Impact 0 holds
+      the bubbles back now too (`npm run kickbubbles`), but a plate judged
+      for what the hand alone did is judged in silence all the same: the
+      band's tempo still paces the look, and a kick still breathes a maze.
+      "None" written here is a choice made, so the wake leaves it alone. The
+      printed-only plates are photographed silent too, the reported one
+      included.
+    */
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('chromaglass-desk-mode', 'design');
+        localStorage.setItem('chromaglass-audio-source', 'none');
+      } catch { /* none */ }
+    });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${sc.look}${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(8000);
     await page.evaluate(({ sc, CALM }) => {
@@ -234,6 +257,20 @@ try {
       await page.close();
       continue;
     }
+    /*
+      That the plate was silent, asked of the band itself: the band's own
+      hook (window.__band, which App.tsx defines whenever the band starts
+      under ?debug) as well as the kicks the plate and the ear counted. The
+      counts alone can read 0 with the band playing on a page that is not
+      drawing (check-skeptic): the plate counts a kick only in the frame
+      loop. On the Mac, with the band let start, they read 29 and 26.
+    */
+    const music = await page.evaluate(() => {
+      const d = window.chromaglassDebug?.();
+      return { band: typeof window.__band === 'function', kicks: d?.kicks?.() ?? null, heard: d?.heardKicks?.() ?? null };
+    });
+    check(`${sc.name}: the plate hears no music while it is judged`, !music.band && music.kicks === 0 && music.heard === 0,
+      `${music.band ? 'the band was started' : 'no band started'}, ${music.kicks} kicks reached the plate and the ear heard ${music.heard}, over the ${REPS} drops`);
     check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
       worst ? `most away from the hand ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'nothing');
     await page.close();

@@ -27,14 +27,53 @@
  *      stops the dish within a fifth of a second; near the middle it reads
  *      nothing; lifted it lets go; a fast swipe past the middle turns the
  *      dish no faster than a hand can, a turn and a half a second;
- *   8. with Auto Spin off and no hand, the turntable and its liquid are
- *      exactly zero, so a look nobody spins turns as it always did;
- *   9. and let go, they come back to exactly zero, not for ever nearly.
+ *   8. with Auto Spin off and no hand, the turntable is exactly zero, beside
+ *      a look's own flywheel swinging with the music;
+ *   9. and let go, the dish and its liquid come back to exactly zero, not
+ *      for ever nearly.
+ *
+ * The look's own turning on the same dish (PLAN 22h, dishFrame): its motor,
+ * the music routed to rotation and a flick turn the one dish the turntable
+ * turns, and the picture turns with the liquid following their sum.
+ *
+ *  10. a look nobody turns (no motor, no music, no flick, no turntable):
+ *      the dish, the liquid and the picture's angle stay exactly zero for ten
+ *      minutes, so the change is nothing where nothing turns;
+ *  11. a flick on a dish of water: the picture is still while the glass goes
+ *      round (under a tenth of the dish's speed after a tenth of a second),
+ *      and comes up to the dish with the drag time τ: the liquid's speed is
+ *      the exact answer for a dish coasting on its bed to 2% at 1 s and
+ *      3 s, at 60 and at 144 frames a second. On the thick liquid it is
+ *      with the dish within half a second;
+ *  12. a look's steady motor: the picture turns at the motor's speed and
+ *      ends Ωτ behind where the rigid picture did, to 2%, so a slow look
+ *      does not lose its turn, it trails it by a fixed angle;
+ *  13. a look's music sway, through the water: the liquid is a first-order
+ *      filter of the dish with corner 1/τ, so at a swing every eight seconds
+ *      (four bars at 120 bpm) the picture's sway is 1/√(1 + (ωτ)²) of the
+ *      dish's, 0.39 on water and 0.99 on the thick liquid, to 3%: the
+ *      measure of what 22h changes on the nine thin looks with music;
+ *  14. the turntable's share reaches the liquid: a look's flick and a
+ *      turntable turning half as fast the other way leave the water going
+ *      round at the half that is left, with the water's drag time; and a
+ *      hand holding a flicked dish still (the turntable exactly against the
+ *      look) has the dish at exactly zero every frame and the water at rest,
+ *      exactly, when the drag time says, τ ln(2/LIQUID_REST), to a frame;
+ *  15. the look's motor holds its way round whatever the band does (PLAN
+ *      22j): with a band routed to rotation and gone quiet (every feature
+ *      0, a sway of 0.4 − 1.2 = −0.8) acid-trip's dial still turns the dish
+ *      forwards at the dial's speed, where the sway used to carry it
+ *      backwards; the band's own share is the sway times the push, as it
+ *      always was, at any sway; the dial is `v × 0.01` to the bit in its
+ *      bottom tenth and has no step at 0.1; and the frame hands the dial
+ *      and the band to the motor apart (read from its source, as `npm run
+ *      backplate` reads the plate's own motor).
  */
 import {
   AutoSpin, SpinHand, SPIN_RATE, SPIN_TEMPO, SPIN_OFF, WATER_NU, THICK_NU, OIL_NU,
-  carrierViscosity, dishFollow, dragSeconds, liquidFollow,
+  carrierViscosity, dishFollow, dishFrame, dragSeconds, liquidFollow, LIQUID_REST, lookMotor, lookMotorRate,
 } from '../src/lib/turntable.ts';
+import { readFileSync } from 'node:fs';
 
 let bad = 0;
 const check = (name, ok, detail = '') => {
@@ -191,16 +230,15 @@ check('water takes twenty times as long as the thick liquid', near(reach(tw) / r
     to show the two do not leak into each other.
   */
   const a = new AutoSpin();
-  let dish = 0, liq = 0, look = 0, angle = 0;
+  let dish = 0, look = 0, angle = 0;
   const D = (0.04 + 0.25 * 1.2) * 0.8;
   for (let k = 0; k < 60 * 600; k++) {
     look = dishFollow(look, 0.03 * Math.sin(k / 40), D, 1 / 60);
     dish = dishFollow(dish, a.target(SPIN_OFF, 6, 16, { periodMs: 500, nextBeatMs: 1000, nowMs: 900 }, angle), D, 1 / 60);
-    liq = liquidFollow(liq, dish, 1 / 60, tw);
     angle += dish / 60;
   }
-  check('with Auto Spin off and no hand, the turntable and its liquid stay exactly still', dish === 0 && liq === 0 && angle === 0,
-    `dish ${dish}, liquid ${liq}, angle ${angle}, beside a look swinging to ${look.toFixed(4)} rad/s`);
+  check('with Auto Spin off and no hand, the turntable stays exactly still', dish === 0 && angle === 0,
+    `turntable ${dish}, its angle ${angle}, beside a look swinging to ${look.toFixed(4)} rad/s`);
 }
 
 // 9
@@ -215,6 +253,176 @@ check('water takes twenty times as long as the thick liquid', near(reach(tw) / r
   }
   check('let go, the dish and its water come to rest exactly, not for ever nearly', dish === 0 && liq === 0 && t < 120,
     `at rest after ${t.toFixed(1)} s`);
+}
+
+// The look's turning on the same dish (PLAN 22h).
+// A thin look's bed at the default Plate Drag with the glass not pressed (the
+// flywheel in LiquidVisualizer: (0.04 + spinDrag 1.2) × 0.8 for thin, times
+// 1 + Plate Pressure × 0.8, here 0). Used only against itself.
+const BED = (0.04 + 0.25 * 1.2) * 0.8;
+
+// 10
+{
+  let look = 0, liq = 0, angle = 0, worst = 0;
+  for (let k = 0; k < 60 * 600; k++) {
+    look = dishFollow(look, 0, BED, 1 / 60);
+    const f = dishFrame(look, 0, liq, 1 / 60, tw);
+    liq = f.liquid; angle += f.turn;
+    worst = Math.max(worst, Math.abs(f.dish));
+  }
+  check('a look nobody turns: dish, liquid and picture exactly still for ten minutes', worst === 0 && liq === 0 && angle === 0,
+    `dish ${worst}, liquid ${liq}, angle ${angle}`);
+}
+
+// 11
+{
+  /*
+    The exact answer for the liquid behind a coasting dish. The flick sets the
+    look's flywheel to Ω0 and its bed takes it down as e^(−Dt) (the dry
+    friction's last grip is too small to matter in three seconds); the liquid,
+    dω/dt = (Ω − ω)/τ from rest, is then Ω0 (e^(−Dt) − e^(−t/τ)) / (1 − Dτ).
+  */
+  const O0 = 2 * Math.PI * 0.6 * 0.5;   // a flick at the default Spin Impulse
+  const exact = (t, tau) => O0 * (Math.exp(-BED * t) - Math.exp(-t / tau)) / (1 - BED * tau);
+  const run = (fps, seconds, tau) => {
+    let look = O0, liq = 0;
+    const n = Math.round(seconds * fps);
+    for (let k = 0; k < n; k++) {
+      // The frame's order: the flywheel coasts, then the liquid follows it.
+      look = dishFollow(look, 0, BED, 1 / fps);
+      liq = dishFrame(look, 0, liq, 1 / fps, tau).liquid;
+    }
+    return { look, liq };
+  };
+  const early = run(60, 0.1, tw);
+  check('a flick on water: the picture stays put while the glass goes round', early.liq < 0.1 * early.look,
+    `liquid ${early.liq.toFixed(3)} against the dish's ${early.look.toFixed(3)} rad/s after 0.1 s`);
+  const errs = [];
+  for (const fps of [60, 144]) for (const t of [1, 3]) {
+    const got = run(fps, t, tw).liq, want = exact(t, tw);
+    errs.push(Math.abs(got - want) / want);
+  }
+  const worst = Math.max(...errs);
+  check('and comes up to the dish with the water\'s drag time, at any frame rate', worst < 0.02,
+    `worst ${(100 * worst).toFixed(2)}% off the exact answer at 1 s and 3 s, 60 and 144 fps; at 3 s ${run(60, 3, tw).liq.toFixed(3)} of ${run(60, 3, tw).look.toFixed(3)} rad/s`);
+  /*
+    And the picture's angle, which is what the room sees: the liquid's speed
+    integrated over each frame exactly, so a frame that took a quarter of a
+    second turns it as far as fifteen frames of a sixtieth do. Held to the
+    exact answer for a dish at a steady Ω from rest, Ω T − τ ω_l(T). Taken as
+    the speed at the frame's end times its length, the four-frames-a-second
+    picture read 11% ahead after 2 s; CI's Mac drew a 0.46 s frame while the
+    shaders were still building and the flick turned the water twice as far.
+  */
+  const angleAt = (fps) => {
+    let liq = 0, a = 0;
+    for (let k = 0; k < Math.round(2 * fps); k++) { const f = dishFrame(1.8, 0, liq, 1 / fps, tw); liq = f.liquid; a += f.turn; }
+    return a;
+  };
+  const exactAngle = 1.8 * 2 - tw * 1.8 * (1 - Math.exp(-2 / tw));
+  const a60 = angleAt(60), a4 = angleAt(4);
+  check('the picture turns as far at four frames a second as at sixty, the exact angle', near(a60, exactAngle, 1e-6) && near(a4, exactAngle, 1e-6),
+    `${a60.toFixed(5)} and ${a4.toFixed(5)} rad after 2 s, exactly ${exactAngle.toFixed(5)}`);
+  const thick = run(60, 0.5, tt);
+  check('on the thick liquid it is with the dish within half a second', thick.liq > 0.95 * thick.look,
+    `${(thick.liq / thick.look).toFixed(3)} of the dish's speed`);
+}
+
+// 12
+{
+  // acid-trip's motor, the fastest a shipped look asks for (Rotation Speed
+  // 0.421 since PLAN 22j moved its stir onto the dish; 0.1 × 0.01 rad/s before).
+  const M = lookMotorRate(0.421);
+  let look = 0, liq = 0, rigid = 0, angle = 0;
+  for (let k = 0; k < 60 * 120; k++) {
+    look = dishFollow(look, M, BED, 1 / 60);
+    const f = dishFrame(look, 0, liq, 1 / 60, tw);
+    liq = f.liquid; angle += f.turn; rigid += look / 60;
+  }
+  check('a look\'s steady motor: the picture turns at its speed and trails the rigid picture by Ωτ',
+    near(liq, M, 1e-6) && near(rigid - angle, M * tw, 0.02), `${(rigid - angle).toFixed(5)} rad behind, Ωτ = ${(M * tw).toFixed(5)}`);
+}
+
+// 13
+{
+  const sway = (tau) => {
+    // The dish swung every eight seconds; amplitudes read over the last of
+    // 60 s, once the start has died away. The dish's speed itself, not the
+    // motor's: the flywheel's dry friction bends a sine near its zeros, and
+    // what is measured here is the liquid's filter, not the flywheel's.
+    const w = 2 * Math.PI / 8, fps = 60;
+    let liq = 0, aDish = 0, aLiq = 0;
+    for (let k = 0; k < fps * 60; k++) {
+      const t = k / fps;
+      const look = 0.03 * Math.sin(w * t);
+      liq = dishFrame(look, 0, liq, 1 / fps, tau).liquid;
+      if (t > 52) { aDish = Math.max(aDish, Math.abs(look)); aLiq = Math.max(aLiq, Math.abs(liq)); }
+    }
+    return { ratio: aLiq / aDish, want: 1 / Math.sqrt(1 + (w * tau) ** 2) };
+  };
+  const water = sway(tw), thick = sway(tt);
+  check('a look\'s music sway through water is filtered by its drag time', near(water.ratio, water.want, 0.03),
+    `${water.ratio.toFixed(3)} of the dish's sway, 1/√(1 + (ωτ)²) = ${water.want.toFixed(3)}`);
+  check('and through the thick liquid hardly at all', near(thick.ratio, thick.want, 0.03) && thick.ratio > 0.98,
+    `${thick.ratio.toFixed(3)}, want ${thick.want.toFixed(3)}`);
+}
+
+// 14
+{
+  // A look flicked to Ω0 and a turntable held at −Ω0/2: the water goes to Ω0/2.
+  let liq = 0;
+  for (let k = 0; k < 60 * 3; k++) liq = dishFrame(1.2, -0.6, liq, 1 / 60, tw).liquid;
+  check('the turntable\'s share reaches the same liquid', near(liq, 0.6 * (1 - Math.exp(-1)), 0.02),
+    `${liq.toFixed(4)} rad/s after one drag time, the drag time says ${(0.6 * (1 - Math.exp(-1))).toFixed(4)}`);
+
+  // A flicked plate, and a hand holding the glass still: the turntable is
+  // exactly against the look (held = 0), the dish exactly zero.
+  let look = 3, l2 = 2, t = 0, moved = 0;
+  while (l2 !== 0 && t < 120) {
+    look = dishFollow(look, 0, BED, 1 / 60);
+    const f = dishFrame(look, -look, l2, 1 / 60, tw);
+    if (f.dish !== 0) moved++;
+    l2 = f.liquid;
+    t += 1 / 60;
+  }
+  const want = tw * Math.log(2 / LIQUID_REST);
+  check('a hand holding a flicked dish still: the dish is still and the water comes to rest when its drag time says',
+    moved === 0 && l2 === 0 && Math.abs(t - want) < 1 / 60 + 1e-9,
+    `${moved} frames the dish moved; at rest after ${t.toFixed(2)} s, τ ln(2/LIQUID_REST) = ${want.toFixed(2)} s`);
+}
+
+// 15
+{
+  const rate = lookMotorRate(0.421);
+  // acid-trip's band (energy) gone quiet: rotationMod = 0, sway (0 − 0.4) × 3 + 0.4.
+  const quiet = lookMotor(rate, 1, 0, 0.4 + (0 - 0.4) * 3);
+  check('a look\'s motor turns its dish its own way round when the band routed to rotation goes quiet',
+    quiet === rate && rate > 0.3, `${quiet.toFixed(4)} rad/s, the dial's ${rate.toFixed(4)} (the sway alone would have made it ${(rate * -0.8).toFixed(4)})`);
+  let worst = 0;
+  for (const music of [0, 0.002, 0.013, 0.05]) for (const sway of [-0.8, -0.1, 0, 0.4, 1.3, 2.2]) {
+    worst = Math.max(worst, Math.abs(lookMotor(0, 1, music, sway) - music * sway), Math.abs(lookMotor(rate, -1, music, sway) - (music * sway - rate)));
+  }
+  check('and the band\'s own share is its push times its sway, as it always was', worst < 1e-15, `largest difference ${worst}`);
+  const low = [0, 0.003, 0.05, 0.1].every((v) => lookMotorRate(v) === v * 0.01);
+  check('the dial is v × 0.01 in its bottom tenth and has no step at 0.1', low && near(lookMotorRate(0.1 + 1e-9), 0.001, 1e-6),
+    `${lookMotorRate(0.1)} and ${lookMotorRate(0.1 + 1e-9)} rad/s either side of 0.1`);
+  const src = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+  /*
+    And the frame wires it so. The call's shape alone would pass with the
+    sway put back into the motor's way inside the band's block, so every
+    assignment to motorWay in the code is read too: it starts as the plate's
+    sign and only Spin Direction and the wander may change it.
+  */
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const ways = [...code.matchAll(/motorWay\s*([*+\-/]?=)\s*([^;]+);/g)].map((m) => `${m[1]} ${m[2].trim()}`);
+  const allowed = ['= dirMod', '= 1', '= -1', '*= 1 + w * wander * 3.4'];
+  const begin = code.indexOf('let motorWay = dirMod;');
+  const band = code.indexOf('if (currentAudioData && currentSettings.audioMappings)', begin);
+  check('the frame hands the dial and the band to the motor apart',
+    /const motor = lookMotor\(motorRate, motorWay, musicSpeed, dirMod\)/.test(code)
+    && /const motorRate = lookMotorRate\(asked\)/.test(code) && !/\btwist\b/.test(code)
+    && begin > 0 && band > begin && ways.length === 4 && ways.every((w) => allowed.includes(w)),
+    `motorWay set ${ways.length} times: ${ways.join(' · ')}`);
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');

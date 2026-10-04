@@ -98,6 +98,8 @@ export function luckyLook(
     // The comic print is the Roy look's and its own control's, and a roll
     // is a new look: rolled from Roy it would still be printed.
     benDay: 0,
+    // Lamp Ground (PLAN 18b) is kept: a roll is a variation on the look on
+    // the plate, and which ground it is seen on is that look's choice.
     sensitivity: rand() * 0.8 + 0.2,
     /*
       1 to 2, not 0.5 to 2. No preset sets this — it is an ear setting, so
@@ -140,8 +142,14 @@ export function luckyLook(
       now been reported three times — the first half being a zoom that should
       have been held and was not. Twice the looks' top leaves room to surprise
       without leaving the vocabulary.
+
+      Since PLAN 22j the dial's bottom tenth no longer stirs the middle, it
+      only turns the dish (at a thousandth of a radian a second at most), and
+      the looks were moved up the dial to keep their turn: most now sit
+      between 0.02 and 0.2, a turn every few hours to one every three minutes. The
+      dice keep to that, not to the three fast music looks above it.
     */
-    rotationSpeed: rand() * 0.025,
+    rotationSpeed: rand() * 0.2,
     centerGravity: rand(),
     ledPlatform: rand() > 0.5,
     ledMode: ledModes[Math.floor(rand() * ledModes.length)],

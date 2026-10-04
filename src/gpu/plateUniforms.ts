@@ -316,6 +316,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('liesShow', clamp01(s.liesegang ?? 0));
     pack.set('thickOptics', clamp01(s.thicknessOptics ?? 0));
     pack.set('spectral', clamp01(s.spectralOptics ?? 0));
+    // The photograph has its own ground, the paper, and lays the dye over
+    // it as transmission already; the lamp's is the projector's.
+    pack.set('lampGround', !photo && Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
     pack.set('droplets', clamp01(s.microDroplets ?? 0));

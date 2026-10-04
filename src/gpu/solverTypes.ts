@@ -152,7 +152,6 @@ export interface GpuStepParams {
   rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
   rockY: number;
   currentGrav: number;      // a concave dish, × (density − mean): heavy dye pools in the middle
-  twist: number;            // the top glass turning: a differential rotation, fastest inside
   meanDensity: number;
   maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
   /**
@@ -222,6 +221,12 @@ export interface PlateSolver {
   readonly oilCover?: number;
   /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
   carryMix?(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void;
+  /**
+   * Whether the last step ran the plate as a thin gap (PLAN §18a): then a
+   * hand on the glass lays only the glass, and the flow carries the liquid
+   * (lib/squish.ts). Optional because only the WebGPU solver has one.
+   */
+  readonly thinGapLive?: boolean;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */

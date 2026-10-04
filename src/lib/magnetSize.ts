@@ -1,5 +1,5 @@
 /**
- * How big the magnet in the hand is (Magnet Size), and the pool it brings.
+ * How big the magnet in the hand is (Magnet Size).
  *
  * Asked for by the owner, after picking the Magnet still put "a giant black
  * hole" on the plate: "I just want a magnet that I can control the size of
@@ -71,28 +71,10 @@ export function sizedMagnet(strength: number, height: number, size: number | und
 }
 
 /*
-  The pool a magnet brings to a plate that has no ferrofluid on it: one drop,
-  laid under the hand, of this radius at the tool's own size and k times it
-  at another.
-
-  Why a pool under the hand and not the ring: picking the Magnet used to pour
-  the look's ring of ferrofluid (phasePour) over the whole plate the moment it
-  was picked, about a fifth of the plate in black drops round the middle, and
-  at a large Ferrofluid Scale those drops ran together across the middle. That
-  is the "giant black hole as soon as you pick it" the owner reported after
-  the magnet under the middle (PLAN 9s) had been taken away. A performer with
-  a magnet and a bottle puts the ferrofluid where they are about to work, and
-  a magnet over a bare plate does nothing at all (the reason the pour was
-  added), so the liquid comes with the hand: where it first touches, as much
-  as the magnet will stand up.
-
-  0.09 at the tool's own size: the spikes' patch over the hand's magnet
-  reaches about 1.1 of its height out (spikes.ts: the field off the axis
-  falls to the onset's share there), 0.15 of the plate at Ferrofluid Scale
-  0.4, so the pool sits inside it and the whole of it stands into domes,
-  about a dozen at the spikes' pitch. 0.9 full, as the ring's drops are (a
-  half-full drop would not separate from the water at all): one drop holds
-  0.9 πr²/2, a little under 1% of the plate, against the ring's 22%.
+  There is no pool here any more. From 9x a magnet touching a plate with no
+  ferrofluid laid a pool under the hand, sized by this setting. The owner,
+  2026-10-04: "Why does the magnet add ferrofluid? It should only work on
+  ferrofluid that is already there." Magnet Size is the magnet's own size and
+  reach and nothing else; the ferrofluid it works on is poured from the
+  bottle or laid by the look.
 */
-export const MAGNET_POOL_RADIUS = 0.09;
-export const MAGNET_POOL_FILL = 0.9;

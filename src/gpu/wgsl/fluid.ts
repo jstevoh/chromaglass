@@ -60,7 +60,7 @@ struct Sim {
   curDamp: f32,
   curBuoy: f32,
   curGrav: f32,
-  twist: f32,
+  spare25: f32,       // the motor's stir until PLAN 22j: the dish drags the liquid now
   meanD: f32,
   maxCur: f32,
   rock: vec2f,
@@ -245,6 +245,21 @@ fn packedBilerp(uv: vec2f, n: f32) -> f32 {
 `;
 
 const HEAD = SIM_STRUCT;
+// phaseSeparate's and phaseGrid's blur of the ferrofluid (each defines raw()).
+const PHASE_MEAN3 = /* wgsl */ `
+// The field blurred by the binomial [1 2 1]² kernel, which both cells of a
+// pair read alike. The sharpening follows it: the kernel's response to a
+// checkerboard is exactly zero, so one is never fed (a plain 3×3 mean passes
+// a ninth of it, and the plate grew a checkerboard over the magnet).
+fn mean3(p: vec2i, n: i32) -> f32 {
+  var t = 0.0;
+  for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) {
+    let w = f32((2 - abs(i)) * (2 - abs(j)));
+    t += w * clamp(raw(clamp(p + vec2i(i, j), vec2i(0), vec2i(n - 1))), 0.0, 1.0);
+  } }
+  return t / 16.0;
+}
+`;
 const W = '@compute @workgroup_size(8, 8)';
 
 /*
@@ -884,19 +899,7 @@ ${STAND_ASIDE}
   without a clamp (a quarter of that each way, over four neighbours).
 */
 fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
-// The field blurred by the binomial [1 2 1]² kernel, which both cells of a
-// pair read alike. The sharpening follows it: the kernel's response to a
-// checkerboard is exactly zero, so one is never fed (a plain 3×3 mean passes
-// a ninth of it, and the plate grew a checkerboard over the magnet).
-fn mean3(p: vec2i, n: i32) -> f32 {
-  var t = 0.0;
-  for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) {
-    let w = f32((2 - abs(i)) * (2 - abs(j)));
-    t += w * clamp(raw(clamp(p + vec2i(i, j), vec2i(0), vec2i(n - 1))), 0.0, 1.0);
-  } }
-  return t / 16.0;
-}
-fn exchange(p: vec2i, q: vec2i, sp: f32, n: i32) -> f32 {
+${PHASE_MEAN3}fn exchange(p: vec2i, q: vec2i, sp: f32, n: i32) -> f32 {
   // What flows into p from its neighbour q.
   let a = raw(p);
   let b = raw(q);
@@ -925,6 +928,53 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (p.y > 0) { d += exchange(p, p - vec2i(0, 1), sp, n); }
   if (p.y < n - 1) { d += exchange(p, p + vec2i(0, 1), sp, n); }
   textureStore(dst, p, vec4f(c + d, 0.0, 0.0, 0.0));
+}`,
+
+  /*
+    phaseSeparate's grid-scale filter alone, for the ferrofluid carried as a
+    volume under Thin Gap (phaseAdvect's A.a.x). The filter exchanges share
+    between neighbours, which keeps Σc; but under a press the plate's
+    ferrofluid is Σc·h, and a share moved from a cell the glass has closed
+    on to one it has not is more liquid there than it was here. Measured on
+    the Press × ferrofluid check's pool (npm run ferropress), pressed to a
+    sixth of the gap in twenty steps as the glass closes under a load (h³,
+    squeezeUpdate): its volume grew 1.9% (0.01570 to 0.01600), and with the
+    filter skipped it was kept to 0.2%. (Cahn–Hilliard, which keeps Σc too,
+    took 0.7% more over the ten steps held after: phaseCHVolume; the
+    relaxation moved it by under 0.1%.) So here what crosses a face
+    is a volume, the same exchange times the thinner of the two gaps, and
+    each cell divides by its own: the pair's two sides are one number, so
+    Σc·h is kept, and no cell takes more than an eighth of a difference a
+    face, as before. The gaps are phaseAdvect's at the end of this
+    substep: A.a.x of the way from the gap the phase last saw to now.
+  */
+  phaseGrid: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(4) var gapNow: texture_2d<f32>;
+@group(0) @binding(5) var<storage, read> gapSeen: array<f32>;
+@group(0) @binding(6) var stand: texture_2d<f32>;
+${STAND_ASIDE}
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+${PHASE_MEAN3}
+fn gapAt(q: vec2i, n: i32) -> f32 {
+  return mix(max(gapSeen[q.x + q.y * n], 0.004), max(textureLoad(gapNow, q, 0).r, 0.004), A.a.x);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let c = raw(p);
+  let sp = mean3(p, n);
+  let hp = gapAt(p, n);
+  var d = 0.0;
+  for (var k = 0; k < 4; k++) {
+    let e = select(vec2i(0, 1 - 2 * (k & 1)), vec2i(1 - 2 * (k & 1), 0), k < 2);
+    let q = p + e;
+    if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
+    d += aside(p, q, S.n) * 0.125 * ((raw(q) - c) - (mean3(q, n) - sp)) * min(hp, gapAt(q, n));
+  }
+  textureStore(dst, p, vec4f(c + d / hp, 0.0, 0.0, 0.0));
 }`,
 
   squeezeUpdate: `${HEAD}
@@ -956,6 +1006,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       // rest is left where it is, not pulled down.
       var g2 = max(0.004, gap + dg);
       if (dg > 0.0) { g2 = min(g2, max(gap, rest)); }
+      /*
+        On a thin gap (A.a.y) a press closes the film as a film under a load
+        does: the liquid has to leave through the gap it is closing, whose
+        resistance goes as 1/h³ (Reynolds; Stefan's law for two plates,
+        F = 3πμR⁴ḣ / 2h³), so under a steady hand the glass comes down fast
+        and slows as the film thins, dh/dt = −a (h/h₀)³, never quite reaching
+        the floor. \`dg\` is the hand's rate at the rest gap h₀, as the
+        Press lays it; integrated exactly over the step, 1/h² grows by
+        2a/h₀³. Laid as a straight subtraction, the Press's bowl took the
+        film from rest to the floor in one step, and the liquid it pushed out
+        crossed 75 cells of a 384² solver in that step, past anything the
+        dye's carry can follow (npm run presslift). The rate's other
+        factors, the palm's size and the liquid's viscosity, stay in the
+        hand's own number: a thicker liquid does not yet press slower.
+      */
+      if (dg < 0.0 && A.a.y > 0.5) {
+        let h0 = max(rest, 0.004);
+        g2 = max(0.004, inverseSqrt(1.0 / (gap * gap) + 2.0 * (-dg) / (h0 * h0 * h0)));
+      }
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }
@@ -1283,28 +1352,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
   /*
-    Two terms, and the second is the one that empties a bubble.
+    One term: the air arriving, and only while it arrives.
 
-    The rate — how much air arrived since last frame — is the physical one: a
-    growing bubble displaces liquid, a popping one lets it back. It is also
-    only there while the bubble is *changing*, and a bubble that has arrived
-    and sits still has no rate at all. Measured on its own it moved the
-    interior from 0.70 to 0.67, which is nothing.
+    The rate (how much air arrived since last frame) is the physical source:
+    a growing bubble displaces liquid, a popping one lets it back. A bubble
+    that has arrived and sits still has no rate at all, and that is right.
+    Between two glasses a still bubble pushes nothing anywhere; the liquid
+    is simply not where the air is.
 
-    So there is a standing term as well: a source everywhere the air is, a
-    sink everywhere it is not, which keeps liquid flowing out of a bubble and
-    around it for as long as it is there. A.a.z is the fraction of the
-    plate that is air, subtracted so the two balance — a source that does not
-    average to zero has no solution for the projection to find, which is the
-    Neumann condition pressureSelfTest exists to protect.
+    There used to be a second, "standing" term beside it: a source everywhere
+    the air was and a sink everywhere it was not, (air - the plate's air
+    fraction) times 30 every step, put there to empty a bubble's middle of
+    dye, because the rate alone left it full (0.70 to 0.67). It never could
+    empty the middle (a radial source's velocity is zero at its centre, see
+    airExclude, which is what empties it now), and what it did do was pour
+    liquid out of every bubble for as long as the bubble lasted, with the
+    rest of the plate as the sink. That is a flow out over the whole plate
+    that never stops. On the Mac, four bubbles the simulated band left near
+    the middle of a calm Classic plate took its mean speed from 1.3 to 40 to
+    138 (a thousandth of a unit), 0.70 of it straight out from them, and that
+    is what kept failing the drop check's "and nowhere else"
+    (scripts/mirror.mjs). In the lab the same four bubbles, held still with
+    their presses on, kept the far plate at 4.57e-3 once steady, 0.79 of it
+    straight out from them, as fast as when they arrived; without the
+    standing term, 1.83e-5. npm run heldpress holds it.
   */
   /*
-    Zero-mean, as the standing term below already is.
+    Zero-mean.
 
     A source the projection solves has to average to zero over the plate or
     there is no solution to find, which is the Neumann condition
-    pressureSelfTest protects. The standing term has the air fraction taken
-    off for exactly that reason and this one never did: while a bubble grows
+    pressureSelfTest protects. This one never did: while a bubble grows
     it is a net source over the whole plate with nothing to balance it, and
     the solve spends itself on the imbalance rather than on the shape.
 
@@ -1312,7 +1390,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     changing, and the CPU has it from the bubble list for nothing.
   */
   let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
-  let standing = (now - A.a.z) * 30.0;
   /*
     And the press, as mass conservation says it is: closing a gap of height h
     at a rate dh/dt pushes out −(1/h)(dh/dt) per unit area.
@@ -1330,7 +1407,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let sqv = textureLoad(sq, p, 0);
   let squeeze = clamp(-sqv.g / max(sqv.r, 0.004), -60.0, 60.0) * A.b.z;
-  let q = (rate + standing) * A.a.x + squeeze;
+  let q = rate * A.a.x + squeeze;
   textureStore(dst, p, vec4f(-0.5 * (dx + dy) / S.n + q / (S.n * S.n), 0.0, 0.0, 0.0));
 }`,
 
@@ -1344,7 +1421,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     place has to be taken in somewhere else, or the liquid has nowhere to go.
     The velocity's own divergence always does sum to zero — with the wall's
     ghost cells, the central differences telescope to nothing. The sources
-    do not: the air arriving, the air standing, and the press each put
+    do not: the air arriving and the press each put
     liquid in where they are, and each was balanced with a mean the CPU
     worked out from its own idea of the plate (the bubble list's coverage,
     the gap deltas over a resting gap). Where an idea was wrong the
@@ -1357,8 +1434,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     is a closed cell of liquid between two sheets of glass: a palm pressing
     the gap shut in one place lifts the glass, a hair, everywhere else, and
     the liquid it pushed out goes there. A uniform sink over the whole plate
-    is exactly that lift. The air terms keep their own CPU means, which
-    centre them before their clamps; this takes off whatever those missed.
+    is exactly that lift. The air's rate keeps its own CPU mean, which
+    centres it before its clamp; this takes off whatever that missed.
 
     Two passes to find the mean, the same shape as the plate's stats
     (`wgsl/stats.ts`): a fixed number of workgroups each sum their stride of
@@ -1591,7 +1668,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   p[x + y * n] = (b[x + y * n] + s) * 0.25;
 }`,
 
-  // A.a.x = cells to zero.
+  /*
+    A.a.x = cells to zero. Level 0's packed pressure too, between
+    projections (`clearBuffer`), with A.a.x its n²: that had a kernel of its
+    own, `pressureClear`, the same zeroing with the count read off the
+    Sim, and every show waited for it to compile before it opened. A kernel
+    is a compile of about a fifth of a second on a cold Mac whatever it does
+    (`gpu/prepare.ts`), so two that do one thing are one.
+  */
   mgZero: `${HEAD}
 @group(0) @binding(2) var<storage, read_write> p: array<f32>;
 @compute @workgroup_size(64)
@@ -1600,7 +1684,15 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   p[id.x] = 0.0;
 }`,
 
-  // Add the coarse correction, bilinear between cell centres. A.a.x = fine n.
+  /*
+    Add the coarse correction, bilinear between cell centres. A.a.x = fine n;
+    A.a.y = 1 when the fine level is level 0, whose buffer is packed red and
+    black (`pressureRedBlack`), so cell (x, y) is a different word there.
+    Level 0 had a kernel of its own, `mgProlong0`, the same arithmetic but
+    for that index, and the opening waited for its compile as for this one's
+    (`mgZero` above on why two are one). Which index is one uniform branch,
+    the same for every thread of every dispatch.
+  */
   mgProlong: `${HEAD}
 @group(0) @binding(2) var<storage, read> e: array<f32>;
 @group(0) @binding(3) var<storage, read_write> p: array<f32>;
@@ -1618,40 +1710,12 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let f = c - vec2f(c0);
   let v = mix(mix(ec(c0.x, c0.y, m), ec(c0.x + 1, c0.y, m), f.x),
               mix(ec(c0.x, c0.y + 1, m), ec(c0.x + 1, c0.y + 1, m), f.x), f.y);
-  p[i] = p[i] + v;
-}`,
-
-  // The same into level 0's packed buffer.
-  mgProlong0: `${HEAD}
-@group(0) @binding(2) var<storage, read> e: array<f32>;
-@group(0) @binding(3) var<storage, read_write> pr: array<f32>;
-fn ec(x: i32, y: i32, m: i32) -> f32 { return e[clamp(x, 0, m - 1) + clamp(y, 0, m - 1) * m]; }
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let n = i32(S.n);
-  let m = n / 2;
-  let i = i32(id.x);
-  if (i >= n * n) { return; }
-  let x = i % n;
-  let y = i / n;
-  let c = (vec2f(f32(x), f32(y)) + 0.5) * 0.5 - 0.5;
-  let c0 = vec2i(floor(c));
-  let f = c - vec2f(c0);
-  let v = mix(mix(ec(c0.x, c0.y, m), ec(c0.x + 1, c0.y, m), f.x),
-              mix(ec(c0.x, c0.y + 1, m), ec(c0.x + 1, c0.y + 1, m), f.x), f.y);
-  let half = n / 2;
-  let k = ((x + y) & 1) * n * half + y * half + (x >> 1);
-  pr[k] = pr[k] + v;
-}`,
-
-  /** Zero the pressure buffer between projections, as the Jacobi's fill did. */
-  pressureClear: `${HEAD}
-@group(0) @binding(2) var<storage, read_write> pr: array<f32>;
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-  let n = u32(S.n);
-  if (id.x >= n * n) { return; }
-  pr[id.x] = 0.0;
+  var k = i;
+  if (A.a.y > 0.5) {
+    let half = n / 2;
+    k = ((x + y) & 1) * n * half + y * half + (x >> 1);
+  }
+  p[k] = p[k] + v;
 }`,
 
   /** `gradientSubtract`, reading the pressure from the buffer the sweeps wrote. */
@@ -1875,6 +1939,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and in the same plan item.
   */
 
+  /*
+    On a thin gap (A.a.x 1) three below are not here: each is taken as the
+    force its phenomenon makes (PLAN 18a-2). Rain Drip and Updraft are the
+    dye's weight and a draught's shear (hsBody); Glass Smear is the glass
+    sliding, which drags the liquid toward its speed (hsPrep). Vibration
+    stays a stir for now: as the glass ringing it is a change in the gap,
+    and PLAN 18a-2 says why that waits for 18a-8.
+  */
+  let thin = A.a.x > 0.5;
+
   if (S.vibI > 0.0005 && d > 0.05) {
     let f = S.vibF * 0.5;
     let s = S.time * 20.0;
@@ -1882,7 +1956,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
               v.y + cos(p.x * f) * sin(p.y * f + s) * S.vibI, v.z, v.w);
   }
 
-  if (S.drip > 0.01) {
+  if (!thin && S.drip > 0.01) {
     let streak = (snoise(vec2f(p.x * 0.15, p.y * 0.02 - S.time * 0.2)) + 1.0) * 0.5;
     v.y -= 0.5 * S.drip * (0.1 + streak * streak * 0.9);
     let s1 = 1.0 - max(0.0, streak);
@@ -1890,11 +1964,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.xy * exp(-friction * S.dt), v.z, v.w);
   }
 
-  if ((S.smear.x != 0.0 || S.smear.y != 0.0) && d > 0.01) {
+  if (!thin && (S.smear.x != 0.0 || S.smear.y != 0.0) && d > 0.01) {
     v = vec4f(v.xy + S.smear * (snoise(p * 0.1) * 0.5 + 0.5), v.z, v.w);
   }
 
-  if (S.air > 0.1 && d > 0.01) {
+  if (!thin && S.air > 0.1 && d > 0.01) {
     let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
     let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
     v = vec4f(v.x + gx, v.y + gy, v.z, v.w);
@@ -1929,8 +2003,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
   if (r > 1e-4) { f += (toC / r) * (S.curGrav * dd); }
-  let w = 1.0 - smoothstep(0.0, 0.5, r);
-  f += S.twist * w * w * vec2f(toC.y, -toC.x);
   c = c * S.curDamp + f * (1.0 - S.curDamp);
   let s = length(c);
   if (s > S.maxCur) { c *= S.maxCur / s; }
@@ -3111,6 +3183,42 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    phaseCH for the ferrofluid carried as a volume under Thin Gap
+    (phaseAdvect's A.a.x). The plain step moves share down μ's gradient,
+    which keeps Σc; in a gap the glass is pressing, what crosses a face is
+    liquid, as much as the thinner of the two gaps lets through, and each
+    cell divides by its own gap, so Σc·h is kept, as phaseGrid's filter is.
+    Measured on the Press × ferrofluid check's pool (npm run ferropress)
+    after phaseGrid, held ten steps under a palm that had pressed the
+    middle to a sixth of the gap: the volume went 0.01567 → 0.01556 (0.7%)
+    with the plain step and stayed at 0.01570 with none. Every face's share
+    of the difference is at most the plain step's, so its stability limit
+    is unchanged. The gap is the one the phase has now moved into.
+  */
+  phaseCHVolume: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var mu: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var stand: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<r32float, write>;
+${STAND_ASIDE}
+fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).g; }
+fn hh(p: vec2i, n: f32) -> f32 { return max(textureLoad(sq, clampP(p, n), 0).r, 0.004); }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let hp = hh(p, n);
+  let up = uu(p, n);
+  var flow = 0.0;
+  for (var k = 0; k < 4; k++) {
+    let q = p + select(vec2i(0, 1 - 2 * (k & 1)), vec2i(1 - 2 * (k & 1), 0), k < 2);
+    flow += aside(p, q, n) * (uu(q, n) - up) * min(hp, hh(q, n));
+  }
+  textureStore(dst, p, vec4f(textureLoad(src, p, 0).r + A.b.x * flow / hp, 0.0, 0.0, 0.0));
+}`,
+
+  /*
     The reactions run in a gel, on grids of their own (256² for BZ, 128² for
     Liesegang): a gel does not flow, and reaction-diffusion patterns are
     counted in cells, so on the solver's grid they would come out a
@@ -3450,6 +3558,104 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), d);
 }`,
 
+  /*
+    How far the step's flow carries anything across a face, at the most,
+    in cells: for the carries' substeps in a thin gap (carryPlan, and why).
+
+    The face velocity is bodyAdvect's own (the same smoothing along the face
+    and the same Rhie–Chow correction from the pressure), so the number is
+    the Courant number the flux step itself would clamp, not an estimate of
+    it. Each cell reads its east and north faces; a workgroup keeps its
+    largest and hands one atomicMax to the buffer. A positive float's bits
+    order as the float does, so the maximum of the bits is the bits of the
+    maximum. A.b.y is the step's displacement and A.b.z the Rhie–Chow
+    scale, as the carries take them.
+  */
+  carryCourant: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read> pr: array<f32>;
+@group(0) @binding(4) var<storage, read_write> most: array<atomic<u32>>;
+${PACKED}
+var<workgroup> wgMost: atomic<u32>;
+fn faceCourant(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  let t = vec2i(e.y, e.x);
+  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
+  let pa = packedAt(a.x, a.y, n);
+  let pb = packedAt(b.x, b.y, n);
+  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
+  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
+  return abs(ve * A.b.y * f32(n));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32) {
+  // No early return: the barriers below have to be reached by the whole workgroup.
+  if (li == 0u) { atomicStore(&wgMost, 0u); }
+  workgroupBarrier();
+  if (inGrid(id)) {
+    let p = vec2i(id.xy);
+    let n = i32(S.n);
+    var c = 0.0;
+    if (p.x + 1 < n) { c = max(c, faceCourant(p, vec2i(1, 0), n)); }
+    if (p.y + 1 < n) { c = max(c, faceCourant(p, vec2i(0, 1), n)); }
+    // A NaN fails this and counts as nothing: safeVel has already zeroed any such cell.
+    if (c > 0.0) { atomicMax(&wgMost, bitcast<u32>(min(c, 1e30))); }
+  }
+  workgroupBarrier();
+  if (li == 0u) { atomicMax(&most[0], atomicLoad(&wgMost)); }
+}`,
+
+  /*
+    How many substeps this step's carries take, decided on the GPU from the
+    Courant number carryCourant found, so a press is followed from its first
+    step with nothing read back.
+
+    The carries move an amount across each face, upwind and limited, and a
+    face may carry no more than 0.45 of a cell in one go (the clamp in
+    bodyAdvect). That is plenty for a stir, and nowhere near a hand on the
+    glass: on a thin gap the app's Press thins the film by half in its first
+    steps, and the liquid it squeezes out crosses up to 8 cells of a 384²
+    solver a step even with the film closing as h³ (squeezeUpdate; 75 when
+    it closed by subtraction), measured in the lab on Classic's clock.
+    Clamped, the colour stayed where the liquid left it: the ring
+    round a press went 42% of the way the displaced volume sends it, and
+    when the glass came back up, slowly enough to be carried, it was drawn
+    in past where it began. The fast stroke out and the slow stroke back
+    were two different flows to the dye, so a press could never be undone.
+
+    So the carries are split into n substeps of 1/n of the step each, n
+    enough to keep every face under A.a.x of a cell. n is odd: one substep
+    is run as always, then the rest in pairs, each pair from the read field
+    to the write field and back, so the result lands in the same texture
+    whatever n is and the encoder needs no count. Each pair is an indirect
+    dispatch; a pair this step does not need is given no workgroups.
+    A.a.y is the most substeps (odd), A.a.z the workgroups across the grid,
+    A.a.w the pairs. `sub` is 1/n, n and the Courant number, for the
+    carries and for a check to read.
+  */
+  carryPlan: `${HEAD}
+@group(0) @binding(2) var<storage, read_write> most: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> ind: array<u32>;
+@group(0) @binding(4) var<storage, read_write> sub: array<f32>;
+@compute @workgroup_size(1)
+fn main() {
+  let c = bitcast<f32>(atomicLoad(&most[0]));
+  // Ready for the next step's maximum.
+  atomicStore(&most[0], 0u);
+  // Clamped as a float first: a float past u32's range has no defined conversion.
+  let n = u32(clamp(ceil(c / A.a.x), 1.0, A.a.y)) | 1u;
+  let w = u32(A.a.z);
+  for (var k = 0u; k < u32(A.a.w); k++) {
+    let on = 2u * k + 1u < n;
+    ind[3u * k] = select(0u, w, on);
+    ind[3u * k + 1u] = select(0u, w, on);
+    ind[3u * k + 2u] = 1u;
+  }
+  sub[0] = 1.0 / f32(n);
+  sub[1] = f32(n);
+  sub[2] = c;
+}`,
+
   // Clear a field to a constant (A.a), used by clear() and the pressure warm start.
   fill: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<DYE_FORMAT, write>;
@@ -3458,8 +3664,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), A.a);
 }`,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
-  ...thinGapKernels(HEAD, W),
+  ...thinGapKernels(HEAD, W, NOISE_WGSL),
 };
+
+/*
+  The carries that run in substeps on a thin gap (carryPlan): the same
+  kernels, reading what share of the step each substep is from the plan's
+  buffer, bound after everything they already take.
+*/
+function substepped(name: string): string {
+  const src = KERNELS[name];
+  const bound = '@group(0) @binding(5) var<storage, read> pr: array<f32>;';
+  const moved = 'A.b.y * f32(n)';
+  if (!src.includes(bound) || src.split(moved).length !== 2) throw new Error(`${name} cannot be substepped: its pressure binding or its one displacement moved`);
+  return src
+    .replace(bound, `${bound}\n@group(0) @binding(6) var<storage, read> sub: array<f32>;`)
+    .replace(moved, 'A.b.y * sub[0] * f32(n)');
+}
+KERNELS.bodyAdvectSub = substepped('bodyAdvect');
+KERNELS.mixAdvectSub = substepped('mixAdvect');
 
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {

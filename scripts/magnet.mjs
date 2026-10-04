@@ -8,18 +8,20 @@
  * physics with the magnet placed by setting, and every one of its checks
  * passed while the tool did very little in the hand: the pull was scaled by
  * the flow's own step, which a slow look keeps tiny, so a dragged magnet left
- * the ferrofluid behind, and on a look without ferrofluid it did nothing at
- * all. So this goes the way a visitor does, through the keyboard and the
- * mouse, on a look that has no ferrofluid of its own:
+ * the ferrofluid behind. So this goes the way a visitor does, through the
+ * keyboard and the mouse, on a look that has no ferrofluid of its own:
  *
  *   1. picking the Magnet changes nothing on the plate: no ferrofluid
  *      poured and no magnet under it until a hand holds it (the owner's
  *      "immediate big black hole in the middle when I select it", and then
  *      "Magnet still makes a giant black hole as soon as you pick it")
- *   2. the first touch brings the ferrofluid: a pool under the hand, as big
- *      as Magnet Size, and nothing poured anywhere else
- *   3. dragging it across the plate carries that pool with the hand, and
- *      neither makes nor loses liquid
+ *   2. touching the bare plate with it brings no ferrofluid either: none in
+ *      the solver, Ferrofluid not turned up, no look's pour (the owner: "Why
+ *      does the magnet add ferrofluid? It should only work on ferrofluid
+ *      that is already there"); it does give the look its magnet
+ *   3. over ferrofluid that is there (a pool laid as the bottle lays it), a
+ *      hold draws it and adds none, and a drag carries it with the hand,
+ *      neither making nor losing liquid
  *   4. let go of, it stays where the hand left it, rather than going back
  *      to the middle and taking the ferrofluid with it
  *   5. and Magnet Across still moves it once the hand has set it down
@@ -27,8 +29,8 @@
  *      reaching further (lib/magnetSize.ts), k times deeper with k³ the
  *      strength, so the spikes over it start where they did
  *   7. a new grid (the quality governor stepping down) with the Magnet in
- *      hand lays nothing on an untouched plate, and only the hand's pool,
- *      at the magnet, once it has brought one: never the look's ring again
+ *      hand lays nothing on a bare plate, picked and untouched or held:
+ *      never the look's ring, and no pool of the magnet's own
  *
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
@@ -57,12 +59,11 @@ try {
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   /*
     On one grid (sim=256, as bottles.mjs pins it): the governor moving the
-    grid gives the plate a new solver, which lays the Magnet's pool again
-    where the magnet is, and a pool laid again at the hand reads as one
-    carried there. Counted too (magnetRelays), so it cannot pass if it
-    happens anyway. And at Magnet Size 0.9 from the load (set=, which a look
-    change keeps: it is the performer's, RIG_KEYS), so the pool the first
-    touch brings is a size the tool's own size would not give.
+    grid gives the plate a new solver, which does not carry the ferrofluid
+    across (PLAN 9w), and the drag below would read the pool as lost.
+    Counted too (phaseLays), so it cannot pass if it happens anyway. And at
+    Magnet Size 0.9 from the load (set=, which a look change keeps: it is
+    the performer's, RIG_KEYS), so the set-down magnet is sized (check 4).
   */
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&set=magnetSize=0.9${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
@@ -115,8 +116,7 @@ try {
     solver lays it afresh) is caught too.
   */
   const lays = () => page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
-  const pools = () => page.evaluate(() => window.chromaglassDebug().magnetPools?.() ?? -1);
-  const relays = () => page.evaluate(() => window.chromaglassDebug().magnetRelays?.() ?? -1);
+  const live = () => page.evaluate(() => window.chromaglassDebug().phaseState?.()?.live ?? null);
   const laysBefore = await lays();
   await page.mouse.click(5, 5);
   await page.keyboard.press('m');
@@ -176,33 +176,33 @@ try {
   const at = (fx) => [box.x + box.width * fx, box.y + box.height * 0.5];
 
   /*
-    2. The first touch brings the ferrofluid: one pool, under the hand, as
-    big as Magnet Size.
+    2. The first touch on the bare plate brings no ferrofluid.
 
-    Where the hand is, read from the app while it holds (magnetHand). The
-    touch is near the canvas's left edge, so the hand is well off the
-    middle, and that is asked (0.2 at least), or a pool laid at the look's
-    magnet, the middle, would sit near enough the hand to pass. At Size 0.9
-    the pool is 0.09 × 2^0.8 = 0.157 in radius (lib/magnetSize.ts) and
-    holds 0.9 πr²/2 = 3.47% of the plate: asked within a fifth either way,
-    which neither the tool's own size (1.15%) nor the look's ring (22%)
-    meets, and most of it within 0.18 of the hand. Told once
-    (magnetPools), and not laid as a look's ferrofluid (phaseLays, which
-    clears what is there and pours the ring). And drawn: the app turns
-    Ferrofluid up to 0.6 with the hold and gives the look its magnet (0.8),
-    or the pool is in the solver and invisible on the plate.
+    The owner, 2026-10-04, on the build where it did (9x laid a pool under
+    the hand the first time the Magnet touched a plate with none): "Why does
+    the magnet add ferrofluid? It should only work on ferrofluid that is
+    already there." So asked of the solver while the hand holds the magnet
+    on Classic, a look with none: no ferrofluid in it (readPhase, and
+    phaseState's live, which any lay sets), no look's pour (phaseLays), and
+    Ferrofluid not turned up, since turned up over a bare plate the frame
+    loop pours the look's ring. Asked after a second and a half of holding
+    and again after letting go, so a lay that waits for the amount or the
+    hold's later calls to the app is caught too.
+
+    And still a magnet: the hold gives the look one (Magnet Strength 0.8),
+    so let go of it stays under the glass where the hand left it (check 4).
+    A hold that reached nothing would pass every other line here.
+
+    The touch is near the canvas's left edge, so the hand is well off the
+    middle (asked: 0.2 at least), where neither the look's ring nor a magnet
+    under the middle would put anything near it.
   */
-  const POOL = 0.9 * Math.PI * (0.09 * 2 ** 0.8) ** 2 / 2;
   /*
     What the plate is doing round the touch, printed and not asked: on one
-    Mac run the pool's centre sat 0.11 off the hand 1.5 s after the touch
-    (85% of it within 0.18, against 100% on the run before) and the drag
-    then left it behind, while the lab replaying that run's own step (its
-    STEP line, magnet, hand path and pool, 256²) kept it on the hand and
-    carried it 90% of the way, 87% with the pool started 0.11 off, on a
-    bare plate and on a dyed one alike. So whatever moved it is in the app
-    and not in the step: these say which, the next time it happens. The
-    pool where it was laid, a fifth of a second after the touch; the
+    Mac run (#230) the magnet's pool sat 0.11 off the hand 1.5 s after the
+    touch and the drag then left it behind, while the lab replaying that
+    run's own step carried it 87–90%. So whatever moved it is in the app
+    and not in the step: these say which, the next time a drag drops. The
     solver's magnet through the first second and a half; the plate's turn
     and spin; the steps the solver took; and the automation's own hands.
   */
@@ -210,39 +210,70 @@ try {
     const d = window.chromaglassDebug(), f = d.fluids?.[0];
     return { angle: d.rotation?.current?.[0] ?? null, spin: d.spin?.current?.[0] ?? null, steps: f?.stepCount ?? null, auto: { ...(d.autoEvents ?? {}) }, at: performance.now() };
   });
+  const fmtScene = (a, b) => `the plate turned ${a.angle !== null && b.angle !== null ? (b.angle - a.angle).toFixed(4) : '?'} rad (spin ${b.spin !== null ? b.spin.toFixed(4) : '?'} rad/s), ` +
+    `${a.steps !== null && b.steps !== null ? b.steps - a.steps : '?'} solver steps in ${((b.at - a.at) / 1000).toFixed(1)} s, automation ${JSON.stringify(a.auto)} → ${JSON.stringify(b.auto)}`;
+  const given = () => page.evaluate(() => { const s = window.chromaglassDebug().settings ?? {}; return { amount: s.phaseAmount ?? 0, strength: s.magnetStrength ?? 0, size: s.magnetSize }; });
+  await page.mouse.move(...at(0.05));
+  await page.mouse.down();
+  await page.waitForTimeout(1500);
+  const first = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  const firstAt = first ? { x: Math.max(0.05, Math.min(0.95, first.x)), y: Math.max(0.05, Math.min(0.95, first.y)) } : null;
+  const bareHeld = await phase(firstAt, 0.18), liveHeld = await live(), givenHeld = await given(), laysHeld = await lays();
+  await page.mouse.up();
+  await page.waitForTimeout(1500);
+  const bareAfter = await phase(), liveAfter = await live(), givenAfter = await given(), laysAfter = await lays();
+  const offMiddle = firstAt ? Math.hypot(firstAt.x - 0.5, firstAt.y - 0.5) : 0;
+  check('touching a bare plate with the Magnet brings no ferrofluid, and gives the look its magnet',
+    !!firstAt && offMiddle > 0.2 && liveHeld === false && liveAfter === false
+      && bareHeld.total >= 0 && bareHeld.total <= before.total + 0.001 && bareAfter.total >= 0 && bareAfter.total <= before.total + 0.001
+      && laysHeld === laysBefore && laysAfter === laysBefore
+      && givenHeld.amount <= 0.002 && givenAfter.amount <= 0.002 && givenHeld.strength === 0.8,
+    `the hand at ${firstAt ? `${firstAt.x.toFixed(2)},${firstAt.y.toFixed(2)}` : 'nowhere'}, ${offMiddle.toFixed(2)} off the middle; ` +
+    `ferrofluid ${(before.total * 100).toFixed(2)}% of the plate before, ${(bareHeld.total * 100).toFixed(2)}% held, ${(bareAfter.total * 100).toFixed(2)}% let go ` +
+    `(in the solver: ${liveHeld}, then ${liveAfter}); laid as a look's ${laysBefore} → ${laysHeld} → ${laysAfter} times; ` +
+    `Ferrofluid ${givenHeld.amount} held, ${givenAfter.amount} let go; Magnet Strength ${givenHeld.strength}`);
+
+  /*
+    3. Ferrofluid that is there: the hand holds the magnet over it, and the
+    hold draws it and adds none.
+
+    Poured the way the Ferrofluid bottle pours it: the bottle's laying tools
+    end in the solver's addPhase (LiquidVisualizer's liquid dose), called
+    here once, so the pool is one known size where the hand will touch, and
+    the check does not ride a Dropper's timing. 0.157 in radius, 0.9 full:
+    0.9 πr²/2 = 3.47% of the plate. Ferrofluid is left at Classic's 0, as a
+    pool poured and then hidden would be, so the hold has a reason to turn
+    it up and the check can see it does only over ferrofluid that is there.
+    Turned up, the frame loop's "turned up on a bare plate" pour must not
+    fire either (phaseLays, and the total: the ring would add 22%).
+  */
+  const POOL = 0.9 * Math.PI * 0.157 ** 2 / 2;
+  if (firstAt) await page.evaluate(({ x, y }) => window.chromaglassDebug().fluids[0].gpu.addPhase(x, y, 0.157, 0.9), firstAt);
+  await page.waitForTimeout(500);
+  const poured = await phase(firstAt, 0.18), livePoured = await live();
   const sceneBefore = await scene();
   await page.mouse.move(...at(0.05));
   await page.mouse.down();
-  await page.waitForTimeout(200);
-  const laid = await phase(null);
-  const laidHand = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   const early = [];
-  for (let k = 0; k < 5; k++) {
-    await page.waitForTimeout(260);
+  for (let k = 0; k < 6; k++) {
+    await page.waitForTimeout(250);
     early.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
   }
   const sceneTouch = await scene();
-  const fmtScene = (a, b) => `the plate turned ${a.angle !== null && b.angle !== null ? (b.angle - a.angle).toFixed(4) : '?'} rad (spin ${b.spin !== null ? b.spin.toFixed(4) : '?'} rad/s), ` +
-    `${a.steps !== null && b.steps !== null ? b.steps - a.steps : '?'} solver steps in ${((b.at - a.at) / 1000).toFixed(1)} s, automation ${JSON.stringify(a.auto)} → ${JSON.stringify(b.auto)}`;
-  console.log(`     the touch: the pool laid with its centre at ${laid.x.toFixed(2)},${laid.y.toFixed(2)} (${(laid.total * 100).toFixed(2)}%), the hand at ${laidHand ? `${laidHand.x.toFixed(2)},${laidHand.y.toFixed(2)}` : 'nowhere'}; ` +
-    `the solver's magnet ${early.join(' ')}; ${fmtScene(sceneBefore, sceneTouch)}`);
+  console.log(`     the touch: the solver's magnet ${early.join(' ')}; ${fmtScene(sceneBefore, sceneTouch)}`);
   console.log(`     STEP at the touch ${await page.evaluate(() => JSON.stringify(window.chromaglassDebug().fluids?.[0]?.lastStep ?? null))}`);
-  const first = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
-  const firstAt = first ? { x: Math.max(0.05, Math.min(0.95, first.x)), y: Math.max(0.05, Math.min(0.95, first.y)) } : null;
   const brought = await phase(firstAt, 0.18);
-  const pooled = await pools(), laysTouched = await lays();
-  const given = await page.evaluate(() => { const s = window.chromaglassDebug().settings ?? {}; return { amount: s.phaseAmount, strength: s.magnetStrength, size: s.magnetSize }; });
+  const laysTouched = await lays();
+  const givenPool = await given();
   const share = brought.total > 0 ? brought.near / 1e4 / brought.total : 0;
-  const offMiddle = firstAt ? Math.hypot(firstAt.x - 0.5, firstAt.y - 0.5) : 0;
-  check('the first touch brings one pool of ferrofluid, under the hand, as big as Magnet Size, and draws it',
-    !!firstAt && offMiddle > 0.2 && pooled === 1 && laysTouched === laysBefore
-      && Math.abs(brought.total / POOL - 1) < 0.2 && share > 0.6 && given.amount === 0.6 && given.strength === 0.8,
-    `the hand at ${firstAt ? `${firstAt.x.toFixed(2)},${firstAt.y.toFixed(2)}` : 'nowhere'}, ${offMiddle.toFixed(2)} off the middle; ` +
-    `${(brought.total * 100).toFixed(2)}% of the plate (one pool at Size ${given.size}: ${(POOL * 100).toFixed(2)}%), ${(share * 100).toFixed(0)}% of it within 0.18 of the hand; ` +
-    `pools brought ${pooled}, laid as a look's ${laysBefore} → ${laysTouched} times; Ferrofluid ${given.amount}, Magnet Strength ${given.strength}`);
+  check('held over poured ferrofluid, the Magnet draws it and adds none',
+    !!firstAt && livePoured === true && Math.abs(poured.total / POOL - 1) < 0.2 && laysTouched === laysBefore
+      && Math.abs(brought.total / poured.total - 1) < 0.08 && share > 0.6 && givenPool.amount === 0.6,
+    `poured ${(poured.total * 100).toFixed(2)}% of the plate (asked ${(POOL * 100).toFixed(2)}%); held over it ${(brought.total * 100).toFixed(2)}%, ` +
+    `${(share * 100).toFixed(0)}% of it within 0.18 of the hand; laid as a look's ${laysBefore} → ${laysTouched} times; Ferrofluid 0 → ${givenPool.amount}`);
 
   /*
-    3. The drag, from that first touch on without letting go: the pool goes
+    3, on. The drag, from that touch on without letting go: the pool goes
     with the hand. The hand's path sampled (magnetHand) as it goes, and the
     pool's centre of mass asked to have come at least half way from where
     it was laid to where the hand ends, nearer the hand than the hand's
@@ -252,10 +283,9 @@ try {
     held still above, a pool the magnet does not carry stays where it was
     laid: 0 of the way.
 
-    A pool laid again is not a pool carried: one laid afresh under the hand
-    (a clear, then the next hold's pool) or given again to a new solver at
-    the magnet (magnetRelays) would land at the end point at once. So the
-    counters are asked to be as they were at the first touch.
+    A pool laid again is not a pool carried: one laid afresh (a look's
+    pour, phaseLays) would put ferrofluid where the drag did not. So the
+    counter is asked to be as it was at the first touch.
 
     In the lab (scripts/lab.mjs, Classic's settings, 256², the hand's
     magnet at Size 0.5) a pool laid at 0.30 and dragged 0.3 across over
@@ -270,7 +300,6 @@ try {
     of the plate in a cloud session's mapping (0.05 across read 0.74,0.32
     on the plate, 0.75 across 0.36,0.59), in six seconds.
   */
-  const relays0 = await relays();
   const drag0 = await phase(null);
   const sceneDrag = await scene();
   const trail = [];
@@ -292,7 +321,7 @@ try {
   const solverMagnet = await page.evaluate(() => window.chromaglassDebug().magnetNow?.());
   console.log(`     through the drag and the hold: ${fmtScene(sceneDrag, await scene())}`);
   const drag1 = await phase(spot ? { x: spot.x, y: spot.y } : null, 0.18);
-  const after = { pools: await pools(), lays: await lays(), relays: await relays() };
+  const after = { lays: await lays() };
   await page.mouse.up();
   console.log(`     the hand's path: ${trail.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')}`);
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
@@ -303,8 +332,8 @@ try {
   const came = way > 0 ? 1 - behind / way : 0;
   const nearEnd = drag1.total > 0 ? drag1.near / 1e4 / drag1.total : 0;
   const mirrored = spot ? Math.hypot(spot.x - to.x, 1 - spot.y - to.y) : 0;
-  const once = after.pools === 1 && after.lays === laysBefore && after.relays === relays0;
-  const counts = `pools brought ${after.pools}, laid as a look's ${laysBefore} → ${after.lays}, given again to a new solver ${relays0} → ${after.relays}`;
+  const once = after.lays === laysBefore;
+  const counts = `laid as a look's ${laysBefore} → ${after.lays} times`;
   check('dragging the Magnet carries its pool with the hand',
     sameGrid && once && !!spot && way > 0.2 && came > 0.5 && behind < mirrored && nearEnd > 0.5,
     `the pool's centre ${from.x.toFixed(2)},${from.y.toFixed(2)} → ${to.x.toFixed(2)},${to.y.toFixed(2)}, the hand ending at ` +
@@ -459,7 +488,7 @@ try {
     `set from the desk's Magnet options: ${sizes.join(', then ')}; held at Size 0.1: ${fmt(small)}; at 0.9: ${fmt(big)}; height ×${hRatio.toFixed(3)} (asked ×${k.toFixed(3)}), strength ×${sRatio.toFixed(3)} (asked ×${(k ** 3).toFixed(3)})`);
 
   /*
-    7. A new grid while the Magnet is in hand lays only what the hand brought.
+    7. A new grid while the Magnet is in hand lays nothing on a bare plate.
 
     The quality governor moves the solver to another grid when the machine
     falls behind, and a new solver is given the ferrofluid again (the frame
@@ -467,11 +496,15 @@ try {
     old check of the ring read "the ferrofluid was laid again (lays 1 → 2,
     grid 384 → 256) while the middle was watched" on another PR's run, the
     governor stepping down and pouring the ring afresh. The pick pours
-    nothing now, so the same path must lay nothing on an untouched plate,
-    and only the pool, at the magnet, once a hand has brought one: never the
-    ring, never the magnet under the middle, and not a second pool beside
-    the one carried across (the held magnet's own pour asks whether the
-    solver has a phase, which the carry has given it by then).
+    nothing now, so the same path must lay nothing on an untouched plate:
+    never the ring, never the magnet under the middle.
+
+    And nothing with the magnet held there either. The new solver's lay
+    pours the look's ring whenever Ferrofluid is up, so a hold that turned
+    Ferrofluid up over a bare plate would have the governor pour it; and
+    from 9x until the owner's "it should only work on ferrofluid that is
+    already there", a new solver was given the magnet's own pool again at
+    the magnet. Both are the magnet adding ferrofluid.
 
     Its own page, because the drag above pins its grid (sim=256) to keep the
     governor still, and a pinned grid turns the governor off. Here the
@@ -492,7 +525,7 @@ try {
   const counts2 = () => page2.evaluate(() => {
     const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep;
     return {
-      grid: d.fluids?.[0]?.gpu?.N ?? 0, lays: d.phaseLays?.() ?? -1, pools: d.magnetPools?.() ?? -1, relays: d.magnetRelays?.() ?? -1,
+      grid: d.fluids?.[0]?.gpu?.N ?? 0, lays: d.phaseLays?.() ?? -1, live: d.phaseState?.()?.live ?? null, amount: d.settings?.phaseAmount ?? 0,
       strength: st ? +st.magnetStrength : null, magnets: d.magnets?.().length ?? null, governed: !!d.status?.governed,
     };
   });
@@ -533,59 +566,38 @@ try {
   await page2.waitForTimeout(3000);
   const regrid1 = await counts2(), plate1 = await phase2();
   check('a new grid with the Magnet picked and untouched lays nothing: no ring, no magnet under the middle',
-    grids1.moved && grids1.seen[0] === 512 && picked2.lays >= 0 && picked2.relays >= 0
-      && regrid1.lays === picked2.lays && regrid1.pools === 0 && regrid1.relays === picked2.relays
+    grids1.moved && grids1.seen[0] === 512 && picked2.lays >= 0
+      && regrid1.lays === picked2.lays && regrid1.live === false
       && regrid1.strength === 0 && regrid1.magnets === 0 && plate1.total >= 0 && plate1.total <= Math.max(0, bare.total) + 0.001,
-    `grid ${grids1.seen.join(' → ')}² (governed ${regrid1.governed}); laid ${picked2.lays} → ${regrid1.lays} times, ${regrid1.pools} pools, ` +
-    `carried ${picked2.relays} → ${regrid1.relays}; the step's magnet strength ${regrid1.strength}, ${regrid1.magnets} magnets; ` +
+    `grid ${grids1.seen.join(' → ')}² (governed ${regrid1.governed}); laid ${picked2.lays} → ${regrid1.lays} times, in the solver: ${regrid1.live}; ` +
+    `the step's magnet strength ${regrid1.strength}, ${regrid1.magnets} magnets; ` +
     `ferrofluid ${(bare.total * 100).toFixed(2)}% of the plate before, ${(plate1.total * 100).toFixed(2)}% after`);
 
-  // Still, for the same reasons as the drag above: the carry goes where the magnet is.
-  await page2.evaluate(() => {
-    const d = window.chromaglassDebug();
-    Object.assign(d.settings, {
-      rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
-      turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0, globalSpeed: 0.025,
-    });
-  });
+  /*
+    Then held on the bare plate, off the middle, and the governor stepped
+    down again under the hand. The hold has given the look its magnet
+    (asked, so a hold that never reached the app cannot pass), and nothing
+    else: no lay, nothing in the solver, Ferrofluid still down, and the
+    plate as bare as it was.
+  */
   const box2 = await (await page2.$('canvas')).boundingBox();
-  await page2.mouse.move(box2.x + box2.width * 0.42, box2.y + box2.height * 0.5);
+  await page2.mouse.move(box2.x + box2.width * 0.2, box2.y + box2.height * 0.5);
   await page2.mouse.down();
   await page2.waitForTimeout(1500);
   const touched2 = await counts2();
-  const poured2 = await page2.evaluate(() => window.chromaglassDebug().magnetHand?.());
-  /*
-    Then moved, held, out from the middle, so the magnet is no longer where
-    the pool was poured: a carry laid at the pool's first place rather than
-    at the magnet reads under 0.7 near the hand, since the new solver starts
-    with no phase of its own. Outward, and asked of the plate (how far the
-    hand went, and how far from the middle it ended), because the canvas is
-    not the plate: the first Mac run moved 0.2 of the canvas from 0.25 and
-    the plate's hand ended at 0.46,0.51, 0.04 from the middle, where a ring
-    laid round the middle would have read as near the hand too. That run
-    carried one pool, all of it (1.00), 100% at the hand.
-  */
-  for (let i = 1; i <= 15; i++) {
-    await page2.mouse.move(box2.x + box2.width * (0.42 - 0.02 * i), box2.y + box2.height * 0.5);
-    await page2.waitForTimeout(60);
-  }
-  await page2.waitForTimeout(500);
   const grids2 = await newGrid();
   await page2.waitForTimeout(2000);
   const hand2 = await page2.evaluate(() => window.chromaglassDebug().magnetHand?.());
-  const handAt = hand2 ? { x: Math.max(0.05, Math.min(0.95, hand2.x)), y: Math.max(0.05, Math.min(0.95, hand2.y)) } : null;
-  const regrid2 = await counts2(), plate2 = await phase2(handAt);
+  const regrid2 = await counts2(), plate2 = await phase2();
+  const strength2 = await page2.evaluate(() => window.chromaglassDebug().settings?.magnetStrength ?? 0);
   await page2.mouse.up();
-  const offMiddle2 = handAt ? Math.hypot(handAt.x - 0.5, handAt.y - 0.5) : 0;
-  const movedBy = handAt && poured2 ? Math.hypot(handAt.x - poured2.x, handAt.y - poured2.y) : 0;
-  const ofPool = plate2.total / POOL;
-  check('and once the hand has brought its pool, a new grid carries that pool to the magnet and nothing else',
-    grids2.moved && touched2.pools === 1 && regrid2.pools === 1 && regrid2.lays === picked2.lays && regrid2.relays === touched2.relays + 1
-      && ofPool > 0.5 && ofPool < 1.6 && plate2.near > 0.7 && offMiddle2 > 0.15 && movedBy > 0.12,
-    `grid ${grids2.seen.join(' → ')}²; ${touched2.pools} pool from the touch, ${regrid2.pools} after; laid ${picked2.lays} → ${regrid2.lays} times; ` +
-    `carried ${touched2.relays} → ${regrid2.relays}; ferrofluid ${(plate2.total * 100).toFixed(2)}% of the plate, ${ofPool.toFixed(2)} of the pool's ` +
-    `(the ring is about 22%), ${(100 * plate2.near).toFixed(0)}% of it within 0.18 of the hand at ${handAt ? `${handAt.x.toFixed(2)},${handAt.y.toFixed(2)}` : 'nowhere'}, ` +
-    `${offMiddle2.toFixed(2)} from the middle and ${movedBy.toFixed(2)} from where the pool was poured (${poured2 ? `${poured2.x.toFixed(2)},${poured2.y.toFixed(2)}` : 'unknown'}); centre of mass ${plate2.x.toFixed(2)},${plate2.y.toFixed(2)}`);
+  check('and held on the bare plate, a new grid still lays nothing: no ring, no pool of the magnet\'s own',
+    grids2.moved && !!hand2 && strength2 === 0.8 && touched2.lays === picked2.lays && regrid2.lays === picked2.lays
+      && touched2.live === false && regrid2.live === false && regrid2.amount <= 0.002
+      && plate2.total >= 0 && plate2.total <= Math.max(0, bare.total) + 0.001,
+    `grid ${grids2.seen.join(' → ')}² with the hand at ${hand2 ? `${hand2.x.toFixed(2)},${hand2.y.toFixed(2)}` : 'nowhere'}; Magnet Strength ${strength2}; ` +
+    `laid ${picked2.lays} → ${touched2.lays} → ${regrid2.lays} times; in the solver: ${touched2.live}, then ${regrid2.live}; Ferrofluid ${regrid2.amount}; ` +
+    `ferrofluid ${(bare.total * 100).toFixed(2)}% of the plate before, ${(plate2.total * 100).toFixed(2)}% after`);
 } finally {
   await browser.close();
 }

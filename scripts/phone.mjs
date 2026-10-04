@@ -269,6 +269,7 @@ try {
     if (amountUp) await shot(page, `${label.replace(/ /g, '-')}-amount`);
     check(`${label}: a second tap on it opens its Amount`, amountUp);
     const magnetFingers = await visible(page, 'phone-press-fingering');
+    const magnetGlass = (await visible(page, 'phone-press-thin')) || (await visible(page, 'phone-press-lift'));
     /*
       Magnet Size on the Magnet's own Amount (lib/magnetSize.ts), the
       owner's "a magnet that I can control the size of": there under the
@@ -318,6 +319,41 @@ try {
     check(`${label}: the Press's Amount has Fingering under it, and only the Press's, and it goes to 100 % and back`,
       pressFingers && !magnetFingers && under && fingersUp === '100' && fingersBack === '0',
       `on the Press ${pressFingers}, on the Magnet ${magnetFingers}, under the Amount ${under}, ${fingersUp}% then ${fingersBack}%`);
+    /*
+      And the glass under the Press (PLAN §18a): Thin Gap, with which the
+      press draws the liquid back as the glass lifts, and Press Lift, how
+      fast it lifts. On the Press's Amount, beside Fingering, and each
+      reaching the plate's settings: read back from the settings, not only
+      from the slider's own words, so a slider wired to nothing fails.
+    */
+    const setting = (k) => page.evaluate((k) => window.chromaglassSettings?.()?.[k], k);
+    const thinShown = await visible(page, 'phone-press-thin'), liftShown = await visible(page, 'phone-press-lift');
+    let thinOn = null, thinOff = null, thinSaid = '', liftUp = null, liftBack = null;
+    if (thinShown && liftShown) {
+      const was = { thin: await setting('thinGap'), lift: await setting('plateSpring') };
+      // Off first, then on: Thin Gap is on by default in every look (PLAN
+      // 18a-every), so an On read before the slider had moved it would prove
+      // nothing; both halves have to move the setting.
+      await page.getByTestId('phone-press-thin').locator('input').focus();
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      thinOff = await setting('thinGap');
+      await page.keyboard.press('End');
+      await page.waitForTimeout(150);
+      thinOn = await setting('thinGap');
+      thinSaid = (await page.getByTestId('phone-press-thin').innerText()).replace(/\s+/g, ' ');
+      await page.getByTestId('phone-press-lift').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(150);
+      liftUp = await setting('plateSpring');
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      liftBack = await setting('plateSpring');
+      await page.evaluate((w) => window.chromaglassSettings?.({ thinGap: w.thin ?? 1, plateSpring: w.lift ?? 0.35 }), was);
+    }
+    check(`${label}: the Press's Amount has Thin Gap and Press Lift beside Fingering, and both reach the plate`,
+      thinShown && liftShown && !magnetGlass && thinOn === 1 && /On/.test(thinSaid) && thinOff === 0 && liftUp === 1 && liftBack === 0,
+      `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOff} then ${thinOn} ("${thinSaid}"); Press Lift ${liftUp} then ${liftBack}`);
     const pressSize = await visible(page, 'phone-magnet-size');
     check(`${label}: the Magnet's Amount has Size under it, and only the Magnet's, and it moves Magnet Size end to end`,
       magnetSize && !pressSize && sizeUnder && sizeUp === 1 && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
@@ -1198,12 +1234,24 @@ try {
           nearest a finger still inside its disk, so a finger laying a disk or
           two off its cell, which the wider balance would let through, fails.
         */
+        /*
+          And the whole plate's gain against what both fingers handed it, printed
+          only, so a red says whether the plate lost dye everywhere or one pool's
+          worth. The reds of 2026-10-03 with one finger at a third were the old
+          fingering push (#222 took it out; `npm run grating` §6 replays them),
+          but two after it read both fingers low at once: A 0 and B 0 on a branch,
+          and 74 and 76 of 285 and 277 in one of 146 holds of a diagnostic, where
+          the plate gained 159 of 562. Not yet explained (PLAN.md, batch 11).
+        */
+        let gained = 0;
+        for (let i = 0; i < after.length; i++) gained += Math.max(0, after[i]) - Math.max(0, before[i]);
+        const handed = gave.length === 2 && gave.every(Boolean) ? gave.reduce((t, g) => t + g.dye, 0).toFixed(0) : '?';
         const placed = held.length === 2 && drift <= 2;
         const ok = placed && rows.every(r => r.laid > 5 && r.elsewhere.length >= 2 && r.laid > 3 * r.worst && r.laid >= 0.2 * r.near)
           && Math.min(rows[0].near, rows[1].near) > 0.4 * Math.max(rows[0].near, rows[1].near);
         check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
           rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} under it (${r.near.toFixed(0)} nearest it) against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
-            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); ${rb1 - rb0} readbacks`);
+            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); the plate gained ${gained.toFixed(0)} of ${handed} handed it; ${rb1 - rb0} readbacks`);
       } else if (NEED_GPU) {
         check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
       } else {

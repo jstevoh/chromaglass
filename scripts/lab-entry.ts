@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, thinGapViscosity, FERRO_NU } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
@@ -14,7 +14,7 @@ import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/deta
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
-import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
@@ -25,7 +25,7 @@ export const BASE: GpuStepParams = {
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
   platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
   air: 0, evapFactor: 1, time: 0, currentDamp: 0.98, currentBuoy: 0, rockX: 0, rockY: 0, currentGrav: 0,
-  twist: 0, meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
+  meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
 } as GpuStepParams;
 
 /** Numbers as IEEE half floats, for writing an rgba16float texture. */
@@ -97,6 +97,19 @@ const api = {
     const bytes = f32 ? new Float32Array(data).buffer : halves(data);
     solver['device'].queue.writeTexture({ texture: od.read }, bytes, { bytesPerRow: row }, [N, N]);
   },
+  /** Any velocity, heat and gap at all, cell for cell: L × L × 4 (vx, vy, temp, gap), added on the next flush. */
+  addVel(data: number[]) {
+    const { velAdd } = lab!;
+    if (data.length !== velAdd.length) throw new Error(`addVel: ${data.length} values for a ${velAdd.length}-value plate`);
+    for (let k = 0; k < velAdd.length; k++) velAdd[k] += data[k];
+  },
+  /**
+   * Where the plate's clock stands, in seconds: the solver's noises (the
+   * turbulence, the old fingering push `npm run grating` puts back) are
+   * drawn at it, so a check can ask one moment of a show and not only the
+   * first second of a new plate.
+   */
+  setTime(t: number) { lab!.time = t; },
   /** A velocity kick / heat / gap delta at (x, y): channels vx, vy, temp, gap. */
   vel(x: number, y: number, r: number, v: [number, number, number, number]) {
     const { L, velAdd } = lab!;
@@ -114,12 +127,14 @@ const api = {
    * `radius` cells. The app's plate is 192 cells, the lab's L by default, so
    * a press the app makes at radius 30 × GRID_SCALE is radius 45 here too.
    */
-  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0) {
+  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0, thin = false) {
     const { L, velAdd, mul } = lab!;
     squishDisc(L, x, y, radius, amount, fingering, stroke, pile, (idx, gap, vx, vy, m) => {
       velAdd[idx * 4] += vx; velAdd[idx * 4 + 1] += vy; velAdd[idx * 4 + 3] += gap; mul[idx] *= m;
-    });
+    }, thin);
   },
+  /** The carries' substeps on the last thin step, and the Courant number that asked for them (carryPlan). */
+  async carry() { return lab!.solver.readCarry(); },
   /**
    * What a stroke would lay, without laying it: the gap delta cell by cell
    * (L × L). `npm run lift` holds the plate's picture against this, so it
@@ -134,6 +149,10 @@ const api = {
   },
   /** The press's memory, as the plate keeps it: `npm run lift` presses and lets go through this. */
   PressLift,
+  /** The glass's spring a step, as the app derives it from Press Lift (`npm run presslift`). */
+  glassSpring,
+  /** The most substeps a thin gap's carry takes in a step (carryPlan). */
+  carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);
@@ -149,8 +168,10 @@ const api = {
   */
   async step(n: number, over: Partial<GpuStepParams> = {}, flushed = false) {
     const l = lab!;
-    // The app runs the old solver until Thin Gap's pipelines are built
-    // (prepareThinGap); the lab measures the thin gap from its first step.
+    // The app builds Thin Gap's pipelines before its first step (every look
+    // opens on a thin gap); the lab builds them here, so it measures the
+    // thin gap from its first step too. BASE has no thinGap: a lab check
+    // runs the old plate unless it asks for the thin one (PLAN 18a).
     if ((over.thinGap ?? 0) > 0.5) await l.solver.prepareThinGap();
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;

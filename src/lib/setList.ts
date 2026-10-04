@@ -48,7 +48,7 @@ import type { VisualizerSettings } from '../types';
 import type { SongRef } from './songRef';
 import { parseSongRef } from './songRef';
 import type { UserPreset } from './userPresets';
-import { PRESET_FORMAT, SEQUENCE_FORMAT } from './userPresets';
+import { PRESET_FORMAT, SEQUENCE_FORMAT, upgradeSaved } from './userPresets';
 import type { ShowSequence } from './sequencer';
 
 export const SETLIST_FORMAT = 'chromaglass-setlist';
@@ -196,14 +196,14 @@ export function readSetListFile(text: string, known: (key: string) => boolean): 
   else if (isObj(raw) && raw.format === PRESET_FORMAT) {
     // A saved look on its own: one item, carrying it.
     if (!str(raw.id) || !isObj(raw.settings)) throw new Error('This preset file has no id or settings.');
-    presets.push(raw as unknown as UserPreset);
+    presets.push(upgradeSaved(raw as unknown as UserPreset));
     rawItems = [{ saved: raw.id, name: raw.name }];
     name = str(raw.name) ?? name;
   } else if (isObj(raw) && raw.format === SEQUENCE_FORMAT) {
     const seq = raw.sequence;
     if (!isObj(seq) || !str(seq.id) || !Array.isArray(seq.stages)) throw new Error('This sequence file has no sequence in it.');
     sequences.push(seq as unknown as ShowSequence);
-    if (Array.isArray(raw.presets)) presets.push(...(raw.presets as UserPreset[]));
+    if (Array.isArray(raw.presets)) presets.push(...(raw.presets as UserPreset[]).map(upgradeSaved));
     rawItems = [{ sequence: seq.id, name: seq.name }];
     name = str(seq.name) ?? name;
   } else if (isObj(raw) && (raw.format === SETLIST_FORMAT || Array.isArray(raw.items))) {
@@ -214,7 +214,7 @@ export function readSetListFile(text: string, known: (key: string) => boolean): 
     rawItems = Array.isArray(raw.items) ? raw.items : [];
     if (Array.isArray(raw.presets)) {
       for (const p of raw.presets) {
-        if (isObj(p) && str(p.id) && isObj(p.settings)) presets.push(p as unknown as UserPreset);
+        if (isObj(p) && str(p.id) && isObj(p.settings)) presets.push(upgradeSaved(p as unknown as UserPreset));
         else warnings.push('a saved look in the file has no id or settings, and is left out');
       }
     }

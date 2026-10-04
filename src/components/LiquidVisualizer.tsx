@@ -7,7 +7,7 @@ import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/draw
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
-import { sizedMagnet, magnetReach, MAGNET_POOL_RADIUS, MAGNET_POOL_FILL } from '../lib/magnetSize';
+import { sizedMagnet } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -30,7 +30,7 @@ import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
-import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dragSeconds, dyeDensityContrast, liquidFollow } from '../lib/turntable';
+import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
@@ -48,7 +48,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -187,11 +187,12 @@ interface LiquidVisualizerProps {
    * A hand is holding a magnet under a look that has none of its own
    * (magnetStrength 0), or no ferrofluid drawn (phaseAmount 0): the app gives
    * the look the magnet's strength, so that once let go it stays under the
-   * glass where the hand set it down, and turns Ferrofluid up so the pool the
-   * hand brought is drawn (magnetFor). Asked a few times a second while held,
-   * until the settings say both.
+   * glass where the hand set it down, and, when there is ferrofluid in the
+   * solver (`ferrofluid`), turns Ferrofluid up so what is there is drawn
+   * (magnetFor). Never ferrofluid of its own: a magnet brings none. Asked a
+   * few times a second while held, until the settings say both.
    */
-  onMagnetInHand?: () => void;
+  onMagnetInHand?: (ferrofluid: boolean) => void;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -262,7 +263,6 @@ function particleFlowScale(fluid: { dt: number } | undefined, s: VisualizerSetti
 const CUR_BUOY = 0.3;    // × buoyancy × tanh(20 × temperature): the heat field is small, ~0.03 on average
 const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (density − mean)
 const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
-const CUR_TWIST = 30;    // × rotation speed: angular drive, fastest at the centre
 /*
   How much of a blow is swirl rather than push.
 
@@ -290,7 +290,33 @@ const FINGER_SWIRL = 0.8;
   of stopping, which reads as at once.
 */
 const BLOW_DIR_HOLD_MS = 150;
-type BlowDir = { x: number; y: number; at: number };
+/*
+  And the Blow is a straw only once the hand has been held for that long and
+  for this many frames in which the pointer reported no move, counting the
+  press itself as a move (PLAN.md §15c).
+
+  The straw used to be "not going": no move within BLOW_DIR_HOLD_MS. Two holes
+  in that, and the deploy after #230 fell into one: a Blow drawn across a pool
+  lost 54 of its 229 of dye (main's deploy, run 37177982848), the old eraser's
+  size of loss, though the wind had run 49 steps and carried 156.5. The
+  stroke had also run 5 straw steps, and a straw step blows a real bubble,
+  whose air takes the dye under it off the plate (airExclude) for as long as
+  the bubble sits there.
+  - A press has no move before it, so every step between the press and the
+    first move the pointer reports was a straw step: a drag began by blowing
+    a bubble in the middle of whatever it was drawn through. At 10 to 30
+    frames a second, as the Mac runner draws, that is a frame or two of steps
+    before the first move arrives (2, 3, 5 and 7 straw steps on its runs).
+  - On a slow frame rate a hand that never stops reports its moves a frame
+    apart, and 150 ms is a frame and a half at 10 fps: a drag on a struggling
+    machine was a straw every time a move came a frame late.
+  So the press starts the hold's clock as a move does, and the hold is both
+  the time (a hand on a fast machine still reads as held within a sixth of a
+  second) and a few frames with no move in them (a hand on a slow one that is
+  moving reports a move every frame, and is not held).
+*/
+const BLOW_STRAW_FRAMES = 3;
+type BlowDir = { x: number; y: number; at: number; still: number; moved: boolean };
 /*
   Oil Bodies' pours (the onDeposit hook): a body is this many times the
   bottle's own radius (Oil's is 2, so about a tenth of the plate across
@@ -879,32 +905,17 @@ class FluidSimulation {
   temp: Float32Array;
   temp0: Float32Array;
   /**
-   * How fast this plate is actually turning, in radians a second.
-   *
-   * Set by the frame from the flywheel, and read by the twist below. The
-   * *setting* is a motor — what the plate is asked to hold — and this is what
-   * it is doing, which after a flick are very different numbers.
-   */
-  plateSpin = 0;
-  /**
-   * The turntable under the dish (PLAN.md §22, lib/turntable.ts): how fast
-   * Auto Spin and a hand on the Spin tool turn the dish, and how fast the
-   * liquid's bulk follows it with the drag time of a thin gap, in radians a
-   * second. The picture turns at `plateSpin` plus `liquidSpin`, and the
-   * solver drags the liquid toward the dish by the difference (the swirl).
-   * Both are zero on a dish nobody spins, which is every look as shipped.
+   * The dish under this plate (PLAN.md §22, lib/turntable.ts dishFrame), in
+   * radians a second: how fast the glass turns, everything that turns it
+   * together (the look's motor, its music and a flick, Auto Spin, a hand on
+   * the Spin tool), and how fast the liquid's bulk follows it with the drag
+   * time of a thin gap. The picture turns with the liquid; the solver drags
+   * the liquid toward the dish by the difference (the swirl) and flings it
+   * by the liquid's own speed (the centrifuge). Both are zero on a dish
+   * nobody turns, and the swirl does not run.
    */
   dishSpin = 0;
   liquidSpin = 0;
-  /**
-   * How fast the liquid really goes round, for the centrifuge: the look's
-   * turn and the turntable's liquid together, while the turntable is
-   * turning; zero otherwise, so a look nobody spins is no centrifuge (22h).
-   * Not the turntable's liquid alone: a hand held still on a flicked plate
-   * stops the picture by turning the turntable against the flick, and the
-   * liquid it holds still is flung nowhere.
-   */
-  spinCentrifuge = 0;
   /**
    * The angle the dish is drawn turned to, and how far down from its centre
    * the plate is still on screen (in plate widths). Gravity is the room's,
@@ -1020,10 +1031,10 @@ class FluidSimulation {
    *   - `clockLean`, the phrase's slow lean on the timestep (slewed over 2.5
    *     s, so it is never quite where the render's reset phrase would put
    *     it): every step's `dt` is multiplied by it;
-   *   - `plateAngle` and `plateSpin`, which the frame sets from the flywheel
-   *     only after the solver has stepped, so the render's first steps read
-   *     the live plate's angle (gravity's direction) and spin (the twist)
-   *     rather than the ones the look was just laid with;
+   *   - `plateAngle` and the dish's spin, which the frame sets only after
+   *     the solver has stepped, so the render's first steps read the live
+   *     plate's angle (gravity's direction) and spin (the swirl) rather than
+   *     the ones the look was just laid with;
    *   - the bubbles' bookkeeping (`prevPacked`, `coverPacked`, the holes
    *     still filling, the mirror's sequence the rim deposit keys on): the
    *     bubbles are cleared with the look, and a list of last frame's bubbles
@@ -1041,10 +1052,8 @@ class FluidSimulation {
   forgetHistory(angle: number, viewHalfW: number, viewHalfH: number): void {
     this.forgetPress();
     this.clockLean = 1;
-    this.plateSpin = 0;
     this.dishSpin = 0;
     this.liquidSpin = 0;
-    this.spinCentrifuge = 0;
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
@@ -1455,6 +1464,17 @@ class FluidSimulation {
    * halves read the same mirror.
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
+    /*
+      Not on a thin gap (PLAN §18a): there the flow does what this was
+      written to stand in for. The glass closing pushes the liquid out with
+      its colour and its oil, and the glass coming back up draws them back
+      in, which a carry here could never do: it took the colour out to a
+      ring and nothing ever brought it home, so a press only pushed things
+      away (the owner, 2026-09-28: "it just pushes everything out instead of
+      bringing it back when you release"). On top of the flow it moved the
+      colour out twice and back once.
+    */
+    if (this.thinGap) return;
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
     const N = this.size;
     const R = Math.max(2, radius);
@@ -2452,10 +2472,11 @@ class FluidSimulation {
     // whether a kick's press reached the plate at all, and whether the kick's
     // release gave back what it took.
     let laid = 0, depth = 0;
+    // On a thin gap a press lays only the glass, as a bowl, and the flow moves the liquid (squishDisc).
     squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, (idx, g, vx, vy, m) => {
       if (Number.isInteger(idx) && g < 0) { laid++; depth -= g; }
       this.squishCell(idx, g, vx, vy, m);
-    });
+    }, this.thinGap);
     this.pressedCells[who] += laid;
     this.pressedDepth[who] += depth;
   }
@@ -2475,7 +2496,7 @@ class FluidSimulation {
       squishDisc(this.size, lift.x, lift.y, lift.radius, lift.amount, lift.fingering, 'lift', 0, (idx, gap, vx, vy, m) => {
         if (Number.isInteger(idx)) cells++;
         this.squishCell(idx, gap, vx, vy, m);
-      });
+      }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
     // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
@@ -2495,8 +2516,11 @@ class FluidSimulation {
     this.applySquish(x, y, 40, amount, fingering, true, 'press', 'kick');
     this.applySquish(x, y, 27, amount, fingering, false, 'press', 'kick');
     this.applySquish(x, y, 15, amount, fingering, false, 'press', 'kick');
-    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount);
+    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
   }
+
+  /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
+  get thinGap(): boolean { return !!this.gpu?.thinGapLive; }
 
   /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
   private readonly squishCell = (idx: number, gap: number, vx: number, vy: number, m: number): void => {
@@ -3263,9 +3287,6 @@ class FluidSimulation {
     // or gradients and reads as a static colour wash. A macro frame needs
     // empty ground around its subject, so the budget drops hard while the
     // closeup camera is running.
-    // What the motor asks for, in the flywheel's units, so the twist below can
-    // tell the plate's own momentum apart from the speed it was told to hold.
-    const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
     // Eased down over the zoom's travel, not dropped at the first notch: the
     // plate emptying at 1.05x was a jump of its own (reported as the zoom
     // not being smooth, "especially at the beginning steps").
@@ -3457,9 +3478,25 @@ class FluidSimulation {
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
-      thinGap: (settings.thinGap ?? 0) > 0.5 ? 1 : 0,
+      thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
-      gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
+      /*
+        The half-life the comment above means is in seconds, and `this.dt`
+        is not one: it is the look's step, Speed × 0.2, so on Classic
+        (0.0018 a step) Press Lift's default 1.55 s half-life came out at
+        about fourteen seconds, and the glass was still half down long after
+        the hand had gone. On the old solver that only shapes how long the
+        film stays thin, and every look is tuned on it, so it stays. On a
+        thin gap the glass coming up is what draws the liquid back under the
+        palm, so it rises in the show's seconds, `dtSeconds`, as a hand
+        lets go of it: the ring a press pushed out is a third of the way
+        back in a second and within 3% of where it began once the glass is
+        (`npm run presslift`, Classic's glass; on the look's clock, 4% in
+        that second). Keyed on the thin gap running, not the setting: while
+        its pipelines build, or where it cannot run, the old solver steps,
+        and its glass stays on the clock its looks were tuned on.
+      */
+      gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
       platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
@@ -3476,35 +3513,30 @@ class FluidSimulation {
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
-        The liquid is dragged round by the glass it is touching.
-
-        The first term is the motor's, unchanged, because every look is tuned
-        against it. The second is the part of the plate's motion that the
-        motor did not ask for — what a flick put there — and it is what makes
-        dye follow a spun plate instead of sitting still while the plate turns
-        underneath it.
-
-        Scaled by how hard the plates are pressed together, because that is
-        what contact means here: a plate barely touching drags its liquid
-        weakly, and one squeezed down on it takes the liquid with it. Couette
-        drag, in the one place this solver can express it without giving the
-        current pass the gap field to read.
-
-        The turntable's dish (Auto Spin, the Spin tool) is not in it: its drag
-        on the liquid is the swirl below, from the gap and the viscosity.
+        No stir for the look's motor (PLAN 22j). The current had one, a
+        swirl round the middle at rotationSpeed × 30, fastest at the centre
+        and nothing at the rim: a stand-in from when the motor turned the
+        picture rigidly and nothing else made the liquid go round. The motor
+        turns the dish now (22h, dishFrame), and a dish turning steadily
+        under its liquid drags it round through the gap until it turns with
+        the glass, after which there is nothing left to stir: the picture
+        turns, and the liquid in it is still. What the glass does to the
+        liquid while it catches up, or where a palm, a dome or oil grips it
+        harder than the bulk, is the swirl's (spinSwirl), worked out from the
+        gap's drag. The stir was most of what turned some looks (acid-trip's
+        middle at 0.95 rad/s against its motor's 0.001), so their motors
+        were turned up to move the liquid in view as fast (presets.ts, the
+        note on Rotation Speed).
       */
-      twist: (Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1)
-        + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
-          * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
       /*
         The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
         frame that turns with the liquid, the liquid's own speed (the
         centrifuge), the bulk's drag time at the rest gap, and the liquid.
-        All but the last are zero on a dish nobody spins, and the swirl
+        All but the last are zero on a dish nobody turns, and the swirl
         does not run.
       */
       spinDish: this.dishSpin - this.liquidSpin,
-      spinLiquid: this.spinCentrifuge,
+      spinLiquid: this.liquidSpin,
       spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
       spinNu: carrierViscosity(settings.viscosity),
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
@@ -3525,7 +3557,6 @@ class FluidSimulation {
   private stepCurrent(p: GpuStepParams) {
     const M = this.CM, S = this.size;
     const cvx = this.cvx, cvy = this.cvy, cpr = this.cpr, cdv = this.cdv;
-    const sm = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
     for (let j = 1; j < M - 1; j++) {
       for (let i = 1; i < M - 1; i++) {
         const k = i + j * M;
@@ -3536,9 +3567,6 @@ class FluidSimulation {
         const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
         const r = Math.sqrt(tx * tx + ty * ty);
         if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
-        const w = 1 - sm(0, 0.5, r);
-        const tw = p.twist * w * w;
-        fx += tw * ty; fy -= tw * tx;
         // Relax toward the flow the forces ask for (see the GPU twin).
         let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
         let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
@@ -4459,6 +4487,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
+  /*
+    `ambientSeed(false)`: the three Lissajous orbits stop laying their dye
+    (the "Ambient seeding" block below). They lay 0.05 a frame each, every
+    frame on every look, wherever they are, so a cleared plate gathers
+    their trails a quarter to a third of the plate out from its middle. A
+    check that reads where a hand's colour went reads those trails too: on
+    the Mac the tools check's pool, settled 1.5, 8 or 12 of the plate's
+    seconds, drifted out from the palm at the same 0.004 of the plate a
+    second whatever its age (a spreading drop slows as it ages; a source
+    that never stops does not), and the plate's colour grew 6% in three
+    seconds with nothing touching it. Only a harness turns it off;
+    a ref, so a rebuild of the frame loop (a self-heal, a lost device) keeps it.
+  */
+  const ambientSeedRef = useRef(true);
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -4475,7 +4517,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
   const blowDirRef = useRef<BlowDir | undefined>(undefined);
   /** The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`. */
-  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0 });
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -4524,6 +4566,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * kicks the band played).
    */
   const heardKicksRef = useRef({ n: 0, lastAt: null as number | null });
+  /**
+   * What the music did with its chances to release air, for
+   * `chromaglassDebug().musicBubbles()` (`npm run kickbubbles`): the kicks
+   * that reached the decision with room on the plate, the ones that released
+   * air, the releases on a held bass note, and the Audio Impact, drive and
+   * Bubbles the frame itself last used (the plate's settings, which a song's
+   * chorus can lift above the App's).
+   */
+  const musicBubblesRef = useRef({ chances: 0, kicks: 0, held: 0, impact: NaN, drive: NaN, amount: NaN });
   /*
     Sound learn, read by the loop through refs like every other live prop: the
     bindings change when the map does, the trigger handler on every render of
@@ -4966,8 +5017,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // mount) owes its phase to the solver when it attaches: laid here it
       // went nowhere, and Magnet Garden opened as a bare gold pool.
       phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
-      // A look laid owes its own ferrofluid, not the Magnet's old pool.
-      if (phasePendingRef.current) magnetPoolRef.current = null;
       layPhaseRef.current(presetId);
     }
     for (const later of laid.slice(1)) {
@@ -5007,7 +5056,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
       phaseLaysRef.current++;
-      magnetPoolRef.current = null;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
@@ -5503,10 +5551,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // Layers alternate direction, as they do for the motor, so a flick on the
     // back plate turns the other way and the two shear against each other.
     const dir = l % 2 === 0 ? 1 : -1;
-    // Up to about six-tenths of a turn a second at full strength, which is
-    // sixty times what the rotationSpeed slider can ask for at its top. That
-    // is deliberate: the slider is a drift that keeps a plate alive, and a
-    // flick is meant to be seen.
+    // Up to about six-tenths of a turn a second at full strength, about the
+    // speed the rotationSpeed slider asks for at its top (lookMotorRate) and
+    // twelve times the fastest look's motor: a flick is meant to be seen.
     const top = 2 * Math.PI * 0.6;
     const add = dir * Math.max(0, Math.min(2, strength)) * (settingsRef.current.spinImpulse ?? 0.5) * top;
     if (Number.isFinite(add)) spinVelRef.current[l] = (spinVelRef.current[l] ?? 0) + add;
@@ -5529,12 +5576,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
   /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
   const magnetToldRef = useRef(-Infinity);
-  /** How many pools the Magnet has brought to a bare plate (magnetFor), for the harness. */
-  const magnetPoolsRef = useRef(0);
-  /** The pool the Magnet brought, while it is the plate's ferrofluid: a look's lay (layPhase) or a clear forgets it. */
-  const magnetPoolRef = useRef<{ x: number; y: number; r: number } | null>(null);
-  /** How many times a new solver has been given that pool again, at the magnet, for the harness: a pool laid again is not a pool carried. */
-  const magnetRelaysRef = useRef(0);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5563,6 +5604,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
+        // A plate added is a dish at rest with still liquid, not the speeds a
+        // plate dropped from this index left behind (the picture turns with
+        // the liquid, so a stale one turned a fresh plate).
+        dishSpinRef.current[i] = 0;
+        liquidSpinRef.current[i] = 0;
 
       }
     } else if (currentCount > targetCount) {
@@ -5841,26 +5887,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           app ignores a call when the look already has its magnet.
         */
         /*
-          And the ferrofluid, on a plate with none: a pool under the hand,
-          as big as this magnet stands up (lib/magnetSize.ts), the first time
-          it touches. Picking the Magnet used to pour the look's ring over the
-          whole plate, which was the owner's "giant black hole as soon as you
-          pick it". Laid here, before the app turns Ferrofluid up (so the
-          plate draws it), so the solver already has its phase when the
-          amount rises and the bare-plate pour below leaves it alone.
+          And no ferrofluid of its own. From 9x the first touch on a plate
+          with none laid a pool under the hand, as big as Magnet Size, so a
+          magnet over a bare plate did something; the owner, 2026-10-04: "Why
+          does the magnet add ferrofluid? It should only work on ferrofluid
+          that is already there." A magnet is a field. It moves the
+          ferrofluid that was poured, and over a dish with none it moves
+          nothing, which is what a real one does. The ferrofluid comes from
+          the bottle (the Ferrofluid liquid with a laying tool) or the look.
+
+          What the hold still tells the app is whether there is any in the
+          solver to draw (phaseIsLive: something laid it and nothing has
+          cleared it since), so Ferrofluid is turned up only over ferrofluid
+          that is there. Turned up over none, the frame loop's "turned up on
+          a bare plate" pour would lay the look's ring, which is the magnet
+          adding ferrofluid again by the back door.
         */
-        const leadGpu = held && hand ? lead?.gpu : null;
-        if (hand && leadGpu?.addPhase && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
-          const r = MAGNET_POOL_RADIUS * magnetReach(look.magnetSize ?? settingsRef.current.magnetSize);
-          const px = Math.max(0.05, Math.min(0.95, hand.x)), py = Math.max(0.05, Math.min(0.95, hand.y));
-          leadGpu.addPhase(px, py, r, MAGNET_POOL_FILL);
-          magnetPoolRef.current = { x: px, y: py, r };
-          magnetPoolsRef.current++;
-        }
+        const ferroThere = !!(lead?.gpu as { phaseIsLive?: boolean } | undefined)?.phaseIsLive;
         const told = settingsRef.current;
-        if (held && ((told.magnetStrength ?? 0) <= 0 || (told.phaseAmount ?? 0) <= 0.002) && now - magnetToldRef.current > 250) {
+        if (held && ((told.magnetStrength ?? 0) <= 0 || (ferroThere && (told.phaseAmount ?? 0) <= 0.002)) && now - magnetToldRef.current > 250) {
           magnetToldRef.current = now;
-          onMagnetInHandRef.current?.();
+          onMagnetInHandRef.current?.(ferroThere);
         }
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
@@ -6261,22 +6308,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           show when it moves the grid, and the dye is carried across that
           but the phase is not: Magnet Garden had its ferrofluid at 8 s and
           a bare gold pool by 20.
+
+          The lay is the look's own pour, so ferrofluid a hand put down (the
+          bottle) is not what comes back: it comes back as the look's ring
+          while Ferrofluid is up. Carrying the phase across as the dye is
+          carried is PLAN 9w. Until 9x was taken out again the Magnet's own
+          pool was the one exception, laid again at the magnet; the Magnet
+          brings no ferrofluid now, so there is no pool of its own to carry.
         */
         const leadGpu = fluidsRef.current[0]?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
-          /*
-            Unless the ferrofluid on the plate is the pool the Magnet brought
-            (magnetFor): a new solver would pour the look's ring in its place,
-            the very pour picking the Magnet no longer makes. The pool goes
-            back where the magnet now is, which is where it had gathered.
-          */
-          const pool = phasePendingRef.current ? null : magnetPoolRef.current;
-          if (pool && leadGpu?.addPhase) {
-            const m = lastMagnetRef.current;
-            leadGpu.addPhase(m?.x ?? pool.x, m?.y ?? pool.y, pool.r, MAGNET_POOL_FILL);
-            magnetRelaysRef.current++;
-          } else if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
@@ -6319,9 +6362,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const amt = settingsRef.current.phaseAmount ?? 0;
           // Not when it was turned up for the Ferrofluid bottle: that one
           // goes where it is dropped, not over the whole plate. (The Magnet
-          // needs no exception: picking it no longer turns the amount up,
-          // and its first hold lays its pool before it does, so the plate
-          // is not bare by the time the amount rises: phaseIsLive.)
+          // needs no exception: neither picking nor holding it turns the
+          // amount up unless there is ferrofluid in the solver already, so
+          // the plate is never bare when it rises for the Magnet: phaseIsLive.)
           const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0;
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
               && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
@@ -6603,22 +6646,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   swept, leaving a trench of holes and not a pushed tongue.
                 */
                 const now = performance.now();
-                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now };
-                const going = hand.blowDir && now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
+                // The press counts as a move, with no direction (BLOW_STRAW_FRAMES).
+                // The press step starts the frame count at 0 rather than counting itself.
+                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now, still: 0, moved: true };
+                else if (!hand.blowDir) hand.blowDir = { x: 0, y: 0, at: now, still: 0, moved: false };
+                else if (simStep === 0) hand.blowDir.still++;
+                const going = now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
+                const held = !going && hand.blowDir.still >= BLOW_STRAW_FRAMES;
                 af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
                 /*
                   The straw only when the hand is held, not moved, by the same
-                  clock the ferrofluid goes by. Asked of `still` (no move this
-                  step), a drag blew the straw on every step after a frame's
-                  first and on every frame the pointer did not report a move,
-                  which is most of them: a drag left a string of straw bubbles
-                  and ran the wind a step a frame at best, so the wind's carry
+                  clock the ferrofluid goes by and a few frames with no move
+                  (BLOW_STRAW_FRAMES). Asked of `still` (no move this step), a
+                  drag blew the straw on every step after a frame's first and
+                  on every frame the pointer did not report a move, which is
+                  most of them: a drag left a string of straw bubbles and ran
+                  the wind a step a frame at best, so the wind's carry
                   (PLAN.md §15c) waited on the rare step that was both a wind
                   step and a fresh reading of the dye.
                 */
-                if (activeLayerRef.current === 0 && !going && primary) {
+                if (activeLayerRef.current === 0 && held && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
                   blowStepsRef.current.straw++;
+                  // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
+                  if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
                 } else {
                   // The wind: it carries the colour (and an oil body's oil)
                   // the way the hand last went, as the ferrofluid above, or
@@ -7039,7 +7090,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (h.dosed === 1 && p >= 0.5) {
                 h.dosed = 2;
                 if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
-                else { lead?.gpu?.clearPhase?.(); magnetPoolRef.current = null; }
+                else lead?.gpu?.clearPhase?.();
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
                     doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
@@ -7138,7 +7189,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (isActiveRef.current && drainFrameRef.current === 0) {
             // ── Ambient seeding ────────────────────────────────
             const af = fluidsRef.current[activeLayerRef.current];
-            if (af) {
+            if (af && ambientSeedRef.current) {
               // Three Lissajous orbits, each carrying its own harmony color —
               // keeps several distinct hues alive in the frame at all times.
               const phase = time * 0.18;
@@ -7448,7 +7499,34 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // the oil is the thing the references actually show.
               const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
-              if (currentAudioData && room && ((onset && DICE.music.float() < 0.45 * bubbleAmt) || (bass01 > 0.5 && DICE.music.float() < 0.003 * bubbleAmt))) {
+              /*
+                And only as hard as Sound Drive lets the music reach the
+                plate. Every other reaction to the music (the centre pulse,
+                the bursts, the ring of dye on a kick, the liquids it doses)
+                sits behind Audio Impact; these did not, so at 0, with every
+                other reaction still, a fresh browser's first click started
+                the built-in band and its kicks went on dropping air near the
+                middle (found by the mirror check: 29 kicks over four drops,
+                four bubbles near the middle, and the middle of the preview
+                moving by itself from the second drop on). The odds follow
+                the dye ring's own scale, impact over 0.45, up to 0.45 and no
+                further: from 0.45 up (the defaults are 0.6, Classic's 0.55) a
+                kick is as likely to release air as it always was, and the
+                draws are the same draws in the same order, so a render there
+                is the same render; below it the air thins with the fader, and
+                at 0 the music releases none. The look's Bubbles setting still
+                says how many the plate may carry, and the straw still blows
+                its own.
+              */
+              const impactNow = currentSettings.audioImpact ?? 0.45;
+              const drive = Math.min(1, Math.max(0, impactNow) / 0.45);
+              const mb = musicBubblesRef.current;
+              mb.impact = impactNow; mb.drive = drive; mb.amount = bubbleAmt;
+              if (currentAudioData && room && onset) mb.chances++;
+              const kickAir = !!currentAudioData && room && onset && DICE.music.float() < 0.45 * bubbleAmt * drive;
+              const heldAir = !kickAir && !!currentAudioData && room && bass01 > 0.5 && DICE.music.float() < 0.003 * bubbleAmt * drive;
+              if (kickAir || heldAir) {
+                if (kickAir) mb.kicks++; else mb.held++;
                 const dens = fluidsRef.current[0]?.readDensity;
                 let bx = GRID_SIZE / 2, by = GRID_SIZE / 2, best = -1;
                 for (let t = 0; t < 6; t++) {
@@ -7539,6 +7617,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (isActiveRef.current) {
             let rotationMod = 0;
             let dirMod = l % 2 === 0 ? 1 : -1;
+            /*
+              The motor's own way round, which the music does not sway.
+
+              `dirMod` below becomes the music's sway on a look with a band
+              routed to rotation, and it crosses zero: with the band quiet
+              (every feature near 0) it is 0.4 − 1.2 = −0.8, the plate pushed
+              backwards. That is the music's push, and it used to carry the
+              motor with it, which cost nothing while the motor was a
+              thousandth of a radian a second. Since the motor's stir went
+              onto the dish (PLAN 22j) the motor is most of what turns
+              acid-trip (0.31 rad/s), and a quiet bar would have turned that
+              whole dish backwards at a quarter of a radian a second. A motor
+              holds its way round whatever the band does; the band's share
+              keeps its sway exactly as it had it.
+            */
+            let motorWay = dirMod;
 
             if (currentAudioData && currentSettings.audioMappings) {
               const mappedFeature = currentSettings.audioMappings.rotation;
@@ -7567,8 +7661,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               the projectionist's move, one motor under the whole wall.
             */
             const dirChoice = currentSettings.spinDirection ?? 0;
-            if (dirChoice > 0.5) dirMod = Math.abs(dirMod);
-            else if (dirChoice < -0.5) dirMod = -Math.abs(dirMod);
+            if (dirChoice > 0.5) { dirMod = Math.abs(dirMod); motorWay = 1; }
+            else if (dirChoice < -0.5) { dirMod = -Math.abs(dirMod); motorWay = -1; }
 
             /*
               A hand on a dish is never a motor.
@@ -7613,34 +7707,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 seconds of watching never caught one.
               */
               dirMod *= 1 + w * wander * 3.4;
+              motorWay *= 1 + w * wander * 3.4;
             }
 
             /*
-              The top of this dial used to be one turn every thirteen minutes.
-
-              `rotationSpeed` ran `v * 0.01`, so the whole slider reached
-              0.01 rad/s — measured at 0.011 rad over 1.4 s with the dial at
-              0.8, against 1.885 rad/s for a flick. It was a motor that kept a
-              plate alive and could not be seen doing it, and asking for a
-              plate that visibly turns was asking for travel this dial did not
-              have.
-
-              Every shipped look sits at 0.1 or below (most under 0.012), so
-              the bottom tenth is kept exactly as it was — `v * 0.01`, the same
-              arithmetic, the same numbers — and the ninety per cent above it,
-              which nothing has ever used, is where the speed now lives. The
-              two halves meet at 0.001 rad/s, so there is no step at the join,
-              and the square keeps fine control at the slow end of what is
-              finally a visible range: about a turn every fifteen seconds at
-              half, and a flick's worth at the top.
+              The dial as a speed, rad/s (lookMotorRate, lib/turntable.ts,
+              which says why it bends at a tenth).
             */
             // This plate's own motor: `rotationSpeed` is a solver key, so a
             // back plate with a look of its own (§16a), or a patch aimed at
             // one plate, turns that dish at its own speed, not the front's.
             const asked = Math.max(0, patch.layer(l).rotationSpeed ?? 0);
-            const motorRate = asked <= 0.1
-              ? asked * 0.01
-              : 0.001 + Math.pow((asked - 0.1) / 0.9, 2) * 2.4;
+            const motorRate = lookMotorRate(asked);
 
             /*
               How hard the music pushes, kept off by default.
@@ -7654,7 +7732,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const audioDepth = Math.max(0, Math.min(1, currentSettings.spinAudioDepth ?? 0));
 
             // Use realDt only — never timeMultiplier, which spikes with audio energy
-            const rotationSpeed = motorRate + Math.abs(rotationMod) * (0.3 + audioDepth * 26);
+            const musicSpeed = Math.abs(rotationMod) * (0.3 + audioDepth * 26);
             /*
               An angle that accumulates cannot be allowed to go non-finite.
 
@@ -7669,8 +7747,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             /*
               The plate as a flywheel.
 
-              `rotationSpeed` is the motor: the speed the plate is *asked* to
-              hold, and the flywheel relaxes toward it rather than being set
+              `motor` is the motor: the speed the plate is *asked* to
+              hold (the dial's, its way round, and the music's push), and the flywheel relaxes toward it rather than being set
               to it. With the motor at zero — which is most looks — a flick
               spins the plate up and the bed it rests on brings it back to
               rest, which is the whole point.
@@ -7683,7 +7761,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               friction term as well: without it a flicked plate creeps for
               ever at a speed too small to see and too large to be stopped.
             */
-            const motor = rotationSpeed * dirMod;
+            const motor = lookMotor(motorRate, motorWay, musicSpeed, dirMod);
             const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
               * (1 + (patch.layer(l).platePressure ?? 0) * 0.8);
             /*
@@ -7699,24 +7777,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // Dry friction, toward the motor's speed: with no motor that is rest (dishFollow).
             const vel = dishFollow(vel0, motor, dragRate, realDt);
             if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
-            // The plate is told what it is doing, so the liquid touching it
-            // can be dragged round by it (the twist in paramsFor).
-            if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
             /*
-              The turntable (PLAN §22, lib/turntable.ts): a dish of its own
-              under the look's, turned by Auto Spin and by a hand on the Spin
-              tool, with the same bed and drag as the look's flywheel.
-
-              Why two and not one. The look's own turning (its motor, the
-              music routed to rotation on eleven shipped looks, a flick) turns
-              the picture as it always has, rigidly, because those looks are
-              tuned against exactly that: sent through the liquid's lag
-              below, a thin look's sway was smoothed over three seconds and a
-              flick trailed, and the swirl ran on every look with music. So
-              only what is new goes through the physics, and with Auto Spin
-              off and no hand on the dish every number here is zero and the
-              plate is today's to the bit. Moving the look's own turning onto
-              the dish too is PLAN 22h, once it has been seen on the Mac.
+              The turntable (PLAN §22, lib/turntable.ts): Auto Spin's motor
+              and a hand on the Spin tool, with the same bed and drag as the
+              look's flywheel above. It is the same dish, not a second one
+              (22h): the two speeds add, and the liquid follows their sum
+              below. They are kept apart only because they are steered
+              apart: the look's motor by the look and the music, this by
+              Auto Spin, its tempo lock and the hand.
 
               Auto Spin's direction is the plate's (which layer, Spin
               Direction) and the Rate's sign, and nothing else: the music's
@@ -7757,31 +7825,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const dishNow = dishSpinRef.current[l] ?? 0;
             if (Number.isFinite(dishNow * realDt)) dishAngleRef.current[l] = (dishAngleRef.current[l] ?? 0) + dishNow * realDt;
             /*
-              And the liquid follows the turntable with the drag time of its
-              gap: seconds for water, a tenth of one for oil. The picture
-              turns with the liquid, because the liquid is what the lamp
-              shines through; the dish itself is never seen.
+              And the liquid follows the whole dish with the drag time of its
+              gap: three seconds for water, a sixth of one for the thick
+              liquid. The picture turns with the liquid, because the liquid
+              is what the lamp shines through; the dish itself is never seen.
+
+              The whole dish, the look's turning included (PLAN 22h). Until
+              then the look's motor, its music and a flick turned the picture
+              rigidly, as if the liquid were bolted to the glass, and only
+              the turntable went through the gap. That made a flicked plate
+              of water go round at once and a turntable's the same speed
+              trail by three seconds, two dishes of one glass. One dish now:
+              a flick on a thin look leaves the water behind for a moment
+              and it catches up (`npm run turntable`: 63% in one drag time,
+              to 2%), and the solver's swirl, the dish's drag where the glass
+              is pressed close (Ω − ω_l), and its centrifuge (ω_l) see every
+              turn of the dish, not just the turntable's.
+
+              What it changes on the shipped looks, measured in `npm run
+              turntable` rather than guessed: a look with a steady motor ends
+              where it did, Ωτ behind (a few thousandths of a radian on any
+              of them); a thick look is unchanged to within its 0.15 s; the
+              nine thin looks with music routed to rotation have their sway
+              smoothed by the water's three seconds, as a dish of water
+              would, and the swirl runs while they play. Judged on the Mac,
+              `docs/judging.md` §28.
+
+              An angle that accumulates cannot be allowed to go non-finite
+              (the note above); dishFrame returns a finite turn or none.
             */
             const tau = dragSeconds(carrierViscosity(currentSettings.viscosity));
-            const liq = liquidFollow(liquidSpinRef.current[l] ?? 0, dishNow, realDt, tau);
-            if (Number.isFinite(liq)) liquidSpinRef.current[l] = liq;
-            // The solver drags the liquid toward the dish by the difference (the swirl).
+            const frame = dishFrame(spinVelRef.current[l] ?? 0, dishNow, liquidSpinRef.current[l] ?? 0, realDt, tau);
+            if (Number.isFinite(frame.liquid)) liquidSpinRef.current[l] = frame.liquid;
             if (fluidsRef.current[l]) {
-              const liqNow = liquidSpinRef.current[l] ?? 0;
-              fluidsRef.current[l].dishSpin = dishNow;
-              fluidsRef.current[l].liquidSpin = liqNow;
-              fluidsRef.current[l].spinCentrifuge = dishNow !== 0 || liqNow !== 0 ? (spinVelRef.current[l] ?? 0) + liqNow : 0;
+              fluidsRef.current[l].dishSpin = frame.dish;
+              fluidsRef.current[l].liquidSpin = liquidSpinRef.current[l] ?? 0;
             }
-            /*
-              An angle that accumulates cannot be allowed to go non-finite —
-              see the note above, which is why both of these are guarded and
-              not just the sum. The turntable's turn is added only when there
-              is one, so a plate nobody spins sums exactly what it did.
-            */
-            const turn = (spinVelRef.current[l] ?? 0) * realDt;
-            if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
-            const liquidTurn = (liquidSpinRef.current[l] ?? 0) * realDt;
-            if (liquidTurn !== 0 && Number.isFinite(liquidTurn)) rotationAnglesRef.current[l] += liquidTurn;
+            rotationAnglesRef.current[l] += frame.turn;
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
@@ -8642,6 +8722,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         kicks: () => kickCountRef.current,
         /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
         heardKicks: () => heardKicksRef.current.n,
+        /** The music's chances to release air and what it did with them (see `musicBubblesRef`): none released at Audio Impact 0. */
+        musicBubbles: () => ({ ...musicBubblesRef.current }),
         beads: beadsRef.current.beads.length,
         beadList: beadsRef.current.beads.map(b => [b.x, b.y, b.r]),
         chemistry: chemRef.current,
@@ -8650,6 +8732,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         rotation: rotationAnglesRef,
         /** Angular velocity per layer, rad/s, and the flick that adds to it. */
         spin: spinVelRef,
+        /** The turntable's share of each dish's speed, and the liquid following the whole dish, rad/s (PLAN 22h). */
+        turntable: dishSpinRef,
+        liquidSpin: liquidSpinRef,
         flick: flickSpin,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputConfig: outputCfgRef.current,
@@ -8709,6 +8794,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
+        ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
         ...(renderer?.debug?.() ?? {}),
       });
@@ -8943,7 +9029,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // `?prepare=0` opens the show the old way, every pipeline built on the
       // frame that first needs it: `npm run startup`'s control, so a run
       // measures the freeze it guards against as well as its absence.
-      if (PREPARE_OFF) return s;
+      // The thin gap's pipelines too, which otherwise wait for nothing but
+      // build behind the old plate (WebGPUFluid.buildAhead says why).
+      if (PREPARE_OFF) { WebGPUFluid.buildAhead = false; return s; }
       /*
         Never the reason the show does not open. The builds themselves cannot
         fail (a pipeline that will not build ahead is left to the frame), but
@@ -9566,8 +9654,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
           phaseLays: () => phaseLaysRef.current,
-          magnetPools: () => magnetPoolsRef.current,
-          magnetRelays: () => magnetRelaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;

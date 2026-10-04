@@ -31,7 +31,9 @@ const browser = await launchChromium(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+  // On the old plate: squeezeOut is its press, and on a thin gap, which every
+  // look runs on since PLAN 18a-every, it returns before moving anything.
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&set=thinGap=0${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
   await page.evaluate(() => {
     const d = window.chromaglassDebug();

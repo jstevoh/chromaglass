@@ -61,7 +61,7 @@ import { WebGPUParticles } from './particles';
 import { WebGPUCamera } from './camera';
 import { WebGPUOutput } from './output';
 import { PICTURE_FORMAT, WebGPUPostChain } from './post';
-import { PipelineCache, type Prep } from './kit';
+import { PipelineCache, type BuildTimes, type Prep } from './kit';
 import type { Opening } from './opening';
 
 /**
@@ -88,14 +88,34 @@ export interface Prepared {
   ms: number;
   /** Whether it stopped waiting at the timeout. */
   timedOut: boolean;
-  /** What it asked for, by the ledger's `scope/name`. */
+  /** What it asked for, by the ledger's `scope/name`, in the order it asked (any it never reached last). */
   keys: string[];
   /**
-   * Each build as it went: its key, when it was asked for (ms from load) and
-   * how long it took to settle. What `npm run startup` holds a stop against:
-   * a stop that one build spans end to end is that build's.
+   * Each build as it went: its key, and the stretch of the opening's wall
+   * time charged to it (from ms from load, for ms): one at a time, from its
+   * ask to its settle; several at a time, from its ask or the last settle,
+   * whichever was later, so the stretches never overlap (`buildInTurn`).
+   * What `npm run startup` holds a stop against: a stop that one build spans
+   * end to end is that build's.
    */
   builds: [key: string, at: number, ms: number][];
+  /**
+   * Each build from its own ask, overlaps and all, split in two: its key,
+   * its ask in ms from load, the ms to its compile, and the ms from there to
+   * its first use handed to the GPU (null where it had none; the GPU's own
+   * time for all of them is `useWait`). Not wall time, as `builds`
+   * is: with three in flight these add up to about three times the
+   * opening. What it says is where a build's time goes, the compiler or the
+   * first use, which `builds` cannot.
+   */
+  raw: [key: string, at: number, compile: number | null, use: number | null][];
+  /**
+   * The opening's one wait for the GPU to finish every first use it was
+   * handed (`firstUse` in `gpu/kit.ts`), in ms, once the last compile is in;
+   * null for the half behind the show, which has none. In `ms`, and in no
+   * build's stretch of `builds`: it is the GPU's time, not a compile's.
+   */
+  useWait: number | null;
 }
 
 /**
@@ -116,11 +136,52 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
 }
 
 /**
- * `builds`, one at a time (above), until they are done, the device is gone or
- * PREPARE_TIMEOUT_MS has passed. A device lost part way would otherwise have
- * every remaining build refused one after another, each counted as a try.
+ * How many of the opening's builds are in flight at once. Three, and only
+ * for the half the show waits for.
+ *
+ * What was reported: the show takes a long time to load. What was measured:
+ * on CI's Mac, with the shader cache emptied, the plate sat black on its
+ * starting frame until its first step at 12.15, 17.62 and 12.49 s (`npm run
+ * startup`, runs 37166785182, 37166234101, 37165604455), and 11.46, 13.57
+ * and 11.83 s of that was this file building the opening's fifty pipelines
+ * one after another. The owner's machine pays the same, scaled to its
+ * compiler, every time a deploy changes the shaders, which is most deploys.
+ *
+ * One at a time was chosen against all at once (above): all at once
+ * compiled faster, 0.12 s a pipeline against 0.22, but the page waited
+ * behind every queued compile and drew nothing for 8.6 s. A few at a time
+ * sits between: the page waits behind at most that few, and the compiler
+ * has the next one in hand while the GPU runs the last one's first use,
+ * which one at a time left idle on every pipeline. (Since 2026-10-04 a
+ * first use is not waited for in the lane at all, but once, at the end:
+ * `firstUse` in `gpu/kit.ts`.)
+ *
+ * Two at a time, on the same Mac (run 37172629037): the fifty in 10.86 s.
+ * The first of them, `fluid/fill`, sits under Chromium starting the GPU
+ * whatever the count (2.5 to 3.7 s); the forty-nine after it took 7.17 s
+ * against 8.93 and 9.17 s one at a time, a fifth less, and the longest
+ * wait for a frame anywhere in the opening was 0.67 s, under the 2 s an
+ * audience would see. Three is the next step toward all at once's 0.12 s,
+ * still waiting behind no more than three compiles (about 0.7 s). The half
+ * built behind the show stays one at a time: there a compile costs the
+ * running show frames, and nobody is waiting.
+ *
+ * `?lanes=N` (1 to 8) changes it, from the query string alone, so a machine
+ * can be timed both ways: `?lanes=1` is the old opening.
  */
-async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[]): Promise<Prepared> {
+const OPENING_LANES = (() => {
+  let asked: number | null = null;
+  try { asked = Number(new URLSearchParams(window.location.search).get('lanes') ?? NaN); } catch { /* no window */ }
+  return asked !== null && Number.isInteger(asked) && asked >= 1 && asked <= 8 ? asked : 3;
+})();
+
+/**
+ * `builds`, `lanes` at a time (above), until they are done, the device is
+ * gone or PREPARE_TIMEOUT_MS has passed. A device lost part way would
+ * otherwise have every remaining build refused one after another, each
+ * counted as a try.
+ */
+async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[], lanes = 1): Promise<Prepared> {
   const t0 = performance.now();
   let gone = false;
   void device.lost.then(() => { gone = true; });
@@ -129,20 +190,93 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   // device's builds (a replacement's, mid-way) would add to.
   let ready = 0;
   const times: Prepared['builds'] = [];
-  for (const prep of builds) {
-    if (gone) break;
-    const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
-    if (left <= 0) { timedOut = true; break; }
-    const b0 = performance.now();
-    const built = prep.build();
-    const settled = await within(built.then(() => undefined), left);
-    times.push([prep.key, Math.round(b0), Math.round(performance.now() - b0)]);
-    if (!settled) { timedOut = true; break; }
-    if (await built) ready++;
+  const raw: Prepared['raw'] = [];
+  // Each lane takes the next build in the list when its last one settles, so
+  // the order they are asked in is the list's, as it was with one, but for
+  // the one render pipeline at a time (`renderBusy`, below).
+  const queue = builds.slice();
+  const asked: string[] = [];
+  /*
+    One render pipeline compiling at a time, the other lanes taking the
+    compute kernels behind it in the meantime.
+
+    What was reported: main's deploy of 5505a2a (run 37196539858) went red
+    on startup 4b, the page's thread held from outside it for 4.98 s from
+    0.96 s against a 4.5 s cap. What was measured, over the open shard's 30
+    runs of 3-4 October: the hold begins at 0.92 to 1.07 s on every
+    opening, before #249 and after (Chromium readying the page's GPU), and
+    lasts until the GPU process is free. Before #249 the first thing asked
+    was a compute kernel, and the hold ran 1.54 to 3.50 s. #249 asked for
+    the render pipelines first, so three of them (the display, derive and
+    the air's splat) compiled at once from about 0.5 s, and by their times
+    they did not run beside each other but queued in the GPU process: each
+    took 5.22 to 5.24 s on the red run, where the display alone had taken 1.03 to 2.49 s
+    on every run before #249 and derive a few tenths. Chromium's hold
+    waited behind them, 1.92 to 4.98 s on the seven runs since. So three
+    render compiles at once bought nothing (they were served one after
+    another anyway) and held the page for all three.
+    The display is still asked for first, as #249 chose, for the reason it
+    gave: it is the one compile of seconds, and asked last it ran alone
+    while the other lanes stood idle.
+  */
+  let renderBusy: Promise<void> | null = null;
+  const take = (): Prep | undefined => {
+    const i = renderBusy ? queue.findIndex((b) => b.kind !== 'render') : 0;
+    return i < 0 ? undefined : queue.splice(i, 1)[0];
+  };
+  /*
+    What each build is charged in `builds`: the opening's wall time from the
+    later of its own ask and the last build to settle, to its own settle. One
+    at a time that is exactly its ask to its settle, as it always was. Two at
+    a time, the raw ask-to-settle stretches overlap, and `npm run startup`
+    adds them up as the time the opening spent compiling (its 1b lines) and
+    names a stop by the one build that spans it: summed raw, two lanes would
+    read as twice the compile they took. Charged this way the stretches tile
+    the wall time without overlapping, so the sum is the time the opening was
+    compiling, whichever count of lanes ran.
+  */
+  let lastSettled = t0;
+  const lane = async () => {
+    while (queue.length && !gone && !timedOut) {
+      const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
+      if (left <= 0) { timedOut = true; break; }
+      const prep = take();
+      // Only render pipelines are left and one is compiling: wait for it.
+      if (!prep) { await renderBusy; continue; }
+      asked.push(prep.key);
+      const b0 = performance.now();
+      const stamps: BuildTimes = {};
+      const built = prep.build(stamps);
+      const waited = within(built.then(() => undefined), left);
+      if (prep.kind === 'render') renderBusy = waited.then(() => { renderBusy = null; });
+      const settled = await waited;
+      const now = performance.now();
+      const from = Math.max(b0, lastSettled);
+      lastSettled = now;
+      times.push([prep.key, Math.round(from), Math.round(now - from)]);
+      const c = stamps.compiled;
+      raw.push([prep.key, Math.round(b0), c == null ? null : Math.round(c - b0), c == null || stamps.used == null ? null : Math.round(stamps.used - c)]);
+      if (!settled) { timedOut = true; break; }
+      if (await built) ready++;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
+  /*
+    The first uses, handed over as each compile came in and not waited for
+    there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
+    the show still opens with them paid. Within what is left of the
+    timeout, like the builds.
+  */
+  let useWait: number | null = null;
+  if (stage === 'opening' && !gone) {
+    const w0 = performance.now();
+    const left = t0 + PREPARE_TIMEOUT_MS - w0;
+    if (left <= 0 || !await within(device.queue.onSubmittedWorkDone().catch(() => undefined), left)) timedOut = true;
+    useWait = Math.round(performance.now() - w0);
   }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
-    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times,
+    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: [...asked, ...queue.map((b) => b.key)], builds: times, raw, useWait,
   };
   prepareLog.push(done);
   return done;
@@ -163,7 +297,33 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUOutput.prepare(device, format),
     ...WebGPUPostChain.prepare(device, format, open),
   ];
-  const opening = await buildInTurn(device, 'opening', builds.filter((b) => !b.later));
+  /*
+    The render pipelines first, the plate's display first of all (it heads
+    its owner's list); the compute kernels after, in their owners' order.
+
+    What was measured: with three in flight, the opening's fifty took from
+    0.46 s to 9.23 s, and the last 1.34 s of it was the display alone, from
+    7.89 s, with nothing else settling (`npm run startup`, run 37174580232,
+    its "slowest ahead"). It is one compile of seconds (1.3 to 2.2 s cold on
+    CI's Mac) among forty-nine of tenths, and it was asked for forty-fifth,
+    once the solver's kernels had all been handed out, so the other two
+    lanes ran dry while it finished. Asked for first it runs beside them
+    instead, and the opening ends when the most work does, not when the
+    longest compile asked last does: the order a list of jobs on a few
+    workers wants, longest first. The kind is the measure of length here
+    because it is the one the code knows: every render pipeline built ahead
+    draws a picture (the display's is the whole plate), every compute
+    kernel moves one field, and the slowest compute in any run read was
+    0.44 s. Sorted, not reordered by hand, so a new render pipeline in any
+    owner's list takes its place without anyone remembering this.
+
+    First in the list, not all at once: `buildInTurn` compiles one render
+    pipeline at a time and gives the other lanes the kernels behind it (why
+    there), so the display goes first and the other render pipelines follow
+    it one by one while the kernels run beside them.
+  */
+  const ahead = builds.filter((b) => !b.later).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'render' ? -1 : 1));
+  const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES);
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
   void buildInTurn(device, 'later', builds.filter((b) => b.later))
