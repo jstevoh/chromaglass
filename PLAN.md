@@ -1095,7 +1095,7 @@ Open, from building 9i:
   lays the look's ferrofluid only on a solver that opened on no carry (the first,
   or one after a lost device). `npm run regrid` (lab, 6/6 in a cloud session at
   384² and 256²): 5.288% of the plate in → 5.288% on the new grid, 0.0 ppm off,
-  each cell within 1.1e-7 of the area mean worked out in JavaScript, the black
+  each cell (ferrofluid and mix) within 1.5e-7 of the area mean worked out in JavaScript, the black
   shared 97.4% (98.2% back up), the middle moved 0.00 cell; the same move with
   nothing handed over leaves 0.000% (main's behaviour); oil 3.020% → 3.020%, soap
   0.690% → 0.690%, acid 0.396% → 0.396%, Oil Bodies' tally the same; BZ and the
@@ -1105,7 +1105,11 @@ Open, from building 9i:
   same amount, the pools where they were. Not carried: Oil Bodies' share of the
   dye (it starts empty and is handed back the colour inside each body within a
   few steps), the glass's press (a press held through a move starts again from
-  the rest gap) and the particles (H1, which re-seed from the dye).
+  the rest gap) and the particles (H1, which re-seed from the dye). Not checked
+  anywhere yet: that the app keeps the carry until the new solver's first
+  readback, so an out-of-memory retry after a climb gets it, and that after a
+  lost device the app's next solver refuses the old carry and lays the look's
+  ferrofluid as before (the lab checks only a second device's refusal).
 - **9z. The dye at its own grid across a new solver.** Found while doing 9w: the
   dye and the flow cross a move of the grid through the CPU's 192² arrays
   (`FluidSimulation.attachGpu`, `pullStateFromGpu`), so a plate on 384² to 1024²

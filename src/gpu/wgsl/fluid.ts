@@ -3652,6 +3652,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, me, sum / (f32(oldN) * f32(oldN)));
 }`,
 
+  // Clear a field to a constant (A.a), used by clear() and the pressure warm start.
   fill: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {

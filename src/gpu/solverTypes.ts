@@ -186,16 +186,6 @@ export interface GpuStepParams {
 }
 
 /**
- * What the plate needs of a solver, whichever API it runs on
- * (docs/webgpu-plan.md, P3).
- *
- * `GpuFluid` below and `gpu/fluid.ts`'s `WebGPUFluid` both satisfy this, so
- * `FluidSimulation` can hold either without knowing which. What is *not* here
- * is anything one of them cannot do: `packInto` renders into a framebuffer,
- * which is WebGL's alone, so the WebGL renderer narrows to its own class at
- * the one place it needs it.
- */
-/**
  * What one solver hands the next when the grid moves (PLAN 9w): the liquids
  * that live only on the GPU, copied out before the old solver goes. Opaque
  * here; `gpu/fluid.ts` holds what is in it.
@@ -207,6 +197,16 @@ export interface SolverCarry {
   destroy(): void;
 }
 
+/**
+ * What the plate needs of a solver, whichever API it runs on
+ * (docs/webgpu-plan.md, P3).
+ *
+ * `GpuFluid` below and `gpu/fluid.ts`'s `WebGPUFluid` both satisfy this, so
+ * `FluidSimulation` can hold either without knowing which. What is *not* here
+ * is anything one of them cannot do: `packInto` renders into a framebuffer,
+ * which is WebGL's alone, so the WebGL renderer narrows to its own class at
+ * the one place it needs it.
+ */
 export interface PlateSolver {
   /** The physical grid it is solving on. */
   readonly N: number;

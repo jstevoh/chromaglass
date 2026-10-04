@@ -39,13 +39,15 @@
  *      1.200 just moved back up, 1.072 after the steps; the separation holds
  *      its own edge width, so a move barely softens it.)
  *   4. the mix (oil poured as bodies, soap, acid) comes across in the same
- *      amounts, with Oil Bodies' tally of the oil poured, and plays on
+ *      amounts and places, cell for cell as 1 asks of the ferrofluid (its
+ *      own pipeline and branch), with Oil Bodies' tally of the oil poured,
+ *      and plays on: the oil moves
  *   5. the two reactions (the BZ waves, the Liesegang gel) come across as
  *      they were, value for value: their grids are the same size on every
  *      solver
- *   6. a carry offered to a solver on another device (after a lost one) is
- *      refused, and lays nothing, where reading the dead device's copies
- *      would be an error
+ *   6. a carry offered to a solver on another device (as after a lost one)
+ *      is refused: a bind of another device's textures is a validation
+ *      error. (Only another device; a lost one is not made here.)
  *
  * What it is not: the app. Whether the app hands the carry over at the
  * governor's move, and stops laying the look's ring over it, is
@@ -158,7 +160,7 @@ try {
   console.log(`  moved to 256²: ${pct(a256.total)}, middle ${a256.x.toFixed(4)}, ${a256.y.toFixed(4)}; the most a cell is off the area mean ${off256.toExponential(2)}`);
   console.log(`  the control, moved with nothing handed over: ${pct(ctl.total)} before, ${pct(ctlNow.total)} after, phase stage ${ctlLive ? 'running' : 'off'}\n`);
   check('moved down a rung, the ferrofluid is all there, each cell the area mean of the old ones under it, in the same shape and place',
-    down.taken && live256 && ctl.total > 0.02 && !ctlMove.handed && ctlNow.total === 0 && !ctlLive
+    down.taken && live256 && f384.n === 384 && f256.n === 256 && ctl.total > 0.02 && !ctlMove.handed && ctlNow.total === 0 && !ctlLive
       && a384.total > 0.02 && rel(a256.total, a384.total) < 1e-4 && off256 < 1e-5 && lap256 > 0.9 && moved256 < 1,
     `${pct(a384.total)} of the plate → ${pct(a256.total)} (${(rel(a256.total, a384.total) * 1e6).toFixed(1)} ppm); `
     + `cells off the area mean by at most ${off256.toExponential(1)}; black shared ${(lap256 * 100).toFixed(1)}%; middle moved ${moved256.toFixed(2)} cell; `
@@ -173,7 +175,7 @@ try {
   const lapBack = overlap(back.data, 384, f384.data, 384);
   const movedBack = Math.hypot(aBack.x - a384.x, aBack.y - a384.y) * 256;
   check('moved back up, the same amount again, within a coarse cell of the field it left',
-    up.taken && liveBack && rel(aBack.total, a384.total) < 2e-4 && offBack < 1e-5 && lapBack > 0.9 && movedBack < 1,
+    up.taken && liveBack && back.n === 384 && rel(aBack.total, a384.total) < 2e-4 && offBack < 1e-5 && lapBack > 0.9 && movedBack < 1,
     `${pct(aBack.total)} (${(rel(aBack.total, a384.total) * 1e6).toFixed(1)} ppm off the first); cells off the area mean by at most ${offBack.toExponential(1)}; `
     + `black shared with the field before the moves ${(lapBack * 100).toFixed(1)}%; middle ${movedBack.toFixed(2)} of a 256² cell from where it was`);
 
@@ -182,9 +184,18 @@ try {
   const played = await phase(), livePlayed = await live();
   const aPlayed = amount(played.data, 384);
   const soft0 = softness(f384.data, 384), softUp = softness(back.data, 384), softPlayed = softness(played.data, 384);
+  /*
+    phaseIsLive alone is a flag takeOver sets, not a stage that ran, and a
+    total kept and an edge as sharp as before are both true of a field
+    nobody stepped (the check-skeptic's control: with no steps this passed).
+    So the steps must have changed it: the edge sharpened past where the
+    move left it, and cells moved.
+  */
+  let stepped = 0; for (let i = 0; i < played.data.length; i++) stepped = Math.max(stepped, Math.abs(played.data[i] - back.data[i]));
   check('the new solver plays on with it: nothing made or lost, and the edge as sharp as before the moves',
-    livePlayed && rel(aPlayed.total, aBack.total) < 0.005 && softPlayed <= soft0 * 1.15,
-    `${pct(aBack.total)} → ${pct(aPlayed.total)} over 120 steps; part-full cells per black cell ${soft0.toFixed(3)} before the moves, `
+    livePlayed && played.n === 384 && rel(aPlayed.total, aBack.total) < 0.005 && softPlayed <= soft0 * 1.15
+      && softPlayed < softUp * 0.95 && stepped > 0.01,
+    `${pct(aBack.total)} → ${pct(aPlayed.total)} over 120 steps, a cell changing by up to ${stepped.toFixed(3)}; part-full cells per black cell ${soft0.toFixed(3)} before the moves, `
     + `${softUp.toFixed(3)} just moved back up, ${softPlayed.toFixed(3)} after the steps`);
 
   // ── 4. The mix ───────────────────────────────────────────────────────
@@ -205,11 +216,19 @@ try {
   const mPlayed = await page.evaluate(() => lab.chemistry('mix'));
   const oilPlayed = amount(mPlayed.data, 256, 4, 0).total;
   const each = chans.map((c, k) => `${c} ${pct(was[k])} → ${pct(now[k])}`).join(', ');
-  check('the oil, soap and acidity come across in the same amounts, with the tally of oil poured, and play on',
-    !!m256 && was[0] > 0.01 && was[1] > 0.001 && was[2] > 1e-4
+  // Where, not only how much: a mix moved or flipped keeps its totals.
+  const wantMix = areaMean(m384.data, 384, 256, 4);
+  let offMix = Infinity;
+  if (m256?.n === 256) { offMix = 0; for (let i = 0; i < wantMix.length; i++) offMix = Math.max(offMix, Math.abs(wantMix[i] - m256.data[i])); }
+  // And it plays on: the oil itself moves (a frozen mix keeps its total too).
+  let oilMoved = 0;
+  if (m256?.n === 256 && mPlayed?.n === 256) for (let i = 0; i < m256.data.length; i += 4) oilMoved = Math.max(oilMoved, Math.abs(mPlayed.data[i] - m256.data[i]));
+  check('the oil, soap and acidity come across in the same amounts and places, with the tally of oil poured, and play on',
+    !!m256 && offMix < 1e-5 && oilMoved > 0.01 && was[0] > 0.01 && was[1] > 0.001 && was[2] > 1e-4
       && rel(now[0], was[0]) < 1e-4 && rel(now[1], was[1]) < 1e-4 && rel(now[2], was[2]) < 1e-4
       && cover256 === cover384 && cover384 > 0 && rel(oilPlayed, now[0]) < 0.005,
-    `${each}; oil poured ${cover384.toFixed(4)} → ${cover256.toFixed(4)} of the plate; the oil after 40 more steps ${pct(oilPlayed)}`);
+    `${each}; each cell within ${offMix.toExponential(1)} of the area mean; oil poured ${cover384.toFixed(4)} → ${cover256.toFixed(4)} of the plate; `
+    + `the oil after 40 more steps ${pct(oilPlayed)}, a cell of it changing by up to ${oilMoved.toFixed(3)}`);
 
   // ── 5. The reactions ─────────────────────────────────────────────────
   await page.evaluate(() => lab.create(384));
@@ -236,10 +255,9 @@ try {
   await pour();
   const strangerHad = amount((await phase()).data, 384).total;
   const strangerTook = await page.evaluate(() => lab.strangerTakes(256));
-  const strangerGot = amount((await phase()).data, 256).total;
-  check('a carry from another device is refused, and lays nothing',
-    strangerHad > 0.02 && strangerTook === false && strangerGot === 0 && !(await live()),
-    `${pct(strangerHad)} on the first device; the second ${strangerTook ? 'took it' : 'refused it'}, and holds ${pct(strangerGot)}`);
+  check('a carry from another device is refused',
+    strangerHad > 0.02 && strangerTook === false && !(await live()),
+    `${pct(strangerHad)} on the first device; the second ${strangerTook ? 'took it' : 'refused it'}`);
 } finally {
   await close();
 }

@@ -1156,8 +1156,10 @@ class FluidSimulation {
     reactions), handed from the last solver to this one (PLAN 9w; handOver
     in gpu/fluid.ts says why a copy on the GPU). Kept until this solver's
     first readback lands, for the same reason as the seed above: a solver
-    swapped out before it has spoken (out of memory straight after a climb)
-    hands the next one this, not whatever it managed in a frame.
+    swapped out before it has spoken (out of memory straight after a climb,
+    or a second move inside a frame or two) hands the next one this, not
+    whatever it managed in a frame: on a solver that ran out of memory that
+    would be a copy of textures that were never made.
   */
   private carry: SolverCarry | null = null;
   private carried = false;
@@ -1321,25 +1323,37 @@ class FluidSimulation {
   }
 
   /** Bring the field back to the CPU arrays and release the GPU solver. */
-  detachGpu() {
+  detachGpu(handOver = true) {
     if (!this.gpu) return;
-    this.releaseGpu();
+    this.releaseGpu(handOver);
     this.gpu = null;
   }
 
   /**
    * The plate off the attached solver before it goes: the dye and the flow
-   * to the CPU arrays, the rest as a carry for the next solver (handOver).
+   * to the CPU arrays, the rest as a carry for the next solver (handOver),
+   * unless there is no next solver to take one (`handOver` false: going to
+   * no solver at all, or to a render that lays its own plate). A solver that
+   * has not spoken keeps the carry it was handed, as above.
    */
-  private releaseGpu() {
+  private releaseGpu(handOver = true) {
     const gpu = this.gpu!;
     this.pullStateFromGpu();
-    const next = gpu.handOver?.() ?? null;
-    if (next) {
-      this.carry?.destroy();
-      this.carry = next;
+    if (!handOver) this.forgetCarry();
+    else if (!(this.carry && !this.gpuLanded)) {
+      const next = gpu.handOver?.() ?? null;
+      if (next) {
+        this.carry?.destroy();
+        this.carry = next;
+      }
     }
     gpu.dispose();
+  }
+
+  /** Let a held carry go: nothing will take it (a plate removed, a render's fresh plate). */
+  forgetCarry() {
+    this.carry?.destroy();
+    this.carry = null;
   }
 
   /**
@@ -5650,7 +5664,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
       }
     } else if (currentCount > targetCount) {
-      for (const dropped of fluidsRef.current.slice(targetCount)) dropped.dropGpu();
+      for (const dropped of fluidsRef.current.slice(targetCount)) { dropped.dropGpu(); dropped.forgetCarry(); }
       fluidsRef.current = fluidsRef.current.slice(0, targetCount);
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
       spinVelRef.current = spinVelRef.current.slice(0, targetCount);
@@ -8499,7 +8513,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         resize();
         setStaged(true);
         for (const f of fluidsRef.current) {
-          if (f.gpu) f.detachGpu();
+          /*
+            Nothing handed over: the render lays its own look on its own
+            grid from the seed, and the live show's ferrofluid or oil in
+            its solver would make two renders of one seed differ by what
+            the show held when each began (PLAN 9w's carry is for the
+            governor's moves, not this).
+          */
+          if (f.gpu) f.detachGpu(false);
+          f.forgetCarry();
           renderer.attachSolver(f, grid);
         }
         /*
@@ -9254,7 +9276,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         resize: () => { size(); },
         attachSolver(fluid, wantRes) {
           if (wantRes <= 0) {
-            if (fluid.gpu) fluid.detachGpu();
+            if (fluid.gpu) fluid.detachGpu(false);
             return true;
           }
           if (fluid.gpu && fluid.gpu.N === wantRes) return true;
