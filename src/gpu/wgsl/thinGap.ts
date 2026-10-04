@@ -79,6 +79,8 @@
  * a coefficient a face instead (hsCoarsen says why) and a sign a cell.
  */
 
+import { HAND_GRIP } from '../../lib/handSolid';
+
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
  * its packed-plane reader, which are passed in rather than imported so this
@@ -274,8 +276,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var mid: texture_2d<f32>;
 @group(0) @binding(5) var sq: texture_2d<f32>;
 @group(0) @binding(6) var phase: texture_2d<f32>;
-@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(8) var<storage, read_write> mob: array<f32>;
+@group(0) @binding(7) var hand: texture_2d<f32>;
+@group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(9) var<storage, read_write> mob: array<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -297,13 +300,56 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let share = clamp(textureLoad(phase, min(q, vec2i(textureDimensions(phase)) - 1), 0).r, 0.0, 1.0);
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share);
-  let ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
-  let c = 1.0 / (1.0 + kdt);
+  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
+  /*
+    A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
+    layer, and the liquid it touches moves with it. Brinkman's penalised
+    solid: inside the hand the liquid feels a second drag, toward the hand's
+    own velocity rather than toward rest, so this cell's implicit update is
+    u = (u* + K·Δt·U) / (1 + k·Δt + K·Δt). It is in the solve and not laid
+    over the velocity beforehand, because the mobility h·c carries it into
+    the pressure: where the hand grips, c is small, so the pressure that
+    makes the flow conserve liquid barely moves the liquid there, and the
+    liquid round the hand is what gives way (the flow past a moving
+    obstacle). Laid over beforehand, as the deltas did, the solve took the
+    divergent half of a disc moving through still liquid straight back out,
+    and with it nearly all of the push.
+
+    \`hand\` is (Σ χ·U, Σ χ), U in the hands' cells a step (CPU grid), χ how
+    much of the cell the hand fills; a cell two hands share takes their mean
+    velocity. 1/(S.l·S.disp) turns cells a step into the solver's velocity,
+    and the grip K·Δt where χ is 1 is HAND_GRIP over the cell's own drag
+    (lib/handSolid.ts). 1×1 and empty with no hand down.
+  */
+  let hs = textureLoad(hand, min(q, vec2i(textureDimensions(hand)) - 1), 0);
+  let chi = clamp(hs.z, 0.0, 1.0);
+  // In units of the cell's own drag, so the hand wins over a thick liquid
+  // (the ferrofluid's, glycerine's) as surely as over water: a solid's speed
+  // does not depend on what it moves through.
+  let grip = chi * ${HAND_GRIP.toFixed(1)} * (1.0 + kdt);
+  if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) / max(S.l * S.disp, 1e-9); }
+  let c = 1.0 / (1.0 + kdt + grip);
   var mo = hsGap(g, A.a.z) * c;
   // Past the rim the liquid is open to the air: p is held at zero there.
   let d = uvOf(id) - vec2f(0.5);
   if (length(d) >= A.a.w) { mo = -mo; }
   mob[q.x + q.y * n] = mo;
+  /*
+    Under a hand what is stored is u* + K·Δt·U, which the gradient takes
+    back down by c, and at a brisk hand's speed it is past VEL_BOUND: the
+    bound cut a hand at five cells a step to 2.8 (\`npm run fingerflow\`).
+    So the hand's cells are bounded at what the half float holds instead;
+    elsewhere the speed stays held to VEL_BOUND as it was.
+  */
+  if (grip > 0.0) {
+    var o = vec4f(ustar, uf.z, uf.w);
+    if (!finite4(vec4f(o.xyz, 0.0))) { o = vec4f(0.0); }
+    let sp = length(o.xy);
+    if (sp > 60000.0) { o = vec4f(o.xy * (60000.0 / sp), o.z, o.w); }
+    o.z = clamp(o.z, -VEL_BOUND, VEL_BOUND);
+    textureStore(dst, q, o);
+    return;
+  }
   textureStore(dst, q, safeVel(vec4f(ustar, uf.z, uf.w)));
 }`,
 
@@ -645,6 +691,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     c·P is exact where c is flat and never corrects more than P would where
     it is not (c ≤ 1). The solve keeps P in a buffer of its own, so the old
     solver's pressure buffer only ever holds a pressure in its own sense.
+
+    On a thin gap the colour's and the oil's carries, carryCourant and the
+    ferrofluid's volume carry no longer read it: they cross the solve's own
+    faces from P and the mobility (THIN_FACE in wgsl/fluid.ts, PLAN 15b),
+    which are exact where c is not flat, at a hand's rim above all. What
+    still reads c·P here is phaseAdvect's area form (Phase Volume off, or
+    the step before it is primed) and the old plate's carries.
   */
   seen[hsPacked(q.x, q.y, n)] = select(pi * mi / h, 0.0, mob[q.x + q.y * n] < 0.0);
 }`,
