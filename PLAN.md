@@ -3450,9 +3450,20 @@ its frame rate live. "Free" means no new passes or texture reads.
     - Checks that measured the old plate's Press by default: `bottles`' Press-moves-
       the-oil lines (`squeezeOut` and `pressMix`, which a thin gap retires) now turn
       Thin Gap off for themselves and say so in a line of their own; `tools`' "Press
-      pushes the dye out from under the palm" reads with the palm still down, since
-      on a thin gap the lift draws the colour back; `press.mjs` (not in CI) opens on
-      the old plate. Set lists bring old saved looks in with Thin Gap on too.
+      pushes the dye out from under the palm" (a ring from 0.05 to 0.25, squeezeOut's
+      move) runs on the old plate too, since on a thin gap the colour spreads as the
+      film thins, r ∝ h^-½ (Mac: a pool 0.011 from the palm's middle went to 0.028
+      at a sixth of the gap, √6 × 0.011 = 0.027), still inside that line's disc; the
+      let-go check asks the thin gap in its own terms. `depth` asks Depth Drag on the
+      old plate, the only plate it acts on, and asks the thin gap whether its rim is
+      slower on a domed plate than a flat one with no dial. `press.mjs` (not in CI)
+      opens on the old plate. Set lists bring old saved looks in with Thin Gap on too.
+  - **Depth Drag does nothing on a thin gap** (found with 18a-every). It is the old
+    plate's stand-in for the gap's mobility, and a thin gap has the real one (h³/12μ):
+    on Classic domed, the rim already runs at 0.156 of the centre with the dial at 0
+    (Mac, `npm run depth`). Hide or retire the dial while Thin Gap is on, on the
+    desks, the phone and the remote, so a performer does not turn a dial that moves
+    nothing.
   - **The oil's press on a thin gap has no app check** (found with 18a-every). On a
     thin gap the flow carries Oil Bodies' oil and its colour out and back; `bottles`
     measures only the old plate's move. Add an Oil & Water leg to `tools`' let-go

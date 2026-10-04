@@ -762,6 +762,10 @@ has been seen at 60 fps like this:
   opening along them (the colour is drawn in by the flow, not pushed);
 - the frame time while pressing (below): the colour's carry runs in up to 33 short
   substeps for the few steps the glass is closing fastest, and in one otherwise;
+- a small pool right under the middle of the palm now spreads only a little while
+  held (as a film between closing glasses does: about 2.5 times wider at a sixth of
+  the gap), where the old plate threw it out to a ring; say if the press reads as
+  too weak;
 - every look, not only the Press: a push now lasts as long as the liquid and the gap
   say, and the rim is open, so each look's drift and stirring may read differently.
   Name any look that feels wrong, and whether it is better with Thin Gap off;
