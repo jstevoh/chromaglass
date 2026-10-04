@@ -28,7 +28,7 @@ import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
@@ -116,8 +116,8 @@ const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
 /** The letter printed on each tool, and the tool it picks. */
-const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet'> = {
-  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet',
+const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin'> = {
+  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet', n: 'spin',
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
@@ -578,7 +578,7 @@ export default function App() {
     setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
   }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet'>('dropper');
+  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
   // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
@@ -1729,41 +1729,41 @@ export default function App() {
   }, [selectedLiquid, presetSeq]);
 
   /*
-    The Magnet brings its ferrofluid. A magnet over a plate with none on it
-    does nothing at all, which read as the tool being broken, so picking it
-    on such a look pours some (the visualizer lays it when the amount rises).
-    The look keeps it, and the Ferrofluid slider takes it away again.
+    The Magnet brings its ferrofluid, and its magnet, with the hand.
 
-    Picking it used to give the look a magnet as well (Magnet Strength 0.8),
-    and a look's magnet sits under the plate at Magnet Across and Up, the
-    middle on every look, from the moment it has strength. So before the hand
-    had touched anything, a magnet nobody put there was pulling the freshly
-    poured ring of ferrofluid into the middle. Reported by the owner: "Magnet
-    makes an immediate big black hole in the middle when I select it." In the
-    lab (Classic's pour, that magnet, 256²) 9% of the disc 0.12 round the
-    middle was black as poured, 54% a second later and all of it in four;
-    with no magnet it stayed at 9%. Picking a magnet up is taking it in the hand: nothing is
-    under the dish until the hand puts it there. So the strength now comes
-    with the first hold (onMagnetInHand, below), and the magnet is set down
-    where that hand lets go of it, as before.
+    A magnet over a plate with none on it does nothing at all, which read as
+    the tool being broken, so picking it on such a look poured the look's
+    ring of ferrofluid. Picking it also gave the look a magnet (Magnet
+    Strength 0.8), which sits under the plate at Magnet Across and Up, the
+    middle, from the moment it has strength, and gathered that ring there
+    before the hand touched anything: the owner's "immediate big black hole
+    in the middle when I select it" (PLAN 9s, which took that magnet away).
+
+    And then, with no magnet: "Magnet still makes a giant black hole as soon
+    as you pick it. That's not what I want. I just want a magnet that I can
+    control the size of that I can interact with." The pour was still the
+    hole. It covers about a fifth of the plate in black drops round the
+    middle, and at a big Ferrofluid Scale they run together across it.
+
+    So picking the Magnet does nothing to the plate. Picking a magnet up is
+    taking it in the hand. The first hold over a bare plate brings both: the
+    visualizer lays a pool under the hand, as big as Magnet Size stands up
+    (magnetFor, lib/magnetSize.ts), and asks for the rest here
+    (onMagnetInHand): Ferrofluid turned up so the plate draws it, and a
+    magnet for the look, so the magnet is set down where the hand lets go of
+    it, as before.
+
+    Every hold asks, so a Magnet Strength set to 0 by hand comes back to 0.8
+    the next time the Magnet is held: holding a magnet under the glass is
+    giving the plate one, and the slider is how it is taken away again
+    between holds.
   */
-  useEffect(() => {
-    if (activeTool !== 'magnet') return;
-    const s = settingsRef.current;
-    if ((s.phaseAmount ?? 0) > 0.002) return;
-    updateSettings({ phaseAmount: 0.6 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool]);
-  /**
-   * The first hand to hold the Magnet over a look with no magnet of its own
-   * gives it one (see above). Every hold does, so a Magnet Strength set to 0
-   * by hand comes back to 0.8 the next time the Magnet is held: holding a
-   * magnet under the glass is giving the plate one, and the slider is how it
-   * is taken away again between holds.
-   */
   const magnetInHand = () => {
-    if ((settingsRef.current.magnetStrength ?? 0) > 0) return;
-    updateSettings({ magnetStrength: 0.8 });
+    const s = settingsRef.current;
+    const patch: Partial<VisualizerSettings> = {};
+    if ((s.magnetStrength ?? 0) <= 0) patch.magnetStrength = 0.8;
+    if ((s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
+    if (Object.keys(patch).length) updateSettings(patch);
   };
 
   /*
@@ -3014,6 +3014,8 @@ export default function App() {
       case 'seed':            setSeedCount(prev => prev + 1); break;
       case 'spin-front':      flickPlate(0); break;
       case 'spin-back':       flickPlate(1); break;
+      case 'spin-reverse':    updateSettings({ spinRpm: -(settingsRef.current.spinRpm ?? 6) }); break;
+      case 'spin-auto':       updateSettings({ spinAuto: (Math.round(settingsRef.current.spinAuto ?? 0) + 1) % 3 }); break;
       case 'clear':           setClearTrigger(prev => prev + 1); break;
       case 'drain':           setDrainTrigger(prev => prev + 1); break;
       case 'lucky':           triggerLucky(); break;
@@ -3215,6 +3217,10 @@ export default function App() {
           break;
         case 'finger':
           visualizerRef.current?.applyGesture({ tool: 'finger', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+          break;
+        // The pad's finger on the dish (PLAN §22): the dish turns under it.
+        case 'spin':
+          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount, id: message.id });
           break;
         case 'tilt':
           visualizerRef.current?.setExternalTilt(message.x, message.y);
@@ -4221,6 +4227,7 @@ export default function App() {
                       { id: 'press' as const, icon: Hand, label: 'Press' },
                       { id: 'finger' as const, icon: Fingerprint, label: 'Finger' },
                       { id: 'magnet' as const, icon: Magnet, label: 'Magnet' },
+                      { id: 'spin' as const, icon: RotateCw, label: 'Spin' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
                         key={id}
@@ -4593,6 +4600,7 @@ export default function App() {
             onClear={() => setClearTrigger(n => n + 1)}
             onDrain={() => setDrainTrigger(n => n + 1)}
             onSpin={() => flickPlate(activeLayer)}
+            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
@@ -4631,6 +4639,10 @@ export default function App() {
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
             fingering={settings.fingering ?? 0}
             onFingering={(v) => updateSettings({ fingering: v })}
+            magnetSize={settings.magnetSize ?? 0.5}
+            onMagnetSize={(v) => updateSettings({ magnetSize: v })}
+            benDay={settings.benDay ?? 0}
+            onBenDay={(v) => updateSettings({ benDay: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
@@ -5158,6 +5170,8 @@ export default function App() {
           onToolAmount={(v) => setToolAmount(activeTool, v)}
           amountOf={(t: string) => toolAmounts[t] ?? 1}
           onAmountFor={setToolAmount}
+          magnetSize={settings.magnetSize ?? 0.5}
+          onMagnetSize={(v) => updateSettings({ magnetSize: v })}
           dyes={trayDyes}
           dye={selectedLiquid?.color ?? null}
           onDye={(hex) => {
@@ -5233,6 +5247,8 @@ export default function App() {
           onToolAmount={(v) => setToolAmount(activeTool, v)}
           amountOf={(t: string) => toolAmounts[t] ?? 1}
           onAmountFor={setToolAmount}
+          magnetSize={settings.magnetSize ?? 0.5}
+          onMagnetSize={(v) => updateSettings({ magnetSize: v })}
           layer={activeLayer}
           layers={stageLayers}
           onLayer={setActiveLayer}

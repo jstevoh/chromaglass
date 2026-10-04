@@ -96,6 +96,7 @@ const SECTION_OF: Record<string, string> = {
   colourBody: 'look',
   edgeRelief: 'look',
   lacing: 'look',
+  benDay: 'look',
   lightPlay: 'lamp',
   lampMotion: 'lamp',
   lampHotspot: 'lamp',
@@ -135,6 +136,7 @@ const SECTION_OF: Record<string, string> = {
   kaleidoSpin: 'kaleidoscope',
   kaleidoZoom: 'kaleidoscope',
   mazeDetail: 'physics',
+  magnetSize: 'physics',
   filmPhysics: 'camera',
   phaseDisplace: 'physics',
   oilBodies: 'physics',
@@ -142,6 +144,9 @@ const SECTION_OF: Record<string, string> = {
   gapThickness: 'physics',
   pacing: 'automation',
   songFollow: 'automation',
+  spinRpm: 'layers',
+  spinAuto: 'layers',
+  spinBeats: 'layers',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
   // And each row's fade time (lib/mixFade.ts), beside its strip.

@@ -238,6 +238,8 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('glossiness', s.glossiness ?? 0);
   pack.set('saturation', s.saturationBoost ?? 1.35);
   pack.set('colourBody', Math.max(0, Math.min(1, s.colourBody ?? 0)));
+  // Ben-Day dots (the Roy look): 0, and so none, for every look saved before them.
+  pack.set('benDay', clamp01(s.benDay ?? 0));
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));

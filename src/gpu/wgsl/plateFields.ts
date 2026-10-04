@@ -138,6 +138,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'liesShow', type: 'f32', note: 'Liesegang precipitate bands' },
   { name: 'thickOptics', type: 'f32', note: 'how far colour depth follows the gap between the glasses' },
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
+  { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);
