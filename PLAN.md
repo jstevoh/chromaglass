@@ -238,7 +238,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
-- **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, ~~**9w**~~ #266, **9z**, **9m**,
+- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, **9v**, ~~**9w**~~ #266, **9z**, **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
@@ -379,7 +379,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v, open; carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a disc 9v, open; carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m and 9o–9r open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -957,7 +957,8 @@ Open, from building 9e (in the order to do them):
   while the hand is still opened the gaps to 41%, but it was a look-driven tuning
   and was dropped under the physics rule. The phone's finger magnets get the same.
   Judging notes: docs/judging.md §22.
-- **9t. Domes that stand up out of the layer** (found building 9f). The ferrofluid is
+- **9t, as found. Domes that stand up out of the layer** (found building 9f; built as
+  the 9t below, **shipped**, with a film rather than the cap raised). The ferrofluid is
   a plan-view layer capped at full (phaseRelax, and the double well's minimum at 1),
   so a pool the magnet pulls together can only spread sideways, and the domes pack.
   A real Rosensweig peak rises many layer depths out of the pool and draws the
@@ -1075,6 +1076,78 @@ Open, from building 9i:
   window, and that the magnet let go of has strength. Left: a hold while the show is stopped
   or draining gives no magnet, because the hand is read in the solver's step; a
   hold after Start does.
+- **9t. The ferrofluid stands up as a layer that keeps its volume** (**shipped**).
+  The plate kept the ferrofluid as one number a cell, held at or under full: a plan
+  view that keeps the liquid's area, so a pool under the Magnet could only be packed
+  into domes (spikes.ts's lattice, wells in the separation, a pull eased to half) and
+  84% of the plate within 0.08 of the magnet stayed black, where every reference has
+  black domes with the colour between them. A real layer keeps its volume: a dome
+  standing up takes its height out of the layer round it, and the gaps open by
+  themselves. Now, round each magnet past the onset (the hand's, and the phone's other
+  fingers), a patch of the plate's cells is stepped as a thin film of the Rosensweig
+  instability (`src/gpu/standing.ts`, `wgsl/standing.ts`): tension, gravity, the
+  field's lift as a half-Laplacian through an FFT, the glass's wetting, a cell past
+  full a dome that much taller. The plate's own passes step aside under it (the
+  separation, Cahn–Hilliard, the maze's flow and the magnet's pull), and the
+  water's flow carries only the layer's mean there, the film its shape; its cap at
+  full is raised to the top glass there. The plate draws each dome from
+  the layer's own slope, the white point on the top of each. In the lab on 384², a
+  pool 0.12 in radius under the hand's Magnet: from 84% black to 47% within 0.08 of it, 13
+  domes a median 0.032 apart (2π l_c is 0.04), none made or lost; flat under
+  the onset; back to a pool when the field is turned down (`npm run standing`).
+  `npm run spikes` moved to 384² and reads the domes the layer makes (28 within 0.12 of the hand, 16 with a white point on
+  the top against 1.8 half a pitch off, 6/6). The
+  plate's film beyond a domain's line reads the least of four points on the way out, not
+  one four and a half cells off, which had landed in the next dome and drawn dark dashes
+  on every dome's side facing it.
+  Shortcuts, each still to replace:
+  - **9t-1. The lift held near the onset.** G under the hand is 2.8 (a real layer's is
+    hundreds), so the domes grow at a scale the grid draws; at the lab's G 4.3 they set
+    as bars along the grid. A finer film grid under the magnet (the patch at twice the
+    plate's cells) would let it rise.
+  - **9t-2. No pull under the film.** The magnet's Kelvin pull is in the film's
+    pressure, worked out from the liquid's susceptibility (EFH1, χ0 2.6), and scaled to
+    nothing: at the whole of it the pool gathered into one heap with no domes on it (the
+    lift being held low, 9t-1), and at a tenth or a quarter its gathering front set the
+    domes along the grid. With 9t-1's finer grid it can come back.
+  - **9t-3. No hysteresis.** Real domes stay a few per cent under the field that raised
+    them; turned to 0.95 of the onset on the axis, these were all gone two seconds on.
+  - **9t-4. Slower than a real layer.** Domes start a second and a half after the Magnet
+    arrives and stand by four; a real layer takes a fraction of a second (9t-1 again).
+  - **9t-5. The model's own simplifications:** the lift saturating with the layer's
+    height (S(h)), small slopes, a flat water top, no finite-depth correction to the
+    lift, a (9, 3) wetting law at a 10° angle, the mobility capped at full, a noise of
+    a hundredth of the pressure scale to seed it, the window (full to half the
+    patch's half-width, none past three quarters, and no further than 0.083 and 0.125
+    of the plate on any grid: at 0.65 and 0.9 the fingers at a pool's rim fell to
+    7/5/5/4, against 11/10/9/5 with the film off, 9t-8), and each patch stepping its own magnet in turn
+    where two fingers' overlap.
+  - **9t-6. The film's cost**, up to four patches of 128² on 384², eight substeps each,
+    13 dispatches a substep (eight FFT passes, then pressure, flux, apply, sum and
+    take), is not yet measured on a Mac or a phone.
+  - **9t-7. 256².** A capillary length is 1.6 cells there, and the domes are coarse
+    (9g).
+  - **9t-8. Fewer fingers past a pool's rim: fixed in #247.** With the film's window
+    stepping the water's flow aside, nothing carried the layer out of it: the window
+    kept 7212 of the pool's 13029 where the plate alone kept 5429, the rim had less to
+    finger with, and `npm run fingers` counted 6/4/5/2 on the Mac against main's
+    12/9/9/3. The flow now carries the layer's mean under the window (wgsl/fluid.ts,
+    carried): 9/12/9/5 in 7 sectors, the domes standing (the flow carrying each cell
+    as outside instead poured the domes into slabs). Left: the last dome on the
+    magnet's axis lies down more slowly when the field is turned down (1.12 at the
+    end of `npm run standing`'s leg, 1.06 after 960 steps more; that check now asks under 1.2
+    and at most 30 cells past 1.05, where it asked under 1.1), and the window still
+    stands in for the film fingering at its own edge, which a real layer does by the
+    same repulsion that raises its domes (9t-1).
+  - **9t-9. The magnets still reach the plate's uniforms unread.** The plate drew its
+    spikes from them; the domes come from the layer now, and the app still computes and
+    uploads them every frame (plateUniforms.ts, magnetsOnPlate). Take them out, with the
+    harnesses that tell the plate of them.
+  - **9t-10. The first Magnet of a session waits for the film's build.** Its nine kernels
+    are built behind the show the first time a magnet passes the onset (a moment or two
+    on a cold cache), and until then the pool only gathers. Starting the build at half
+    the onset would build it on every Magnet Garden show, whose own magnet is there;
+    starting it when the Magnet tool is picked would not.
 - **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
   behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
   share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
