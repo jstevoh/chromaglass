@@ -91,9 +91,12 @@ export interface Prepared {
   /** What it asked for, by the ledger's `scope/name`. */
   keys: string[];
   /**
-   * Each build as it went: its key, when it was asked for (ms from load) and
-   * how long it took to settle. What `npm run startup` holds a stop against:
-   * a stop that one build spans end to end is that build's.
+   * Each build as it went: its key, and the stretch of the opening's wall
+   * time charged to it (from ms from load, for ms): one at a time, from its
+   * ask to its settle; two at a time, from its ask or the last settle,
+   * whichever was later, so the stretches never overlap (`buildInTurn`).
+   * What `npm run startup` holds a stop against: a stop that one build spans
+   * end to end is that build's.
    */
   builds: [key: string, at: number, ms: number][];
 }
@@ -116,11 +119,42 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
 }
 
 /**
- * `builds`, one at a time (above), until they are done, the device is gone or
- * PREPARE_TIMEOUT_MS has passed. A device lost part way would otherwise have
- * every remaining build refused one after another, each counted as a try.
+ * How many of the opening's builds are in flight at once. Two, and only for
+ * the half the show waits for.
+ *
+ * What was reported: the show takes a long time to load. What was measured:
+ * on CI's Mac, with the shader cache emptied, the plate sat black on its
+ * starting frame until its first step at 12.15, 17.62 and 12.49 s (`npm run
+ * startup`, runs 37166785182, 37166234101, 37165604455), and 11.46, 13.57
+ * and 11.83 s of that was this file building the opening's fifty pipelines
+ * one after another. The owner's machine pays the same, scaled to its
+ * compiler, every time a deploy changes the shaders, which is most deploys.
+ *
+ * One at a time was chosen against all at once (above): all at once
+ * compiled faster, 0.12 s a pipeline against 0.22, but the page waited
+ * behind every queued compile and drew nothing for 8.6 s. Two at a time sits
+ * between: the page waits behind at most two, and the compiler has the next
+ * one in hand while the GPU runs the last one's first use (`firstUse` in
+ * `gpu/kit.ts` waits for the GPU each time), which one at a time left idle
+ * on every pipeline. The half built behind the show stays one at a time:
+ * there a compile costs the running show frames, and nobody is waiting.
+ *
+ * `?lanes=N` (1 to 8) changes it, from the query string alone, so a machine
+ * can be timed both ways: `?lanes=1` is the old opening.
  */
-async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[]): Promise<Prepared> {
+const OPENING_LANES = (() => {
+  let asked: number | null = null;
+  try { asked = Number(new URLSearchParams(window.location.search).get('lanes') ?? NaN); } catch { /* no window */ }
+  return asked !== null && Number.isInteger(asked) && asked >= 1 && asked <= 8 ? asked : 2;
+})();
+
+/**
+ * `builds`, `lanes` at a time (above), until they are done, the device is
+ * gone or PREPARE_TIMEOUT_MS has passed. A device lost part way would
+ * otherwise have every remaining build refused one after another, each
+ * counted as a try.
+ */
+async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[], lanes = 1): Promise<Prepared> {
   const t0 = performance.now();
   let gone = false;
   void device.lost.then(() => { gone = true; });
@@ -129,17 +163,38 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   // device's builds (a replacement's, mid-way) would add to.
   let ready = 0;
   const times: Prepared['builds'] = [];
-  for (const prep of builds) {
-    if (gone) break;
-    const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
-    if (left <= 0) { timedOut = true; break; }
-    const b0 = performance.now();
-    const built = prep.build();
-    const settled = await within(built.then(() => undefined), left);
-    times.push([prep.key, Math.round(b0), Math.round(performance.now() - b0)]);
-    if (!settled) { timedOut = true; break; }
-    if (await built) ready++;
-  }
+  // Each lane takes the next build in the list when its last one settles, so
+  // the order they are asked in is the list's, as it was with one.
+  let next = 0;
+  /*
+    What each build is charged in `builds`: the opening's wall time from the
+    later of its own ask and the last build to settle, to its own settle. One
+    at a time that is exactly its ask to its settle, as it always was. Two at
+    a time, the raw ask-to-settle stretches overlap, and `npm run startup`
+    adds them up as the time the opening spent compiling (its 1b lines) and
+    names a stop by the one build that spans it: summed raw, two lanes would
+    read as twice the compile they took. Charged this way the stretches tile
+    the wall time without overlapping, so the sum is the time the opening was
+    compiling, whichever count of lanes ran.
+  */
+  let lastSettled = t0;
+  const lane = async () => {
+    while (next < builds.length && !gone && !timedOut) {
+      const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
+      if (left <= 0) { timedOut = true; break; }
+      const prep = builds[next++];
+      const b0 = performance.now();
+      const built = prep.build();
+      const settled = await within(built.then(() => undefined), left);
+      const now = performance.now();
+      const from = Math.max(b0, lastSettled);
+      lastSettled = now;
+      times.push([prep.key, Math.round(from), Math.round(now - from)]);
+      if (!settled) { timedOut = true; break; }
+      if (await built) ready++;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
     at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times,
@@ -163,7 +218,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUOutput.prepare(device, format),
     ...WebGPUPostChain.prepare(device, format, open),
   ];
-  const opening = await buildInTurn(device, 'opening', builds.filter((b) => !b.later));
+  const opening = await buildInTurn(device, 'opening', builds.filter((b) => !b.later), OPENING_LANES);
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
   void buildInTurn(device, 'later', builds.filter((b) => b.later))
