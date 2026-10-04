@@ -158,7 +158,7 @@ Judged in this order, because these gate code:
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
   look's own turning; **21c** dots and zoom; **3-highlight**; **18i** timed pops;
-  ~~**0-bandbubbles**~~ #PRNUM (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
+  ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
 - **2.6** **P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).
   Recommended: delete; it unblocks 3.2.
@@ -429,7 +429,7 @@ itself (the bubble as a region the flow goes round: a no-flux boundary, or the
 Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
 `npm run straw` and `npm run heldpress`, which should then need no press to hold.
 
-*Found 2026-10-04 (#238); **shipped #PRNUM (0-bandbubbles)**:* **the simulated band's
+*Found 2026-10-04 (#238); **shipped #251 (0-bandbubbles)**:* **the simulated band's
 kicks released bubbles whatever Audio Impact said.** The first click on a browser that
 never chose a sound source starts the band (`App.tsx`, the first visit's wake), and
 from then on a kick may release bubbles into the densest dye near the middle of the
