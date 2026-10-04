@@ -4005,6 +4005,11 @@ was a shard not running. Two changes, neither of which runs less of `Checks`:
   to PRs already merged. It is its own workflow, not a `closed` trigger on `checks.yml`,
   so the deploy gate can never read a run of it as a green `Checks`.
   `npm run closedruns` (in Measure) holds the three files' groups to one spelling.
+  As shipped in #234 it wrote the group with `github.ref`, which for a merged PR's
+  closed event is the base branch, not `refs/pull/<n>/merge`: on #234's own merge it
+  joined `checks-Checks-refs/heads/main` and stopped nothing. The follow-up builds the
+  ref from the PR's number, and `closedruns` now evaluates closed.yml's side as a
+  merged PR's closed event (red on #234's spelling, green on the fix).
 
 *Measure after:* `npm run macqueue` over a like window once a day's PRs have run: the
 gallery's share should be its labelled runs only, and the shards' mean wait below 19
