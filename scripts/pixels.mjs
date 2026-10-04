@@ -32,6 +32,7 @@
  * Writes, under pixels/ (or PIXELS_OUT):
  *   <id>.jpg          the frame, 720 px wide
  *   <id>-crop.png     the middle 360×225 canvas pixels, one to one
+ *   <id>-full.jpg     the whole canvas, one to one
  *   index.json        every number below
  *
  * Needs a GPU that presents WebGPU: the macOS runner (pixels.yml).
@@ -150,6 +151,7 @@ try {
         lockX: lock(across, W), lockY: lock(down, H),
         pitch: N ? [+(W / N).toFixed(2), +(H / N).toFixed(2)] : null,
         jpg: out.toDataURL('image/jpeg', 0.88), png: crop.toDataURL('image/png'),
+        full: full.toDataURL('image/jpeg', 0.93),
       };
     });
     if (!got) {
@@ -160,7 +162,8 @@ try {
     }
     fs.writeFileSync(path.join(OUT, `${preset.id}.jpg`), Buffer.from(got.jpg.split(',')[1], 'base64'));
     fs.writeFileSync(path.join(OUT, `${preset.id}-crop.png`), Buffer.from(got.png.split(',')[1], 'base64'));
-    const { jpg, png, ...row } = got;
+    fs.writeFileSync(path.join(OUT, `${preset.id}-full.jpg`), Buffer.from(got.full.split(',')[1], 'base64'));
+    const { jpg, png, full, ...row } = got;
     index.push({ id: preset.id, labels, ...row });
     console.log(`  ${preset.id.padEnd(22)} ${got.W}×${got.H} ${String(got.N).padStart(4)}²  cell ${got.pitch?.join('×') ?? '-'} px  lock ${got.lockX}/${got.lockY}  lit ${got.lit}  rungs: ${labels.join(' → ')}`);
     await page.close();
