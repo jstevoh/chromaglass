@@ -2167,8 +2167,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     Up and Soap Film threw single pixels of another colour along every thin
     edge (7.1% and 3.0% of the edges' pixels flecks, as grainedge reads them).
     Pigment settling deeper in a place does not make the liquid thicker there.
+    It takes every later change to the opacity but the grain's (the dark
+    blend's 0.6 and the closeup's, below), so with no grain the film is
+    drawn exactly as it was.
   */
-  let film0 = fluid0.a;
+  var film0 = fluid0.a;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
     fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
@@ -2183,7 +2186,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
   }
   fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
-  if (darkBlend) { fluid0.a *= 0.6; }
+  if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
 
   if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
     var edge0 = boundaryLine(near0.z);
@@ -2228,7 +2231,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    fluid0 = mix(fluid0, macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof), macroAmt);
+    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+    // The film follows what the closeup does to the opacity, as it did when
+    // it read fluid0.a here; only the grain is kept out of it.
+    film0 = mix(film0, detail0.a * film0 / max(fluid0.a, 1e-4), macroAmt);
+    fluid0 = mix(fluid0, detail0, macroAmt);
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
