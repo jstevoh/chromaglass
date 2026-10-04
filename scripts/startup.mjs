@@ -768,6 +768,8 @@ async function open(query, looks) {
         beats: longest(changes(2)),
         steps: longest(changes(3)),
         firstStep: (rows.find((r) => r[3] > 0) ?? [null])[0],
+        // The intro's times (src/lib/intro.ts), for the line under the milestones.
+        intro: { ...(window.__cgIntro ?? {}) },
         /*
           When the plate started moving for good: the end of the last stretch
           of more than MAX_GAP_S without a step, or the first step if there
@@ -1116,6 +1118,27 @@ const waitOf = (x, oldWay) => {
     // Chromium's hold read 0.01 s of compile, and the show's 12.48 s
     // building the same 48 read as 917 times slower. Summed and not the
     // longest, so a compile split over two stops is not read as half.
+    //
+    // And a stop that begins within a second of the end of one the builds
+    // sat in is that compile still going, though no build sits in it. On
+    // #257's run (37216108435) the control asked for all
+    // 47 inside one long task of its own, the page's thread busy 1.96 s from
+    // 0.51 s, which stopped its frames 2.02 s from 0.54 s: every build sat
+    // in that stop. Then the frames came back for 0.33 s, and from 2.89 s
+    // they stopped 16.27 s while the GPU
+    // process compiled what had been asked, with no build in it (they had
+    // all been asked already). Only the first was priced, so the old way's
+    // compile read 2.02 s, its own wait 16.99 s, and the show's 10.64 s
+    // building the same 47 ahead read 5.28 times as slow: red on a PR that
+    // never touched the opening. Priced with the stop that follows, the
+    // control's compile is 18.29 s, its own 0.71 s; the show's own 1.36 s
+    // is held to that (and passes, by 0.35 s), its build reads 0.58 times
+    // the control's, beside the 0.62 to 0.82 of the four other runs read
+    // since #242.
+    // Not looser: what moves from the control's own wait to its compile
+    // makes the first line stricter by the same amount as it makes this
+    // one easier, and a stop must still begin within a second of the
+    // builds' own to be priced, so a runner's stall later is not.
     const built = (x.ledger?.onFrame ?? []).map((e) => e.at / 1000).filter((t) => t <= steady);
     const raw = (x.frameStopsRaw ?? []).filter(([from]) => from < steady);
     const holds = raw.map(() => 0);
@@ -1124,10 +1147,24 @@ const waitOf = (x, oldWay) => {
       if (i < 0) i = raw.findIndex(([from]) => from > t && from <= t + 1);
       if (i >= 0) holds[i]++;
     }
+    let compiling = -Infinity;
     stops = raw.map(([s, len], i) => {
       const from = Math.max(s, end);
       const n = Math.max(0, Math.min(s + len, steady) - from);
-      return { from: from - t0, len: n, builds: holds[i], taken: holds[i] > 0 && n >= 0.25 };
+      const follows = holds[i] === 0 && s - compiling <= 1;
+      const taken = (holds[i] > 0 || follows) && n >= 0.25;
+      /*
+        Only a stop the builds sat in, and one priced at that, opens the
+        second's window for the next (check-skeptic on #278): a priced stop
+        that only followed passed the window on, so runner stalls 0.9 s apart
+        chained without end into the control's compile (2.02 s of builds and
+        three stalls read 16.02 s, against 5.02 s), and a builds' stop wholly
+        inside Chromium's own hold (n under 0.25, unpriced) armed it for a
+        15 s stall after it with no build in it, so "the cache was not cold"
+        and 1b judged a stall. #257's run still prices its 18.29 s.
+      */
+      if (holds[i] > 0 && n >= 0.25) compiling = s + len;
+      return { from: from - t0, len: n, builds: holds[i], follows, taken };
     });
     for (const st of stops.filter((st) => st.taken)) {
       compile += st.len;
@@ -1140,7 +1177,7 @@ const waitOf = (x, oldWay) => {
 const sayWait = (w) => (w == null ? 'never moving for good'
   : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
     // Every stop its frames made, so a pick that is wrong reads off the log.
-    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it${st.taken ? ', priced' : ''}`).join('; ') : 'never'}]` : ''));
+    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, held = null) => {
   // Whether the page's own thread was busy through a gap (a long task
@@ -1239,6 +1276,15 @@ try {
   o.frames = frames;
   console.log(`  as shipped (shader cache ${o.cache})`);
   console.log(`     ${milestones(o)}`);
+  /*
+    How much of the opening the intro covered, printed and not judged
+    (`npm run intro` judges it): it is up from the page's first frame and
+    leaves on the plate's first step, so on a cold Mac this is the share of
+    the wait nobody looks at a black plate. The first step here is the
+    quarter-second row it was seen in; the intro's own leaving is exact.
+  */
+  const intro = o.intro ?? {};
+  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}`);
   const p = o.prepared;
   const b = o.behind;
   check('the show opens and the plate is stepping',

@@ -274,7 +274,8 @@ try {
       for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) { const c = m.data[(i + j * 128) * 4]; t += c; x += c * (i + 0.5) / 128; y += c * (j + 0.5) / 128; }
       return { t, x: x / t, y: y / t }; };
     const a = await cm();
-    // Ten drags to the right through the drop's middle, as fingerDrag hands them over.
+    // Ten drags to the right through the drop's middle, as fingerDrag hands them over with Thin Gap off
+    // (on a thin gap the Finger is a solid and the flow carries the oil: `npm run fingerflow`).
     for (let k = 0; k < 10; k++) s.carryMix(0.4 + k * 0.01, 0.35, 0.06, 1, 0, 0.5, 2 / 128);
     const b = await cm();
     return { moved: b.x - a.x, across: b.y - a.y, kept: b.t / a.t };
