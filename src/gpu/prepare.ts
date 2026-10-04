@@ -102,12 +102,20 @@ export interface Prepared {
   /**
    * Each build from its own ask, overlaps and all, split in two: its key,
    * its ask in ms from load, the ms to its compile, and the ms from there to
-   * its first use done (null where it had none). Not wall time, as `builds`
+   * its first use handed to the GPU (null where it had none; the GPU's own
+   * time for all of them is `useWait`). Not wall time, as `builds`
    * is: with three in flight these add up to about three times the
    * opening. What it says is where a build's time goes, the compiler or the
    * first use, which `builds` cannot.
    */
   raw: [key: string, at: number, compile: number | null, use: number | null][];
+  /**
+   * The opening's one wait for the GPU to finish every first use it was
+   * handed (`firstUse` in `gpu/kit.ts`), in ms, once the last compile is in;
+   * null for the half behind the show, which has none. In `ms`, and in no
+   * build's stretch of `builds`: it is the GPU's time, not a compile's.
+   */
+  useWait: number | null;
 }
 
 /**
@@ -143,9 +151,10 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
  * compiled faster, 0.12 s a pipeline against 0.22, but the page waited
  * behind every queued compile and drew nothing for 8.6 s. A few at a time
  * sits between: the page waits behind at most that few, and the compiler
- * has the next one in hand while the GPU runs the last one's first use
- * (`firstUse` in `gpu/kit.ts` waits for the GPU each time), which one at a
- * time left idle on every pipeline.
+ * has the next one in hand while the GPU runs the last one's first use,
+ * which one at a time left idle on every pipeline. (Since 2026-10-04 a
+ * first use is not waited for in the lane at all, but once, at the end:
+ * `firstUse` in `gpu/kit.ts`.)
  *
  * Two at a time, on the same Mac (run 37172629037): the fifty in 10.86 s.
  * The first of them, `fluid/fill`, sits under Chromium starting the GPU
@@ -217,9 +226,22 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
+  /*
+    The first uses, handed over as each compile came in and not waited for
+    there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
+    the show still opens with them paid. Within what is left of the
+    timeout, like the builds.
+  */
+  let useWait: number | null = null;
+  if (stage === 'opening' && !gone) {
+    const w0 = performance.now();
+    const left = t0 + PREPARE_TIMEOUT_MS - w0;
+    if (left <= 0 || !await within(device.queue.onSubmittedWorkDone().catch(() => undefined), left)) timedOut = true;
+    useWait = Math.round(performance.now() - w0);
+  }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
-    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times, raw,
+    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times, raw, useWait,
   };
   prepareLog.push(done);
   return done;

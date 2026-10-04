@@ -992,8 +992,10 @@ const underWay = (o, g) => {
   page but not what a build cost, three being in flight at once; this is
   each build's own, overlaps and all, so its sums run to about three times
   the opening. What it is for: choosing the next cut at the opening
-  (PLAN.md 14v). Fewer kernels saves compiles; first uses waited for one
-  at a time would be cut by waiting once for all of them.
+  (PLAN.md 14v). Run 37190509856 read 6.31 s of lane time in first uses,
+  6.18 s of it three render pipelines' first draws at once, each lane idle
+  for 2.06 s; the first uses have been handed over without waiting since,
+  and the one wait for all of them is printed after.
 */
 const splitAhead = (o) => {
   const raw = o.prepared?.raw ?? [];
@@ -1010,7 +1012,9 @@ const splitAhead = (o) => {
   // times, rounded to the millisecond, where the first three tie and fall
   // back to the order they finished in.
   const order = (o.prepared?.keys ?? []).slice(0, 4).join(', ');
-  return `each build ahead from its own ask: ${part('compiled', 2)}; ${part('first used', 3)}; asked first: ${order}`;
+  const wait = o.prepared?.useWait;
+  return `each build ahead from its own ask: ${part('compiled', 2)}; ${part('first used (handed to the GPU)', 3)}`
+    + `; then waited ${wait == null ? 'never' : `${(wait / 1000).toFixed(2)} s`} for the GPU to finish the first uses; asked first: ${order}`;
 };
 
 /*

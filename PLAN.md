@@ -2859,7 +2859,13 @@ for, and the GPU was asked for only after they had arrived and drawn.
   opening with Thin Gap off. Each build ahead now records its compile and its first
   use apart (`Prepared.raw`), and `npm run startup` prints them ("each build ahead
   from its own ask"), to say whether the next cut is fewer kernels or waiting once for
-  all the first uses rather than one at a time.
+  all the first uses rather than one at a time. Its first Mac run (37190509856, with
+  #248's thin gap now in every opening) answered: built ahead 0.54 → 11.24 s, first
+  step 11.54 s, and 6.31 s of the lanes' time was first uses, 6.18 s of it the
+  display's, the derive's and the air's first draws, 2.06 s each and all at once,
+  every lane idle while the GPU warmed. So a first use is now handed to the GPU and
+  not waited for in its lane; the opening waits once for all of them at the end
+  (`useWait`, printed by `startup`).
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure

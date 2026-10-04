@@ -338,6 +338,19 @@ export class PipelineCache {
   render"). A pipeline of the later half pays its first use on the frame
   that first asks for it, as it did before.
 
+  Handed to the GPU and not waited for, one by one: `gpu/prepare.ts` waits
+  once, for all of them, when the opening's compiles are done. Each was
+  waited for until 2026-10-04, and that held a lane of the opening's builds
+  idle for as long as the GPU took. With the render pipelines asked first
+  (`gpu/prepare.ts`), the display's, the derive's and the air's first draws
+  each took 2.06 s, all three at once, the first draws on a new device
+  that #181 found: three lanes of three idle for two seconds of a cold
+  opening, while the forty-five kernels after them waited to be asked for
+  (`npm run startup`, run 37190509856: 6.31 s of the opening's lane time
+  in first uses, 6.18 s of it those three). The GPU's work is the same
+  either way and still done before the show opens; the compiler no longer
+  waits for it.
+
   Inside an error scope: a scrap the shader does not like is a first use
   that did not happen, not a GPU error for the loop's error count, and the
   frame still uses it as it always did.
@@ -396,7 +409,6 @@ async function firstUse(device: GPUDevice, pipeline: GPUComputePipeline, code: s
   } catch { /* no first run; the frame's is the first */ } finally {
     await device.popErrorScope().catch(() => null);
   }
-  await device.queue.onSubmittedWorkDone().catch(() => undefined);
 }
 
 /** A render pipeline's first draw: see above. */
@@ -424,7 +436,6 @@ async function firstDraw(device: GPUDevice, pipeline: GPURenderPipeline, desc: G
   } catch { /* no first draw; the frame's is the first */ } finally {
     await device.popErrorScope().catch(() => null);
   }
-  await device.queue.onSubmittedWorkDone().catch(() => undefined);
 }
 
 /**
@@ -452,8 +463,9 @@ export interface Prep {
 
 /**
  * When a build ahead got past each of its two parts, as `performance.now()`:
- * the compile, then its first use (`firstUse`, `firstDraw`), which only the
- * opening's half has. Unset for a part that did not happen (already in the
+ * the compile, then its first use handed to the GPU (`firstUse`,
+ * `firstDraw`; waited for once, for all of them, in `gpu/prepare.ts`), which
+ * only the opening's half has. Unset for a part that did not happen (already in the
  * cache, refused, or built behind the show). What `npm run startup` splits
  * the opening's time by, to say which of the two the next cut should go at.
  */
