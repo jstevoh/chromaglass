@@ -17,7 +17,8 @@
  *
  *   1. a look nobody turns (no motor, no music) has its liquid exactly still
  *      and its picture's angle unchanged over a second, while the frame loop
- *      draws at least thirty frames (still, not stalled);
+ *      draws at least ten frames (still, not stalled), once the plate draws
+ *      twenty frames a second (it waits for that: the shaders build first);
  *   2. a flick on a plate of water: a moment later the liquid's speed is the
  *      exact answer for a dish coasting on its bed, ω_l = Ω0 (e^(−Dt) −
  *      e^(−t/τ)) / (1 − Dτ) at the page's own elapsed time, within a factor
@@ -109,8 +110,33 @@ try {
     const d = window.chromaglassDebug();
     const a0 = d.rotation.current[0] ?? 0;
     d.flick(0);
-    return { at: performance.now(), angle: a0, dish: d.spin.current[0] ?? 0 };
+    return { at: performance.now(), frames: d.frames ?? 0, angle: a0, dish: d.spin.current[0] ?? 0 };
   });
+
+  /*
+    Measured on a plate that draws, not one still building. The first run on
+    CI's Mac read its first window 11 s after load and found five frames in a
+    second and one 0.46 s frame across the flick: the shaders were still
+    building (the cold load starts moving at about 9.5 s there, `npm run
+    loadtime`), and the speeds were right but the checks that need a step
+    after the flick saw none. So wait until a half second holds ten frames,
+    twice running, for up to forty seconds, and say how long it took; and
+    after each flick wait for frames as well as time.
+  */
+  const framesNow = () => page.evaluate(() => window.chromaglassDebug().frames ?? 0);
+  const steadyFrom = Date.now();
+  let steadyRuns = 0, lastRate = 0;
+  while (steadyRuns < 2 && Date.now() - steadyFrom < 40000) {
+    const a = await framesNow();
+    await page.waitForTimeout(500);
+    lastRate = (await framesNow()) - a;
+    steadyRuns = lastRate >= 10 ? steadyRuns + 1 : 0;
+  }
+  console.log(`     the plate drew ${lastRate} frames a half second after a further ${((Date.now() - steadyFrom) / 1000).toFixed(1)} s`);
+  const settle = async (ms, since) => {
+    await page.waitForTimeout(ms);
+    for (let k = 0; k < 40 && (await framesNow()) - since < 4; k++) await page.waitForTimeout(50);
+  };
 
   // ── 1: nothing turning ──
   await quiet('thin');
@@ -119,7 +145,7 @@ try {
   await page.waitForTimeout(1000);
   const s1 = await read();
   check('a look nobody turns: its liquid exactly still and its picture unturned, while the plate draws',
-    s1.liquid === 0 && s1.angle === s0.angle && s1.frames - s0.frames >= 30,
+    s1.liquid === 0 && s1.angle === s0.angle && s1.frames - s0.frames >= 10,
     `liquid ${s1.liquid}, the angle moved ${(s1.angle - s0.angle).toExponential(2)} rad over ${s1.frames - s0.frames} frames`);
 
   // ── 2–4: a flick on water ──
@@ -132,7 +158,7 @@ try {
   const behind = (O0, t) => O0 * (Math.exp(-D * t) - Math.exp(-t / T)) / (1 - D * T);
   const liquidTurn = (O0, t) => O0 * ((1 - Math.exp(-D * t)) / D - T * (1 - Math.exp(-t / T))) / (1 - D * T);
   const f = await flick();
-  await page.waitForTimeout(300);
+  await settle(300, f.frames);
   const w = await read();
   const t = (w.at - f.at) / 1000;
   const want = behind(f.dish, t);
@@ -160,9 +186,9 @@ try {
   const g = await page.evaluate((O0) => {
     const d = window.chromaglassDebug();
     d.turntable.current[0] = O0;
-    return { at: performance.now(), dish: O0 };
+    return { at: performance.now(), frames: d.frames ?? 0, dish: O0 };
   }, f.dish);
-  await page.waitForTimeout(300);
+  await settle(300, g.frames);
   const u = await read();
   const tu = (u.at - g.at) / 1000;
   const uRatio = u.liquid / behind(g.dish, tu);
@@ -172,8 +198,8 @@ try {
   // ── 6: the thick liquid ──
   await quiet('thick');
   await page.waitForTimeout(1000);
-  await flick();
-  await page.waitForTimeout(400);
+  const fk = await flick();
+  await settle(400, fk.frames);
   const k = await read();
   // 0.93 of the glass by the drag time; water would read under a sixth.
   check('on the thick liquid the picture is with the glass at once', k.liquid > 0.75 * k.dish && k.dish > 0,

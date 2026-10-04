@@ -295,6 +295,24 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
   const worst = Math.max(...errs);
   check('and comes up to the dish with the water\'s drag time, at any frame rate', worst < 0.02,
     `worst ${(100 * worst).toFixed(2)}% off the exact answer at 1 s and 3 s, 60 and 144 fps; at 3 s ${run(60, 3, tw).liq.toFixed(3)} of ${run(60, 3, tw).look.toFixed(3)} rad/s`);
+  /*
+    And the picture's angle, which is what the room sees: the liquid's speed
+    integrated over each frame exactly, so a frame that took a quarter of a
+    second turns it as far as fifteen frames of a sixtieth do. Held to the
+    exact answer for a dish at a steady Ω from rest, Ω T − τ ω_l(T). Taken as
+    the speed at the frame's end times its length, the four-frames-a-second
+    picture read 11% ahead after 2 s; CI's Mac drew a 0.46 s frame while the
+    shaders were still building and the flick turned the water twice as far.
+  */
+  const angleAt = (fps) => {
+    let liq = 0, a = 0;
+    for (let k = 0; k < Math.round(2 * fps); k++) { const f = dishFrame(1.8, 0, liq, 1 / fps, tw); liq = f.liquid; a += f.turn; }
+    return a;
+  };
+  const exactAngle = 1.8 * 2 - tw * 1.8 * (1 - Math.exp(-2 / tw));
+  const a60 = angleAt(60), a4 = angleAt(4);
+  check('the picture turns as far at four frames a second as at sixty, the exact angle', near(a60, exactAngle, 1e-6) && near(a4, exactAngle, 1e-6),
+    `${a60.toFixed(5)} and ${a4.toFixed(5)} rad after 2 s, exactly ${exactAngle.toFixed(5)}`);
   const thick = run(60, 0.5, tt);
   check('on the thick liquid it is with the dish within half a second', thick.liq > 0.95 * thick.look,
     `${(thick.liq / thick.look).toFixed(3)} of the dish's speed`);

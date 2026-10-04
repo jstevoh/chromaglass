@@ -137,14 +137,26 @@ export function liquidFollow(omegaL: number, dish: number, dt: number, tau: numb
  *
  * `dish` is the dish's speed Ω, `liquid` the bulk's ω_l after this frame
  * (liquidFollow, so it comes to rest exactly when the dish does), and `turn`
- * the angle the picture turns this frame, ω_l dt. The solver's swirl is
- * driven by Ω − ω_l and its centrifuge by ω_l, both from these.
+ * the angle the picture turns this frame: the liquid's speed integrated over
+ * the frame exactly, Ω dt + (ω_l − Ω) τ (1 − e^(−dt/τ)), not the speed at its
+ * end times dt. The two agree at 60 frames a second; on a frame that took
+ * half a second (a busy machine, the shaders still building) the end speed
+ * counted the whole frame at a speed the liquid only reached at its end, and
+ * a flick turned water twice as far as it went (CI's Mac, the first run of
+ * `npm run flick`: 0.117 rad in a 0.46 s frame where the liquid went 0.061).
+ * The solver's swirl is driven by Ω − ω_l and its centrifuge by ω_l, both
+ * from these.
  */
 export interface DishFrame { dish: number; liquid: number; turn: number }
 export function dishFrame(look: number, turntable: number, liquid: number, dt: number, tau: number): DishFrame {
   const dish = (Number.isFinite(look) ? look : 0) + (Number.isFinite(turntable) ? turntable : 0);
   const next = liquidFollow(liquid, dish, dt, tau);
-  const turn = next * dt;
+  if (!(dt > 0) || !Number.isFinite(dt) || next === liquid && next === dish) {
+    const still = next * (dt > 0 && Number.isFinite(dt) ? dt : 0);
+    return { dish, liquid: next, turn: Number.isFinite(still) ? still : 0 };
+  }
+  const t = Math.max(1e-4, tau);
+  const turn = dish * dt + (liquid - dish) * t * (1 - Math.exp(-dt / t));
   return { dish, liquid: next, turn: Number.isFinite(turn) ? turn : 0 };
 }
 
