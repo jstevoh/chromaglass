@@ -4718,7 +4718,7 @@ ones report.
   the control asked all 47 inside a 2.02 s stop of its own long task, then its frames
   stopped 16.27 s from 0.33 s later while the GPU compiled them, a stop no build sat
   in, so unpriced. A stop begun within a second of one the builds sat in is now the
-  same compile (18.29 s; the show's own 1.36 s held to the control's 0.71 s, 0.58×).
+  same compile (18.29 s; the show's own 1.36 s held to the control's 0.71 s, 0.58×). Only a priced stop the builds sat in opens that second (#278's check-skeptic, fixed in its follow-up): a stop that only followed no longer passes it on, so runner stalls cannot chain into the control's compile.
   And the half behind the show ran out of `gpu/prepare.ts`'s thirty seconds with 52 of
   54 built (37209299356; 21 to 24 s on the other four runs, and growing with the
   list): that cap is now per build behind the show, so a list nobody waits for is
