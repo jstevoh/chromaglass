@@ -50,6 +50,11 @@
  * two steps; the app about once a frame. A Mac check through the real
  * pointer is PLAN.md §9q.
  *
+ * The Finger's half is the old plate's since PLAN §15b: on a thin gap (every
+ * look) the Finger is a solid in the liquid and the flow carries the
+ * ferrofluid, with no carry (`npm run fingerflow`). Blow keeps its carry
+ * until 15g.
+ *
  * On 256². A couple of minutes in a cloud session.
  */
 import { openLab } from './lab.mjs';

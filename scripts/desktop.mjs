@@ -41,6 +41,7 @@
  *                 screen with no click and no key, mirrors the show there, and
  *                 is in the page's own full screen, so neither the wall nor
  *                 the laptop asks for a click to drop the title bar
+ *                 and shows no pointer on any of its elements
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
  *
@@ -444,7 +445,7 @@ try {
       const w = BrowserWindow.fromId(id);
       if (!w || w.isDestroyed()) return null;
       const casts = BrowserWindow.getAllWindows().filter((x) => /[?&]cast=/.test(x.webContents.getURL())).length;
-      const doc = await w.webContents.executeJavaScript("({ age: performance.now(), origin: performance.timeOrigin, linked: !!window.opener && !window.opener.closed, full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('#stage-canvas'), canvas: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0, frames: window.__cgLongFrames ?? null, scripts: performance.getEntriesByType('resource').filter((e) => /\\.js$/.test(e.name)).map((e) => `${e.name.split('/').pop().replace(/-[\\w-]{8}\\.js$/, '')} ${(e.responseEnd / 1000).toFixed(2)} s`) })");
+      const doc = await w.webContents.executeJavaScript("({ age: performance.now(), origin: performance.timeOrigin, linked: !!window.opener && !window.opener.closed, full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('#stage-canvas'), canvas: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0, elements: document.querySelectorAll('*').length, pointer: [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).cursor !== 'none').map((el) => el.tagName.toLowerCase()).slice(0, 4), frames: window.__cgLongFrames ?? null, scripts: performance.getEntriesByType('resource').filter((e) => /\\.js$/.test(e.name)).map((e) => `${e.name.split('/').pop().replace(/-[\\w-]{8}\\.js$/, '')} ${(e.responseEnd / 1000).toFixed(2)} s`) })");
       return { windowFull: w.isFullScreen(), casts, ...doc };
     }, cast.id).catch(() => null), sleep(3000).then(() => null)]);
     // `age` is the projector page's own clock: how long since its document started.
@@ -482,6 +483,14 @@ try {
       : mirrorAt !== null && !samePage
       ? `the mirror's canvas up ${(mirrorAt / 1000).toFixed(2)} s after the page opened, then ${!castState ? 'the second read, 2 s later, got no answer from the projector window' : `the second read was of ${castState.origin !== firstRead.origin ? 'another page (the window reloaded or navigated)' : `the page only ${((castState.age - mirrorAt) / 1000).toFixed(2)} s after the mirror`}`}, so the click hint was never judged`
       : `opened ${cast.url.replace(/^http:\/\/localhost:\d+/, '')} at left=${askedLeft}${standIn === null ? '' : ` (the stand-in's edge is ${standIn})`}; ${castState?.casts ?? '?'} projector window(s), page full screen ${castState?.full}, window full screen ${castState?.windowFull}, the show window ${castState?.linked ? 'there to mirror' : 'gone'}, the mirror's canvas ${mirrorAt !== null ? `up ${(mirrorAt / 1000).toFixed(2)} s after the page opened (${held(castState, mirrorAt)})` : `missing at ${((castState?.age ?? 0) / 1000).toFixed(2)} s (${held(castState, Infinity)}; ${castState?.canvas ? 'a canvas, but not the mirror\'s' : `no canvas, ${castState?.root ?? 0} in the root`}; scripts in by ${castState?.scripts?.join(', ') || 'none'})`}, click hint on the wall ${castState?.hint}${mirrorAt !== null ? ` ${((castState.age - mirrorAt) / 1000).toFixed(1)} s after it` : ''}, title-bar chip on the laptop ${chip > 0}`);
+  // The owner's ask of 2026-10-04: no pointer on the wall, however the mouse
+  // gets there (index.html's `show-screen`; `npm run showcursor` asks it of
+  // the web's projector window and a receiver, with the mouse moving).
+  check('projector: no pointer on the wall',
+    // On the page itself, not just its <head>: a page that never drew has
+    // nothing to point at and would pass on its 24 head elements alone.
+    !!castState && castState.root > 0 && castState.mirror && castState.pointer.length === 0,
+    castState ? (castState.pointer.length ? `a pointer on ${castState.pointer.join(', ')}` : `none on ${castState.elements} elements`) : 'no projector window opened');
 
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));

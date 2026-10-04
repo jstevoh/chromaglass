@@ -1,5 +1,5 @@
 /**
- * The operator's own hand, as the microphone hears it (PLAN.md 14w).
+ * The operator's own hand, as the microphone hears it (PLAN.md 14x).
  *
  * What was reported: pressing a control (the Speed ride, a tool) sometimes
  * made the plate pulse, as if it had taken a beat or a press. The show was on
@@ -44,7 +44,7 @@
  * reads in that frame's animation callbacks, after it, so a reading is late
  * to the mark only when the knock reached the analyser sooner than the event
  * reached the page; `npm run clicks` measures a frame's delay in handling it
- * against a laptop's input latency, and PLAN.md 14w holds the rest.
+ * against a laptop's input latency, and PLAN.md 14x holds the rest.
  */
 
 /** How long after a gesture's stamp a reading may still hold its sound, seconds. */

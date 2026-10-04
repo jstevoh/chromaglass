@@ -46,9 +46,18 @@ on:
 # request runs are cancelled. Deploys are not — `deploy.yml` has its own
 # `cancel-in-progress: false` on the live channel, and a `workflow_call` run
 # inherits the caller's group rather than this one.
+#
+# Except a re-run. A re-run joins the group again, and with cancel-in-progress
+# it cancelled whatever was running there, which is the PR's newest push: on
+# 4 October, re-running ea7eb00's red run (attempt 3, 19:28 UTC) cancelled
+# ec0f102's run on the same PR, and re-running ed7126a's (16:54 UTC)
+# cancelled e0b7c9e's, so the owner's click on the old red run threw away the
+# run the merge and the deploy gate would have read. A re-run (any attempt
+# after the first) now waits behind a run in progress instead of cancelling
+# it. A newer push still cancels the re-run, as it cancels any older run.
 concurrency:
   group: checks-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
 
 jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
@@ -213,7 +222,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run kicks
 
-      # A click is not a beat (PLAN.md 14w): the ear in arithmetic, a click a
+      # A click is not a beat (PLAN.md 14x): the ear in arithmetic, a click a
       # tick and a thump, in a quiet room and under the band. With no gesture
       # marked it takes the clicks for kicks (the control); marked, no onset in
       # a click's moment at 10 to 200 ms of input latency, every kick of the
@@ -436,6 +445,14 @@ jobs:
       - name: A click is not a beat, in the app
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run clicks -- --app
+      # No pointer on the show (scripts/showcursor.mjs, the owner's ask of
+      # 2026-10-04): the projector window, a cast receiver and clean screen
+      # show no arrow as they open, with the mouse moving over them, or later;
+      # the design screen keeps its crosshair. CSS, so no GPU; on the same
+      # dist/.
+      - name: No pointer on the show
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/showcursor.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -549,6 +566,13 @@ jobs:
       - name: The Press comes back on a thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run presslift
+      # The Finger on a thin gap as a solid in the liquid: what it touches
+      # moves at the hand's speed, the colour, the ferrofluid and the oil on
+      # its path go with it by the flow alone, nothing is lost, and the
+      # liquid stops with the hand.
+      - name: The Finger drags the liquid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run fingerflow
       # The plate's forces as forces on a thin gap (PLAN 18a-2): a body force
       # (Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity
       # says, Glass Smear is the glass sliding and Updraft a draught's shear,
@@ -605,7 +629,9 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingers
       # The Finger and Blow carry the ferrofluid, as they carry the dye; the
-      # tools' push alone (all they did before) leaves it where it was.
+      # tools' push alone (all they did before) leaves it where it was. The
+      # Finger's half is its carry with Thin Gap off; on a thin gap (every
+      # look) the Finger is a solid and `npm run fingerflow` checks it.
       - name: The hands move the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrohands
@@ -649,6 +675,14 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # A clear film that tears (PLAN 20b): the film's volume kept, a thick film
+      # whole and a thin dusty one torn into holes of every size by the physics
+      # alone, a drop of solvent opening a growing hole, white over the colour
+      # on the lamp, and the picture unchanged with the film off. In the open
+      # shard, beside the lamp it is drawn on.
+      - name: A clear film that tears
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run lace
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print

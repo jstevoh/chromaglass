@@ -845,6 +845,58 @@ try {
         `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
 
       /*
+        A back plate added and taken off from the Play sheet, on a look with
+        one plate and on a look with two.
+
+        Reported by the owner: layers could be added on some presets and not
+        others, and taken off on none. The phone's half of it was that its
+        plate picker showed only on a two-plate look and had no button either
+        way. Two looks cover every preset here: what the sheet offers turns on
+        the look's plate count alone, and every built-in carries one or two.
+        Each look is laid from the Looks sheet, its button pressed, and the
+        other button pressed to put it back: on Lumia (one plate) that is add,
+        then take off; on Classic (two) the reverse. What is measured is the
+        Front and Back pickers coming and going with the buttons, which are
+        App's plate count on the stage, and the solvers the engine has (built
+        with or without a GPU, so asked everywhere: a missing count fails). A tap that did nothing leaves the sheet as
+        it was, and the check wants the button to have flipped both times.
+      */
+      const platesOf = async () => {
+        await page.waitForTimeout(400);
+        const solvers = await page.evaluate(() => window.chromaglassDebug?.().solver?.().layers ?? null);
+        return {
+          two: await visible(page, 'phone-layer-1'),
+          add: await visible(page, 'phone-add-layer'),
+          off: (await visible(page, 'phone-remove-layer')) && (await page.getByTestId('phone-remove-layer').first().isEnabled()),
+          solvers,
+        };
+      };
+      // Pressed only when it is there, so a sheet without the button reads as
+      // a FAIL that says what the sheet had, not a sixty-second timeout.
+      const pressIf = async (testId) => { if (await visible(page, testId)) await tap(page, testId); };
+      const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''} (${st.solvers ?? 'no'} solvers)`;
+      for (const [id, plates] of [['lumia', 1], ['classic', 2]]) {
+        await tap(page, 'phone-open-looks');
+        await tap(page, `phone-look-${id}`);
+        await page.waitForTimeout(1500);
+        if (await visible(page, 'phone-sheet-looks')) await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+        await tap(page, 'phone-open-play');
+        const laid = await platesOf();
+        await pressIf(plates === 1 ? 'phone-add-layer' : 'phone-remove-layer');
+        const flipped = await platesOf();
+        await pressIf(plates === 1 ? 'phone-remove-layer' : 'phone-add-layer');
+        const back = await platesOf();
+        await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+        await page.waitForTimeout(250);
+        const one = (st) => !st.two && st.add && !st.off && st.solvers === 1;
+        const two = (st) => st.two && !st.add && st.off && st.solvers === 2;
+        const [a, b] = plates === 1 ? [one, two] : [two, one];
+        check(`the Play sheet ${plates === 1 ? 'adds a back plate to' : 'takes the back plate off'} ${id} (${plates === 1 ? 'one plate' : 'two'}), and puts it back`,
+          a(laid) && b(flipped) && a(back),
+          `${plateSays(laid)} → ${plateSays(flipped)} → ${plateSays(back)}`);
+      }
+
+      /*
         The back plate's own look (PLAN.md §16a), from the same sheet: the
         switch at its top sends the next look picked to the back plate alone.
         What has to be true is four things. The back plate says it is on that

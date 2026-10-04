@@ -100,6 +100,8 @@ export function luckyLook(
     benDay: 0,
     // Lamp Ground (PLAN 18b) is kept: a roll is a variation on the look on
     // the plate, and which ground it is seen on is that look's choice.
+    // Clear Film (PLAN §20b) is kept as the lamp is: it is liquid on the
+    // dish, and a roll that drew it off would fill the lace back in.
     sensitivity: rand() * 0.8 + 0.2,
     /*
       1 to 2, not 0.5 to 2. No preset sets this — it is an ear setting, so

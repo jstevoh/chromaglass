@@ -84,6 +84,15 @@ export interface GpuStepParams {
   mazeDetail?: number;
   /** How hard the ferrofluid pushes the dye aside where it moves (0 leaves the dye where it was, under the black). */
   phaseDisplace?: number;
+  /**
+   * A clear film against the glass (PLAN §20b, wgsl/film.ts): 0 none, and the
+   * film run not at all; up, a film that thick (a share of FILM_MAX of the gap)
+   * laid over the plate, which tears into lace by its own physics. Moved while
+   * a film is on, the film is raised or lowered everywhere by the difference.
+   */
+  clearFilm?: number;
+  /** The dish's dust under the clear film: 1 in a show; 0 a clean dish, for a check. */
+  filmDust?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */
@@ -217,6 +226,8 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
+  addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */
   readonly oilCover?: number;
   /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
@@ -235,7 +246,12 @@ export interface PlateSolver {
   addLiesegang?(x: number, y: number, radius: number, amount?: number): void;
   readonly chemistryLive?: { rxn: boolean; lies: boolean };
   step(p: GpuStepParams, deltasApplied: boolean): void;
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
+  /**
+   * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),
+   * U the hand's own motion in cells a step and χ how much of the cell it
+   * fills, held as a solid for the next step only (PLAN 15b; hsPrep).
+   */
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null): void;
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;

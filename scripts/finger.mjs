@@ -182,7 +182,9 @@ try {
     `${bandRatio.toFixed(2)}x what an idle plate moves in the same window, ` +
     `the middle of three bands each against its own idle`);
   /*
-    And the control that explains why it has to carry the dye itself.
+    And the control that explains why it has to carry the dye itself (with
+    Thin Gap off: on a thin gap the Finger is a solid in the solve and the
+    flow carries the dye, PLAN §15b, `npm run fingerflow`).
 
     A localised blob of velocity is mostly a gradient, and a gradient is what
     the projection exists to remove — so adding velocity, at any strength, does

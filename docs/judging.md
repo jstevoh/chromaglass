@@ -853,9 +853,112 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
 
+## 34. Several areas of interest: Velvet Underground, Lumia and Cell Bloom (PLAN 25a)
+
+The owner found Velvet Underground, Lumia and Cell Bloom underwhelming, with one area of
+interest. All three are now built on areas of the dish (`src/lib/plateAreas.ts`): a few places apart
+on the plate, each with its own liquid and dye, where the look's hands and its music
+land. Every other look plays as before.
+
+- **Velvet Underground**, with music: three pools apart on deep violet. Top left, a
+  magenta glycerine pool the mids circle; right, a raspberry well where every kick
+  lands (its ring, its push and a drop of soap, which carries the colour off the
+  surface into a ring); low in the middle, ultramarine syrup that glitters with the
+  treble. Say whether the three stay three for a few minutes or run together, and
+  whether the dark between them is too much (Dye Budget, now 0.45, sets it).
+- **Lumia**, without a beat: three veils of colour in different parts of a nearly
+  clear plate, under Wilfred's folded light. The light layer is unchanged; say if it
+  now covers the veils too much (the Lumia slider), or if the veils are too faint.
+- **Cell Bloom**: three small pools turning slowly under the magnifier on violet,
+  packed with paint cells (none were drawn at its zoom before). Say if the cells
+  are too big now (Cell Size, 0.6) or the pools drift out of the frame.
+- The Go into any of the three and the sequencer stepping onto it should pour into
+  the same places.
+- **Fillmore East, 1969** (PLAN 25g): its two plates now fill the screen rather than
+  sitting as two dishes on black. Say if the two plates over each other read too busy
+  without the black between them.
+
 ---
 
-## 33. A click on the laptop is not a beat (PLAN 14w)
+## 33. The Finger drags the liquid (PLAN 15b)
+
+The Finger used to move the colour by a hand-written carry, a little taken from behind
+it and put a hop ahead, while the push it gave the liquid itself did nothing. Now it is
+a solid in the liquid: what it touches moves at your hand's speed, the liquid round it
+parts to let it through, and the flow carries the colour, the oil and the ferrofluid
+together. It changes how the Finger feels. On Classic:
+
+- draw the Finger slowly across bands or blobs of colour: the colour on its path should
+  be pulled along it in chevrons, the way a stylus pulls marbling, and the colour a
+  little to either side should bend back the other way as the hand passes;
+- draw it fast, then stop: the liquid should stop with the hand within a fraction of a
+  second, not coast on;
+- draw it through a pool on a ferrofluid look (Magnet Garden, or any with ferrofluid):
+  the pool should be drawn out after the hand into a tongue and, once the hand lifts,
+  pull itself back into a rounder drop at the tongue's head;
+- on Oil & Water: an oil body should go with the hand, its colour inside it;
+- on a thick look (Thickness high) the drag should reach less far round the finger
+  than on a thin one;
+- on the phone, drag a finger across the plate with the Finger tool: the same;
+- the remote's pad Finger (the phone driving the laptop): say if it stutters;
+- the frame time while dragging over ferrofluid: its carry takes more substeps while a
+  fast hand is down.
+
+Say if the Finger now feels too strong, too sticky (a blob that rides along under the
+hand), or not enough like a finger in liquid.
+
+## 35. Picking a bottle pours nothing (PLAN 15i)
+
+Picking a liquid, on the desk's shelf, the Design desk or the phone's Dye sheet, puts it
+in your hand and nothing on the plate.
+
+- On a look with no ferrofluid (Classic), pick Ferrofluid: nothing lands, and the plate
+  stays as it was for as long as you leave it. Pour with the Dropper: only what you
+  poured shows, where you poured it.
+- Pick Oil, Soap, Milk, then a dye, each without touching the plate: nothing lands.
+- With Ferrofluid in your hand, open Magnet Garden: its own ferrofluid is there as
+  before. Open Classic from it, then pour one drop of Ferrofluid: only the drop shows,
+  not Magnet Garden's ring coming back with it.
+- After pouring some, Go to another look with a fade: no ring of ferrofluid lands half
+  way through.
+
+---
+
+## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
+
+Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
+the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
+over the plate, that thick (1 is most of the gap), and it tears open by itself: thin
+parts and the dish's specks of dust first, and wherever a drop of Alcohol or Soap
+lands. Nothing draws the holes; they are the film dewetting. The film is clear, so
+it shows as the lamp's white only with **Lamp Ground** up (§31); on black it is a
+darkening of the colour, with the colour full strength in the holes. Try it on Lamp
+Ground 1 over a look with dense colour, at Clear Film about 0.4 (tears in a second
+or two) and about 0.9 (holds until you drop Alcohol on it). Please say:
+
+- whether it reads as the pale lace of the reference still, and what is most unlike
+  it (the holes here grow a raised rim and the film retracts into a thin network;
+  the still's holes are cut clean with wide film between them, which is 20c's
+  viscous film, not built yet);
+- the pace: a thin film tears in a second or two and a thick one holds for twenty
+  seconds and more; say if it should be slower or faster (FILM_RATE);
+- the size of the holes and of the lace on the wall (they are set by the film's own
+  physics on a 384² grid; at 1080p a cell is about three pixels);
+- the gestures: Alcohol from the Dropper punches a hole, Oil thickens the film where
+  it lands, and moving Clear Film pours more film over everything or draws it off,
+  which fills the holes back in (these pours are not in a check: the lab pours
+  straight into the film, not through the Dropper);
+- a fade into a look with a thick film: on its way up the film passes through the
+  thin range that tears over the dust, so it may arrive already torn; say whether
+  that reads as a feature or a fault;
+- on a look with BZ, whether the reaction's fringe looks as it did (its activator
+  is now packed in eight bits to make room for the film);
+- the cost on the Mac with the film on (the film is twelve small passes twice a
+  frame on a 384² grid; `npm run stages` in the console, or the frame time below).
+
+---
+
+## 33. A click on the laptop is not a beat (PLAN 14x)
 
 On the laptop's own microphone, in a quiet room (no music), with any look:
 
