@@ -88,6 +88,12 @@ fn decodeDensity(a: f32) -> f32 { return a * a * DENSITY_SCALE; }
   only one it has), 1 everywhere else.
 */
 var<private> gapScale: f32 = 1.0;
+/*
+  The water's share of the gap under the clear film (PLAN §20b), for the one
+  decode that leaves gapScale out of its painted thickness (decodeFluidRaw,
+  the defocused path): 1 with no film, and outside the front plate's decode.
+*/
+var<private> filmWater: f32 = 1.0;
 
 /*
   The lamp through the dye (PLAN 18b): what fraction of the lamp, colour by
@@ -919,7 +925,7 @@ fn decodeFluidRaw(raw: vec4f) -> vec4f {
   let darkness = 1.0 - max(c.r, max(c.g, c.b));
   let amount = mix(totalDensity * 2.8, max(0.0, totalDensity - U.filmLevel) * U.filmGain, clamp(U.macroOn, 0.0, 1.0));
   if (U.lampGround > 0.001) { dyeThrough = lampThrough(unit, amount * gapScale); }
-  let thickness = amount * (1.0 + darkness * 1.7);
+  let thickness = amount * (1.0 + darkness * 1.7) * filmWater;
   return vec4f(c, min(mix(0.95, 0.995, clamp(U.macroOn, 0.0, 1.0)), 1.0 - exp(-thickness)));
 }
 
@@ -1279,13 +1285,19 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
 
 /** Reading view0, between its texels. Only with the display's own bindings. */
 export const VIEW = /* wgsl */ `
-struct View { phase: f32, oil: f32, acid: f32, soap: f32, bz: f32, pr: f32, gap: f32, bzu: f32 };
-fn viewTexel(p: vec2i) -> array<f32, 8> {
+/*
+  film: the clear film's share of the gap (PLAN §20b), 0 with none. The last
+  word holds the gap in sixteen bits and BZ's activator (on a square-root
+  scale) and the film in eight each: see packView in wgsl/fluid.ts.
+*/
+struct View { phase: f32, oil: f32, acid: f32, soap: f32, bz: f32, pr: f32, gap: f32, bzu: f32, film: f32 };
+fn viewTexel(p: vec2i) -> array<f32, 9> {
   let d = vec2i(textureDimensions(view0)) - 1;
   let q = textureLoad(view0, clamp(p, vec2i(0), d), 0);
   let a = unpack2x16unorm(q.x); let b = unpack2x16unorm(q.y);
   let c = unpack2x16unorm(q.z); let e = unpack2x16unorm(q.w);
-  return array<f32, 8>(a.x, a.y, b.x, b.y, c.x, c.y, e.x, e.y);
+  let u = f32((q.w >> 16u) & 255u) / 255.0;
+  return array<f32, 9>(a.x, a.y, b.x, b.y, c.x, c.y, e.x, u * u, f32(q.w >> 24u) / 255.0);
 }
 fn viewAt(uv: vec2f) -> View {
   let n = vec2f(textureDimensions(view0));
@@ -1294,9 +1306,9 @@ fn viewAt(uv: vec2f) -> View {
   let f = q - floor(q);
   let t00 = viewTexel(i); let t10 = viewTexel(i + vec2i(1, 0));
   let t01 = viewTexel(i + vec2i(0, 1)); let t11 = viewTexel(i + vec2i(1, 1));
-  var o = array<f32, 8>();
-  for (var k = 0; k < 8; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
-  return View(o[0], o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7]);
+  var o = array<f32, 9>();
+  for (var k = 0; k < 9; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
+  return View(o[0], o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7], o[8]);
 }
 
 /*
@@ -2059,8 +2071,19 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // turning plate is up to √2 pixels and softened the edge as it spun.
   let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
+  /*
+    The clear film (PLAN §20b; 18b-6): where it lies against the glass the
+    dyed water is only the gap less the film, so the dye's path is that much
+    shorter. Under a whole film (0.86 of the gap) the lamp comes through the
+    seventh of the gap that is water, white with a faint tint of the dye;
+    where it has torn, the water spans the gap and the colour is at full
+    strength. With no film this is 1, exactly, and nothing changes.
+  */
+  gapScale *= 1.0 - view.film;
+  filmWater = 1.0 - view.film;
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
+  filmWater = 1.0;
   // What the lamp gets through, and the decode it came with (onGround).
   let through0 = dyeThrough;
   let tint0 = fluid0.rgb;

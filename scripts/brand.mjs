@@ -17,6 +17,8 @@
  *   public/og-card.png              what a shared link unfurls into
  *   src/assets/brand/lockup.svg     mark and name, for the headers
  *   src/assets/brand/mark.svg       the dish alone, where the name will not fit
+ *   public/intro-*.svg              the intro's burst, hub and name (src/lib/intro.ts),
+ *                                   apart because the burst turns under the other two
  *   docs/brand/…                    the same at full detail, plus the sizes other
  *                                   services ask for (Google's sign-in screen,
  *                                   profile pictures)
@@ -30,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { icon, lockup, shareCard } from './brand/art.mjs';
+import { icon, lockup, shareCard, introLayers } from './brand/art.mjs';
 
 const words = JSON.parse(fs.readFileSync('scripts/brand/words.json', 'utf8'));
 
@@ -46,6 +48,10 @@ write('src/assets/brand/lockup.svg', lockup(words, { detail: 'medium' }));
 write('src/assets/brand/mark.svg', icon({ shape: 'circle', detail: 'medium' }));
 write('docs/brand/lockup.svg', lockup(words, { detail: 'high' }));
 write('docs/brand/icon.svg', icon({ shape: 'tile', detail: 'high' }));
+const intro = introLayers(words, { detail: 'medium' });
+write('public/intro-burst.svg', intro.burst);
+write('public/intro-hub.svg', intro.hub);
+write('public/intro-name.svg', intro.name);
 
 // Rasterised by the browser, the one renderer every place these end up agrees with.
 const PNG = [

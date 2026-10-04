@@ -15,6 +15,19 @@ import { LOCKUP_URL } from '../brand';
  * it here: a PresentationConnection when Chrome presented this page to a
  * Chromecast or a second display, or a BroadcastChannel when it was opened
  * as a popup. It never looks at `window.opener`: a presented page has none.
+ *
+ * No pointer here, ever. It used to come back on any movement and hide after
+ * two and a half seconds still (three on a receiver), which meant an arrow on
+ * the wall every time the operator's hand crossed to the projector's screen
+ * on its way somewhere, and at the moment the owner opened the window; the
+ * owner asked for none on the show at all (2026-10-04). Nothing on this page
+ * is meant to be aimed at: a click anywhere asks for full screen, and F,
+ * Enter or Space do the same. The class and its rule are in `index.html`'s
+ * head, so even the black window that waits for this page has no arrow (set
+ * from `main.tsx` it was there for the first ~30 ms), and the rule is
+ * `.show-screen *` with `!important` rather than a style on the root here,
+ * because a style on one element is undone by any child that sets its own
+ * (the plate's canvas is `cursor-crosshair`). `npm run showcursor` holds it.
  */
 export default function CastDisplay() {
   // Opened by the show window itself, on this machine: mirror its canvas pixel
@@ -76,7 +89,6 @@ function useFullscreen() {
 function StageMirror({ source }: { source: HTMLCanvasElement }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gone, setGone] = useState(false);
-  const [showCursor, setShowCursor] = useState(true);
   const isFullscreen = useFullscreen();
   // This window *is* the projector. Nothing it does is worth a screensaver.
   useWakeLock(true);
@@ -203,13 +215,6 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
   }, [source]);
 
   useEffect(() => {
-    let timer = setTimeout(() => setShowCursor(false), 2500);
-    const move = () => { setShowCursor(true); clearTimeout(timer); timer = setTimeout(() => setShowCursor(false), 2500); };
-    window.addEventListener('mousemove', move);
-    return () => { window.removeEventListener('mousemove', move); clearTimeout(timer); };
-  }, []);
-
-  useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassCast?: unknown }).chromaglassCast = () => ({ mode: 'mirror', linked: !gone, stage: { width: canvasRef.current?.width, height: canvasRef.current?.height }, source: { width: source.width, height: source.height } });
     }
@@ -218,7 +223,6 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
   return (
     <div
       className="w-full h-screen bg-black overflow-hidden"
-      style={{ cursor: showCursor ? 'default' : 'none' }}
       onClick={goFullscreen}
       data-testid="cast-display"
     >
@@ -343,23 +347,6 @@ function CastReceiver() {
 
   const isFullscreen = useFullscreen();
 
-  // Hide the cursor after a few seconds still.
-  const [showCursor, setShowCursor] = useState(true);
-  const cursorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => {
-    const handleMove = () => {
-      setShowCursor(true);
-      if (cursorTimer.current) clearTimeout(cursorTimer.current);
-      cursorTimer.current = setTimeout(() => setShowCursor(false), 3000);
-    };
-    window.addEventListener('mousemove', handleMove);
-    cursorTimer.current = setTimeout(() => setShowCursor(false), 3000);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      if (cursorTimer.current) clearTimeout(cursorTimer.current);
-    };
-  }, []);
-
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassCast?: unknown }).chromaglassCast = () => ({ linked, stale, state, audio });
@@ -371,7 +358,6 @@ function CastReceiver() {
   return (
     <div
       className="relative w-full h-screen bg-black overflow-hidden text-white overlays-hidden"
-      style={{ cursor: showCursor ? 'default' : 'none' }}
       onClick={goFullscreen}
       data-testid="cast-display"
     >

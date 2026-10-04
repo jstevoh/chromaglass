@@ -92,10 +92,17 @@
    focus ring               0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent)
 */
 
-/* Clean screen: nothing over the liquid, not even the pointer. */
-.overlays-hidden canvas {
-  cursor: none;
+/* Clean screen: nothing over the liquid, not even the pointer. Everything in
+   it, not only the canvas: in clean screen the window is the show, and the
+   arrow came back over anything that is not the plate (the letterbox, the
+   "needs WebGPU" card). */
+.overlays-hidden,
+.overlays-hidden * {
+  cursor: none !important;
 }
+
+/* The show screen (the projector window, a cast receiver) hides the pointer
+   from a rule in index.html's <head>, so it holds before this sheet loads. */
 
 /* ── Phone remote sliders ──────────────────────────────────────────
    A 40px-tall touch target with a 10px visible track and a thumb big

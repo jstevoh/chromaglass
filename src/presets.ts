@@ -603,7 +603,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'velvet-underground',
     name: 'Velvet Underground',
-    description: 'Rich pools of magenta, raspberry and ultramarine over deep violet, churning slowly to the beat under a warm lamp.',
+    description: 'Three pools apart on deep violet: thick magenta glycerine folded by the mids, a raspberry well of soap the bass breaks open, and ultramarine syrup glittering with the treble.',
     settings: {
       globalSpeed: 0.0084,
       surge: 0.18,
@@ -611,7 +611,9 @@ export const PRESETS: Preset[] = [
       blendMode: 'overlay',
       gooeyEffect: 0.75,
       rotationSpeed: 0.023,      // the dish's motor; was 0.005 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.35,
+      // Flat: a concave dish slid all three pools into one in the middle. The
+      // pools are its areas of the dish now (lib/plateAreas.ts).
+      centerGravity: 0.0,
       ledPlatform: true,
       ledMode: 'single',
       ledColor: '#220044',
@@ -621,7 +623,7 @@ export const PRESETS: Preset[] = [
       advection: 0.2,
       damping: 0.992,
       heatDecay: 0.997,
-      automateRate: 0.04,
+      automateRate: 0.08,       // the hands tend three areas now, so a little more often (was 0.04)
       platePressure: 0.3,
       glassSmear: 0.25,
       rainDrip: 0.6,
@@ -635,6 +637,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.35,
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
+      dyeBudget: 0.45,          // dark violet between the pools: at the default 0.85 they ran into one wash
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -740,7 +743,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'lumia',
     name: 'Lumia',
-    description: 'Thomas Wilfred\u2019s aurora: slow folded sheets of light drifting under a nearly clear plate. No beat, no dye to speak of \u2014 minutes-long evolutions.',
+    description: 'Thomas Wilfred\u2019s lumia: slow folded light, and three veils of colour in different parts of a nearly clear plate, two held in glycerine and one that soap spreads thin. No beat \u2014 minutes-long evolutions.',
     settings: {
       globalSpeed: 0.00504,
       surge: 0.12,
@@ -758,7 +761,7 @@ export const PRESETS: Preset[] = [
       advection: 0.3,
       damping: 0.99,
       heatDecay: 0.99,
-      automateRate: 0.008,
+      automateRate: 0.03,       // tends its three veils; at 0.008 a drop came every three minutes and the plate stayed empty
       platePressure: 0.05,
       glassSmear: 0.2,
       rainDrip: 0.0,
@@ -773,7 +776,7 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.7,
       boundaryContrast: 0.15,
       saturationBoost: 1.2,
-      dyeBudget: 0.1,          // a nearly clear plate: the light is the subject, the dye a few drifting veils
+      dyeBudget: 0.2,          // a nearly clear plate: three veils, in their areas (lib/plateAreas.ts), and dark between (was 0.1, with nothing laid)
       edgeRelief: 0.3,
       bubbles: 0,
       plateRock: 0.1,
@@ -1190,15 +1193,15 @@ export const PRESETS: Preset[] = [
   {
     id: 'cell-bloom',
     name: 'Cell Bloom',
-    description: 'Packed rings of paint cells — dark cores in bright magenta and lavender halos — breathing across a magnified violet pool.',
+    description: 'Three small pools turning under a magnifier on violet: silicone that breaks into packed rings of paint cells in magenta and ultramarine, and a lavender pool of oil between them.',
     settings: {
       macroMode: true,
-      macroCamera: 'follow',     // rides the liquid under the aim; aim it anywhere, or Auto to roam
+      macroCamera: 'hold',       // sits on the middle, where its three pools turn (lib/plateAreas.ts); was follow, which rode one pool
       macroZoom: 3.5,
       macroChase: 0.45,          // slower drift — this one lingers on a pool
       macroHold: 7.0,
       macroCells: 1.0,           // maximum cell structure
-      macroCellScale: 0.32,      // small, densely packed cells
+      macroCellScale: 0.6,       // was 0.32, too small to resolve at 3.5x, so no cell was ever drawn (lib/plateAreas.ts)
       macroLacing: 0.35,
       macroDepth: 0.7,
       macroEdgeDetail: 0.5,
@@ -1310,7 +1313,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'fillmore-1969',
     name: 'Fillmore East, 1969',
-    description: 'The Joshua Light Show behind the Mothers: three projectors on one black screen, a big dish pressed into a radial sunburst, a field of dark-rimmed oil beads across the red and orange, cyan and blue against them.',
+    description: 'The Joshua Light Show behind the Mothers: two plates thrown over the whole screen, pressed into a radial sunburst, a field of dark-rimmed oil beads across the red and orange, cyan and blue against them.',
     settings: {
       globalSpeed: 0.01008,
       surge: 0.6,
@@ -1352,7 +1355,11 @@ export const PRESETS: Preset[] = [
       beads: 0.8,
       fingering: 0.85,
       cells: 0.2,
-      dishSpread: 0.85,
+      // 0: the plates fill the screen. At 0.85 each was its own dish on black,
+      // the lead one 0.71 of the frame's height across (40% of a 16:9 width)
+      // and the second 0.45: the owner, "it only takes up a small amount of
+      // the canvas". Dish Spread is still there to spread them.
+      dishSpread: 0.0,
       dishVignette: 0.0,
       plateRock: 0.3,
       beatSqueeze: 0.9,

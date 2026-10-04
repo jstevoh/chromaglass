@@ -283,7 +283,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // see NOT_A_TARGET in sceneMap.ts.
 // Nor the Mixer rows' fade times: see the same list there.
 // Nor Thin Gap, which switches the solver: see the same list there.
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap',
+// Nor Clear Film, which pours over the whole dish: the same list again.
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
@@ -535,6 +536,9 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
+  // The clear film (PLAN §20b): a fader pours clear oil over the dish and
+  // draws it off again, and its first lift lays the film that tears.
+  { key: 'clearFilm',       label: 'Clear Film',       min: 0, max: 1 },
   // The plate as a thin gap (PLAN §18a). A switch, stepped, so a pad or the
   // top half of a fader turns it on; and the liquid's thickness in it on a
   // fader, because thinning the liquid mid-song is a gesture: pushes start

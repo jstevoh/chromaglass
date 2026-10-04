@@ -31,6 +31,9 @@
  *   7. a new grid (the quality governor stepping down) with the Magnet in
  *      hand lays nothing on a bare plate, picked and untouched or held:
  *      never the look's ring, and no pool of the magnet's own
+ *   8. and a new grid under ferrofluid poured by hand on Classic, with
+ *      Ferrofluid up, keeps it, the same amount where it was, and lays no ring over it
+ *      (PLAN 9w; the solver's side is `npm run regrid`)
  *
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
@@ -59,8 +62,9 @@ try {
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   /*
     On one grid (sim=256, as bottles.mjs pins it): the governor moving the
-    grid gives the plate a new solver, which does not carry the ferrofluid
-    across (PLAN 9w), and the drag below would read the pool as lost.
+    grid gives the plate a new solver, which carries the ferrofluid across
+    now (PLAN 9w, check 8) but resampled, and the drag below measures one
+    field on one grid.
     Counted too (phaseLays), so it cannot pass if it happens anyway. And at
     Magnet Size 0.9 from the load (set=, which a look change keeps: it is
     the performer's, RIG_KEYS), so the set-down magnet is sized (check 4).
@@ -602,6 +606,76 @@ try {
     `grid ${grids2.seen.join(' → ')}² with the hand at ${hand2 ? `${hand2.x.toFixed(2)},${hand2.y.toFixed(2)}` : 'nowhere'}; Magnet Strength ${strength2}; ` +
     `laid ${picked2.lays} → ${touched2.lays} → ${regrid2.lays} times; in the solver: ${touched2.live}, then ${regrid2.live}; Ferrofluid ${regrid2.amount}; ` +
     `ferrofluid ${(bare.total * 100).toFixed(2)}% of the plate before, ${(plate2.total * 100).toFixed(2)}% after`);
+
+  /*
+    8. A new grid keeps the ferrofluid poured by hand (PLAN 9w).
+
+    The owner's case: ferrofluid poured from the bottle on Classic, a look
+    with none of its own, Ferrofluid up (as the bottle and the Magnet's hold
+    leave it), and the governor moving the grid mid-show. Before 9w the new
+    solver had no ferrofluid and the frame loop poured Classic's ring in its
+    place, because Ferrofluid was up: phaseLays one more, the pools gone and
+    about 22% of the plate in the ring. Now the old solver hands its
+    ferrofluid over and nothing is laid.
+
+    Two pools, a big one and a small one off the middle, poured as the
+    bottle pours (the solver's addPhase, as check 3), so the shape is one no
+    look pours and a lay of any look's would show in where the ferrofluid
+    is, not only in how much. Then Ferrofluid turned up to 0.6
+    (chromaglassSettings), as a hand's first pour of the bottle turns it up
+    (PLAN 15i): Ferrofluid up is what made the old lay fire. The solver's
+    addPhase called directly does not mark the pour as a hand's
+    (phaseByHand, 15i's own guard against the same lay), so what keeps the
+    pools here is the carry alone. Its own page on the same
+    rung as check 7 (512²), stepped down once to 384².
+  */
+  await page2.close();
+  const page3 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page3.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
+  await page3.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&rung=2${engineQuery()}`, { waitUntil: 'load' });
+  await page3.waitForTimeout(9000);
+  const POOLS = [{ x: 0.3, y: 0.55, r: 0.12 }, { x: 0.7, y: 0.32, r: 0.07 }];
+  const counts3 = () => page3.evaluate(() => {
+    const d = window.chromaglassDebug();
+    return { grid: d.fluids?.[0]?.gpu?.N ?? 0, lays: d.phaseLays?.() ?? -1, live: d.phaseState?.()?.live ?? null, amount: d.settings?.phaseAmount ?? 0 };
+  });
+  // The ferrofluid's total, and the share of it in each pool's reach (half again its radius).
+  const pools3 = () => page3.evaluate(async (POOLS) => {
+    const f = await window.chromaglassDebug().readPhase();
+    if (!f) return { total: -1, near: POOLS.map(() => 0), n: 0 };
+    const { n, data } = f;
+    let total = 0;
+    const near = POOLS.map(() => 0);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const v = data[x + y * n];
+      total += v;
+      POOLS.forEach((p, k) => { if (Math.hypot((x + 0.5) / n - p.x, (y + 0.5) / n - p.y) < p.r * 1.5) near[k] += v; });
+    }
+    return { total: total / (n * n), near: near.map(v => (total ? v / total : 0)), n };
+  }, POOLS);
+  await page3.evaluate((POOLS) => { const g = window.chromaglassDebug().fluids[0].gpu; for (const p of POOLS) g.addPhase(p.x, p.y, p.r, 0.9); }, POOLS);
+  await page3.waitForTimeout(500);
+  await page3.evaluate(() => window.chromaglassSettings({ phaseAmount: 0.6 }));
+  await page3.waitForTimeout(1500);
+  const before3 = await counts3(), poured3 = await pools3();
+  let grids3 = { seen: [before3.grid], moved: false };
+  for (let i = 0; i < 4 && !grids3.moved; i++) {
+    await page3.evaluate(() => window.chromaglassDebug().stepDownFrames(1));
+    await page3.waitForTimeout(2500);
+    const g = (await counts3()).grid;
+    if (g !== grids3.seen[grids3.seen.length - 1]) grids3.seen.push(g);
+    grids3.moved = g > 0 && g !== before3.grid;
+  }
+  const after3 = await counts3(), kept3 = await pools3();
+  const keptShare = kept3.total > 0 ? kept3.total / poured3.total : 0;
+  const shares = (p) => p.near.map(v => `${(v * 100).toFixed(0)}%`).join(' and ');
+  check('a new grid keeps the ferrofluid poured by hand, where it was, and lays no ring over it',
+    grids3.moved && before3.grid === 512 && before3.live === true && before3.amount === 0.6 && before3.lays >= 0
+      && after3.lays === before3.lays && after3.live === true && poured3.total > 0.02
+      && Math.abs(keptShare - 1) < 0.05 && kept3.near.every((v, k) => v > poured3.near[k] * 0.85),
+    `grid ${grids3.seen.join(' → ')}²; Ferrofluid ${before3.amount}; laid as a look's ${before3.lays} → ${after3.lays} times; `
+    + `ferrofluid ${(poured3.total * 100).toFixed(2)}% of the plate poured, ${(kept3.total * 100).toFixed(2)}% on the new grid (${kept3.n}²); `
+    + `in the two pools' reach ${shares(poured3)} before, ${shares(kept3)} after`);
 } finally {
   await browser.close();
 }
