@@ -211,6 +211,13 @@ export interface PhoneStageProps {
    */
   lampGround: number;
   onLampGround: (v: number) => void;
+  /**
+   * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
+   * lace. On the Dye sheet, under the bottles, because it is a liquid
+   * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
+   */
+  clearFilm: number;
+  onClearFilm: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -581,6 +588,12 @@ export function PhoneStage(p: PhoneStageProps) {
             </div>
           ))}
           {liquid?.description && <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-liquid-description">{liquid.description}</p>}
+
+          <div className="mt-3">
+            <Slider label="Clear Film" value={p.clearFilm} min={0} max={1} step={0.05} onChange={p.onClearFilm}
+              display={`${Math.round(p.clearFilm * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+          </div>
 
           <SectionLabel>{liquid ? `${liquid.name}'s colour` : 'Colour'}</SectionLabel>
           <div className="grid grid-cols-6 gap-2">

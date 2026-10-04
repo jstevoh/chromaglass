@@ -2805,6 +2805,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ surfactantFlow: v })}
           settingKey="surfactantFlow"
         />
+        {/*
+          A clear oil film against the glass that tears into lace (PLAN §20b):
+          how thick it is laid. Thin tears at once over the dish's dust, thick
+          holds until alcohol or soap lands on it. White only on Lamp Ground.
+        */}
+        <Slider
+          label="Clear Film"
+          value={settings.clearFilm ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ clearFilm: v })}
+          settingKey="clearFilm"
+        />
         <Slider
           label="Dye Weight"
           value={settings.solutalBuoyancy ?? 0}

@@ -52,6 +52,12 @@ export interface LiquidDeposit {
   acid?: number;
   /** Ferrofluid, into the GPU's second phase through `onDeposit`; nothing here reads it. */
   magnetic?: number;
+  /**
+    A solvent that lowers a clear film's surface tension where it lands (PLAN
+    §20b), so the film is pulled away and a hole opens. Nothing here reads it:
+    it goes to the GPU's film, through `onDeposit`.
+  */
+  solvent?: number;
 }
 
 /**

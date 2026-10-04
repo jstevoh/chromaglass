@@ -26,6 +26,7 @@
 import { SPIKES_WGSL } from './spikes';
 import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
+import { filmKernels } from './film';
 
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
@@ -3266,11 +3267,28 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       x  ferrofluid, oil
       y  acidity (−1..1 as 0..1), soap
       z  BZ's oxidised catalyst, Liesegang's precipitate (0..4 as 0..1)
-      w  the gap between the glasses (0..0.06 as 0..1), BZ's activator
+      w  the gap between the glasses (0..0.06 as 0..1), in the low 16
+         bits; in the high 16, BZ's activator and the clear film (PLAN §20b),
+         eight bits each
 
-    The reactions live on grids of their own and are read between their
-    texels. A.a = which inputs are real (ferrofluid, mix, BZ, Liesegang);
-    A.b.x, A.b.y = the BZ and Liesegang grids.
+    The clear film took half of the activator's place because there was no
+    other: all eight numbers were spoken for, and the display pass cannot bind
+    a seventeenth texture. The activator is only ever asked whether it is
+    there at all (the plate's BZ draws where either species is over 0.0005),
+    so it keeps eight bits on a square-root scale, nothing at or under that
+    0.0005 and at least 0.000554 over it: at a texel the gate answers exactly
+    as it did, and only between texels, where the plate blends four, can the
+    reaction's fringe move by a fraction of a texel. The film is a share of the gap, 0..1 in steps of
+    1/255, which the plate reads as the water's path (1 − film) through it:
+    the faint tint of the dyed water under a whole film is a seventh of the
+    gap, drawn in steps of 3% of itself. The gap keeps its sixteen bits and
+    pack2x16unorm's own rounding, so a plate with no film packs every bit
+    as it did.
+
+    The reactions and the film live on grids of their own and are read
+    between their texels. A.a = which inputs are real (ferrofluid, mix, BZ,
+    Liesegang); A.b.x, A.b.y = the BZ and Liesegang grids; A.b.z the film's
+    grid and A.b.w whether there is a film.
   */
   packView: `${HEAD}
 @group(0) @binding(2) var phase: texture_2d<f32>;
@@ -3278,7 +3296,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var rxn: texture_2d<f32>;
 @group(0) @binding(5) var lies: texture_2d<f32>;
 @group(0) @binding(6) var sq: texture_2d<f32>;
-@group(0) @binding(7) var dst: texture_storage_2d<rgba32uint, write>;
+@group(0) @binding(7) var filmT: texture_2d<f32>;
+@group(0) @binding(8) var dst: texture_storage_2d<rgba32uint, write>;
 fn grid(t: texture_2d<f32>, uv: vec2f, g: f32) -> vec4f {
   let q = uv * g - 0.5;
   let i = vec2i(floor(q));
@@ -3299,11 +3318,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let r = select(vec4f(0.0), grid(rxn, uv, A.b.x), A.a.z > 0.5);
   let l = select(vec4f(0.0), grid(lies, uv, A.b.y), A.a.w > 0.5);
   let gap = textureLoad(sq, p, 0).r;
+  let film = select(0.0, grid(filmT, uv, A.b.z).r, A.b.w > 0.5);
+  // The activator: 0 at or under the plate's 0.0005, and at least step 6
+  // (0.000554 decoded) over it, so at a texel the gate answers as it did.
+  let bzu = select(0u, max(6u, u32(0.5 + 255.0 * sqrt(clamp(r.r, 0.0, 1.0)))), r.r > 0.0005);
+  let w = u32(0.5 + 65535.0 * clamp(gap / 0.06, 0.0, 1.0))
+        | (bzu << 16u)
+        | (u32(0.5 + 255.0 * clamp(film, 0.0, 1.0)) << 24u);
   textureStore(dst, p, vec4u(
     pack2x16unorm(clamp(vec2f(ph, m.r), vec2f(0.0), vec2f(1.0))),
     pack2x16unorm(clamp(vec2f(m.b * 0.5 + 0.5, m.g), vec2f(0.0), vec2f(1.0))),
     pack2x16unorm(clamp(vec2f(r.g, l.a * 0.25), vec2f(0.0), vec2f(1.0))),
-    pack2x16unorm(clamp(vec2f(gap / 0.06, r.r), vec2f(0.0), vec2f(1.0)))));
+    w));
 }`,
 
   sharpenDye: `${HEAD}
@@ -3600,6 +3626,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W),
+  // A clear film that tears (PLAN §20b): see wgsl/film.ts.
+  ...filmKernels(HEAD, W),
 };
 
 /*

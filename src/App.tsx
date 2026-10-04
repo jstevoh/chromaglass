@@ -4649,6 +4649,8 @@ export default function App() {
             onBenDay={(v) => updateSettings({ benDay: v })}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
+            clearFilm={settings.clearFilm ?? 0}
+            onClearFilm={(v) => updateSettings({ clearFilm: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
