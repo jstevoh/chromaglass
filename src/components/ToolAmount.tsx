@@ -36,7 +36,7 @@ export function ToolAmount({ tool, value, onChange, className = '' }: {
 /** Each tool's name, as the popover titles it. */
 const TOOL_NAMES: Record<string, string> = {
   dropper: 'Drop', spray: 'Spray', splatter: 'Splat', pour: 'Pour', streak: 'Streak',
-  blow: 'Blow', press: 'Press', finger: 'Finger', magnet: 'Magnet',
+  blow: 'Blow', press: 'Press', finger: 'Finger', magnet: 'Magnet', spin: 'Spin',
 };
 
 /**
