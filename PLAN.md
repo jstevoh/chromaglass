@@ -253,6 +253,8 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **7.5** Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
   **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, then **23.7**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
+- **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
+  13.1-sign), then **24.4**.
 
 ### One home for work written twice
 
@@ -284,6 +286,7 @@ and to mark shipped, and the others now point to it.
 | Mixed versions at the projector | 14p | 14k |
 | The checks red on trees they do not measure | Wave 0's list | §0, §11, 19h |
 | Press dye on the GPU | 18a-3 | 15d |
+| An input per channel | 24.1 | 5-channels |
 
 ## Running order
 
@@ -786,7 +789,9 @@ the analyser's: the kick's onset from the kick mic, the vocal bus for the lyrics
 for presence, the room mic's roar as a sound-learn source. Browsers differ above two
 channels, so it is surest in the Mac app (§13 step 1). The phone's Sound sheet gets a
 meter and an on/off per channel. *Measure:* `npm run bands` on a four-channel file with
-a kick on channel 1 only: the kick onset follows channel 1, not the mix.
+a kick on channel 1 only: the kick onset follows channel 1, not the mix. **Home: 24.1**
+(2026-10-04), the audio-voice half of the Patch inputs; Chrome gives a page at most two
+input channels, so above two it is the Mac app's alone.
 
 ### 6. Render a song
 
@@ -5330,3 +5335,110 @@ sit behind the key.
   mark only; your own logo is the app's.
 - **23.7** *(owner)*: the free beta, then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
+
+## 24. Modular rigs: patch the rack into the liquid
+
+*Asked 2026-10-04: how to sell ChromaGlass straight to modular (Eurorack) synth players,
+and what would make it easy to bring into their shows. The owner put all four steps
+below into the plan the same day.*
+
+**Why not just the line-in.** Every visualizer has a line-in, and ChromaGlass's asks the
+interface for one channel (`App.tsx`, `channelCount: 1`), so a stereo mix arrives folded
+to mono. A modular player's sound is not one mix: the kick, the bass and the lead each
+leave the rack on their own cable, and the rack runs on gates, control voltages and a
+clock pulse rather than on MIDI. What makes a thing feel like it belongs in a rack is
+that it can be patched. Many of these players already own a DC-coupled interface for
+VCV Rack or Bitwig (Expert Sleepers ES-8: 4 DC-coupled inputs, 8 outputs, ±10 V,
+class-compliant; ES-9: 14 in, 8 out; MOTU's UltraLite mk5 has DC-coupled outputs only),
+so the interface is the dongle and needs no driver on a Mac.
+
+**What already reaches them, with no new code.** MIDI clock, Start, Continue and Stop
+into the beat clock, MIDI timecode, and MIDI learn from any CC or note (`midi.ts`), which
+hardware sequencers (Hermod+, OXI One, Polyend Tracker, the Elektron boxes) drive, and so
+do CV-to-MIDI modules (Befaco CV Thing, Expert Sleepers FH-2, Doepfer A-192-2). OSC
+through the show server, which VCV Rack reaches with trowaSoft's cvOSCcv module (CV
+sent as OSC, up to 32 more channels with its expanders) and monome norns speaks itself.
+§13.4's OSC write-up should name both.
+
+**The one fact that shapes the steps.** Chrome hands a page at most two input channels,
+whatever the interface has, on macOS and on Windows: Chromium's
+`AudioManagerMac::GetInputStreamParameters` keeps a device's channel count only when it
+is two or fewer, the Windows code sets discrete input devices to two outright, and the
+request to lift it (crbug 40403559) has been open since 2015. The Electron app inherits
+the cap unless it reads the interface natively (inferred, not tested). With echo
+cancellation, noise suppression and auto gain all off, Chrome skips its WebRTC
+processing, where the high-pass filter lives, so DC on those two channels probably
+survives; whether the OS or driver blocks it is unmeasured. So the site gets two
+channels and the app all of them, which fits §23's rule that paid is what a page cannot
+do. (§5's "an ear per input channel", 5-channels, says browsers "differ" above two: they
+do not, Chrome stops at two. That item is now 24.1's audio half; its home is here.)
+
+### Steps
+
+- **24.1** *Patch inputs* (two PRs). A Patch panel lists the interface's input channels,
+  each with a live scope, and makes each one of:
+  - an **audio voice**: the channel is one instrument, and its onsets and level feed
+    sound learn and the plate's sources by name (5-channels), so the kick channel drops
+    and the bass channel swells with no guessing which band the kick is in;
+  - a **gate**: a rising edge (with a threshold and hysteresis, so a slow envelope does
+    not chatter) fires any action a pad fires;
+  - a **CV**: a voltage rides any learnable setting as a MIDI fader does, over a chosen
+    range (0–5 V, 0–10 V, ±5 V) and the setting's own curve, smoothed by a frame;
+  - a **clock** at 1, 2, 4, 24 or 48 pulses a beat into the beat clock as a tempo
+    source beside MIDI clock and tap, and a **reset** that is bar one: the downbeat a
+    MIDI clock never carries.
+  Learned as MIDI is: touch the cable, and the channel that moves is the one picked.
+  Saved with the show and in the MIDI map file. Volts are read off the interface's
+  full scale (the ES-8 and ES-9 are ±10 V at full scale), with a calibrate step that
+  reads 0 V and a known voltage for any other interface. The phone's remote shows the
+  Patch page read-only (what each cable does, live); editing is on the laptop.
+  - **24.1a** (lanes D and B, after 1.5): two channels, on the site and in the app,
+    through `getUserMedia` with `channelCount: 2` and a `ChannelSplitter`.
+  - **24.1b** (`desktop/`, after 24.1a and 13.1-sign): every channel in the Mac app,
+    read natively (Core Audio through a small native module) and handed to the page
+    as the same sources. Paid (§23). The Windows app's with 13-win-app.
+  *Measure:* a new check, `patch`, that feeds a page a generated multichannel WAV as its
+  fake capture device: channel 1 a gate at 120 bpm, channel 2 a slow DC ramp, channel
+  3 a 4-pulses-a-beat clock with a reset every 16 beats. Every gate fires its action
+  within one frame (count equal, none doubled), the ridden setting tracks the ramp
+  within 2 % of its travel, the clock reads 120 bpm, and the bar grid's one lands on
+  every reset. In the app, the same with all channels. By hand on the Mac with an ES-8
+  (docs/judging.md, next free number at merge): DC on the site's two channels, measured.
+- **24.2** *The interface picked at soundcheck is the one the show hears, and comes back
+  after a knocked cable.* This is Wave 1's 1.5 (14s) and 1.6 (14g); a rack is plugged
+  in at soundcheck and knocked at the gig, so 24.1 is not offered before both ship.
+- **24.3** *MIDI notes as voices* (lane D then B, one PR). A sequencer's notes play the
+  plate rather than press a button: a channel picks the tool and the liquid, pitch the
+  dye (or a place on the plate, by a scale across it), velocity the drop's size, and a
+  held note pours for as long as it is held. It is a binding kind beside `setting`,
+  `action`, `preset` and `dye` in `MidiTarget`, learned from the first note that
+  arrives, so one learn covers every note on that channel. Start as bar one is 14e's
+  (Start and dropout) and 5-downbeat's; 24.3 does not do it twice. *Measure:* beside
+  `npm run desk`'s MIDI lines, a page fed a recorded sequence of notes on two
+  channels: one drop per note-on, the dye by pitch, the size rising with velocity, and
+  a held note's pour lasting its length within a frame.
+- **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
+  DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
+  (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid
+  modulates the synth and the loop is the show, which no comparable video module does
+  that way round. Read on the GPU from the readouts the governor and the flash guard
+  already take (no new full-plate readback), sent a frame at a time and smoothed at
+  audio rate so a step does not click. The site may reach the first two outputs
+  (`AudioContext.setSinkId`, Chrome 110 and later, then a `ChannelMerger`); the app
+  reaches all of them. *Measure:* a page whose output is captured back as a WAV: the
+  dye-motion output rises within a frame of a stir and falls when the plate rests, and
+  the drop trigger counts the drops.
+
+**Later, not a step yet.** No laptop: an iPad with a class-compliant interface (the ES-8
+is class-compliant on iOS) and HDMI out through Apple's USB-C Digital AV Multiport
+Adapter, which carries HDMI and a USB device together; the two working at once on one
+iPad is unverified. It rides on §12's app, not a box of our own. A Eurorack module of
+our own is not planned (hardware, stock, a different business).
+
+**Reaching them** (with 23.7's free beta). A one-minute patch video (a kick's gate into
+the interface drops on every hit, an LFO makes the colour breathe, a clock and reset
+change the look on the bar) posted to ModWiggler's Video Synthesis forum, lines
+(llllllll.co), r/modular and r/videosynthesis, and sent to the creators who already
+review video synths. Ask Expert Sleepers to list ChromaGlass as working with the ES-8
+and ES-9. Superbooth 27 is 6–8 May 2027 in Berlin. The dedicated video synths cost
+$400–1,500 (EYESY, Hypno, Structure, Videomancer), which is the price to sit under.
