@@ -797,6 +797,12 @@ Found with it, open:
   512 → 384 → 256 in every look in its first twenty seconds. If the owner's laptop does
   the same, the plate is drawn from a quarter of the cells most of the time; a look's
   grid should be measured on the owner's machine (judging §34) before the ladder is changed.
+- **1e. The lab draws without the grain field unless asked** (`lab.render`'s `grain`
+  option, scripts/lab-entry.ts). Without it the plate reads a blank texture and every
+  look's grain is one value, about 0.75, everywhere: each lab check of a look with grain
+  measures a plate a quarter thinner in optical depth than the app's. `benday` had its
+  washes tuned on that (re-laid in 1a). Draw with the grain by default, and re-read the
+  checks that move.
 
 ### 2. Lacing
 
