@@ -56,7 +56,8 @@ jobs:
   # check-only merge). Then nothing is checked or published, and the run is
   # green in seconds. Over the 30 merges to 2026-10-04 three would have
   # answered it, and one of them (#245, docs only) waited 79 minutes for the
-  # Mac. A run by hand still checks and deploys.
+  # Mac. A run by hand still checks and deploys, and is how a changed build
+  # secret (VITE_*, above) goes live: a docs merge no longer carries one out.
   verified:
     name: Already checked on its PR
     runs-on: ubuntu-latest

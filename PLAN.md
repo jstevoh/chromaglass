@@ -4366,10 +4366,12 @@ shard on its deploy (rule 3, because its PR skipped them): 84bb112 (#245) went l
 minutes after its merge; a check-only merge cost eight minutes of Measure.
 
 *Fix, shipped:* rule 6 in `deploygate.sh`. When no site file differs from the commit that is
-live (the head of the newest green deploy run before this one), the deploy answers `nothing`,
-checks and publishes nothing, and is green in seconds, so the concurrency group is free for
-the merges behind it. A changed check script still ran on its own PR; a run by hand still
-checks and deploys. *Measured:* `npm run deploygate -- --history 30` gave 5 `true`, 16
+live (the head of the last green deploy run to start before this one, on any branch, so a
+re-run of an old deploy counts by when it ran), the deploy answers `nothing`, checks and
+publishes nothing, and is green in seconds, so the concurrency group is free for the merges
+behind it. A change to the gate or `reach.mjs` always deploys, and a filter that fails never
+reads as "no site file". A changed check script still ran on its own PR; a run by hand still
+checks and deploys, and is now how a changed `VITE_*` secret goes live. *Measured:* `npm run deploygate -- --history 30` gave 5 `true`, 16
 `disjoint`, 9 `false` before; 5, 14, 8 and 3 `nothing` after (84bb112, 3586ead, e199bd3:
 together 95 minutes of deploy time, 79 of them behind the Mac). `vite build` of each of the
 three and of the commit live before it gave the same 25 files byte for byte; a site merge

@@ -62,18 +62,20 @@
 #      change was not yet live and their run was the one to check and publish
 #      it: d027626's 111 minutes were three PRs' site changes going out.
 #
-#      "The commit that is live" is the head of main's newest deploy run that
-#      succeeded before this push's own run. A successful run that published
+#      "The commit that is live" is the head of the newest deploy run, on any
+#      branch, that succeeded and started before this push's own run. A successful run that published
 #      nothing (this rule) had the live commit's site files, so the chain
 #      holds through it. It is compared with the commit live then, not with the
 #      push's parent: a docs-only merge on top of a site change whose deploy went
 #      red differs from what is live, and is deployed (and checked) in full.
 #      "Built from" is `reach.mjs --site` (src/, public/, index.html, the build
 #      config, the lockfile, package.json, firebase.json), plus this workflow
-#      and .firebaserc, which decide how it is built and where it goes;
+#      and .firebaserc, which decide how it is built and where it goes, and
+#      this script and reach.mjs, so the gate never judges its own change;
 #      package.json counts unless only scripts the build never runs changed.
 #      A rollback or a deploy from outside this workflow would make the newest
 #      green run not the live one: anything that publishes must do it here.
+#      A re-run of an old deploy does publish here, and counts by when it ran.
 #
 # Runs from before the title carried the tested SHA (before 2026-09-27) fall
 # back to inferring it: the head has the pushed tree, and main as it stood
@@ -217,7 +219,8 @@ apart() {
     if [ "$v" = replaced ]; then
       if [ "${GATE_DEPTH:-0}" -ge 1 ]; then continue; fi
       v=$(GATE_DEPTH=1 judge "$x" | tail -1) || v=false
-      case "${v%% *}" in true|disjoint) continue ;; esac
+      # nothing: it would have published nothing, the live site being its own.
+      case "${v%% *}" in true|disjoint|nothing) continue ;; esac
       v="replaced and would not have passed"
     fi
     [ "$v" = green ] || bad="$bad ${x:0:7} ($v)"
@@ -231,20 +234,45 @@ apart() {
 # otherwise (including when anything cannot be read: the other rules decide).
 #   $1 the pushed commit   $2 its tree
 unchanged() {
-  local sha="$1" tree="$2" runs mine live ltree diff deployable
-  runs=$(api "actions/workflows/deploy.yml/runs?branch=main&per_page=100") || return 0
-  # This push's own deploy run, if it has one (a re-run keeps its number), and
-  # the newest success before it; a replay of an older merge (--history) reads
-  # what was live when that merge's own deploy started.
-  mine=$(jq -r --arg h "$sha" '[.workflow_runs[] | select(.head_sha == $h) | .run_number] | min // empty' <<<"$runs") || return 0
-  live=$(jq -r --argjson n "${mine:-1000000000}" '[.workflow_runs[] | select(.conclusion == "success" and .run_number < $n)]
-    | max_by(.run_number) | .head_sha // empty' <<<"$runs") || return 0
+  local sha="$1" tree="$2" runs mine live ltree diff site deployable
+  # Every run of this workflow, on whichever branch: a run by hand started from
+  # another branch publishes to the same live channel.
+  runs=$(api "actions/workflows/deploy.yml/runs?per_page=100") || return 0
+  # When this run started: in CI the run that is going ($GITHUB_RUN_ID, so a
+  # main pushed back to an older commit is not taken for that commit's first
+  # deploy); in a replay (--history, or rule 5 judging a replaced commit) the
+  # push's own first deploy. A run missing from the listing gives no verdict.
+  if [ -n "${GITHUB_RUN_ID:-}" ] && [ "$sha" = "${GITHUB_SHA:-}" ] && [ "${GATE_DEPTH:-0}" = 0 ]; then
+    mine=$(jq -r --argjson id "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.id == $id)] | first | .run_started_at // empty' <<<"$runs") || return 0
+  else
+    mine=$(jq -r --arg h "$sha" '[.workflow_runs[] | select(.head_sha == $h and .event == "push")] | min_by(.run_number) | .run_started_at // empty' <<<"$runs") || return 0
+  fi
+  [ -n "$mine" ] || return 0
+  # What is live is what the last green run before this one published, "last"
+  # by when it ran, not by its number: a re-run keeps its number, so an old
+  # deploy re-run after newer ones (209, 211, 215 and 218 were re-run on
+  # 2026-10-03) put its older tree up last, and a docs merge after it must
+  # replace that, not leave it. run_started_at is the latest attempt's start,
+  # and the concurrency group runs one deploy at a time and drops a waiting one
+  # when a newer one queues, so every run that started before this one has
+  # finished, in the order they started.
+  live=$(jq -r --arg t "$mine" '[.workflow_runs[] | select(.conclusion == "success" and .run_started_at < $t)]
+    | max_by(.run_started_at) | .head_sha // empty' <<<"$runs") || return 0
   [ -n "$live" ] || return 0
   ltree=$(treeof "$live") || return 0
   [ -n "$ltree" ] || return 0
   diff=$(treediff "$ltree" "$tree") || return 0
-  deployable=$( { printf '%s\n' "$diff" | grep -v '^$' | node "$(dirname "$0")/reach.mjs" --reaching --site || true
-                  printf '%s\n' "$diff" | grep -xE '\.github/workflows/deploy\.yml|\.firebaserc' || true; } | sort -u | grep -v '^$' || true)
+  # A filter that fails must not read as "no site file": only an empty diff
+  # may leave $site empty without reach.mjs answering.
+  site=$(printf '%s\n' "$diff" | grep -v '^$' | node "$(dirname "$0")/reach.mjs" --reaching --site) \
+    || [ -z "$diff" ] || return 0
+  # Besides the site's own files: this workflow and .firebaserc, which decide
+  # how it is built and where it goes, and this gate and reach.mjs, which would
+  # otherwise judge their own change (a SITE list narrowed in the same merge as
+  # a change to src/ would wave that change through).
+  deployable=$( { printf '%s\n' "$site"
+                  printf '%s\n' "$diff" | grep -xE '\.github/workflows/deploy\.yml|\.firebaserc|scripts/deploygate\.sh|scripts/reach\.mjs' || true; } \
+                | grep -v '^$' | sort -u || true)
   if grep -qx package.json <<<"$deployable" && scriptsonly "$live" "$sha"; then
     deployable=$(grep -vx package.json <<<"$deployable" || true)
   fi
