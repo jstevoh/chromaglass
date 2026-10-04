@@ -46,7 +46,7 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 
 | Where | Can verify | Cannot |
 |---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `particles`, `derive`, `mixer`), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
+| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `particles`, `derive`, `mixer`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
 | CI, macOS runner (Metal) | Everything | — |
 | The owner's machine | How it looks at 60 fps | — |
 
@@ -72,6 +72,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | the mixer (`src/lib/mixer.ts`, `MixerPanel.tsx`) | `mixer`, `rowfade` (the take buttons), `panel`, `phone`, `remotemix` (the remote's) |
 | the projector's pass (`src/gpu/output.ts`, `src/gpu/wgsl/output.ts`, `src/lib/outputConfig.ts`, `src/lib/plateSources.ts`, `OutputPanel.tsx`) | `map`, `beams` and `mixer` (the lab, `PW_WEBGPU=1`), `phone`; `wall` on the Mac |
 | the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`) | `applink`, `remotemix`; the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
+| the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
@@ -93,9 +94,12 @@ deploy:
   `scripts/deploygate.sh`). Otherwise the deploy runs them in full. So bring
   `main` into a PR and let it go green before merging, rather than merging a
   head that is behind.
-- Superseded PR runs are cancelled. `gallery.yml` (every preset photographed),
-  `controls.yml` (every control measured) and `film.yml` (every look filmed and
-  measured against real shows: swells, calm, black, sync by section) run by hand.
+- Superseded PR runs are cancelled, and so are a PR's runs still queued or going
+  when it merges or closes (`closed.yml`). `gallery.yml` (every preset
+  photographed), `controls.yml` (every control measured) and `film.yml` (every
+  look filmed and measured against real shows: swells, calm, black, sync by
+  section) run by hand; the first two also on a PR labelled `gallery` or
+  `controls`, which a session can add.
 
 When CI is red, use the `steward` skill.
 

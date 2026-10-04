@@ -1,0 +1,105 @@
+name: A closed PR stops its runs
+
+# When a pull request is merged or closed, its `Checks` and `iPhone app` runs
+# that are still queued or running have nothing left to decide: the merge has
+# happened, and the deploy runs its own checks unless `scripts/deploygate.sh`
+# finds a green run that already finished. Yet they kept their place in the
+# macOS queue and then held a runner for their full length. On 2026-10-03 at
+# 19:14 UTC, #204 had been merged for an hour while its last push's four Mac
+# shards were still queued and running, in front of the deploy that #204's own
+# merge had started.
+#
+# GitHub cancels a run when another run enters the same concurrency group
+# with `cancel-in-progress`, and concurrency groups are shared by every
+# workflow in the repository. So each job below joins the group the run it
+# stops is in, spelled out by hand, and does nothing: a pull request event's
+# `github.ref` is `refs/pull/<n>/merge` for every activity type, closed
+# included, so the groups match.
+#
+#   checks.yml   checks-${{ github.workflow }}-${{ github.ref }}, where its
+#                github.workflow is its name, "Checks"
+#   ios.yml      ios-${{ github.ref }}
+#
+# The stopping is done here rather than by adding `closed` to checks.yml's own
+# triggers, because the deploy gate trusts any green pull-request `Checks` run
+# whose title names the tree being deployed; a closed event's run with every
+# job skipped would finish green having tested nothing. This workflow is not
+# `Checks`, so the gate never reads it. A cancelled run is never green, so the
+# gate falls back to running the checks itself. That loses nothing in the usual
+# case: the gate reads the runs once, when the merge's deploy starts, and a run
+# still going at the merge has not finished by then. The one case it costs is a
+# deploy left pending behind an earlier deploy, whose gate would have found the
+# run green had it been let finish; the deploy then runs its four Mac shards
+# where the PR run would have run its remaining ones.
+#
+# If a group's spelling changes in checks.yml or ios.yml, change it here too,
+# or this stops nothing. `npm run closedruns` (in Measure) holds the three
+# files to the same spelling before a merge, and each job below goes red after
+# one if a run it was meant to stop is still going.
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  # Each job joins its group, which is all the cancelling there is, then looks:
+  # it waits for the stopped run to end and fails if any run of that workflow
+  # on the PR's head is still queued or running three minutes later. Without
+  # this a group spelt wrong, or a GitHub behaviour this relies on changing,
+  # would leave every job here green and every stale run going.
+  checks:
+    name: Stop its Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    concurrency:
+      group: checks-Checks-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      GH_TOKEN: ${{ github.token }}
+      WORKFLOW: checks.yml
+      GROUP: checks-Checks-${{ github.ref }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Nothing of it is left queued or running
+        run: |
+          echo "PR #${{ github.event.number }} closed; joined $GROUP to stop its $WORKFLOW runs on ${HEAD:0:7}."
+          for _ in $(seq 18); do
+            sleep 10
+            left=$(curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW/runs?event=pull_request&head_sha=$HEAD&per_page=30" \
+              | jq -r '[.workflow_runs[] | select(.status != "completed") | .html_url] | join(" ")')
+            [ -z "$left" ] && { echo "No $WORKFLOW run on ${HEAD:0:7} is queued or running."; exit 0; }
+            echo "Still going: $left"
+          done
+          echo "::error::$WORKFLOW runs on ${HEAD:0:7} still going three minutes after joining $GROUP: $left"
+          exit 1
+
+  ios:
+    name: Stop its iPhone app build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    concurrency:
+      group: ios-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      GH_TOKEN: ${{ github.token }}
+      WORKFLOW: ios.yml
+      GROUP: ios-${{ github.ref }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Nothing of it is left queued or running
+        run: |
+          echo "PR #${{ github.event.number }} closed; joined $GROUP to stop its $WORKFLOW runs on ${HEAD:0:7}."
+          for _ in $(seq 18); do
+            sleep 10
+            left=$(curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW/runs?event=pull_request&head_sha=$HEAD&per_page=30" \
+              | jq -r '[.workflow_runs[] | select(.status != "completed") | .html_url] | join(" ")')
+            [ -z "$left" ] && { echo "No $WORKFLOW run on ${HEAD:0:7} is queued or running."; exit 0; }
+            echo "Still going: $left"
+          done
+          echo "::error::$WORKFLOW runs on ${HEAD:0:7} still going three minutes after joining $GROUP: $left"
+          exit 1

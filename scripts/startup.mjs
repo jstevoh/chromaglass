@@ -23,10 +23,18 @@
  *   1. it opens: the plate is stepping in every quarter second, and the
  *      first step comes within FIRST_STEP_MAX_S of load
  *   1b. and it is moving for good (no stretch of more than MAX_GAP_S
- *      without a step after) no more than STEADY_SLACK_S later than the
- *      control was. Waiting for all eighty-seven passed everything else and
- *      opened at 23 s against the control's 14 (`gpu/prepare.ts`): a fix
- *      that trades the freeze for a longer wait is not one.
+ *      without a step after) no later than the control was, with what
+ *      neither page owns taken out of both: Chromium handing over the GPU,
+ *      and the GPU compiling the pipelines the old way built on its frames.
+ *      What is left, the page's own wait, may be no more than
+ *      STEADY_SLACK_S longer than the control's; and the show may take no
+ *      more than COMPILE_RATIO times as long a pipeline building them
+ *      ahead as the control's stop took compiling them. Waiting for all
+ *      eighty-seven passed everything else and opened at 23 s against the
+ *      control's 14 (`gpu/prepare.ts`): a fix that trades the freeze for a
+ *      longer wait is not one. Two openings' wall times, unpaired, could not
+ *      say so: the same compile ran up to half as long again in one as in
+ *      the other (STEADY_SLACK_S).
  *   2. every pipeline it asked for ahead was built ahead, before the show
  *      opened and behind it, on the device it opened on, and it waited for
  *      every pipeline the control built on its frames, by name
@@ -134,15 +142,48 @@ const OPENING_SECONDS = 3;
 const LOOK_CAP_S = Number(process.env.STARTUP_LOOK_CAP ?? 20);
 const OPENINGS_BUDGET_S = Number(process.env.STARTUP_OPENINGS_BUDGET ?? 360);
 /**
- * How much later than the old way the plate may start moving for good. The
- * old way was moving from the end of its freeze; this one waits for its
- * look's own pipelines, one at a time, where the old way had the GPU compile
- * them in a burst, and a cold compile on the runner varies by a second or two
- * from one opening to the next. Three seconds says the wait was moved, not
- * made longer; the twenty-three it took when the show waited for everything
- * fails it by far.
+ * How much longer than the old way the show's own part of the wait to moving
+ * for good may be (1b, waitOf). It was three seconds on the whole wait, from
+ * load, on the reading that a cold compile "varies by a second or two from
+ * one opening to the next". It varies by more. Over seventy runs of the open
+ * shard (27 September to 3 October) the show less the control ran from -4.95
+ * to +4.35 s, and went red on three (16.72 against 13.71 s on 36371919138,
+ * 22.47 against 18.12 on 37095698733, 19.24 against 14.99 on 37143242070,
+ * #223's). Each opening's wait is three things: Chromium handing over the
+ * adapter and device (2.9 to 6.1 s after load), the GPU compiling the same
+ * forty-five pipelines cold, and the page's own work around them. The first
+ * is not the page's; the second took the two openings of one run from 0.75
+ * to 1.5 times as long a pipeline as each other, the same pipelines on the
+ * same runner a minute apart, and on the three reds the show's compile was
+ * the slower by 22 to 31 per cent (12.9 to 16.8 s of it). The page's own
+ * part, what the show waited for beyond the old way's list included, was
+ * 0.91 to 1.85 s in the show and 1.09 to 2.26 s in the control, and the
+ * show's less the control's -0.89 to +0.27 s on every one of the seventy,
+ * the three reds +0.01, +0.27 and +0.07 (replayed from what each run
+ * printed, each build's time approximated from the total; waitOf). So
+ * that is what is held to the old way's, and a second is above every run
+ * read: the eighty-seven the show once waited for add forty pipelines of
+ * its own, nine seconds of them.
  */
-const STEADY_SLACK_S = Number(process.env.STARTUP_STEADY_SLACK ?? 3);
+const STEADY_SLACK_S = Number(process.env.STARTUP_STEADY_SLACK ?? 1);
+/**
+ * How much longer the show may take building the old way's pipelines ahead
+ * than the old way's steps stopped while it compiled them on its frames (1b's
+ * second line). Waited for one at a time with the async call, a cold compile
+ * costs what it does on the frame (0.23 against 0.22 s, `gpu/prepare.ts`);
+ * over the seventy runs the show's against the control's, opening against
+ * opening, read 0.75 to 1.5 times, approximated from each run's total (the
+ * logs print the whole build, not each), with the three reds at 1.22 to
+ * 1.31. That spread is the runner's: the same compile, a minute apart. The
+ * first line prices the show's compile as the runner's whatever it took, so
+ * this is what holds the show to building no slower than the runner
+ * compiles. At 1.75 it is above every pair read with room for what the
+ * approximation hides, and a build made twice as slow (another eleven
+ * seconds) is the page's. Slower than the runner's own spread, by less than
+ * half again, one pair of openings cannot tell from the runner, and did not
+ * before either: the old line went red on the runner instead.
+ */
+const COMPILE_RATIO = 1.75;
 /**
  * The most time before the first step the page's thread may be held from
  * outside it, all told (4b). This is not what tells Chromium's stop from
@@ -698,12 +739,22 @@ async function open(query, looks) {
           // A stop still going when this reads: not moving for good at all.
           return ts.length && now - ts[ts.length - 1] > maxGap * 1000 ? null : from;
         })(),
+        // Every stretch of more than MAX_GAP_S without a step, [from, how
+        // long]: the old way's is its freeze, the GPU compiling on the frame
+        // what its first step asked for, which 1b prices (waitOf).
+        stepStops: (() => {
+          const ts = changes(3);
+          const out = [];
+          for (let i = 1; i < ts.length; i++) if (ts[i] - ts[i - 1] > maxGap * 1000) out.push([ts[i - 1] / 1000, (ts[i] - ts[i - 1]) / 1000]);
+          return out;
+        })(),
         long: window.__startupLong.filter(([s]) => s <= now),
         // The first seconds' long animation frames, [began, lasted], so a
         // run says whether one lay across Chromium's hold (4b).
         loaf: window.__startupLoaf.filter(([st]) => st <= Math.min(now, (heldBy + 3) * 1000))
           .map(([st, d, rs, bl, n]) => [st / 1000, d / 1000, rs == null ? null : rs / 1000, bl == null ? null : bl / 1000, n]),
         settledStarts,
+        t0: window.__startupT0,
         rows: rows.map((r) => [+(r[0] / 1000).toFixed(2), ...r.slice(1)]),
         prepared: d?.pipelines?.()?.prepares?.find((p) => p.stage === 'opening') ?? null,
         gpu: window.__startupGpu.map(([w, a, b]) => [w, a / 1000, b == null ? null : b / 1000]),
@@ -912,6 +963,67 @@ const gpuTime = (o) => {
     ...slow.map((r) => `  handed ${r.t.toFixed(2)} s, done ${r.d.toFixed(2)} s, ${r.took.toFixed(2)} s on it: ${top(r.w)}`)];
 };
 
+/*
+  1b's reading of one opening: the wait from load to moving for good, split
+  into Chromium's, the GPU's compile of the pipelines the old way built on
+  its frames, and the rest, which is the page's own.
+
+  Chromium's is the page's first request for an adapter and its first for a
+  device, each from asked to handed over, overlap counted once. Not capped
+  against the control's: the control is the same page, asking the same way
+  (only ?prepare=0 differs), so a change to how it asks moves both sides, and
+  what differs between the two is the runner (the show's handover less the
+  control's read -4.08 to +1.28 s over the seventy runs). Any further request,
+  a device lost and asked for again, is the page's own.
+
+  The old way's compile is the stop in its steps that the builds it made on
+  its frames sat in: each control read asked for them on its first step and
+  stopped once, 0.25 to 0.42 s later, until it was moving for good. A stop
+  begun more than a second after the last of them is not theirs. The show's
+  is how long each of the same pipelines took to build ahead, one at a time,
+  its first build under that name only (`gpu/prepare.ts`). Both include each
+  pipeline's first use, which the old way paid on its frames as well
+  (`gpu/kit.ts`, firstUse). What the show waited for beyond the old way's
+  list is not priced out: it is the show's own wait.
+
+  The steps are sampled every quarter second and the builds timed to the
+  millisecond, so the two own waits are each good to about a quarter second;
+  the seventy runs' differences (-0.89 to +0.27 s) were read with that in.
+*/
+const waitOf = (x, oldWay) => {
+  if (x.steadyFrom == null) return null;
+  // Rows are from the init script's start; WebGPU's moments, the builds' and
+  // the ledger's are performance.now()'s.
+  const t0 = (x.t0 ?? 0) / 1000;
+  const steady = x.steadyFrom / 1000 + t0;
+  const firstOf = (w) => (x.gpu ?? []).filter(([k, a]) => k === w && a != null).sort((p, q) => p[1] - q[1])[0];
+  const asks = ['adapter', 'device'].map(firstOf).filter((r) => r && r[1] < steady)
+    .map(([, a, b]) => [a, Math.min(b ?? steady, steady)]).sort((p, q) => p[0] - q[0]);
+  let chromium = 0, end = 0;
+  for (const [a, b] of asks) { const from = Math.max(a, end); if (b > from) chromium += b - from; end = Math.max(end, b); }
+  let compile = 0, count = 0;
+  if (x.prepared) {
+    const seen = new Set();
+    for (const [key, at, ms] of x.prepared.builds ?? []) {
+      if (!oldWay.includes(key) || seen.has(key) || at / 1000 >= steady) continue;
+      seen.add(key);
+      compile += Math.min(ms / 1000, steady - at / 1000);
+      count++;
+    }
+  } else {
+    const built = (x.ledger?.onFrame ?? []).map((e) => e.at / 1000).filter((t) => t <= steady);
+    const first = Math.min(...built), last = Math.max(...built);
+    for (const [at, len] of x.stepStops ?? []) {
+      const from = at + t0;
+      if (!built.length || from >= steady || from > last + 1 || from + len < first) continue;
+      compile += Math.min(len, steady - from);
+      count++;
+    }
+  }
+  return { steady: steady - t0, chromium, compile, shared: count, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', own: steady - t0 - chromium - compile };
+};
+const sayWait = (w) => (w == null ? 'never moving for good'
+  : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}), ${w.own.toFixed(2)} s the page's own`);
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, held = null) => {
   // Whether the page's own thread was busy through a gap (a long task
@@ -951,17 +1063,32 @@ try {
     `${o.firstStep == null ? 'no step at all' : `first step at ${(o.firstStep / 1000).toFixed(2)} s (no later than ${FIRST_STEP_MAX_S} s)`}`
     + `${p ? `, after ${(p.ms / 1000).toFixed(2)} s building ${p.asked} pipelines ahead` : ''}${o.running ? '' : '; never two steady seconds'}`);
   const secs = (t) => (t == null ? 'never' : `${(t / 1000).toFixed(2)} s`);
-  check(`and it is moving for good no later than the old way was (with ${STEADY_SLACK_S} s to spare)`,
-    // A control that never ran steadily is no bar at all: its window now
-    // runs to when it was seen running (see the watch), and one that never
-    // was would otherwise hand the show a late one.
-    o.steadyFrom != null && c.running && c.steadyFrom != null && o.steadyFrom <= c.steadyFrom + STEADY_SLACK_S * 1000
-      && o.steadyFrom / 1000 <= FIRST_STEP_MAX_S,
-    `from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)} for ?prepare=0${c.running ? '' : ' (never running steadily)'}, read to ${secs(c.watch)}`);
   // What the old way built on its frames, on the same look: each should have
   // been waited for. Names, not a count, so a list that grew elsewhere and
   // lost one of these still fails.
   const oldWay = [...new Set((c.ledger?.onFrame ?? []).map((e) => e.name))];
+  const cWait = waitOf(c, oldWay);
+  const oWait = waitOf(o, oldWay);
+  // A control that lost its device compiled on two, and its wait is no bar.
+  const cDevices = c.ledger?.devices ?? 0;
+  // The same pipelines on both sides, so the same count: a show that built
+  // fewer of them ahead is check 2's to catch, and reads faster here.
+  const rate = cWait?.compile > 0 && oWait && oldWay.length ? oWait.compile / cWait.compile : null;
+  console.log(`     1b, the wait to moving for good split up: ${sayWait(oWait)}; for ?prepare=0 ${sayWait(cWait)}`);
+  check(`and it is moving for good no later than the old way was, Chromium's and the GPU's compile apart (with ${STEADY_SLACK_S} s to spare)`,
+    // A control that never ran steadily is no bar at all: its window now
+    // runs to when it was seen running (see the watch), and one that never
+    // was would otherwise hand the show a late one. One that never stopped
+    // for its compile was not cold, and prices nothing.
+    o.steadyFrom != null && c.running && c.steadyFrom != null && o.steadyFrom / 1000 <= FIRST_STEP_MAX_S
+      && !!oWait && !!cWait && cDevices === 1 && cWait.compile > 0 && oWait.own <= cWait.own + STEADY_SLACK_S,
+    `the show's own ${oWait ? `${oWait.own.toFixed(2)} s` : 'unread'} against ${cWait ? `${cWait.own.toFixed(2)} s` : 'unread'} for ?prepare=0`
+      + `${cWait && !(cWait.compile > 0) ? ' (it never stopped for what it built on its frames, so its cache was not cold)' : ''}`
+      + `${cDevices === 1 ? '' : ` (the control had ${cDevices} devices, so its compile is no bar)`}`
+      + `; moving for good from ${secs(o.steadyFrom)}, against ${secs(c.steadyFrom)}${c.running ? '' : ' (never running steadily)'}, read to ${secs(c.watch)}`);
+  check(`and it built the old way's pipelines no slower than the old way compiled them on its frames (at most ${COMPILE_RATIO}×)`,
+    rate != null && rate <= COMPILE_RATIO,
+    rate == null ? 'nothing to compare' : `${oWait.compile.toFixed(2)} s building ${oWait.shared} of the ${oldWay.length} ahead, against ${cWait.compile.toFixed(2)} s stopped for them: ${rate.toFixed(2)}×`);
   const notWaited = p ? oldWay.filter((k) => !p.keys.includes(k)) : oldWay;
   check('every pipeline it asked for ahead was built ahead, before it opened and behind it, on the device it opened on',
     !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && p.ready === p.asked && !p.timedOut && b.ready === b.asked && !b.timedOut,
