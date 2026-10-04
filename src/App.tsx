@@ -307,6 +307,9 @@ export default function App() {
     if (!new URLSearchParams(window.location.search).has('debug')) return;
     (window as unknown as { chromaglassApplyPreset?: unknown }).chromaglassApplyPreset =
       (id: string) => { cuePresetRef.current?.(id); };
+    // A Go to a look over a fade, as the palette's ⇧⏎ does (`npm run bottles` fades a look in with it).
+    (window as unknown as { chromaglassGo?: unknown }).chromaglassGo =
+      (id: string, seconds?: number) => { goLookNowRef.current?.(id, seconds); };
     /*
       Fire the controller's "this was hit" signal by hand.
 
@@ -353,6 +356,9 @@ export default function App() {
     // Which bottle is in the hand, as the shelf does (npm run bottles).
     (window as unknown as { chromaglassLiquid?: unknown }).chromaglassLiquid =
       (id: string) => { setSelectedLiquidId(id); };
+    // Every bottle on the bench, by id (npm run bottles picks each one).
+    (window as unknown as { chromaglassBottles?: unknown }).chromaglassBottles =
+      () => liquidTypesRef.current.map(l => l.id);
     // And its Amount, as the Amount slider does (npm run tools).
     (window as unknown as { chromaglassToolAmount?: unknown }).chromaglassToolAmount =
       (tool: string, v: number) => { setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })); };
@@ -1485,7 +1491,8 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setPresetSeq(n => n + 1);
-    visualizerRef.current?.applyPreset(presetId);
+    // With the Ferrofluid the look asks for: the settings above reach the plate a render after this.
+    visualizerRef.current?.applyPreset(presetId, undefined, lookPhase(targetLook(settingsRef.current, presetSettings)));
   };
 
   const applyUserPreset = (p: UserPreset) => {
@@ -1500,7 +1507,8 @@ export default function App() {
     setDocId(p.id);
     setDocDirty(false);
     setPresetSeq(n => n + 1);
-    visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null, liquids: p.liquids ?? null });
+    visualizerRef.current?.applyPreset(p.id, { contract: p.contract ?? null, injectStyles: p.injectStyles ?? null, liquids: p.liquids ?? null },
+      lookPhase(targetLook(settingsRef.current, p.settings)));
   };
   /*
     ── The look you are working on, as a document ────────────────────
@@ -1727,16 +1735,43 @@ export default function App() {
   }, [isAutomated, isActive]);
 
   /*
-    The Ferrofluid bottle needs the plate to draw ferrofluid at all: picking
-    it on a look with none turns the amount up, and the visualizer, seeing
-    the bottle, leaves the plate bare for the drops to land on.
+    The Ferrofluid bottle needs the plate to draw ferrofluid at all: the plate
+    draws the second phase only with Ferrofluid (phaseAmount) up, and every
+    shipped look but three has it at 0. So picking the bottle used to turn
+    the amount up to 0.6, and the visualizer, seeing the bottle, left the
+    plate bare for the drops to land on.
+
+    Except that it did not stay bare. With the amount up, the places that
+    lay the look's ferrofluid afresh read it as the look asking for some,
+    and only one of them knew about the bottle: a new solver under the lead
+    plate (the governor moving the grid, a lost device) lays the look's
+    ring whatever is in the hand; so does the half-way point of the next
+    look fading in, because a new look brought the amount up again for the
+    bottle (this effect ran on every look); and a cast display running a
+    plate of its own (one that cannot mirror the show's canvas), which is
+    sent the settings but not the bottle, saw the amount rise over a bare
+    plate and poured the ring at once (it still does on a hand's first pour:
+    it is never sent the hands, PLAN 15j). The ring is a fifth of the plate in
+    black drops round the middle. The owner, 2026-10-04: "when I pick the
+    ferrofluid liquid - it deposits a huge chunk on the canvas. It shouldn't
+    do that. I want to pour it on myself. Same with all of the other
+    liquids."
+
+    So picking a bottle changes nothing but the bottle in the hand, on every
+    path that picks one (the desk's shelf, the Design desk's bottles, the
+    phone's Dye sheet, the remote, a file from the Liquid Designer): picking
+    a bottle up off the bench puts nothing in the dish. Ferrofluid is turned
+    up when the hand actually pours it, as the Magnet's hold does: the
+    visualizer asks (onFerrofluidPoured) once the bottle's ferrofluid is in
+    the solver, so what turns the amount up is ferrofluid that is there, and
+    the "turned up on a bare plate" pour never sees a bare plate.
   */
-  useEffect(() => {
-    if (!((selectedLiquid.behaviour?.magnetic ?? 0) > 0)) return;
+  /** What a look asks of the ferrofluid, for the plate to lay it by before the look's settings arrive. */
+  const lookPhase = (s: Partial<VisualizerSettings>) => ({ phaseAmount: s.phaseAmount ?? 0, phaseScale: s.phaseScale ?? DEFAULT_SETTINGS.phaseScale });
+  const ferrofluidPoured = () => {
     if ((settingsRef.current.phaseAmount ?? 0) > 0.002) return;
     updateSettings({ phaseAmount: 0.6 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLiquid, presetSeq]);
+  };
 
   /*
     The Magnet brings its magnet with the hand, and never ferrofluid.
@@ -2162,8 +2197,9 @@ export default function App() {
     // Pressing Go is a decision: the whole look, structure and all — and its
     // colours with it, handed over across the fade rather than left to
     // evaporate for minutes under the new ones. A cut still gets a second.
-    visualizerRef.current?.handoff(Math.max(1, seconds));
-    fadeSettingsTo(targetLook(from, next.settings), seconds);
+    const target = targetLook(from, next.settings);
+    visualizerRef.current?.handoff(Math.max(1, seconds), lookPhase(target));
+    fadeSettingsTo(target, seconds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
@@ -2172,6 +2208,8 @@ export default function App() {
     if (cued) sendLook(cued, seconds ?? cued.fade ?? fadeSeconds);
   }, [cued, fadeSeconds, sendLook]);
 
+  /** For the debug hook, which is installed once and above the callback it calls. */
+  const goLookNowRef = useRef<((presetId: string, seconds?: number) => void) | null>(null);
   /** The same, for a look that was never armed — the palette's ⇧⏎. */
   const goLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
@@ -2180,6 +2218,7 @@ export default function App() {
       : built ? { id: presetId, name: built.name, settings: built.settings } : null;
     if (look) sendLook(look, seconds);
   }, [fadeSeconds, sendLook]);
+  goLookNowRef.current = goLookNow;
 
   /*
     Go to Back Plate (PLAN.md §16a): the cued look to the back plate alone.
@@ -2237,7 +2276,7 @@ export default function App() {
     if (!prev) return;
     previousLook.current = null;
     if (prev.id) adoptPreset(prev.id);
-    visualizerRef.current?.handoff(Math.max(1, fadeSeconds));
+    visualizerRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(prev.settings));
     // A take still walking stops where it is: the Back puts every row's level
     // back and was pressed later, and two walks writing one setting would
     // fight a tick at a time. Every row, not only the ones whose level moved
@@ -3844,6 +3883,7 @@ export default function App() {
         onSoundTrigger={runSoundTrigger}
         onManualGesture={musicIntel.recordGesture}
         onMagnetInHand={magnetInHand}
+        onFerrofluidPoured={ferrofluidPoured}
         onEngineStatus={(next) => {
           // The live reading goes in a ref (the settings panel polls it while
           // open); the shell only re-renders when the engine itself changed.
