@@ -265,7 +265,9 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
   // plate it is pouring on: the Evolve's random plate, the Seed button (each
   // plate), the ambient orbits and the music (the active plate), and a hand.
   const sites = {
-    evolve: /const li = fluidsRef\.current\.indexOf\(af\);\s*const color = harmonyColor\(harmonyOf\(li\)\);\s*const styles = stylesOf\(li\);/,
+    // On a look built on areas (lib/plateAreas.ts) the drop's colour is its
+    // area's dye, read for the same plate (areaColor(li, …)).
+    evolve: /const li = fluidsRef\.current\.indexOf\(af\);\s*const color = (?:area \? areaColor\(li, area\) : )?harmonyColor\(harmonyOf\(li\)\);\s*const styles = stylesOf\(li\);/,
     evolveLiquid: /doseLiquid\(af, liquidsOf\(li\)/,
     seed: /fluidsRef\.current\.forEach\(\(fluid, li\) => \{[\s\S]{0,200}const styles = stylesOf\(li\);[\s\S]{0,300}harmonyColor\(harmonyOf\(li\)\)[\s\S]{0,400}doseLiquid\(fluid, liquidsOf\(li\)/,
     ambient: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.25/,

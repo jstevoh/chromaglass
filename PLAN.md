@@ -241,6 +241,9 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
+- **6.9** Several areas of interest (§25, lane G): ~~**25a**~~ areas of the dish, with Velvet
+  Underground, Lumia and Cell Bloom, then **25b** the next looks in its order, **25e**,
+  **25c**, **25f** (after 18f and 18d).
 
 ### Wave 7. Reach
 
@@ -5796,3 +5799,135 @@ change the look on the bar) posted to ModWiggler's Video Synthesis forum, lines
 review video synths. Ask Expert Sleepers to list ChromaGlass as working with the ES-8
 and ES-9. Superbooth 27 is 6–8 May 2027 in Berlin. The dedicated video synths cost
 $400–1,500 (EYESY, Hypno, Structure, Videomancer), which is the price to sit under.
+
+## 25. Areas of interest: several places on one plate
+
+The owner, 2026-10-04: Velvet Underground "underwhelming", then Lumia, and "I need more
+complexity across presets in general. I want to have multiple areas of interest in
+different parts of the canvas."
+
+**Why a look had one.** Read off the code, every look was built to have a single area
+of interest:
+
+- Every look's music worked from the middle of the dish: the kick's ring of dye, the
+  burst on the velocity route, the pulse on the density route and Beat Squeeze's press
+  were centred on the plate's middle, and the mid's stream circled it at 0.3 of the plate.
+- 29 of 41 looks set Center Gravity (a concave dish: heavy dye slides to the middle),
+  and the dish turns about the middle.
+- Nothing made one part of the plate unlike another for long. A look's liquids were
+  laid as fifteen spots anywhere and topped up wherever the automation's drop landed,
+  so soap or glycerine was spread thin over the whole glass; each drop's colour was a
+  fresh pick from the look's dyes.
+
+Velvet Underground was the plainest case: its four seed pools, Gaussians 18–25 cells
+(128-grid) wide, overlapped into one wash covering 92% of the plate (the lab, one lit
+region over density 0.3, 4% of the plate dark), bass routed to both the burst and the
+pulse in the middle, and Center Gravity 0.35. Lumia laid no dye at all and its
+automation dropped one every three minutes, so its picture was the lumia light layer
+alone: a texture over the whole frame with no place in it.
+
+**The mechanism (25a, shipped).** `src/lib/plateAreas.ts`: a look may name two to four
+areas of the dish, each a place (centre and radius, in the dish's frame), a liquid, a
+dye (an index into the look's dyes, each area a different one; a palette lock still
+wins, and a hue journey or the sequencer turns all the areas' dyes on together, so they
+stay different colours) and a band of the music. Laying the look pours each
+area's dye as a pool with its own rim of drops and each area's liquid into it; the
+automation's drops land in the areas (weighted by size), in each area's dye and
+liquid; the bass's ring, burst, pulse and squeeze land in the bass area (taking several
+in turn, kick by kick), the mid's stream circles the mid area's edge, the treble's
+sparks fall in the treble area (a look with no mid or treble area of its own takes its
+areas in turn, eight seconds each). The Color route still moves the colour, cycling
+between an area's dye and the next one, and a kick's ring is the other of the two
+against its pool. A Go and the sequencer pour into the same places. A
+hand that picks the plate's bottles keeps the areas' places and colours and pours what
+was picked. What happens in each area is the liquid's own physics already in the
+solver (liquidPhase.ts: glycerine's body, soap's Marangoni, syrup's weight); nothing
+paints a region. A look without areas plays exactly as before, its dice drawn in the
+same order. `npm run plate` checks every area look: real liquids the look lists, dyes
+in its set, inside the plate, areas apart, and the routing the app uses.
+
+Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
+
+- **Velvet Underground**: a magenta glycerine pool the mids circle (top left), a
+  raspberry soap well the bass breaks open (right), ultramarine syrup glittering with
+  the treble (low middle). Center Gravity 0.35 → 0, Dye Budget 0.85 → 0.45 (violet
+  between the pools), automation 0.04 → 0.08, liquids ink/glycerine/syrup →
+  glycerine/soap/syrup. Lab, laid plate: 1 lit region (92%) → 3 (8.6, 7.6, 7.5%),
+  dark 4% → 73%. The same plate run for 15 s of kicks in the lab kept the old one as one
+  region (92.5%); the run on the new plate stalled on software WebGPU and is owed (25e).
+- **Lumia**: three veils, two in glycerine and one with soap in it (spread thin and
+  opened), under the unchanged lumia light. Dye Budget 0.1 → 0.2, automation 0.008 →
+  0.03, soap added to its liquids.
+- **Cell Bloom** (added by the owner the same afternoon): a closeup look, and its one
+  area was its camera's. Follow mode locked onto the pool nearest the middle and rode
+  it, and at its 3.5x zoom its Paint Cells were never drawn: at Cell Size 0.32 a cell
+  is too small on screen to resolve (`resolved` in wgsl/plate.ts starts the coarse
+  cells at 3.9x), so the lab drew it as a plain wash. Now three small pools (silicone
+  and magenta, oil and lavender, silicone and ultramarine) sit round the middle
+  inside one closeup frame, the camera holds on the middle (follow → hold) and the
+  dish's turn carries them round under it, and Cell Size 0.32 → 0.6 so the cells are
+  drawn at its zoom.
+
+**Fillmore East fills the screen (25g, shipped with 25a).** The owner: "it only takes
+up a small amount of the canvas... should zoom in so the entire plate takes up the
+canvas." Its Dish Spread 0.85 drew each plate as its own dish on black: the lead one
+0.71 of the frame's height across (about 40% of a 16:9 width), the second 0.45. Now 0:
+both plates over the whole screen (the lab, a square frame: 44% of it lit → 99%). No
+other look sets Dish Spread. Four set Dish Vignette, a round dish edge with black beyond
+it, which on a 16:9 screen leaves the sides dark: **clock-glass** 0.8 (the dish 65% of
+the width; that look is the "Clock glass and ferro looks" work's), **oil-wheel** 0.7
+(71%), **fractal-dream** 0.5 (81%), **home-movie** 0.3 (91%). Those are round on
+purpose; the owner says which, if any, should fill the screen too.
+
+**Next looks to move (25b, one PR each or a few together, measured the same way):**
+
+1. **deep-ocean**: Center Gravity 0.8 pulls everything into one middle pool; layers of
+   glycerine and syrup in separate places are what depth looks like.
+2. **fillmore-1969**: the reference light show, two projectors, Beat Squeeze 0.9 and
+   both routes on the bass all in the middle; its oil, silicone and milk want a place each.
+3. **bass-drop**: every kick into the middle (Squeeze 0.8, Center Gravity 0.4); kicks
+   that take two or three wells in turn.
+4. **poster-1969** and **roy**: flat poster shapes, bass on both routes and the squeeze
+   in the middle; a shape per area keeps them separate shapes.
+5. **oil-on-water**, **glycerine-drift**, **milk-marble**, **home-movie**, **crowd-plate**:
+   each liquid look's bottles in places of their own.
+6. **jellyfish-bloom**: its four bells already sit in four places; the mids should land
+   at the bells, not orbit the middle.
+
+Kept centred on purpose: galaxy, solar-flare, stardust-collapse and fractal-dream (their
+picture is a centre), and classic (the picture `npm run fx` measures). The ferrofluid
+looks and Clock Glass are the "Clock glass and ferro looks" work's.
+
+**Open, found building it:**
+
+- **25c. The hand works in the room, not on the glass (a shortcut).** An area is in the
+  dish's frame, so it turns with the glass, and the music's hands follow it round. A
+  liquid laid in the dish does turn with it; a projectionist's hand stays where it is
+  while the dish turns under it. At Velvet's motor (one turn in about six minutes) the
+  difference is invisible; on a look that spins (acid-trip turns in about 20 s) the
+  hands should stay put in the room and the areas' liquids turn away from them. Needs
+  the dish's angle (`plateAngle`) to turn a room-frame point into the grid.
+- **25d. The second plate of a two-plate area look.** A back plate with a look of its
+  own takes that look's areas whole (its pools, liquids, hand-off pours, drops and
+  music). The second plate of a two-plate look (Velvet Underground) lays nothing at
+  first (laySecondPlate), as before, and takes the automation's area drops only; it
+  could lay its own pools offset from the front's, so the two plates' areas overlap
+  in part, as two projectors' do.
+- **25f. Cell Bloom's cells are drawn by the camera, not grown (a painted effect,
+  not new here).** Paint Cells (`macroDetail`'s `cellField` in wgsl/plate.ts) draws
+  rings over any dye under the closeup, clumped by noise; the silicone poured in its
+  pools does not make them. In a real pour, cells are silicone oil and a lighter
+  paint rising through a denser one and opening where surface tension is lowest
+  (Marangoni and a density inversion). With 18f's heat and 18d's densities the
+  solver could grow them where the silicone is, and the camera would only shade
+  them.
+- **25e. A film measure for it.** `npm run film` measures near-black, hues and swells
+  over the whole frame; it has no number for how many separate places hold something.
+  The lab's count of lit regions (connected cells over density 0.3, each over 1% of the
+  plate) is the measure used here; it belongs in `watch.mjs`'s shape() so every look
+  can be held to it on the Mac. With it, a Mac check that the app uses the areas:
+  `npm run plate` holds the table and the helpers, but nothing it runs reaches
+  `LiquidVisualizer.tsx`, so a kick put back in the middle would pass it. Load Velvet
+  Underground, fire kicks, difference the dye frames: the change should centre within
+  about 0.06 of the bass area (turned by the plate's angle), and on classic at the
+  middle (the check-skeptic's design).
