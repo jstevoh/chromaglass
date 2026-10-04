@@ -94,6 +94,7 @@
     "wgsl": "node scripts/wgsl.mjs",
     "deploygate": "bash scripts/deploygate.sh",
     "closedruns": "node scripts/closedruns.mjs",
+    "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
     "physics": "node scripts/physics.mjs",
     "bodies": "node scripts/bodies.mjs",

@@ -9,10 +9,13 @@ name: Checks
 # person remembering to. Since `npm run show` pulls `main` on show night, what
 # that added up to was: an untested `main` is what arrives at the venue.
 #
-# Three jobs, because they cost very different amounts of time and a fast red X
-# is worth more than a slow one:
+# Kinds of job, because they cost very different amounts of time and a fast
+# red X is worth more than a slow one:
 #
-#   measure   the pure-logic harnesses. Half a minute, no browser.
+#   reach     which files the PR changed, and whether any of them can reach
+#             a Mac shard (a few seconds).
+#   measure   the harnesses that need no GPU, in three parts side by side,
+#             each about five minutes, on ubuntu.
 #   webgpu    everything with a picture in it, on a runner with a GPU: the
 #             stage, a show night, the post chain and the wall.
 #
@@ -29,6 +32,13 @@ run-name: "${{ github.event.pull_request.title || 'Checks' }} (tests ${{ github.
 
 on:
   workflow_call:
+    inputs:
+      # The deploy turns the Mac off when its gate found the PR's site files
+      # apart from main's newer changes (deploygate.sh rule 5); anything else
+      # that calls this workflow gets the Mac.
+      mac:
+        type: boolean
+        default: true
   pull_request:
 
 # A second push to a branch makes the first push's run pointless, and these are
@@ -41,10 +51,52 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  measure:
-    name: Measure
+  # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
+  # push of only PLAN.md, the docs, the sessions' skills, a workflow that
+  # never runs a Mac shard or the scripts that check the workflows does not
+  # queue the four Mac shards: it proves
+  # nothing new there, and on 2026-10-03 each such push still waited twenty
+  # to thirty minutes for a Mac and then held one for forty-five runner-minutes
+  # in front of PRs that did change the plate. Measure always runs. A deploy
+  # (`workflow_call`) reaches the Mac unless its gate passed `mac: false`
+  # (deploygate.sh rule 5), and the gate never trusts a run that skipped it.
+  reach:
+    name: What the change reaches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mac: ${{ steps.reach.outputs.mac }}
+    steps:
+      # Two deep: the pull request's merge commit and the base it was merged
+      # into, which is the whole of what the PR changes.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - name: Which files reach a Mac shard
+        id: reach
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          CALL_MAC: ${{ inputs.mac }}
+        run: node scripts/reach.mjs --diff
+
+  # Measure, in three parts side by side. As one job it took a median 14.3
+  # minutes and at most 14.9 over 87 green runs on 2026-10-03 against its
+  # 15-minute timeout, so the next slow runner would have turned it red with
+  # nothing wrong; and its first red step skipped every step after it, so a
+  # push with two things wrong found one (PLAN.md 19b). Split by what each
+  # step needs: the arithmetic (`logic`, about four minutes, most of it the
+  # drops), the sound harnesses that want ffmpeg (`sound`, about six), and
+  # the ones that want Chromium (`browser`, about five). Every step runs
+  # whatever failed before it in its part. GitHub's ubuntu runners are not
+  # the queue the Mac's are, so three at once cost the queue nothing.
+  measure-part:
+    name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [logic, sound, browser]
     steps:
       - uses: actions/checkout@v5
       # 22, not 20: `music`, `scene`, `liquids` and `wall` all run their
@@ -55,24 +107,43 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - name: Install
+        id: install
+        run: npm ci
 
       - name: Typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run lint
+
+      # Every script parses (PLAN.md 19b). `tsc` reads only a handful of the
+      # harnesses, so a syntax error in one that only a Mac shard runs used to
+      # be found after the Mac queue; this finds it in about three seconds.
+      - name: The scripts parse
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: for f in scripts/*.mjs server/*.js dc.mjs; do node --check "$f" || exit 1; done
+
+      # The list of what cannot reach a Mac shard, held to the paths it was
+      # written for (the first job above uses it to skip the Mac).
+      - name: What a change reaches
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run reach
 
       # Every preset's dish: that its dyes, injection styles and liquids all
       # name things that exist. The cheapest check in the repo and the one that
       # catches a rename that a type cannot.
       - name: The plate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run plate
 
       # That a look change never cuts the plate to black in front of a room.
       - name: The desk
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run desk
 
       # The two lists that have to agree about what a control is: the settings
       # panel's own markup, and the registry the desks pin from.
       - name: The panel
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
 
       # The workflows' own wiring: closed.yml cancels a merged PR's runs by
@@ -80,12 +151,14 @@ jobs:
       # gallery runs on its label rather than on every push (PLAN.md 19a).
       # A rename in one file would quietly undo either.
       - name: A closed PR stops its runs
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run closedruns
 
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.
       - name: The ear
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run music
 
       # The bands: synthetic kicks, snares, hats, a bass line and a pad through
@@ -96,8 +169,10 @@ jobs:
       # the ubuntu runner does not have until it is installed here; with no
       # decoder the script fails on CI rather than skipping the real music.
       - name: ffmpeg, for the shelf and the render's files
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: The bands
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run bands
 
       # Sound learn: controls bound to the music. A synthesised song through
@@ -107,6 +182,7 @@ jobs:
       # and two add and clamp; the map file round-trips; and with the music
       # stopped nothing fires.
       - name: Sound learn
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run learn
 
       # The song's shape (PLAN.md §10, step 2): builds, drops and breakdowns
@@ -118,6 +194,7 @@ jobs:
       # bound to each fire once per event; then the shelf, decoded by the
       # ffmpeg installed above, held to at most a drop a minute.
       - name: The song's shape
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run shape
 
       # The kicks (PLAN.md §14d): the show's own band, its score rendered to
@@ -128,6 +205,7 @@ jobs:
       # within the first bars; and the old ear, the smoothed bass crossing
       # its line, missing the chorus as the Mac did.
       - name: The kicks
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run kicks
 
       # The one (PLAN.md §10, step 3): the beats and which of them is the one,
@@ -141,6 +219,7 @@ jobs:
       # deadline); an estimate's median and 99th percentile cost; and the
       # accent at 0 leaving every kick at exactly 1. About a minute and a half.
       - name: The one
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run downbeat
 
       # Pacing (PLAN.md §10, step 1): a running sequence's stages played as
@@ -150,6 +229,7 @@ jobs:
       # 40 % of the time; dark endings reach near-black without a step; and a
       # locate neither piles moments up nor loses them.
       - name: Pacing
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run pacing
 
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
@@ -161,6 +241,7 @@ jobs:
       # above for the shelf, opens each file with the right streams, every
       # packet and the right length (with no ffprobe this fails on CI).
       - name: The render's clock, ear and file
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run render
 
       # The shape of the quality ladder: that every rung is a rung, that a
@@ -168,41 +249,50 @@ jobs:
       # pixels actually gets fewer. That last one was inert for a long while
       # and nothing looked.
       - name: The ladder's shape
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run rungs
 
       # Soap, milk, silicone and glycerine, each measured on the thing it is
       # for — and first, that an empty plate is left completely alone.
       - name: The liquids
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run liquids
 
       # A liquid someone made: the file reads back as what they meant, a bad
       # one says why, and "how it meets the others" agrees with the shelf.
       - name: The liquids file
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run liquidfile
       # A popped bubble closes back into the liquid, round, not into blocks.
       - name: The popped bubbles
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run pops
       # Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,
       # each drop its own colour, pressed flat where it touches, a swallowed
       # one kept inside and let go, and at 0 the rings' field to the bit.
       - name: The drops
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run drops
       # A soap film's own colours (Film Physics): the research's film.py to a level of
       # 8-bit colour, the textbook sequence in the shader's table, and the shader carrying it.
       - name: The film table
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run filmtable
       # A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):
       # whole fades driven at the show timer's 16 ms, no step past the curve's
       # steepest, the turn-round, the hand, the cut, and the pads wired.
       - name: A row's fade
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run rowfade
       # The back plate's own look (PLAN.md §16a): the fold hands plate 1 the
       # look's solver keys under the live patches and leaves the picture the
       # front's, the fade is a Go's, Follow lets go, and the pours are wired.
       - name: The back plate's own look
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run backplate
       # The set list file: a show's running order reads back as it was written.
       - name: The set list file
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
       # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
       # src draws from Math.random outside a short allowlist of ids, and the
@@ -210,11 +300,13 @@ jobs:
       # twice on one seed come out the same, on another seed differently, and
       # none of them moves another's numbers.
       - name: The seed
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run seed
 
       # The room sensor: painted rooms through the real analysis, a closed
       # feedback loop, and a person who walks in and stops.
       - name: The room
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run scene
 
       # Four harnesses that were written as gates and then never gated
@@ -224,9 +316,11 @@ jobs:
       # frames behind all night, a fixture lit on the wrong channel, a shape
       # mapped onto the wrong part of a wall.
       - name: The shapes
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run shapes
 
       - name: The timecode
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run timecode
 
       # The closeup's drawn cells ride the paint and hold still between
@@ -235,12 +329,15 @@ jobs:
       # tempo and the lean changing and Speed pulled to nothing; their clock
       # wraps cleanly; and packing the flow adds no rounding of its own.
       - name: The closeup's cells
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run cellride
 
       - name: The lights
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run lights
 
       - name: The mapping
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run map
 
       # The crash-report Worker, against in-memory R2 and KV (crash-plan.md):
@@ -251,6 +348,7 @@ jobs:
       # address is held to its hourly limit. The endpoint is public, so most
       # of what it proves is what it will not do.
       - name: The report Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run report-worker
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
@@ -259,21 +357,31 @@ jobs:
       # night on macOS; here they fail in two minutes rather than fifteen, and
       # before the GPU shards have a chance to hide them behind another step.
       - name: Install Chromium
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npx playwright install --with-deps chromium
+      # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
+      # It runs again on the Mac's show shard, against Metal; here it is found
+      # before the Mac queue rather than after it.
+      - name: The shaders compile
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run wgsl
       - name: The layout
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping
       # most of the screen, each sheet opening and closing, and Tilt's
       # arithmetic. The fingers on the plate need WebGPU and are asked on the
-      # tools shard below.
+      # open shard below.
       - name: The phone
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run phone
       # The iPhone app as the laptop's remote (src/lib/appLink.ts): a real
       # relay, a stand-in laptop and the app's page from another origin. No
       # plate needed, so it runs here rather than on a Mac.
       - name: The iPhone app's remote
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run applink
 
       # The remote's Mixer (scripts/remotemix.mjs): the show server and two
@@ -282,6 +390,7 @@ jobs:
       # fades run on its "needs WebGPU" screen. The phone's step above built
       # dist/, which the show server serves, so this runs the script alone.
       - name: The remote's Mixer
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/remotemix.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
@@ -292,6 +401,7 @@ jobs:
       # every frame) needs a plate that draws and is held on the Mac's open
       # shard below. On the dist/ the phone's step built, like the Mixer.
       - name: The sound's renders
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/renders.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
@@ -310,8 +420,20 @@ jobs:
   # startup check alone: it opens the show twice on a cold shader cache and
   # then every look on its own, about five minutes, which the tools shard
   # (eight already) had no room for under the timeout.
+  #
+  # The repository being public makes the runners free, not plentiful: the
+  # account runs about five Mac jobs at once, and on 2026-10-03 a shard
+  # waited a mean 21 to 31 minutes for one (`npm run macqueue`). So the
+  # shards are kept even, the longest about eleven and a half minutes by the
+  # medians then (tools 13.2 → about 9.8 without the phone's fingers, open
+  # 7.8 → about 11.2 with them, plate 11.2 → about 10.2 without the mixer
+  # and 11.3 with #218's Ben-Day print (63 s on its PR's runs), show 8.8 →
+  # about 9.8 with the mixer), and they do not run at all for a change
+  # that reaches none of them (the `reach` job above).
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
+    needs: reach
+    if: ${{ needs.reach.outputs.mac == 'true' }}
     runs-on: macos-15
     timeout-minutes: 15
     strategy:
@@ -469,8 +591,10 @@ jobs:
       # passes the front plate from lamp to beam, every grade does what its
       # name says, and every one of the 31 controls changes the picture; the
       # gel wheel and the lumia in the lamp, over the lens and among the rest.
+      # On the show shard (a median 8.8 minutes) rather than the plate shard
+      # (11.2), to even them (PLAN.md 19h); it is the lab, so any shard will do.
       - name: The mixer's order and grades
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run mixer
       # Beams: two projectors of different sources add where they cross, two
       # carrying one picture sum to it across their overlap with no seam
@@ -584,8 +708,12 @@ jobs:
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.
+      # On the open shard, after the startup check has had its cold cache:
+      # about three and a half minutes, which put the tools shard at a median
+      # 13.2 and at most 15.6 against its 15-minute timeout on 2026-10-03,
+      # where open finished in 7.8 (PLAN.md 19h).
       - name: The phone's fingers
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: PHONE_GPU=1 node --experimental-strip-types scripts/phone.mjs
 
       # A drop lands where it is dropped: on the Design desk, on either layer,
@@ -629,12 +757,27 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/moving.mjs
 
-  # The one name the rest of the repository knows this stage by: green only
-  # when every shard is.
+  # The one name the rest of the repository knows this stage by.
+  # Green when every shard is, or when the change reached no Mac shard and
+  # the shards were skipped for that reason alone (a shard skipped because
+  # `reach` itself failed is red here).
   webgpu-all:
     name: WebGPU (macOS)
-    needs: webgpu
+    needs: [reach, webgpu]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - run: test "${{ needs.webgpu.result }}" = success
+      - run: >-
+          test "${{ needs.webgpu.result }}" = success ||
+          { test "${{ needs.reach.result }}" = success &&
+            test "${{ needs.reach.outputs.mac }}" = false &&
+            test "${{ needs.webgpu.result }}" = skipped; }
+
+  # The one name for the three Measure parts: green only when all three are.
+  measure:
+    name: Measure
+    needs: measure-part
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.measure-part.result }}" = success
