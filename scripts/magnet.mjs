@@ -549,18 +549,24 @@ try {
     });
   });
   const box2 = await (await page2.$('canvas')).boundingBox();
-  await page2.mouse.move(box2.x + box2.width * 0.25, box2.y + box2.height * 0.5);
+  await page2.mouse.move(box2.x + box2.width * 0.42, box2.y + box2.height * 0.5);
   await page2.mouse.down();
   await page2.waitForTimeout(1500);
   const touched2 = await counts2();
+  const poured2 = await page2.evaluate(() => window.chromaglassDebug().magnetHand?.());
   /*
-    Then moved, held, 0.2 of the canvas on, so the magnet is no longer where
+    Then moved, held, out from the middle, so the magnet is no longer where
     the pool was poured: a carry laid at the pool's first place rather than
     at the magnet reads under 0.7 near the hand, since the new solver starts
-    with no phase of its own.
+    with no phase of its own. Outward, and asked of the plate (how far the
+    hand went, and how far from the middle it ended), because the canvas is
+    not the plate: the first Mac run moved 0.2 of the canvas from 0.25 and
+    the plate's hand ended at 0.46,0.51, 0.04 from the middle, where a ring
+    laid round the middle would have read as near the hand too. That run
+    carried one pool, all of it (1.00), 100% at the hand.
   */
-  for (let i = 1; i <= 10; i++) {
-    await page2.mouse.move(box2.x + box2.width * (0.25 + 0.02 * i), box2.y + box2.height * 0.5);
+  for (let i = 1; i <= 15; i++) {
+    await page2.mouse.move(box2.x + box2.width * (0.42 - 0.02 * i), box2.y + box2.height * 0.5);
     await page2.waitForTimeout(60);
   }
   await page2.waitForTimeout(500);
@@ -571,14 +577,15 @@ try {
   const regrid2 = await counts2(), plate2 = await phase2(handAt);
   await page2.mouse.up();
   const offMiddle2 = handAt ? Math.hypot(handAt.x - 0.5, handAt.y - 0.5) : 0;
+  const movedBy = handAt && poured2 ? Math.hypot(handAt.x - poured2.x, handAt.y - poured2.y) : 0;
   const ofPool = plate2.total / POOL;
   check('and once the hand has brought its pool, a new grid carries that pool to the magnet and nothing else',
     grids2.moved && touched2.pools === 1 && regrid2.pools === 1 && regrid2.lays === picked2.lays && regrid2.relays === touched2.relays + 1
-      && ofPool > 0.5 && ofPool < 1.6 && plate2.near > 0.7 && offMiddle2 > 0.15,
+      && ofPool > 0.5 && ofPool < 1.6 && plate2.near > 0.7 && offMiddle2 > 0.15 && movedBy > 0.12,
     `grid ${grids2.seen.join(' → ')}²; ${touched2.pools} pool from the touch, ${regrid2.pools} after; laid ${picked2.lays} → ${regrid2.lays} times; ` +
     `carried ${touched2.relays} → ${regrid2.relays}; ferrofluid ${(plate2.total * 100).toFixed(2)}% of the plate, ${ofPool.toFixed(2)} of the pool's ` +
     `(the ring is about 22%), ${(100 * plate2.near).toFixed(0)}% of it within 0.18 of the hand at ${handAt ? `${handAt.x.toFixed(2)},${handAt.y.toFixed(2)}` : 'nowhere'}, ` +
-    `${offMiddle2.toFixed(2)} from the middle; centre of mass ${plate2.x.toFixed(2)},${plate2.y.toFixed(2)}`);
+    `${offMiddle2.toFixed(2)} from the middle and ${movedBy.toFixed(2)} from where the pool was poured (${poured2 ? `${poured2.x.toFixed(2)},${poured2.y.toFixed(2)}` : 'unknown'}); centre of mass ${plate2.x.toFixed(2)},${plate2.y.toFixed(2)}`);
 } finally {
   await browser.close();
 }
