@@ -531,6 +531,14 @@ jobs:
       - name: The Press comes back on a thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run presslift
+      # The plate's forces as forces on a thin gap (PLAN 18a-2): a body force
+      # (Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity
+      # says, Glass Smear is the glass sliding and Updraft a draught's shear,
+      # each against the old reading it replaced.
+      - name: The forces are forces
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 4
+        run: npm run forces
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.
