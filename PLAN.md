@@ -232,7 +232,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.5** **18d** each liquid's real properties, then **10.5-bodies** and **H8** more bottles.
 - **6.6** **18h**, **18a-2** (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
-- **6.7** §20 after its prerequisites: ~~**20b**~~ #PR, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
+- **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22k** (~~22h~~ #252). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
@@ -3817,7 +3817,7 @@ its frame rate live. "Free" means no new passes or texture reads.
   or key still lays its dye as it did. Decide whether a row blend means anything under
   the lamp, or the lamp overrides it.
 - **18b-6. Light through a film, not the whole gap (for 20b).** *Shipped with 20b
-  (#PR) for the dye: the front plate's dye path is the gap less the clear film
+  (#259) for the dye: the front plate's dye path is the gap less the clear film
   (`gapScale *= 1 − film` in the plate, from the packed view).* The path is the dye's
   amount times the gap (Layer Depth). Once a film of clear liquid sits in the gap
   (20b), the water's path is the gap less the film, which is where the reference's
@@ -4736,7 +4736,7 @@ Pictures in `/mnt/project-files/lace/`: `reference-vs-prototype.png`,
 | Feature | What the plate has | What is missing |
 |---|---|---|
 | White where there is no dye | Dye stored as absorbance; the gap bound in the plate pass | The lamp ground: 18b, shipped (#256) behind Lamp Ground; a look must turn it up (20a) |
-| A film that tears | Clear Film (20b, #PR): a thickness field with a disjoining pressure, dust and a solvent, tearing on its own | A viscous film (20c), and the film pushing the water (20b-1) |
+| A film that tears | Clear Film (20b, #259): a thickness field with a disjoining pressure, dust and a solvent, tearing on its own | A viscous film (20c), and the film pushing the water (20b-1) |
 | Rimless holes, slits | Flow shear; 18a's thin-gap flow (Thin Gap, on in every look since #248) | A viscous film (20c) on 18a's per-liquid mobility (18d) |
 | Hairline edges | The projector's aperture law for drops and bubbles (`dropLens`, u*) | The same law applied to every edge: 18e |
 | Flat discs | Drops flattened by the half gap (`DROP_HALF_GAP`); Oil Bodies; two layers | Large pancakes poured on the front layer, and tinted by absorption (18b) rather than glowing |
@@ -4754,7 +4754,7 @@ lamp and 0% on black. What is left of 20a is the look itself, on Lamp Ground 1.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
-**Shipped (#PR), behind Clear Film (`clearFilm`), 0 in every look; judging §32.**
+**Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §32.**
 What was built, against the plan below:
 
 - The film is `src/gpu/wgsl/film.ts`: a thickness h and a solvent Γ on a grid of
