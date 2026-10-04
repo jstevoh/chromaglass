@@ -768,6 +768,8 @@ async function open(query, looks) {
         beats: longest(changes(2)),
         steps: longest(changes(3)),
         firstStep: (rows.find((r) => r[3] > 0) ?? [null])[0],
+        // The intro's times (src/lib/intro.ts), for the line under the milestones.
+        intro: { ...(window.__cgIntro ?? {}) },
         /*
           When the plate started moving for good: the end of the last stretch
           of more than MAX_GAP_S without a step, or the first step if there
@@ -1151,7 +1153,17 @@ const waitOf = (x, oldWay) => {
       const n = Math.max(0, Math.min(s + len, steady) - from);
       const follows = holds[i] === 0 && s - compiling <= 1;
       const taken = (holds[i] > 0 || follows) && n >= 0.25;
-      if (holds[i] > 0 || taken) compiling = s + len;
+      /*
+        Only a stop the builds sat in, and one priced at that, opens the
+        second's window for the next (check-skeptic on #278): a priced stop
+        that only followed passed the window on, so runner stalls 0.9 s apart
+        chained without end into the control's compile (2.02 s of builds and
+        three stalls read 16.02 s, against 5.02 s), and a builds' stop wholly
+        inside Chromium's own hold (n under 0.25, unpriced) armed it for a
+        15 s stall after it with no build in it, so "the cache was not cold"
+        and 1b judged a stall. #257's run still prices its 18.29 s.
+      */
+      if (holds[i] > 0 && n >= 0.25) compiling = s + len;
       return { from: from - t0, len: n, builds: holds[i], follows, taken };
     });
     for (const st of stops.filter((st) => st.taken)) {
@@ -1264,6 +1276,15 @@ try {
   o.frames = frames;
   console.log(`  as shipped (shader cache ${o.cache})`);
   console.log(`     ${milestones(o)}`);
+  /*
+    How much of the opening the intro covered, printed and not judged
+    (`npm run intro` judges it): it is up from the page's first frame and
+    leaves on the plate's first step, so on a cold Mac this is the share of
+    the wait nobody looks at a black plate. The first step here is the
+    quarter-second row it was seen in; the intro's own leaving is exact.
+  */
+  const intro = o.intro ?? {};
+  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}`);
   const p = o.prepared;
   const b = o.behind;
   check('the show opens and the plate is stepping',

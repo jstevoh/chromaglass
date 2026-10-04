@@ -5,6 +5,7 @@ import {
   AudioFeatures, ANALYSER_FFT_SIZE, ANALYSER_SMOOTHING, type AudioReading,
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
+import { handSounds, listenForHands } from '../lib/handSounds';
 
 export interface AudioData {
   frequencyData: Uint8Array;
@@ -122,6 +123,12 @@ export function useAudioAnalyzer(
   bassBoost: number = 1.0,
   autoCalibrate: boolean = true,
   calibrateNonce: number = 0,
+  /**
+   * The stream is a microphone in the room, which hears the operator's own
+   * clicks and taps: onsets in the moment of one are not the music's
+   * (lib/handSounds.ts). False for a song, the band, the drone or a shared tab.
+   */
+  hearsRoom: boolean = false,
 ): Ear {
   const [audioData, setAudioData] = useState<AudioData | null>(null);
   const liveRef = useRef<AudioData | null>(null);
@@ -137,8 +144,11 @@ export function useAudioAnalyzer(
   // Live trims are read from refs inside the analysis loop: rebuilding the
   // AudioContext every time a slider moves would glitch the audio and throw
   // away the room calibration mid-song.
-  const paramsRef = useRef({ sensitivity, bassBoost, autoCalibrate });
-  paramsRef.current = { sensitivity, bassBoost, autoCalibrate };
+  const paramsRef = useRef({ sensitivity, bassBoost, autoCalibrate, hearsRoom });
+  paramsRef.current = { sensitivity, bassBoost, autoCalibrate, hearsRoom };
+  // Marked whatever is listening, so a microphone chosen mid-show knows the
+  // gesture that chose it. Four listeners on the window and a short list.
+  useEffect(() => listenForHands(window), []);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -210,11 +220,13 @@ export function useAudioAnalyzer(
 
       const ear = new EarClock();
       earRef.current = ear;
+      // Kick onsets this ear reported, for `npm run clicks` beside what it swallowed.
+      let kicksHeard = 0, lastKickAt: number | null = null;
       const update = (frameTs?: number) => {
         const analyser = analyzerRef.current;
         if (!analyser) return;
 
-        const { sensitivity: sens, bassBoost: bBoost, autoCalibrate: autoCal } = paramsRef.current;
+        const { sensitivity: sens, bassBoost: bBoost, autoCalibrate: autoCal, hearsRoom: room } = paramsRef.current;
         const nowSec = performance.now() / 1000;
         const dt = Math.max(0, Math.min(0.25, nowSec - lastFrame));
         lastFrame = nowSec;
@@ -233,7 +245,9 @@ export function useAudioAnalyzer(
         const reading = features.update(
           { bins: floatData, scale: 'db', sampleRate: audioContext.sampleRate, fftSize: analyser.fftSize },
           nowSec,
+          room && handSounds.covers(nowSec),
         );
+        if (reading.onsets.kick.hit) { kicksHeard++; lastKickAt = nowSec; }
         const win = levels.calibrate(floatData, dt, autoCal);
         if (autoCal) {
           analyser.minDecibels = win.minDb;
@@ -326,6 +340,10 @@ export function useAudioAnalyzer(
         const w = window as unknown as { __earTick?: (on: boolean) => void; __earContext?: AudioContext };
         w.__earTick = (on) => tickerRef.current?.postMessage(on ? TICK_MS : 0);
         w.__earContext = audioContext;
+        // `npm run clicks`: the gestures marked, the kicks this ear swallowed in their moments and the ones it heard.
+        (window as unknown as { __hands?: () => unknown }).__hands = () => ({
+          marks: handSounds.count, swallowed: features.swallowed.kick, kicks: kicksHeard, lastKickAt, hearsRoom: paramsRef.current.hearsRoom,
+        });
       }
 
       /*

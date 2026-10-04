@@ -24,6 +24,7 @@
 
 import { PRESETS } from '../src/presets.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR } from '../src/presetPlate.ts';
+import { PRESET_AREAS, plateAreas, areaForBand, areaDye, pointInArea, pickArea } from '../src/lib/plateAreas.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
 import { PALETTE } from '../src/constants.ts';
 import { BeadField } from '../src/lib/beads.ts';
@@ -64,6 +65,130 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     .filter(([id, shape]) => !(PRESETS.find(p => p.id === id)?.settings.phaseAmount > 0.002) || !['ring', 'scatter'].includes(shape))
     .map(([id, shape]) => `${id}:${shape}`);
   check('every ferrofluid pour is for a look that pours ferrofluid, in a shape that exists', stray.length === 0, stray.join(', '));
+}
+
+// ── 1c. A look's areas of the dish are separate places, each with something in it ──
+//
+// lib/plateAreas.ts: the few places a look's liquids, its automation's drops
+// and its music's hands land, so a plate has several areas of interest and
+// not one wash with a busy middle. Like the other maps it is keyed by a plain
+// string and read silently, so a typo'd liquid pours nothing and two areas
+// laid on top of each other are one area that looks like a feature.
+//
+// Each claim below was tried against a helper or a table that gets it wrong
+// (check-skeptic): areas that overlap or copy each other, a position that is
+// not a number, water (which pours nothing: its every property is zero), a
+// lookup that returns no areas, a pick that ignores size or the kick count, a
+// point that is always the middle, and the colours read through a hue
+// journey's narrower window (two of three areas came out one colour).
+{
+  // What `deposit` (lib/liquidPhase.ts) does anything with: a liquid whose
+  // every one of these is zero returns from it having poured nothing.
+  const pours = (l) => !!l.behaviour && !l.behaviour.magnetic
+    && ['soap', 'body', 'repel', 'weight', 'polarity', 'acid'].some(k => (l.behaviour[k] ?? 0) !== 0);
+  const pourable = new Set(DEFAULT_LIQUID_TYPES.filter(pours).map(l => l.id));
+  const finite = (...v) => v.every(Number.isFinite);
+  const bad = [];
+  for (const [id, areas] of Object.entries(PRESET_AREAS)) {
+    if (!ids.includes(id)) { bad.push(`${id}: not a look`); continue; }
+    if (areas.length < 2 || areas.length > 4) bad.push(`${id}: ${areas.length} areas, where an area look has two to four`);
+    const contract = PRESET_CONTRACTS[id] ?? [];
+    const liquids = PRESET_LIQUIDS[id] ?? [];
+    areas.forEach((a, i) => {
+      const at = `${id}[${i}]`;
+      if (!pourable.has(a.liquid)) bad.push(`${at}: liquid '${a.liquid}' pours nothing (or is not a liquid)`);
+      // The dish's bottles as the desks list them must include what the areas pour.
+      if (!liquids.includes(a.liquid)) bad.push(`${at}: pours '${a.liquid}', which the look's liquids do not list`);
+      if (!Number.isInteger(a.dye) || a.dye < 0 || a.dye >= contract.length) bad.push(`${at}: dye ${a.dye} is outside its ${contract.length} dyes`);
+      if (!['bass', 'mid', 'treble', 'any'].includes(a.band)) bad.push(`${at}: band '${a.band}'`);
+      if (a.fill !== undefined && !(Number.isFinite(a.fill) && a.fill > 0 && a.fill <= 1)) bad.push(`${at}: fill ${a.fill}`);
+      if (!finite(a.x, a.y, a.r)) bad.push(`${at}: (${a.x}, ${a.y}) r ${a.r} is not a place`);
+      else if (!(a.r > 0.04) || a.x - a.r < 0.04 || a.x + a.r > 0.96 || a.y - a.r < 0.04 || a.y + a.r > 0.96)
+        bad.push(`${at}: (${a.x}, ${a.y}) r ${a.r} is not inside the plate`);
+    });
+    for (let i = 0; i < areas.length; i++) for (let j = i + 1; j < areas.length; j++) {
+      const a = areas[i], b = areas[j];
+      // Apart, with room: the pool a look lays reaches about 1.1 r (its rim of
+      // drops out to 0.85 r, each up to 0.24 r wide), so two areas only just
+      // clear of each other are laid touching.
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (!(d >= 1.2 * (a.r + b.r))) bad.push(`${id}: areas ${i} and ${j} are ${d.toFixed(2)} apart, under 1.2 × (${a.r} + ${b.r})`);
+      if (a.dye === b.dye) bad.push(`${id}: areas ${i} and ${j} share dye ${a.dye}`);
+    }
+  }
+  check('every look\'s areas are separate places in the plate, each with a liquid that pours and a dye of its own',
+    bad.length === 0 && Object.keys(PRESET_AREAS).length > 0, bad.join('; ') || `${Object.keys(PRESET_AREAS).join(', ')}`);
+
+  // The colour each area is drawn in, as the app reads it (areaDye over the
+  // look's dyes, turned by the journey's or the sequencer's steps): different
+  // from every other area's at every step.
+  const same = [];
+  for (const [id, areas] of Object.entries(PRESET_AREAS)) {
+    const contract = PRESET_CONTRACTS[id] ?? [];
+    for (let lead = 0; lead < Math.max(1, contract.length); lead++) {
+      const cols = areas.map(a => areaDye(a, contract, lead));
+      if (new Set(cols).size !== areas.length) same.push(`${id} step ${lead}: ${cols.join('/')}`);
+    }
+  }
+  check('and each is drawn in a colour of its own, at every step of a hue journey', same.length === 0, same.join('; '));
+
+  // What the app asks of them, on the looks and on a table of its own whose
+  // answers are written out, so the rotation and the fallbacks are tested
+  // whatever the looks are tuned to.
+  const off = [];
+  for (const nothing of ['classic', null, undefined, '']) if (plateAreas(nothing) !== null) off.push(`${String(nothing)} has areas`);
+  for (const id of Object.keys(PRESET_AREAS)) if (plateAreas(id) !== PRESET_AREAS[id]) off.push(`plateAreas('${id}') is not its table`);
+  const T = [
+    { x: 0.2, y: 0.2, r: 0.1, band: 'bass', dye: 0 }, { x: 0.8, y: 0.2, r: 0.1, band: 'bass', dye: 1 },
+    { x: 0.5, y: 0.8, r: 0.2, band: 'any', dye: 2 }, { x: 0.2, y: 0.7, r: 0.1, band: 'mid', dye: 3 },
+  ];
+  const want = [
+    ['bass', 0, T[0]], ['bass', 1, T[1]], ['bass', 2, T[0]], ['bass', 3, T[1]],
+    ['mid', 0, T[3]], ['mid', 5, T[3]], ['treble', 0, T[2]], ['treble', 4, T[2]],
+  ];
+  for (const [band, n, w] of want) if (areaForBand(T, band, n) !== w) off.push(`table: ${band} kick ${n} went to the wrong area`);
+  const U = [T[3], { ...T[0], band: 'mid' }];
+  if (areaForBand(U, 'treble', 0) !== U[0] || areaForBand(U, 'treble', 1) !== U[1])
+    off.push('table: a band no area claims, with no `any` area, did not take the areas in turn');
+  if (areaDye(T[1], [5, 6, 7], 2) !== 5 || areaDye(T[0], [5, 6, 7], -1) !== 7) off.push('table: areaDye does not turn the dyes round');
+  let s = 12345;
+  const rng = { float: () => (s = s * 16807 % 2147483647) / 2147483647 };
+  // The automation's pick is by area (r²): the big area 4 of every 7 drops.
+  const counts = new Map(T.map(a => [a, 0]));
+  for (let n = 0; n < 7000; n++) { const a = pickArea(T, rng); counts.set(a, counts.get(a) + 1); }
+  const total = T.reduce((t, a) => t + a.r * a.r, 0);
+  for (const a of T) {
+    const share = counts.get(a) / 7000, expect = a.r * a.r / total;
+    if (Math.abs(share - expect) > 0.2 * expect) off.push(`table: an area of r ${a.r} took ${(share * 100).toFixed(1)}% of drops, not ${(expect * 100).toFixed(1)}%`);
+  }
+  // A point in an area is in it, and spread over it: uniform over a disc puts
+  // the mean distance at 2/3 of the radius and some points near the rim.
+  for (const a of [...T, ...Object.values(PRESET_AREAS).flat()]) {
+    let far = 0, sum = 0, outside = 0, nan = 0;
+    for (let n = 0; n < 400; n++) {
+      const p = pointInArea(a, 192, rng);
+      if (!finite(p.x, p.y)) { nan++; continue; }
+      const d = Math.hypot(p.x / 192 - a.x, p.y / 192 - a.y) / a.r;
+      if (d > 1 + 1e-9) outside++;
+      far = Math.max(far, d); sum += d;
+    }
+    const mean = sum / Math.max(1, 400 - nan);
+    if (nan || outside || far < 0.8 || Math.abs(mean - 2 / 3) > 0.08)
+      off.push(`a point in (${a.x}, ${a.y}) r ${a.r}: ${nan} not a number, ${outside} outside, furthest ${far.toFixed(2)} r, mean ${mean.toFixed(2)} r`);
+  }
+  // And on the looks: every band lands in one of the look's areas (its own
+  // if it has one), and the automation reaches all of them.
+  for (const [id, areas] of Object.entries(PRESET_AREAS)) {
+    for (const band of ['bass', 'mid', 'treble']) {
+      const got = areaForBand(areas, band, 0);
+      if (!areas.includes(got)) off.push(`${id}: ${band} lands outside the look's areas`);
+      else if (areas.some(a => a.band === band) && got.band !== band) off.push(`${id}: ${band} lands in a ${got.band} area`);
+    }
+    const tended = new Set();
+    for (let n = 0; n < 400; n++) tended.add(pickArea(areas, rng));
+    if (tended.size !== areas.length) off.push(`${id}: 400 drops reached ${tended.size} of ${areas.length} areas`);
+  }
+  check('and the music and the automation land in them, spread over each', off.length === 0, off.join('; '));
 }
 
 // ── 2. Every preset is fully described ───────────────────────────────

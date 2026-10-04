@@ -84,6 +84,15 @@ export interface GpuStepParams {
   mazeDetail?: number;
   /** How hard the ferrofluid pushes the dye aside where it moves (0 leaves the dye where it was, under the black). */
   phaseDisplace?: number;
+  /**
+   * A clear film against the glass (PLAN §20b, wgsl/film.ts): 0 none, and the
+   * film run not at all; up, a film that thick (a share of FILM_MAX of the gap)
+   * laid over the plate, which tears into lace by its own physics. Moved while
+   * a film is on, the film is raised or lowered everywhere by the difference.
+   */
+  clearFilm?: number;
+  /** The dish's dust under the clear film: 1 in a show; 0 a clean dish, for a check. */
+  filmDust?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */
@@ -185,6 +194,18 @@ export interface GpuStepParams {
 }
 
 /**
+ * What one solver hands the next when the grid moves (PLAN 9w): the liquids
+ * that live only on the GPU, copied out before the old solver goes. Opaque
+ * here; `gpu/fluid.ts` holds what is in it.
+ */
+export interface SolverCarry {
+  /** The grid it was copied from. */
+  readonly n: number;
+  /** Let its copies go. */
+  destroy(): void;
+}
+
+/**
  * What the plate needs of a solver, whichever API it runs on
  * (docs/webgpu-plan.md, P3).
  *
@@ -217,6 +238,8 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
+  addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */
   readonly oilCover?: number;
   /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
@@ -234,6 +257,15 @@ export interface PlateSolver {
   addRxn?(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void;
   addLiesegang?(x: number, y: number, radius: number, amount?: number): void;
   readonly chemistryLive?: { rxn: boolean; lies: boolean };
+  /**
+   * The liquids that never cross to the CPU (the ferrofluid, the mix, the
+   * reactions), copied for the solver that replaces this one, and laid onto
+   * that one's grid (PLAN 9w). Optional because only the WebGPU solver holds
+   * any; `takeOver` is false when it could not take the carry (another
+   * device's).
+   */
+  handOver?(): SolverCarry | null;
+  takeOver?(carry: SolverCarry): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   /**
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),

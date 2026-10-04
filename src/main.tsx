@@ -4,6 +4,7 @@ import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
 import { requestGpuEarly } from './gpu/device';
+import { installIntro, introOut } from './lib/intro';
 
 // The black box, first: whatever goes wrong from here on has a line
 // (docs/crash-plan.md).
@@ -17,6 +18,9 @@ const show = !params.has('remote') && !params.has('cast');
 // cast, which mirrors the show's canvas when it can and asks for its own
 // GPU only when it cannot.
 if (show) requestGpuEarly();
+// The intro `index.html` painted, listened to from here on: a key or a press
+// on it takes it away, and the plate's first frame does (lib/intro.ts).
+installIntro(show);
 // The phone loads only the control surface — no visualizer, no solver.
 const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
@@ -115,6 +119,8 @@ class Boot extends Component<{ children: any }, { failed: any; recovering: boole
 function Loading() {
   const [slow, setSlow] = useState(false);
   useEffect(() => { const t = setTimeout(() => setSlow(true), 8000); return () => clearTimeout(t); }, []);
+  // The intro sits over this rectangle, so the way out would be under it.
+  useEffect(() => { if (slow) introOut('slow'); }, [slow]);
   return (
     <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
       {slow && (

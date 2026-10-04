@@ -222,6 +222,16 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run kicks
 
+      # A click is not a beat (PLAN.md 14x): the ear in arithmetic, a click a
+      # tick and a thump, in a quiet room and under the band. With no gesture
+      # marked it takes the clicks for kicks (the control); marked, no onset in
+      # a click's moment at 10 to 200 ms of input latency, every kick of the
+      # band outside one still heard, and the beat clock firing the band's
+      # kicks through them. At 48 and 44.1 kHz. About a minute and a half.
+      - name: A click is not a beat
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run clicks
+
       # The one (PLAN.md §10, step 3): the beats and which of them is the one,
       # on eight synthesised songs whose bars are known (four on the floor
       # and a rock beat, a chord a bar or every two), 20 dB down, at 30 fps,
@@ -400,6 +410,18 @@ jobs:
       - name: The load
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run loadtime
+      # The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before
+      # the app has arrived, taken into the plate's frame on the desk and the
+      # phone, leaving on the frame the plate first steps, out of the way of
+      # every press, and never on the remote or a cast. The plate is
+      # SwiftShader's, so what is judged is frames and order, not seconds.
+      # The site "The load" just built, not built again (`npm run intro`
+      # builds first, for a run by hand).
+      - name: The intro
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        env:
+          PW_WEBGPU: '1'
+        run: node scripts/intro.mjs
       # The iPhone app as the laptop's remote (src/lib/appLink.ts): a real
       # relay, a stand-in laptop and the app's page from another origin. No
       # plate needed, so it runs here rather than on a Mac.
@@ -426,6 +448,23 @@ jobs:
       - name: The sound's renders
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/renders.mjs
+      # The same in the app (scripts/clicks.mjs --app): the microphone a
+      # stand-in that knocks as it is pressed, the way a laptop's hears a
+      # click. Knocks with no hand on anything are heard as kicks; tools picked
+      # and the Speed ride pressed on the Perform desk, and tools and the
+      # Amount slider tapped on the phone, are not; on the band the gate is
+      # off. No GPU: it reads the ear, not the plate. On the phone's dist/.
+      - name: A click is not a beat, in the app
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run clicks -- --app
+      # No pointer on the show (scripts/showcursor.mjs, the owner's ask of
+      # 2026-10-04): the projector window, a cast receiver and clean screen
+      # show no arrow as they open, with the mouse moving over them, or later;
+      # the design screen keeps its crosshair. CSS, so no GPU; on the same
+      # dist/.
+      - name: No pointer on the show
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/showcursor.mjs
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -648,6 +687,14 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # A clear film that tears (PLAN 20b): the film's volume kept, a thick film
+      # whole and a thin dusty one torn into holes of every size by the physics
+      # alone, a drop of solvent opening a growing hole, white over the colour
+      # on the lamp, and the picture unchanged with the film off. In the open
+      # shard, beside the lamp it is drawn on.
+      - name: A clear film that tears
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run lace
       # The pigment's grain inside the dye, not at its edge: in every look the
       # grain moves almost no pixel of a dye edge by a fleck's worth (it made
       # the edges a dithered fringe, "very digital"), and the bodies keep it.
@@ -682,6 +729,13 @@ jobs:
       - name: The ferrofluid through the whole plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferropour
+      # A new grid (the quality governor's move) keeps the plate's liquids
+      # that live only on the GPU: the ferrofluid and the mix in the same
+      # amounts and shape, the reactions value for value (PLAN 9w). In the
+      # open shard: the plate shard is near its timeout.
+      - name: The liquids carried onto a new grid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run regrid
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

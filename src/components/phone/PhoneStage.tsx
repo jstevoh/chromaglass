@@ -112,6 +112,10 @@ export interface PhoneStageProps {
   layers: number;
   activeLayer: number;
   onLayer: (i: number) => void;
+  /** Put a back layer on this look (there are at most two). */
+  onAddLayer: () => void;
+  /** Take the back layer off; absent while the back plate has a look of its own. */
+  onRemoveLayer?: () => void;
   onClear: () => void;
   onDrain: () => void;
   onSpin: () => void;
@@ -211,6 +215,13 @@ export interface PhoneStageProps {
    */
   lampGround: number;
   onLampGround: (v: number) => void;
+  /**
+   * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
+   * lace. On the Dye sheet, under the bottles, because it is a liquid
+   * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
+   */
+  clearFilm: number;
+  onClearFilm: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -582,6 +593,12 @@ export function PhoneStage(p: PhoneStageProps) {
           ))}
           {liquid?.description && <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-liquid-description">{liquid.description}</p>}
 
+          <div className="mt-3">
+            <Slider label="Clear Film" value={p.clearFilm} min={0} max={1} step={0.05} onChange={p.onClearFilm}
+              display={`${Math.round(p.clearFilm * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+          </div>
+
           <SectionLabel>{liquid ? `${liquid.name}'s colour` : 'Colour'}</SectionLabel>
           <div className="grid grid-cols-6 gap-2">
             {p.dyeColors.map(hex => {
@@ -810,19 +827,34 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}
               display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
           </div>
-          {p.layers > 1 && (
-            <>
-              <SectionLabel>The plate your fingers work</SectionLabel>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${p.layers}, minmax(0, 1fr))` }}>
-                {Array.from({ length: p.layers }).map((_, i) => (
-                  <button key={i} onClick={() => p.onLayer(i)} aria-pressed={p.activeLayer === i} data-testid={`phone-layer-${i}`}
-                    className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
-                    {i === 0 ? 'Front' : i === 1 ? 'Back' : `Layer ${i + 1}`}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {/*
+            The plates, on every look. This section was here only on a look
+            with two, as a picker, so the phone could neither give a look a
+            back plate nor take one off (the owner reported the desk's half of
+            the same gap). Now it is always here: the picker when there are
+            two, with a button beside it that takes the back one off, and on a
+            one-plate look a button that adds it.
+          */}
+          <SectionLabel>{p.layers > 1 ? 'The plate your fingers work' : 'Plates'}</SectionLabel>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: p.layers > 1 ? `repeat(${p.layers}, minmax(0, 1fr)) auto` : '1fr' }}>
+            {p.layers > 1 && Array.from({ length: p.layers }).map((_, i) => (
+              <button key={i} onClick={() => p.onLayer(i)} aria-pressed={p.activeLayer === i} data-testid={`phone-layer-${i}`}
+                className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                {i === 0 ? 'Front' : i === 1 ? 'Back' : `Layer ${i + 1}`}
+              </button>
+            ))}
+            {p.layers > 1 ? (
+              <button onClick={p.onRemoveLayer} disabled={!p.onRemoveLayer} data-testid="phone-remove-layer"
+                className="h-12 rounded-lg border border-border bg-elevated px-4 text-[14px] text-text-2 disabled:opacity-60">
+                {p.onRemoveLayer ? 'Take off back' : 'Back has a look'}
+              </button>
+            ) : (
+              <button onClick={p.onAddLayer} data-testid="phone-add-layer"
+                className="h-12 rounded-lg border border-border bg-elevated px-4 text-left text-[14px] text-text-2">
+                + Add a back plate
+              </button>
+            )}
+          </div>
           <SectionLabel>Turn the dish by itself</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5" data-testid="phone-spin-auto">
             {(['Off', 'Rate', 'Tempo'] as const).map((name, mode) => (

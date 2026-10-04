@@ -28,7 +28,7 @@ import { spikesOnAxis } from './wgsl/spikes';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
-import type { GpuStepParams } from './solverTypes';
+import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
@@ -46,6 +46,17 @@ import { WebGPUAir } from './air';
   needs nothing here.
 */
 const AIR_CAPACITY = 512;
+
+/** What `handOver` copies out: the fields, on the device they were copied on. */
+interface FieldCarry extends SolverCarry {
+  readonly device: GPUDevice;
+  readonly phase: GPUTexture | null;
+  readonly mix: GPUTexture | null;
+  readonly rxn: GPUTexture | null;
+  readonly lies: GPUTexture | null;
+  /** Oil Bodies' tally of the oil poured: the oil is carried, so its tally is. */
+  readonly oilPoured: number;
+}
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -147,6 +158,32 @@ const LAMP_HEAT = 6;
 const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 const CH_SUBSTEPS = 4;
+/*
+  The clear film (PLAN §20b, wgsl/film.ts), on a grid of its own.
+
+  FILM_GRID is the prototype's (lace.py, 384²), whose numbers the kernels
+  keep, so a hole is the size the prototype found on any solver that grid
+  fits in; a smaller solver runs the film on its own grid and tears coarser.
+
+  FILM_MAX is the thickest film Clear Film lays, at 1: the prototype's plateau,
+  under the other glass's 0.9. FILM_RATE is the film's own time a second of the
+  show. The prototype's lace took about five units, so at 0.15 a thin film
+  (0.3 of the gap) tears in a second or two over the dust and a thick one
+  (0.8) holds for twenty seconds and more, which is the pace a real film
+  dewets at on a light show's dish. FILM_DT is the explicit step's limit
+  (2 / M(64σ + 8·wall) is 2.6e-4 at the film's stiffest, see filmUpdate), so
+  a second takes 0.15 / 2.2e-4 ≈ 680 substeps, twelve a frame at 60 frames;
+  a slow frame takes no more than FILM_SUBSTEPS and the film runs slower
+  rather than unstable. FILM_CARRY substeps carry it with the flow.
+*/
+export const FILM_GRID = 384;
+export const FILM_MAX = 0.86;
+export const FILM_RATE = 0.15;
+const FILM_DT = 2.2e-4;
+const FILM_SUBSTEPS = 12;
+const FILM_CARRY = 2;
+/** The precursor film the glass keeps wet, as in wgsl/film.ts (F_HP): no film is laid thinner. */
+const FILM_HP = 0.06;
 /** Liesegang's inner electrolyte, spread evenly through the gel. */
 const LIES_B0 = 0.2;
 /*
@@ -586,6 +623,15 @@ export class WebGPUFluid {
   */
   private mix: PingPong | null = null;
   /*
+    The clear film (PLAN §20b): thickness and solvent, on its own grid
+    (FILM_GRID, at most the solver's), and its pressure, made the first step
+    a plate asks for a film. filmLaid is the Clear Film it was laid at, 0
+    while there is none on the plate (and nothing of it is run).
+  */
+  private film: PingPong | null = null;
+  private filmP: GPUTexture | null = null;
+  private filmLaid = 0;
+  /*
     The thin-gap solver's own storage (PLAN §18a), made the first time a
     plate is stepped with Thin Gap on: the velocity before the step's forces,
     the mobility a cell (row-major, negative past the rim), and the mobility
@@ -801,6 +847,15 @@ export class WebGPUFluid {
       // built behind the show; waited for at the open, `npm run startup`
       // fails it as asked for by none.
       ['phaseCarry', [R32], false],
+      // The ferrofluid and the mix carried onto a new grid (takeOver, PLAN
+      // 9w): only when the governor moves the grid, a few seconds into a
+      // show at the earliest, so built behind it.
+      ['carryArea', [R32, RGBA32], false],
+      // The clear film (PLAN §20b): no look lays one, so built behind the show.
+      ['filmAdvect', [RGBA32], false],
+      ['filmMu', [R32], false],
+      ['filmUpdate', [RGBA32], false],
+      ['filmSplat', [RGBA32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
       ['rxnStep', [RGBA32], open.reaction],
@@ -1224,6 +1279,8 @@ export class WebGPUFluid {
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
+    // The clear film goes with the plate, and is laid fresh on the next step a look asks for one.
+    this.filmLaid = 0;
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.grainAge = 0;
@@ -2215,6 +2272,58 @@ export class WebGPUFluid {
     }, !!mix && this.mixLive);
 
     /*
+      The clear film (PLAN §20b, wgsl/film.ts).
+
+      Laid the first step Clear Film is up, over the whole plate at its
+      thickness, and raised or lowered everywhere by the difference when the
+      control moves with a film on (more clear oil poured over the dish, or
+      drawn off it). At 0 there is no film and nothing here runs.
+
+      After the mix, on the same velocity the dye was carried by: the film is
+      carried first, then evolved in substeps of its own time. The substeps
+      share one dt (the same args each), so their uniforms are written once.
+    */
+    const filmWant = Math.max(0, Math.min(1, Number.isFinite(p.clearFilm) ? p.clearFilm as number : 0));
+    if (filmWant <= 0.001) this.filmLaid = 0;
+    stage('film', (pass) => {
+      const f = this.ensureFilm();
+      const n = f.size[0];
+      /*
+        What is on the plate is what was poured, so `filmLaid` follows the
+        pours, not the control: a first lay at the precursor (a fade starting
+        from 0 asks for less than a film can be) records the precursor, and a
+        change too small to pour this frame is kept for a later one rather
+        than counted as poured. Recording the control instead lost every
+        step under 1e-4 of a long fade (the film stayed thick to the end,
+        then went at once) and ended a fade-in from 0 a precursor thicker
+        than the same setting laid at once.
+      */
+      if (this.filmLaid <= 0) {
+        const h = Math.max(FILM_HP, FILM_MAX * filmWant);
+        for (const t of [f.a, f.b]) this.fill(pass, t, [h, 0, 0, 0], n);
+        this.filmLaid = h / FILM_MAX;
+      } else if (Math.abs(filmWant - this.filmLaid) > 1e-4) {
+        this.run(pass, 'filmSplat', f.write, [f.read], this.arg('film level', [0, 0, 0, 1, FILM_MAX * (filmWant - this.filmLaid), 0, 0, 0]), n);
+        f.swap();
+        this.filmLaid = filmWant;
+      }
+      const carry = this.arg('film carry', [(disp / FILM_CARRY) * n, 0, 0, 0]);
+      for (let k = 0; k < FILM_CARRY; k++) {
+        this.run(pass, 'filmAdvect', f.write, [f.read, this.velForced], carry, n);
+        f.swap();
+      }
+      const span = FILM_RATE * Math.max(0, p.magnetSeconds ?? 1 / 60);
+      const subs = Math.max(1, Math.min(FILM_SUBSTEPS, Math.ceil(span / FILM_DT)));
+      const dust = this.arg('film dust', [Math.max(0, p.filmDust ?? 1), 0, 0, 0]);
+      const step = this.arg('film step', [Math.min(FILM_DT, span / subs), 0, 0, 0]);
+      for (let k = 0; k < subs; k++) {
+        this.run(pass, 'filmMu', this.filmP!, [f.read], dust, n);
+        this.run(pass, 'filmUpdate', f.write, [f.read, this.filmP!], step, n);
+        f.swap();
+      }
+    }, filmWant > 0.001);
+
+    /*
       Oil Bodies: each liquid keeps its own colour (bodyPartition, and why).
 
       After the mix, so the colour is kept to where the oil is at the end of
@@ -2401,6 +2510,60 @@ export class WebGPUFluid {
     return this.mix;
   }
 
+  /** The clear film's fields (PLAN §20b), made the first time a plate asks for a film. */
+  private ensureFilm(): PingPong {
+    if (!this.film) {
+      const n = Math.min(FILM_GRID, this.N);
+      this.film = new PingPong(this.device, this.disposer, [n, n], 'rgba32float', 'film');
+      this.filmP = this.disposer.track(this.device.createTexture({
+        label: 'film pressure', size: [n, n], format: R32,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    }
+    return this.film;
+  }
+
+  /**
+   * A pour onto the clear film (PLAN §20b): clear oil (`film`, in fractions of
+   * the gap at the middle of the pour) thickens it, a solvent (`solvent`) lands
+   * where its Marangoni pull opens a hole. In plate units. Nothing while there
+   * is no film on the plate: a drop of alcohol on bare water has nothing to
+   * tear, and the oil goes where it always went.
+   */
+  addFilm(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void {
+    if (!this.film || this.filmLaid <= 0) return;
+    const enc = this.device.createCommandEncoder({ label: 'add film' });
+    const pass = enc.beginComputePass({ label: 'add film' });
+    const n = this.film.size[0];
+    this.run(pass, 'filmSplat', this.film.write, [this.film.read],
+      this.arg('film splat', [x, y, radius, 0, what.film ?? 0, what.solvent ?? 0, 0, 0]), n);
+    this.film.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  /** Whether a clear film is on the plate (PLAN §20b). */
+  get filmOn(): boolean { return this.filmLaid > 0; }
+
+  /** The clear film read back whole (thickness, solvent, ·, ·), or null with none on the plate. For checks. */
+  async readFilm(): Promise<{ n: number; data: Float32Array } | null> {
+    if (!this.film || this.filmLaid <= 0) return null;
+    const n = this.film.size[0];
+    const row = Math.ceil((n * 16) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read film', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read film' });
+    enc.copyTextureToBuffer({ texture: this.film.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(buf.getMappedRange().slice(0));
+    const out = new Float32Array(n * n * 4);
+    const stride = row / 4;
+    for (let y = 0; y < n; y++) out.set(all.subarray(y * stride, y * stride + n * 4), y * n * 4);
+    buf.unmap();
+    buf.destroy();
+    return { n, data: out };
+  }
+
   private ensureRxn(): PingPong {
     if (!this.rxn) {
       this.rxn = new PingPong(this.device, this.disposer, [BZ_GRID, BZ_GRID], 'rgba32float', 'rxn');
@@ -2428,13 +2591,15 @@ export class WebGPUFluid {
     }
     this.blank('r');
     const has = [this.phaseLive, this.mixLive && !!this.mix, this.rxnLive && !!this.rxn, this.liesLive && !!this.lies];
+    const film = this.filmLaid > 0 && !!this.film;
     this.run(pass, 'packView', this.viewTex, [
       has[0] ? this.phase.read : this.blankR!,
       has[1] ? this.mix!.read : this.blankRGBA!,
       has[2] ? this.rxn!.read : this.blankRGBA!,
       has[3] ? this.lies!.read : this.blankRGBA!,
       this.squeeze.read,
-    ], this.arg('view', [...has.map((h) => (h ? 1 : 0)), BZ_GRID, LIES_GRID, 0, 0]));
+      film ? this.film!.read : this.blankRGBA!,
+    ], this.arg('view', [...has.map((h) => (h ? 1 : 0)), BZ_GRID, LIES_GRID, film ? this.film!.size[0] : 1, film ? 1 : 0]));
   }
 
   private ensureLies(): PingPong {
@@ -2609,6 +2774,109 @@ export class WebGPUFluid {
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
+  }
+
+  /**
+   * The liquids that live only here, copied out for the next solver (PLAN 9w).
+   *
+   * When the governor moves the grid the app builds a new solver and lets
+   * this one go. The dye and the flow were always carried across, through
+   * the CPU's 192² arrays (`FluidSimulation.attachGpu`); nothing else was,
+   * because nothing else ever crosses to the CPU. So the ferrofluid, the oil
+   * and soap and acidity of the mix, and the two reactions were simply gone
+   * on the new grid, and the app filled the gap by pouring the look's
+   * ferrofluid ring again whenever Ferrofluid was up: a pool dragged into a
+   * shape came back as the ring, and ferrofluid poured from the bottle on a
+   * look with none of its own came back as ferrofluid nobody poured. With
+   * the Magnet moving only what is on the plate (9y), a pool lost that way
+   * left the magnet nothing to hold mid-show.
+   *
+   * A copy on the GPU, not a read to the CPU and back: the read would be a
+   * frame or more late and cost a megabyte or more each way, and the copy is
+   * in queue order after this solver's last step, so what the next one
+   * starts from is the plate as it was. Copies rather than this solver's own
+   * textures, because the app releases the old solver before it builds the
+   * new one (a solver is a couple of hundred megabytes at the top rungs, and
+   * holding two doubles the peak): the copies are the field alone, 4 bytes a
+   * cell for the ferrofluid and 16 for the mix, about 20 MB at 1024².
+   *
+   * Only what is on the plate is copied (the live flags), so a plate with
+   * none of these pays one empty encoder. Null once disposed.
+   */
+  handOver(): FieldCarry | null {
+    if (this.disposed) return null;
+    const enc = this.device.createCommandEncoder({ label: 'hand over' });
+    const made: GPUTexture[] = [];
+    const copy = (pp: PingPong | null, live: boolean): GPUTexture | null => {
+      if (!pp || !live) return null;
+      const [w, h] = pp.size;
+      const t = this.device.createTexture({
+        label: `carried ${pp.read.label}`, size: [w, h], format: pp.format,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+      });
+      enc.copyTextureToTexture({ texture: pp.read }, { texture: t }, [w, h]);
+      made.push(t);
+      return t;
+    };
+    const carry: FieldCarry = {
+      n: this.N,
+      device: this.device,
+      phase: copy(this.phase, this.phaseLive),
+      mix: copy(this.mix, this.mixLive),
+      rxn: copy(this.rxn, this.rxnLive),
+      lies: copy(this.lies, this.liesLive),
+      oilPoured: this.oilPoured,
+      destroy: () => { for (const t of made.splice(0)) t.destroy(); },
+    };
+    this.device.queue.submit([enc.finish()]);
+    return carry;
+  }
+
+  /**
+   * Lay what the last solver handed over (`handOver`) onto this grid: the
+   * ferrofluid and the mix resampled by area (carryArea), so the plate holds
+   * the same amount of each, in the same place and shape to within a cell of
+   * the coarser grid; the reactions copied as they were, their grids being
+   * the same size on every solver. Call it on a fresh solver, after `clear`
+   * and before its first step. False, and nothing laid, for a carry from
+   * another device (the old one was lost, and its copies with it).
+   *
+   * The oil's share of the dye (Oil Bodies) is not carried: the dye itself
+   * comes back through the CPU's 192² arrays, a frame old and at that grid,
+   * so a share carried at full resolution would no longer be a share of it.
+   * It starts empty, as it does whenever Oil Bodies is turned on over oil
+   * that is already there, and bodyPartition hands the colour inside each
+   * body back to it within a few steps.
+   */
+  takeOver(c: SolverCarry): boolean {
+    const carry = c as FieldCarry;
+    if (carry.device !== this.device || this.disposed) return false;
+    const enc = this.device.createCommandEncoder({ label: 'take over' });
+    const pass = enc.beginComputePass({ label: 'take over' });
+    if (carry.phase) {
+      this.run(pass, 'carryArea', this.phase.write, [carry.phase], this.arg('carry phase', [carry.n, this.N, 0, 0]));
+      this.phase.swap();
+      this.phaseLive = true;
+      this.phaseGapPrimed = false;
+    }
+    if (carry.mix) {
+      const m = this.ensureMix();
+      this.run(pass, 'carryArea', m.write, [carry.mix], this.arg('carry mix', [carry.n, this.N, 0, 0]));
+      m.swap();
+      this.mixLive = true;
+      this.oilPoured = carry.oilPoured;
+      this.oilDyeStale = true;
+    }
+    pass.end();
+    const same = (from: GPUTexture | null, to: PingPong) => {
+      if (!from || from.width !== to.size[0] || from.format !== to.format) return false;
+      enc.copyTextureToTexture({ texture: from }, { texture: to.read }, [from.width, from.height]);
+      return true;
+    };
+    if (carry.rxn && same(carry.rxn, this.ensureRxn())) this.rxnLive = true;
+    if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
+    this.device.queue.submit([enc.finish()]);
+    return true;
   }
 
   /** The mix or the reactions, read back whole (RGBA per texel). For checks. */

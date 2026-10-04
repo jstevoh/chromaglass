@@ -700,6 +700,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.thinGap ?? 1) > 0.5 && (
             <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/*
+            The clear film that tears into lace (PLAN §20b), always: laying it
+            and thickening it is a pour, worth a thumb from across the room.
+          */}
+          <Slider label="Clear Film" field="clearFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
