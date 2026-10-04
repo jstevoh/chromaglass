@@ -53,6 +53,9 @@ when it ships, strikes the step here in the same PR (`~~…~~ #NNN`) and marks i
 shipped. What it finds along the way goes into the section it belongs to, and here only
 if it changes the order.
 
+**The owner's QA list** (below, after the duplicates table) is ranked separately: a fix
+thread for a QA item takes the top open line in its tier.
+
 **Why this order.** Five rules, in priority:
 
 1. **First, whatever makes every later PR cheaper.** On 2026-10-03, 46 % of the PR check
@@ -153,7 +156,7 @@ Judged in this order, because these gate code:
 
 - **2.1** **18a-11** Thin Gap's cost (`docs/judging.md` §19a): gates 18a-10, and says whether
   Thin Gap, on in every look since #248, needs a look turned back off.
-- **2.2** **15b** the tools' feel: gates 15g.
+- **2.2** **15b** the tools' feel (the Finger as a solid shipped; judging §33): gates 15g.
 - **2.3** **16b-cost** a source pass's cost and **13-twoproj** two popup projectors: gate 16d.
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
@@ -223,7 +226,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
 
 - **6.1** ~~**18a-every** Thin Gap in every look~~ #248 (the owner's pick came before 2.1's
-  reading; 2.1 still reads it), then **15b**, **15g**,
+  reading; 2.1 still reads it), then ~~**15b**~~ (the Finger, shipped), **15g**,
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground, 0 in every look;
   the owner picks the looks, judging §31), then **18f** heat from the lamp (which unblocks 10.6
@@ -235,7 +238,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
-  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261). Painters: **21b**, **21d**. The
+  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 
@@ -250,7 +253,12 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
+- **7.5** Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
+  **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
+  **23.7**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
+- **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
+  13.1-sign), then **24.4**.
 
 ### One home for work written twice
 
@@ -282,6 +290,71 @@ and to mark shipped, and the others now point to it.
 | Mixed versions at the projector | 14p | 14k |
 | The checks red on trees they do not measure | Wave 0's list | §0, §11, 19h |
 | Press dye on the GPU | 18a-3 | 15d |
+| An input per channel | 24.1 | 5-channels |
+
+### QA list: what the owner found playing it (from 2026-10-04)
+
+The owner's QA rounds, one line per fault, ranked by how much it costs a show. A fix
+thread takes the top open item in a tier; the PR that fixes it strikes the line here
+(`~~…~~ #NNN`, and "live" once deployed). Where it shows: **desk** (the laptop's
+Perform and Design desks), **phone**, **wall** (the show screen or projector), **Mac**
+(the desktop app).
+
+**Tier 1. Seen by the room, or it stops the show.**
+
+- **QA-1** The plate pulses each time a control is pressed or a tool is picked. Desk;
+  the pulse reaches the wall. Thread "Plate pulses on control clicks", no PR yet.
+- **QA-2** The mouse pointer shows on the show screen. Wall, Mac. Draft #271.
+
+**Tier 2. A control does the wrong thing, or cannot be reached.**
+
+- **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
+  phone. Draft #269 (PLAN 15i).
+- **QA-4** Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
+  top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
+  The chip is `fixed top-3 … translate-y-9` in `src/App.tsx` (the `macroZoom > 1.05`
+  block, about line 3984) and lands on the desk's top strip, where
+  `PerformanceButton` sits (`PerformDesk.tsx:466`; Design has the same button,
+  `DesignDesk.tsx:291`, check it there too). Not on the phone (the chip is desk-only).
+- **QA-5** Layers: + appears only on one-plate looks and there is no −. Desk, phone.
+  Thread "Layers on every preset", no PR yet (a third plate is 16d).
+- **QA-6** The Magnet lays a fixed grid of spikes. Desk, phone. Draft #247 deletes the
+  lattice (9t); thread "Magnet without the grid".
+
+- **QA-12** Pressing Hold on the zoom chip makes the closeup jump; it should stay exactly
+  where it is. Hold aims the camera at the stored aim (`macroAimX/Y`), not where the
+  camera is: under Follow or Auto the camera has ridden away from the aim, so Hold eases
+  it back there fast (`aimed()` in `src/lib/macroCamera.ts`, rate 6 + 6 × chase). The chip
+  only sets `macroCamera` (`src/App.tsx`, `macro-camera-hold`). Fix: on switching to
+  Hold, write the camera's current centre into the aim. Desk, phone
+  (`PhoneStage.tsx`), and it shows on the wall.
+
+**Tier 3. On the wall, it looks wrong.**
+
+- **QA-7** Looks read as pixelated, "very digital", on a laptop. Wall, desk. Draft #267.
+- **QA-8** Sensual Laboratory is washed out by the lamp. Wall. Draft #262 (18b-1).
+- **QA-9** Clock Glass and the ferrofluid looks fall short of their references. Wall.
+  Thread "Clock glass and ferro looks", no PR yet.
+- **QA-10** Velvet Underground, Lumia and Cell Bloom are underwhelming: one area of interest, not
+  several. Wall. Thread "More going on in every look", no PR yet.
+
+- **QA-13** Fillmore East's dish fills only a small part of the canvas; it should be
+  framed so the whole plate fills it. Wall, desk. Thread "More going on in every look".
+
+- **QA-14** The looks carry too few colours: the owner wants many, with subtle gradients
+  between them, across the presets in general. Wall, desk. Thread "More colour in the
+  looks".
+
+**Tier 4. Polish.**
+
+- **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
+  `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
+  without ever cutting away; Auto picks its own subject, rides it for Shot Length (5 s
+  by default) and whip-pans to another. Between Auto's cuts both ride one bead, and
+  nothing on the chip says which is which (the difference is only in hover titles).
+  Make it obvious on the chip, for example a mark where Follow is locked and Auto's
+  cuts named in its label; keep both. Desk (`src/App.tsx`, the zoom chip) and phone
+  (`PhoneStage.tsx`, the same three buttons).
 
 ## Running order
 
@@ -307,13 +380,13 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 8 not started (7, a DAW bridge plugin, and 8, a native renderer core for later, added 2026-10-04); Windows (13-win-smoke, -app, -sign) planned 2026-10-04, never run on a PC |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (0 in every look, the owner picks which go on the lamp; `npm run lamp`), 18b-1 to 18b-6 left |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
-| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22b–22g, 22i, 22k–22m open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -434,6 +507,13 @@ its gap loses, as fast as the viscous film lets it close. Replace both with the 
 itself (the bubble as a region the flow goes round: a no-flux boundary, or the
 Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
 `npm run straw` and `npm run heldpress`, which should then need no press to hold.
+And `npm run ferrodrift`, whose old-plate line asks the press to be still pulling
+poured ferrofluid in toward bubbles near the middle on the old plate (0.099 → 0.150 in
+twelve seconds, #250), as the proof that check can see a drift: when the press goes,
+that line turns round and asks the old plate to stay. The thin gap
+already keeps it still, because there the press is only the glass and a gap near the
+floor is where the flow's mobility (h³) goes to nothing, which is the no-flux
+boundary this item asks for, reached by the gap itself.
 
 *Found 2026-10-04 (#238); **shipped #251 (0-bandbubbles)**:* **the simulated band's
 kicks released bubbles whatever Audio Impact said.** The first click on a browser that
@@ -464,25 +544,26 @@ own and left as it is: Soap Bursts on the beat (Soap Flow), Rock and the rhythm 
 camera's beat (Macro Sync), and the look's pace (Tempo Sync). Whether any of those
 should also answer to Audio Impact is a later look question, not done here.
 
-*Found 2026-10-04 (#238), not yet done:* **with the band playing, the ferrofluid
-poured round Classic's middle drifts into it.** Picking the Magnet on Classic pours a
-ring round the middle; `npm run magnet` watches the disc 0.12 round the middle for
-nine seconds with the solver stepped with no magnet at all. While a still bubble
-poured liquid out over the whole plate (the standing air term #238 removed), eight
-runs on other PRs read the disc's mean 0.058–0.099 at the start and 0.054–0.184 at
-the end; with that outflow gone and the band left playing (the check's own click
-starts it), the Mac read 0.180 and 0.501. So the outflow was hiding something the
-band does to the middle. Not found in the lab: the app's own step (sound drives held
-at zero, as the check holds them), the same pour, and four bubbles held or kicked on
-and off near the middle keep the disc at 0.095 → 0.083–0.086 without the outflow
-(0.062–0.069 with it), and dense dye with no bubbles moves it 0.095 → 0.103. Left to
-look at: the band's bubbles as the app moves them (carried by the flow, pressed,
-popped with a puff of air), and the first 2.5 s, when Beat Squeeze and the band's
-turbulence still run and the disc already reads 0.180. In silence the same window on
-the Mac read 0.099 → 0.084 with no bubbles on the plate (a run of #238 before #230
-merged), so it is the band. #230 then took the pour out of the pick and that line out
-of `npm run magnet`, so no check sees this now: build one that pours a ring round the
-middle with the band on, in the app, on the Mac, and find what moves it.
+*Found 2026-10-04 (#238), **done on the thin gap (#250); open on the old plate** below:* **with the band playing, the
+ferrofluid poured round Classic's middle drifted into it** (the disc 0.12 round the
+middle 0.180 → 0.501 of black in nine seconds on the Mac, 0.099 → 0.084 in silence).
+`npm run ferrodrift` (#250) pours the ring with the band on, in the app, on the Mac,
+and four runs of it found: with the look as it is the ring spreads into the middle as
+fast in silence as with the band (0.100 → 0.248 against 0.097 → 0.233 in twelve
+seconds, the ferrofluid's mean distance from the middle growing, so the look's own
+stirring spreading it both ways), and no slower with the bubbles, centre gravity,
+Tempo Sync or vibration taken away; with the plate's own currents held, as #238 held
+them, on the thin gap every look plays since #248 the band moves nothing in, its
+bubbles on the plate or not (0.097 → 0.082 and 0.102 → 0.076; silence 0.114 → 0.117);
+and held on the old plate (Thin Gap off) it still drifts in when the band's bubbles
+land near the middle (0.099 → 0.150 with two to seven, the mean distance 0.310 →
+0.298), and not on a run where it dropped none or with Bubbles at 0 (0.086 → 0.086,
+0.097 → 0.093). So it was the old plate's bubble press ("a still bubble presses the
+glass", above), and #248 took every look off it. The check asks the thin gap with
+the band and four bubbles set down where the band drops them, against a silence that
+has to be still itself, and asks the old plate to drift by more than the same bar, so
+the instrument is shown to see what it was built for; that line turns round to ask
+the old plate to stay once its bubbles stop pressing.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -807,7 +888,9 @@ the analyser's: the kick's onset from the kick mic, the vocal bus for the lyrics
 for presence, the room mic's roar as a sound-learn source. Browsers differ above two
 channels, so it is surest in the Mac app (§13 step 1). The phone's Sound sheet gets a
 meter and an on/off per channel. *Measure:* `npm run bands` on a four-channel file with
-a kick on channel 1 only: the kick onset follows channel 1, not the mix.
+a kick on channel 1 only: the kick onset follows channel 1, not the mix. **Home: 24.1**
+(2026-10-04), the audio-voice half of the Patch inputs; Chrome gives a page at most two
+input channels, so above two it is the Mac app's alone.
 
 ### 6. Render a song
 
@@ -2265,8 +2348,8 @@ shader compiler and Windows' audio inputs are all unmeasured. In this order:
   job signs with. Unsigned, SmartScreen warns people off the installer, as macOS does
   for the unsigned Mac app (13.1-sign).
 - **13.3**'s Spout out then lands on this build, and **13-update**'s updates serve both.
-- Selling it, if that is chosen, needs nothing Windows-only: a licence key checked
-  offline works the same in both apps.
+- Selling it (§23) needs nothing Windows-only: a licence key checked offline works
+  the same in both apps.
 
 Until step 2 lands, the plate still reaches a VJ app the way it can today: OBS
 captures the projector window and sends it on through its Syphon or NDI plugin, and a
@@ -2322,6 +2405,28 @@ network):
   check that times out because its machine is slow says nothing about the app.
   Wait for the reload on the page's own first frame rather than `load`, or say
   "skip" when the covered reading shows the page was starved, as the lit plate does.
+- ~~`npm run desktop`'s projector line goes red on CI's Mac on PRs that never touched
+  it ("the mirror's canvas missing", #255 and #262 on 2026-10-04)~~ **Fixed 2026-10-04
+  (#263):** the line read the projector once, 2.5 s after its window appeared, and on
+  the Mac the mirror comes up 3.15 s after the projector's page opens (the first run
+  that printed it). Until then the page is `main.tsx`'s black loading fallback: the
+  projector shares the show window's renderer, and the show has just reloaded and is
+  in its opening, so the page's first animation frame is held as long as the show's
+  (in the cloud 0.48–0.58 s with 11–66 ms of script, the mirror at 0.39–0.65 s). The
+  line now waits for the mirror (`#stage-canvas`) up to the app's own 8 s loading bar,
+  prints how long it took and the longest frame the page sat in before it, and reads
+  the click hint 2 s after the mirror came up: the hint is timed from the mirror's
+  mount, so the old read could judge it before it was due. The second read must be of
+  the same page (its `timeOrigin`), at least 1.5 s after the mirror, with the show
+  window still there and one projector window (the `check-skeptic`). Red on a build
+  with no mirror canvas (missing at 8.02 s), on one whose hint ignores full screen,
+  and on that one again with the projector reloading, or closing, 1 s after the mirror.
+  Keeping the solver's 668 kB chunk out of the mirror's page was tried and moved
+  nothing in the cloud (0.42–0.63 s against 0.39–0.65 s), so it was left out. *Still
+  open:* whether the Mac's 3 s is Chromium's GPU-start hold (`npm run startup` reads
+  a cold show's at 2.5–3.2 s) or the show's own opening code is what the printed
+  frame says; if it is script, it is the show's opening to shorten (§14), since the
+  wall is black for those seconds after the projector is plugged in.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
@@ -3083,28 +3188,70 @@ performer would notice first:
 
 ### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 
-Every liquid rides one velocity field, which is held to `MAX_SPEED` 0.002
-(`src/gpu/fluid.ts`, `decayVel`). The idle plate already runs at that limit. A
-tool's velocity folds in before the step, carries the liquid once, and the clamp
-then cuts it back to idle. The comments in `fingerDrag` and `blowAir` say the
-projection removes the push. In the lab, the clamp accounts for about three times as
-much as the projection does. Lab, 256², fingerDrag's own velocity dragged 30 cells
-across a disc of dye and ferrofluid over 60 steps (centroid shift, cells):
+**Shipped for the Finger on a thin gap (every look; `npm run fingerflow`), not yet
+judged on the Mac (`docs/judging.md` §33).** The owner's OK for the feel change came
+2026-10-04 ("start with the making liquids real work").
 
-| | dye | ferrofluid |
-|---|---|---|
-| left alone | 0.00 | 0.00 |
-| today | 0.17 | 0.20 |
-| clamp lifted | 0.56 | 0.63 |
-| at the hand's own speed, no swirl, clamp on | 0.87 | 1.09 |
+What was found when it was picked up: the clamp this item was written about is
+already gone on a thin gap (`decayVel` neither damps nor clamps there, since 18a),
+and Thin Gap is on in every look since #248. The push still moved nothing. Lab,
+Classic's plate (384² under 192), the Finger's own velocity drawn 0.4 of the plate at
+two cells a step through bands of colour, a pool of ferrofluid and a drop of oil on
+its path: the bands moved 0.13% of the plate, as they do left alone, the pool 0.04%,
+the drop 0.03%. A disc of velocity laid over still liquid is mostly the divergent
+part of a flow, and the thin solve, which makes the flow conserve liquid, took it
+straight back out. Only the hand-written carries moved anything.
 
-Only liquids with a hand-written carry actually move under a tool: the dye (Finger's
-`carryDye`, Press's `squeezeOut`) and the oil (Finger's `carryMix`). A likely fix is
-to feed a hand's velocity into the lasting current (`cur`, capped at 0.75 of a cell a
-step, which remembers for about a hundred steps) instead of the clamped field. That
-would carry every field alike. It changes how every tool feels, so it goes to the owner
-first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
-these numbers.
+What shipped: the Finger is a solid in the layer, moving at the hand's own speed
+(Brinkman's penalised solid, inside the thin solve: `hsPrep`, `lib/handSolid.ts`). The
+liquid it touches moves with it and the liquid round it gives way as the flow past a
+moving disc in a Hele-Shaw cell does (a dipole, back the other way beside it at
+U·a²/d²), and the flow carries the colour, the oil and the ferrofluid alike. On a thin
+gap the Finger's carries (`carryDye`, `carryMix`, `fingerCarry`) and its push and swirl
+no longer run; `liquid.stir` still mixes the chemistry under it. The ferrofluid's
+carry, and the colour's under a Labyrinth's flow, take as many substeps as the fastest
+hand needs. The show's own Finger stroke (the automation's) keeps its colour carry on a
+plate with ferrofluid on it, as it did, so it does not pull tongues out of the pools. The numbers are in the PR and
+in `scripts/fingerflow.mjs`.
+
+Found by the Mac's `npm run tools` on the way: its Finger, drawn through a pool the Drop
+had laid, took the plate's colour from 222 to 161 where the plate left alone gained 17.
+The colour's and the oil's carries crossed faces rebuilt from the cells' velocities,
+with the pressure put back as if the drag were even (18a-8), and a solid is exactly
+where it is not: at the hand's rim those faces gathered liquid, a full pool's cells
+went past the plate's cap of 6, and the cap cut them. Bands at 1 never reached the cap,
+so the lab's first checks passed. The colour's and the oil's carries and the substeps'
+Courant number now cross the faces the thin solve made conserve liquid, as the
+ferrofluid's has since 15d (`THIN_FACE`, `wgsl/fluid.ts`): a full pool drawn as the
+pointer draws one (a cell every third step) kept 59.5% of its colour before and all of
+it after (`npm run fingerflow`, check 7).
+
+Left, each its own plan item:
+
+- **15b-blow.** Blow's push on a thin gap is still a disc of velocity (moved nothing
+  measurable for the Finger's; Blow keeps its carries, `blowDye`, `blowOil`,
+  `blowCarry`). Its real replacement is air's shear and the jet's dimple on the film,
+  15g, which can now be built on this.
+- **15b-old.** With Thin Gap off (and on the CPU engine) the old plate keeps the clamp
+  and the Finger keeps its push and its carries. Not worth a lasting-current route
+  while every look is thin; if a look is turned back off for its cost (judging 2.1),
+  revisit.
+- **15b-inside.** The penalised solid is a porous disc: the liquid (and its colour)
+  under the hand rides with it, where a real fingertip has no liquid inside it and
+  parts what is ahead of it. A pool the hand passes over is drawn along under it, and
+  at its tail the colour bleeds out through the disc's soft edge (two Brinkman lengths,
+  `handEdge`) as a trail. Measure against a stylus through marbling (Jaffer's tine
+  displacement, falling with distance from the path) and, if it shows, exclude the
+  hand's cells from what the carries move.
+- **15b-remote.** A hand's Finger moves at the rate its events come, not once a step:
+  the solid it lays moves as far as the hand moved since its last event, in the one
+  step after it, and is not laid on the steps between. A remote (the phone as the
+  laptop's remote, a pen, OSC) sends at message rate, and the pointer itself is no
+  smoother when its events come slower than the steps (tools.mjs's stroke is a cell
+  every third step), so such a stroke is a hand that stops and starts. It no longer
+  loses colour (fingerflow's check 7 draws it that way); whether it reads as a jerky
+  stroke on the Mac is judging §33's, and if it does, carry the hand's last speed
+  across the steps until its next event.
 
 ### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
@@ -3906,7 +4053,8 @@ its frame rate live. "Free" means no new passes or texture reads.
         does not turn with Tilt Direction. Kept as it was (every look with it was
         tuned on it); whether an updraft should rise against Rain Drip is a look
         question for the owner on the Mac (judging §32).
-  - **18a-3, tools as solids.** A hand's push is imposed along its direction (a
+  - **18a-3, tools as solids.** The Finger is one now (15b: Brinkman in the thin solve,
+    its carries retired on a thin gap, `npm run fingerflow`). The rest: a hand's push is imposed along its direction (a
     penalised solid in the limit where the solid wins), not a disc moving at the hand's
     velocity (Brinkman), and the hand-written carries (`carryDye`, `carryMix`,
     `fingerCarry`, `pressDye`, `pressMix`, `blowDye`, `blowOil`, `blowCarry`) still run
@@ -3937,9 +4085,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     cells outside it count as open too.
   - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
     which leaves a small checkerboard at a floored dent's edge; the advections'
-    Rhie–Chow faces are given c·P, exact only where the drag is even; and the face
-    fluxes' upwinding squares off a ring under a fast radial flow (the pressed rings in
-    the picture). A staggered grid takes all three, and `dampGrid`'s job.
+    Rhie–Chow faces were given c·P, exact only where the drag is even (on a thin gap
+    the colour's and the oil's carries and carryCourant now cross the solve's own
+    faces, `THIN_FACE`, as the ferrofluid's did: a Finger's solid is where the drag is
+    least even, 15b; off a thin gap the carries keep their Rhie–Chow faces, exact on
+    the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
+    radial flow (the pressed rings in the picture). A staggered grid takes all three,
+    and `dampGrid`'s job.
   - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
@@ -4436,6 +4588,18 @@ ones report.
   so the fault the phase is for (the gate turning down the show's own next frame)
   cleared it. On one refresh the slots served must now be at most 1.15 of either
   window's frames (the Mac reads 1.00 to 1.02).
+- ~~`wall`'s busy phases' "missed from one book" can pair a refresh with its neighbour~~
+  **Fixed 2026-10-04:** red once in 91 tools-shard runs of 2026-10-03/04 (f350e75, #255;
+  green on re-run), reading "the wall's stamp 8.3 ms after the show's (-8.3 to 8.3)" in
+  both busy phases on a 60.6 Hz display, whose half refresh (8.25 ms) is under the
+  book's 8.33 ms radius. The two windows' stamps sit a different gap apart each run
+  (the 91 runs read -7.5 to +8.3 ms, each within 0.1 to 0.3 ms), so once in a few dozen
+  runs the gap is within jitter of half a refresh and the nearest raw stamp is a coin
+  toss. The book (`bookEntry` in `scripts/wall.mjs`) now pairs around the gap the first
+  refresh both windows looked up set, reset each busy phase, so a refresh's neighbours
+  are a whole refresh away at any gap. The line is unchanged. A model of the book on two
+  windows at every gap from -R/2 to +R/2 on a starved thread: 0 of 410 red, the book as
+  it was red in 20 (all at half a refresh, "d -8.3 to 8.3", the CI signature).
 - `wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
   own next frame on a runner whose two windows are handed different refreshes (the Mac
   read 1.69 slots per window's frame there once, with the gate right); only the one-refresh
@@ -4478,6 +4642,23 @@ ones report.
   nothing between, still goes to check 4; which promise settled at 1.0 s on that run
   is not known (the opening line now names it); and the rule's cases could run in
   Measure, being pure Node, if #239's owner of the workflows adds them.
+- ~~`startup`'s reds on PRs that never touched the opening, after #242~~ **Fixed
+  2026-10-04 (this PR).** Of the thirteen startup reds of 3-4 October, eleven were a
+  PR's own (#241's, #242's, #261's `spinSwirl`) or read lines since mended (#235,
+  #241, #242, #254). Two were neither. 1b's ratio read 5.28× on #257's run (37216108435):
+  the control asked all 47 inside a 2.02 s stop of its own long task, then its frames
+  stopped 16.27 s from 0.33 s later while the GPU compiled them, a stop no build sat
+  in, so unpriced. A stop begun within a second of one the builds sat in is now the
+  same compile (18.29 s; the show's own 1.36 s held to the control's 0.71 s, 0.58×).
+  And the half behind the show ran out of `gpu/prepare.ts`'s thirty seconds with 52 of
+  54 built (37209299356; 21 to 24 s on the other four runs, and growing with the
+  list): that cap is now per build behind the show, so a list nobody waits for is
+  finished rather than left to compile on the frame. *Still open:* 4b's hold, since
+  #249 asked for the display first, is the GPU process compiling it while Chromium
+  readies the page (2.92 to 4.00 s on the four runs since #254, against a 4.5 s cap
+  and 1.54 to 3.50 s before #249): the page's own compile inside the window 4b excuses
+  as Chromium's. A compute kernel first would put it back; it costs the opening the
+  display's seconds at the end.
 
 *Fix:* `CRASH_GPU=1`; `songs` into Measure; `shelf`, `sw` and `bubbles` on a Mac shard,
 or written into CLAUDE.md as by hand; `check.mjs` reading `scripts/*.mjs` paths as well
@@ -5248,16 +5429,276 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   which a saved look has). (4) Since the motor is most of what turns acid-trip,
   cyberpunk and stardust-collapse, their liquid turns faster than 0.05 rad/s all the
   time and the swirl's centrifuge runs on every step there, not only while they play
-  (22k measures what the swirl costs).
-- **22k. The swirl runs on every look with music routed to rotation.** Since 22h a
-  music look's dish sways under its liquid, so Ω − ω_l is over the swirl's 1e-3 rad/s
-  floor most of the time (above): thirteen more dispatches a step on the current's
-  half grid (spinSwirl, its divergence, ten pressure sweeps, the gradient). At 1e-3
-  rad/s the swirl moves the liquid at most 0.1 mm/s at the rim, a tenth of a cell a
-  second. Measure the cost on the Mac (`npm run stages`), and set the floor from the
-  travel it would make in the drag time (a fraction of a cell) rather than a speed.
+  (22k measured what that costs: under a fifth of a percent of the GPU).
+- ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and
+  cut** (#258). Since 22h a music look's dish sways under its liquid, so Ω − ω_l is over the
+  swirl's 1e-3 rad/s floor nearly all the time: on CI's Mac, with the built-in band playing,
+  the swirl ran on 91–100% of the nine thin looks' steps. It was thirteen dispatches a step on
+  the current's half grid (spinSwirl, its divergence, ten Jacobi sweeps, the gradient).
+
+  What it cost, timed on the GPU (`npm run swirlcost`: a run of swirl stages back to back,
+  submit to done, the slope between two counts so the submit's own cost drops out), laptop
+  and phone layouts, the governor's own grid (256² on CI's Mac):
+
+  | | thirteen dispatches (before) | one (now) | GPU share now, at the steps that ran it |
+  |---|---|---|---|
+  | phone, nine looks (median) | 105 µs a step | 45 µs | 0.07% (14 steps/s) |
+  | laptop, nine looks (median) | 272 µs | 75 µs | 0.17% (22 steps/s) |
+  | Acid Trip, Cyberpunk, Stardust Collapse at #261's motors (set by hand on the build before it), phone | 97–110 µs | 41–51 µs | 0.07–0.08% |
+
+  So it was never a frame-rate problem: under 1% of the GPU's time before, under 0.2% now,
+  and the frame rate alone cannot see either. The same page alternated swirl on and off
+  read 26.4 against 27.3 fps on the phone and 40.9 against 42.2 on the laptop, but each
+  look's own pair scattered by five frames either way and an earlier run of the same app
+  read 30.6 against 30.3. The laptop's bench is the noisier: its first form (20 and 220
+  stages) read three looks in twelve negative, so the script now times 20 and 1020; the
+  table's laptop row is the median of that first form.
+
+  The cut is physics, not a shortcut. On a thin plate the swirl field is the dish's drive,
+  a speed at the rest gap, handed to the thin solve with the current; the solve makes the
+  whole flow conserve liquid, ∇·(hu) = 0, by its multigrid. Projecting the drive first by
+  ten Jacobi sweeps of ∇·u = 0 did a weaker version of the same job with the operator that
+  ignores the gap, so it is gone: one dispatch, spinSwirl alone. `npm run dish` (lab): a
+  pressed palm 0.307 → 0.306 of A r, the plate away from it 6.08e-3 → 6.04e-3. The old plate
+  (Thin Gap off) keeps its projection, because nothing after the swirl projects it there.
+
+  The floor stays a speed. Set from the travel it makes in a drag time, it would have saved
+  steps; at under a fifth of a percent of the GPU there is nothing worth saving, and a lower
+  floor would only run the swirl on more of a song.
+
+  Found along the way:
+  - **CI's Mac grants no timestamp queries.** `chromaglassDebug().webgpu.timestamps` reads
+    false there and the profiler reads nothing, so `npm run stages` and `npm run ladder`
+    measure nothing on CI; only the owner's machine gives per-pass times. `benchSwirl`'s
+    submit-to-done timing is the way round it for one stage.
+  - **`npm run flick` read the plate between frames.** It went red once on #258 (water at
+    0.117 against the drag time's 0.179) on an app it had passed an hour before: it took the
+    page's clock at the read against the last frame's speeds. It now times by the plate's
+    own clock (`chromaglassDebug().frameAt`) and read 0.188 against 0.188.
+  - **22g's thin palm reads 0.307 in the lab, not the 0.607 written there,** on main before
+    this change. Still over the check's half of the old plate's 0.534, but by 15% where it
+    was by more than double. Find what moved it (#248 Thin Gap everywhere, #255 the thin
+    forces, or the lab's own plate) and either restore it or write down why it moved.
 - **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
   angular speed round the middle, held to a turn and a half a second, because near
   the middle a small move is a large angle. A hand's real torque is its friction
   times its lever arm: weight each hand by its radius and let a thick liquid's drag
   push back (22e).
+
+## 23. Selling it: the site free, the app paid
+
+*Asked 2026-10-04: which features should leave the free web app and stay in a paid
+version. The owner chose the split below the same day. Nothing is gated yet; this
+section is the order to build it in.*
+
+**The rule.** The website keeps the whole plate and is the demo: anyone who opens it
+sees the best ChromaGlass there is, on their own laptop and one projector. Home is
+what a listener wants for an evening with their own music (whatever the computer plays,
+the TV with no click, full recordings); Pro is what turns the plate into a show rig, and most of that is what a page cannot
+do at all, so the paid side is mostly the Mac app (§13 step 1), and the Windows app
+after it (13-win-app), rather than features cut from the site.
+
+**Why so little leaves the site.** The source is public and BUSL lets anyone run
+their own copy and change it, so a gate on the website is a nudge, not a lock. It
+still works, because nearly everyone uses the hosted site rather than building from
+source: gates go in the hosted site's build, and the code stays in the repo. What the
+app does natively (the show server with no terminal, video out, offline, the
+projector with no click, writing to disk) needs no enforcement at all. Two things
+cost the owner money on every use, song ID now and any cloud storage later, so they
+sit behind the key.
+
+**Order.** None of it before Wave 1, a judging pass (Wave 2), the signed Mac app
+(13.1-sign) and a free beta with a few VJs. Then the steps below, then charging.
+
+### The split
+
+| Feature | Free website | Home app | Pro app | Why |
+|---|---|---|---|---|
+| Every look, preset and photograph | ✓ | ✓ | ✓ | The look is what sells it; a weaker demo loses the sale. |
+| Solver quality, grid and governor | ✓ | ✓ | ✓ | Hobbling the picture makes the site a worse advert. |
+| Every tool and every liquid | ✓ | ✓ | ✓ | Playing with the liquid is a first visit's "wow". |
+| Design desk; your own presets as files | ✓ | ✓ | ✓ | People invest in it, and their presets carry into the app. |
+| Microphone, system audio, file player, beat clock, band in the box | ✓ | ✓ | ✓ | Sound-reactivity is the core promise. |
+| Whatever the computer plays (a streaming app, a music library), heard with no tab to share | | ✓ | ✓ | The listener's first wish, and a page can only hear a shared tab or a microphone. Whether Electron can take the Mac's system audio directly is not yet tested. |
+| An ambient mode: full screen on the TV for hours, cool and quiet (14j) | best effort | ✓ | ✓ | A listening session runs an album or an evening, not a set. |
+| MIDI controller, MIDI learn, tap tempo | ✓ | ✓ | ✓ | A VJ tries it with their own controller before buying. |
+| One projector or TV on HDMI (Cast → Second display) | ✓ | ✓ | ✓ | A party or a first gig on the site is the best advert. |
+| Projector or TV found and sent to with no click, back after a knocked cable | | ✓ | ✓ | A page needs a gesture; at home it is the TV coming on by itself. |
+| The Mixer's stack on one plate | ✓ | ✓ | ✓ | It is part of the look. |
+| Two or more projectors, each its own plate (§16) | | | ✓ | Only multi-screen rigs need it, and they are paying jobs. |
+| Show Sequencer and set lists | ✓ | ✓ | ✓ | Free to try; a cap on a site set list's length can come later. |
+| Lyrics overlay (LRCLIB) | ✓ | ✓ | ✓ | A free service and a good party trick. |
+| Song ID | manual tag only | ✓, a monthly cap | ✓ | Every lookup costs the owner money; the cap keeps Home's price above its cost. |
+| Song maps, per-track identity, history | ✓ | ✓ | ✓ | Work from a manual tag at no cost. |
+| Your own logo on the wall | ChromaGlass mark | ChromaGlass mark | ✓ | A club or a band putting its name up is a paying use. |
+| Record | short clips, small mark | full length, no mark, to disk | full length, no mark, to disk | The site holds the take in memory anyway (§13 found along the way). |
+| Render a song | 720p, small mark | full resolution, no mark | full resolution, no mark | Sharing a video of your own record is what a listener does. |
+| Phone and tablet remote | | ✓ | ✓ | Changing the look from the couch; needs the show server, which the app has built in. |
+| Network displays, OSC in | | | ✓ | The same show server; pro integration. |
+| Art-Net: the room's lights follow the plate | | | ✓ | The same show server; only venues have DMX. |
+| Syphon, Spout, NDI out (13.2, 13.3) | | | ✓ | Impossible from a page; the main reason a VJ buys a native app. |
+| DAW bridge plugin (13.7) | | | ✓ | It talks to the app, not the site. |
+| Modular patch inputs (§24): two channels / every channel; CV out | two channels | two channels | every channel, CV out | A page gets two input channels; the rest needs the app reading the interface natively. |
+| Works offline | best effort | ✓ | ✓ | The app bundles the build. |
+| The room camera driving the plate | ✓ | ✓ | ✓ | A demo moment that costs nothing. |
+| iPhone app playing the show itself (§12) | free | | | Store rules take a cut of an in-app sale; keep it a demo. |
+| iPhone app as the laptop's remote | | via the laptop's key | via the laptop's key | The laptop's licence covers its remote, so no store sale. |
+
+### How it unlocks
+
+- **Bought once through a merchant of record** (Paddle or Lemon Squeezy), which runs
+  the checkout, VAT and sales tax and emails a licence key. No accounts and no
+  logins; those wait until something syncs to the cloud (presets, set lists).
+- **The key is a signed token** the app checks against a public key built into it, so
+  it works with no internet at the gig: activated once online, two machines per key,
+  moved from a settings page.
+- **Two tiers, each bought once with a year of updates** (the owner's choice,
+  2026-10-04, "I want more casual hobby buyers": people using it for their own
+  listening sessions on their stereos, not just VJs). **Home, $29–39**, for listeners:
+  what the hobby end of the market charges (Visual Lab Pro $39, Magic Music Visuals
+  $79.95). **Pro, $199**, for show rigs: what the closest products charge (Synesthesia
+  Standard $199, VDMX6 $199; Resolume Avenue is €299). Home to Pro costs the difference,
+  as Resolume's Avenue to Arena does. After the year, updates are an optional yearly
+  renewal (about $59 for Pro), and a lapsed key keeps the last version it had. A
+  founder price for the beta's first buyers and half off for students are the norm.
+  The exact Home price is the owner's, in 23.1. A subscription would need the key to
+  expire and the app to call home, which fights the offline promise; if the owner
+  wants one, it is a separate decision. Prices read 2026-10-04 from the vendors' pages.
+
+### Steps
+
+- **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
+  and the checkout page.
+- **23.2** (one PR, lane B): a hosted-site build flag that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link, off in the app and in a
+  local `npm run dev`. *Measure:* a check that loads the site build and the app
+  build and lists which controls each shows, against the table.
+- **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
+  well as an allowed origin, and the site's manual tag stays. *Measure:* in the
+  manner of `npm run report-worker`: no key refused, a bad signature refused, a good
+  key answered.
+- **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
+  and the two-machine count, the key's tier (Home or Pro) and the features each
+  opens, an upgrade key, and an "unlicensed" app that runs as the site does. Lands
+  in the Windows app with 13-win-app. *Measure:* `npm run desktop` with a good, a
+  bad and no key.
+- **23.5** (one PR, lane B): the site's Record capped to a short clip and Render to
+  720p, each with a small mark the Mixer cannot hide; the app's untouched. *Measure:*
+  a take from each, its length, size and the mark's pixels.
+- **23.6** (one PR, lane B, after 23.2): the site's logo layer shows the ChromaGlass
+  mark only; your own logo is the app's.
+- **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
+  whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
+  for once), and an ambient mode runs the plate full screen on the TV for hours with
+  the frame cap and the quiet of 14j. *Measure:* in `npm run desktop`, a tone played by
+  another process reaches the ear; on the owner's Mac, an album through a streaming app
+  drives the plate (docs/judging.md, next free number at merge).
+- **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
+  pasted into the site unlocks it there too (bypassable from source, which is fine).
+
+## 24. Modular rigs: patch the rack into the liquid
+
+*Asked 2026-10-04: how to sell ChromaGlass straight to modular (Eurorack) synth players,
+and what would make it easy to bring into their shows. The owner put all four steps
+below into the plan the same day.*
+
+**Why not just the line-in.** Every visualizer has a line-in, and ChromaGlass's asks the
+interface for one channel (`App.tsx`, `channelCount: 1`), so a stereo mix arrives folded
+to mono. A modular player's sound is not one mix: the kick, the bass and the lead each
+leave the rack on their own cable, and the rack runs on gates, control voltages and a
+clock pulse rather than on MIDI. What makes a thing feel like it belongs in a rack is
+that it can be patched. Many of these players already own a DC-coupled interface for
+VCV Rack or Bitwig (Expert Sleepers ES-8: 4 DC-coupled inputs, 8 outputs, ±10 V,
+class-compliant; ES-9: 14 in, 8 out; MOTU's UltraLite mk5 has DC-coupled outputs only),
+so the interface is the dongle and needs no driver on a Mac.
+
+**What already reaches them, with no new code.** MIDI clock, Start, Continue and Stop
+into the beat clock, MIDI timecode, and MIDI learn from any CC or note (`midi.ts`), which
+hardware sequencers (Hermod+, OXI One, Polyend Tracker, the Elektron boxes) drive, and so
+do CV-to-MIDI modules (Befaco CV Thing, Expert Sleepers FH-2, Doepfer A-192-2). OSC
+through the show server, which VCV Rack reaches with trowaSoft's cvOSCcv module (CV
+sent as OSC, up to 32 more channels with its expanders) and monome norns speaks itself.
+§13.4's OSC write-up should name both.
+
+**The one fact that shapes the steps.** Chrome hands a page at most two input channels,
+whatever the interface has, on macOS and on Windows: Chromium's
+`AudioManagerMac::GetInputStreamParameters` keeps a device's channel count only when it
+is two or fewer, the Windows code sets discrete input devices to two outright, and the
+request to lift it (crbug 40403559) has been open since 2015. The Electron app inherits
+the cap unless it reads the interface natively (inferred, not tested). With echo
+cancellation, noise suppression and auto gain all off, Chrome skips its WebRTC
+processing, where the high-pass filter lives, so DC on those two channels probably
+survives; whether the OS or driver blocks it is unmeasured. So the site gets two
+channels and the app all of them, which fits §23's rule that paid is what a page cannot
+do. (§5's "an ear per input channel", 5-channels, says browsers "differ" above two: they
+do not, Chrome stops at two. That item is now 24.1's audio half; its home is here.)
+
+### Steps
+
+- **24.1** *Patch inputs* (two PRs). A Patch panel lists the interface's input channels,
+  each with a live scope, and makes each one of:
+  - an **audio voice**: the channel is one instrument, and its onsets and level feed
+    sound learn and the plate's sources by name (5-channels), so the kick channel drops
+    and the bass channel swells with no guessing which band the kick is in;
+  - a **gate**: a rising edge (with a threshold and hysteresis, so a slow envelope does
+    not chatter) fires any action a pad fires;
+  - a **CV**: a voltage rides any learnable setting as a MIDI fader does, over a chosen
+    range (0–5 V, 0–10 V, ±5 V) and the setting's own curve, smoothed by a frame;
+  - a **clock** at 1, 2, 4, 24 or 48 pulses a beat into the beat clock as a tempo
+    source beside MIDI clock and tap, and a **reset** that is bar one: the downbeat a
+    MIDI clock never carries.
+  Learned as MIDI is: touch the cable, and the channel that moves is the one picked.
+  Saved with the show and in the MIDI map file. Volts are read off the interface's
+  full scale (the ES-8 and ES-9 are ±10 V at full scale), with a calibrate step that
+  reads 0 V and a known voltage for any other interface. The phone's remote shows the
+  Patch page read-only (what each cable does, live); editing is on the laptop.
+  - **24.1a** (lanes D and B, after 1.5): two channels, on the site and in the app,
+    through `getUserMedia` with `channelCount: 2` and a `ChannelSplitter`.
+  - **24.1b** (`desktop/`, after 24.1a and 13.1-sign): every channel in the Mac app,
+    read natively (Core Audio through a small native module) and handed to the page
+    as the same sources. Paid (§23). The Windows app's with 13-win-app.
+  *Measure:* a new check, `patch`, that feeds a page a generated multichannel WAV as its
+  fake capture device: channel 1 a gate at 120 bpm, channel 2 a slow DC ramp, channel
+  3 a 4-pulses-a-beat clock with a reset every 16 beats. Every gate fires its action
+  within one frame (count equal, none doubled), the ridden setting tracks the ramp
+  within 2 % of its travel, the clock reads 120 bpm, and the bar grid's one lands on
+  every reset. In the app, the same with all channels. By hand on the Mac with an ES-8
+  (docs/judging.md, next free number at merge): DC on the site's two channels, measured.
+- **24.2** *The interface picked at soundcheck is the one the show hears, and comes back
+  after a knocked cable.* This is Wave 1's 1.5 (14s) and 1.6 (14g); a rack is plugged
+  in at soundcheck and knocked at the gig, so 24.1 is not offered before both ship.
+- **24.3** *MIDI notes as voices* (lane D then B, one PR). A sequencer's notes play the
+  plate rather than press a button: a channel picks the tool and the liquid, pitch the
+  dye (or a place on the plate, by a scale across it), velocity the drop's size, and a
+  held note pours for as long as it is held. It is a binding kind beside `setting`,
+  `action`, `preset` and `dye` in `MidiTarget`, learned from the first note that
+  arrives, so one learn covers every note on that channel. Start as bar one is 14e's
+  (Start and dropout) and 5-downbeat's; 24.3 does not do it twice. *Measure:* beside
+  `npm run desk`'s MIDI lines, a page fed a recorded sequence of notes on two
+  channels: one drop per note-on, the dye by pitch, the size rising with velocity, and
+  a held note's pour lasting its length within a frame.
+- **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
+  DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
+  (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid
+  modulates the synth and the loop is the show, which no comparable video module does
+  that way round. Read on the GPU from the readouts the governor and the flash guard
+  already take (no new full-plate readback), sent a frame at a time and smoothed at
+  audio rate so a step does not click. The site may reach the first two outputs
+  (`AudioContext.setSinkId`, Chrome 110 and later, then a `ChannelMerger`); the app
+  reaches all of them. *Measure:* a page whose output is captured back as a WAV: the
+  dye-motion output rises within a frame of a stir and falls when the plate rests, and
+  the drop trigger counts the drops.
+
+**Later, not a step yet.** No laptop: an iPad with a class-compliant interface (the ES-8
+is class-compliant on iOS) and HDMI out through Apple's USB-C Digital AV Multiport
+Adapter, which carries HDMI and a USB device together; the two working at once on one
+iPad is unverified. It rides on §12's app, not a box of our own. A Eurorack module of
+our own is not planned (hardware, stock, a different business).
+
+**Reaching them** (with 23.7's free beta). A one-minute patch video (a kick's gate into
+the interface drops on every hit, an LFO makes the colour breathe, a clock and reset
+change the look on the bar) posted to ModWiggler's Video Synthesis forum, lines
+(llllllll.co), r/modular and r/videosynthesis, and sent to the creators who already
+review video synths. Ask Expert Sleepers to list ChromaGlass as working with the ES-8
+and ES-9. Superbooth 27 is 6–8 May 2027 in Berlin. The dedicated video synths cost
+$400–1,500 (EYESY, Hypno, Structure, Videomancer), which is the price to sit under.

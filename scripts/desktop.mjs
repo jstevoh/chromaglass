@@ -368,6 +368,17 @@ try {
         return { screens: [...d.screens, wall], currentScreen: here, onscreenschange: null, addEventListener() {}, removeEventListener() {} };
       };
     });
+    // Every page from here on keeps its long animation frames, so the
+    // projector's line can say what its page was waiting on (see there).
+    await page.context().addInitScript(() => {
+      const frames = [];
+      window.__cgLongFrames = frames;
+      try {
+        new PerformanceObserver((list) => {
+          for (const e of list.getEntries()) frames.push({ start: e.startTime, duration: e.duration, script: (e.scripts ?? []).reduce((t, x) => t + x.duration, 0) });
+        }).observe({ type: 'long-animation-frame', buffered: true });
+      } catch { /* no LoAF in this engine: the line says so */ }
+    });
     await page.reload({ waitUntil: 'load' });
   } else {
     skip('projector: with one screen, no projector window opens', `${screens} real screens attached`);
@@ -377,15 +388,85 @@ try {
     await sleep(100);
     cast = (await allWindows()).find((w) => /[?&]cast=/.test(w.url)) ?? null;
   }
+  /*
+    The wall is read twice: once the mirror is up, and again two seconds later.
+
+    It was read once, at a fixed 2.5 s after the window appeared, and went red
+    on two PRs that never touched it (2026-10-04, #255 and #262's Mac app job:
+    "the mirror's canvas missing", with the page loaded and in full screen).
+    A page that has loaded but has no canvas is, by every sign, `main.tsx`'s
+    Suspense fallback: the projector's page is one lazy import, and until it
+    has rendered the root holds a black <div> and nothing else.
+
+    What it waits on is the show window. The two windows share one renderer
+    (the mirror reads the opener's document directly, so they must), and the
+    show has just reloaded and is starting its plate. In a cloud session the
+    projector's scripts are all in by 0.12 s, and still the mirror mounts at
+    0.39–0.65 s (six runs), as the page's first animation frame ends: 0.48–
+    0.58 s long, 11–66 ms of it script, while the show's own first frame is
+    held over the same span with next to none. On the Mac, the first frame
+    of a show's opening is where Chromium starts the GPU, which
+    `npm run startup` has measured holding a cold show 2.5–3.2 s with no script
+    running (scripts/pagehold.mjs); whether this reload's frame is that same
+    hold is what the printed frame says. Either way a fixed 2.5 s read races
+    the show's opening, which nothing on the projector's side can shorten,
+    and the wall is black through it: the show has drawn nothing to mirror
+    yet. (Keeping the solver's 668 kB chunk out of the mirror's page was
+    tried: in the cloud the mirror came up at 0.42–0.63 s with it out against
+    0.39–0.65 s with it in, so it is not what the page waits on.)
+
+    So the line waits for the mirror, prints how long it took and the
+    longest frame the page sat in before it, and holds it to the app's own
+    bar: the 8 s after which `Loading` stops being a black screen and says
+    the page is stuck.
+
+    The second read is what the 2.5 s was for. `CastHint` puts the click hint
+    up 1.5 s after it mounts, which is when the mirror mounts, not when the
+    window opened: a mirror that came up at 2.4 s was read for the hint 0.1 s
+    later and passed whatever the hint would have done. Read 2 s after the
+    mirror was first seen, the hint has had its 1.5 s.
+
+    And the second read has to be a read of the same page, at least 1.5 s
+    after the mirror, or the line is red (the check-skeptic, 2026-10-04): a
+    read that failed (the window closed, its renderer gone, a page that never
+    answers, each given 3 s) used to fall back to the first, taken the moment
+    the mirror came up, with the hint not yet due; and a page that reloaded
+    in between starts its clock again, so its hint is not due either. The same
+    page is the same `timeOrigin`. It must still have the show window to
+    mirror (an opener, not closed), and there must be one projector window,
+    not a healthy first one beside another.
+  */
   let castState = null;
+  let firstRead = null;
+  let mirrorAt = null;
   if (cast) {
-    await sleep(2500);   // CastHint shows itself after 1.5 s when not in full screen
-    castState = await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+    const readWall = () => Promise.race([electronApp.evaluate(async ({ BrowserWindow }, id) => {
       const w = BrowserWindow.fromId(id);
-      if (!w) return null;
-      const doc = await w.webContents.executeJavaScript("({ full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0 })");
-      return { windowFull: w.isFullScreen(), ...doc };
-    }, cast.id);
+      if (!w || w.isDestroyed()) return null;
+      const casts = BrowserWindow.getAllWindows().filter((x) => /[?&]cast=/.test(x.webContents.getURL())).length;
+      const doc = await w.webContents.executeJavaScript("({ age: performance.now(), origin: performance.timeOrigin, linked: !!window.opener && !window.opener.closed, full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('#stage-canvas'), canvas: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0, frames: window.__cgLongFrames ?? null, scripts: performance.getEntriesByType('resource').filter((e) => /\\.js$/.test(e.name)).map((e) => `${e.name.split('/').pop().replace(/-[\\w-]{8}\\.js$/, '')} ${(e.responseEnd / 1000).toFixed(2)} s`) })");
+      return { windowFull: w.isFullScreen(), casts, ...doc };
+    }, cast.id).catch(() => null), sleep(3000).then(() => null)]);
+    // `age` is the projector page's own clock: how long since its document started.
+    for (let i = 0; i < 400; i++) {
+      castState = await readWall();
+      if (castState?.mirror) { mirrorAt = castState.age; firstRead = castState; break; }
+      if ((castState?.age ?? 0) > 8000) break;
+      await sleep(50);
+    }
+    if (mirrorAt !== null) {
+      await sleep(2000);
+      castState = await readWall();
+    }
+  }
+  const samePage = !!castState && castState.origin === firstRead?.origin && castState.age - mirrorAt >= 1500;
+  /** The projector page's longest animation frame begun before `by`, and how much of it was script. */
+  function held(state, by) {
+    if (!Array.isArray(state?.frames)) return 'its frames not kept';
+    const before = state.frames.filter((f) => f.start < by);
+    if (!before.length) return 'no long frame before it';
+    const f = before.reduce((a, b) => (b.duration > a.duration ? b : a));
+    return `its longest frame before then ${(f.duration / 1000).toFixed(2)} s from ${(f.start / 1000).toFixed(2)} s, ${Math.round(f.script)} ms of it script`;
   }
   // Where the page asked for the window: the stand-in's left edge, not the
   // laptop's. Which real display main.js then puts it on needs a real
@@ -395,10 +476,12 @@ try {
   const aimed = standIn === null || askedLeft === standIn;
   const chip = await page.locator('[data-testid=projector-fill]').count();
   check('projector: a second screen gets the show, with no click, filling its screen',
-    !!cast && aimed && !!castState?.full && !castState.hint && !!castState.mirror && castState.root > 0 && chip === 0,
-    cast
-      ? `opened ${cast.url.replace(/^http:\/\/localhost:\d+/, '')} at left=${askedLeft}${standIn === null ? '' : ` (the stand-in's edge is ${standIn})`}; page full screen ${castState?.full}, window full screen ${castState?.windowFull}, the mirror's canvas ${castState?.mirror ? 'there' : 'missing'}, click hint on the wall ${castState?.hint}, title-bar chip on the laptop ${chip > 0}`
-      : 'no projector window opened');
+    !!cast && aimed && mirrorAt !== null && samePage && castState.linked && castState.casts === 1 && !!castState.full && !castState.hint && !!castState.mirror && castState.root > 0 && chip === 0,
+    !cast
+      ? 'no projector window opened'
+      : mirrorAt !== null && !samePage
+      ? `the mirror's canvas up ${(mirrorAt / 1000).toFixed(2)} s after the page opened, then ${!castState ? 'the second read, 2 s later, got no answer from the projector window' : `the second read was of ${castState.origin !== firstRead.origin ? 'another page (the window reloaded or navigated)' : `the page only ${((castState.age - mirrorAt) / 1000).toFixed(2)} s after the mirror`}`}, so the click hint was never judged`
+      : `opened ${cast.url.replace(/^http:\/\/localhost:\d+/, '')} at left=${askedLeft}${standIn === null ? '' : ` (the stand-in's edge is ${standIn})`}; ${castState?.casts ?? '?'} projector window(s), page full screen ${castState?.full}, window full screen ${castState?.windowFull}, the show window ${castState?.linked ? 'there to mirror' : 'gone'}, the mirror's canvas ${mirrorAt !== null ? `up ${(mirrorAt / 1000).toFixed(2)} s after the page opened (${held(castState, mirrorAt)})` : `missing at ${((castState?.age ?? 0) / 1000).toFixed(2)} s (${held(castState, Infinity)}; ${castState?.canvas ? 'a canvas, but not the mirror\'s' : `no canvas, ${castState?.root ?? 0} in the root`}; scripts in by ${castState?.scripts?.join(', ') || 'none'})`}, click hint on the wall ${castState?.hint}${mirrorAt !== null ? ` ${((castState.age - mirrorAt) / 1000).toFixed(1)} s after it` : ''}, title-bar chip on the laptop ${chip > 0}`);
 
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));

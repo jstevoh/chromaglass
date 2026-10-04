@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import { layFinger } from '../lib/handSolid';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -1085,6 +1086,9 @@ class FluidSimulation {
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
   private velAdd: Float32Array;
+  /** The fingers in the liquid this step on a thin gap (lib/handSolid.ts), made when one first touches it. */
+  private hands: Float32Array | null = null;
+  private handsLaid = false;
   /*
     How many readbacks have landed. The rim deposit needs it: the mirror
     refreshes only when `readbackAsync` has something, and depositing from a
@@ -1432,11 +1436,12 @@ class FluidSimulation {
       da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
-    gpu.applyDeltas(da, va, this.mul, dt);
+    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null);
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
+    if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
     this.dirty = false;
   }
 
@@ -1866,6 +1871,7 @@ class FluidSimulation {
     this.pressure.fill(0); this.dhdt.fill(0);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
+    if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
     this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null;
@@ -2606,17 +2612,48 @@ class FluidSimulation {
    * and a counter-rotation either side of its track, which is the pair of
    * vortices a stick pulled through water actually leaves.
    *
+   * On a thin gap (every look) none of the above is how it moves the
+   * liquid: it is a solid in the layer, and the flow carries what it touches
+   * (see the first block below, PLAN.md §15b).
+   *
    * The other half is `stir` on the liquid field, and it is the part no other
    * tool can do: it averages the chemistry under the finger, so two liquids
    * that refuse each other are briefly one liquid and stay mixed after the
    * finger has gone.
    */
-  fingerDrag(x: number, y: number, radius: number, strength: number, dx: number, dy: number, phase = true): void {
+  fingerDrag(x: number, y: number, radius: number, strength: number, dx: number, dy: number, phase = true, moved?: { x: number; y: number }): void {
     const r = Math.round(radius * GRID_SCALE);
     const r2 = r * r;
     const len = Math.hypot(dx, dy);
     if (!(len > 1e-4)) return;
     const ux = dx / len, uy = dy / len;
+    /*
+      On a thin gap (every look since #248) the finger is a solid in the
+      layer, moving as far as the hand moved this step (`moved`: the
+      pointer's stroke is its own, a remote's or the automation's stroke
+      says what it moved), and the flow carries everything it touches: the
+      colour, the oil and the ferrofluid alike, conserved by the carries
+      that move them with the flow, so none of the hand-written carries
+      below runs (PLAN.md §15b; lib/handSolid.ts has the story and the
+      numbers, `npm run fingerflow` the check). How hard the hand pressed
+      (`strength`, the tool's Amount) does not change how fast the liquid
+      it touches goes, which is the hand's own speed; it was the size of a
+      push, and a solid has no push to size. Amount still mixes the
+      chemistry under it harder (stir, below).
+
+      Not the automation's stroke on a plate with ferrofluid on it
+      (`phase` false): a solid moves every liquid alike, and it would pull
+      tongues out of the pools unasked (see the ferrofluid's carry below).
+      That stroke keeps the colour's carry, as it had.
+    */
+    const ferroUnasked = !phase && !!(this.gpu as { phaseIsLive?: boolean } | null)?.phaseIsLive;
+    if (this.gpu && this.thinGap && !ferroUnasked) {
+      const m = moved ?? { x: dx, y: dy };
+      if (!this.hands) this.hands = new Float32Array(GRID_AREA * 4);
+      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y) > 0) { this.dirty = true; this.handsLaid = true; }
+      this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
+      return;
+    }
     for (let j = -r; j <= r; j++) {
       for (let i = -r; i <= r; i++) {
         const d2 = i * i + j * j;
@@ -4516,8 +4553,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
   const blowDirRef = useRef<BlowDir | undefined>(undefined);
-  /** The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`. */
-  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0 });
+  /**
+   * The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`.
+   * `directed` counts the wind steps that had a way to go (a move within BLOW_DIR_HOLD_MS) and
+   * `carries` the ones whose carry ran (a fresh dye reading), so a stroke that pushed little says
+   * whether the wind lost its direction or waited on readings.
+   */
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0, directed: 0, carries: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -4854,7 +4896,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           is right, because you mix by moving.
         */
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
-          af.fingerDrag(x, y, 7, 0.09 * amt * 0.5, g.dx, g.dy);
+          af.fingerDrag(x, y, 7, 0.09 * amt * 0.5, g.dx, g.dy, true, { x: g.dx * S, y: g.dy * S });
           if (layer === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
         }
         break;
@@ -6674,8 +6716,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // The wind: it carries the colour (and an oil body's oil)
                   // the way the hand last went, as the ferrofluid above, or
                   // out from under it held still; it used to erase it.
-                  blowStepsRef.current.carried += af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  blowStepsRef.current.carried += carried;
                   blowStepsRef.current.wind++;
+                  if (going) blowStepsRef.current.directed++;
+                  if (carried > 0) blowStepsRef.current.carries++;
                   if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                     bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                   }
@@ -6993,7 +7038,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (stroke) {
               const af = fluidsRef.current[0];
               if (af) {
-                af.fingerDrag(stroke.x, stroke.y, 7, 0.07, stroke.dx * 3, stroke.dy * 3, false);
+                af.fingerDrag(stroke.x, stroke.y, 7, 0.07, stroke.dx * 3, stroke.dy * 3, false, { x: stroke.dx * 1.6, y: stroke.dy * 1.6 });
                 if ((currentSettings.bubbles ?? 0) > 0) {
                   beadsRef.current.disturb(stroke.x, stroke.y, 9 * GRID_SCALE, 0.18);
                 }
@@ -8635,6 +8680,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /**
+         * The clock the last frame stepped the plate to, in milliseconds on
+         * the page's own clock (Date.now, or the render's): what its dish,
+         * its liquid and its picture's angle are the state at. `npm run
+         * flick` times its flick and its readings by this, not by when it
+         * happened to ask.
+         */
+        frameAt: lastTimeRef.current * 1000,
         /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
         drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks, stampMisses: { ...stampMisses } },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
@@ -9639,6 +9692,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (f.gpu instanceof WebGPUFluid) { f.gpu.profiler.ms.clear(); f.gpu.stageTimings = on; }
               }
               return on;
+            },
+            /**
+             * The spun dish's swirl held off (`on` false) or let run, for
+             * `npm run swirlcost` (PLAN 22k), and every layer's count of the
+             * steps taken and the steps that ran it since the page opened.
+             */
+            swirl: (on?: boolean) => {
+              if (on !== undefined) WebGPUFluid.swirlHeldOff = !on;
+              return fluidsRef.current.map((f) => (f.gpu instanceof WebGPUFluid ? { ...f.gpu.swirlCount, heldOff: WebGPUFluid.swirlHeldOff } : null));
+            },
+            /** The lead plate's swirl stage timed on the GPU (WebGPUFluid.benchSwirl). */
+            benchSwirl: async (reps: number, thin: boolean) => {
+              const g = fluidsRef.current[0]?.gpu;
+              return g instanceof WebGPUFluid ? await g.benchSwirl(reps, thin) : null;
             },
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */

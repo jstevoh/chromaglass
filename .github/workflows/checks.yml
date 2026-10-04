@@ -46,9 +46,18 @@ on:
 # request runs are cancelled. Deploys are not — `deploy.yml` has its own
 # `cancel-in-progress: false` on the live channel, and a `workflow_call` run
 # inherits the caller's group rather than this one.
+#
+# Except a re-run. A re-run joins the group again, and with cancel-in-progress
+# it cancelled whatever was running there, which is the PR's newest push: on
+# 4 October, re-running ea7eb00's red run (attempt 3, 19:28 UTC) cancelled
+# ec0f102's run on the same PR, and re-running ed7126a's (16:54 UTC)
+# cancelled e0b7c9e's, so the owner's click on the old red run threw away the
+# run the merge and the deploy gate would have read. A re-run (any attempt
+# after the first) now waits behind a run in progress instead of cancelling
+# it. A newer push still cancels the re-run, as it cancels any older run.
 concurrency:
   group: checks-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
 
 jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
@@ -530,6 +539,13 @@ jobs:
       - name: The Press comes back on a thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run presslift
+      # The Finger on a thin gap as a solid in the liquid: what it touches
+      # moves at the hand's speed, the colour, the ferrofluid and the oil on
+      # its path go with it by the flow alone, nothing is lost, and the
+      # liquid stops with the hand.
+      - name: The Finger drags the liquid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run fingerflow
       # The plate's forces as forces on a thin gap (PLAN 18a-2): a body force
       # (Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity
       # says, Glass Smear is the glass sliding and Updraft a draught's shear,
@@ -586,7 +602,9 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingers
       # The Finger and Blow carry the ferrofluid, as they carry the dye; the
-      # tools' push alone (all they did before) leaves it where it was.
+      # tools' push alone (all they did before) leaves it where it was. The
+      # Finger's half is its carry with Thin Gap off; on a thin gap (every
+      # look) the Finger is a solid and `npm run fingerflow` checks it.
       - name: The hands move the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferrohands
@@ -769,6 +787,14 @@ jobs:
       - name: The magnet moves the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run magnet
+      # The ferrofluid poured round Classic's middle, watched with the band
+      # playing and its bubbles on the plate (PLAN.md, found by #238): on the
+      # thin gap it gathers no more than in silence; the old plate, whose
+      # bubbles still press the glass, is shown to drift, so the instrument
+      # sees what it was built for. About a minute and a half.
+      - name: The band leaves the ferrofluid where it was poured
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: node scripts/ferrodrift.mjs
       # Every other tool in the hand (asked for: "check all of the tools to
       # make sure they work in expected ways"): each does what it says and
       # nothing else, and hovering does nothing (scripts/tools.mjs).
