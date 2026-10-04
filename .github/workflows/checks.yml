@@ -691,6 +691,13 @@ jobs:
       - name: The ferrofluid through the whole plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferropour
+      # A new grid (the quality governor's move) keeps the plate's liquids
+      # that live only on the GPU: the ferrofluid and the mix in the same
+      # amounts and shape, the reactions value for value (PLAN 9w). In the
+      # open shard: the plate shard is near its timeout.
+      - name: The liquids carried onto a new grid
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run regrid
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

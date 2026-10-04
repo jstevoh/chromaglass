@@ -111,6 +111,7 @@
     "spikes": "node scripts/spikes.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferropour": "node scripts/ferropour.mjs",
+    "regrid": "node scripts/regrid.mjs",
     "pops": "node scripts/pops.mjs",
     "drops": "node scripts/drops.mjs",
     "droplens": "node scripts/droplens.mjs",

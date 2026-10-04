@@ -268,6 +268,45 @@ const api = {
   async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
+  /**
+   * The governor moving the grid, as the app's FluidSimulation moves it (PLAN
+   * 9w): the old solver hands over, is let go, and a new one on the same
+   * device opens cleared and takes the carry. `carry: false` is the move as
+   * it was before 9w, nothing handed over, for a check's control. The copies
+   * are let go once the new solver has run, as the app lets them go once it
+   * has spoken. What the app carries through the CPU (the dye, the flow) is
+   * not this, and not moved here.
+   */
+  async regrid(N: number, carry = true) {
+    const l = lab!;
+    const old = l.solver;
+    const device = old['device'] as GPUDevice;
+    const handed = carry ? old.handOver() : null;
+    old.dispose();
+    const solver = new WebGPUFluid(device, N, l.L, { float32Filterable: device.features.has('float32-filterable') });
+    solver.clear();
+    const taken = handed ? solver.takeOver(handed) : false;
+    l.solver = solver; l.N = N;
+    await device.queue.onSubmittedWorkDone();
+    handed?.destroy();
+    return { taken, handed: !!handed };
+  },
+  /**
+   * A carry offered to a solver on another device, as after a lost device:
+   * handed over from this solver, then a fresh lab (its own device) asked to
+   * take it. The fresh lab is what is left open.
+   */
+  async strangerTakes(N: number) {
+    const handed = lab!.solver.handOver();
+    await api.create(N);
+    const taken = handed ? lab!.solver.takeOver(handed) : false;
+    handed?.destroy();
+    return taken;
+  },
+  /** The mix or the reactions (readChemistry), as plain arrays; null when the solver has none. */
+  async chemistry(which: 'mix' | 'rxn' | 'lies') { const f = await lab!.solver.readChemistry(which); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /** The oil's share of the dye, pour by pour (Oil Bodies' budget). */
+  oilCover() { return lab!.solver.oilCover; },
   /** The oil's half of a press, through the app's own function (squeezeOut): mirror cells, N across. */
   pressOil(cx: number, cy: number, R: number, N: number, take: number) { pressOil(lab!.solver, cx, cy, R, N, take); },
   pressRing: PRESS_RING,

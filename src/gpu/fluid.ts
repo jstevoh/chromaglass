@@ -28,7 +28,7 @@ import { spikesOnAxis } from './wgsl/spikes';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
-import type { GpuStepParams } from './solverTypes';
+import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
@@ -46,6 +46,17 @@ import { WebGPUAir } from './air';
   needs nothing here.
 */
 const AIR_CAPACITY = 512;
+
+/** What `handOver` copies out: the fields, on the device they were copied on. */
+interface FieldCarry extends SolverCarry {
+  readonly device: GPUDevice;
+  readonly phase: GPUTexture | null;
+  readonly mix: GPUTexture | null;
+  readonly rxn: GPUTexture | null;
+  readonly lies: GPUTexture | null;
+  /** Oil Bodies' tally of the oil poured: the oil is carried, so its tally is. */
+  readonly oilPoured: number;
+}
 
 /** What the app used to scan the whole field for (see `measure`). */
 export interface FieldStats {
@@ -836,6 +847,10 @@ export class WebGPUFluid {
       // built behind the show; waited for at the open, `npm run startup`
       // fails it as asked for by none.
       ['phaseCarry', [R32], false],
+      // The ferrofluid and the mix carried onto a new grid (takeOver, PLAN
+      // 9w): only when the governor moves the grid, a few seconds into a
+      // show at the earliest, so built behind it.
+      ['carryArea', [R32, RGBA32], false],
       // The clear film (PLAN §20b): no look lays one, so built behind the show.
       ['filmAdvect', [RGBA32], false],
       ['filmMu', [R32], false],
@@ -2759,6 +2774,109 @@ export class WebGPUFluid {
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
+  }
+
+  /**
+   * The liquids that live only here, copied out for the next solver (PLAN 9w).
+   *
+   * When the governor moves the grid the app builds a new solver and lets
+   * this one go. The dye and the flow were always carried across, through
+   * the CPU's 192² arrays (`FluidSimulation.attachGpu`); nothing else was,
+   * because nothing else ever crosses to the CPU. So the ferrofluid, the oil
+   * and soap and acidity of the mix, and the two reactions were simply gone
+   * on the new grid, and the app filled the gap by pouring the look's
+   * ferrofluid ring again whenever Ferrofluid was up: a pool dragged into a
+   * shape came back as the ring, and ferrofluid poured from the bottle on a
+   * look with none of its own came back as ferrofluid nobody poured. With
+   * the Magnet moving only what is on the plate (9y), a pool lost that way
+   * left the magnet nothing to hold mid-show.
+   *
+   * A copy on the GPU, not a read to the CPU and back: the read would be a
+   * frame or more late and cost a megabyte or more each way, and the copy is
+   * in queue order after this solver's last step, so what the next one
+   * starts from is the plate as it was. Copies rather than this solver's own
+   * textures, because the app releases the old solver before it builds the
+   * new one (a solver is a couple of hundred megabytes at the top rungs, and
+   * holding two doubles the peak): the copies are the field alone, 4 bytes a
+   * cell for the ferrofluid and 16 for the mix, about 20 MB at 1024².
+   *
+   * Only what is on the plate is copied (the live flags), so a plate with
+   * none of these pays one empty encoder. Null once disposed.
+   */
+  handOver(): FieldCarry | null {
+    if (this.disposed) return null;
+    const enc = this.device.createCommandEncoder({ label: 'hand over' });
+    const made: GPUTexture[] = [];
+    const copy = (pp: PingPong | null, live: boolean): GPUTexture | null => {
+      if (!pp || !live) return null;
+      const [w, h] = pp.size;
+      const t = this.device.createTexture({
+        label: `carried ${pp.read.label}`, size: [w, h], format: pp.format,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+      });
+      enc.copyTextureToTexture({ texture: pp.read }, { texture: t }, [w, h]);
+      made.push(t);
+      return t;
+    };
+    const carry: FieldCarry = {
+      n: this.N,
+      device: this.device,
+      phase: copy(this.phase, this.phaseLive),
+      mix: copy(this.mix, this.mixLive),
+      rxn: copy(this.rxn, this.rxnLive),
+      lies: copy(this.lies, this.liesLive),
+      oilPoured: this.oilPoured,
+      destroy: () => { for (const t of made.splice(0)) t.destroy(); },
+    };
+    this.device.queue.submit([enc.finish()]);
+    return carry;
+  }
+
+  /**
+   * Lay what the last solver handed over (`handOver`) onto this grid: the
+   * ferrofluid and the mix resampled by area (carryArea), so the plate holds
+   * the same amount of each, in the same place and shape to within a cell of
+   * the coarser grid; the reactions copied as they were, their grids being
+   * the same size on every solver. Call it on a fresh solver, after `clear`
+   * and before its first step. False, and nothing laid, for a carry from
+   * another device (the old one was lost, and its copies with it).
+   *
+   * The oil's share of the dye (Oil Bodies) is not carried: the dye itself
+   * comes back through the CPU's 192² arrays, a frame old and at that grid,
+   * so a share carried at full resolution would no longer be a share of it.
+   * It starts empty, as it does whenever Oil Bodies is turned on over oil
+   * that is already there, and bodyPartition hands the colour inside each
+   * body back to it within a few steps.
+   */
+  takeOver(c: SolverCarry): boolean {
+    const carry = c as FieldCarry;
+    if (carry.device !== this.device || this.disposed) return false;
+    const enc = this.device.createCommandEncoder({ label: 'take over' });
+    const pass = enc.beginComputePass({ label: 'take over' });
+    if (carry.phase) {
+      this.run(pass, 'carryArea', this.phase.write, [carry.phase], this.arg('carry phase', [carry.n, this.N, 0, 0]));
+      this.phase.swap();
+      this.phaseLive = true;
+      this.phaseGapPrimed = false;
+    }
+    if (carry.mix) {
+      const m = this.ensureMix();
+      this.run(pass, 'carryArea', m.write, [carry.mix], this.arg('carry mix', [carry.n, this.N, 0, 0]));
+      m.swap();
+      this.mixLive = true;
+      this.oilPoured = carry.oilPoured;
+      this.oilDyeStale = true;
+    }
+    pass.end();
+    const same = (from: GPUTexture | null, to: PingPong) => {
+      if (!from || from.width !== to.size[0] || from.format !== to.format) return false;
+      enc.copyTextureToTexture({ texture: from }, { texture: to.read }, [from.width, from.height]);
+      return true;
+    };
+    if (carry.rxn && same(carry.rxn, this.ensureRxn())) this.rxnLive = true;
+    if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
+    this.device.queue.submit([enc.finish()]);
+    return true;
   }
 
   /** The mix or the reactions, read back whole (RGBA per texel). For checks. */

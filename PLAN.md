@@ -237,7 +237,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
-- **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
+- **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, ~~**9w**~~ #266, **9z**, **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
@@ -378,7 +378,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v and carrying the ferrofluid across a new solver 9w, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v, open; carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -1155,7 +1155,7 @@ Open, from building 9i:
   as the bottle pours it is drawn by the hold, not added to, and carried by the
   drag; and that a new grid lays nothing on a bare plate, picked and untouched or
   held. Found along the way: ferrofluid poured by hand is not what a new solver gets
-  back; it gets the look's ring while Ferrofluid is up (9w).
+  back; it gets the look's ring while Ferrofluid is up (9w, since shipped).
 - **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
   solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
   its face than a dipole, and a bigger one at the same gap is somewhat stronger at
@@ -1169,13 +1169,48 @@ Open, from building 9i:
   (lib/magnetSize.ts: at Size 0.9, 0.47 of it one height out and 0.33 at one and
   a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
   weakly at the edge of its reach than a real one.
-- **9w. Carry the ferrofluid across a new solver.** The dye is carried when the
-  governor moves the grid; the phase is not. The look's ring is poured again while
-  Ferrofluid is up, so a pool dragged into a shape loses that shape at a grid move,
-  and ferrofluid poured by hand from the bottle (on Classic, say) comes back as the
-  look's ring, ferrofluid nobody poured. (9x laid the Magnet's own pool again at the
-  magnet; 9y took that pool out with the rest of the Magnet's laying.) Read the phase back and write it into the
-  new grid as the dye is.
+- **9w. Carry the ferrofluid across a new solver** (**shipped**). The dye was
+  carried when the governor moved the grid; the phase was not, so the frame loop
+  poured the look's ring onto every new solver while Ferrofluid was up: a pool
+  dragged into a shape lost it, and ferrofluid poured by hand from the bottle (on
+  Classic, say) came back as the look's ring, ferrofluid nobody poured. With the
+  Magnet moving only what is on the plate (9y), a pool lost that way left it
+  nothing to hold. The oil, soap and acidity of the mix (Oil Bodies' bodies
+  among them) and the BZ and Liesegang reactions were lost the same way, with
+  nothing poured back. Now the old solver copies those fields on the GPU before
+  it goes (`handOver` in `gpu/fluid.ts`), and the new one lays them onto its
+  grid (`takeOver`): the ferrofluid and the mix by an area-weighted mean
+  (`carryArea`, counted in integers so every overlap is exact), which keeps the
+  amount to the rounding, and the reactions copied as they were. The frame loop
+  lays the look's ferrofluid only on a solver that opened on no carry (the first,
+  or one after a lost device). `npm run regrid` (lab, 6/6 in a cloud session at
+  384² and 256²): 5.288% of the plate in → 5.288% on the new grid, 0.0 ppm off,
+  each cell (ferrofluid and mix) within 1.5e-7 of the area mean worked out in JavaScript, the black
+  shared 97.4% (98.2% back up), the middle moved 0.00 cell; the same move with
+  nothing handed over leaves 0.000% (main's behaviour); oil 3.020% → 3.020%, soap
+  0.690% → 0.690%, acid 0.396% → 0.396%, Oil Bodies' tally the same; BZ and the
+  gel identical value for value; a carry from another device refused. On the
+  Mac, `npm run magnet` check 8 asks it of the app: the Ferrofluid bottle on
+  Classic, two pools poured, the governor stepped down from 512²: no lay, the
+  same amount, the pools where they were. Not carried: Oil Bodies' share of the
+  dye (it starts empty and is handed back the colour inside each body within a
+  few steps), the glass's press (a press held through a move starts again from
+  the rest gap), the particles (H1, which re-seed from the dye), and the clear
+  film of 20b (#259, which landed while this was in review: its field is
+  dropped at a move as the ferrofluid was, to be carried the same way). Not checked
+  anywhere yet: that the app keeps the carry until the new solver's first
+  readback, so an out-of-memory retry after a climb gets it, and that after a
+  lost device the app's next solver refuses the old carry and lays the look's
+  ferrofluid as before (the lab checks only a second device's refusal).
+- **9z. The dye at its own grid across a new solver.** Found while doing 9w: the
+  dye and the flow cross a move of the grid through the CPU's 192² arrays
+  (`FluidSimulation.attachGpu`, `pullStateFromGpu`), so a plate on 384² to 1024²
+  is carried at 192² and upsampled back: anything finer than about two cells of
+  the old grid is smoothed away at every move, and the copy is a frame old.
+  Carry the dye and the velocity on the GPU as 9w carries the phase (an area
+  mean for the dye, which is an amount; the velocity resampled and projected),
+  keeping the CPU path only for a lost device. Measure it first: the dye's fine
+  structure (the `grating` or `microscope` measures) before and after one move.
 
 ### 10. Playing like a show
 
