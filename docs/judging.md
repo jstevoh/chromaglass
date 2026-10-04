@@ -705,6 +705,16 @@ lab measured the swirl (`npm run dish`), not the picture. On the Mac:
 - the phone: the Spin tool with one finger round the middle, and Auto Spin on the
   Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
 
+- the look's own turning on the same dish (PLAN 22h): flick a thin look (Galaxy,
+  Acid Trip, or any look with Viscosity thin) with the Spin pad or a flick on the
+  phone's Play sheet: the glass goes round at once but the picture should stay put
+  for a moment and catch up over about three seconds; on Classic (thick) it goes with
+  the glass. Then play music on the nine thin looks with music routed to rotation
+  (Galaxy, Cyberpunk, Acid Trip, Timbre Shifter, Boiling Point, Aurora Borealis, Solar
+  Flare, Fractal Dream, Stardust Collapse) against the last deploy before this one:
+  their sway is now through the water (within 2° of where it was) and the swirl runs
+  while they play. Say if any of them reads worse, and whether the frame rate dropped.
+
 Say if the lag is too long or too short to read as a liquid, and whether the swirl a
 press makes is visible or wants more.
 
