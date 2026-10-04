@@ -783,6 +783,7 @@ fn dishToPlate(uvScreen: vec2f, layer: i32, aspect: f32, c: f32, s: f32) -> vec2
 
 // Blend mode functions
 ${SPIKES_WGSL}
+fn magnetRadius() -> f32 { return U.magnetRadius; }
 /*
   The ferrofluid's spikes drawn (spikes.ts says where they are and why): the
   solver gathers the pool into a dome under each (phaseMu), which is a plan

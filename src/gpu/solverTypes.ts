@@ -55,6 +55,13 @@ export interface GpuStepParams {
   magnetHeight: number;
   magnetStrength: number;
   /**
+    The magnet's radius in plate widths (wgsl/magnetDisc.ts): Magnet Size's,
+    MAGNET_RADIUS at the tool's own size and when not given. It is a cylinder
+    held with its face where the height says; a bigger one keeps the face
+    there.
+  */
+  magnetRadius?: number;
+  /**
     The other fingers holding a magnet on a touch screen, up to three, in
     plate coordinates; each at this magnet's height and strength. Only read
     while this one is on.

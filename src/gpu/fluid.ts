@@ -25,6 +25,7 @@ import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup
 import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
 import { spikesOnAxis } from './wgsl/spikes';
+import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
@@ -445,7 +446,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 48;      // 36 scalars (33 is the vec2's alignment), then the fingers' three magnets at 36..47
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48
 
 export class WebGPUFluid {
   readonly N: number;
@@ -1143,6 +1144,7 @@ export class WebGPUFluid {
       f[36 + k * 4] = m?.x ?? 0; f[37 + k * 4] = m?.y ?? 0;
       f[38 + k * 4] = p.magnetHeight; f[39 + k * 4] = m ? p.magnetStrength : 0;
     }
+    f[48] = p.magnetRadius ?? MAGNET_RADIUS;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1404,7 +1406,7 @@ export class WebGPUFluid {
       And the magnet's own field is a maze field as strong as its spikes, on
       a look with a Labyrinth (see HAND_SCREEN).
     */
-    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight, p.magnetRadius) : 0;
     const spikes = spikeAmt > 0;
     const field = maze > 0.001 ? Math.max(maze, spikeAmt) : 0;
     // Never under twelve cells a period: the edge is three or four wide, and

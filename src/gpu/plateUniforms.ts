@@ -19,6 +19,7 @@ import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
 import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
+import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 
 /** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
@@ -56,10 +57,10 @@ export interface PlateView {
   lamp: { x: number; y: number; x2: number; y2: number };
   /**
    * The magnets under the glass, as the lead plate was last stepped with them
-   * (fluid uv, and the solver's own height and strength): what raises the
-   * ferrofluid's spikes. Up to four; none when absent.
+   * (fluid uv, and the solver's own height, strength and magnet radius): what
+   * raises the ferrofluid's spikes. Up to four; none when absent.
    */
-  magnets?: readonly { x: number; y: number; height: number; strength: number }[];
+  magnets?: readonly { x: number; y: number; height: number; strength: number; radius?: number }[];
   gelAngle: number;
   /** Where the mirror rig has turned to, accumulated on the CPU. */
   kaleidoPhase: number;
@@ -302,6 +303,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
       mags[k * 4] = m.x; mags[k * 4 + 1] = m.y; mags[k * 4 + 2] = Math.max(0.02, m.height); mags[k * 4 + 3] = Math.max(0, m.strength);
     });
     pack.set('magnets', ...mags);
+    pack.set('magnetRadius', view.magnets?.[0]?.radius ?? MAGNET_RADIUS);
     pack.set('lightPlay', clamp01(s.lightPlay ?? 0));
     pack.set('iridescence', clamp01(s.iridescence ?? 0));
   }
@@ -428,10 +430,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 /**
  * The magnets under the lead plate as its last step had them, for the plate
  * to draw the spikes they raise (plate.ts, spikeAt): the one in the step and
- * the other fingers', at its height and strength. None with the magnet off.
+ * the other fingers', at its height, strength and size. None with the magnet off.
  */
-export function magnetsOnPlate(p: GpuStepParams | null): { x: number; y: number; height: number; strength: number }[] {
+export function magnetsOnPlate(p: GpuStepParams | null): { x: number; y: number; height: number; strength: number; radius: number }[] {
   if (!p || p.magnetStrength <= 0.0001) return [];
-  const one = { x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength };
+  const one = { x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength, radius: p.magnetRadius ?? MAGNET_RADIUS };
   return [one, ...(p.extraMagnets ?? []).slice(0, 3).map((m) => ({ ...one, x: m.x, y: m.y }))];
 }

@@ -573,6 +573,12 @@ jobs:
       - name: The ferrofluid maze's detail
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run maze
+      # The magnet is a disc (PLAN 9v): the shader's field against Biot–Savart,
+      # flatter over its face than the dipole was, a bigger one stronger at the
+      # glass and reaching further, the default's spikes where they were.
+      - name: The magnet's field
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run disc
       # The magnet held close stands the ferrofluid up: the pool parts into
       # lit domes and its outline stops being a blob's; a look's own far
       # magnet leaves it whole; a second finger raises domes of its own.

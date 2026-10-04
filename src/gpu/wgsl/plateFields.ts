@@ -101,6 +101,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'macroEdge', type: 'f32', note: 'fractal silhouette warp' },
   { name: 'macroLacing', type: 'f32', note: 'dark lacing filaments along dye boundaries' },
   { name: 'macroRelief', type: 'f32', note: 'surface relief: per-pixel normals, specular, occlusion' },
+  { name: 'magnetRadius', type: 'f32', note: 'the magnets\' radius in fluid uv (wgsl/magnetDisc.ts): Magnet Size' },
   { name: 'markOn', type: 'f32', note: '1 when there is one loaded' },
   { name: 'markBlend', type: 'f32', note: 'the logo\'s blend, as mixBlend counts them; the finish reads it too' },
   { name: 'backBlend', type: 'f32', note: 'the back plate\'s blend, as mixBlend counts them; 0 is blendMode' },

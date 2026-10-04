@@ -3,6 +3,9 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '../src/gpu/wgsl/spikes';
+import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
+import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
@@ -281,6 +284,13 @@ const api = {
   },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /**
+   * The magnet's field as the solver and the plate both include it
+   * (wgsl/spikes.ts with wgsl/magnetDisc.ts), and the TypeScript the solver
+   * ramps on, for `npm run disc` to run the shader's own text against the
+   * physics.
+   */
+  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /**
