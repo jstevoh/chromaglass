@@ -339,11 +339,15 @@ try {
         await settle(3000);
         const before = await idleWindow(2500);
         const steps0 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
+        const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const w0p = await snap('wind0');
+        const t0 = Date.now();
         await stroke('blow', from, to, 1500);
+        const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');
         const steps1 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
+        const rb1 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const strokeSteps = await page.evaluate(() => window.__toolSnaps.wind1.step - window.__toolSnaps.wind0.step);
         const wa = await measure('wind0', w0p), wb = await measure('wind1', w0p);
         // In two halves, printed: whether the drift after dies away.
@@ -356,7 +360,8 @@ try {
           before, early, late, strokeSteps, wa, wb, along, idle, bar,
           earlyAlong: toward(sign, early.cx, early.cy), lateAlong: toward(sign, late.cx, late.cy),
           stepsOk: before.steps > 0 && early.steps > 0 && late.steps > 0 && strokeSteps > 0,
-          wind: d('wind'), straw: d('straw'), carried: d('carried'),
+          wind: d('wind'), straw: d('straw'), carried: d('carried'), directed: d('directed'), carries: d('carries'),
+          readings: rb1 - rb0, strokeMs, poolX: wa.cx - from[0], poolY: wa.cy - from[1],
           strawFirst: (steps1?.strawFirst ?? NaN) - (steps0?.strawFirst ?? NaN),
         };
       };
@@ -364,6 +369,21 @@ try {
       const C = [0.5, 0.5], half = (B[0] - A[0]);
       const fwd = await windRun(C, [C[0] + half, C[1]], 1);
       const back = await windRun(C, [C[0] - half, C[1]], -1);
+      /*
+        Printed, not judged: the stroke out to the right went red twice on
+        4 October (+0.17% and -0.03% against +0.20% to beat) while the one to
+        the left moved +1.76% and +1.86%, and over 36 runs the right carried
+        less colour than the left on 27 (145.9 against 352.4, 144.0 against
+        303.0 on the two reds). The right is always drawn first. A third
+        stroke, out to the right again after both, says whether it is the
+        way or the order; and for each, the wind steps that had a way to go,
+        the carries that found a fresh reading, the readings that landed,
+        how long the 30 moves took and where the pool's middle sat.
+      */
+      const again = await windRun(C, [C[0] + half, C[1]], 1);
+      for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
+        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
+      }
       /*
         The plate's own drift, signed, at its rate toward where the stroke
         went in the window before it, over the solver steps the stroke

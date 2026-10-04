@@ -398,6 +398,17 @@ class OnsetDetector {
     return !first && this.armed && odf > threshold && time - this.lastHit >= REFRACTORY_S;
   }
 
+  /**
+   * A hit that is not the music's: the operator's own click (`handSounds.ts`).
+   * Taken as a hit is taken, so the same sound's rise on the next frame is
+   * not a fresh one, but nothing about it is kept: not its time, which is
+   * what the plate and the beat clock read a kick from, and not its strength,
+   * which would set the scale the music's next hit is measured against.
+   */
+  swallow(): void {
+    this.armed = false;
+  }
+
   /** A hit: returns its strength, 0..1, against the recent hardest. */
   fire(time: number, odf: number): number {
     this.armed = false;
@@ -503,7 +514,16 @@ export class AudioFeatures {
     return true;
   }
 
-  update(frame: SpectrumFrame, time: number): AudioReading {
+  /** Hits heard in the moment of the operator's own click and not taken as the music's (`handSounds.ts`), by source. */
+  readonly swallowed = Object.fromEntries(SOURCE_NAMES.map(n => [n, 0])) as Record<SourceName, number>;
+
+  /**
+   * `hand` says this frame may hold a sound the operator's hand made on the
+   * laptop the microphone is in (a click, a key, a tap on a phone's glass):
+   * a hit it would call is swallowed rather than reported. The levels go on
+   * as they were; it is only the onsets the show acts on as beats.
+   */
+  update(frame: SpectrumFrame, time: number, hand = false): AudioReading {
     const n = frame.bins.length;
     this.layout(frame.sampleRate, frame.fftSize, n);
     const db = this.db;
@@ -573,8 +593,10 @@ export class AudioFeatures {
       const odf = this.odf[r];
       let hit = false, strength = 0;
       if (det.candidate(time, odf, r === 0 ? first : waking, ODF_MIN_DB + ODF_NOISE_DB / Math.sqrt(this.regions[r].length)) && value >= PRESENCE && this.owns(r)) {
-        hit = true;
-        strength = det.fire(time, odf);
+        if (hand) { det.swallow(); this.swallowed[SOURCE_NAMES[r]]++; } else {
+          hit = true;
+          strength = det.fire(time, odf);
+        }
       }
       // A candidate the drum does not own leaves it armed: the next frame may
       // be the same hit seen properly (a kick landing with a snare can read as

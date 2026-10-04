@@ -175,3 +175,27 @@ export function shareCard(words) {
     + `<path transform="translate(${textX} ${ly + 257})" d="${line2.d}"/></g>`;
   return svg(`0 0 ${W} ${H}`, defs, body);
 }
+
+/**
+ * The intro's three layers (src/lib/intro.ts), apart, because they move
+ * apart: the burst turns, the hub with its C stays upright over it, and the
+ * name sits under both. Drawn on no ground: the intro's own liquid is the
+ * ground, and a dish's dark circle turning would read as a disc, not dye.
+ * Detail as for the headers, since the intro is shown as large as they are.
+ */
+export function introLayers(words, { detail = 'medium' } = {}) {
+  const b = burst({ id: 'if', detail });
+  const h = hub({ id: 'ih', detail });
+  // The C drawn alone, a 512 canvas cropped to the hub's hot spot.
+  const hubSvg = svg('152 152 208 208', h.defs, h.body);
+  // A finger can reach past the 512 square; the viewBox takes them all.
+  const burstSvg = svg('-24 -24 560 560', b.defs, b.body);
+  const glassX = words.chroma.width + 8;
+  const end = glassX + words.glass.width;
+  const top = -words.capHeight - 40;
+  const defs = linear('ichroma', [0, 0, words.chroma.width, 0], [['0', '#8fe8ff'], ['0.5', '#4fe6cf'], ['1', '#a8ff8c']])
+    + linear('iglass', [0, -words.capHeight, 0, 0], [['0', '#ffffff'], ['0.6', '#e4fbff'], ['1', '#9fdcf0']]);
+  const nameSvg = svg(`-8 ${r1(top)} ${r1(end + 16)} ${r1(-top + 50)}`, defs,
+    `<path d="${words.chroma.d}" fill="url(#ichroma)"/><path transform="translate(${r1(glassX)} 0)" d="${words.glass.d}" fill="url(#iglass)"/>`);
+  return { burst: burstSvg, hub: hubSvg, name: nameSvg };
+}

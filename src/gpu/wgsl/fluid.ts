@@ -27,6 +27,7 @@ import { SPIKES_WGSL } from './spikes';
 import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
+import { filmKernels } from './film';
 
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
@@ -224,6 +225,61 @@ fn packedAt(x: i32, y: i32, n: i32) -> f32 {
   let cy = clamp(y, 0, n - 1);
   let half = n / 2;
   return pr[((cx + cy) & 1) * n * half + cy * half + (cx >> 1)];
+}
+`;
+
+/*
+  A face's velocity on a thin gap, as the thin solve made it conserve liquid
+  (wgsl/thinGap.ts), for the carries that move what the liquid holds across
+  faces: the colour, the oil, and the step's count of substeps (carryCourant).
+  The ferrofluid's volume carry has used it since PLAN 15d (phaseAdvect, which
+  has the derivation): the solve's face flux is the mean of the two cells'
+  M·u* less n·M_f·ΔP, and hsGradient left each cell's h·u as the mean of its
+  two faces' M_f·ΔP, so the face is the mean of the two cells' h·u plus n/4
+  times the second difference of M_f·ΔP along the axis, over the face's gap.
+
+  What the carries had instead: the two cells' velocities filtered [1 2 1]
+  along the face, swapped back to the compact gradient with c·P (Rhie–Chow
+  on the old solve's pressure). That is exact where the drag c is even, and
+  a Finger is a solid in the solve, c forty times smaller inside the hand
+  than outside it (hsPrep): across its rim those faces gathered liquid that
+  was not there to gather. Measured in the lab on the app's Classic step,
+  a pool near the plate's cap (5.5 at its middle) and a Finger drawn through
+  it as the pointer drags one, a cell every third step: the colour
+  piled past the plate's cap of 6 a cell at the hand's rim, the cap cut it
+  (capDye), and the pool lost 43% of itself in a stroke 0.16 of the plate
+  long (40.5% on the lab's longer Classic step, `npm run fingerflow`'s
+  check 7; Mac CI's `tools` check: 222 → 161). The same flow through these
+  faces gathers nothing a converged solve did not.
+
+  Needs `vel` (the flow the carries ride, hsGradient's), `pr` bound to the
+  solve's own P, `sq` (the gap), `mob` (the mobility, negative past the
+  open rim, where P is held at zero) and the rest gap in A.b.w.
+*/
+const THIN_FACE = /* wgsl */ `
+fn tfIn(q: vec2i, n: i32) -> bool { return q.x >= 0 && q.y >= 0 && q.x < n && q.y < n; }
+fn tfP(q: vec2i, n: i32) -> f32 {
+  if (mob[q.x + q.y * n] < 0.0) { return 0.0; }
+  let half = n / 2;
+  return pr[((q.x + q.y) & 1) * n * half + q.y * half + (q.x >> 1)];
+}
+// The solve's M_f·ΔP through the face q → q + e; nothing through the grid's wall.
+fn tfFace(q: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = q + e;
+  if (!tfIn(q, n) || !tfIn(b, n)) { return 0.0; }
+  let ma = abs(mob[q.x + q.y * n]);
+  let mb = abs(mob[b.x + b.y * n]);
+  return 2.0 * ma * mb / max(ma + mb, 1e-20) * (tfP(b, n) - tfP(q, n));
+}
+fn tfGap(q: vec2i) -> f32 { return max(textureLoad(sq, q, 0).r, 0.004) / A.b.w; }
+// The velocity through the face a → a + e, both cells inside the grid.
+fn thinFaceVel(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  let ha = tfGap(a);
+  let hb = tfGap(b);
+  let face = 0.5 * (dot(textureLoad(vel, a, 0).xy, vec2f(e)) * ha + dot(textureLoad(vel, b, 0).xy, vec2f(e)) * hb)
+           + 0.25 * f32(n) * (tfFace(a - e, e, n) - 2.0 * tfFace(a, e, n) + tfFace(b, e, n));
+  return face / (0.5 * (ha + hb));
 }
 `;
 
@@ -3330,11 +3386,29 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       x  ferrofluid, oil
       y  acidity (−1..1 as 0..1), soap
       z  BZ's oxidised catalyst, Liesegang's precipitate (0..4 as 0..1)
-      w  the gap between the glasses (0..0.06 as 0..1), BZ's activator
+      w  the gap between the glasses (0..0.06 as 0..1), in the low 16
+         bits; in the high 16, BZ's activator and the clear film (PLAN §20b),
+         eight bits each
 
-    The reactions live on grids of their own and are read between their
-    texels. A.a = which inputs are real (ferrofluid, mix, BZ, Liesegang);
-    A.b.x, A.b.y = the BZ and Liesegang grids.
+    The clear film took half of the activator's place because there was no
+    other: all eight numbers were spoken for, and the display pass cannot bind
+    a seventeenth texture. The activator is only ever asked whether it is
+    there at all (the plate's BZ draws where either species is over 0.0005),
+    so it keeps eight bits on a square-root scale, nothing at or under that
+    0.0005 and at least 0.000554 over it: at a texel the gate answers exactly
+    as it did, and only between texels, where the plate blends four, can the
+    reaction's fringe move by a fraction of a texel. That is the one thing
+    this changes on a plate with no film, and only where BZ is drawn. The
+    film is a share of the gap, 0..1 in steps of 1/255, which the plate
+    reads as the water's path (1 − film) through it: the faint tint of the
+    dyed water under a whole film is a seventh of the gap, drawn in steps of
+    3% of itself. The gap keeps its sixteen bits and pack2x16unorm's own
+    rounding, so the gap is packed exactly as it was.
+
+    The reactions and the film live on grids of their own and are read
+    between their texels. A.a = which inputs are real (ferrofluid, mix, BZ,
+    Liesegang); A.b.x, A.b.y = the BZ and Liesegang grids; A.b.z the film's
+    grid and A.b.w whether there is a film.
   */
   packView: `${HEAD}
 @group(0) @binding(2) var phase: texture_2d<f32>;
@@ -3342,7 +3416,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var rxn: texture_2d<f32>;
 @group(0) @binding(5) var lies: texture_2d<f32>;
 @group(0) @binding(6) var sq: texture_2d<f32>;
-@group(0) @binding(7) var dst: texture_storage_2d<rgba32uint, write>;
+@group(0) @binding(7) var filmT: texture_2d<f32>;
+@group(0) @binding(8) var dst: texture_storage_2d<rgba32uint, write>;
 fn grid(t: texture_2d<f32>, uv: vec2f, g: f32) -> vec4f {
   let q = uv * g - 0.5;
   let i = vec2i(floor(q));
@@ -3363,12 +3438,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let r = select(vec4f(0.0), grid(rxn, uv, A.b.x), A.a.z > 0.5);
   let l = select(vec4f(0.0), grid(lies, uv, A.b.y), A.a.w > 0.5);
   let gap = textureLoad(sq, p, 0).r;
+  let film = select(0.0, grid(filmT, uv, A.b.z).r, A.b.w > 0.5);
+  // The activator: 0 at or under the plate's 0.0005, and at least step 6
+  // (0.000554 decoded) over it, so at a texel the gate answers as it did.
+  let bzu = select(0u, max(6u, u32(0.5 + 255.0 * sqrt(clamp(r.r, 0.0, 1.0)))), r.r > 0.0005);
+  let w = u32(0.5 + 65535.0 * clamp(gap / 0.06, 0.0, 1.0))
+        | (bzu << 16u)
+        | (u32(0.5 + 255.0 * clamp(film, 0.0, 1.0)) << 24u);
   textureStore(dst, p, vec4u(
     // The ferrofluid as a share of PHASE_VIEW_TOP, so a dome past full reaches the plate.
     pack2x16unorm(clamp(vec2f(ph / ${PHASE_VIEW_TOP}.0, m.r), vec2f(0.0), vec2f(1.0))),
     pack2x16unorm(clamp(vec2f(m.b * 0.5 + 0.5, m.g), vec2f(0.0), vec2f(1.0))),
     pack2x16unorm(clamp(vec2f(r.g, l.a * 0.25), vec2f(0.0), vec2f(1.0))),
-    pack2x16unorm(clamp(vec2f(gap / 0.06, r.r), vec2f(0.0), vec2f(1.0)))));
+    w));
 }`,
 
   sharpenDye: `${HEAD}
@@ -3562,31 +3644,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     How far the step's flow carries anything across a face, at the most,
     in cells: for the carries' substeps in a thin gap (carryPlan, and why).
 
-    The face velocity is bodyAdvect's own (the same smoothing along the face
-    and the same Rhie–Chow correction from the pressure), so the number is
-    the Courant number the flux step itself would clamp, not an estimate of
-    it. Each cell reads its east and north faces; a workgroup keeps its
+    The face velocity is the thin carries' own (THIN_FACE, the faces the
+    thin solve made conserve liquid), so the number is the Courant number
+    the flux step itself would clamp, not an estimate of it. Each cell reads its east and north faces; a workgroup keeps its
     largest and hands one atomicMax to the buffer. A positive float's bits
     order as the float does, so the maximum of the bits is the bits of the
-    maximum. A.b.y is the step's displacement and A.b.z the Rhie–Chow
-    scale, as the carries take them.
+    maximum. A.b.y is the step's displacement and A.b.w the rest gap, as
+    the carries take them.
   */
   carryCourant: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var<storage, read> pr: array<f32>;
 @group(0) @binding(4) var<storage, read_write> most: array<atomic<u32>>;
-${PACKED}
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var<storage, read> mob: array<f32>;
+${THIN_FACE}
 var<workgroup> wgMost: atomic<u32>;
 fn faceCourant(a: vec2i, e: vec2i, n: i32) -> f32 {
-  let b = a + e;
-  let t = vec2i(e.y, e.x);
-  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
-  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
-  let pa = packedAt(a.x, a.y, n);
-  let pb = packedAt(b.x, b.y, n);
-  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
-  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
-  return abs(ve * A.b.y * f32(n));
+  return abs(thinFaceVel(a, e, n) * A.b.y * f32(n));
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32) {
   // No early return: the barriers below have to be reached by the whole workgroup.
@@ -3656,6 +3731,57 @@ fn main() {
   sub[2] = c;
 }`,
 
+  /*
+    A field carried onto a new grid (PLAN 9w): the old solver's texture, read
+    whole, written at this solver's size. A.a = (the old grid, this grid).
+
+    Each new cell takes the mean of the old cells under it, weighted by how
+    much of each it covers, which is the one resampling that keeps what the
+    field holds: a cell's value times its area, summed over the plate, comes
+    out the same on either grid to the last rounding. That matters because
+    these fields are amounts. The ferrofluid's is how much of each cell it
+    fills; the oil's is the same, and Cahn–Hilliard holds the total exactly
+    from then on (npm run physics). A bilinear read would put a little more
+    or less liquid on the plate at every move of the grid, and the governor
+    moves it whenever the frame time crosses a rung.
+
+    What it does not keep is an edge sharper than the coarser grid: going up,
+    an edge that was one old cell wide is a step two or three new cells wide,
+    which the field's own separation (phaseSeparate, mixRelax) narrows back
+    to its own width in a few steps; going down, an edge narrower than a new
+    cell is averaged into it, as it would be by any grid that size. Nothing
+    is clamped: a mean of values between 0 and 1 is between them already.
+
+    Reads by textureLoad, never a sampler, because the phase is r32float
+    and not filterable on every device.
+  */
+  carryArea: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  // Counted in integers, in old cells times the new grid: a new cell spans
+  // [id·old, (id+1)·old) and an old one [k·new, (k+1)·new), so every
+  // overlap is exact. In floats, a cell's edge 255 cells in was off by
+  // about 1e-5 of a cell and so was its weight.
+  let oldN = i32(A.a.x);
+  let newN = i32(A.a.y);
+  let me = vec2i(id.xy);
+  if (me.x >= newN || me.y >= newN) { return; }
+  let lo = me * oldN;
+  let hi = lo + vec2i(oldN);
+  let k0 = lo / newN;
+  let k1 = min((hi - vec2i(1)) / newN, vec2i(oldN - 1));
+  var sum = vec4f(0.0);
+  for (var y = k0.y; y <= k1.y; y++) {
+    let wy = min(hi.y, (y + 1) * newN) - max(lo.y, y * newN);
+    for (var x = k0.x; x <= k1.x; x++) {
+      let wx = min(hi.x, (x + 1) * newN) - max(lo.x, x * newN);
+      sum += f32(wx * wy) * textureLoad(src, vec2i(x, y), 0);
+    }
+  }
+  textureStore(dst, me, sum / (f32(oldN) * f32(oldN)));
+}`,
+
   // Clear a field to a constant (A.a), used by clear() and the pressure warm start.
   fill: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<DYE_FORMAT, write>;
@@ -3665,6 +3791,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
+  // A clear film that tears (PLAN §20b): see wgsl/film.ts.
+  ...filmKernels(HEAD, W),
 };
 
 /*
@@ -3681,8 +3809,29 @@ function substepped(name: string): string {
     .replace(bound, `${bound}\n@group(0) @binding(6) var<storage, read> sub: array<f32>;`)
     .replace(moved, 'A.b.y * sub[0] * f32(n)');
 }
-KERNELS.bodyAdvectSub = substepped('bodyAdvect');
-KERNELS.mixAdvectSub = substepped('mixAdvect');
+
+/*
+  The same carries on a thin gap, through the faces the thin solve made
+  conserve liquid (THIN_FACE) in place of faces rebuilt from the cells'
+  velocities: `pr` is bound to the solve's own P, and the gap and the
+  mobility follow everything the kernel already takes. A.b.w is the rest gap.
+*/
+function thinFaced(src: string, name: string): string {
+  const block = /  let t = vec2i\(e\.y, e\.x\);\n[^]*?  let ve = [^\n]*\n/;
+  const last = Math.max(...[...src.matchAll(/@binding\((\d+)\)/g)].map((m) => Number(m[1])));
+  const at = src.indexOf('fn flux(');
+  if (!block.test(src) || at < 0 || !src.includes('var vel: texture_2d<f32>;') || !src.includes('var<storage, read> pr: array<f32>;')) {
+    throw new Error(`${name} cannot take the thin solve's faces: its face velocity, its flux or its bindings moved`);
+  }
+  const bindings = `@group(0) @binding(${last + 1}) var sq: texture_2d<f32>;\n@group(0) @binding(${last + 2}) var<storage, read> mob: array<f32>;\n`;
+  const withFace = src.slice(0, at) + `${THIN_FACE}\n` + src.slice(at);
+  return withFace
+    .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
+    .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
+}
+KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
+KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
+KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
 
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {
