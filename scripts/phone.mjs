@@ -1161,41 +1161,63 @@ try {
           }
           return s;
         };
-        for (let round = 0; round < 12; round++) {
-          await page.evaluate(() => window.chromaglassAction('clear'));
-          await settle(2500);
-          const b0 = await snap();
-          await page.evaluate(() => { window.__cgTouchLog = []; });
-          const t0 = await plateSteps();
-          await touch('touchStart', [{ ...DA, id: 1 }]);
-          await touch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
-          const t1 = await plateSteps();
-          const mids = [];
-          for (const wait of [400, 400, 400]) {
-            await settle(wait);
-            const [hs, m] = await Promise.all([hands(), snap()]);
-            const st = await plateSteps();
-            const f = hs.hands;
-            mids.push(`@${st - t0}: ` + (f.length === 2 ? f.map((h, i) => `${h.laid.steps}st ${sumAt(m, b0, h, R).toFixed(0)}`).join(' | ') : `${f.length} hands`));
+        const rounds = async (pg, tch, tag, count) => {
+          const snapP = () => pg.evaluate(() => [...window.chromaglassDebug().fluids[0].readDensity]);
+          const stepsP = () => pg.evaluate(() => window.chromaglassDebug().fluids[0].stepCount);
+          const handsP = () => pg.evaluate(() => window.chromaglassDebug().hands());
+          for (let round = 0; round < count; round++) {
+            await pg.evaluate(() => window.chromaglassAction('clear'));
+            await pg.waitForTimeout(2500);
+            const b0 = await snapP();
+            const k0 = await pg.evaluate(() => { window.__cgTouchLog = []; return window.chromaglassDebug().kicks(); });
+            const t0 = await stepsP();
+            await tch('touchStart', [{ ...DA, id: 1 }]);
+            await tch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
+            const t1 = await stepsP();
+            const mids = [];
+            for (const wait of [400, 400, 400]) {
+              await pg.waitForTimeout(wait);
+              const [hs, m] = await Promise.all([handsP(), snapP()]);
+              const st = await stepsP();
+              const f = hs.hands;
+              mids.push(`@${st - t0}: ` + (f.length === 2 ? f.map((h) => `${h.laid.steps}st ${sumAt(m, b0, h, R).toFixed(0)}`).join(' | ') : `${f.length} hands`));
+            }
+            const hh = (await handsP()).hands;
+            await tch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
+            await pg.waitForTimeout(700);
+            const a = await snapP();
+            let total = 0, best = { v: -1, x: 0, y: 0 };
+            for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+              const g = Math.max(0, a[x + y * n]) - Math.max(0, b0[x + y * n]);
+              total += g;
+              if (hh.length === 2 && hh.every(h => Math.hypot(x - h.x, y - h.y) > 3 * R) && g > best.v) best = { v: g, x, y };
+            }
+            const k1 = await pg.evaluate(() => window.chromaglassDebug().kicks());
+            const log = await pg.evaluate(() => window.__cgTouchLog ?? []);
+            const rows = hh.length === 2 ? hh.map((h, i) => `${'AB'[i]} (${h.x},${h.y}) laid ${h.laid.steps}st ${h.laid.dye.toFixed(0)} under ${sumAt(a, b0, h, R).toFixed(0)} near ${sumAt(a, b0, h, 3 * R, hh[1 - i]).toFixed(0)}`).join('; ') : `${hh.length} hands`;
+            const blob = best.v >= 0 ? `; most elsewhere at (${best.x},${best.y}) ${best.v.toFixed(2)}, ${sumAt(a, b0, best, R).toFixed(0)} round it` : '';
+            console.log(`  diag ${tag} ${round}: ${rows}; plate gained ${total.toFixed(0)} over ${t1 - t0}+ steps; ${k1 - k0} kicks${blob}`);
+            console.log(`    mid ${mids.join(' ; ')}`);
+            console.log(`    trails ${JSON.stringify(hh.map(h => h.laid.trail))}`);
+            console.log(`    touch ${log.filter((l, i) => !l.startsWith('mousemove') || i < 40).join(' ')}`);
           }
-          const hh = (await hands()).hands;
-          await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
-          await settle(700);
-          const a = await snap();
-          let total = 0, best = { v: -1, x: 0, y: 0 };
-          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-            const g = Math.max(0, a[x + y * n]) - Math.max(0, b0[x + y * n]);
-            total += g;
-            if (hh.length === 2 && hh.every(h => Math.hypot(x - h.x, y - h.y) > 3 * R) && g > best.v) best = { v: g, x, y };
-          }
-          const log = await page.evaluate(() => window.__cgTouchLog ?? []);
-          const rows = hh.length === 2 ? hh.map((h, i) => `${'AB'[i]} (${h.x},${h.y}) laid ${h.laid.steps}st ${h.laid.dye.toFixed(0)} under ${sumAt(a, b0, h, R).toFixed(0)} near ${sumAt(a, b0, h, 3 * R, hh[1 - i]).toFixed(0)}`).join('; ') : `${hh.length} hands`;
-          const blob = best.v >= 0 ? `; most elsewhere at (${best.x},${best.y}) ${best.v.toFixed(2)}, ${sumAt(a, b0, best, R).toFixed(0)} round it` : '';
-          console.log(`  diag ${round}: ${rows}; plate gained ${total.toFixed(0)} over ${t1 - t0}+ steps${blob}`);
-          console.log(`    mid ${mids.join(' ; ')}`);
-          console.log(`    trails ${JSON.stringify(hh.map(h => h.laid.trail))}`);
-          console.log(`    touch ${log.filter(l => !l.startsWith('mousemove') || log.indexOf(l) < 40).join(' ')}`);
-        }
+        };
+        await rounds(page, touch, 'band', 10);
+        // And a page that never starts the band (as #238's mirror check does), the same places.
+        const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+        await ctx2.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ } });
+        const p2 = await ctx2.newPage();
+        await p2.goto(URL, { waitUntil: 'load' });
+        for (let i = 0; i < 40 && !(await p2.evaluate(() => typeof window.chromaglassDebug?.()?.hands === 'function')); i++) await p2.waitForTimeout(500);
+        await p2.waitForTimeout(800);
+        await p2.evaluate(() => window.chromaglassSettings({ rotationSpeed: 0, plateRock: 0, beatSqueeze: 0, audioImpact: 0 }));
+        await p2.waitForTimeout(1500);
+        await p2.getByTestId('phone-tool-dropper').click();
+        await p2.evaluate(() => window.chromaglassSettings({ turbulenceScale: 0, rainDrip: 0, glassSmear: 0, bubbles: 0, beads: 0, fingering: 0 }));
+        const cdp2 = await ctx2.newCDPSession(p2);
+        const touch2 = (type, pts) => cdp2.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
+        await rounds(p2, touch2, 'silent', 10);
+        await ctx2.close();
       }
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
 
