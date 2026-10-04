@@ -87,7 +87,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 
 - **0.1** **19j** (E, S): a merge that changes no file the site is built from deploys nothing
   and waits for nothing. Ten of the last thirty merges changed no site file, and a
-  docs-only merge still runs the whole Mac (63 to 111 minutes). This PR is one.
+  docs-only merge still runs the whole Mac (63 to 111 minutes); #245, which wrote this
+  order, is one.
 - **0.2** **19i** (E, M): a green Mac result carries across a merge of main that is disjoint
   from the PR's own site files. Those pushes were 56 % of the PRs' Mac minutes and 16
   of their 29 reds; this is the largest saving in the file.
