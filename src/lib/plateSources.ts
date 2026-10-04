@@ -20,7 +20,7 @@
  *   side by side would carry two, and two overlapping beams (16c) one twice
  *   as bright.
  * - The **film alone** takes out both plates and every lamp row and the logo,
- *   so it is the film over the bare background. A film row on Multiply is
+ *   and the lamp ground, so it is the film over black. A film row on Multiply is
  *   drawn Add here: multiply lays the film over what is under it, and under
  *   the film alone is black, so Multiply would be a dark projector. Over
  *   black, Add is the frame itself, which is what a film projector shows.
@@ -42,5 +42,11 @@ export function sourceSettings(kind: Exclude<SurfaceSource, 'wall'>, s: Visualiz
   const out = { ...s } as Record<string, unknown>;
   for (const key of SOURCE_OFF[kind]) out[key] = 0;
   if (kind === 'film' && out.filmBlend === 'multiply') out.filmBlend = 'add';
+  // And no lamp ground under it (PLAN 18b): with the plates and the lamp rows
+  // gone, a look on the lamp would still draw its bare lamp, a white wall with
+  // the film added over it and clipped, on the projector that should carry
+  // the film alone over black. The lamp is the plates' projector, not the
+  // film's. Found when ten looks went on the lamp (18b-1).
+  if (kind === 'film') out.lampGround = 0;
   return out as unknown as VisualizerSettings;
 }

@@ -17,11 +17,14 @@
  *
  * Asked here, through the real plate shader on lab plates:
  *
- *   1. at 0, which every shipped look is, the picture is the plate as it was
- *      before the lamp, byte for byte: every look against a second lab built
+ *   1. at 0 the picture is the plate as it was before the lamp, byte for
+ *      byte: every look, its Lamp Ground set to 0, against a second lab built
  *      from today's plate.ts with the lamp's lines taken out (loud if one is
  *      not where it was), on a plate of five pools and a two-dye overlap,
- *      a back plate drawn where a look has one
+ *      a back plate drawn where a look has one. And the looks that ship on
+ *      the lamp (PLAN 18b-1, `npm run lampjudge`) draw on it: as shipped
+ *      each differs from itself at 0 by more than the ground not reaching
+ *      it, and none is black
  *   2. a clear pool on the lamp ground throws at least 90% of the lamp (PLAN
  *      §20a), read in a hole in a ring of dye against the bare lamp at the
  *      same pixels; the same pool on the black ground is the control, and
@@ -48,7 +51,7 @@
  * Checks 2 to 5 render with the grade and the plate's painted texture
  * (saturation, grain, boundary glow, meniscus, beads) at their neutral
  * values, so what is read is the light through the dye and nothing laid on
- * it; check 1 renders each look as it ships.
+ * it; check 1 renders each look with its own settings.
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
@@ -135,7 +138,9 @@ const POOLS = [[0.3, 0.3, 0.14, RED, 1.4], [0.7, 0.3, 0.14, YELLOW, 1.4], [0.3, 
   [0.47, 0.5, 0.1, RED, 0.3], [0.55, 0.5, 0.1, BLUE, 0.3]];
 const NEUTRAL = { saturationBoost: 1, granulation: 0, boundaryContrast: 0, edgeRelief: 0, beads: 0, lacing: 0, cells: 0, glossiness: 0, microDroplets: 0, thinFilm: 0 };
 
-/** Every look on the pools plate, at its own settings: [id, pixels]. */
+/** Every look on the pools plate, at its own settings with Lamp Ground 0:
+ *  [id, its own Lamp Ground, pixels at 0, pixels as shipped (only when that
+ *  is not 0)]. */
 const everyLook = (lab) => lab.page.evaluate(async ([pools, S]) => {
   await lab.create(128);
   for (const p of pools) lab.dye(...p);
@@ -144,7 +149,9 @@ const everyLook = (lab) => lab.page.evaluate(async ([pools, S]) => {
   for (const id of lab.lookIds()) {
     const s = lab.look(id).settings;
     const back = (s.layerCount ?? 1) > 1;
-    out.push([id, s.lampGround ?? 0, await lab.render(S, s, { backPlate: back, backRotation: back ? 1.1 : 0 })]);
+    const cam = { backPlate: back, backRotation: back ? 1.1 : 0 };
+    const lg = s.lampGround ?? 0;
+    out.push([id, lg, await lab.render(S, { ...s, lampGround: 0 }, cam), lg > 0 ? await lab.render(S, s, cam) : null]);
   }
   return out;
 }, [POOLS, S]);
@@ -243,20 +250,36 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
 
 // ── 1. At 0, the plate as it was ─────────────────────────────────────
 {
-  const rows = looksNow.map(([id, lg, a], i) => {
+  const litOf = (px) => { let t = 0; for (let k = 0; k < px.length; k += 4) t += px[k] + px[k + 1] + px[k + 2]; return t / (px.length / 4); };
+  const rows = looksNow.map(([id, lg, a, own], i) => {
     const [idThen, , b] = looksThen[i];
     if (idThen !== id || a.length !== S * S * 4 || b.length !== a.length) return { id, lg, worst: NaN, lit: 0 };
-    let worst = 0, lit = 0;
+    let worst = 0;
     for (let k = 0; k < a.length; k++) { if (k % 4 !== 3) worst = Math.max(worst, Math.abs(a[k] - b[k])); }
-    for (let k = 0; k < a.length; k += 4) lit += a[k] + a[k + 1] + a[k + 2];
-    return { id, lg, worst, lit: lit / (a.length / 4) };
+    let moved = 0;
+    if (own) for (let k = 0; k < a.length; k++) { if (k % 4 !== 3) moved += Math.abs(own[k] - a[k]); }
+    return { id, lg, worst, lit: litOf(a), litOwn: own ? litOf(own) : null, moved: own ? moved / (a.length * 0.75) / 255 : null };
   });
-  const up = rows.filter(r => r.lg > 0);
   const off = rows.filter(r => !(r.worst === 0));
   const dark = rows.filter(r => r.lit < 5);
-  check(`every shipped look draws at Lamp Ground 0, and the plate as it was before the lamp, byte for byte (${rows.length} looks)`,
-    !up.length && !off.length && !dark.length && rows.length >= 30,
-    `${up.length ? `turned up: ${up.map(r => r.id).join(', ')}; ` : ''}${off.length ? `different: ${off.map(r => `${r.id} ${r.worst}`).join(', ')}; ` : ''}${dark.length ? `black: ${dark.map(r => r.id).join(', ')}` : 'none different'}`);
+  check(`every look at Lamp Ground 0 draws the plate as it was before the lamp, byte for byte (${rows.length} looks)`,
+    !off.length && !dark.length && rows.length >= 30,
+    `${off.length ? `different: ${off.map(r => `${r.id} ${r.worst}`).join(', ')}; ` : ''}${dark.length ? `black: ${dark.map(r => r.id).join(', ')}` : 'none different'}`);
+  // A look turned up draws a different picture from the same look at 0, by
+  // more than the 6% `npm run lampjudge` calls the ground not reaching it, and
+  // not a black one. Not "brighter": a look whose own light already glows on
+  // the black ground (Timbre Shifter's rainbow LED ring) has that light
+  // filtered by the dye on the lamp, and reads darker there; the first
+  // version of this line asked for brighter and found four of the ten darker
+  // (Timbre Shifter 449 to 200 summed over the plate).
+  // Equal would mean the setting never reached the plate; black, that the
+  // lamp is dimmed to nothing.
+  const up = rows.filter(r => r.lg > 0);
+  const flat = up.filter(r => !(r.moved > 0.06) || r.litOwn < 5);
+  // At least one: with none on the lamp the line would pass on nothing.
+  check(`the looks that ship on the lamp draw on it (${up.length}: each differs from itself at 0 by over 6%, none black)`,
+    up.length > 0 && !flat.length,
+    up.length ? up.map(r => `${r.id} ${(r.moved * 100).toFixed(0)}%`).join(', ') : 'none ship on the lamp');
 }
 
 // ── 2. A clear pool throws the lamp ──────────────────────────────────
