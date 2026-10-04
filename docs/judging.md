@@ -864,9 +864,11 @@ Open the site in a private window (a cold cache) on the Mac, and once on a phone
   and green, with "Warming the lamp" breathing under the name. When the desk
   arrives the intro should shrink into the plate's preview without a jump in the
   swirl, and never cover the desk's controls.
-- **Say whether the swirl stops** for a few seconds near the start (Chromium starting
-  the GPU may freeze it; PLAN 14v's open item). A still picture is acceptable; a stall
-  that reads as a crash is not.
+- **The swirl holds still on purpose** for a few seconds near the start, while the
+  plate's drawing shaders compile (PLAN 14v-4: turning through them stopped the
+  page's frames on the Mac). Say whether that pause reads as a pause or as a crash,
+  and whether the desk still answers a click while it is held. Say also whether it
+  freezes earlier, as Chromium starts the GPU (PLAN 14v's open item).
 - When the plate is ready the intro should fade into it in about a second, with the
   plate already moving underneath; it should never sit over a plate that is ready.
 - A key or a click on the intro skips it to the black plate; a click on the desk
