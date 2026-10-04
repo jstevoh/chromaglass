@@ -699,8 +699,9 @@ export class WebGPUFluid {
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
       ['addCurrent', [VEL], true],
-      // The spun dish (PLAN §22): no look spins at opening, so built behind.
-      ['spinSwirl', [VEL], false],
+      // The spun dish (PLAN §22): waited for when the look's own motor starts
+      // its dish ahead of its liquid at opening (PLAN 22j, opening.ts).
+      ['spinSwirl', [VEL], open.spin],
       ['decayDye', [dye], true],
       ['decayVel', [VEL], true],
       ['packView', ['rgba32uint'], true],

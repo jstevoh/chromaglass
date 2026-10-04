@@ -5007,7 +5007,10 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   the sway is −0.8, which reversed the dial's share with the band's; harmless at a
   thousandth of a radian a second, it would have turned acid-trip backwards at 0.24
   rad/s in every quiet bar (`lookMotor`, `npm run turntable` 15). Lucky's dial rolls
-  0 to 0.2 (was 0.025). Judged on the Mac, `docs/judging.md` §28.
+  0 to 0.2 (was 0.025). A dish whose motor is over about 1.25e-3 rad/s now starts
+  the swirl in its first steps (the liquid lags the dish as it comes up to speed), so
+  the opening waits for `spinSwirl` on those eighteen looks (`lookOpensSpinning` in
+  `gpu/opening.ts`; `npm run startup` found six of them asking for it unbuilt). Judged on the Mac, `docs/judging.md` §28.
 - **22l. Nothing winds the middle against the rim now.** The stir was a differential
   rotation, and some looks read by it (galaxy's spiral arms; its preset said so). A
   steady dish under one liquid cannot make one; what does in a real show is a second,
