@@ -474,12 +474,16 @@ try {
       whole push (0.023, run 37163762683): a press frozen at the lift read
       54%, and the check could not tell. The Press is the same Press; the
       plate's own stirring, which no lift can undo, is what is taken away.
-      Put back after.
+      And no bubbles: the page's first click (an earlier check's) starts the
+      built-in band, whose kicks drop bubbles near the middle of the plate
+      whatever Audio Impact says, and a bubble is a held press of its own
+      (#225; the mirror check's thread found the band there, #238). Bubbles
+      at 0 clears the look's and stops the kicks laying more. Put back after.
     */
     const before = await page.evaluate(() => ({ ...window.chromaglassSettings?.() }));
     await page.evaluate(() => window.chromaglassSettings?.({
       thinGap: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
-      rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0,
+      rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0, bubbles: 0,
       audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
     }));
     await settle(3000);
