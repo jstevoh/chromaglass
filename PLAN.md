@@ -4655,6 +4655,15 @@ its frame rate live. "Free" means no new passes or texture reads.
   Clock Glass and the ferrofluid looks (their own pass), Roy's three inks, and the looks
   whose liquids or chemistry make the colour. Judging: docs/judging.md §37 (the owner's eyes
   on every look, on the Mac).
+- **Across the looks** (the survey above, every look before and after, its own dyes,
+  as many as its plate shows at once): the 27 widened looks went from a median of 65
+  distinct colours and 19 hue bins to 101 and 25 (Classic 65 → 100, Galaxy 27 → 72,
+  Stardust Collapse 21 → 127, Soap Film 63 → 136); the 14 left alone from 54.5 to 62.5,
+  from the dye and the grade alone.
+- **18l-4. Three widened looks read fewer colours on the survey's plate:** Acid Trip
+  (146 → 138; its exclusion blend inverts where dyes overlap), Fractal Dream (42 → 38)
+  and Sunny Side Up (92 → 79). Look at them on the Mac (judging §37) and reorder or
+  trim their families if they read muddier.
 - **18l-1. Real dye spectra (the shortcut kept).** Still three bands: a dye's colour is
   three transmissions, and the 4%/96% limits stand in for the tails of a real absorption
   band. Spectral Optics' six bands cannot reproduce the palette's saturated colours (its
