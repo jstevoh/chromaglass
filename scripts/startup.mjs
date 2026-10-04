@@ -768,6 +768,8 @@ async function open(query, looks) {
         beats: longest(changes(2)),
         steps: longest(changes(3)),
         firstStep: (rows.find((r) => r[3] > 0) ?? [null])[0],
+        // The intro's times (src/lib/intro.ts), for the line under the milestones.
+        intro: { ...(window.__cgIntro ?? {}) },
         /*
           When the plate started moving for good: the end of the last stretch
           of more than MAX_GAP_S without a step, or the first step if there
@@ -1274,6 +1276,15 @@ try {
   o.frames = frames;
   console.log(`  as shipped (shader cache ${o.cache})`);
   console.log(`     ${milestones(o)}`);
+  /*
+    How much of the opening the intro covered, printed and not judged
+    (`npm run intro` judges it): it is up from the page's first frame and
+    leaves on the plate's first step, so on a cold Mac this is the share of
+    the wait nobody looks at a black plate. The first step here is the
+    quarter-second row it was seen in; the intro's own leaving is exact.
+  */
+  const intro = o.intro ?? {};
+  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}`);
   const p = o.prepared;
   const b = o.behind;
   check('the show opens and the plate is stepping',

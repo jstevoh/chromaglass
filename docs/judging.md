@@ -856,6 +856,21 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
 
+## 36. The intro while the show opens (PLAN 14v)
+
+Open the site in a private window (a cold cache) on the Mac, and once on a phone.
+
+- From the very first moment the mark turns slowly over three pools of blue, teal
+  and green, with "Warming the lamp" breathing under the name. When the desk
+  arrives the intro should shrink into the plate's preview without a jump in the
+  swirl, and never cover the desk's controls.
+- **Say whether the swirl stops** for a few seconds near the start (Chromium starting
+  the GPU may freeze it; PLAN 14v's open item). A still picture is acceptable; a stall
+  that reads as a crash is not.
+- When the plate is ready the intro should fade into it in about a second, with the
+  plate already moving underneath; it should never sit over a plate that is ready.
+- A key or a click on the intro skips it to the black plate; a click on the desk
+  does not. The projector window and the phone remote never show it.
 ## 34. Several areas of interest: Velvet Underground, Lumia and Cell Bloom (PLAN 25a)
 
 The owner found Velvet Underground, Lumia and Cell Bloom underwhelming, with one area of
@@ -958,6 +973,21 @@ or two) and about 0.9 (holds until you drop Alcohol on it). Please say:
   is now packed in eight bits to make room for the film);
 - the cost on the Mac with the film on (the film is twelve small passes twice a
   frame on a 384² grid; `npm run stages` in the console, or the frame time below).
+
+---
+
+## 33. A click on the laptop is not a beat (PLAN 14x)
+
+On the laptop's own microphone, in a quiet room (no music), with any look:
+
+- Pick tools one after another, press the Speed ride and other rides, and type a
+  few keys. The plate should not pulse, squeeze or ring on any of them. Before
+  this, a click was heard as a kick and the plate took it as one.
+- Clap once, or knock on the table away from the trackpad, with no hand on the
+  laptop: the plate should still pulse. That is the microphone hearing the room.
+- Then with music playing through speakers and Follow Beat on: ride a fader and
+  pick tools through a chorus. The beat should carry on through the clicks.
+- On the phone, on its microphone: tap tools and the Amount slider. Same as above.
 
 ---
 

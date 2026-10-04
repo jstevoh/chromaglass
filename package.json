@@ -111,6 +111,7 @@
     "spikes": "node scripts/spikes.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferropour": "node scripts/ferropour.mjs",
+    "regrid": "node scripts/regrid.mjs",
     "pops": "node scripts/pops.mjs",
     "drops": "node scripts/drops.mjs",
     "droplens": "node scripts/droplens.mjs",
@@ -146,6 +147,7 @@
     "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs",
     "depth": "npm run build && esbuild scripts/depth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/depth.mjs && node node_modules/.cache/depth.mjs",
     "loadtime": "npm run build && node scripts/loadtime.mjs",
+    "intro": "npm run build && PW_WEBGPU=1 node scripts/intro.mjs",
     "startup": "npm run build && esbuild scripts/startup.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/startup.mjs && node node_modules/.cache/startup.mjs",
     "wash": "npm run build && esbuild scripts/wash.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/wash.mjs && node node_modules/.cache/wash.mjs",
     "replay": "esbuild scripts/replay.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/replay.mjs && node node_modules/.cache/replay.mjs",
@@ -165,7 +167,8 @@
     "desktop": "npm run build && node scripts/desktop.mjs",
     "app": "npm run build && npm --prefix desktop start",
     "mac-app": "npm run build && npm --prefix desktop run dist",
-    "lampjudge": "node scripts/lampjudge.mjs"
+    "lampjudge": "node scripts/lampjudge.mjs",
+    "clicks": "esbuild scripts/clicks.mjs --bundle --platform=node --format=esm --external:playwright --log-level=warning --outfile=node_modules/.cache/clicks.mjs && node node_modules/.cache/clicks.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

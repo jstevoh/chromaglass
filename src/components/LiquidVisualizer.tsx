@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { layFinger } from '../lib/handSolid';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
@@ -35,7 +35,7 @@ import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
-import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
+import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
@@ -59,6 +59,7 @@ import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
+import { adoptIntro, introOut, introPlateFrame } from '../lib/intro';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -1190,6 +1191,25 @@ class FluidSimulation {
   */
   private gpuLanded = false;
   private seed: Float32Array[] | null = null;
+  /*
+    The liquids that never cross to the CPU (the ferrofluid, the mix, the
+    reactions), handed from the last solver to this one (PLAN 9w; handOver
+    in gpu/fluid.ts says why a copy on the GPU). Kept until this solver's
+    first readback lands, for the same reason as the seed above: a solver
+    swapped out before it has spoken (out of memory straight after a climb,
+    or a second move inside a frame or two) hands the next one this, not
+    whatever it managed in a frame: on a solver that ran out of memory that
+    would be a copy of textures that were never made.
+  */
+  private carry: SolverCarry | null = null;
+  private carried = false;
+  /**
+   * Whether the attached solver opened on what the one before it handed
+   * over. The frame loop lays a look's ferrofluid on a new solver only when
+   * it did not: a solver that opened on the last one's plate already has
+   * the plate's ferrofluid, or none because there was none.
+   */
+  get openedOnCarry(): boolean { return this.carried; }
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
@@ -1336,12 +1356,10 @@ class FluidSimulation {
 
   /** Move the simulation onto the GPU. Whatever the CPU arrays hold becomes the opening state. */
   attachGpu(gpu: PlateSolver) {
-    if (this.gpu) {                       // resolution change: carry the field across
-      this.pullStateFromGpu();
-      this.gpu.dispose();
-    }
+    if (this.gpu) this.releaseGpu();      // resolution change: carry the field across
     this.gpu = gpu;
     gpu.clear();
+    this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -1358,11 +1376,37 @@ class FluidSimulation {
   }
 
   /** Bring the field back to the CPU arrays and release the GPU solver. */
-  detachGpu() {
+  detachGpu(handOver = true) {
     if (!this.gpu) return;
-    this.pullStateFromGpu();
-    this.gpu.dispose();
+    this.releaseGpu(handOver);
     this.gpu = null;
+  }
+
+  /**
+   * The plate off the attached solver before it goes: the dye and the flow
+   * to the CPU arrays, the rest as a carry for the next solver (handOver),
+   * unless there is no next solver to take one (`handOver` false: going to
+   * no solver at all, or to a render that lays its own plate). A solver that
+   * has not spoken keeps the carry it was handed, as above.
+   */
+  private releaseGpu(handOver = true) {
+    const gpu = this.gpu!;
+    this.pullStateFromGpu();
+    if (!handOver) this.forgetCarry();
+    else if (!(this.carry && !this.gpuLanded)) {
+      const next = gpu.handOver?.() ?? null;
+      if (next) {
+        this.carry?.destroy();
+        this.carry = next;
+      }
+    }
+    gpu.dispose();
+  }
+
+  /** Let a held carry go: nothing will take it (a plate removed, a render's fresh plate). */
+  forgetCarry() {
+    this.carry?.destroy();
+    this.carry = null;
   }
 
   /**
@@ -1437,6 +1481,8 @@ class FluidSimulation {
     // One frame of latency instead of a pipeline stall every frame.
     if (!this.gpu.readbackAsync()) return;
     this.gpuLanded = true;
+    // This solver has spoken, and has whatever it was handed: the copies can go.
+    if (this.carry) { this.carry.destroy(); this.carry = null; }
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
     for (let i = 0; i < GRID_AREA; i++) {
@@ -4227,6 +4273,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** Where the intro goes once the plate is on the page: just above the canvas, under everything else in the frame. */
+  const introSlotRef = useRef<HTMLDivElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
   /*
     The noise a look is laid with and the CPU turbulence stirs by.
@@ -4563,6 +4611,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const glLostRef = useRef(false);
   /** Why there is no GPU to draw with, for the "needs WebGPU" screen. */
   const [gpuFailure, setGpuFailure] = useState<GpuFailure | null>(null);
+  // The intro over the plate (lib/intro.ts): taken into the plate's frame as
+  // soon as there is one, and gone the moment there is a reason to say why
+  // there will be no plate, which it would otherwise cover.
+  useLayoutEffect(() => { adoptIntro(introSlotRef.current); }, []);
+  useEffect(() => { if (gpuFailure) introOut('failure'); }, [gpuFailure]);
   const [glLost, setGlLost] = useState(false);
   const [glEpoch, setGlEpoch] = useState(0);
   /** The look that is on the plate, so a rebuild can put the same one back. */
@@ -5822,7 +5875,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
       }
     } else if (currentCount > targetCount) {
-      for (const dropped of fluidsRef.current.slice(targetCount)) dropped.dropGpu();
+      for (const dropped of fluidsRef.current.slice(targetCount)) { dropped.dropGpu(); dropped.forgetCarry(); }
       fluidsRef.current = fluidsRef.current.slice(0, targetCount);
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
       spinVelRef.current = spinVelRef.current.slice(0, targetCount);
@@ -6513,24 +6566,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
         }
         /*
-          The phase goes to each new solver the lead plate gets, not only
-          the first. The governor rebuilds the solver a few seconds into a
-          show when it moves the grid, and the dye is carried across that
-          but the phase is not: Magnet Garden had its ferrofluid at 8 s and
-          a bare gold pool by 20.
+          The look's ferrofluid, laid on a new solver only when the plate's
+          own could not come with it.
 
-          The lay is the look's own pour, so ferrofluid a hand put down (the
-          bottle) is not what comes back: it comes back as the look's ring
-          while Ferrofluid is up. Carrying the phase across as the dye is
-          carried is PLAN 9w. Until 9x was taken out again the Magnet's own
-          pool was the one exception, laid again at the magnet; the Magnet
-          brings no ferrofluid now, so there is no pool of its own to carry.
+          The governor rebuilds the solver a few seconds into a show when it
+          moves the grid. The dye was carried across that and the phase was
+          not (Magnet Garden had its ferrofluid at 8 s and a bare gold pool
+          by 20), so every new solver got the look's ring again while
+          Ferrofluid was up. That put back the wrong ferrofluid: a pool
+          dragged into a shape came back as the ring, and ferrofluid poured
+          from the bottle on a look with none (Classic) came back as a ring
+          nobody poured, a different amount in a different place.
+
+          Now the old solver hands its ferrofluid to the new one, resampled
+          by area so the amount is the same (handOver and takeOver in
+          gpu/fluid.ts, PLAN 9w), and a solver that opened on that carry is
+          left alone, ferrofluid or none: a plate that had none had none
+          poured, and a new grid lays nothing on it (which `npm run magnet`
+          asks). The look's pour is for a solver that opened on nothing it
+          could take: the first one, for a look laid before it existed
+          (phasePending), or one after the device was lost, whose plate
+          comes back from the CPU's copy and whose ferrofluid never had one.
         */
-        const leadGpu = fluidsRef.current[0]?.gpu ?? null;
+        const lead = fluidsRef.current[0];
+        const leadGpu = lead?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
           // Not over a hand's pour (phaseByHand): the look's ring would land where nobody poured (PLAN 15i).
-          if (leadGpu?.addPhase && (phasePendingRef.current || ((settingsRef.current.phaseAmount ?? 0) > 0.002 && !phaseByHandRef.current))) {
+          if (leadGpu?.addPhase && (phasePendingRef.current
+            || ((settingsRef.current.phaseAmount ?? 0) > 0.002 && !lead?.openedOnCarry && !phaseByHandRef.current))) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
@@ -8517,6 +8581,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           fxFrame: fxFrameRef.current,
           fxSeed: fxSeedRef.current,
         }, fluidsRef.current) ?? null;
+        // The intro was covering for this frame: the first with a step in it,
+        // or the first at all when the show opens paused. The fade begins on
+        // the frame the plate is presented, so the plate is never held back.
+        introPlateFrame((fluidsRef.current[0]?.stepCount ?? 0) > 0 || !isActiveRef.current);
 
         /*
           The projector window, in this task (docs/webgpu-plan.md, P3).
@@ -8754,7 +8822,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         resize();
         setStaged(true);
         for (const f of fluidsRef.current) {
-          if (f.gpu) f.detachGpu();
+          /*
+            Nothing handed over: the render lays its own look on its own
+            grid from the seed, and the live show's ferrofluid or oil in
+            its solver would make two renders of one seed differ by what
+            the show held when each began (PLAN 9w's carry is for the
+            governor's moves, not this).
+          */
+          if (f.gpu) f.detachGpu(false);
+          f.forgetCarry();
           renderer.attachSolver(f, grid);
         }
         /*
@@ -9517,7 +9593,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         resize: () => { size(); },
         attachSolver(fluid, wantRes) {
           if (wantRes <= 0) {
-            if (fluid.gpu) fluid.detachGpu();
+            if (fluid.gpu) fluid.detachGpu(false);
             return true;
           }
           if (fluid.gpu && fluid.gpu.N === wantRes) return true;
@@ -10561,6 +10637,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
         id="liquid-canvas"
       />
+      {/* The intro's place (lib/intro.ts); empty, and so not there at all, once it has gone. */}
+      <div ref={introSlotRef} className="absolute inset-0 pointer-events-none empty:hidden" data-testid="intro-slot" />
       {/*
         A caption rather than a black rectangle. The recovery is automatic and
         usually takes well under a second, but a projector that goes dark with
