@@ -436,6 +436,13 @@ its gap loses, as fast as the viscous film lets it close. Replace both with the 
 itself (the bubble as a region the flow goes round: a no-flux boundary, or the
 Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
 `npm run straw` and `npm run heldpress`, which should then need no press to hold.
+And `npm run ferrodrift`, whose old-plate line asks the press to be still pulling
+poured ferrofluid in toward bubbles near the middle on the old plate (0.099 → 0.150 in
+twelve seconds, #250), as the proof that check can see a drift: when the press goes,
+that line turns round and asks the old plate to stay. The thin gap
+already keeps it still, because there the press is only the glass and a gap near the
+floor is where the flow's mobility (h³) goes to nothing, which is the no-flux
+boundary this item asks for, reached by the gap itself.
 
 *Found 2026-10-04 (#238); **shipped #251 (0-bandbubbles)**:* **the simulated band's
 kicks released bubbles whatever Audio Impact said.** The first click on a browser that
@@ -466,25 +473,26 @@ own and left as it is: Soap Bursts on the beat (Soap Flow), Rock and the rhythm 
 camera's beat (Macro Sync), and the look's pace (Tempo Sync). Whether any of those
 should also answer to Audio Impact is a later look question, not done here.
 
-*Found 2026-10-04 (#238), not yet done:* **with the band playing, the ferrofluid
-poured round Classic's middle drifts into it.** Picking the Magnet on Classic pours a
-ring round the middle; `npm run magnet` watches the disc 0.12 round the middle for
-nine seconds with the solver stepped with no magnet at all. While a still bubble
-poured liquid out over the whole plate (the standing air term #238 removed), eight
-runs on other PRs read the disc's mean 0.058–0.099 at the start and 0.054–0.184 at
-the end; with that outflow gone and the band left playing (the check's own click
-starts it), the Mac read 0.180 and 0.501. So the outflow was hiding something the
-band does to the middle. Not found in the lab: the app's own step (sound drives held
-at zero, as the check holds them), the same pour, and four bubbles held or kicked on
-and off near the middle keep the disc at 0.095 → 0.083–0.086 without the outflow
-(0.062–0.069 with it), and dense dye with no bubbles moves it 0.095 → 0.103. Left to
-look at: the band's bubbles as the app moves them (carried by the flow, pressed,
-popped with a puff of air), and the first 2.5 s, when Beat Squeeze and the band's
-turbulence still run and the disc already reads 0.180. In silence the same window on
-the Mac read 0.099 → 0.084 with no bubbles on the plate (a run of #238 before #230
-merged), so it is the band. #230 then took the pour out of the pick and that line out
-of `npm run magnet`, so no check sees this now: build one that pours a ring round the
-middle with the band on, in the app, on the Mac, and find what moves it.
+*Found 2026-10-04 (#238), **done on the thin gap (#250); open on the old plate** below:* **with the band playing, the
+ferrofluid poured round Classic's middle drifted into it** (the disc 0.12 round the
+middle 0.180 → 0.501 of black in nine seconds on the Mac, 0.099 → 0.084 in silence).
+`npm run ferrodrift` (#250) pours the ring with the band on, in the app, on the Mac,
+and four runs of it found: with the look as it is the ring spreads into the middle as
+fast in silence as with the band (0.100 → 0.248 against 0.097 → 0.233 in twelve
+seconds, the ferrofluid's mean distance from the middle growing, so the look's own
+stirring spreading it both ways), and no slower with the bubbles, centre gravity,
+Tempo Sync or vibration taken away; with the plate's own currents held, as #238 held
+them, on the thin gap every look plays since #248 the band moves nothing in, its
+bubbles on the plate or not (0.097 → 0.082 and 0.102 → 0.076; silence 0.114 → 0.117);
+and held on the old plate (Thin Gap off) it still drifts in when the band's bubbles
+land near the middle (0.099 → 0.150 with two to seven, the mean distance 0.310 →
+0.298), and not on a run where it dropped none or with Bubbles at 0 (0.086 → 0.086,
+0.097 → 0.093). So it was the old plate's bubble press ("a still bubble presses the
+glass", above), and #248 took every look off it. The check asks the thin gap with
+the band and four bubbles set down where the band drops them, against a silence that
+has to be still itself, and asks the old plate to drift by more than the same bar, so
+the instrument is shown to see what it was built for; that line turns round to ask
+the old plate to stay once its bubbles stop pressing.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
