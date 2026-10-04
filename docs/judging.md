@@ -853,6 +853,21 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
 
+## 33. Picking a bottle pours nothing (PLAN 15i)
+
+Picking a liquid, on the desk's shelf, the Design desk or the phone's Dye sheet, puts it
+in your hand and nothing on the plate.
+
+- On a look with no ferrofluid (Classic), pick Ferrofluid: nothing lands, and the plate
+  stays as it was for as long as you leave it. Pour with the Dropper: only what you
+  poured shows, where you poured it.
+- Pick Oil, Soap, Milk, then a dye, each without touching the plate: nothing lands.
+- With Ferrofluid in your hand, open Magnet Garden: its own ferrofluid is there as
+  before. Open Classic from it, then pour one drop of Ferrofluid: only the drop shows,
+  not Magnet Garden's ring coming back with it.
+- After pouring some, Go to another look with a fade: no ring of ferrofluid lands half
+  way through.
+
 ---
 
 ## Reading the frame time while you do it

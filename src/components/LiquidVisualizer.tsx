@@ -194,6 +194,14 @@ interface LiquidVisualizerProps {
    */
   onMagnetInHand?: (ferrofluid: boolean) => void;
   /**
+   * The hand has poured ferrofluid from the bottle and it is in the solver,
+   * but the look draws none (phaseAmount 0): the app turns Ferrofluid up so
+   * the pour shows. Picking the bottle no longer does (App's
+   * ferrofluidPoured says why): only ferrofluid that is there turns it up.
+   * Asked a few times a second while the hand pours, until the settings say so.
+   */
+  onFerrofluidPoured?: () => void;
+  /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
    * arrives as its own prop instead of riding in `settings` where a preset
@@ -374,6 +382,12 @@ function layBottle(af: FluidSimulation, x: number, y: number, r: number, liq: Li
   tools lay the liquid no wider than the Dropper does, and a Pour is a held
   Dropper's worth of the liquid (with its own, wider colour).
 */
+/** What a look asks of the ferrofluid: how much is drawn (Ferrofluid) and the size it is poured at (Scale). */
+export type LookPhase = { phaseAmount?: number; phaseScale?: number };
+
+/** The tools that lay the bottle: every hand but the Blow, the Press, the Finger, the Magnet and the Spin. */
+const LAYING_TOOLS: ReadonlySet<string> = new Set(['dropper', 'drop', 'pour', 'spray', 'splatter', 'streak']);
+
 function bottleReach(liq: LiquidType | undefined, r: number): number {
   return Math.min(r, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE));
 }
@@ -739,8 +753,12 @@ export interface LiquidVisualizerHandle {
   pace: (sample: PaceSample) => void;
   /** A flood across a good share of the lead plate, `gust` (0..1, default 0.8) its size and force. */
   pour: (gust?: number) => void;
-  /** Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids. */
-  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
+  /**
+   * Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids.
+   * `phase` is the Ferrofluid (and its Scale) the look asks for, when the caller knows it: the look's settings
+   * reach the plate a render after this call, so without it the ferrofluid is laid by the last look's.
+   */
+  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }, phase?: LookPhase) => void;
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   /** What is on each live layer: how full it is, and the colour of it. */
   layerReport: () => { index: number; fill: number; colour: string }[];
@@ -757,7 +775,8 @@ export interface LiquidVisualizerHandle {
    */
   adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
-  handoff: (seconds: number) => void;
+  /** A look fading in over `seconds`; `phase` as for applyPreset: what the incoming look asks of the ferrofluid, laid half way. */
+  handoff: (seconds: number, phase?: LookPhase) => void;
   /**
    * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
    * follow the front again. Over `seconds`: its solver settings fade the way
@@ -4133,7 +4152,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
-  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4437,7 +4456,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     thins to a little under half and six pours of the new palette arrive
     through the second half, so the colours change hands with the settings.
   */
-  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null; plates?: number } | null>(null);
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null; plates?: number; phase?: LookPhase } | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -4790,6 +4809,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // And the amount set for this tool, on top of how hard this hand pressed.
     const kTool = toolAmountRef.current;
     const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2 * kTool;
+    if (LAYING_TOOLS.has(g.tool) && (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0) handPoursFerro(af);
 
     switch (g.tool) {
       case 'blow':
@@ -4948,7 +4968,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (presetId === 'fillmore-1969') fluid.seedPreset('fillmore-wash', noise2D);
   };
 
-  const layPlate = (presetId: string, layBack = false) => {
+  const layPlate = (presetId: string, layBack = false, phase?: LookPhase) => {
     /*
       The plate's dice start again, from (seed, stream, this look), before
       anything below draws, so the numbers this look is laid with do not
@@ -5016,8 +5036,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // A look laid before the GPU solver exists (the opening look, laid on
       // mount) owes its phase to the solver when it attaches: laid here it
       // went nowhere, and Magnet Garden opened as a bare gold pool.
-      phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
-      layPhaseRef.current(presetId);
+      /*
+        By the amount this look asks for (`phase`, from the app), not the
+        one in the settings: the app calls this before its new settings
+        have reached the plate, so the settings still held the last look's
+        amount, or the 0.6 that picking the Ferrofluid bottle used to set.
+        Laid by that, a look with no ferrofluid in it cleared what the hand
+        had poured and laid its own ring in its place: a big black chunk
+        from pressing Go (the owner's "deposits a huge chunk", 2026-10-04).
+      */
+      const asked = phase?.phaseAmount ?? settingsRef.current.phaseAmount ?? 0;
+      phasePendingRef.current = asked > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
+      layPhaseRef.current(presetId, asked, phase?.phaseScale);
     }
     for (const later of laid.slice(1)) {
       // Laid again with a look of its own: from that look, and its handover,
@@ -5051,17 +5081,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * the id is passed while a look is being laid, because livePresetRef only
    * becomes that look at the end of layPlate.
    */
-  const layPhase = (presetId: string = livePresetRef.current) => {
-    const amt = settingsRef.current.phaseAmount ?? 0;
+  const layPhase = (presetId: string = livePresetRef.current, amt: number = settingsRef.current.phaseAmount ?? 0, scale: number = settingsRef.current.phaseScale ?? 0.4) => {
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
       phaseLaysRef.current++;
+      phaseByHandRef.current = false;
       lead.clearPhase?.();
-      const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);
+  /**
+   * Whether the ferrofluid on the lead plate was last put there by a hand (the
+   * bottle) rather than laid as the look's (layPhase). A new solver lays the
+   * look's again only over the look's own: over a hand's pour it would put the
+   * ring where the hand never poured (PLAN 15i). Carrying the pour across is 9w.
+   */
+  const phaseByHandRef = useRef(false);
   /** How many times the ferrofluid has been laid afresh (layPhase), for the harness: a lay clears what was there. */
   const phaseLaysRef = useRef(0);
   layPhaseRef.current = layPhase;
@@ -5200,14 +5236,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const contract = presetContractRef.current;
       if (contract) harmonyRef.current = harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0);
     },
-    applyPreset: (presetId: string, extras) => {
+    applyPreset: (presetId: string, extras, phase) => {
       // A user's preset carries its own dyes and injection styles; register
       // them under its id so seeding and adoption find them like a built-in.
       if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
       else if (extras && !extras.contract) delete PRESET_CONTRACTS[presetId];
       if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
       if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
-      layPlateRef.current(presetId);
+      layPlateRef.current(presetId, false, phase);
     },
     /*
       What is on each layer.
@@ -5254,10 +5290,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         harmonyRef.current = contract ? harmonyFromContract(contract, (settingsRef.current.hueJourney ?? 0) > 0) : pickHarmony();
       }
     },
-    handoff: (seconds: number) => {
+    handoff: (seconds: number, phase) => {
       if (!(seconds > 0)) { handoffRef.current = null; return; }
       const now = showNow();
-      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null };
+      handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null, phase };
     },
     sendBack: (presetId, look, seconds, name = null, extras) => {
       // Not while a render has the plate (a pad pressed mid-render): the
@@ -5576,6 +5612,29 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
   /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
   const magnetToldRef = useRef(-Infinity);
+  const onFerrofluidPouredRef = useRef(onFerrofluidPoured);
+  useEffect(() => { onFerrofluidPouredRef.current = onFerrofluidPoured; }, [onFerrofluidPoured]);
+  /** When a hand last laid from a magnetic bottle, and when the app was last asked to draw it, on the show's clock. */
+  const ferroPouredAtRef = useRef(-Infinity);
+  const ferroToldRef = useRef(-Infinity);
+  /*
+    A hand laying from the Ferrofluid bottle onto `af`, this step.
+
+    A pour that starts while the plate draws no ferrofluid (Ferrofluid at 0)
+    clears what is in the solver unseen first. A cut to a look with none
+    leaves the last look's ring there, hidden by the amount at 0 (a look that
+    asks for no ferrofluid leaves the field alone), and turning the amount up
+    for this pour would have brought the whole ring back with one drop.
+    Nothing visible goes: at 0 none of it is drawn. Only at the start of a
+    pour (nothing laid from the bottle for a second), so the pour's own first
+    drops are not cleared while the app's answer is a render away.
+  */
+  const handPoursFerro = (af: FluidSimulation) => {
+    const now = showNow();
+    if (now - ferroPouredAtRef.current > 1000 && (settingsRef.current.phaseAmount ?? 0) <= 0.002) af.gpu?.clearPhase?.();
+    ferroPouredAtRef.current = now;
+    if (af === fluidsRef.current[0]) phaseByHandRef.current = true;
+  };
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -6319,7 +6378,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const leadGpu = fluidsRef.current[0]?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
-          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+          // Not over a hand's pour (phaseByHand): the look's ring would land where nobody poured (PLAN 15i).
+          if (leadGpu?.addPhase && (phasePendingRef.current || ((settingsRef.current.phaseAmount ?? 0) > 0.002 && !phaseByHandRef.current))) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
@@ -6360,17 +6420,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         {
           const amt = settingsRef.current.phaseAmount ?? 0;
-          // Not when it was turned up for the Ferrofluid bottle: that one
-          // goes where it is dropped, not over the whole plate. (The Magnet
-          // needs no exception: neither picking nor holding it turns the
-          // amount up unless there is ferrofluid in the solver already, so
-          // the plate is never bare when it rises for the Magnet: phaseIsLive.)
+          // Not with the Ferrofluid bottle in the hand: that one goes where
+          // it is dropped, not over the whole plate. It turns the amount up
+          // only once it is poured (below), so the lead plate is bare then
+          // only when the hand poured on the back plate. (The Magnet needs
+          // no exception: neither picking nor holding it turns the amount up
+          // unless there is ferrofluid in the solver already: phaseIsLive.)
           const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0;
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
               && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
             layPhaseRef.current();
           }
           phaseAmountRef.current = amt;
+          /*
+            And the bottle's ferrofluid drawn once it is poured. Picking the
+            Ferrofluid bottle turned the amount up, and with it up a new
+            solver or the next look laid the look's ring with nothing poured
+            (App's ferrofluidPoured). Now the amount rises when a hand has
+            laid from the bottle in the last second and the phase is in the
+            solver (phaseIsLive, on whichever plate it went to), so it never
+            rises over a bare plate and the pour above cannot fire for it.
+          */
+          const nowMs = showNow();
+          if (amt <= 0.002 && nowMs - ferroPouredAtRef.current < 1000 && nowMs - ferroToldRef.current > 250
+              && fluidsRef.current.some((f) => (f?.gpu as { phaseIsLive?: boolean } | undefined)?.phaseIsLive)) {
+            ferroToldRef.current = nowMs;
+            onFerrofluidPouredRef.current?.();
+          }
         }
         {
           const lead = fluidsRef.current[0];
@@ -6572,6 +6648,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // frame's flywheel); it lays, presses and stirs nothing.
               if (tool === 'spin') continue;
               const liq = selectedLiquidRef.current;
+              if (LAYING_TOOLS.has(tool) && (liq?.behaviour?.magnetic ?? 0) > 0) handPoursFerro(af);
               const strokeFrom = hand.stroke ?? { x, y };
               const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
               hand.stroke = { x, y };
@@ -7089,7 +7166,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // The second phase, once, half way: it is a body, not a wash.
               if (h.dosed === 1 && p >= 0.5) {
                 h.dosed = 2;
-                if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
+                /*
+                  By what the incoming look asks for (h.phase, from the app),
+                  not the settings: half way through the fade they are half
+                  way between the looks, so from a plate with Ferrofluid up
+                  (the bottle's pour) to a look with none they read 0.3 here,
+                  and the incoming look's ring was laid over the pour, a black
+                  chunk fading out over the second half (PLAN 15i).
+                */
+                const asked = h.phase?.phaseAmount ?? settingsRef.current.phaseAmount ?? 0;
+                if (asked > 0.002) layPhaseRef.current(livePresetRef.current, asked, h.phase?.phaseScale);
                 else lead?.gpu?.clearPhase?.();
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
