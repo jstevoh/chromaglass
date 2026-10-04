@@ -319,6 +319,13 @@ const BLOW_DIR_HOLD_MS = 150;
 const BLOW_STRAW_FRAMES = 3;
 type BlowDir = { x: number; y: number; at: number; still: number; moved: boolean };
 /*
+  A pour of clear oil onto the clear film (PLAN §20b): this much of the gap
+  added at the middle of the drop, falling to nothing at its rim. A drop of
+  oil on an oil film merges into it, so it thickens what is there; half the
+  gap at the middle is a drop that fills a hole it lands in.
+*/
+const FILM_POUR = 0.5;
+/*
   Oil Bodies' pours (the onDeposit hook): a body is this many times the
   bottle's own radius (Oil's is 2, so about a tenth of the plate across
   on the full dose), and the pours stop once the oil covers this share of
@@ -1220,9 +1227,22 @@ class FluidSimulation {
         const L = this.size;
         g.addPhase(cx / L, cy / L, Math.max(1.5, radius * 1.4) / L, 0.25 * Math.min(1, what.magnetic ?? 0) * Math.min(1, amount));
       }
+      /*
+        A clear film on the plate (PLAN §20b): a solvent (alcohol, or soap)
+        lands in it and opens a hole, and clear oil joins it, thickening it
+        where it lands, rather than going into the mix as well (the film is
+        that oil). Nothing while there is no film.
+      */
+      const filmOn = this.layerIndex === 0 && (s.clearFilm ?? 0) > 0.001 && !!g.addFilm;
+      const clearOil = !(what.magnetic ?? 0) ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
+      if (filmOn) {
+        const solvent = Math.max(what.solvent ?? 0, what.soap ?? 0) * Math.min(1, amount);
+        const L = this.size;
+        if (solvent > 0 || clearOil > 0) g.addFilm!(cx / L, cy / L, Math.max(1.5, radius) / L, { film: FILM_POUR * Math.min(1, clearOil), solvent });
+      }
       if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
-      let oil = oilOn && !(what.magnetic ?? 0) ? Math.max(0, -(what.polarity ?? 0) - 0.5) * 2 * Math.min(1, amount) : 0;
+      let oil = oilOn && !filmOn ? clearOil : 0;
       const soap = (s.surfactantFlow ?? 0) > 0.001 ? (what.soap ?? 0) * Math.min(1, amount) : 0;
       const acid = (s.phIndicator ?? 0) > 0.001 ? (what.acid ?? 0) * Math.min(1, amount) : 0;
       const L = this.size;
@@ -3503,6 +3523,10 @@ class FluidSimulation {
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
+      // The front plate only: the display reads the film from the front
+      // plate's packed view alone, so a film on the back plate would be
+      // computed and never seen (PLAN 20b-5).
+      clearFilm: this.layerIndex === 0 ? Math.max(0, Math.min(1, settings.clearFilm ?? 0)) : 0,
       solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
       ...this.downhill(settings.tiltDirection ?? 180),

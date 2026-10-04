@@ -656,6 +656,14 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # A clear film that tears (PLAN 20b): the film's volume kept, a thick film
+      # whole and a thin dusty one torn into holes of every size by the physics
+      # alone, a drop of solvent opening a growing hole, white over the colour
+      # on the lamp, and the picture unchanged with the film off. In the open
+      # shard, beside the lamp it is drawn on.
+      - name: A clear film that tears
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run lace
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print

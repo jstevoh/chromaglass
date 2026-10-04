@@ -236,7 +236,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.5** **18d** each liquid's real properties, then **10.5-bodies** and **H8** more bottles.
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
-- **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
+- **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
@@ -4172,7 +4172,9 @@ its frame rate live. "Free" means no new passes or texture reads.
   Blend Mode) the back plate filters the lamp; a mixer row set to screen, add, multiply
   or key still lays its dye as it did. Decide whether a row blend means anything under
   the lamp, or the lamp overrides it.
-- **18b-6. Light through a film, not the whole gap (for 20b).** The path is the dye's
+- **18b-6. Light through a film, not the whole gap (for 20b).** *Shipped with 20b
+  (#259) for the dye: the front plate's dye path is the gap less the clear film
+  (`gapScale *= 1 − film` in the plate, from the packed view).* The path is the dye's
   amount times the gap (Layer Depth). Once a film of clear liquid sits in the gap
   (20b), the water's path is the gap less the film, which is where the reference's
   faint pink and lavender in the white come from. A drop's or bubble's "through"
@@ -5123,7 +5125,7 @@ Pictures in `/mnt/project-files/lace/`: `reference-vs-prototype.png`,
 | Feature | What the plate has | What is missing |
 |---|---|---|
 | White where there is no dye | Dye stored as absorbance; the gap bound in the plate pass | The lamp ground: 18b, shipped (#256) behind Lamp Ground; a look must turn it up (20a) |
-| A film that tears | A Cahn–Hilliard phase (Oil Bodies, §10 step 5; the ferrofluid) with flux-form transport, Rayleigh–Plateau for free; `marangoniFlux` moving what rides the surface away from soap | A film **thickness** field with a disjoining pressure; nucleation from solvent and dust |
+| A film that tears | Clear Film (20b, #259): a thickness field with a disjoining pressure, dust and a solvent, tearing on its own | A viscous film (20c), and the film pushing the water (20b-1) |
 | Rimless holes, slits | Flow shear; 18a's thin-gap flow (Thin Gap, on in every look since #248) | A viscous film (20c) on 18a's per-liquid mobility (18d) |
 | Hairline edges | The projector's aperture law for drops and bubbles (`dropLens`, u*) | The same law applied to every edge: 18e |
 | Flat discs | Drops flattened by the half gap (`DROP_HALF_GAP`); Oil Bodies; two layers | Large pancakes poured on the front layer, and tinted by absorption (18b) rather than glowing |
@@ -5140,6 +5142,90 @@ pool on the black ground stays the control.
 lamp and 0% on black. What is left of 20a is the look itself, on Lamp Ground 1.
 
 ### 20b. A clear film that tears (the thin-film equation)
+
+**Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
+What was built, against the plan below:
+
+- The film is `src/gpu/wgsl/film.ts`: a thickness h and a solvent Γ on a grid of
+  their own (`FILM_GRID` 384², at most the solver's), kernels `filmAdvect`,
+  `filmMu`, `filmUpdate` and `filmSplat`, with the prototype's numbers in its cells.
+  Explicit, in substeps of the film's own time (`FILM_RATE` 0.15 a second, at most
+  `FILM_DT` 2.2e-4 each, twelve a frame), in flux form with each donor's fluxes
+  scaled down together at the floor, so the film is conserved to rounding and no
+  global sum is needed. A numpy copy of the same kernels was run first (scratch,
+  not the repo): a 0.35 film with dust tore into 365 holes in 8 s, p10 1.6 to p99
+  18.6 cells; a 0.8 film with no dust stayed whole for 20 s; a drop of solvent
+  opened a hole from 3.7 to 9.4 cells in 7 s.
+- The top glass is a linear pressure past 0.9 at 150 (the prototype's 30 let rims
+  pile to 1.1 of the gap; 400 was unstable at the step).
+- Dust is procedural (one candidate speck a 16-cell square, by a hash), fixed to the
+  glass, a stronger disjoining pressure (1 + 0.3 · speck), which is what a speck
+  the water wets does. The plan said "a slightly lower local K"; with this Π a
+  lower K is a *stronger* film, so it is higher.
+- Carried by the gap's Poiseuille profile: a film of thickness h against one glass
+  moves at U (3h − 2h²), so a thin film lags the water and a young hole shears.
+- Pours: Alcohol is now a solvent (`solvent: 1` on the bottle) and Soap counts as
+  one; both land in Γ. Clear oil (any non-magnetic oil bottle) joins the film
+  instead of the mix while a film is on. The plan said alcohol already went into
+  the mix's surfactant channel; it never did (only `soap` does), so the film keeps
+  its own solvent rather than reading the mix.
+- Drawn as the dye's path through the gap less the film (18b-6), from the packed
+  view: the film took eight bits of the word BZ's activator had, which keeps eight
+  on a square-root scale (it is only asked whether it is there).
+- Check: `npm run lace` (CI, open shard), seven cases, below.
+
+Left from 20b, each its own item:
+
+- **20b-1. The film does not push the water.** It is passive: where it thickens,
+  the dyed water's path is shorter in the picture, but the water is not displaced
+  sideways and the Hele-Shaw flow does not see a narrower gap. The real film is a
+  second liquid in the gap; on 18a's solver it is a change of the water's gap (as
+  a press is), which 20c's first way does anyway. *A shortcut named for speed and
+  scope.*
+- **20b-2. The film's carry assumes the water's viscosity** (the Poiseuille profile
+  across the whole gap). A heavy oil film moves differently; 20c replaces it.
+- **20b-3. Cost unmeasured on a GPU.** Two carries and twelve substeps of two passes
+  a frame on 384², with a reach of two cells in `filmUpdate`. Measure with `npm run
+  stages` on the Mac; if it is over 0.4 ms, fuse `filmMu` into `filmUpdate` through
+  workgroup memory, or a stabilised semi-implicit step with a few Jacobi sweeps
+  (fewer substeps). A slow frame takes at most twelve, so the film runs slower
+  rather than unstable. *Named as a shortcut: the film's clock dilates on slow frames.*
+- **20b-4. The packed view is full.** All eight numbers and now the film share the
+  one texture the display pass can still bind (sixteen textures). The next field the
+  plate draws needs a new home: a device limit raised where the adapter allows, or
+  the reactions moved to their own pass.
+- **20b-5. Only the front plate has a film.** The back plate (two-layer looks)
+  carries none: its solver is handed 0, because the display reads the film from the
+  front plate's packed view alone. Clear Film is on the per-plate list (`PER_LAYER`),
+  so aimed at the back plate it does nothing yet.
+- **20b-6. A rung below 384² tears coarser.** The film's grid is the solver's there,
+  and the lengths are in its cells; at 1080p a 384² cell is about three pixels, and
+  the still's smallest holes are a pixel or two.
+- **20b-7. The dust does not turn with the glass.** When the dish spins (§22) the
+  specks should go round with it; they are fixed to the screen's plate coordinates.
+- **20b-8. Alcohol on bare water.** It is a solvent only for the film; whether it
+  should also drive the water's Marangoni flow (Soap Bursts) as soap does is open.
+- **20b-9. The hole's edge is drawn between the film's texels.** On a 4K wall the
+  edge is soft; 18e's refraction lines would draw it as the still does.
+- **20b-10. The film's carry is not on the projection's faces.** `filmAdvect` builds
+  its face velocities from the collocated flow, averaged, on a grid of another size
+  than the solver's, and those carry a grid-scale divergence that compressed a thick
+  film from 0.8 to 0.54..0.91 in half a second of one stir (lab, 128²). It takes back
+  what the faces' net outflow would do to a film the same everywhere (the advective
+  form): exact where the flow is free of divergence, not conservative to the last
+  digit where it is not (`npm run lace` holds the volume to 0.1% over 20 s of
+  stirring). Carried on the projection's own Rhie–Chow faces (a film grid that divides
+  the solver's), it would be both. *A shortcut named for scope.*
+- **20b-11. The bubble lens and the edge decodes do not see the film.** Only the
+  plate's main decode draws the water's path less the film; a bubble over whole film
+  (the lens's `decodeFluid` calls) and the edges show the colour at full strength, as
+  `thickOptics` does. Pass the film to those decodes when the film is judged.
+- **20b-12. The app's pours into the film are not in a check.** `lace` pours straight
+  into the film (`lab.addFilm`); the Dropper's path (`onDeposit`: Alcohol and Soap as
+  the solvent, clear oil joining the film, the front plate only) is judged by eye
+  (judging §34). A lab case that drives `onDeposit` as the app does would hold it.
+
+The plan as written before it was built:
 
 - **What:** a new liquid, a clear film against the glass. It gets its own thickness
   field h (one R32F texture), moved with the plate's flow in flux form (`mixAdvect`),

@@ -884,6 +884,40 @@ hand), or not enough like a finger in liquid.
 
 ---
 
+## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
+
+Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
+the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
+over the plate, that thick (1 is most of the gap), and it tears open by itself: thin
+parts and the dish's specks of dust first, and wherever a drop of Alcohol or Soap
+lands. Nothing draws the holes; they are the film dewetting. The film is clear, so
+it shows as the lamp's white only with **Lamp Ground** up (§31); on black it is a
+darkening of the colour, with the colour full strength in the holes. Try it on Lamp
+Ground 1 over a look with dense colour, at Clear Film about 0.4 (tears in a second
+or two) and about 0.9 (holds until you drop Alcohol on it). Please say:
+
+- whether it reads as the pale lace of the reference still, and what is most unlike
+  it (the holes here grow a raised rim and the film retracts into a thin network;
+  the still's holes are cut clean with wide film between them, which is 20c's
+  viscous film, not built yet);
+- the pace: a thin film tears in a second or two and a thick one holds for twenty
+  seconds and more; say if it should be slower or faster (FILM_RATE);
+- the size of the holes and of the lace on the wall (they are set by the film's own
+  physics on a 384² grid; at 1080p a cell is about three pixels);
+- the gestures: Alcohol from the Dropper punches a hole, Oil thickens the film where
+  it lands, and moving Clear Film pours more film over everything or draws it off,
+  which fills the holes back in (these pours are not in a check: the lab pours
+  straight into the film, not through the Dropper);
+- a fade into a look with a thick film: on its way up the film passes through the
+  thin range that tears over the dust, so it may arrive already torn; say whether
+  that reads as a feature or a fault;
+- on a look with BZ, whether the reaction's fringe looks as it did (its activator
+  is now packed in eight bits to make room for the film);
+- the cost on the Mac with the film on (the film is twelve small passes twice a
+  frame on a 384² grid; `npm run stages` in the console, or the frame time below).
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real
