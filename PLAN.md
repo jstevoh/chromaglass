@@ -4655,6 +4655,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   Clock Glass and the ferrofluid looks (their own pass), Roy's three inks, and the looks
   whose liquids or chemistry make the colour. Judging: docs/judging.md §37 (the owner's eyes
   on every look, on the Mac).
+  `npm run mixer` read the back plate's dye as the pixels adding it at full level moved;
+  a deep pool of a dark dye now draws near black and adding it moves nothing, so 150
+  covered pixels read as bare glass and Multiply darkening them (77 steps) failed the
+  check. The footprint is now also read from the plate drawn flat (Transmission 0, same
+  coverage): worst 0 off the dye, 68/68, bounds unchanged.
 - **Across the looks** (the survey above, every look before and after, its own dyes,
   as many as its plate shows at once): the 27 widened looks went from a median of 65
   distinct colours and 19 hue bins to 101 and 25 (Classic 65 → 100, Galaxy 27 → 72,
