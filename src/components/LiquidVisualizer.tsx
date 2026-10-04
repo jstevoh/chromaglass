@@ -4404,6 +4404,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
+  /*
+    `ambientSeed(false)`: the three Lissajous orbits stop laying their dye
+    (the "Ambient seeding" block below). They lay 0.05 a frame each, every
+    frame on every look, wherever they are, so a cleared plate gathers
+    their trails a quarter to a third of the plate out from its middle. A
+    check that reads where a hand's colour went reads those trails too: on
+    the Mac the tools check's pool, settled 1.5, 8 or 12 of the plate's
+    seconds, drifted out from the palm at the same 0.004 of the plate a
+    second whatever its age (a spreading drop slows as it ages; a source
+    that never stops does not), and the plate's colour grew 6% in three
+    seconds with nothing touching it. Only a harness turns it off;
+    a ref, so a rebuild of the frame loop (a self-heal, a lost device) keeps it.
+  */
+  const ambientSeedRef = useRef(true);
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -6989,7 +7003,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (isActiveRef.current && drainFrameRef.current === 0) {
             // ── Ambient seeding ────────────────────────────────
             const af = fluidsRef.current[activeLayerRef.current];
-            if (af) {
+            if (af && ambientSeedRef.current) {
               // Three Lissajous orbits, each carrying its own harmony color —
               // keeps several distinct hues alive in the frame at all times.
               const phase = time * 0.18;
@@ -8487,6 +8501,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
+        ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
         ...(renderer?.debug?.() ?? {}),
       });

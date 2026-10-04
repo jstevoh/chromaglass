@@ -3698,13 +3698,20 @@ its frame rate live. "Free" means no new passes or texture reads.
     seconds. The press itself read 62%, 98%, 97% and 99% back net of drift. Now
     each pool is its own control (its drift measured before the hand), on the
     calm plate (mirror.mjs's CALM), with a quarter of the push back before any
-    drift is credited and a press frozen at the lift reading under half.
+    drift is credited and a press frozen at the lift reading under half. The
+    calm plate with no bubbles still drifted 0.0043 a second (run 37166234101),
+    as much as settled 1.5 or 8 seconds: the three ambient seeding orbits that
+    every look runs keep painting colour a quarter of the plate out (it grew 6%
+    in three untouched seconds). The check now turns them off for its runs
+    (`chromaglassDebug().ambientSeed`) and fails if colour still arrives.
   - **On the Mac the thin Press barely clears the colour from under the palm.**
     The share of the colour within 0.05 of the palm went 76% → 69% held → 68%
     after the lift (its idle pool 78% → 76% → 72%; Thin Gap off 72% → 1%). The
     lab's press takes the middle's colour to ×0.171. Find what the app's Press
     lays on a thin gap that the lab's does not (radius, depth, the bowl's 3×,
-    the stroke's per-frame rate), and measure it under the palm.
+    the stroke's per-frame rate), and measure it under the palm. Those shares
+    were read with the ambient seeding laying colour far out, which lowers every
+    share and the held one most; read them again with it off before chasing it.
   - **The substeps' ceiling.** 33 substeps of 0.4 cover 13 cells a step; the
     Press at 1× on 384² asks 8. A Press at 2× Amount on a 512² solver, or a
     machine-starved step (a longer step's spring), can ask more, and past it the
