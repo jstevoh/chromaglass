@@ -54,7 +54,7 @@ const settle = async (page, seconds = 9) => {
   for (let s = 0; s < seconds; s++) {
     await page.waitForTimeout(1000);
     seen.push(await page.evaluate(async () => {
-      const d = window.chromaglassDebug(), f = await d.readPhase(), st = d.fluids?.[0]?.lastStep;
+      const d = window.chromaglassDebug(), f = d.readPhase ? await d.readPhase() : null, st = d.fluids?.[0]?.lastStep;
       let sum = 0, c = 0;
       if (f) for (let y = 0; y < f.n; y++) for (let x = 0; x < f.n; x++) {
         if (Math.hypot((x + 0.5) / f.n - 0.5, (y + 0.5) / f.n - 0.5) < 0.12) { sum += f.data[x + y * f.n]; c++; }
@@ -528,9 +528,14 @@ try {
     playing, the ferrofluid poured round Classic's middle drifts into it").
   */
   {
+    // The judged page closed first: two plates on one GPU left the second
+    // without the GPU solver (no readPhase) on the Mac.
+    await page.close();
     const p2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     await p2.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
     await p2.waitForTimeout(9000);
+    const engine2 = await p2.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    console.log(`     band on (diagnostic): ${engine2}`);
     await p2.mouse.click(5, 5);
     await p2.keyboard.press('m');
     const pick = await settle(p2, 3);
