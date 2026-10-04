@@ -651,6 +651,21 @@ or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
   your Mac; if it does, the app should use a borderless window over the
   projector's screen instead.
 
+## 24. Roy, 1963: the plate printed as a comic (PLAN 21)
+
+Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
+panel: flat red, yellow and blue on white, a black line round every solid shape
+and where two colours meet, and the pale washes round the shapes as even dots.
+
+- are the dots the right size on the wall (32 rows down the picture), and the line
+  heavy enough? Say if either wants to be bigger or smaller;
+- does it hold up moving: do the dots sit still while the colour slides under them,
+  and does the line stay a line, not a flicker, as the shapes move and merge;
+- Ben-Day Dots (Settings → Look) from 0 to 100 % on Roy, and on Classic: is there a
+  point between where it looks better than either end;
+- zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
+  them to grow with the zoom, as the accidental ones did.
+
 ---
 
 ## Reading the frame time while you do it

@@ -31,6 +31,7 @@ seconds, with the band playing, and puts them all on one contact sheet.
   | Round dish | Fractal Dream, Oil Wheel, Home Movie, Clock Glass |
   | Light through dye | Deep Ocean, Lava Lamp, Velvet Underground, Glycerine Drift, Clock Glass |
   | Macro music sync | Macro Bead, Cell Bloom, Lacing Run |
+  | Ben-Day Dots (the print) | Roy, 1963 |
 
 ## Rules a preset keeps
 
