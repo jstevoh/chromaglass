@@ -18,6 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes on the lamp when it still reads there with its own dye; a look that is
   light itself or a picture with its own ground keeps black.
 
+### Added — a clear film that tears into lace (PLAN 20b)
+
+- **Clear Film** (`clearFilm`, Settings → Squish Plate; MIDI, the desks, the remote
+  and the phone's Dye sheet), 0 in every look. Up, a clear oil film is laid over the
+  plate against the glass, and it tears open into a lace of holes by the thin-film
+  equation: surface tension, a disjoining pressure that makes a thin film unstable,
+  fixed specks of dust that seed it, and a solvent's Marangoni pull. Nothing draws a
+  hole. A thin film tears in a second or two, a thick one holds until Alcohol (now a
+  solvent) or Soap lands on it; Oil poured on it thickens it; moving the control
+  pours film over the whole dish or draws it off. The film rides the flow at its own
+  speed through the gap (a thin film lags the water), which shears young holes into
+  slits. The dyed water under it is the gap less the film, so on Lamp Ground the
+  film is the lamp's white with a faint tint of the dye, and the colour is full in
+  the holes.
+- `npm run lace` (CI, open shard): the film's volume kept over 20 s of stirring, a
+  thick film on a clean dish whole for 20 s, a drop of solvent opening a hole that
+  grows steadily, a thin dusty film tearing into holes spanning tenfold, the lace
+  breaking into more pieces, white over the colour on the lamp and not on black, and
+  the picture unchanged byte for byte with the film off.
+
 ### Changed — the spun dish's swirl on a thin plate is one pass, not thirteen (PLAN 22k)
 
 - Since a look's own turning went onto the dish, the nine thin looks with music

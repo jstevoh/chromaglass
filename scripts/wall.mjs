@@ -516,6 +516,138 @@ const check = (name, ok, detail = '') => {
   console.log('');
 }
 
+/*
+  The busy machine's book (below, in the windows): which of the other
+  window's refreshes is this one.
+
+  Both windows look each refresh up in one book kept in the show's window,
+  so that a refresh the busy machine misses is missed by both. The book
+  used to take the nearest entry within half a 60 Hz refresh of the raw
+  stamp, and that is a coin toss on a Mac runner whose two windows sit
+  near half a refresh apart: the line "missed from one book" went red on
+  f350e75 (2026-10-04, tools shard, green on re-run) with "the wall's stamp
+  8.3 ms after the show's (-8.3 to 8.3)" in both busy phases, on a display
+  of 60.6 Hz, whose half refresh is 8.25 ms, under the 8.33 ms radius. Each
+  window's stamps are steady to a tenth of a millisecond; what the two keep
+  between them is not. Over the 91 tools-shard runs of 2026-10-03 and 04
+  the line read the wall's stamp anywhere from -7.5 to +8.3 ms after the
+  show's, a different place each run (-1.4, 3.5, 5.9, 7.5, 8.2, ...), and
+  within a run spread over 0.1 to 0.3 ms. Two windows' animation frames on
+  the Mac are each begun on a display link of their own, in step with the
+  display but not with each other, so the gap between them is anywhere in
+  a refresh, and once a run in a few dozen it falls within jitter of
+  half of one. Then a refresh is as near the next refresh's entry as its
+  own, and which it takes changes from one refresh to the next.
+
+  At half a refresh apart there is no fact about which of the show's
+  refreshes "is" the wall's: the wall's refresh N is as much the show's N
+  as its N+1. What the busy machine needs is that the answer is the same
+  every time. So the book pairs around the gap the two windows keep, not
+  around zero: the first refresh both windows look up sets it (`lock.d`,
+  the wall's stamp less the show's), and from then on a wall stamp is
+  moved back by it before it is matched, so each is matched within half a
+  refresh of where the show's own stamp for it is, and its neighbours are a
+  whole refresh away whatever the gap. Not a wider radius: any radius is a
+  coin toss at some gap. Not the gap measured once before the phase from
+  the windows' idle stamps: that reading has the same half-refresh
+  ambiguity to settle, and settling it by the first pair the book makes
+  settles it in the terms the book then uses.
+
+  The line itself is unchanged and still has what to catch: a book that
+  pairs a refresh with its neighbour (the one this replaces, at half a
+  refresh apart) spreads `d` over a refresh, a projector that keeps a book
+  of its own leaves entries in it and none looked up by both. The model
+  after it holds this function to that at every gap the Mac read and at
+  exactly half a refresh, with the book as it was as the control.
+
+  No closures: it is handed to both windows as source (`addInitScript`).
+*/
+function bookEntry(book, lock, who, at, draw) {
+  const off = lock && typeof lock.d === 'number' ? lock.d : 0;
+  const onShow = (stamp, by) => (by === 'wall' ? stamp - off : stamp);
+  const mine = onShow(at, who);
+  let seen = null, nearest = 1000 / 120;
+  for (const e of book) { const gap = Math.abs(onShow(e.at, e.by) - mine); if (gap < nearest) { nearest = gap; seen = e; } }
+  if (seen) {
+    if (!seen[who]) {
+      seen[who] = true;
+      seen.d = who === 'wall' ? at - seen.at : seen.at - at;
+      if (lock && typeof lock.d !== 'number') lock.d = seen.d;
+    }
+    return seen;
+  }
+  const entry = { at, by: who, missed: draw(), [who]: true };
+  book.push(entry);
+  if (book.length > 64) book.shift();
+  return entry;
+}
+
+/*
+  The book on two windows a given gap apart, on a starved thread: each
+  window handed three quarters to all of the refreshes on its own, each
+  callback run up to a refresh and a half late (so a window can look up a
+  refresh after the other has entered the next), stamps jittered by
+  0.3 ms, the busy machine missing half. Judged as the line in the app
+  judges it (at least 10 looked up by both, `d` within 4 ms), and on what
+  that stands for: every refresh both windows looked up is the same pair,
+  the wall's refresh N with the show's N + k for one k. Gaps from -R/2 to
+  +R/2 in fortieths, both displays the Mac's runners read (60 and 60.6 Hz),
+  the gap exactly half a refresh among them; the control is the book as it
+  was (no lock), which has to go red at half a refresh, or this model
+  could not see the fault f350e75 hit.
+*/
+{
+  const sweepBook = (locked) => {
+    let worst = null, runs = 0, red = 0;
+    for (const hz of [60, 60.6]) {
+      const R = 1000 / hz;
+      for (let k = -20; k <= 20; k++) for (const seed0 of [3, 7, 11, 13, 17]) {
+        const gap = (k / 40) * R;
+        let seed = seed0;
+        const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        const own = 0.75 + 0.25 * rand();
+        const looks = [];
+        for (let i = 0; i * R < 4000; i++) {
+          for (const [who, base] of [['show', i * R], ['wall', i * R + gap]]) {
+            if (rand() > own) continue;
+            const at = 1000 + base + (rand() - 0.5) * 0.3;
+            looks.push({ who, i, at, runs: at + rand() * 1.5 * R });
+          }
+        }
+        looks.sort((x, y) => x.runs - y.runs);
+        const book = [], lock = locked ? { d: null } : null;
+        const index = new Map();
+        for (const l of looks) {
+          const e = bookEntry(book, lock, l.who, l.at, () => rand() < 0.5);
+          if (!index.has(e)) index.set(e, {});
+          index.get(e)[l.who] = l.i;
+        }
+        const both = book.filter((e) => e.show && e.wall);
+        const d = both.map((e) => e.d).sort((x, y) => x - y);
+        const shifts = new Set([...index.entries()].filter(([e]) => e.show && e.wall).map(([, v]) => v.wall - v.show));
+        // And where, not only whether (check-skeptic on #278): one pairing
+        // for every refresh also passes a book that always pairs the wall
+        // with the show's refresh before (d about a refresh), so each pair has
+        // to be the nearest, within half a refresh and a jitter's margin.
+        const ok = d.length >= 10 && d[d.length - 1] - d[0] <= 4 && shifts.size === 1 && d.every((x) => Math.abs(x) <= R / 2 + 1);
+        runs++;
+        if (!ok) {
+          red++;
+          if (!worst) worst = `${hz} Hz, the wall ${gap.toFixed(2)} ms after the show: ${d.length} looked up by both, d ${d.length ? `${d[0].toFixed(1)} to ${d[d.length - 1].toFixed(1)}` : '-'}, ${shifts.size} pairings`;
+        }
+      }
+    }
+    return { runs, red, worst };
+  };
+  const now = sweepBook(true), was = sweepBook(false);
+  console.log(`  the busy machine's book, two windows a gap apart (${now.runs} runs)  red ${now.red}; the book as it was red ${was.red}`);
+  check('the busy machine\'s book pairs each refresh with one of the other window\'s, at every gap between the two windows, half a refresh among them',
+    now.red === 0, now.worst ?? `${now.runs} runs, each one pairing, d within 4 ms`);
+  check('  control: the book as it was pairs a refresh with its neighbour somewhere', was.red > 0,
+    was.worst ?? `none red in ${was.runs}: this model cannot see the fault`);
+  console.log('');
+}
+
 // Its own server, and it must be its own: a survivor from a killed run would
 // serve a stale bundle and the whole run would measure the wrong build.
 {
@@ -618,6 +750,9 @@ let failed = 0;
 {
   const context = await browser.newContext({ viewport: { width: 640, height: 400 } });
   try {
+    // The book's matching, the same function the model above holds to every
+    // gap, handed to both windows as its source.
+    await context.addInitScript({ content: `window.__bookEntry = ${bookEntry.toString()};` });
     await context.addInitScript(() => {
       const raf = window.requestAnimationFrame.bind(window);
       const caf = window.cancelAnimationFrame.bind(window);
@@ -672,11 +807,16 @@ let failed = 0;
         apart. How far apart they were is kept (`d`, the wall's stamp less
         the show's), so the check can say the pairing held: one refresh
         matched to its neighbour would put `d` a whole refresh away from the
-        rest.
+        rest. And matched around that gap, not around zero, once the first
+        refresh both windows looked up has set it (`__missLock`): the Mac
+        puts the two windows anywhere up to half a refresh apart, a
+        different place each run, and at half a refresh the nearest raw
+        stamp is a coin toss (`bookEntry` at the top of this file).
       */
       const host = () => (window.opener && !window.opener.closed && window.opener.__missBook ? window.opener : window);
       window.__busy = 0;
       window.__missBook = [];
+      window.__missLock = { d: null };
       // Each window its own seed: two windows that each kept a book of their
       // own would still agree by chance on one seed, and the agreement
       // counted below could not see it (the check-skeptic, 2026-10-03).
@@ -687,16 +827,9 @@ let failed = 0;
         if (!(h.__busy > 0) || typeof ts !== 'number') return false;
         const at = performance.timeOrigin + ts;
         const who = new URLSearchParams(location.search).has('cast') ? 'wall' : 'show';
-        let seen = null, nearest = 1000 / 120;
-        for (const e of h.__missBook) { const d = Math.abs(e.at - at); if (d < nearest) { nearest = d; seen = e; } }
-        if (seen) {
-          if (!seen[who]) { seen[who] = true; seen.d = who === 'wall' ? at - seen.at : seen.at - at; }
-          return seen.missed;
-        }
-        const entry = { at, missed: h.__busyRand() < h.__busy, [who]: true };
-        h.__missBook.push(entry);
-        if (h.__missBook.length > 64) h.__missBook.shift();
-        return entry.missed;
+        // Paired around the gap the two windows keep (`bookEntry`, at the
+        // top of this file, and why), the lock reset as each busy phase starts.
+        return window.__bookEntry(h.__missBook, h.__missLock, who, at, () => h.__busyRand() < h.__busy).missed;
       };
       window.__missed = missed;
       const count = (ts) => {
@@ -958,6 +1091,7 @@ let failed = 0;
             both: d.length,
             apart: d.length ? { least: d[0], most: d[d.length - 1], median: d[d.length >> 1] } : null,
             wallOwn: wallW ? wallW.__missBook.length : null,
+            lock: typeof window.__missLock?.d === 'number' ? window.__missLock.d : null,
           };
         })(),
         fallbacks: d.drawGate?.stampFallbacks ?? null,
@@ -1244,7 +1378,8 @@ let failed = 0;
           refresh is the machine this phase is for.
         */
         const missedShare = 0.5;
-        await show.evaluate((x) => { window.__busy = x; }, missedShare);
+        // Each phase pairs the two windows' refreshes afresh (`bookEntry`).
+        await show.evaluate((x) => { window.__missLock = { d: null }; window.__busy = x; }, missedShare);
         await show.waitForTimeout(300);
         const m = await measure(2000 / (1 - missedShare));
         await show.evaluate(() => { window.__busy = 0; });
@@ -1257,9 +1392,15 @@ let failed = 0;
           38.6), so a busy machine that is only a little busy measures
           nothing. And the same refreshes missed in both windows.
         */
+        /*
+          And the gap the book pairs around within half a refresh (check-skeptic
+          on #278): a first lock taken a refresh out pairs every refresh with
+          its neighbour, one pairing and a narrow spread, and at half a
+          refresh behind nothing else in this phase would catch it.
+        */
         const b = m.book;
-        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4,
-          `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows${b.apart ? `, the wall's stamp ${f1(b.apart.median)} ms after the show's (${f1(b.apart.least)} to ${f1(b.apart.most)})` : ''}, the projector's own book ${b.wallOwn ?? '-'}`);
+        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4 && b.lock !== null && Math.abs(b.lock) <= busyRefresh / 2 + 1,
+          `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows${b.apart ? `, the wall's stamp ${f1(b.apart.median)} ms after the show's (${f1(b.apart.least)} to ${f1(b.apart.most)}), paired around ${f1(b.lock)}` : ''}, the projector's own book ${b.wallOwn ?? '-'}`);
         /*
           And, on one refresh, both windows handed the same refreshes: the
           slots served at most 1.15 of the more of the two windows' frames.
