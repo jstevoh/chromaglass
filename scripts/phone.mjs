@@ -1150,6 +1150,53 @@ try {
           + `it would lay it at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt([ref.DA, ref.DB])}, ${pick.clear} clear controls each`);
       }
 
+      // DIAG (temporary, two-finger Drop flake): the same hold again and again, every number.
+      console.log(`  diag first: trails ${JSON.stringify(held.map(h => h.laid?.trail))}`);
+      if (NEED_GPU && rb1 - rb0 >= 3) {
+        const sumAt = (a, b, c, r, other) => {
+          let s = 0;
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const d = Math.hypot(x - c.x, y - c.y);
+            if (d < r && (!other || d < Math.hypot(x - other.x, y - other.y))) s += Math.max(0, a[x + y * n]) - Math.max(0, b[x + y * n]);
+          }
+          return s;
+        };
+        for (let round = 0; round < 12; round++) {
+          await page.evaluate(() => window.chromaglassAction('clear'));
+          await settle(2500);
+          const b0 = await snap();
+          await page.evaluate(() => { window.__cgTouchLog = []; });
+          const t0 = await plateSteps();
+          await touch('touchStart', [{ ...DA, id: 1 }]);
+          await touch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
+          const t1 = await plateSteps();
+          const mids = [];
+          for (const wait of [400, 400, 400]) {
+            await settle(wait);
+            const [hs, m] = await Promise.all([hands(), snap()]);
+            const st = await plateSteps();
+            const f = hs.hands;
+            mids.push(`@${st - t0}: ` + (f.length === 2 ? f.map((h, i) => `${h.laid.steps}st ${sumAt(m, b0, h, R).toFixed(0)}`).join(' | ') : `${f.length} hands`));
+          }
+          const hh = (await hands()).hands;
+          await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
+          await settle(700);
+          const a = await snap();
+          let total = 0, best = { v: -1, x: 0, y: 0 };
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const g = Math.max(0, a[x + y * n]) - Math.max(0, b0[x + y * n]);
+            total += g;
+            if (hh.length === 2 && hh.every(h => Math.hypot(x - h.x, y - h.y) > 3 * R) && g > best.v) best = { v: g, x, y };
+          }
+          const log = await page.evaluate(() => window.__cgTouchLog ?? []);
+          const rows = hh.length === 2 ? hh.map((h, i) => `${'AB'[i]} (${h.x},${h.y}) laid ${h.laid.steps}st ${h.laid.dye.toFixed(0)} under ${sumAt(a, b0, h, R).toFixed(0)} near ${sumAt(a, b0, h, 3 * R, hh[1 - i]).toFixed(0)}`).join('; ') : `${hh.length} hands`;
+          const blob = best.v >= 0 ? `; most elsewhere at (${best.x},${best.y}) ${best.v.toFixed(2)}, ${sumAt(a, b0, best, R).toFixed(0)} round it` : '';
+          console.log(`  diag ${round}: ${rows}; plate gained ${total.toFixed(0)} over ${t1 - t0}+ steps${blob}`);
+          console.log(`    mid ${mids.join(' ; ')}`);
+          console.log(`    trails ${JSON.stringify(hh.map(h => h.laid.trail))}`);
+          console.log(`    touch ${log.filter(l => !l.startsWith('mousemove') || log.indexOf(l) < 40).join(' ')}`);
+        }
+      }
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
 
       /*

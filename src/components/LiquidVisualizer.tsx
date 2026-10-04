@@ -308,7 +308,7 @@ const DROP_EVERY = 10;
   solver has touched anything; `npm run phone` holds two fingers' counts to
   each other and the plate's dye to them.
 */
-type DropLaid = { steps: number; drops: number; dye: number };
+type DropLaid = { steps: number; drops: number; dye: number; trail?: string[] };  // DIAG trail: temporary, two-finger Drop flake
 const freshLaid = (): DropLaid => ({ steps: 0, drops: 0, dye: 0 });
 
 /*
@@ -6577,6 +6577,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k;
                 hand.laid.steps++;
+                { // DIAG: temporary, two-finger Drop flake
+                  const tr = hand.laid.trail ?? (hand.laid.trail = []);
+                  const key = `${x},${y}`;
+                  if (!tr.length || !tr[tr.length - 1].startsWith(key + '@')) tr.push(`${key}@${af.stepCount}${primary ? 'p' : 'e'}${activeLayerRef.current}`);
+                }
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -9497,6 +9502,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (aimDragRef.current) { panAim(e); return; }
       const rect = drawnRect();
       const { x, y } = getTransformedMousePos(e.clientX, e.clientY, rect);
+      ((window as unknown as { __cgTouchLog?: string[] }).__cgTouchLog ??= []).push(`mousemove(${x},${y})@${fluidsRef.current[0]?.stepCount}`); // DIAG
       lastMousePosRef.current = { ...mousePosRef.current };
       mousePosRef.current = { x, y };
       const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -9555,6 +9561,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
 
     const handleMouseDown = (e: MouseEvent) => {
+      ((window as unknown as { __cgTouchLog?: string[] }).__cgTouchLog ??= []).push(`mousedown@${fluidsRef.current[0]?.stepCount}`); // DIAG
       const probe = aimProbeRef.current;
       probe.downs++; if (e.altKey) probe.altDowns++;
       probe.zoom = macroShotRef.current.zoom; probe.hasAim = !!onAimRef.current;
@@ -9572,6 +9579,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       dropLaidRef.current = freshLaid();
     };
     const handleMouseUp = (e: MouseEvent) => {
+      ((window as unknown as { __cgTouchLog?: string[] }).__cgTouchLog ??= []).push(`mouseup@${fluidsRef.current[0]?.stepCount}`); // DIAG
       const drag = aimDragRef.current;
       if (drag) {
         aimDragRef.current = null;
@@ -9635,7 +9643,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const dv = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale;
       onAimRef.current?.(Math.min(1, Math.max(0, pinch.aimX - du)), Math.min(1, Math.max(0, pinch.aimY - dv)));
     };
+    const diagTouch = (t: string, e: TouchEvent) => { // DIAG: temporary, two-finger Drop flake
+      const w = window as unknown as { __cgTouchLog?: string[] };
+      (w.__cgTouchLog ??= []).push(`${t}[${[...e.changedTouches].map(x => x.identifier).join(',')}/${e.targetTouches.length}]@${fluidsRef.current[0]?.stepCount} p${primaryTouchRef.current} x${[...extraHandsRef.current.keys()].join(',')}`);
+    };
     const handleTouchStart = (e: TouchEvent) => {
+      diagTouch('start', e);
       if (pinchRef.current) return;
       /*
         On the closeup by what the look asks for, not by where the camera
@@ -9670,6 +9683,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     };
     const handleTouchEnd = (e: TouchEvent) => {
+      diagTouch(e.type, e);
       const pinch = pinchRef.current;
       if (pinch) {
         if (e.targetTouches.length === 0) {
@@ -9705,6 +9719,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (e.targetTouches.length === 0) letGo();
     };
     const handleTouchMove = (e: TouchEvent) => {
+      diagTouch('move', e);
       const pinch = pinchRef.current;
       if (pinch) {
         if (e.targetTouches.length < 2) return;
@@ -9780,6 +9795,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // The fingers are let go of with their listeners; a mouse button held
       // through a rebuild is left as it always was, down until its mouseup.
       if (primaryTouchRef.current !== null) isMouseDownRef.current = false;
+      ((window as unknown as { __cgTouchLog?: string[] }).__cgTouchLog ??= []).push(`cleanup@${fluidsRef.current[0]?.stepCount}`); // DIAG
       primaryTouchRef.current = null;
       extraHandsRef.current.clear();
       pinchRef.current = null;
