@@ -24,6 +24,7 @@
  */
 
 import { SPIKES_WGSL } from './spikes';
+import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 
 /**
@@ -1930,7 +1931,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var cur: texture_2d<f32>;
 @group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var sw: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let v = textureLoad(vel, vec2i(id.xy), 0);
@@ -1956,7 +1958,124 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
     flow = flow * pow(ratio, A.a.z);
   }
+  /*
+    The spun dish's swirl (spinSwirl), after the depth: it is already the
+    gap's own flow, worked out from the drag the gap sets, so the mobility
+    above would count the gap twice. A.a.w turns plate widths a second into
+    this field's units (the step's seconds over its displacement), and is
+    zero whenever the swirl is not running, which adds nothing at all.
+  */
+  if (A.a.w != 0.0) {
+    flow += bilerpN(sw, uvOf(id), A.a.y).xy * A.a.w;
+  }
   textureStore(dst, vec2i(id.xy), safeVel(vec4f(flow, v.z, v.w)));
+}`,
+
+  /*
+    The spun dish, in the frame that turns with its liquid (PLAN.md §22,
+    lib/turntable.ts, which says why the picture turns with the liquid and
+    not the glass). On the current's grid; its projection is the current's
+    own three passes on its own textures.
+
+    What is simulated. The liquid is a layer between two glasses that turn
+    together. Depth-averaged, the flow between two plates is plane Poiseuille
+    flow, and the walls hold it back with a drag 12ν/h² per unit mass (the
+    Hele-Shaw drag PLAN §18a builds the whole solver on). So relative to the
+    dish, the liquid's velocity decays at k = 12ν/h², here and now: h is this
+    cell's gap (the squeeze film: the dome, and every press), ν its liquid's
+    (the look's, and the oil where there is oil, mixed as viscosities mix,
+    ln ν = x ln ν_oil + (1 − x) ln ν).
+
+    The frame turns at ω_l, the liquid's bulk, which follows the dish with
+    the drag time at the rest gap, 1/k0 (A.a.y is k0). In that frame the dish
+    turns at A = Ω − ω_l (A.a.x), and the liquid here is dragged toward the
+    dish's velocity A ẑ×r and pushed back by the frame's own acceleration,
+    −ω̇_l ẑ×r = −A k0 ẑ×r. So its velocity w in this frame obeys
+
+        dw/dt = A (k − k0) ẑ×r − k w + f_c − ∇p.
+
+    Where the cell is the bulk (k = k0) nothing drives it and w stays zero:
+    the whole picture turns, lagging the glass by the drag time, and that is
+    all. Where the glass is closer (a press, the tight part of a dome) or the
+    liquid thicker (oil), k > k0 and the liquid there is carried ahead with
+    the dish; where the gap opens up it falls behind. That difference is the
+    swirl, and it is what winds the colour into spirals.
+
+    The centrifuge, f_c. In the turning frame everything feels ω_l² r
+    outward. Acting on a density ρ(1 + β) that is a body force β ω² r, and
+    written as β ω² ∇(r²/2) = ∇(β ω² r²/2) − (ω² r²/2) ∇β, its first part is
+    a gradient, a pressure that moves nothing, and the second is what moves
+    the liquid: −(ω² r²/2) ∇β, at the edges between liquids, heavy outward
+    and light inward. Written that way on purpose: the current's projection
+    is ten Jacobi sweeps, which clear a local divergence but leave most of a
+    plate-wide gradient standing, and a force that is mostly gradient would
+    have been kept by it as a flow that is not there. (A.a.z is ω_l².)
+
+    Coriolis, −2ω ẑ×w, is not here, and the omission is the physics: for a
+    flow without divergence ẑ×w is itself a gradient (ẑ×∇⊥ψ = −∇ψ), so the
+    pressure takes all of it. Added as a force it would be deleted by an
+    exact projection and kept in part by ten sweeps, which is a flow that is
+    not there. (In a gap of varying depth hw, not w, is what has no
+    divergence, and a sliver of the Coriolis force survives; PLAN §22 has it.)
+
+    Integrated exactly over the step for a force held through it:
+    w = a/k + (w − a/k) e^(−k dt), which is stable for any k, down to the
+    glycerine's millisecond. dt is A.a.w, real seconds. Units are plate
+    widths and seconds throughout; the gap is turned into metres by the
+    plate's width (DISH_METRES) only where it meets the viscosity.
+  */
+  spinSwirl: `${HEAD}${BILERP_N}
+@group(0) @binding(2) var sw: texture_2d<f32>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var mixT: texture_2d<f32>;
+@group(0) @binding(6) var ph: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
+// Oil: its share of a cell, from the mix where a look has one (1×1 blank otherwise).
+fn oilAt(uv: vec2f) -> f32 { return clamp(bilerpN(mixT, uv, f32(textureDimensions(mixT).x)).r, 0.0, 1.0); }
+/*
+  Δρ/ρ here. The dye as the current reads it (saturated about the plate's mean,
+  so a plate with more dye everywhere is not heavier everywhere), times the
+  dye's contrast (A.b.z); the oil lighter (A.b.w); the ferrofluid heavier, a
+  fixed property of the liquid (lib/turntable.ts).
+*/
+fn weightAt(uv: vec2f) -> f32 {
+  let d = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
+  let f = clamp(bilerpN(ph, uv, f32(textureDimensions(ph).x)).r, 0.0, 1.0);
+  return A.b.z * d - A.b.w * oilAt(uv) + 0.25 * f;
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  let m = f32(textureDimensions(dst).x);
+  if (id.x >= u32(m) || id.y >= u32(m)) { return; }
+  let q = vec2i(id.xy);
+  let uv = (vec2f(id.xy) + 0.5) / m;
+  let d = uv - vec2f(0.5);
+  // The way round a positive speed turns, in the solver's uv: the picture's
+  // angle grows this way (uvToFluid in wgsl/plate.ts).
+  let turn = vec2f(-d.y, d.x);
+  let h = clamp(bilerpN(sq, uv, S.n).r, ${DISH_GAP_RANGE[0]}, ${DISH_GAP_RANGE[1]}) * ${DISH_METRES};
+  let nu = exp(mix(log(A.b.x), log(A.b.y), oilAt(uv)));
+  let k = 12.0 * nu / (h * h);
+  var a = A.a.x * (k - A.a.y) * turn;
+  if (A.a.z > 0.0) {
+    let e = 1.0 / m;
+    let g = vec2f(weightAt(uv + vec2f(e, 0.0)) - weightAt(uv - vec2f(e, 0.0)),
+                  weightAt(uv + vec2f(0.0, e)) - weightAt(uv - vec2f(0.0, e))) / (2.0 * e);
+    a -= 0.5 * A.a.z * dot(d, d) * g;
+  }
+  /*
+    A thin gap (A.a.w below zero) takes the drive itself, as the speed it
+    would hold the liquid to at the rest gap: its own solve brings the liquid
+    toward that at k0 and drags it with the local 12ν/h², which lands on a/k,
+    the same steady swirl, with the lag its own (fluid.ts, the swirl stage).
+  */
+  if (A.a.w < 0.0) {
+    textureStore(dst, q, safeVel(vec4f(a / A.a.y, 0.0, 0.0)));
+    return;
+  }
+  let still = a / k;
+  let w = still + (textureLoad(sw, q, 0).xy - still) * exp(-k * A.a.w);
+  textureStore(dst, q, safeVel(vec4f(w, 0.0, 0.0)));
 }`,
 
   // The current's own divergence and projection, on the M grid.

@@ -9,6 +9,7 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
+import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { MixerPanel } from './MixerPanel';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
@@ -254,7 +255,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   // presses (more dye) and leans (which way the air goes). Each device holds
   // one layer, so two tablets are two projectionists on two plates.
   const [padLayer, setPadLayer] = useState(0);
-  const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press' | 'finger'>('blow');
+  const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press' | 'finger' | 'spin'>('blow');
   const [padColor, setPadColor] = useState<string | null>(null);
   const [padLiquid, setPadLiquid] = useState<string>('water');
   const [padFull, setPadFull] = useState(false);
@@ -270,11 +271,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     // Normalised, y up — the plate's own coordinates.
     return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) };
   };
-  const padSend = (kind: 'blow' | 'drop' | 'press' | 'finger', e: ReactPointerEvent, p: { x: number; y: number },
+  const padSend = (kind: 'blow' | 'drop' | 'press' | 'finger' | 'spin', e: ReactPointerEvent, p: { x: number; y: number },
                    from?: { x: number; y: number }) => {
     const amount = pressureOf(e);
     if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
     else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount }); }
+    // A finger on the dish (PLAN §22): it turns under the finger, and the
+    // finger held still keeps sending (below), because a still hand is a brake.
+    else if (kind === 'spin') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: e.pointerId }); }
     else if (kind === 'finger') {
       // A finger mixes by moving, so the stroke's own direction is the whole
       // gesture: where the touch was last, against where it is now. A tap
@@ -305,7 +309,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     const from = padTouches.current.get(e.pointerId);
     padTouches.current.set(e.pointerId, p);
     const now = performance.now();
-    if (now - (padLastSend.current.get(e.pointerId) ?? 0) < (padTool === 'press' ? 16 : 33)) return;   // 30 Hz along a drag, 60 for a held press
+    if (now - (padLastSend.current.get(e.pointerId) ?? 0) < (padTool === 'press' || padTool === 'spin' ? 16 : 33)) return;   // 30 Hz along a drag, 60 for a held press or a turn
     padLastSend.current.set(e.pointerId, now);
     padSend(e.buttons === 32 ? 'blow' : padTool, e, p, from);
   };
@@ -325,7 +329,13 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     last, at its last pressure.
   */
   useEffect(() => {
-    if (padTool !== 'press' || padTouchCount === 0) return;
+    /*
+      And a finger held still on the dish keeps holding it (PLAN §22): the
+      display lets go of a remote hand a quarter of a second after it last
+      heard from it, so a finger that stops would otherwise let the dish
+      coast on under it instead of stopping it.
+    */
+    if ((padTool !== 'press' && padTool !== 'spin') || padTouchCount === 0) return;
     const id = window.setInterval(() => {
       const now = performance.now();
       // Only pointers that pressed: a pen's barrel button or a right-button
@@ -334,7 +344,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         const p = padTouches.current.get(pid);
         if (!p || now - (padLastSend.current.get(pid) ?? 0) < 50) continue;
         padLastSend.current.set(pid, now);
-        send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
+        if (padTool === 'spin') send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: pid });
+        else send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
       }
     }, 50);
     return () => window.clearInterval(id);
@@ -401,7 +412,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       data-testid="remote-pad"
     >
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[10px] uppercase tracking-[0.25em] text-white/25">
-        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : 'tap or drag to drop dye'}
+        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : padTool === 'spin' ? 'drag round the middle to turn the dish; hold still to stop it' : 'tap or drag to drop dye'}
         {penSeen ? ' · pen: press for more, lean to steer' : ''}
       </span>
       {padTouchCount > 0 && (
@@ -428,8 +439,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
-          {(['blow', 'drop', 'press', 'finger'] as const).map((t) => (
+        {/*
+          Wrapping: Spin made it five tools and Tilt, wider than a phone's
+          row, and the row that did not wrap widened the page past the
+          screen, so the transport bar's Blackout could not be tapped
+          (`npm run applink`, "linked: ran to the end": 42/43, now 48/48).
+        */}
+        <div className="flex flex-wrap gap-1.5">
+          {(['blow', 'drop', 'press', 'finger', 'spin'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setPadTool(t)}
@@ -628,6 +645,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          {/*
+            The dish's own turning (PLAN.md §22): Auto Spin's mode and its
+            rate, so the phone in a hand across the room can set the plate
+            going and stop it without walking back to the laptop. Beats a
+            Turn stays on the laptop and the phone's Play sheet: it is set
+            once for a set, not played.
+          */}
+          <Slider label="Auto Spin" field="spinAuto" step={1} format={(v) => SPIN_AUTO_NAMES[Math.round(v)] ?? 'Off'} value={value('spinAuto') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Spin Rate" field="spinRpm" step={0.5} format={(v) => `${v.toFixed(1)} rpm`} value={value('spinRpm') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Accent the One" field="beatAccent" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             Only while a maze is on the plate, as the macro dials are only
