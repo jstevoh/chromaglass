@@ -97,8 +97,9 @@ const snap = (page) => page.evaluate(() => {
     at: performance.now(),
     frames: d.frames ?? 0,
     grid: d.status?.grid ?? 0,
-    steps: counts.reduce((a, c) => a + (c?.steps ?? 0), 0),
-    ran: counts.reduce((a, c) => a + (c?.ran ?? 0), 0),
+    // The lead plate's: the bench times the lead plate's swirl.
+    steps: counts[0]?.steps ?? 0,
+    ran: counts[0]?.ran ?? 0,
     dish: d.fluids?.[0]?.lastStep?.spinDish ?? null,
     timestamps: d.webgpu?.timestamps ?? null,
     gpu: d.webgpu?.label ?? null,
@@ -121,7 +122,7 @@ const windowOf = async (page, on) => {
   if (b.steps < a.steps) { a.steps = 0; a.ran = 0; }
   return {
     on, grid: b.grid, fps: (b.frames - a.frames) / secs,
-    stepsPerSec: (b.steps - a.steps) / secs, ranShare: (b.ran - a.ran) / Math.max(1, b.steps - a.steps),
+    stepsPerSec: (b.steps - a.steps) / secs, ranPerSec: (b.ran - a.ran) / secs, ranShare: (b.ran - a.ran) / Math.max(1, b.steps - a.steps),
     steps: b.steps - a.steps, ran: b.ran - a.ran,
   };
 };
@@ -185,15 +186,18 @@ try {
       const ons = windows.filter((w) => w.on), offs = windows.filter((w) => !w.on);
       const row = {
         stepsPerSec: mean(ons.map((w) => w.stepsPerSec)),
+        // What the swirl takes is its stage times the steps that ran it.
+        ranPerSec: mean(ons.map((w) => w.ranPerSec)),
         fpsOn: mean(ons.map((w) => w.fps)), fpsOff: mean(offs.map((w) => w.fps)),
         ran: mean(ons.map((w) => w.ranShare)), ranOff: Math.max(...offs.map((w) => w.ran)),
         grid: [...new Set(windows.map((w) => w.grid))].join('/'),
       };
+      const share = (ms) => ms * row.ranPerSec / 1000;
+      row.shareOne = share(bench.one); row.shareThirteen = share(bench.thirteen);
       Object.assign(results.at(-1), row);
-      const share = (ms) => ms * row.stepsPerSec / 1000;
       console.log(`  ${name.padEnd(6)} ${look.padEnd(18)} grid ${row.grid.padEnd(8)} ${row.stepsPerSec.toFixed(0)} steps/s; ` +
         `swirl ${(bench.one * 1000).toFixed(1)} µs a step now, ${(bench.thirteen * 1000).toFixed(1)} µs with thirteen ` +
-        `(${(share(bench.one) * 100).toFixed(2)}% and ${(share(bench.thirteen) * 100).toFixed(2)}% of the GPU's second); ` +
+        `(${(row.shareOne * 100).toFixed(2)}% and ${(row.shareThirteen * 100).toFixed(2)}% of the GPU's second); ` +
         `${row.fpsOn.toFixed(1)} fps on, ${row.fpsOff.toFixed(1)} off; ran ${(row.ran * 100).toFixed(0)}% of steps`);
     }
     await ctx.close();
@@ -210,18 +214,28 @@ for (const name of screens) {
   if (!rs.length) continue;
   const where = name === 'phone' ? 'the phone layout' : "the laptop's layout";
   check(`${name}: every page is ${where}`, rs.every((r) => (name === 'phone') === r.phone));
-  check(`${name}: the band played on every look`, rs.every((r) => !!r.band),
+  check(`${name}: the band played on every look`, rs.every((r) => (r.band?.kicks ?? 0) > 0),
     rs.filter((r) => !r.band).map((r) => r.look).join(', ') || `${rs.length} looks`);
-  check(`${name}: the bench timed the swirl stage both ways on every look`,
-    rs.every((r) => r.bench.one > 0 && r.bench.thirteen > 0 && Number.isFinite(r.bench.one + r.bench.thirteen)));
+  /*
+    Thirteen dispatches against one, at least half as much again: on
+    SwiftShader in the lab the one alone was 9.3 ms against 20.4 (the
+    centrifuge's dye and mix reads make spinSwirl the heaviest of them), and
+    on a GPU where a dispatch is mostly launch the gap is wider. A bench that
+    read noise, or timed a queue that never ran the stage, would not hold it
+    on every look.
+  */
+  check(`${name}: the bench timed the swirl stage both ways on every look, thirteen dispatches over one by half as much again`,
+    rs.every((r) => r.bench.one > 0 && r.bench.thirteen > 1.5 * r.bench.one && Number.isFinite(r.bench.one + r.bench.thirteen)),
+    rs.map((r) => `${r.look} ${(r.bench.thirteen / r.bench.one).toFixed(1)}×`).join(', '));
   const ranLow = rs.filter((r) => !(r.ran >= 0.5));
   check(`${name}: the swirl ran on most steps where it was let run`, ranLow.length === 0,
     rs.map((r) => `${r.look} ${(r.ran * 100).toFixed(0)}%`).join(', '));
   check(`${name}: and on none where it was held off`, rs.every((r) => r.ranOff === 0));
   const one = mean(rs.map((r) => r.bench.one)), thirteen = mean(rs.map((r) => r.bench.thirteen));
   const sps = mean(rs.map((r) => r.stepsPerSec));
+  const s1 = mean(rs.map((r) => r.shareOne)), s13 = mean(rs.map((r) => r.shareThirteen));
   console.log(`\n  ${name}: over ${rs.length} looks at ${sps.toFixed(0)} steps/s, the swirl stage is ${(one * 1000).toFixed(1)} µs a step now ` +
-    `and was ${(thirteen * 1000).toFixed(1)} µs (${(one * sps / 10).toFixed(2)}% and ${(thirteen * sps / 10).toFixed(2)}% of the GPU's second); ` +
+    `and was ${(thirteen * 1000).toFixed(1)} µs (${(s1 * 100).toFixed(2)}% and ${(s13 * 100).toFixed(2)}% of the GPU's second, on the steps that ran it); ` +
     `${mean(rs.map((r) => r.fpsOn)).toFixed(1)} fps with it, ${mean(rs.map((r) => r.fpsOff)).toFixed(1)} without\n`);
 }
 

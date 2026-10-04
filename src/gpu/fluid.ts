@@ -2584,9 +2584,9 @@ export class WebGPUFluid {
    * profiler reads nothing there, measured on #258), and the frame rate
    * alone could not see it: two runs of the nine looks read the swirl at
    * 2 fps of 41 and at nothing of 30, each look's own pair scattered by
-   * five frames either way. The caller times two counts of reps and takes
-   * the slope, which leaves out the submit's own fixed cost and the frame
-   * the queue was still busy with.
+   * five frames either way. It waits for the queue to empty first, so the
+   * frame's own work is not timed with it, and the caller times two counts
+   * of reps and takes the slope, which leaves out the submit's fixed cost.
    *
    * On the plate's own swirl textures, with a made-up drive: on the thin
    * plate what it writes is overwritten by the next step that runs the
@@ -2599,6 +2599,8 @@ export class WebGPUFluid {
     for (let k = 0; k < reps; k++) this.stepSwirl(pass, p, thin);
     pass.end();
     this.swirlLive = true;
+    // Behind whatever the frame has already queued, so it is not timed with it.
+    await this.device.queue.onSubmittedWorkDone();
     const t0 = performance.now();
     this.device.queue.submit([enc.finish()]);
     await this.device.queue.onSubmittedWorkDone();

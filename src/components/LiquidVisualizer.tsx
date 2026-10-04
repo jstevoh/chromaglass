@@ -8653,6 +8653,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /**
+         * The clock the last frame stepped the plate to, in milliseconds on
+         * the page's own clock (Date.now, or the render's): what its dish,
+         * its liquid and its picture's angle are the state at. `npm run
+         * flick` times its flick and its readings by this, not by when it
+         * happened to ask.
+         */
+        frameAt: lastTimeRef.current * 1000,
         /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
         drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks, stampMisses: { ...stampMisses } },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
