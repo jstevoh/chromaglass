@@ -681,6 +681,37 @@ Two things to settle, in this order:
 
 **Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+#### 1a. The grain at the dye's edge made the plate look digital (shipped)
+
+Reported 2026-10-04 on the laptop's web app: "quite a few of the looks seem very
+pixelated ... less like liquids", and "it's always been this way to a point. It just
+looks very digital." `npm run pixels` (new, `pixels.yml` on the Mac, or a PR labelled
+`pixels`) photographed every look at 1440×900 on a Retina panel: every look's dye edges
+were a ragged fringe of single lit and dark flecks, at the governed rung and the top one.
+The cause was granulation (on at 0.5 in every look) scaling the opacity *before* the gooey
+contrast curve, which is steepest at the edge's half opacity, so every grain there became
+fully on or off. **Shipped:** the grain is drawn after the edge, as optical depth
+(`grainedDepth`, wgsl/plate.ts). `npm run grainedge`: flecks at the edges 3–15% of the edge
+pixels in the five looks it was found on, 0–0.04% after, every look under 0.5%; the bodies
+keep their grain. The owner's eyes on a laptop: `docs/judging.md` §34.
+
+Found with it, open:
+
+- **1b. Agate's Liesegang rings are dots on a 128² lattice** (lane C, `liesStep` in
+  wgsl/fluid.ts, `LIES_GRID`). The precipitate nucleates once per cell of its own grid, so
+  at a laptop's size Agate shows a regular grid of dots where real Liesegang bands are
+  continuous rings. Measure: the `lock` of `npm run pixels` on Agate at the lattice's pitch
+  rather than the solver's.
+- **1c. A Retina laptop on the website opens at one device pixel per CSS pixel**
+  (`platform.ts`: the hosted ladder starts on `{512, 1}`, tops out at 1.5x). The plate is
+  drawn at a quarter of the panel's pixels and upscaled until the governor climbs, and
+  never above 1.5x. Whether it can open higher without missing frames is for
+  `npm run pixels -- --rung 0` and the frame time on the owner's laptop.
+- **1d. On CI's Mac every look settles on 256²**: the governed `pixels` run went
+  512 → 384 → 256 in every look in its first twenty seconds. If the owner's laptop does
+  the same, the plate is drawn from a quarter of the cells most of the time; a look's
+  grid should be measured on the owner's machine (judging §34) before the ladder is changed.
+
 ### 2. Lacing
 
 **Shipped**; its 4–8 px gate moved to batch 3. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -4217,8 +4248,8 @@ its frame rate live. "Free" means no new passes or texture reads.
 ### 18j. Milky liquids scatter
 
 - **Where:** everything in the plate is a pure absorber. `colourBody` pushes opacity
-  and saturation up to imitate a body of colour, `granulation` modulates alpha with
-  noise, and the Liesegang precipitate is a lerp.
+  and saturation up to imitate a body of colour, `granulation` modulates the dye's
+  optical depth with noise (1a), and the Liesegang precipitate is a lerp.
 - **The real phenomenon:** pigment and fat droplets scatter light (Mie), handled as
   two-flux Kubelka–Munk. With a projector's small aperture almost all scattered light
   misses the lens, so a milky liquid throws dark or grey with a soft forward halo. It

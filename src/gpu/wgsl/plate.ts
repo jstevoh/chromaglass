@@ -512,6 +512,20 @@ fn pigmentGrain(grainTex: texture_2d<f32>, fuv: vec2f) -> f32 {
   return mix(grainAt(a * U.grainScale), grainAt(b * U.grainScale), U.grainMix) - 0.5;
 }
 
+/*
+  What the grain does to the colour's depth at a point, as a factor on the
+  opacity the curve made: the grain is more or less pigment, so it scales the
+  dye's optical depth, and an opacity a = 1 - exp(-t) with t times g is
+  1 - (1 - a)^g. A thin wash takes the grain nearly in proportion; a body
+  already near opaque hardly moves. Taken against the bare opacity (the
+  dye's own, before the gooey curve) so the factor is the pigment's alone,
+  and the curve, which is the meniscus, keeps deciding where the edge is.
+*/
+fn grainedDepth(bare: f32, grain: f32) -> f32 {
+  let a = clamp(bare, 1e-4, 0.999);
+  return (1.0 - pow(1.0 - a, grain)) / a;
+}
+
 // Satellite droplets: the hundreds of tiny beads that sit on the glass around
 // every drop in a macro photograph. Each cell of a jittered grid holds one
 // small lens, shaded like the big bubbles — dim toward the lamp, bright away
@@ -2079,15 +2093,53 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     more0 *= dish0.x;
   }
 
-  if (U.granulation > 0.002 && fluid0.a > 0.004) {
-    let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
-    fluid0.a = fluid0.a * grain;
-    more0 *= grain;
-  }
-
+  let bare0 = fluid0.a;   // the opacity the dye alone gives, for the grain below
   if (useBlur && fluid0.a > 0.0) {
     let contrast = 1.2 + U.gooey * 4.0;
     fluid0.a = clamp((fluid0.a - 0.5) * contrast + 0.5, 0.0, 1.0);
+  }
+
+  /*
+    The pigment's grain, after the edge and not before it.
+
+    What was reported: on the laptop, quite a few looks "very pixelated, like
+    a computer with poor graphics, less like liquids". Photographed on CI's
+    Mac at a laptop's size (npm run pixels), the mark common to them was the
+    dye's edges: every boundary between colour and clear dissolved into a
+    sandpaper fringe of flecks a few cells across, on Oil and Water, Oil
+    Wheel, Poster 1969, Red Cabbage, Colorful Cosmos and most of the rest,
+    at the top rung as at the bottom. So it was not the grid's size.
+
+    It was this block's order. Granulation (0.5 in every look by default)
+    scaled the opacity by the pigment's noise, about 0.6 to 1.4, and the
+    gooey edge's contrast curve came after it, with a slope of 1.2 + 4 x
+    Gooey (3.6 at Colorful Cosmos's 0.6). Inside a body the opacity is near
+    1 and the curve clamps, so the grain did little; at the edge, where the
+    opacity passes 0.5, the curve multiplied the grain's ±40% three to five
+    times and thresholded it, and the edge went wherever the noise said. The
+    grain's coordinates ride the flow (seedGrain), so they are sheared
+    hardest exactly at the edges, into flecks.
+
+    Neither half of that is the liquid. The curve is the meniscus: surface
+    tension pulling a body's rim crisp, set by how much dye is there. The
+    grain is pigment settling within the wash, which changes how deep the
+    colour is at a point, not where the body ends. So the edge is made from
+    the dye first and the grain then varies the depth of what is inside it,
+    as much as it always did in the body's interior. Measured in the lab with
+    the solver's own grain field (npm run pixels describes the fringe): the
+    ragged ring at every edge is gone and the bodies' insides are as they
+    were.
+
+    How much the grain varies the depth is Beer and Lambert's, not a
+    multiple of the opacity (grainedDepth). Before, the opacity times the
+    grain could pass 1 on a look with no Gooey, and mix() then drew past
+    the dye's own colour; and on an opaque body the grain is the most it
+    can be, so its opacity should move least, which a multiple got backwards.
+  */
+  if (U.granulation > 0.002 && fluid0.a > 0.004) {
+    let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
+    fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
+    more0 *= grain;
   }
 
   let sharp0 = dof < 0.55;
@@ -2453,15 +2505,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       more1 *= dish1.x;
     }
 
-    if (U.granulation > 0.002 && fluid1.a > 0.004) {
-      let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      fluid1.a = fluid1.a * grain;
-      more1 *= grain;
-    }
-
+    let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
     if (useBlur && fluid1.a > 0.0) {
       let contrast = 1.2 + U.gooey * 4.0;
       fluid1.a = clamp((fluid1.a - 0.5) * contrast + 0.5, 0.0, 1.0);
+    }
+
+    // The grain after the edge, not before it: see the front plate's.
+    if (U.granulation > 0.002 && fluid1.a > 0.004) {
+      let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
+      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
+      more1 *= grain;
     }
 
     let sharp1 = dof < 0.55;

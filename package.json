@@ -127,6 +127,7 @@
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "benday": "node scripts/benday.mjs",
+    "grainedge": "node scripts/grainedge.mjs",
     "lamp": "node scripts/lamp.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
     "beams": "node scripts/beams.mjs",
