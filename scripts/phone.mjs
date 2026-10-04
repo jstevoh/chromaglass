@@ -1165,11 +1165,35 @@ try {
           const snapP = () => pg.evaluate(() => [...window.chromaglassDebug().fluids[0].readDensity]);
           const stepsP = () => pg.evaluate(() => window.chromaglassDebug().fluids[0].stepCount);
           const handsP = () => pg.evaluate(() => window.chromaglassDebug().hands());
+          const rbP = () => pg.evaluate(() => { const f = window.chromaglassDebug().fluids[0]; return `${f.gpu?.rbDyeLanded}/${f.gpu?.rbDyeIssued}@${f.stepCount}`; });
+          const fA = ref.DA, fB = ref.DB;
+          const look = (m) => {
+            let tot = 0; for (let i = 0; i < m.length; i++) tot += Math.max(0, m[i]);
+            const at = (c) => { let s = 0; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < 3 * R) s += Math.max(0, m[x + y * n]); return s; };
+            return `${tot.toFixed(0)} [${at(fA).toFixed(1)}|${at(fB).toFixed(1)}]`;
+          };
           for (let round = 0; round < count; round++) {
-            await pg.evaluate(() => window.chromaglassAction('clear'));
-            await pg.waitForTimeout(2500);
+            // The check's own lead-in: the Press held and let go, then the Drop.
+            await pg.getByTestId('phone-tool-press').click();
+            await pg.evaluate(() => window.chromaglassSettings({ fingering: 0.8 }));
+            await tch('touchStart', [{ ...A, id: 5 }]);
+            await pg.waitForTimeout(600);
+            await tch('touchEnd', [{ ...A, id: 5 }]);
+            await pg.waitForTimeout(900);
+            await pg.evaluate(() => window.chromaglassSettings({ fingering: 0 }));
+            await pg.getByTestId('phone-tool-dropper').click();
+            await pg.evaluate(() => window.chromaglassSettings({ turbulenceScale: 0, rainDrip: 0, glassSmear: 0, bubbles: 0, beads: 0 }));
+            const pre = [];
+            pre.push(`pre ${look(await snapP())} rb ${await rbP()}`);
+            await pg.evaluate(() => { window.__cgTouchLog = []; window.__cgSink = { evapMin: 1, dtMax: 0, mean: 0, air: 0, mul: [], thin: [] }; window.chromaglassAction('clear'); });
+            for (const w of [100, 400, 1000, 1000]) {
+              await pg.waitForTimeout(w);
+              pre.push(`${look(await snapP())} rb ${await rbP()}`);
+            }
+            const settleSink = await pg.evaluate(() => { const k = window.__cgSink; window.__cgSink = { evapMin: 1, dtMax: 0, mean: 0, air: 0, mul: [], thin: [] }; return k; });
             const b0 = await snapP();
-            const k0 = await pg.evaluate(() => { window.__cgTouchLog = []; window.__cgSink = { evapMin: 1, dtMax: 0, mean: 0, air: 0, mul: [], thin: [] }; return window.chromaglassDebug().kicks(); });
+            const rbBefore = await rbP();
+            const k0 = await pg.evaluate(() => window.chromaglassDebug().kicks());
             const t0 = await stepsP();
             await tch('touchStart', [{ ...DA, id: 1 }]);
             await tch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
@@ -1180,31 +1204,31 @@ try {
               const [hs, m] = await Promise.all([handsP(), snapP()]);
               const st = await stepsP();
               const f = hs.hands;
-              mids.push(`@${st - t0}: ` + (f.length === 2 ? f.map((h) => `${h.laid.steps}st ${sumAt(m, b0, h, R).toFixed(0)}`).join(' | ') : `${f.length} hands`));
+              mids.push(`@${st - t0}${hs.pinch ? ' PINCH' : ''}: ` + (f.length === 2 ? f.map((h) => `${h.laid.steps}st ${sumAt(m, b0, h, R).toFixed(0)}`).join(' | ') : `${f.length} hands`));
             }
             const hh = (await handsP()).hands;
             await tch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
             await pg.waitForTimeout(700);
             const a = await snapP();
-            let total = 0, best = { v: -1, x: 0, y: 0 };
-            for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-              const g = Math.max(0, a[x + y * n]) - Math.max(0, b0[x + y * n]);
-              total += g;
-              if (hh.length === 2 && hh.every(h => Math.hypot(x - h.x, y - h.y) > 3 * R) && g > best.v) best = { v: g, x, y };
-            }
+            const rbAfter = await rbP();
+            let total = 0;
+            for (let i = 0; i < a.length; i++) total += Math.max(0, a[i]) - Math.max(0, b0[i]);
             const k1 = await pg.evaluate(() => window.chromaglassDebug().kicks());
             const log = await pg.evaluate(() => window.__cgTouchLog ?? []);
             const sink = await pg.evaluate(() => { const k = window.__cgSink; window.__cgSink = undefined; return k; });
+            const misc = await pg.evaluate(() => { const d = window.chromaglassDebug(); return JSON.stringify({ auto: d.autoEvents, fl: d.fluids.length }); });
             const rows = hh.length === 2 ? hh.map((h, i) => `${'AB'[i]} (${h.x},${h.y}) laid ${h.laid.steps}st ${h.laid.dye.toFixed(0)} under ${sumAt(a, b0, h, R).toFixed(0)} near ${sumAt(a, b0, h, 3 * R, hh[1 - i]).toFixed(0)}`).join('; ') : `${hh.length} hands`;
-            const blob = best.v >= 0 ? `; most elsewhere at (${best.x},${best.y}) ${best.v.toFixed(2)}, ${sumAt(a, b0, best, R).toFixed(0)} round it` : '';
-            console.log(`  diag ${tag} ${round}: ${rows}; plate gained ${total.toFixed(0)} over ${t1 - t0}+ steps; ${k1 - k0} kicks${blob}`);
+            const low = hh.length === 2 && hh.some(h => sumAt(a, b0, h, R) < 0.6 * h.laid.dye * 0.75);
+            console.log(`  diag ${tag} ${round}${low ? ' LOW' : ''}: ${rows}; plate gained ${total.toFixed(0)} over ${t1 - t0}+ steps; ${k1 - k0} kicks; rb before ${rbBefore} after ${rbAfter}; ${misc}`);
+            console.log(`    settle ${pre.join(' -> ')}`);
             console.log(`    mid ${mids.join(' ; ')}`);
-            console.log(`    trails ${JSON.stringify(hh.map(h => h.laid.trail))}`);
-            console.log(`    sink evap ${sink?.evapMin?.toFixed(5)} dt ${sink?.dtMax?.toFixed(5)} mean ${sink?.mean?.toFixed(3)} air ${sink?.air} thin ${(sink?.thin ?? []).slice(0, 8).join(' ')} mul(${sink?.mul?.length}) ${(sink?.mul ?? []).slice(0, 6).join(' ')}`);
-            console.log(`    touch ${log.filter((l, i) => !l.startsWith('mousemove') || i < 40).join(' ')}`);
+            const fmtSink = (k) => `evap ${k?.evapMin?.toFixed(5)} dt ${k?.dtMax?.toFixed(5)} mean ${k?.mean?.toFixed(3)} air ${k?.air} thin ${(k?.thin ?? []).slice(0, 8).join(' ')} mul(${k?.mul?.length}) ${(k?.mul ?? []).slice(0, 6).join(' ')}`;
+            console.log(`    sink settle: ${fmtSink(settleSink)}`);
+            console.log(`    sink hold: ${fmtSink(sink)}`);
+            if (low) console.log(`    touch ${log.filter((l, i) => !l.startsWith('mousemove') || i < 40).join(' ')}`);
           }
         };
-        await rounds(page, touch, 'band', 14);
+        await rounds(page, touch, 'band', 30);
         // And a page that never starts the band (as #238's mirror check does), the same places.
         const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
         await ctx2.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ } });
@@ -1223,7 +1247,7 @@ try {
         await p2.evaluate(() => window.chromaglassSettings({ turbulenceScale: 0, rainDrip: 0, glassSmear: 0, bubbles: 0, beads: 0, fingering: 0 }));
         const cdp2 = await ctx2.newCDPSession(p2);
         const touch2 = (type, pts) => cdp2.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
-        await rounds(p2, touch2, 'silent', 10);
+        await rounds(p2, touch2, 'silent', 6);
         await ctx2.close();
       }
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
