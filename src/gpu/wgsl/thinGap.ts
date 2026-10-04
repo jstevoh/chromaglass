@@ -33,7 +33,12 @@
  *      step adds k₀·Δt of it. So a look's forces keep their size on an open
  *      plate, take the drag time to get there and to fade, and, being forces
  *      and not speeds, move the liquid less where the gap is tight (as h²,
- *      the Darcy mobility of a body force). Then the drag, implicitly, cell by
+ *      the Darcy mobility of a body force). Since 18a-2 the body forces (the
+ *      magnet, the mix, Rain Drip's heavy colour and Updraft's shear, which
+ *      `hsBody` adds) are read against the default liquid's k₀ rather than
+ *      this one's, so a thick liquid answers them slowly; the look's stirring
+ *      keeps this liquid's k₀, a dial; and a sliding glass (Glass Smear) is a
+ *      drag toward its speed, not a force (hsPrep says each). Then the drag, implicitly, cell by
  *      cell: c = 1/(1 + kΔt) with k = 12ν/h², so a thick liquid in a tight gap
  *      stops at once and a thin one in a deep gap coasts.
  *   2. `hsDivergence`: what the flux h·c·u* would pile up or drain, and what
@@ -74,12 +79,14 @@
  * a coefficient a face instead (hsCoarsen says why) and a sign a cell.
  */
 
+import { HAND_GRIP } from '../../lib/handSolid';
+
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
  * its packed-plane reader, which are passed in rather than imported so this
  * file does not import the module that spreads it into its kernel table.
  */
-export function thinGapKernels(HEAD: string, W: string): Record<string, string> {
+export function thinGapKernels(HEAD: string, W: string, NOISE: string): Record<string, string> {
   /*
     Shared by every kernel below: where a cell sits in the packed level-0
     pressure (the two colour planes pressureRedBlack uses, see PACKED in
@@ -152,36 +159,133 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
 
   return {
     /*
-      The step's forces as terminal speeds, the drag, and the mobility.
+      Two of the look's own forces as the forces they are, on a thin gap
+      only (PLAN 18a-2). The old plate keeps forcesB's versions, and every
+      look's step on it is what it was.
+
+      **Rain Drip is heavy dye on a plate stood up.** What it drew was
+      streaks of the plate sliding downhill (a noise's streaks pushed down,
+      and a second, made-up friction between them). What runs down a glass
+      is the coloured liquid being denser than the clear round it, and
+      between two glasses that is a Hele-Shaw cell with a heavy liquid over
+      a light one, which is unstable (Rayleigh–Taylor in a gap: growth
+      k·Δρ·g·h²/12μ, the drag's mobility times the weight): the colour
+      falls in fingers and the clear liquid rises between them, and nobody
+      draws the streaks. So the force is the dye's excess weight over the
+      plate's mean, down the plate (Boussinesq: the mean's weight is the
+      still liquid's pressure, held by the dish's own bottom), A.a.x the
+      weight of a unit of dye in the reference liquid's speeds at the rest
+      gap. It moves no liquid on balance, it is fastest where the colour is
+      thickest, and a thick liquid drips slowly (it is a body force, read
+      as one in hsPrep).
+
+      **Updraft is a draught's shear on the liquid.** Air moving over a
+      liquid drags its surface with a stress τ, which in a layer this thin
+      drives a shear across it: its mean goes at τh/2μ, in proportion to
+      the depth (the same model 15g gives Blow). So the force is the old
+      push over the gap in rest gaps: through the gap's Darcy mobility (h²)
+      it moves the liquid as h, half as fast where the glass is pressed to
+      half the gap, and as 1/μ, slower in a thick liquid. And it moves all
+      the liquid, not only the colour: the old push was only where there
+      was dye, and air does not know what colour it is blowing on.
+
+      A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
+      AIR_SHEAR), the rest gap h0, 0).
+    */
+    hsBody: `${HEAD}${NOISE}${COMMON}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let q = vec2i(id.xy);
+  var v = textureLoad(vel, q, 0);
+  if (A.a.x > 0.0) {
+    let d = textureLoad(dye, q, 0).a;
+    v = vec4f(v.xy - S.up * (A.a.x * (d - S.meanD)), v.z, v.w);
+  }
+  if (S.air > 0.1) {
+    let p = uvOf(id) * S.l;
+    let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
+    let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
+    v = vec4f(v.xy + vec2f(gx, gy) * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
+  }
+  textureStore(dst, q, safeVel(v));
+}`,
+
+    /*
+      The step's forces, the drag, and the mobility.
 
       A.a = (k scale, real seconds this step, the rest gap h0, the rim's
-      radius), A.b.x the ferrofluid's viscosity over the clear liquid's, A.b.y and A.b.z the hands' (below).
+      radius), A.b = (the ferrofluid's viscosity over the clear liquid's,
+      the reference liquid's viscosity over this one's, the glass's own
+      velocity halved).
       k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
       liquid's kinematic viscosity over the plate's width squared, so the
       drag is in real seconds whatever grid or look clock the plate runs at.
 
-      `prev` is the velocity before this step's forces and `vel` after them.
-      Their difference is what the forces asked for as one step's velocity,
-      which is the speed each drives the liquid to against the glass at the
-      rest gap, so it is added as a force k₀·Δt of that speed (see the file's
-      head). z and w
-      (the heat, and nothing) are taken from after the forces, which the lamp
-      warms.
+      Three snapshots of the velocity: \`prev\` before any of this step's
+      forces, \`mid\` after the body forces, \`vel\` after the rest. Each
+      difference is what its forces asked for as one step's velocity, the
+      number they were tuned as, and the two are taken differently, because
+      they are different things (PLAN 18a-2):
+
+      - **Body forces** (mid − prev): the magnet's pull on the ferrofluid,
+        the maze's, the oil's surface tension, the soap's Marangoni stress,
+        the dye's weight, the heavy dye of Rain Drip and the draught of
+        Updraft (thinBody). These are forces on the liquid, and a force
+        does not know how thick the liquid it pushes is: what it moves the
+        liquid at is f·h²/12μ, Darcy's, so the same pull moves glycerine a
+        thousandth as fast as water. Each is read as the speed it drives the
+        *reference* liquid to at the rest gap (the default Thickness, whose
+        looks every one of them was tuned on), so the force is k_ref·(that
+        speed), A.b.y = ν_ref/ν times this liquid's k₀. On the default
+        Thickness that is exactly what it was; on any other the liquid
+        answers as its own viscosity says. Before, each was read against
+        this liquid's own k₀, which made the force itself scale with the
+        liquid's viscosity: the magnet pulled the ferrofluid 45 times harder
+        through glycerine than through the default oil, and the oil's
+        surface tension moved water no faster than glycerine.
+      - **The look's stirring** (vel − mid): Turbulence and the music's swirl
+        (the hand stir), Polarity's hold between colours, vorticity
+        confinement, and the lasting current (18a-4). These are dials, not
+        a phenomenon: a hand or a stick through the layer imposes its own
+        motion, which the liquid takes whatever its thickness, so each is
+        still read as the speed it drives *this* liquid to at the rest gap,
+        k₀·(that speed). Kept as named dials (PLAN §18, "Kept, named as
+        dials"); Polarity's becomes a capillary jump and a viscosity
+        contrast in 0-fingering.
+
+      And **the glass itself moving** (A.b.zw, Glass Smear): a glass slid
+      over the liquid at U drags the column with a shear, linear across the
+      gap with nothing pressing, so the column's mean goes at U/2, and the
+      gap's drag is then toward U/2, not toward rest:
+      ρ∂u/∂t = −∇p + f − (12μ/h²)(u − U/2). Taken with the drag, kΔt·U/2
+      into u*, so the liquid reaches half the glass's speed in its drag time
+      and holds it at any thickness and any gap, and where the gap changes
+      (a press, a domed plate) the flux h·U/2 does not conserve and the
+      pressure turns it. It is uniform: a glass is rigid.
+
+      z and w (the heat, and nothing) are taken from after the forces, which
+      the lamp warms.
     */
     hsPrep: `${HEAD}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var prev: texture_2d<f32>;
-@group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var phase: texture_2d<f32>;
-@group(0) @binding(6) var hand: texture_2d<f32>;
-@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(8) var<storage, read_write> mob: array<f32>;
+@group(0) @binding(4) var mid: texture_2d<f32>;
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var phase: texture_2d<f32>;
+@group(0) @binding(7) var hand: texture_2d<f32>;
+@group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(9) var<storage, read_write> mob: array<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
   let n = i32(S.n);
   let uf = textureLoad(vel, q, 0);
   let u0 = textureLoad(prev, q, 0).xy;
+  let um = textureLoad(mid, q, 0).xy;
   let g = textureLoad(sq, q, 0).r;
   let hw = max(g, 0.004);
   /*
@@ -196,7 +300,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let share = clamp(textureLoad(phase, min(q, vec2i(textureDimensions(phase)) - 1), 0).r, 0.0, 1.0);
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share);
-  var ustar = u0 + (uf.xy - u0) * (A.a.x / (A.a.z * A.a.z) * A.a.y);
+  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
     layer, and the liquid it touches moves with it. Brinkman's penalised
@@ -213,16 +317,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     \`hand\` is (Σ χ·U, Σ χ), U in the hands' cells a step (CPU grid), χ how
     much of the cell the hand fills; a cell two hands share takes their mean
-    velocity. A.b.y turns cells a step into the solver's velocity (1/(L·disp)),
-    A.b.z is the grip K·Δt where χ is 1, over the cell's own drag. 1×1 and empty with no hand down.
+    velocity. 1/(S.l·S.disp) turns cells a step into the solver's velocity,
+    and the grip K·Δt where χ is 1 is HAND_GRIP over the cell's own drag
+    (lib/handSolid.ts). 1×1 and empty with no hand down.
   */
   let hs = textureLoad(hand, min(q, vec2i(textureDimensions(hand)) - 1), 0);
   let chi = clamp(hs.z, 0.0, 1.0);
   // In units of the cell's own drag, so the hand wins over a thick liquid
   // (the ferrofluid's, glycerine's) as surely as over water: a solid's speed
   // does not depend on what it moves through.
-  let grip = chi * A.b.z * (1.0 + kdt);
-  if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) * A.b.y; }
+  let grip = chi * ${HAND_GRIP.toFixed(1)} * (1.0 + kdt);
+  if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) / max(S.l * S.disp, 1e-9); }
   let c = 1.0 / (1.0 + kdt + grip);
   var mo = hsGap(g, A.a.z) * c;
   // Past the rim the liquid is open to the air: p is held at zero there.

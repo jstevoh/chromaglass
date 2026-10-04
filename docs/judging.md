@@ -705,6 +705,16 @@ lab measured the swirl (`npm run dish`), not the picture. On the Mac:
 - the phone: the Spin tool with one finger round the middle, and Auto Spin on the
   Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
 
+- the look's own turning on the same dish (PLAN 22h): flick a thin look (Galaxy,
+  Acid Trip, or any look with Viscosity thin) with the Spin pad or a flick on the
+  phone's Play sheet: the glass goes round at once but the picture should stay put
+  for a moment and catch up over about three seconds; on Classic (thick) it goes with
+  the glass. Then play music on the nine thin looks with music routed to rotation
+  (Galaxy, Cyberpunk, Acid Trip, Timbre Shifter, Boiling Point, Aurora Borealis, Solar
+  Flare, Fractal Dream, Stardust Collapse) against the last deploy before this one:
+  their sway is now through the water (within 2° of where it was) and the swirl runs
+  while they play. Say if any of them reads worse, and whether the frame rate dropped.
+
 Say if the lag is too long or too short to read as a liquid, and whether the swirl a
 press makes is visible or wants more.
 
@@ -775,9 +785,59 @@ has been seen at 60 fps like this:
 - a look you saved before this should open with Thin Gap on; one you save with it
   off should stay off.
 
+## 31. The lamp through the dye (Lamp Ground, PLAN 18b)
+
+Settings → Lamp & Light → **Lamp Ground** (also MIDI, the desks, the remote and the
+phone's Looks sheet). At 0, as every look ships, the dye glows on black as it always
+has. At 1 the lamp under the dish shines up through it, as a projector does: clear
+liquid is the lamp's white, two dyes over each other darken where they cross, a deep
+pool goes saturated and then dark, a gel or the LED ring under the glass shows
+through the dye, and the back plate is a second filter in the light. It turns the
+picture over, so it is a choice per look, not a fix: the pale lace of the reference
+still (PLAN 20) can only show on it. Please say:
+
+- which looks you want on the lamp ground, and which stay on black (Save Look keeps
+  it); a look on the lamp may want less dye (Dye Budget) to read as colour rather
+  than dark, and its dyes are the ones it was given for black;
+- whether the fade between the two (a MIDI fader on Lamp Ground) is worth playing,
+  or only a setting;
+- edges on the lamp: the meniscus, the boundary line, lacing and cells were drawn
+  for black and are carried over as a darkening or brightening of the light through
+  the dye; say if they read wrong (18e makes them from refraction instead);
+- Roy, 1963 on the lamp: the print reads dense dye as black ink, so its pools print
+  black; it should probably stay on black;
+- a look with the chemistry (Red Cabbage, Chemical Clock, Agate) on the lamp: the
+  pH, BZ and Liesegang colours are now filters in the light, so a BZ wave is a pale
+  blue band through the orange with the dye still showing.
+
+## 32. The plate's forces as forces (Thin Gap, PLAN 18a-2)
+
+On a thin gap (every look) four of a look's forces now act as the thing they stand
+for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap off.
+
+- **Rain Drip** (Settings → Squish Plate, eighteen looks set it): the colour is
+  heavier than the clear liquid and falls through it down the plate, in fingers that
+  grow by themselves, while the clear liquid rises between them. Before, the whole
+  plate slid downhill and drained out of the bottom of the dish. Say if the fall is
+  too slow or too fast against how those looks felt; it falls along Tilt Direction.
+- **Glass Smear**: the glass slides over the liquid and carries all of it at half its
+  speed, colour and clear alike. On an even gap that is a drift, not a shear; where
+  a press or a domed plate changes the gap the drift turns. It moves the colour as
+  fast as before. Say if a look misses its old smear.
+- **Updraft** (nine looks): a draught dragging the liquid's surface, now on all the
+  liquid, not only the colour, half as hard where the glass is pressed. It blows the
+  same way Rain Drip falls, as it always has; say if it should rise instead.
+- **Thickness** (Settings → Squish Plate; on the phone, the Settings tile): turn it
+  up from its default and the magnet's pull, the oil's surface tension, Rain Drip
+  and Updraft should all slow down as a thicker liquid would, while Turbulence (the
+  hand stir) keeps its pace. Turn it down to water and they speed up. At the default
+  nothing should look different.
+- Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
+  known, not this change.
+
 ---
 
-## 31. The Finger drags the liquid (PLAN 15b)
+## 33. The Finger drags the liquid (PLAN 15b)
 
 The Finger used to move the colour by a hand-written carry, a little taken from behind
 it and put a hop ahead, while the push it gave the liquid itself did nothing. Now it is

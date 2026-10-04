@@ -592,6 +592,13 @@ export interface VisualizerSettings {
   colourBody?: number;
   /** Ben-Day dots: the finished picture printed as a comic, flat inks with the tints in even dots (the Roy look). 0 is off. */
   benDay?: number;
+  /**
+   * The ground the dye is seen on (PLAN 18b): 0 the dye painted as light over
+   * black, as every look was drawn; 1 the lamp under the dish shining up
+   * through it (Beer–Lambert), so clear liquid is the lamp's white and dense
+   * dye saturates and then goes dark. Not in the photograph, which has paper.
+   */
+  lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -916,6 +923,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,                // no print: only the Roy look lays Ben-Day dots
+  lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
   lacing: 0,

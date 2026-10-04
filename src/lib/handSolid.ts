@@ -29,6 +29,17 @@
  * at their mean velocity and the solver takes the ratio.
  */
 
+/*
+  How hard a hand holds the liquid it touches (hsPrep, wgsl/thinGap.ts): the
+  penalised solid's drag toward the hand's speed, in units of the cell's own
+  drag. At 40 the liquid where the hand fills the cell goes at 40/41 of the
+  hand's speed whatever its thickness. Higher holds closer to it and makes
+  the hand's cells a steeper jump in mobility for the pressure solve (c falls
+  as 1/(1 + 40)); lower lets the liquid slip through the hand: at 5 a stroke
+  carried bands of colour half as far (`npm run fingerflow`, lab).
+*/
+export const HAND_GRIP = 40;
+
 /**
  * The edge of a finger, in cells of an L-cell plate. A hand's no-slip does
  * not stop at its skin: in a thin layer the drag a solid puts on the liquid

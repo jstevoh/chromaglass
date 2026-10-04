@@ -1950,6 +1950,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and in the same plan item.
   */
 
+  /*
+    On a thin gap (A.a.x 1) three below are not here: each is taken as the
+    force its phenomenon makes (PLAN 18a-2). Rain Drip and Updraft are the
+    dye's weight and a draught's shear (hsBody); Glass Smear is the glass
+    sliding, which drags the liquid toward its speed (hsPrep). Vibration
+    stays a stir for now: as the glass ringing it is a change in the gap,
+    and PLAN 18a-2 says why that waits for 18a-8.
+  */
+  let thin = A.a.x > 0.5;
+
   if (S.vibI > 0.0005 && d > 0.05) {
     let f = S.vibF * 0.5;
     let s = S.time * 20.0;
@@ -1957,7 +1967,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
               v.y + cos(p.x * f) * sin(p.y * f + s) * S.vibI, v.z, v.w);
   }
 
-  if (S.drip > 0.01) {
+  if (!thin && S.drip > 0.01) {
     let streak = (snoise(vec2f(p.x * 0.15, p.y * 0.02 - S.time * 0.2)) + 1.0) * 0.5;
     v.y -= 0.5 * S.drip * (0.1 + streak * streak * 0.9);
     let s1 = 1.0 - max(0.0, streak);
@@ -1965,11 +1975,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.xy * exp(-friction * S.dt), v.z, v.w);
   }
 
-  if ((S.smear.x != 0.0 || S.smear.y != 0.0) && d > 0.01) {
+  if (!thin && (S.smear.x != 0.0 || S.smear.y != 0.0) && d > 0.01) {
     v = vec4f(v.xy + S.smear * (snoise(p * 0.1) * 0.5 + 0.5), v.z, v.w);
   }
 
-  if (S.air > 0.1 && d > 0.01) {
+  if (!thin && S.air > 0.1 && d > 0.01) {
     let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
     let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
     v = vec4f(v.x + gx, v.y + gy, v.z, v.w);
@@ -3646,7 +3656,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), A.a);
 }`,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
-  ...thinGapKernels(HEAD, W),
+  ...thinGapKernels(HEAD, W, NOISE_WGSL),
 };
 
 /*
