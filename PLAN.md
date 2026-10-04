@@ -332,7 +332,14 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 4. Polish.**
 
-- (none yet)
+- **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
+  `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
+  without ever cutting away; Auto picks its own subject, rides it for Shot Length (5 s
+  by default) and whip-pans to another. Between Auto's cuts both ride one bead, and
+  nothing on the chip says which is which (the difference is only in hover titles).
+  Make it obvious on the chip, for example a mark where Follow is locked and Auto's
+  cuts named in its label; keep both. Desk (`src/App.tsx`, the zoom chip) and phone
+  (`PhoneStage.tsx`, the same three buttons).
 
 ## Running order
 
