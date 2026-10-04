@@ -3816,6 +3816,10 @@ its frame rate live. "Free" means no new passes or texture reads.
   the gallery page linked from #262; the pictures are in the project's shared files.
   `npm run lamp` now renders every look at 0 for its byte-for-byte line and asks that the
   looks shipped on the lamp draw on it. The owner can overrule any pick (Save Look).
+  Found on the way: a projector set to the film alone kept the look's lamp ground, so on
+  a look on the lamp it threw the bare lamp with the film over it; the film alone now
+  takes the lamp ground out too (`plateSources.ts`, `npm run map`), as `wall`'s film-alone
+  line on the Mac (Fillmore East) would have found.
 - **18b-8. The dishes too deep for the lamp.** Nineteen looks are dishes by their own
   description but fail the rule with the dye they were given for black: on the lamp the
   dish goes black (ink over 30%) and the colour goes with it: Classic, Deep Ocean, Acid

@@ -28,8 +28,9 @@
  * GALLERY_GROUNDS is for choosing which looks go on the lamp (PLAN 18b-1;
  * `npm run lampjudge` reads the pictures it writes, pixel against pixel). The two grounds are the same
  * moment of the same plate: Lamp Ground is read only by the plate pass, so the
- * setting is turned and the frame taken a few frames later, before the liquid
- * has moved enough to matter. Two page loads would be two different plates
+ * setting is turned and the frame taken a quarter second later, about half a
+ * second after the first ground's (its two frame reads come between), before
+ * most looks have moved enough to matter. Two page loads would be two different plates
  * (the band, the seeding and the look's own wandering all start afresh), and
  * the comparison would be between two dishes rather than two grounds.
  */
@@ -134,8 +135,7 @@ try {
         fs.writeFileSync(path.join(OUT, file), Buffer.from(dataUrl.split(',')[1], 'base64'));
         const r3 = (n) => +n.toFixed(3);
         const metrics = m ? { luma: r3(m.luma), colours: r3(m.colours), flat: r3(m.flat), cast: r3(m.cast), motion: +m.motion.toFixed(4), detail: +m.detail.toFixed(4) } : null;
-        const read = ground === null ? undefined : await page.evaluate(() => window.chromaglassDebug().settings.lampGround);
-        row.frames.push({ t, ground, read, file, engine: status.engine, plates: status.plates, metrics });
+        row.frames.push({ t, ground, file, engine: status.engine, plates: status.plates, metrics });
       }
       if (GROUNDS[0] !== null) await page.evaluate((g) => { window.chromaglassDebug().settings.lampGround = g; }, own);
     }

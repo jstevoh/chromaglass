@@ -9,8 +9,8 @@
  * The owner asked for the choice to be made by rule rather than by taste, so
  * this is the rule, written down, and the numbers it reads come from the Mac
  * (`gallery.yml` labelled `lamp-gallery`: every look at 12 and 30 seconds,
- * each moment taken on both grounds a quarter second apart, so the two
- * pictures are the same dish).
+ * each moment taken on both grounds about half a second apart, so the two
+ * pictures are the same dish, moved on by what half a second moves it).
  *
  * Two questions, in order.
  *
@@ -73,7 +73,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { groundPairOf } from './judge.mjs';
+import { groundPairOf, roomOf } from './judge.mjs';
 
 const DIR = process.argv[2] ?? 'gallery';
 const GLARE = 0.45, INK = 0.30, LIT = 0.20, KEEP = 0.6, SAME = 0.06;
@@ -138,8 +138,11 @@ export const verdictOf = (id, name, pairs) => {
     lit: Math.min(...pairs.map((p) => p.reading.lit)),
     keep: Math.min(...pairs.map((p) => p.reading.lit / Math.max(1e-3, p.reading.litBlack))),
     // The least of the moments: the two pictures are taken about half a
-    // second apart, and a look moving fast (Ferro Maze fingering at 12 s,
+    // second apart (the shot, two frame reads 150 ms apart, the turn, a
+    // quarter second), and a look moving fast (Ferro Maze fingering at 12 s,
     // 0.18) differs that much by itself; the ground differs at every moment.
+    // So `change` is the ground plus that half second's motion, and the gate
+    // can only call a look unreached, never prove one reached.
     change: Math.min(...pairs.map((p) => p.reading.change)),
   } : null;
   const fails = [];
@@ -152,7 +155,7 @@ export const verdictOf = (id, name, pairs) => {
   let ground, reason;
   if (kind === 'light') { ground = 0; reason = `It draws light, not dye: ${why}.`; }
   else if (kind === 'picture') { ground = 0; reason = `A picture with its own ground, not a dish on a lamp: ${why}.`; }
-  else if (!worst) { ground = 0; reason = 'No pair of frames on both grounds to judge; left as it ships.'; }
+  else if (!worst) { ground = null; reason = 'No pair of frames on both grounds to judge.'; }
   else if (worst.change < SAME) { ground = 0; reason = `A dish (${why}), but it draws the same on both grounds (at one moment the pictures differ by ${(worst.change * 100).toFixed(1)}% on average): its own dye already draws the lamp's white, so it keeps what it ships with.`; }
   else if (fails.length) { ground = 0; reason = `A dish (${why}), but on the lamp ${fails.join('; ')}.`; }
   else { ground = 1; reason = `A dish on a lamp (${why}), and it reads there: ${Math.round(worst.lit * 100)}% lit colour, ${Math.round(worst.glare * 100)}% bare lamp, ${Math.round(worst.ink * 100)}% black at worst.`; }
@@ -184,13 +187,18 @@ const readPairs = async (index) => {
     const out = [];
     for (const row of index) {
       const times = [...new Set(row.frames.map((f) => f.t))].sort((a, b) => a - b);
-      const pairs = [];
+      const shots = [];
       for (const t of times) {
         const b = row.frames.find((f) => f.t === t && f.ground === 0)?.file;
         const l = row.frames.find((f) => f.t === t && f.ground === 1)?.file;
-        const reading = b && l ? groundPairOf(await pixelsOf(b), await pixelsOf(l)) : null;
-        pairs.push({ t, black: b ?? null, lamp: l ?? null, reading: reading && Object.fromEntries(Object.entries(reading).map(([k, v]) => [k, +v.toFixed(3)])) });
+        shots.push({ t, black: b ?? null, lamp: l ?? null, px: b && l ? [await pixelsOf(b), await pixelsOf(l)] : null });
       }
+      const whole = shots.filter((s) => s.px);
+      const room = whole.length ? roomOf(whole.map((s) => s.px)) : null;
+      const pairs = shots.map(({ t, black, lamp, px }) => {
+        const reading = px ? groundPairOf(px[0], px[1], room) : null;
+        return { t, black, lamp, reading: reading && Object.fromEntries(Object.entries(reading).map(([k, v]) => [k, +v.toFixed(3)])) };
+      });
       out.push([row, pairs]);
     }
     return out;
@@ -200,6 +208,14 @@ const readPairs = async (index) => {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const index = JSON.parse(fs.readFileSync(path.join(DIR, 'index.json'), 'utf8'));
   const verdicts = (await readPairs(index)).map(([row, pairs]) => verdictOf(row.id, row.name, pairs));
+  // A look without a whole pair at every moment has no reading, and a ruling
+  // made without one would read as "keep black": a gallery run with no grounds
+  // (a plain `gallery` label) or with frames that failed must not look like one.
+  const unread = verdicts.filter((v) => !v.worst && v.kind === 'dish');
+  if (unread.length) {
+    console.error(`  no pair on both grounds for ${unread.map((v) => v.id).join(', ')}: run the gallery labelled lamp-gallery (GALLERY_GROUNDS=0,1)`);
+    process.exit(1);
+  }
   for (const v of verdicts) {
     const w = v.worst;
     console.log(`  ${v.ground ? 'LAMP ' : 'black'}  ${v.id.padEnd(20)} ${v.kind.padEnd(7)} ${w ? `glare ${f2(w.glare)} ink ${f2(w.ink)} lit ${f2(w.lit)} keep ${f2(w.keep)} change ${f2(w.change)}` : 'no frames'}`);

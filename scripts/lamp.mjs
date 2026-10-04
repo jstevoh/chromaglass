@@ -276,8 +276,9 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
   // lamp is dimmed to nothing.
   const up = rows.filter(r => r.lg > 0);
   const flat = up.filter(r => !(r.moved > 0.06) || r.litOwn < 5);
+  // At least one: with none on the lamp the line would pass on nothing.
   check(`the looks that ship on the lamp draw on it (${up.length}: each differs from itself at 0 by over 6%, none black)`,
-    !flat.length,
+    up.length > 0 && !flat.length,
     up.length ? up.map(r => `${r.id} ${(r.moved * 100).toFixed(0)}%`).join(', ') : 'none ship on the lamp');
 }
 
