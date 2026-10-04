@@ -350,6 +350,11 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   between them, across the presets in general. Wall, desk. Thread "More colour in the
   looks".
 
+- **QA-15** Roy, 1963 always opens on a giant black stain over flat red, filling most of
+  the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
+  Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
+  to 21d hold the rest of its open work. Deferred by the owner: fix later.
+
 **Tier 4. Polish.**
 
 - **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
