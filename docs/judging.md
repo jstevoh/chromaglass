@@ -724,8 +724,10 @@ pushes the colour along and keeps it. On Classic, with a pool laid:
 
 - draw the Blow slowly through the pool: a tongue of colour should be pushed ahead
   of the hand and pile up where it stopped, with no dark trail behind it;
-- stop and hold: the straw's bubble should start within a tenth of a second, and a
-  drag should no longer leave a string of small straw bubbles behind it;
+- stop and hold: the straw's bubble should start within about a sixth of a second (a
+  little later on a machine drawing under 20 frames a second), a drag should no longer
+  leave a string of small straw bubbles behind it, and a drag should not start with a
+  bubble where it was pressed;
 - on the phone, hold one finger (the straw) and drag a second across the colour: the
   second pushes it; hold the second still and it should blow a small clear ring;
 - on Oil & Water, blow across a body: the oil and its colour should go together.

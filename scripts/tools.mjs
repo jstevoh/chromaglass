@@ -357,15 +357,31 @@ try {
     const pct = (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
     const straw = (steps1?.straw ?? 0) - (steps0?.straw ?? 0), wind = (steps1?.wind ?? 0) - (steps0?.wind ?? 0);
     const carried = (steps1?.carried ?? 0) - (steps0?.carried ?? 0);
+    const strawFirst = (steps1?.strawFirst ?? NaN) - (steps0?.strawFirst ?? NaN);
     console.log(`     the stroke ran ${wind} wind steps and ${straw} straw steps; the wind carried ${carried.toFixed(1)} of colour`);
     check('Blow drawn across a pool is the wind, and the wind carries colour', wind > straw && carried > 1,
       `${wind} wind steps against ${straw} straw, ${carried.toFixed(1)} carried`);
+    /*
+      And no straw where it was pressed. A straw step blows a real bubble,
+      whose air takes the dye under it off the plate while it sits there
+      (airExclude), and a press has no move before it, so the straw's old
+      clock ("no move in 150 ms") blew one on every step between the press
+      and the first move the pointer reported: main's deploy after #230 lost
+      54 of a pool of 229 under "keeps it" with 5 straw steps in the stroke
+      (49 wind steps, 156.5 carried). The press now counts as a move, so a
+      drag that starts moving at once (this stroke's first move follows the
+      press with no wait) blows none before it; strawFirst counts them. And
+      the stroke has to have run as a Blow at all (wind steps), or a tool pick
+      that missed would blow no straw either.
+    */
+    check('and blows no straw where it was pressed', strawFirst === 0 && wind > 0,
+      `${Number.isFinite(strawFirst) ? strawFirst : 'no count of'} straw step(s) before the stroke's first move`);
     check('and pushes the colour along', stepsOk && wa.total > 20 && wAlong > 0.002 + idleAlong,
       !stepsOk ? `the plate did not step through every window (${wIdle.steps}, ${strokeSteps}, ${wIdleAfter.steps} steps)`
         : `centre of mass moved ${pct(wAlong)} of the plate toward where the stroke went over ${strokeSteps} steps, against ${pct(idleB)} over ${wIdle.steps} before and ${pct(idleBAfter)} over ${wIdleAfter.steps} after left alone (${pct(idleAlong)} at the faster rate toward it over the stroke's steps), from a pool of ${wa.total.toFixed(0)}`);
     const lowIdle = Math.min(wIdle.total, wIdleAfter.total);
     check('and keeps it rather than erasing it', wa.total > 20 && (wb.total - wa.total) - lowIdle > -(0.1 * wa.total + 5),
-      `${wa.total.toFixed(0)} → ${wb.total.toFixed(0)}, against ${wIdle.total >= 0 ? '+' : ''}${wIdle.total.toFixed(0)} before and ${wIdleAfter.total >= 0 ? '+' : ''}${wIdleAfter.total.toFixed(0)} after with the plate left alone as long`);
+      `${wa.total.toFixed(0)} → ${wb.total.toFixed(0)}, against ${wIdle.total >= 0 ? '+' : ''}${wIdle.total.toFixed(0)} before and ${wIdleAfter.total >= 0 ? '+' : ''}${wIdleAfter.total.toFixed(0)} after with the plate left alone as long; ${straw} straw step(s) in the stroke`);
   }
 
   // ── Blow and Press ──────────────────────────────────────────────

@@ -290,7 +290,33 @@ const FINGER_SWIRL = 0.8;
   of stopping, which reads as at once.
 */
 const BLOW_DIR_HOLD_MS = 150;
-type BlowDir = { x: number; y: number; at: number };
+/*
+  And the Blow is a straw only once the hand has been held for that long and
+  for this many frames in which the pointer reported no move, counting the
+  press itself as a move (PLAN.md §15c).
+
+  The straw used to be "not going": no move within BLOW_DIR_HOLD_MS. Two holes
+  in that, and the deploy after #230 fell into one: a Blow drawn across a pool
+  lost 54 of its 229 of dye (main's deploy, run 37177982848), the old eraser's
+  size of loss, though the wind had run 49 steps and carried 156.5. The
+  stroke had also run 5 straw steps, and a straw step blows a real bubble,
+  whose air takes the dye under it off the plate (airExclude) for as long as
+  the bubble sits there.
+  - A press has no move before it, so every step between the press and the
+    first move the pointer reports was a straw step: a drag began by blowing
+    a bubble in the middle of whatever it was drawn through. At 10 to 30
+    frames a second, as the Mac runner draws, that is a frame or two of steps
+    before the first move arrives (2, 3, 5 and 7 straw steps on its runs).
+  - On a slow frame rate a hand that never stops reports its moves a frame
+    apart, and 150 ms is a frame and a half at 10 fps: a drag on a struggling
+    machine was a straw every time a move came a frame late.
+  So the press starts the hold's clock as a move does, and the hold is both
+  the time (a hand on a fast machine still reads as held within a sixth of a
+  second) and a few frames with no move in them (a hand on a slow one that is
+  moving reports a move every frame, and is not held).
+*/
+const BLOW_STRAW_FRAMES = 3;
+type BlowDir = { x: number; y: number; at: number; still: number; moved: boolean };
 /*
   Oil Bodies' pours (the onDeposit hook): a body is this many times the
   bottle's own radius (Oil's is 2, so about a tenth of the plate across
@@ -4520,7 +4546,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
   const blowDirRef = useRef<BlowDir | undefined>(undefined);
   /** The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`. */
-  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0 });
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -6648,22 +6674,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   swept, leaving a trench of holes and not a pushed tongue.
                 */
                 const now = performance.now();
-                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now };
-                const going = hand.blowDir && now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
+                // The press counts as a move, with no direction (BLOW_STRAW_FRAMES).
+                // The press step starts the frame count at 0 rather than counting itself.
+                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now, still: 0, moved: true };
+                else if (!hand.blowDir) hand.blowDir = { x: 0, y: 0, at: now, still: 0, moved: false };
+                else if (simStep === 0) hand.blowDir.still++;
+                const going = now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
+                const held = !going && hand.blowDir.still >= BLOW_STRAW_FRAMES;
                 af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
                 /*
                   The straw only when the hand is held, not moved, by the same
-                  clock the ferrofluid goes by. Asked of `still` (no move this
-                  step), a drag blew the straw on every step after a frame's
-                  first and on every frame the pointer did not report a move,
-                  which is most of them: a drag left a string of straw bubbles
-                  and ran the wind a step a frame at best, so the wind's carry
+                  clock the ferrofluid goes by and a few frames with no move
+                  (BLOW_STRAW_FRAMES). Asked of `still` (no move this step), a
+                  drag blew the straw on every step after a frame's first and
+                  on every frame the pointer did not report a move, which is
+                  most of them: a drag left a string of straw bubbles and ran
+                  the wind a step a frame at best, so the wind's carry
                   (PLAN.md §15c) waited on the rare step that was both a wind
                   step and a fresh reading of the dye.
                 */
-                if (activeLayerRef.current === 0 && !going && primary) {
+                if (activeLayerRef.current === 0 && held && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
                   blowStepsRef.current.straw++;
+                  // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
+                  if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
                 } else {
                   // The wind: it carries the colour (and an oil body's oil)
                   // the way the hand last went, as the ferrofluid above, or
