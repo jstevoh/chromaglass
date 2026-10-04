@@ -206,17 +206,18 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // A bell holds its shape and lags the water it is drifting in.
   'jellyfish-bloom':    ['water', 'milk'],
   'fractal-dream':      ['water', 'silicone'],
-  // Pools that stay pools while the plate churns underneath them.
-  // Pools that stay pools while the plate churns underneath them, with
-  // syrup settling under the ink rather than mixing into it.
-  'velvet-underground': ['ink', 'glycerine', 'syrup'],
+  // Three pools apart, one liquid each, poured into its own area of the
+  // dish (lib/plateAreas.ts): glycerine that holds, soap the bass breaks
+  // open, syrup that settles. Ink was here, and did nothing a pool showed.
+  'velvet-underground': ['glycerine', 'soap', 'syrup'],
   // Filaments are what a Marangoni front curls into.
   'neon-coral-reef':    ['water', 'soap', 'silicone'],
   'stardust-collapse':  ['water', 'soap'],
 
   // ── The light-show and photographic looks ────────────────────────
   // Wilfred's plate is nearly clear; what moves it is thickness, not dye.
-  'lumia':              ['water', 'glycerine'],
+  // And soap, for the one of its three areas whose veil spreads and opens (lib/plateAreas.ts).
+  'lumia':              ['water', 'glycerine', 'soap'],
   // Boyle put reactions on the platen — cells growing, then carried off.
   'sensual-laboratory': ['silicone', 'soap'],
   'oil-wheel':          ['oil', 'silicone'],

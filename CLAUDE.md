@@ -48,7 +48,7 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 
 | Where | Can verify | Cannot |
 |---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `particles`, `derive`, `mixer`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
+| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `regrid`, `particles`, `derive`, `mixer`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
 | CI, macOS runner (Metal) | Everything | — |
 | The owner's machine | How it looks at 60 fps | — |
 
@@ -66,7 +66,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
-| sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading) |
+| sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
 | `scripts/watch.mjs` | `npm run watch -- --selftest` and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |

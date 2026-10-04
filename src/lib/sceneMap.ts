@@ -66,8 +66,11 @@ import { MIX_FADE_KEYS } from './mixer';
   Thin Gap is a solver mode, not an amount (PLAN §18a): a patch riding it
   would switch the plate's physics every time the sound crossed half, so it
   is held by hand, a pad or a desk, and its Thickness is what a patch rides.
+  Clear Film (PLAN §20b) likewise: moving it pours clear oil over the whole
+  dish or draws it off, so a patch riding the beat would fill the lace's
+  holes in on every bar. A pour is a hand's gesture.
 */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap',
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
@@ -116,6 +119,9 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   'thinGap', 'gapThickness',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
   'vorticityConfinement', 'oilTension', 'oilBodies', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
+  // The clear film (PLAN §20b): the front plate's solver lays it; a back
+  // plate is handed 0 until the display can draw one there (20b-5).
+  'clearFilm',
   /*
     The second phase and its magnet (H7). Each layer is a separate dish with
     its own phase field, so each can have its own domains and its own magnet —

@@ -52,6 +52,13 @@ export interface LiquidBehaviour {
    * the magnet, and the maze field, move it.
    */
   magnetic?: number;
+  /**
+   * A solvent: where it lands on a clear film (PLAN §20b) it lowers the film's
+   * surface tension, the film is pulled away from it (Marangoni), and a hole
+   * opens. Alcohol, at about 22 mN/m against water's 72, is the performer's
+   * gesture for it. Soap does the same through its own `soap`.
+   */
+  solvent?: number;
 }
 
 export interface LiquidType {
@@ -85,8 +92,8 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'oil',     name: 'Oil',     color: '#ffaa22', description: 'Lighter than water and will not mix with it — rides up and beads',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0,
     behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3 } },
   // Lighter still, and polar enough to go into water rather than sit on it.
-  { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Light and thin: it rises through water and disperses with heat',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
-    behaviour: { weight: -0.2, polarity: -0.15 } },
+  { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Light and thin: it rises through water and disperses with heat, and opens holes in a clear film',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
+    behaviour: { weight: -0.2, polarity: -0.15, solvent: 1 } },
   { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.3, heatAmount: 0.0,
     behaviour: { weight: 0.02, polarity: 0.2 } },
   // The heavy one, and it is sugar in water, so it is polar: it sinks through
@@ -419,6 +426,16 @@ export interface VisualizerSettings {
   oilBodies: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
+  /**
+   * A clear film against the glass (PLAN §20b): 0 none; up, a clear oil film
+   * that thick (1 is 0.86 of the gap) laid over the plate, which tears open
+   * into a lace of holes by its own physics (dewetting: thin parts and the
+   * dish's dust first, and wherever a drop of alcohol or soap lands). The
+   * dyed water under it is the gap less the film, so it shows white on Lamp
+   * Ground and the colour comes through the holes. Oil poured on it thickens
+   * it. Moved while a film is on, the film is raised or lowered everywhere.
+   */
+  clearFilm?: number;
   /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor). */
   solutalBuoyancy: number;
   /** How far the plate stands up, from flat on the projector (0) to upright on the wall (1): what gravity can do in it. */
@@ -842,6 +859,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   surfactantFlow: 0,
+  clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
