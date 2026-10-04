@@ -123,6 +123,7 @@
     "wind": "node scripts/wind.mjs",
     "thingap": "node scripts/thingap.mjs",
     "presslift": "node scripts/presslift.mjs",
+    "forces": "node scripts/forces.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "benday": "node scripts/benday.mjs",

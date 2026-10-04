@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes on the lamp when it still reads there with its own dye; a look that is
   light itself or a picture with its own ground keeps black.
 
+### Changed — the Magnet moves only the ferrofluid that is there (PLAN 9y)
+
+- **The Magnet brings no ferrofluid.** Its first touch on a plate with none used
+  to lay a pool under the hand. Now it moves only ferrofluid poured from the
+  bottle or laid by the look, and over a bare plate it does nothing visible, as
+  a real magnet under an empty dish. Magnet Size is the magnet's own size.
+
 ### Added — the lamp through the dye (PLAN 18b)
 
 - **Lamp Ground** (`lampGround`, Settings → Lamp & Light; MIDI, the desks, the
