@@ -997,8 +997,9 @@ Open, from building 9i:
   instability (`src/gpu/standing.ts`, `wgsl/standing.ts`): tension, gravity, the
   field's lift as a half-Laplacian through an FFT, the glass's wetting, a cell past
   full a dome that much taller. The plate's own passes step aside under it (the
-  separation, Cahn–Hilliard, the maze's flow, the magnet's pull and the advection);
-  its cap at full is raised to the top glass there. The plate draws each dome from
+  separation, Cahn–Hilliard, the maze's flow and the magnet's pull), and the
+  water's flow carries only the layer's mean there, the film its shape; its cap at
+  full is raised to the top glass there. The plate draws each dome from
   the layer's own slope, the white point on the top of each. In the lab on 384², a
   pool 0.12 in radius under the hand's Magnet: from 84% black to 47% within 0.08 of it, 13
   domes a median 0.032 apart (2π l_c is 0.04), none made or lost; flat under
@@ -1035,14 +1036,18 @@ Open, from building 9i:
     take), is not yet measured on a Mac or a phone.
   - **9t-7. 256².** A capillary length is 1.6 cells there, and the domes are coarse
     (9g).
-  - **9t-8. Fewer fingers past a pool's rim.** Under the hand's Magnet the layer drains
-    from the pool's rim into the domes (the ring 0.125 to 0.17 from the magnet at 0.30 of
-    full where the pour put 0.48, the middle 1.1 to 1.3), so `npm run fingers` counts
-    6/6/8/1 past the rim where the plate without the film made 11/10/9/5 (the window at
-    nothing). Not the window's size (0.4 to 0.65 of the patch gave 6/4/6/3) nor the
-    plate's raised ceiling. Inferred to be the lift's own pull toward the stronger field,
-    which a real layer has too; whether the rim should still finger as it did is a look on
-    the Mac, against the references.
+  - **9t-8. Fewer fingers past a pool's rim: fixed in #247.** With the film's window
+    stepping the water's flow aside, nothing carried the layer out of it: the window
+    kept 7212 of the pool's 13029 where the plate alone kept 5429, the rim had less to
+    finger with, and `npm run fingers` counted 6/4/5/2 on the Mac against main's
+    12/9/9/3. The flow now carries the layer's mean under the window (wgsl/fluid.ts,
+    carried): 9/12/9/5 in 7 sectors, the domes standing (the flow carrying each cell
+    as outside instead poured the domes into slabs). Left: the last dome on the
+    magnet's axis lies down more slowly when the field is turned down (1.12 at the
+    end of `npm run standing`'s leg, 1.06 after 960 steps more; that check now asks under 1.2
+    and at most 30 cells past 1.05, where it asked under 1.1), and the window still
+    stands in for the film fingering at its own edge, which a real layer does by the
+    same repulsion that raises its domes (9t-1).
   - **9t-9. The magnets still reach the plate's uniforms unread.** The plate drew its
     spikes from them; the domes come from the layer now, and the app still computes and
     uploads them every frame (plateUniforms.ts, magnetsOnPlate). Take them out, with the

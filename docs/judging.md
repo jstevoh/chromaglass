@@ -640,7 +640,12 @@ On Magnet Garden, then Ferro Paint:
   sink back. They do not slide along with it (the magnet's pull is not in the film
   yet, 9t-2);
 - a big pool (Magnet Garden's pour) under the Magnet: domes in the middle, the
-  fingers past them at its edge (9i). Say if the fingers are fewer than before;
+  fingers past them at its edge (9i), as many as before the domes (in the lab
+  9/12/9/5 on the fingers check's circles, against 12/9/9/3 before). Say if the
+  pool's middle reads as a patch cut out of it, a ring round the domes where the
+  fingering starts;
+- the Magnet no longer draws the fixed ring lattice of stars over the pool (the grid
+  the owner saw during shows): the domes are the liquid's own, wherever it stands;
 - the frame time with the Magnet held (`?debug`, `status.frameMs`), and on the
   phone with three fingers on the Magnet: each finger runs its own patch of the
   film (9t-6). Say if the governor steps down;
