@@ -9667,6 +9667,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (on !== undefined) WebGPUFluid.swirlHeldOff = !on;
               return fluidsRef.current.map((f) => (f.gpu instanceof WebGPUFluid ? { ...f.gpu.swirlCount, heldOff: WebGPUFluid.swirlHeldOff } : null));
             },
+            /** The lead plate's swirl stage timed on the GPU (WebGPUFluid.benchSwirl). */
+            benchSwirl: async (reps: number, thin: boolean) => {
+              const g = fluidsRef.current[0]?.gpu;
+              return g instanceof WebGPUFluid ? await g.benchSwirl(reps, thin) : null;
+            },
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
           grabFrame: () => stage?.grabFrame() ?? null,

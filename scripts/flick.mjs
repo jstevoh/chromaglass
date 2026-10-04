@@ -97,21 +97,34 @@ try {
     d.turntable.current.fill(0);
     d.liquidSpin.current.fill(0);
   }, { viscosity, drag: DRAG });
-  const read = () => page.evaluate(() => {
+  /*
+    Read inside an animation frame, after the app's own frame callback (it
+    asked for this frame during the one before, so it runs first), and
+    flick the same way: the speeds and angles read are then the ones the
+    frame worked out at the time `at` says, not the last frame's, whenever
+    that was. Read from a plain evaluate they were the last frame's against
+    the page's clock at the read, and a frame loop that paused a tenth of a
+    second before the read put the liquid that much behind its clock: a run
+    on #258 read the water at 0.117 rad/s "after 0.30 s" against 0.179, the
+    picture's angle at 0.41 of the liquid's, both what the drag time gives
+    at 0.19 s, on a commit whose app the same check had passed on an hour
+    before (0.176 against 0.186).
+  */
+  const read = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {
     const d = window.chromaglassDebug();
     const st = d.fluids[0]?.lastStep ?? null;
-    return {
+    resolve({
       at: performance.now(), frames: d.frames ?? 0, dish: (d.spin.current[0] ?? 0) + (d.turntable.current[0] ?? 0),
       liquid: d.liquidSpin.current[0] ?? 0, angle: d.rotation.current[0] ?? 0,
       handed: st ? (st.spinDish ?? 0) : null, twist: st ? (st.twist ?? 0) : null,
-    };
-  });
-  const flick = () => page.evaluate(() => {
+    });
+  })));
+  const flick = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {
     const d = window.chromaglassDebug();
     const a0 = d.rotation.current[0] ?? 0;
     d.flick(0);
-    return { at: performance.now(), frames: d.frames ?? 0, angle: a0, dish: d.spin.current[0] ?? 0 };
-  });
+    resolve({ at: performance.now(), frames: d.frames ?? 0, angle: a0, dish: d.spin.current[0] ?? 0 });
+  })));
 
   /*
     Measured on a plate that draws, not one still building. The first run on
