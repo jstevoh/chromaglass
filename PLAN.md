@@ -2901,8 +2901,24 @@ for, and the GPU was asked for only after they had arrived and drawn.
   restrict and zero) could be one dispatch writing both, which is fewer compiles and
   fewer dispatches a step. Each fusion changes the solver's step, so each wants
   `physics`, `thingap` and the Mac's frame time, not just `startup`.
-- *Chromium's GPU start.* All three first builds sat 3.4 s under it (2.9 s held, run
-  37192204661), whatever they were. Nothing the page asks changes when it ends.
+- **Changed after it shipped (2026-10-04, #254): one render pipeline compiling at a time.**
+  Main's deploy of 5505a2a (run 37196539858) went red on `startup` 4b: the page's
+  thread held 4.98 s from 0.96 s, against the 4.5 s cap. The three render pipelines
+  asked first (display, derive, the air's splat) did not compile side by side: each
+  took 5.22–5.24 s there, where the display alone had taken 1.03–2.49 s on every
+  run before this item, and the hold ended 0.27–0.65 s before the display's compile
+  did on six of the seven Mac runs since (2.92 to 5.94 s; the seventh still waited
+  in its lanes for first uses). Before it, with a kernel first, the hold ended 2.5
+  to 4.5 s in whatever was compiling, once with nothing asked yet. So
+  `buildInTurn` now compiles one render pipeline at a time, the display still
+  first, the other lanes taking kernels beside it. So what the page asks does move
+  when Chromium's hold at the GPU's start ends: it can lengthen it. On #254's Mac run
+  (37200639755) the hold was 2.91 s from 1.01 s (4.98 s on the red deploy; 1.92 to
+  4.98 s on the seven runs since #249), the first step 10.21 s (7.96 to 14.19 s).
+  The display still took 3.46 s, settling at 3.9 s with the two kernels beside it,
+  which also took 3.46 s each: whatever is in flight under Chromium's GPU start
+  ends with it. So one run says the change is not worse and passes 4b with room;
+  whether it narrows the spread needs the next deploys' readings.
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure
@@ -2968,18 +2984,29 @@ the hand held both 150 ms and three frames with no move (`BLOW_STRAW_FRAMES`).
 `tools` asks that the stroke blows no straw before its first move
 (`blowSteps.strawFirst`), and prints the stroke's straw steps under "keeps it".
 
-**Fixed after it shipped (2026-10-04): a drag began with a straw.** Main's deploy
-after #230 went red on `tools`' "keeps it rather than erasing it": a Blow drawn
-across a pool of 229 left 175, with 5 straw steps among its 49 wind steps. A press
-has no move before it, so "no move in 150 ms" made every step between the press
-and the first reported move a straw step, and the straw's bubble takes the dye
-under it off the plate while it sits there (`airExclude`; the plate's budget
-servo returns it later). At the Mac runner's 10–30 frames a second that was 2 to
-7 straw steps a stroke, and on a slow frame rate a moving hand whose moves came a
-frame apart read as held too. The press now counts as a move, and the straw needs
-the hand held both 150 ms and three frames with no move (`BLOW_STRAW_FRAMES`).
-`tools` asks that the stroke blows no straw before its first move
-(`blowSteps.strawFirst`), and prints the stroke's straw steps under "keeps it".
+**Changed after it shipped (2026-10-04): the push was judged against what came after it.**
+Main's deploy of 5505a2a (run 37196539858) went red on `tools`' "pushes the colour
+along": the wind moved the pool's middle +0.70% of the plate toward B, against
++0.56% to beat, all of it from the window left alone *after* the stroke (+0.39%;
+the window before read -0.00%). With the ambient seeder off (#249) the window before
+read -0.08% to +0.00% on all five runs that reached the line, and the window after
++0.24% to +0.39%, toward B every time. And since Thin Gap is on in every look
+(18a-every) the stroke's own push is smaller (+0.70% to +2.31% on main's code, was +0.76% to +4.15%), so the
+drift is a larger share. Whether it is the wind's liquid still going is not settled:
+split in halves on #254's first run it read +0.30% then +0.16% (no dying away within
+the thin gap's tenth of a second), and charged at the second half's rate the wind's
++0.64% met +0.69%. Charging it or not is a guess either way, and not charging it
+would pass a wind that pushed nothing on a plate that starts drifting with the
+stroke. So the wind is now drawn both ways, out to the right and out to the left
+from a fresh pool in the plate's middle each time, and each has to beat the window
+before it by 0.002: a drift the wind did not make helps one stroke as much as it
+holds back the other, and from the middle a drift toward the middle moves neither. The windows after are
+printed in halves for both; if they turn round with the wind, the drift is the
+wind's. On #254's Mac run (37200639755): out to the right +2.33% against +0.20% to
+beat, out to the left +1.48%, both with -0.00% before; after it +0.16% then +0.14%
+right and +0.26% then +0.15% left, each toward its own stroke's end, so the drift
+after does turn round with the wind. Not yet seen: the line failing on a wind with
+its carry turned off.
 
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
