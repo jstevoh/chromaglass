@@ -5521,7 +5521,8 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
   the treble (low middle). Center Gravity 0.35 → 0, Dye Budget 0.85 → 0.45 (violet
   between the pools), automation 0.04 → 0.08, liquids ink/glycerine/syrup →
   glycerine/soap/syrup. Lab, laid plate: 1 lit region (92%) → 3 (8.6, 7.6, 7.5%),
-  dark 4% → 73%; after 30 s of kicks: see the PR.
+  dark 4% → 73%. The same plate run for 15 s of kicks in the lab kept the old one as one
+  region (92.5%); the run on the new plate stalled on software WebGPU and is owed (25e).
 - **Lumia**: three veils, two in glycerine and one with soap in it (spread thin and
   opened), under the unchanged lumia light. Dye Budget 0.1 → 0.2, automation 0.008 →
   0.03, soap added to its liquids.
