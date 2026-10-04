@@ -23,6 +23,16 @@
  *   GALLERY_ONLY=a,b   just these presets
  *   GALLERY_TIMES=8,20,40   seconds after load (default)
  *   GALLERY_OUT=gallery
+ *   GALLERY_GROUNDS=0,1   each moment once per Lamp Ground, files <id>-<t>s-lamp<g>.jpg
+ *
+ * GALLERY_GROUNDS is for choosing which looks go on the lamp (PLAN 18b-1;
+ * `npm run lampjudge` reads the pictures it writes, pixel against pixel). The two grounds are the same
+ * moment of the same plate: Lamp Ground is read only by the plate pass, so the
+ * setting is turned and the frame taken a quarter second later, about half a
+ * second after the first ground's (its two frame reads come between), before
+ * most looks have moved enough to matter. Two page loads would be two different plates
+ * (the band, the seeding and the look's own wandering all start afresh), and
+ * the comparison would be between two dishes rather than two grounds.
  */
 
 import { chromium } from 'playwright';
@@ -38,6 +48,7 @@ const PORT = Number(process.env.GALLERY_PORT ?? 4344);
 const OUT = process.env.GALLERY_OUT ?? 'gallery';
 const ONLY = process.env.GALLERY_ONLY ? process.env.GALLERY_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : null;
 const TIMES = (process.env.GALLERY_TIMES || '8,20,40').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b);
+const GROUNDS = process.env.GALLERY_GROUNDS ? process.env.GALLERY_GROUNDS.split(',').map(Number).filter((n) => n >= 0 && n <= 1) : [null];
 const WIDTH = 480;
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -59,7 +70,7 @@ const looks = PRESETS.filter((p) => !ONLY || ONLY.includes(p.id));
 const index = [];
 const browser = await launchChromium(chromium);
 try {
-  console.log(`  ${looks.length} presets at ${TIMES.join(', ')}s\n`);
+  console.log(`  ${looks.length} presets at ${TIMES.join(', ')}s${GROUNDS[0] === null ? '' : `, Lamp Ground ${GROUNDS.join(' and ')}`}\n`);
   for (const preset of looks) {
     const page = await browser.newPage({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1 });
     const errors = [];
@@ -78,49 +89,61 @@ try {
       const wait = t * 1000 - (Date.now() - t0);
       if (wait > 0) await page.waitForTimeout(wait);
       await page.evaluate(() => document.body.classList.add('overlays-hidden'));
-      const dataUrl = await page.evaluate(async (width) => {
-        const size = await window.__cgShot?.('gallery');
-        const img = window.__shots?.gallery;
-        if (!size || !img) return null;
-        const full = document.createElement('canvas');
-        full.width = img.width; full.height = img.height;
-        full.getContext('2d').putImageData(img, 0, 0);
-        const out = document.createElement('canvas');
-        const scale = Math.min(1, width / img.width);
-        out.width = Math.round(img.width * scale); out.height = Math.round(img.height * scale);
-        const ctx = out.getContext('2d');
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(full, 0, 0, out.width, out.height);
-        return out.toDataURL('image/jpeg', 0.85);
-      }, WIDTH);
-      // The frame as numbers too (scripts/judge.mjs), so the sheet can be read
-      // for dark, flat, grey or frozen looks rather than only looked at.
-      const fa = await frameOf(page, 240, 150);
-      await page.waitForTimeout(150);
-      const fb = await frameOf(page, 240, 150);
-      const m = fa && fb ? readingOf(fa, fb, 240, 150) : null;
-      const status = await page.evaluate(() => {
-        const d = window.chromaglassDebug?.();
-        const r = (n) => (Number.isFinite(n) ? +n.toFixed(4) : String(n));
-        const plates = (d?.plateStats?.() ?? []).map((p) => ({ mean: r(p.mean), colour: p.colour.map(r), nan: p.nan, vmax: r(p.vmax) }));
-        return { engine: d?.engine ?? '', evolve: d?.crash?.latest?.()?.snap?.evolve ?? null, plates };
-      });
-      if (!dataUrl) {
-        row.frames.push({ t, file: null, why: JSON.stringify(await lastFrameRead(page)).slice(0, 200) });
-        console.log(`  ${preset.id.padEnd(22)} ${String(t).padStart(3)}s  no frame`);
-        continue;
+      const own = await page.evaluate(() => window.chromaglassDebug?.()?.settings?.lampGround ?? 0);
+      for (const ground of GROUNDS) {
+        if (ground !== null) {
+          // The settings object the frame loop reads each frame (plates.mjs
+          // turns Plate Curve the same way). A quarter second is about fifteen
+          // frames: enough for the plate pass to have drawn on the new ground,
+          // too short for the liquid to have gone anywhere.
+          await page.evaluate((g) => { window.chromaglassDebug().settings.lampGround = g; }, ground);
+          await page.waitForTimeout(250);
+        }
+        const dataUrl = await page.evaluate(async (width) => {
+          const size = await window.__cgShot?.('gallery');
+          const img = window.__shots?.gallery;
+          if (!size || !img) return null;
+          const full = document.createElement('canvas');
+          full.width = img.width; full.height = img.height;
+          full.getContext('2d').putImageData(img, 0, 0);
+          const out = document.createElement('canvas');
+          const scale = Math.min(1, width / img.width);
+          out.width = Math.round(img.width * scale); out.height = Math.round(img.height * scale);
+          const ctx = out.getContext('2d');
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(full, 0, 0, out.width, out.height);
+          return out.toDataURL('image/jpeg', 0.85);
+        }, WIDTH);
+        // The frame as numbers too (scripts/judge.mjs), so the sheet can be read
+        // for dark, flat, grey or frozen looks rather than only looked at.
+        const fa = await frameOf(page, 240, 150);
+        await page.waitForTimeout(150);
+        const fb = await frameOf(page, 240, 150);
+        const m = fa && fb ? readingOf(fa, fb, 240, 150) : null;
+        const status = await page.evaluate(() => {
+          const d = window.chromaglassDebug?.();
+          const r = (n) => (Number.isFinite(n) ? +n.toFixed(4) : String(n));
+          const plates = (d?.plateStats?.() ?? []).map((p) => ({ mean: r(p.mean), colour: p.colour.map(r), nan: p.nan, vmax: r(p.vmax) }));
+          return { engine: d?.engine ?? '', evolve: d?.crash?.latest?.()?.snap?.evolve ?? null, plates };
+        });
+        if (!dataUrl) {
+          row.frames.push({ t, ground, file: null, why: JSON.stringify(await lastFrameRead(page)).slice(0, 200) });
+          console.log(`  ${preset.id.padEnd(22)} ${String(t).padStart(3)}s  no frame`);
+          continue;
+        }
+        const file = ground === null ? `${preset.id}-${t}s.jpg` : `${preset.id}-${t}s-lamp${ground}.jpg`;
+        fs.writeFileSync(path.join(OUT, file), Buffer.from(dataUrl.split(',')[1], 'base64'));
+        const r3 = (n) => +n.toFixed(3);
+        const metrics = m ? { luma: r3(m.luma), colours: r3(m.colours), flat: r3(m.flat), cast: r3(m.cast), motion: +m.motion.toFixed(4), detail: +m.detail.toFixed(4) } : null;
+        row.frames.push({ t, ground, file, engine: status.engine, plates: status.plates, metrics });
       }
-      const file = `${preset.id}-${t}s.jpg`;
-      fs.writeFileSync(path.join(OUT, file), Buffer.from(dataUrl.split(',')[1], 'base64'));
-      const r3 = (n) => +n.toFixed(3);
-      const metrics = m ? { luma: r3(m.luma), colours: r3(m.colours), flat: r3(m.flat), cast: r3(m.cast), motion: +m.motion.toFixed(4), detail: +m.detail.toFixed(4) } : null;
-      row.frames.push({ t, file, engine: status.engine, plates: status.plates, metrics });
+      if (GROUNDS[0] !== null) await page.evaluate((g) => { window.chromaglassDebug().settings.lampGround = g; }, own);
     }
     // What was on the plate at each moment: fill, and a count of cells that
     // are not a number. A bare-ground frame is empty or poisoned; this says which.
     const plateNote = row.frames.map((f) => (f.plates ?? []).map((p) => `${p.mean}${p.nan ? ` NaN×${p.nan}` : ''}`).join('/')).join(' ');
     const metricNote = row.frames.map((f) => f.metrics ? `L${f.metrics.luma} C${f.metrics.colours} F${f.metrics.flat} M${f.metrics.motion} D${f.metrics.detail}` : '-').join(' | ');
-    console.log(`  ${preset.id.padEnd(22)} ${row.frames.filter((f) => f.file).length}/${TIMES.length} frames${errors.length ? `, ${errors.length} console errors` : ''}  fill ${plateNote}\n      ${metricNote}`);
+    console.log(`  ${preset.id.padEnd(22)} ${row.frames.filter((f) => f.file).length}/${TIMES.length * GROUNDS.length} frames${errors.length ? `, ${errors.length} console errors` : ''}  fill ${plateNote}\n      ${metricNote}`);
     index.push(row);
     await page.close();
   }
@@ -128,13 +151,14 @@ try {
   // The contact sheet: laid out as HTML and photographed, which keeps this
   // free of an image library.
   const img = (f) => f?.file ? `data:image/jpeg;base64,${fs.readFileSync(path.join(OUT, f.file)).toString('base64')}` : '';
-  const rows = index.map((r) => `<tr><th>${r.name}<br><small>${r.id}</small></th>${TIMES.map((t) => {
-    const f = r.frames.find((x) => x.t === t);
+  const cols = TIMES.flatMap((t) => GROUNDS.map((g) => [t, g]));
+  const rows = index.map((r) => `<tr><th>${r.name}<br><small>${r.id}</small></th>${cols.map(([t, g]) => {
+    const f = r.frames.find((x) => x.t === t && x.ground === g);
     const mm = f?.metrics;
     const note = mm ? ` · lum ${mm.luma} · colour ${Math.round(mm.colours * 100)}% · flat ${Math.round(mm.flat * 100)}% · motion ${mm.motion}` : '';
-    return `<td>${f?.file ? `<img src="${img(f)}">` : '<div class="miss">no frame</div>'}<small>${t}s${note}</small></td>`;
+    return `<td>${f?.file ? `<img src="${img(f)}">` : '<div class="miss">no frame</div>'}<small>${t}s${g === null ? '' : ` · lamp ${g}`}${note}</small></td>`;
   }).join('')}</tr>`).join('');
-  const sheet = await browser.newPage({ viewport: { width: 200 + TIMES.length * (WIDTH / 2 + 12), height: 600 } });
+  const sheet = await browser.newPage({ viewport: { width: 200 + cols.length * (WIDTH / 2 + 12), height: 600 } });
   await sheet.setContent(`<html><body style="margin:0;background:#111;color:#ddd;font:12px system-ui">
     <style>td,th{padding:4px;vertical-align:top;text-align:left}th{width:180px}img{width:${WIDTH / 2}px;display:block}.miss{width:${WIDTH / 2}px;height:${WIDTH / 3.2}px;background:#400}</style>
     <table>${rows}</table></body></html>`, { waitUntil: 'load' });

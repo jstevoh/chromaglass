@@ -129,8 +129,11 @@ check(/pull_request:\s*\n\s+types:\s*\[labeled\]/.test(galleryOn) && !/paths:|sy
   'gallery.yml runs on a label or by hand, not on every push');
 // The job's own `if:`, the line under `gallery:`'s name, not a comment.
 const galleryIf = block(gallery, 'jobs').match(/^ {4}if: (.*)$/m)?.[1] ?? 'none';
-check(galleryIf === "github.event_name == 'workflow_dispatch' || github.event.label.name == 'gallery'",
-  "gallery.yml's job runs only for the `gallery` label or a dispatch", galleryIf);
+// Two labels ask for pictures: `gallery` (every look as it ships) and
+// `lamp-gallery` (every look on black and on the lamp, PLAN 18b-1). Any other
+// label, `controls` above all, must not start a Mac run.
+check(galleryIf === "github.event_name == 'workflow_dispatch' || github.event.label.name == 'gallery' || github.event.label.name == 'lamp-gallery'",
+  "gallery.yml's job runs only for the `gallery` or `lamp-gallery` label or a dispatch", galleryIf);
 
 console.log(failed ? `\n${failed} failed` : '\nall ok');
 process.exit(failed ? 1 : 0);

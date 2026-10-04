@@ -109,6 +109,7 @@
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",
     "spikes": "node scripts/spikes.mjs",
+    "standing": "node scripts/standing.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferropour": "node scripts/ferropour.mjs",
     "regrid": "node scripts/regrid.mjs",
@@ -169,6 +170,7 @@
     "desktop": "npm run build && node scripts/desktop.mjs",
     "app": "npm run build && npm --prefix desktop start",
     "mac-app": "npm run build && npm --prefix desktop run dist",
+    "lampjudge": "node scripts/lampjudge.mjs",
     "clicks": "esbuild scripts/clicks.mjs --bundle --platform=node --format=esm --external:playwright --log-level=warning --outfile=node_modules/.cache/clicks.mjs && node node_modules/.cache/clicks.mjs"
   },
   "dependencies": {
