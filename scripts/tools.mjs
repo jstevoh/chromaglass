@@ -22,6 +22,8 @@
  *               to its rim; drawn across a pool, pushes the colour along and
  *               keeps it (it erased it: PLAN.md §15c, and `npm run wind`)
  *   Press       pushes dye out from under the palm into a ring, keeping it
+ *   Press, let go, on a thin gap (Thin Gap, PLAN §18a): the colour goes out
+ *               under the palm and comes back when the hand lets go
  *
  * The Magnet has its own check (npm run magnet).
  *
@@ -72,7 +74,7 @@ try {
   const snap = (keep) => page.evaluate((keep) => {
     const d = window.chromaglassDebug();
     const f = d.fluids?.[0];
-    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1 };
+    (window.__toolSnaps ??= {})[keep] = { n: d.gridSize, data: Float32Array.from(f.readDensity), step: f.stepIndex ?? -1, dt: f.dtSeconds ?? 0 };
     return d.pointer();
   }, keep);
   /**
@@ -449,6 +451,249 @@ try {
       check('and keeps it', made > -0.15 * a.total - slack && made < 1.0 * a.total + slack,
         `${a.total.toFixed(0)} → ${b.total.toFixed(0)}, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} with the plate left alone as long`);
     }
+  }
+
+  // ── Press, let go, on a thin gap ────────────────────────────────
+  /*
+    The owner, 2026-09-28: the Press "just pushes everything out instead of
+    bringing it back when you release". With Thin Gap on, the flow between
+    the glasses is reversible, so what the glass pushed out it draws back
+    as it lifts; this asks it of the app, through the real pointer, on
+    Classic. Measured as the colour's mean distance from the palm, over the
+    whole cleared plate: it has to grow under the press, and once the hand
+    lets go a half of that growth has to come back within three seconds
+    (the lab's `npm run presslift` reads the same colour, under the palm,
+    77% back at 3 s on Classic's glass, and its ring 72%; a glass on the
+    look's clock, as it was, came back 4% in the first second, and a carry
+    that moved the colour out to a ring never brought it back at all). Turned off again after, so nothing
+    below or in later checks runs on it.
+
+    Two controls. The same press with Thin Gap off, the Press the owner
+    reported, which must come back less than half: a check that passed it
+    would not be measuring the fault. And each pool against itself: a pool
+    on this plate keeps spreading on its own (the look's flow and the dye's
+    spread), so before the hand comes down the same pool is watched for three
+    of the plate's seconds, and that drift is taken off what the press and
+    the lift do. The mean distance also falls if colour is lost from the
+    outside of the pool (the look's own fade, or colour pushed over the
+    dish's rim), and would read as colour come back, and rises if colour
+    under the palm is deleted rather than moved (the old press's cleared
+    centre): so neither the press nor the lift may lose more colour than
+    the pool lost on its own over the drift window (5% of it, for the
+    plate's own flicker).
+  */
+  {
+    /*
+      Held and let go in the plate's own seconds, not the page's. The first
+      Mac run held the Press 1.5 s and waited 3 s by the wall clock, and read
+      it pushed out 0.027 and a third back; on a runner that cannot keep the
+      step rate, the solver runs fewer steps than the wall's seconds and the
+      glass both closes and lifts less (the glass springs in the show's
+      seconds, `dtSeconds` a step). So each wait counts the solver's steps,
+      times what each stands for, and prints how long it took.
+    */
+    const waits = [];
+    const plateWait = async (seconds, record = true) => {
+      const t0 = Date.now();
+      const read = () => page.evaluate(() => { const f = window.chromaglassDebug().fluids?.[0]; return { n: f?.stepIndex ?? -1, dt: f?.dtSeconds ?? 0 }; });
+      const a = await read();
+      let b = a;
+      while (Date.now() - t0 < seconds * 8000 + 5000) {
+        await settle(50);
+        b = await read();
+        if (a.n >= 0 && b.dt > 0 && (b.n - a.n) * b.dt >= seconds) break;
+      }
+      const plate = a.n >= 0 ? (b.n - a.n) * b.dt : 0;
+      if (record) waits.push(`${plate.toFixed(2)} s of plate in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+      return plate >= seconds;
+    };
+    /*
+      The pool settles for twelve of the plate's seconds before anything is
+      read, and the hand holds for two and a half. With 1.5 s of the wall's
+      the pool was a fresh drop still spreading, as fast as the press's
+      whole net push (the idle pool 0.009 to 0.016 out in three seconds
+      against pushes of 0.015 to 0.020), and one run passed a press whose
+      own colour never came in (0.077 → 0.076; check-skeptic). Settled eight
+      seconds it still drifted 0.012 in three against a push of 0.023, so
+      the push is made longer and the drift smaller.
+    */
+    const settlePool = () => plateWait(12, false);
+    const HOLD = 2.5;
+    let timed = true;
+    /*
+      One press and let go on a settled pool at A. Read four times: settled;
+      three of the plate's seconds later with nothing touching it (its own
+      drift); held down HOLD seconds; three seconds after letting go.
+
+      Each pool is its own control. The runs before this laid a second,
+      idle pool as the control, and the two pools of one run started 15 to
+      40% apart in mean distance (37148523629: 0.105 against 0.072; the
+      re-run of 37150787513: 0.071 against 0.084) and drifted at different
+      rates, so the control's noise was as big as the effect.
+    */
+    const pressLift = async (name) => {
+      await clear();
+      await pool(A);
+      await settlePool();
+      const where = await snap(`${name}0`);
+      timed = (await plateWait(3)) && timed;
+      await snap(`${name}1`);
+      await tool('press');
+      await settle(300);
+      await page.mouse.move(...screen(...A));
+      await page.mouse.down();
+      timed = (await plateWait(HOLD)) && timed;
+      await snap(`${name}2`);
+      await page.mouse.up();
+      timed = (await plateWait(3)) && timed;
+      await snap(`${name}3`);
+      return where;
+    };
+    const spread = (keep, at) => page.evaluate(({ keep, at }) => {
+      const s = window.__toolSnaps[keep];
+      const n = s.n; let w = 0, d = 0, near = 0, far = 0;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        const v = Math.max(0, s.data[x + y * n]);
+        if (!Number.isFinite(v)) continue;
+        const r = Math.hypot(x - at.x, y - at.y) / n;
+        w += v; d += v * r;
+        if (r < 0.05) near += v;
+        else if (r > 0.2) far += v;
+      }
+      // A snapshot with no colour would read a mean of 0 and agree to anything below (check-skeptic): it stops the check instead.
+      if (!(w > 5)) throw new Error(`${keep}: no colour on the plate to measure`);
+      return { total: w, mean: d / w, under: near / w, far: far / w, step: s.step, dt: s.dt };
+    }, { keep, at });
+    const readRun = async (name, at) => Promise.all([0, 1, 2, 3].map((k) => spread(`${name}${k}`, at)));
+
+    /*
+      Each solver set, and the plate left three seconds, before its pool:
+      the fifth Mac run laid its pools straight after a change of Thin Gap
+      with less colour and further out than the others.
+    */
+    /*
+      On the calm plate (scripts/mirror.mjs's CALM: no turbulence, no sound
+      driving the flow, no rocking, rain or spin), where anything the hand
+      did not do stands out. On Classic as it plays, a pool settled twelve
+      seconds still drifted out 0.0041 of the plate a second, so over the
+      three seconds after the lift the drift (0.012) was half the press's
+      whole push (0.023, run 37163762683): a press frozen at the lift read
+      54%, and the check could not tell. The Press is the same Press; the
+      plate's own stirring, which no lift can undo, is what is taken away.
+      And no bubbles: the page's first click (an earlier check's) starts the
+      built-in band, whose kicks drop bubbles near the middle of the plate
+      whatever Audio Impact says, and a bubble is a held press of its own
+      (#225; the mirror check's thread found the band there, #238). Bubbles
+      at 0 clears the look's and stops the kicks laying more. Put back after.
+
+      And no ambient seeding (`chromaglassDebug().ambientSeed`). On the calm
+      plate with no bubbles the pool still drifted out 0.0043 a second (run
+      37166234101), the same as on Classic as it plays and the same settled
+      1.5, 8 or 12 seconds: not a drop still spreading, which would slow as
+      it aged, but a source that never stops. Every look lays dye at three
+      points orbiting a quarter to a third of the plate out from its middle,
+      0.05 a frame each; on a cleared plate that is the only colour beyond
+      the pool, and it grows. The plate's colour grew 6% in the three
+      seconds nothing touched it, a quarter of it lay beyond 0.05 of the
+      palm before the hand came down, and every bit that arrived out there
+      added to the mean distance. The share beyond 0.2
+      of the palm is printed so the next run shows what is left out there.
+    */
+    const before = await page.evaluate(() => ({ ...window.chromaglassSettings?.() }));
+    await page.evaluate(() => window.chromaglassSettings?.({
+      thinGap: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+      rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, rotationSpeed: 0, spinImpulse: 0, bubbles: 0,
+      audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
+    }));
+    // Asked for outright: a switch that was not there would leave the orbits seeding and the check reading what it read before.
+    const seedOff = await page.evaluate(() => typeof window.chromaglassDebug().ambientSeed === 'function' && (window.chromaglassDebug().ambientSeed(false), true));
+    if (!seedOff) throw new Error('chromaglassDebug().ambientSeed is missing: the Press check cannot stop the ambient seeding');
+    let off, on, thin = false;
+    try {
+      await settle(3000);
+      // The Press as the owner has it, Thin Gap off.
+      off = await readRun('off', await pressLift('off'));
+
+      await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 1 }));
+      // The thin gap's pipelines are built when it is first asked for; the plate runs the old way until they are in.
+      const thinBy = Date.now() + 20000;
+      while (!thin && Date.now() < thinBy) {
+        await settle(250);
+        thin = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap);
+      }
+      await settle(3000);
+      on = await readRun('lift', await pressLift('lift'));
+    } finally {
+      await page.evaluate((b) => window.chromaglassSettings?.({ ...b, thinGap: 0 }), before);
+      await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true));
+    }
+
+    /*
+      Net of the pool's own drift. `drift` is how far its mean moved a
+      plate second over the three before the hand. The push is what the
+      held pool did beyond that drift over the hold (the 0.3 s to pick the
+      tool adds a hundredth of the drift window's change, against it); the
+      return is how far it came in over the three seconds after letting go,
+      plus the three seconds of drift it would otherwise have made, as a
+      share of the push. Reversible flow brings the pool back to where it
+      would have drifted to had the glass never moved: that is 100%. The
+      lab's colour under the palm (`npm run presslift`) is 77% back at 3 s,
+      and the bar is half.
+
+      And the drift must not do the work: a press frozen where the hand left
+      it, its colour not moving at all after the lift, has to read under
+      half (check-skeptic's control: on an earlier run's numbers the frozen
+      press read 107%), and the pressed colour's own mean has to fall. The
+      push has to be real: the mean grows by a fifth more than the drift,
+      which is the film under the palm thinned by a third (the colour moving
+      with its liquid stretches by √(h₀/h)); the lab's press grows it ×2.13.
+    */
+    // Each window's length in the plate's seconds as the solver stepped it, not the wait asked for (a wait stops past its target, and the hold holds the 0.3 s tool pick too).
+    const span = (a, b) => (b.step - a.step) * b.dt;
+    const drift = (r) => (r[1].mean - r[0].mean) / Math.max(span(r[0], r[1]), 1e-3);
+    const pushOf = (r) => (r[2].mean - r[1].mean) - drift(r) * span(r[1], r[2]);
+    const backOf = (r) => (pushOf(r) > 0 ? ((r[2].mean - r[3].mean) + drift(r) * span(r[2], r[3])) / pushOf(r) : 0);
+    /*
+      And a quarter of the push has to come back on its own, before any drift
+      is credited. The frozen press rules out a return of nothing; it does not
+      rule out a token return plus a drift that slowed after the press (a
+      pushed-out pool spreads more slowly), which the pre-press rate then
+      over-credits: with drift 0.004 a second halving under the hand and a 2%
+      return on a 0.03 push, the formula reads 50% (check-skeptic). With this
+      the drift can supply at most half the bar.
+    */
+    const cameIn = (r) => r[2].mean - r[3].mean >= 0.25 * pushOf(r);
+    const pushed = (r) => pushOf(r) > 0.2 * r[1].mean;
+    const frozen = (r) => [r[0], r[1], r[2], { ...r[2], step: r[3].step, dt: r[3].dt }];
+    const resolves = (r) => backOf(frozen(r)) < 0.5;
+    const ratio = (a, b) => (a.total > 0 ? b.total / a.total : 0);
+    const own = (r) => ratio(r[0], r[1]);
+    const pressKept = ratio(on[1], on[2]), liftKept = ratio(on[2], on[3]);
+    const laid = on[0].total > 5 && off[0].total > 5;
+    /*
+      With the seeding off nothing lays colour but the hand, so no pool may
+      gain colour over the three seconds before it (it was 6% with the
+      seeding on). A plate still gaining colour is still being painted by
+      something the check does not control, and its drift is not the pool's.
+    */
+    const quiet = own(on) <= 1.01 && own(off) <= 1.01;
+    const quietNote = quiet ? '' : `; colour still arriving with nothing touching it (${(own(off) * 100).toFixed(0)}% and ${(own(on) * 100).toFixed(0)}% over the drift window)`;
+    const timing = timed ? `; waited ${waits.join(', ')}` : `; the plate did not step through every wait: ${waits.join(', ')}`;
+    const frozenNote = resolves(on) ? '' : `; the pool drifted too much to tell: a press frozen at the lift would read ${(backOf(frozen(on)) * 100).toFixed(0)}% back`;
+    const fmt = (r) => r.map((x) => x.mean.toFixed(3)).join(' → ');
+    // Printed, not asserted: the share of the colour within 0.05 of the palm, as the lab's presslift reads it.
+    const under = (r) => r.map((x) => `${(x.under * 100).toFixed(0)}%`).join(' → ');
+    check('Press on a thin gap pushes the colour out from under the palm',
+      thin && timed && laid && quiet && pushed(on) && pressKept >= own(on) - 0.05,
+      !thin ? 'the plate never ran as a thin gap' : `the colour's mean distance from the palm ${fmt(on)} (settled, its own drift, held down, let go): drifting ${drift(on).toFixed(4)} a second, pushed ${pushOf(on).toFixed(3)} net, against a fifth of ${on[1].mean.toFixed(3)}; ${(pressKept * 100).toFixed(0)}% of the colour kept against its own ${(own(on) * 100).toFixed(0)}% before the hand${quietNote}${timing}`);
+    check('and draws it back when the hand lets go, where the Press as it was did not',
+      thin && timed && laid && quiet && pushed(on) && resolves(on) && cameIn(on) && backOf(on) >= 0.5 && liftKept >= own(on) - 0.05
+        && pushed(off) && backOf(off) < 0.5,
+      `${on[2].mean.toFixed(3)} → ${on[3].mean.toFixed(3)} three of the plate's seconds after letting go: ${(backOf(on) * 100).toFixed(0)}% of the way back net of its drift, ${(((on[2].mean - on[3].mean) / Math.max(pushOf(on), 1e-6)) * 100).toFixed(0)}% before it (a quarter needed); ${(liftKept * 100).toFixed(0)}% of the colour kept against its own ${(own(on) * 100).toFixed(0)}%; with Thin Gap off (the control) ${fmt(off)}, pushed ${pushOf(off).toFixed(3)} net, ${(backOf(off) * 100).toFixed(0)}% back${frozenNote}`);
+    console.log(`     the colour within 0.05 of the palm: pressed on the thin gap ${under(on)}; Thin Gap off ${under(off)}`);
+    const farOf = (r) => r.map((x) => `${(x.far * 100).toFixed(0)}%`).join(' → ');
+    console.log(`     the colour beyond 0.2 of the palm: pressed on the thin gap ${farOf(on)}; Thin Gap off ${farOf(off)}`);
+    console.log(`     the Press's waits, in the plate's seconds: ${waits.join(', ')}`);
   }
 } finally {
   await browser.close();

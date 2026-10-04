@@ -717,7 +717,7 @@ press makes is visible or wants more.
 
 ---
 
-## 26. Blow's wind (PLAN 15c)
+## 29. Blow's wind (PLAN 15c)
 
 The Blow drawn across the plate used to wipe a trail out of the colour. Now it
 pushes the colour along and keeps it. On Classic, with a pool laid:
@@ -733,6 +733,34 @@ pushes the colour along and keeps it. On Classic, with a pool laid:
 - on Oil & Water, blow across a body: the oil and its colour should go together.
 
 Say if the wind now reads as too strong or too weak next to the Finger.
+
+---
+
+## 30. The Press draws the liquid back when you let go (Thin Gap, PLAN 18a)
+
+With Thin Gap on, the Press no longer moves the colour out to a ring by hand: the
+glass bends into a bowl under the palm, the liquid it squeezes out carries the
+colour and the oil with it, and when you let go the glass comes back up in about a
+second and a half (half way, at the default Press Lift) and draws them back in. With
+Thin Gap off, every look presses as it did. Turn it on with Settings → Squish Plate
+→ Thin Gap, `?set=thinGap=1`, or on the phone on the Press's own Amount (tap Press
+twice).
+
+On Classic, then Oil & Water (Oil Bodies), then the look you play most:
+
+- press and hold for a second, then let go: the colour under the palm should go out
+  in a smooth ring and come back in as the glass lifts, most of the way within a
+  few seconds. Say if the return is too slow or too fast; Press Lift sets it (on the
+  phone, "Press · glass lifts");
+- on Oil & Water, the oil should go out and come back with its colour, not leave it
+  behind;
+- press near the dish's edge: what goes over the rim should come back over it;
+- with Fingering up: the lift still breaks into the spokes, now only as the glass
+  opening along them (the colour is drawn in by the flow, not pushed);
+- the frame time while pressing (below): the colour's carry runs in up to 33 short
+  substeps for the few steps the glass is closing fastest, and in one otherwise;
+- the owner picked every look (2026-10-03); that is its own PR, and until it lands
+  Thin Gap is off in every look.
 
 ---
 

@@ -435,12 +435,15 @@ jobs:
   # and 11.3 with #218's Ben-Day print (63 s on its PR's runs), show 8.8 →
   # about 9.8 with the mixer), and they do not run at all for a change
   # that reaches none of them (the `reach` job above).
+  #
+  # The tools shard also takes the Press's let-go on a thin gap with its two
+  # controls (about 35 s more; #228).
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     needs: reach
     if: ${{ needs.reach.outputs.mac == 'true' }}
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -512,6 +515,12 @@ jobs:
       - name: The thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run thingap
+      # The app's own Press on a thin gap: the ring goes out as far as the
+      # displaced volume says with every drop kept, the colour's carry takes
+      # the substeps it needs, and it comes back when the glass lifts.
+      - name: The Press comes back on a thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run presslift
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.

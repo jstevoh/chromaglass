@@ -178,6 +178,18 @@ export interface PhoneStageProps {
    */
   fingering: number;
   onFingering: (v: number) => void;
+  /*
+    And the glass under the Press, beside Fingering: Thin Gap (PLAN §18a),
+    with which a press pushes the liquid out from under the palm and the
+    glass draws it back as it lifts, and Press Lift, how fast the glass
+    comes back up and so how fast the liquid returns. The desk has both on
+    the settings sheet's Physics; here they sit under the finger that
+    presses, so a press, a let go and the speed of the return are one reach.
+  */
+  thinGap: number;
+  onThinGap: (v: number) => void;
+  pressLift: number;
+  onPressLift: (v: number) => void;
   /**
    * Magnet Size, on the Magnet's own Amount panel (lib/magnetSize.ts): how
    * far the magnet under the finger reaches, a coin to a palm. Beside the
@@ -381,7 +393,13 @@ export function PhoneStage(p: PhoneStageProps) {
             touch
             testId="phone-amount-slider"
           />
+          {/*
+            The Press's three under its Amount: one under another in portrait,
+            side by side in landscape, where four rows pushed the dock off the
+            bottom of a phone held sideways (npm run phone).
+          */}
           {p.tool === 'press' && (
+            <div className="grid landscape:grid-cols-3 landscape:gap-x-3">
             <Slider
               label="Press · fingers as it lifts"
               value={p.fingering}
@@ -394,6 +412,31 @@ export function PhoneStage(p: PhoneStageProps) {
               testId="phone-press-fingering"
               midiKey="setting:fingering"
             />
+            <Slider
+              label="Press · thin gap"
+              value={p.thinGap}
+              min={0}
+              max={1}
+              step={1}
+              onChange={p.onThinGap}
+              display={p.thinGap > 0.5 ? 'On' : 'Off'}
+              touch
+              testId="phone-press-thin"
+              midiKey="setting:thinGap"
+            />
+            <Slider
+              label="Press · glass lifts"
+              value={p.pressLift}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={p.onPressLift}
+              display={`${Math.round(p.pressLift * 100)}%`}
+              touch
+              testId="phone-press-lift"
+              midiKey="setting:plateSpring"
+            />
+            </div>
           )}
           {p.tool === 'magnet' && (
             <Slider

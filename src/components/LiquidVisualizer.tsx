@@ -48,7 +48,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -1481,6 +1481,17 @@ class FluidSimulation {
    * halves read the same mirror.
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
+    /*
+      Not on a thin gap (PLAN §18a): there the flow does what this was
+      written to stand in for. The glass closing pushes the liquid out with
+      its colour and its oil, and the glass coming back up draws them back
+      in, which a carry here could never do: it took the colour out to a
+      ring and nothing ever brought it home, so a press only pushed things
+      away (the owner, 2026-09-28: "it just pushes everything out instead of
+      bringing it back when you release"). On top of the flow it moved the
+      colour out twice and back once.
+    */
+    if (this.thinGap) return;
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
     const N = this.size;
     const R = Math.max(2, radius);
@@ -2478,10 +2489,11 @@ class FluidSimulation {
     // whether a kick's press reached the plate at all, and whether the kick's
     // release gave back what it took.
     let laid = 0, depth = 0;
+    // On a thin gap a press lays only the glass, as a bowl, and the flow moves the liquid (squishDisc).
     squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, (idx, g, vx, vy, m) => {
       if (Number.isInteger(idx) && g < 0) { laid++; depth -= g; }
       this.squishCell(idx, g, vx, vy, m);
-    });
+    }, this.thinGap);
     this.pressedCells[who] += laid;
     this.pressedDepth[who] += depth;
   }
@@ -2501,7 +2513,7 @@ class FluidSimulation {
       squishDisc(this.size, lift.x, lift.y, lift.radius, lift.amount, lift.fingering, 'lift', 0, (idx, gap, vx, vy, m) => {
         if (Number.isInteger(idx)) cells++;
         this.squishCell(idx, gap, vx, vy, m);
-      });
+      }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
     // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
@@ -2521,8 +2533,11 @@ class FluidSimulation {
     this.applySquish(x, y, 40, amount, fingering, true, 'press', 'kick');
     this.applySquish(x, y, 27, amount, fingering, false, 'press', 'kick');
     this.applySquish(x, y, 15, amount, fingering, false, 'press', 'kick');
-    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount);
+    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
   }
+
+  /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
+  get thinGap(): boolean { return !!this.gpu?.thinGapLive; }
 
   /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
   private readonly squishCell = (idx: number, gap: number, vx: number, vy: number, m: number): void => {
@@ -3485,7 +3500,23 @@ class FluidSimulation {
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 0) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
-      gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
+      /*
+        The half-life the comment above means is in seconds, and `this.dt`
+        is not one: it is the look's step, Speed × 0.2, so on Classic
+        (0.0018 a step) Press Lift's default 1.55 s half-life came out at
+        about fourteen seconds, and the glass was still half down long after
+        the hand had gone. On the old solver that only shapes how long the
+        film stays thin, and every look is tuned on it, so it stays. On a
+        thin gap the glass coming up is what draws the liquid back under the
+        palm, so it rises in the show's seconds, `dtSeconds`, as a hand
+        lets go of it: the ring a press pushed out is a third of the way
+        back in a second and within 3% of where it began once the glass is
+        (`npm run presslift`, Classic's glass; on the look's clock, 4% in
+        that second). Keyed on the thin gap running, not the setting: while
+        its pipelines build, or where it cannot run, the old solver steps,
+        and its glass stays on the clock its looks were tuned on.
+      */
+      gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
       platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
@@ -4485,6 +4516,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
+  /*
+    `ambientSeed(false)`: the three Lissajous orbits stop laying their dye
+    (the "Ambient seeding" block below). They lay 0.05 a frame each, every
+    frame on every look, wherever they are, so a cleared plate gathers
+    their trails a quarter to a third of the plate out from its middle. A
+    check that reads where a hand's colour went reads those trails too: on
+    the Mac the tools check's pool, settled 1.5, 8 or 12 of the plate's
+    seconds, drifted out from the palm at the same 0.004 of the plate a
+    second whatever its age (a spreading drop slows as it ages; a source
+    that never stops does not), and the plate's colour grew 6% in three
+    seconds with nothing touching it. Only a harness turns it off;
+    a ref, so a rebuild of the frame loop (a self-heal, a lost device) keeps it.
+  */
+  const ambientSeedRef = useRef(true);
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -7172,7 +7217,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (isActiveRef.current && drainFrameRef.current === 0) {
             // ── Ambient seeding ────────────────────────────────
             const af = fluidsRef.current[activeLayerRef.current];
-            if (af) {
+            if (af && ambientSeedRef.current) {
               // Three Lissajous orbits, each carrying its own harmony color —
               // keeps several distinct hues alive in the frame at all times.
               const phase = time * 0.18;
@@ -8743,6 +8788,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
+        ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
         ...(renderer?.debug?.() ?? {}),
       });

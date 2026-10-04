@@ -4639,6 +4639,10 @@ export default function App() {
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
             fingering={settings.fingering ?? 0}
             onFingering={(v) => updateSettings({ fingering: v })}
+            thinGap={settings.thinGap ?? 0}
+            onThinGap={(v) => updateSettings({ thinGap: v })}
+            pressLift={settings.plateSpring ?? 0.35}
+            onPressLift={(v) => updateSettings({ plateSpring: v })}
             magnetSize={settings.magnetSize ?? 0.5}
             onMagnetSize={(v) => updateSettings({ magnetSize: v })}
             benDay={settings.benDay ?? 0}
