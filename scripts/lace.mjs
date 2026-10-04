@@ -21,8 +21,15 @@
  *   2. a thick film on a clean dish, stirred, stays whole for 20 s: holes
  *      come from the physics, not from a clock. A film the same everywhere
  *      cannot tear at all, so it is given a bump (clear oil poured on it), and
- *      the bump is carried with the flow: it moves at least three cells, the
- *      way a dot of dye laid on it moves
+ *      the bump is carried with the flow at the film's own speed. A bump on a
+ *      film is a wave on it, not a parcel of it: with the gap's flux
+ *      U (3h² − 2h³) it travels at the flux's slope, 6h(1 − h) U, which is
+ *      0.96 of the water's mean speed at h 0.8 and 1.44 at h 0.4 (where the
+ *      film itself moves at 1.12 and 0.88). Each bump, laid on a dot of dye
+ *      the same size, must move within 12% of that times the dye's distance
+ *      in the first three seconds (the thin film is the control that the
+ *      speed depends on h as the physics says, the wrong way round from the
+ *      film's own speed)
  *   3. a drop of solvent on a clean dish opens one hole there, whose radius
  *      grows at every reading for ten seconds, to five cells and at least
  *      twice what it first read; the control is the same film with a dent
@@ -109,7 +116,7 @@ try {
   const FILM_MAX = await page.evaluate(() => lab.filmMax);
   const fresh = async () => { await page.evaluate((n) => lab.create(n), N); };
   /*
-    A stir that lasts: a slow swirl kicked in again every two seconds, as a
+    A stir that lasts: a slow swirl kicked in again every second, as a
     performer's hand or the band would, round the plate's middle and one
     corner, so the film is carried and sheared the whole time.
   */
@@ -120,11 +127,8 @@ try {
       lab.flush();
     });
   };
-  const steps = async (seconds, over, stirred) => {
-    for (let s = 0; s < seconds; s += 2) {
-      if (stirred) await stir();
-      await page.evaluate(([n, o]) => lab.step(n, o), [Math.round(Math.min(2, seconds - s) * 60), over]);
-    }
+  const stirEach = async (seconds, over) => {
+    for (let s = 0; s < seconds; s++) { await stir(); await page.evaluate((o) => lab.step(60, o), over); }
   };
   const film = () => page.evaluate(() => lab.film());
   // The dye's amount, read back on the lab's logical grid (L², not N²), and
@@ -136,27 +140,35 @@ try {
     return [((x + 0.5) * N) / L - 0.5, ((y + 0.5) * N) / L - 0.5];
   };
 
-  // 1 and 2: a thick film on a clean dish with a bump and a dot of dye on the bump, stirred for twenty seconds.
-  await fresh();
-  const thick = { ...BASE, clearFilm: 0.8 / FILM_MAX, filmDust: 0 };
-  await page.evaluate(() => { lab.dye(0.3, 0.5, 0.05, [1, 1, 1], 1); lab.flush(); });
-  await page.evaluate((o) => lab.step(1, o), thick);
-  await page.evaluate(() => lab.addFilm(0.3, 0.5, 0.08, 0.1, 0));
-  const f0 = await film();
-  const level = pct(f0.h, 0.5);
-  const bump = (f) => centroid(f.n, f.h.map((v) => Math.max(0, v - level - 0.01)));
-  const b0 = bump(f0), d0 = await dyeMiddle();
-  await steps(20, thick, true);
+  // 1 and 2: a thick film on a clean dish with a bump on a dot of dye, stirred for twenty seconds; and the bump's speed on a thinner film.
+  const wave = async (h) => {
+    await fresh();
+    const over = { ...BASE, clearFilm: h / FILM_MAX, filmDust: 0 };
+    await page.evaluate(() => { lab.dye(0.3, 0.5, 0.05, [1, 1, 1], 1); lab.flush(); });
+    await page.evaluate((o) => lab.step(1, o), over);
+    await page.evaluate(() => lab.addFilm(0.3, 0.5, 0.05, 0.05, 0));
+    const f0 = await film();
+    const bump = (f) => centroid(f.n, f.h.map((v) => Math.max(0, v - h - 0.005)));
+    const b0 = bump(f0), d0 = await dyeMiddle();
+    await stirEach(3, over);
+    const b1 = bump(await film()), d1 = await dyeMiddle();
+    const bm = [b1[0] - b0[0], b1[1] - b0[1]], dm = [d1[0] - d0[0], d1[1] - d0[1]];
+    const moved = Math.hypot(...bm), dyeMoved = Math.hypot(...dm);
+    const along = (bm[0] * dm[0] + bm[1] * dm[1]) / Math.max(1e-9, moved * dyeMoved);
+    return { over, f0, moved, dyeMoved, along, ratio: moved / Math.max(1e-9, dyeMoved), want: 6 * h * (1 - h) };
+  };
+  const thin4 = await wave(0.4);
+  const thick8 = await wave(0.8);
+  await stirEach(17, thick8.over);
   const f1 = await film();
-  const b1 = bump(f1), d1 = await dyeMiddle();
-  const v0 = sum(f0.h), v1 = sum(f1.h);
+  const v0 = sum(thick8.f0.h), v1 = sum(f1.h);
   const drift = Math.abs(v1 - v0) / v0;
   const minThick = Math.min(...f1.h);
-  const bm = [b1[0] - b0[0], b1[1] - b0[1]], dm = [d1[0] - d0[0], d1[1] - d0[1]];
-  const moved = Math.hypot(...bm), dyeMoved = Math.hypot(...dm);
-  const along = (bm[0] * dm[0] + bm[1] * dm[1]) / Math.max(1e-9, moved * dyeMoved);
-  check('2. a thick film on a clean dish stays whole for 20 s, and its bump is carried as the dye is', minThick > 0.4 && moved > 3 && along > 0.8,
-    `thinnest ${minThick.toFixed(3)} (torn is under 0.2); the bump moved ${moved.toFixed(1)} cells, the dye ${dyeMoved.toFixed(1)}, in directions ${(Math.acos(Math.min(1, along)) * 180 / Math.PI).toFixed(0)}° apart`);
+  const rides = (w) => w.dyeMoved > 1 && w.along > 0.8 && Math.abs(w.ratio / w.want - 1) < 0.12;
+  const told = (w) => `${w.ratio.toFixed(2)} of the dye's ${w.dyeMoved.toFixed(1)} cells (want ${w.want.toFixed(2)}), ${(Math.acos(Math.min(1, w.along)) * 180 / Math.PI).toFixed(0)}° apart`;
+  check('2. a thick film on a clean dish stays whole for 20 s, and a bump on it travels as a wave on the film does',
+    minThick > 0.4 && rides(thick8) && rides(thin4),
+    `thinnest ${minThick.toFixed(3)} (torn is under 0.2); in 3 s the bump on 0.8 moved ${told(thick8)}; on 0.4 ${told(thin4)}`);
 
   // 3: a drop of solvent on a clean dish, and a dent with no solvent in the same place.
   const mid = { ...BASE, clearFilm: 0.6 / FILM_MAX, filmDust: 0 };

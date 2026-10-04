@@ -3278,12 +3278,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     so it keeps eight bits on a square-root scale, nothing at or under that
     0.0005 and at least 0.000554 over it: at a texel the gate answers exactly
     as it did, and only between texels, where the plate blends four, can the
-    reaction's fringe move by a fraction of a texel. The film is a share of the gap, 0..1 in steps of
-    1/255, which the plate reads as the water's path (1 − film) through it:
-    the faint tint of the dyed water under a whole film is a seventh of the
-    gap, drawn in steps of 3% of itself. The gap keeps its sixteen bits and
-    pack2x16unorm's own rounding, so a plate with no film packs every bit
-    as it did.
+    reaction's fringe move by a fraction of a texel. That is the one thing
+    this changes on a plate with no film, and only where BZ is drawn. The
+    film is a share of the gap, 0..1 in steps of 1/255, which the plate
+    reads as the water's path (1 − film) through it: the faint tint of the
+    dyed water under a whole film is a seventh of the gap, drawn in steps of
+    3% of itself. The gap keeps its sixteen bits and pack2x16unorm's own
+    rounding, so the gap is packed exactly as it was.
 
     The reactions and the film live on grids of their own and are read
     between their texels. A.a = which inputs are real (ferrofluid, mix, BZ,

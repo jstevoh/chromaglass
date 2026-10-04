@@ -232,7 +232,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.5** **18d** each liquid's real properties, then **10.5-bodies** and **H8** more bottles.
 - **6.6** **18h**, **18a-2** (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
-- **6.7** §20 after its prerequisites: ~~**20b**~~ #PR, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-10).
+- **6.7** §20 after its prerequisites: ~~**20b**~~ #PR, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22k** (~~22h~~ #252). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
@@ -4827,6 +4827,14 @@ Left from 20b, each its own item:
   digit where it is not (`npm run lace` holds the volume to 0.1% over 20 s of
   stirring). Carried on the projection's own Rhie–Chow faces (a film grid that divides
   the solver's), it would be both. *A shortcut named for scope.*
+- **20b-11. The bubble lens and the edge decodes do not see the film.** Only the
+  plate's main decode draws the water's path less the film; a bubble over whole film
+  (the lens's `decodeFluid` calls) and the edges show the colour at full strength, as
+  `thickOptics` does. Pass the film to those decodes when the film is judged.
+- **20b-12. The app's pours into the film are not in a check.** `lace` pours straight
+  into the film (`lab.addFilm`); the Dropper's path (`onDeposit`: Alcohol and Soap as
+  the solvent, clear oil joining the film, the front plate only) is judged by eye
+  (judging §32). A lab case that drives `onDeposit` as the app does would hold it.
 
 The plan as written before it was built:
 

@@ -2135,14 +2135,25 @@ export class WebGPUFluid {
     stage('film', (pass) => {
       const f = this.ensureFilm();
       const n = f.size[0];
+      /*
+        What is on the plate is what was poured, so `filmLaid` follows the
+        pours, not the control: a first lay at the precursor (a fade starting
+        from 0 asks for less than a film can be) records the precursor, and a
+        change too small to pour this frame is kept for a later one rather
+        than counted as poured. Recording the control instead lost every
+        step under 1e-4 of a long fade (the film stayed thick to the end,
+        then went at once) and ended a fade-in from 0 a precursor thicker
+        than the same setting laid at once.
+      */
       if (this.filmLaid <= 0) {
         const h = Math.max(FILM_HP, FILM_MAX * filmWant);
         for (const t of [f.a, f.b]) this.fill(pass, t, [h, 0, 0, 0], n);
+        this.filmLaid = h / FILM_MAX;
       } else if (Math.abs(filmWant - this.filmLaid) > 1e-4) {
         this.run(pass, 'filmSplat', f.write, [f.read], this.arg('film level', [0, 0, 0, 1, FILM_MAX * (filmWant - this.filmLaid), 0, 0, 0]), n);
         f.swap();
+        this.filmLaid = filmWant;
       }
-      this.filmLaid = filmWant;
       const carry = this.arg('film carry', [(disp / FILM_CARRY) * n, 0, 0, 0]);
       for (let k = 0; k < FILM_CARRY; k++) {
         this.run(pass, 'filmAdvect', f.write, [f.read, this.velForced], carry, n);

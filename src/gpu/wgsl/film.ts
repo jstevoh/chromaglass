@@ -41,7 +41,7 @@
  *   proportion, a sum over the whole plate a GPU step cannot afford.
  * - **The floor and the mobility** are both 0.8 h_p. With the mobility
  *   clipped at h_p and h allowed below it, the disjoining term blew up in the
- *   prototype (the handoff's first pitfall).
+ *   prototype (the first thing its notes warn of).
  * - **The top glass** is a linear pressure past 0.9 of the gap, inside p, not a
  *   stiff term of its own: a rim that reaches the other glass spreads along it
  *   instead of piling past it. As an explicit stiff term it was unstable.
@@ -158,8 +158,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       filmUpdate to take differences of.
 
       The dust: one candidate speck in each 16-cell square, there or not by a
-      hash of the square, at a hashed place in it, 1.5 to 3 cells across and
-      of hashed strength. A.a.x scales it (1 in a show; 0 for a check that
+      hash of the square, at a hashed place in it, a Gaussian of radius 1.5
+      to 3 cells (3 to 6 across) and of hashed strength. A.a.x scales it (1 in a show; 0 for a check that
       asks what a clean dish does).
     */
     filmMu: `${HEAD}
@@ -265,8 +265,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       A pour onto the film: clear oil thickens it, a drop of solvent (alcohol,
       soap) lands in Γ. A soft disc, 1 − d²/r² as the lab lays dye, in plate
       units: A.a = (x, y, r, ·), A.b = (film, solvent, ·, ·). The film is held
-      under the other glass (0.95 of the gap), and to the floor where a pour
-      takes none away.
+      under the other glass (0.95 of the gap), and a pour that draws it off
+      stops at the floor. Neither bound moves a cell already past it: the
+      carry has no floor, so a cell can sit under it, and clamping it up
+      there (where the pour does not reach, f = 0) made film from nothing at
+      every pour.
 
       Or, with A.a.w = 1, the film raised or lowered everywhere by A.b.x (the
       Clear Film control moved while a film is on the plate): more clear oil
@@ -286,7 +289,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let d = (vec2f(p) + 0.5) / f32(n) - A.a.xy;
     f = max(0.0, 1.0 - dot(d, d) / max(A.a.z * A.a.z, 1e-12));
   }
-  let h = clamp(here.r + A.b.x * f, F_FLOOR, max(here.r, 0.95));
+  let h = clamp(here.r + A.b.x * f, min(here.r, F_FLOOR), max(here.r, 0.95));
   textureStore(dst, p, vec4f(h, here.g + A.b.y * f, here.b, here.a));
 }`,
   };

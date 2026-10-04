@@ -832,7 +832,13 @@ or two) and about 0.9 (holds until you drop Alcohol on it). Please say:
   physics on a 384² grid; at 1080p a cell is about three pixels);
 - the gestures: Alcohol from the Dropper punches a hole, Oil thickens the film where
   it lands, and moving Clear Film pours more film over everything or draws it off,
-  which fills the holes back in;
+  which fills the holes back in (these pours are not in a check: the lab pours
+  straight into the film, not through the Dropper);
+- a fade into a look with a thick film: on its way up the film passes through the
+  thin range that tears over the dust, so it may arrive already torn; say whether
+  that reads as a feature or a fault;
+- on a look with BZ, whether the reaction's fringe looks as it did (its activator
+  is now packed in eight bits to make room for the film);
 - the cost on the Mac with the film on (the film is twelve small passes twice a
   frame on a 384² grid; `npm run stages` in the console, or the frame time below).
 
