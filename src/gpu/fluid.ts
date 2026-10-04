@@ -784,9 +784,10 @@ export class WebGPUFluid {
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
-    // clearing a pressure and zeroing a coarse level, which both solvers do
-    // every step. The old plate's own solve is in oldPlateBuilds.
-    const byName: [string, GPUTextureFormat][] = [['pressureClear', R32], ['mgZero', R32]];
+    // zeroing a pressure (the old plate's, between projections) and a
+    // coarse level, which both solvers do every step. The old plate's own
+    // solve is in oldPlateBuilds.
+    const byName: [string, GPUTextureFormat][] = [['mgZero', R32]];
     const keyed = new Map<string, [string, boolean]>();
     const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
     for (const [name, formats, now] of byFormat) for (const f of formats) add(`${name}:${f}`, kernel(name, f), now);
@@ -848,7 +849,7 @@ export class WebGPUFluid {
   private static oldPlateBuilds(dye: GPUTextureFormat): [string, string][] {
     const byName: [string, GPUTextureFormat][] = [
       ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
-      ['mgRestrict0', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32], ['mgProlong0', R32],
+      ['mgRestrict0', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32],
       // The projection's right-hand side made zero-mean, every step (divTiles).
       ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
       ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
@@ -2674,15 +2675,22 @@ export class WebGPUFluid {
     }
   }
 
-  /** Zero one of the packed pressure buffers, as the Jacobi's `fill` did. */
+  /**
+   * Zero one of the packed pressure buffers, as the Jacobi's `fill` did, with
+   * the multigrid's own zeroing (`mgZero` in `wgsl/fluid.ts` on why not a
+   * kernel of its own).
+   */
   private clearBuffer(pass: GPUComputePassEncoder, buf: GPUBuffer, key: string): void {
-    const pipe = this.pipelines.computePipeline('pressureClear', kernel('pressureClear', 'r32float'));
+    const pipe = this.pipelines.computePipeline('mgZero', kernel('mgZero', 'r32float'));
     let group = this.groups.get(key);
     if (!group) {
       // The Sim, then the Args, then the buffer: every kernel here takes
       // bindings 0 and 1 from HEAD whether it reads them or not, and a group
-      // that skips the Args puts the pressure on a uniform slot.
-      group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), buf]);
+      // that skips the Args puts the pressure on a uniform slot. The Args
+      // under a name of their own and written once: a buffer is written
+      // before the command buffer runs, so two values under one name in a
+      // step would both read the last.
+      group = bindGroup(this.device, pipe, [this.sim, this.arg('clear pressure', [this.N * this.N, 0, 0, 0]), buf]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -2766,7 +2774,8 @@ export class WebGPUFluid {
     this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
     this.vcycle(pass, l + 1);
     if (l === 0) {
-      this.dispatchBuf(pass, 'mgProlong0', 'mgProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.press], this.N * this.N);
+      // Into level 0's packed buffer (A.a.y = 1): `mgProlong` in wgsl/fluid.ts.
+      this.dispatchBuf(pass, 'mgProlong', 'mgProlong0', this.arg('mg prolong 0', [this.N, 1, 0, 0]), [below.p, this.press], this.N * this.N);
     } else {
       const here = this.mg[l - 1];
       this.dispatchBuf(pass, 'mgProlong', `mgProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p], here.n * here.n);
@@ -3103,7 +3112,21 @@ export class WebGPUFluid {
       this.hsRun(pass, 'hsCoarsen', `hsCoarsen:${l}`, this.arg(`thin coarsen ${l}`, [fineN, l === 0 ? 1 : 0, 0, 0]),
         [cells, faces, this.hsMobC[l], this.hsFaceC[l]], this.mg[l].n * this.mg[l].n);
     }
-    this.clearBuffer(pass, this.hsP!, 'clear pressure');
+    /*
+      Warm-started: the solve begins from the last step's P, not from zero.
+      It looked as if it began from zero: hsP was cleared under the bind
+      group key 'clear pressure', which the old plate's clear of `press` had
+      already built on `press`, so it zeroed `press` (which hsGradient then
+      overwrites) and left hsP as the last step had it; after a groups.clear()
+      the first caller took the key, and the thin gap went cold. Every number
+      Thin Gap was measured and shipped on came from the warm start, and a
+      cold one does not reach them in hsCycles V-cycles: in `npm run thingap`
+      a press on a 130² grid moved its ring 63% of the way the displaced
+      volume puts it, against 100% warm (128² is 100% either way). A Hele-Shaw
+      cell's pressure changes smoothly from one step to the next, so the last
+      step's is the standard first guess; it is chosen here rather than left
+      to whichever clear ran first (PLAN 18a-12).
+    */
     for (let c = 0; c < this.hsCycles; c++) this.hsCycle(pass, 0);
     this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
       [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);
