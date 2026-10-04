@@ -38,11 +38,247 @@ the same way rather than by eye.
 > plans behind each piece. The port landed on 2026-09-20 and the shader freeze with
 > it: there is one shading language in the tree now, WGSL in `src/gpu/wgsl/`.
 
+## Order of work
+
+*Written 2026-10-04 from an inventory of every open item in this file and in
+`docs/stability-plan.md`, `docs/webgpu-plan.md`, `docs/crash-plan.md`, `docs/rig-plan.md`,
+`docs/roadmap.md` and `docs/judging.md`: about 270 items, of which about 30 were the same
+work written in two to six places.* This list is the plan: work from the top. Each line
+is one PR unless it says otherwise. The detail, the evidence and the measure for each
+step are in its section (`§` and the item's id), not here.
+
+**How to use it.** A session takes the first open step in a lane nobody else is in,
+reads only that step's section (`grep -n '^##' PLAN.md`, then `sed -n` the part), and,
+when it ships, strikes the step here in the same PR (`~~…~~ #NNN`) and marks its section
+shipped. What it finds along the way goes into the section it belongs to, and here only
+if it changes the order.
+
+**Why this order.** Five rules, in priority:
+
+1. **First, whatever makes every later PR cheaper.** On 2026-10-03, 46 % of the PR check
+   runs that finished were red, two thirds of them on a line the PR had not touched (19h).
+   Over the week to 10-04 a merged change took a median 90 minutes to go live, and 64 % of
+   the PRs' Mac minutes went on pushes that added none of the PR's own code (19i). Every
+   step below pays that toll on every push, so Wave 0 is the largest saving in the file.
+2. **Then whatever can stop a show or hand it to a stranger,** smallest first (Wave 1).
+3. **The owner's Mac judging runs beside the code, in the order that unblocks code** (Wave 2):
+   47 items wait on the owner's eyes, and a few of them gate whole sections.
+4. **Seams before the features that crowd them** (Wave 3): `LiquidVisualizer.tsx` is 10,109
+   lines and `App.tsx` about 5,000. They are not where merges conflict (none of the last 25
+   recorded conflicts was in them; the shared documents were, which Wave 0 fixes), but a
+   session must read them to change them, and three of Wave 1's faults (S16, 14s, 14u) come
+   from state scattered through them.
+5. **The frame budget before effects that spend it** (Wave 4), **then features in the order
+   their dependencies allow** (Waves 5 to 7).
+
+**Lanes.** Steps in different lanes touch different files and can run in parallel
+sessions; steps in one lane go one after another. **A** `server/` and the Workers. **B**
+`App.tsx`, the desks, the phone, `src/lib` outside sound. **C** `src/gpu/` and
+`src/gpu/wgsl/`. **D** sound and time: `useAudioAnalyzer`, `audioFeatures`, `beatClock`,
+`barGrid`, `songShape`, `soundLearn`, `useMidi`. **E** `scripts/`, `.github/`, the build.
+**F** docs. **G** `LiquidVisualizer.tsx`, one session at a time, always.
+
+### Wave 0. Every change cheaper and faster to ship (lanes E, F)
+
+Ordered by minutes saved, from the Actions API over 2026-09-27 to 10-04 (19i to 19t
+have the evidence). A change merged today waits a median 90 minutes to be live, at most
+313; a PR runs its checks about four times; the account's five Mac runners were 87 to
+91 % busy; and 14 of 26 failed jobs re-run by hand went green with nothing changed.
+
+- **0.1** **19j** (E, S): a merge that changes no file the site is built from deploys nothing
+  and waits for nothing. Ten of the last thirty merges changed no site file, and a
+  docs-only merge still runs the whole Mac (63 to 111 minutes). This PR is one.
+- **0.2** **19i** (E, M): a green Mac result carries across a merge of main that is disjoint
+  from the PR's own site files. Those pushes were 56 % of the PRs' Mac minutes and 16
+  of their 29 reds; this is the largest saving in the file.
+- **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
+  not measure, each to its root cause and never by loosening it, worst first by the
+  ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
+  (19h-2, #240), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
+  on thin pools (0-finger), the wall's gain (0-wallgain), `qa` with no adapter
+  (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
+  14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
+  (11-blowbubble), and `tools`' "Pour lays more than Drop", which passes at 0 against 0.
+- **0.4** **19r** (E, S): the open shard is back near its 15-minute timeout (median 12.6, green
+  maximum 14.1, one cancelled at 15.3); even it again.
+- **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
+  only their shards, a new check edits no shared file, and `npm run quick` runs what
+  the diff needs, in parallel.
+- **0.6** **19m** (F, M, at a quiet moment): fragment files for the shared documents, and this
+  file as an index with one file per section; 23 of the last 25 merge conflicts were in
+  `PLAN.md`, `docs/judging.md`, the changelog or `package.json`.
+- **0.7** **19l** (E, M): app frames readable in a cloud session (headed Chromium under xvfb), so
+  a session reproduces a Mac check's logic before it pushes.
+- **0.8** **19o with 14p** (E, S then M): a rollback in under a minute, and show night played from
+  a tag the owner judged.
+- **0.9** **19p** (E, S): a preview URL on every PR, so the owner judges on a real GPU before
+  merge rather than after.
+- **0.10** **19q** (owner's settings, S): auto-merge with `Measure` and `WebGPU (macOS)` required.
+- **0.11** **19n** (E, S): a Measure-only deploy in about 5.5 minutes, not 8.
+- **0.12** **19c, 19e, 19d-perms, 19d-maps, 19d-deps** (E, S each): the checks nothing runs or that
+  can pass unmeasured (with a `?cast` harness, which S15 needs), shared harness helpers,
+  least-privilege workflows, hidden source maps, `engines`.
+- **0.13** **19t** (E, S): the owner's judging sheet, generated, with a link per item.
+- **0.14** **19f** (F, S): the rest of the docs out of step with the code.
+
+### Wave 1. Nothing at a gig can stop the show or hand it to a stranger
+
+- **1.1** **14m, then 14o** (A, M then S): the show key to loopback only, long and timing-safe,
+  a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
+  and limits, with the report Worker's (`docs/crash-plan.md`).
+- **1.2** **14n** (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks.
+- **1.3** **S19, S18** (C, S each): the particle dispatch at 1024², and finite guards on the
+  carried fields. **S20** after them (C+G, M).
+- **1.4** **S14** (B, S): an error boundary per panel, desk and phone component, the plate
+  outside them all.
+- **1.5** **14s** (B+D, M): the input picker, Safari's second song, song ID's latch.
+- **1.6** **14g** (B, M): a knocked cable brings the input and the projector back.
+- **1.7** **14h** (B+E, M): precache the build, never `startOver()` offline, fonts from the site
+  (#207's note), timeouts on song ID and lyrics.
+- **1.8** **14k**'s build version in the cast hello (B, S), after 0.8's show tag: a projector
+  window from another build says so.
+- **1.9** **S17** (C, M): a pipeline that fails to build is skipped, not fatal (#212 has merged).
+- **1.10** **S16** (G, S): a GPU rebuild keeps the film.
+- **1.11** **13-recmem** (B, M): Record streams to disk; a set-length take cannot run out of memory.
+- **1.12** **14i-guard, then 14r, then S21** (C, S then M then M): the flash guard in linear light,
+  by quarter-wall and the red rule; then the watchdog and a Rescue Go.
+- **1.13** **S15** (B, M): a reload re-attaches the wall and resumes the set; needs 0.12's `?cast`
+  harness. **S7** (E, M): an hour in CI, nightly.
+
+### Wave 2. The owner's judging queue (the owner's lane, beside the code)
+
+Judged in this order, because these gate code:
+
+- **2.1** **18a-11** Thin Gap's cost (`docs/judging.md` §19a): gates 18a-every and 18a-10.
+- **2.2** **15b** the tools' feel: gates 15g.
+- **2.3** **16b-cost** a source pass's cost and **13-twoproj** two popup projectors: gate 16d.
+- **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
+  §10 film judgment, then **10.1** Light Show Night with Pacing up.
+- **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
+  look's own turning; **21c** dots and zoom; **3-highlight**; **18i** timed pops;
+  **0-bandbubbles** (#238).
+- **2.6** **P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
+  roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).
+  Recommended: delete; it unblocks 3.2.
+
+Then the rest of `docs/judging.md` in its own order, an area a sitting (the looks, the
+Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
+with each PR's preview URL (0.9) so a look is judged before it merges. The owner's account steps sit here too: **S8-on** (switch the crash reports on),
+**19g** (more Mac runners), **12.2** (the store accounts), **13.1-sign** (the Mac app's
+Developer ID).
+
+### Wave 3. Seams in the two big files (one session, in a quiet week)
+
+Each a mechanical PR that moves code and changes no behaviour: the same checks, the same
+numbers, merged the day it is green so no other branch has to chase it. The point is what a
+session has to read to make a change, and the faults that come from scattered state; the
+merge conflicts are the shared documents', which 0.6 ends.
+
+- **3.1** **P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines, if 2.6 says so.
+- **3.2** **14l** (G, L): `FluidSimulation` out of `LiquidVisualizer.tsx`; then device recovery as
+  `useGpuStage` (which S16's fault came from); then the pointer and touch handlers as
+  `usePlateInput`; then the frame loop as a module; then the imperative handle.
+- **3.3** **App seams** (B, L, from 14u): the audio source as `useAudioSource` (14s's faults live
+  there); one settings-writer layer that tags each write with its source (14u's Evolve
+  anchor and 11-back come from those rules being scattered); one action table for MIDI,
+  the remote, the keyboard and ⌘K.
+- **3.4** **Keep this file small** (F): after 0.6, a batch whose open items are all done moves to
+  `docs/plan-shipped.md` in the PR that closes it.
+
+### Wave 4. The frame budget (lane C, measured with `npm run stages` and `npm run renders`)
+
+- **4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.
+- **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
+  `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
+- **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
+  after a step, a heat-aware governor.
+- **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
+  target without the camera, air only where there are bubbles, first-order velocity.
+- **4.5** **14f-midi** (B, S): a MIDI ride without an App render.
+- **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
+- **4.7** **14c-4k, 14c-governor, H2c-10, H2c-labels** (S each). Then **H2a**, **H1**, **H3a**.
+
+### Wave 5. Playing it: the instrument
+
+Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
+bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
+(S) then **10.3-4otf, 10.3-sure, 10.3-half, 10.3-newsong, 10.3-fill** (S each);
+**10.2-snare** then **10.2-build** (M); **10.3-rest** (M).
+
+Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back** (S);
+**16a-render, 16a-cast, 16a-remote, 16a-follow** (S each); **16b-logo** (S); **5-learncast**
+(S); **14a-timers** (S); **14c-readout** (S); **14k**'s remote lag and coalesced pointer
+(M); **5-actions** (S); **11-pinch** (S).
+
+Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the load-in card
+(S); **14m-guest** (M, after 1.1).
+
+Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
+**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**.
+
+### Wave 6. The physics under the look (lane C, one solver change at a time)
+
+- **6.1** **18a-every** Thin Gap in every look (after #228 and 2.1), then **15b**, **15g**,
+  **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
+- **6.2** **18b** the lamp through the dye, then **18f** heat from the lamp (which unblocks 10.6
+  and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
+- **6.3** **18c** a pour adds liquid, then **18g** colour leaves by flushing and **18k-spray**.
+- **6.4** **18e** edges from refraction (which is #219's 20d).
+- **6.5** **18d** each liquid's real properties, then **10.5-bodies** and **H8** more bottles.
+- **6.6** **18h**, **18a-2** (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
+  **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
+- **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
+- **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
+  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22i**. Painters: **21b**, **21d**. The
+  wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
+  **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
+
+### Wave 7. Reach
+
+- **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
+  **12.7**, **12.8**; **12.4a**; later **12.9**.
+- **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13.5** OSC out and Link,
+  **13-port**, **13-intel**, **13-icon**, **13-update** (after signing), then **13.2**
+  Syphon, **13.3** NDI and Spout, **13.6** video in.
+- **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
+- **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
+  The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
+
+### One home for work written twice
+
+Each of these was written in more than one place; the first location is the one to read
+and to mark shipped, and the others now point to it.
+
+| Work | Home | Also written in |
+|---|---|---|
+| Real viscous fingering | 18a (18a-2) | §0, 10.4, 15d, roadmap Stage 1 G, #228 |
+| A tool's push lasts one step | 18a (18a-3) | 15b, roadmap §H |
+| Milk's opacity | 18j | §4 |
+| Heat and a plate that lives on its own | 18f | 10.6, roadmap S2 |
+| More liquids as bodies | 18d | 10.5, roadmap §I |
+| Standing domes | 9t | 9u, 15d, 18k |
+| The lamp through the dye, edges by refraction | 18b, 18e | #219's 20a, 20d |
+| Linear light | 18k-linear | 16c, §14's opening, rig R3 |
+| A Mixer row per plate | 16e | 11 step 6, rig R7 |
+| Layers at their own speeds | 16d | 10.7, roadmap Stage 4 |
+| Sound learn's bar on the one | §5 | 10.3 |
+| A beat track on the shelf | 10.2 | 10.3 |
+| Half tempo | 14t (the clock), 10.3 (the bar grid) | done together, 5 |
+| MIDI clock phase | 14e (Start, dropout), 14t (Continue, SPP) | done together |
+| Precache, fonts, offline | 14h | §13, 19d |
+| Source maps, `CRASH_GPU` | 19d, 19c | `docs/crash-plan.md` |
+| The song-ID Worker | 14o | `docs/crash-plan.md` |
+| The show kit | rig R5 (R5-kit) | §13 |
+| Draw cap, pack and read back after a step | 14j | 14b, H2c-9 |
+| Probe pixels and timestamp labels | 14r, H2c-labels | |
+| Mixed versions at the projector | 14p | 14k |
+| The checks red on trees they do not measure | Wave 0's list | §0, §11, 19h |
+| Press dye on the GPU | 18a-3 | 15d |
+
 ## Running order
 
-Each batch is one PR: build, test in the sandbox, merge, deploy, then a GPU look on
-the Mac before the next one starts. Order is by what lifts everything else first,
-and by what would otherwise force a rebase later.
+The batches, and where each stands. This table is the ledger: a PR that ships a step
+updates its row. The order to work in is the order of work above.
 
 Where each batch stands, as of 2026-09-27:
 
@@ -66,7 +302,7 @@ Where each batch stands, as of 2026-09-27:
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
-| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones) |
+| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28); 22b–22i open |
 
@@ -1558,32 +1794,10 @@ while this batch's plan was going in (#177), and no cause is known yet:
 
 ## What comes next
 
-Batches 5 and 6 were the ones that mattered most, and the seeded generator was the
-hinge between them. The generator, the render and sound learn are in; batch 5's shutter
-and look link are not. The order from here, as of 2026-09-26:
-
-1. **Batch 10, the film.** Step 1, rest, big events and darkness, shipped in #170.
-   Run `film.yml` by hand for the first full baseline, and film Light Show Night with
-   Pacing up: the harness measured what the sequence asks for, and only the film can
-   say whether the plate delivers it.
-2. **The rest of batch 5**: the look link and the shutter are independent of
-   everything else and can be built while the Mac is judging a look.
-3. ~~Batch 9c, the dye rides the ferrofluid~~: shipped in #168.
-4. **Batch 11, the mixer**: step 1 shipped in #176 and waits on its Mac look
-   (`docs/judging.md` §13). Steps 2 and 5 are small and independent; step 3 is the
-   next that changes what a show can do.
-
-Batch 10's step 3 (accents) is built (Accent the One, `npm run downbeat`) and waits on
-the owner's eyes on a real GPU. Batch 3 (#163) and the startup
-freeze (#164) have shipped.
-Batch 10's steps 4–7 are larger and map onto roadmap items (G, §I, S2, Stage 4);
-pick them up from `docs/roadmap.md` now that step 1 is in.
-
-**This file is too big to read whole** (about 150 KB, 38k tokens; 2026-09-27). Every
-session told to read it carried it in context for the rest of its life, and the
-shipped batches are most of it. CLAUDE.md now says to read one section. The fix is to
-move shipped batches to `docs/plan-shipped.md`, keeping a line each here, in a PR of its
-own when few branches are editing this file (every open branch touches it).
+The order of work at the top of this file (2026-10-04). It replaces the list that
+stood here, written on 2026-09-26, whose every step has since shipped or moved into
+it. The shipped batches are in `docs/plan-shipped.md`, and 19m is the rest of this
+file's split.
 
 ## Operating rules
 
@@ -1884,52 +2098,7 @@ deferred in `docs/webgpu-plan.md`, and the soft edge between projectors is rig R
 
 ### 14a. The show goes deaf when its window is hidden
 
-**Read in the code.** The sound analysis runs only on the show window's animation
-frames (`requestAnimationFrame(update)`, `src/hooks/useAudioAnalyzer.ts`), and it is
-the only place the analyser is read. The app already knows the show window spends a
-set hidden behind the projector's (the comment over the look fade's timer in
-`App.tsx`), which is why the picture, the fades and the gamepad were all moved off
-animation frames. The analysis was not. So the moment the performer goes fullscreen
-on the projector, or switches to Ableton, the wall keeps moving on the last reading
-it had, which may be the top of a kick, and stops hearing the music. This is the one
-item here that can quietly ruin a whole set.
-
-**Shipped** (asked "Do #1 now", 2026-09-27). `lib/earClock.ts` decides who reads:
-the window's own frames always, as before; the projector's frame ask
-(`__chromaglassFrame` calls `wallAsked`) only while those frames have stopped for
-50 ms, so the plate hears once per frame the wall draws; and a worker's 16 ms tick
-only while neither is coming (covered with no wall, which is still a show on a
-network display or the phone). Taking the frames first keeps one reading per drawn
-frame, which matters because the level smoothing is per reading. A watchdog on its
-own timer calls the ear deaf when the audio context is not running or nothing has
-been read for half a second; the desk's sound line then starts "not hearing" and the
-phone's Sound dot turns amber with a line in its sheet. A suspended context is asked
-back on its `statechange` and on the next touch or key (Chrome starts one suspended
-on a page nobody has touched; iOS interrupts one for a call). Whether a finger's
-lift wakes it on the iPhone is not yet tried. The wall and the tick read 50 ms after the
-frames stop while the page says it is hidden (Chrome says so of a covered window),
-and only after a quarter second while it says it is visible, so a visible window at
-15 fps, 240 Hz or with ragged frames reads exactly its frames, as before. (A stall
-measured from the frames alone went red on the Mac runner's first run: its busy app
-drew 28 frames a second, and the tick read between them. The same went red on its
-second run behind the wall: covered, the wall drew 44 a second and the tick read 5
-times in its gaps. The tick now gives the wall's asks a quarter second whether the
-page is hidden or not, so it takes over a quarter second after the wall closes. On
-its third run a visible page read 3 ticks against 46 frames: the Mac's show is still
-building pipelines behind it for its first half minute, and its frames stalled past a
-quarter second, which is what the tick is for; the check now holds each tick or ask a
-visible page reads against the page's last frame before it (more than 250 ms), which
-a broken build with a long task or a slow uncover cannot pass. Queued ticks after a
-long task read once, not once each.)
-
-`npm run ears` (26 checks, no GPU needed; on the Mac's `open` shard) measures it. A
-headless window is never hidden, so it withholds the show's animation frames itself.
-Covered, with the wall asking: 38 distinct levels in two seconds, one reading per
-frame asked for (120 over 121); with no wall, 38 on the tick; the control on the
-same page (frames withheld, no ask, the tick stopped, the ear as it was before)
-holds **one** level and is called deaf. A build whose ear reads on frames alone went
-red on all three "keeps hearing" lines. Visible with the wall asking, only the frames
-read (122 frame, 0 ask).
+**Shipped** (#191): the ear keeps hearing behind the wall, and says when it is deaf (`npm run ears`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 *Still owed:* the owner's look on the Mac, covering the show window with another app
 for thirty seconds and reading `chromaglassCastState().ear.reads` before and after
@@ -1946,103 +2115,7 @@ time instead of gliding. The same worker tick could drive them.
 
 ### 14b. With the wall up, the plate may draw twice a refresh and the governor cannot see it
 
-**Read in the code; the doubling is inferred.** The projector window asks the show
-for a frame on every one of its own refreshes (`CastDisplay.tsx`). The guard in
-`__chromaglassFrame` (`LiquidVisualizer.tsx`) only compares against the projector's
-previous ask (`lastExternalFrame`); the show's own frames never set it. With the desk
-visible on the laptop and the wall fullscreen on the projector, both windows get
-animation frames on different displays' clocks, and each ask cancels the show's
-pending frame and draws another. Every draw carries the readback and the mirror copy.
-The governor is fed the interleaved intervals, so two half-rate clocks look like one
-full-rate one and it never steps down while the wall is up.
-
-*Fix:* stamp the time of every draw, whichever window asked for it, and skip any ask
-within about 0.6 of a refresh of the last draw; feed the governor the interval
-between real draws. *Measure:* extend `npm run wall` with the mirror popup and both
-windows animating: frames drawn a second no more than about 1.1 times one display's
-refresh.
-
-**Shipped** (2026-09-27). `lib/drawGate.ts` stamps every draw, the show's own frame
-or the projector's ask, and turns down any offer within 0.6 of a refresh of the last
-draw. The refresh is the median of the faster clock's own recent gaps (each window's
-offers, drawn or not, so the gate's own skipping cannot talk it down), never shorter
-than 240 Hz's and with no slow bound (a first bound at 30 Hz let two clocks at 20 a
-second both through, 40.0 draws a second, tried), 60 Hz until measured. Three changes
-from the fix as written, each found red first:
-
-- *The show's own frames are gated too*, while the projector is asking. With the asks
-  alone gated, a projector more than 0.6 of a refresh behind still doubles (its ask
-  draws, and the show's next frame lands 0.4 of a refresh later), which is 40 % of
-  the phases a drifting projector passes through: 120 draws a second in the
-  arithmetic where the gate draws 60, and 113.6 in the app at ¾ of a refresh.
-- *Nothing is gated unless both clocks are running*, so with no wall every one of the
-  show's frames draws, and with the show covered every ask draws, however ragged a
-  busy machine makes them. A gate on the asks alone drew 61 of 121 covered asks
-  handed over alternately on time and 12 ms late, each missing one a frame the wall
-  shows twice.
-- *Every offer carries its refresh's own time*, not the time its callback ran: the
-  show's frames their `requestAnimationFrame` timestamp, the projector's asks its own,
-  moved onto the show's clock by the two windows' `timeOrigin`s (`CastDisplay`), and
-  the time now for an ask with none. Both windows share one main thread, so when both
-  clocks land in one refresh the second callback runs after the first one's draw; the
-  first version stamped with `performance.now()` there, and once a draw cost more than
-  0.6 of a refresh the second looked like the next refresh's and drew too (found in
-  review: 87 a second at 60 Hz with 10.5 ms draws), and the governor was fed the draw's
-  own cost as the interval.
-
-Only let-through frames reach the loop, so the governor's `frameS` is the interval
-between real draws; an ask that is turned down does not offer the ear a reading either
-(one reading per drawn frame, 14a).
-
-`npm run wall` measures it twice, and holds every rate to a floor as well as a
-ceiling (a gate that froze the plate, or turned down one frame in two, passed the
-ceilings alone in review). In arithmetic (node, one main thread with a draw cost):
-laptop and projector at 60/60, 60/59.94, 120/60, 60/120, 60/50, and a busy 28/28 and
-20/20 Hz, twenty phases each, with and without 2 ms of jitter, with free draws and
-with draws of 0.7 of a refresh: between 0.99 and 1.02 times the faster display at
-every phase (27.7 to 28.3 on 28/28, 59.7 to 60.3 on 60/60); the old guard 1.25 to 2.0
-times it on the same clocks (120 on 60/60, 180 on 120/60); the gate stamped with when
-its callback ran 80.0 on 60/60 and 156.0 on 120/60 once draws cost 0.7 of a refresh;
-the median interval fed to the governor a whole refresh (16.7 ms; the old guard 0 to
-11.7, stamped when run 11.7); covered, every ask of a 30, 60 and 120 Hz projector
-draws, and every one of asks 20 to 200 ms apart.
-
-In the app: the real projector window (`?cast=true`), both windows animating, the
-projector's frames handed to it 0, ¼, ½ and ¾ of a refresh late to stand in for a
-second display's clock. On this tree, one run each:
-
-| | before (the old guard) | the first gate (stamped when run) | after |
-|---|---|---|---|
-| the four phases, draws a second | 120.0, 120.1, 120.2, 119.1 (2.0×) | 59.7 to 60.4 | 59.9, 60.3, 59.8, 59.8 (1.0×) |
-| draws of 11.7 ms, both on one refresh | 72.3 (2.0× the 36.1 the held thread managed) | 68.7 (1.3×) | 60.0 (1.0×) |
-| covered, projector's frames ragged | 61 of 121 asks drawn | 120 of 120 | 120 of 120 |
-
-With every phase: at least 0.9 times what the show drew alone (since 14b-2 below,
-what either window was handed in the same two seconds; a gate turning
-everything down drew 0.0, one at 1.3 of a refresh 29.9 to 39.9, against 53.8), and
-about one offer turned down a refresh (59.8 to 60.3 a second), which is what says both
-clocks were running. `npm run ears` 26/26 (123 asks read over 123 frames asked for).
-Counted, not photographed, so the app half runs in a cloud session with no GPU at all:
-there the loop is started by the projector's first ask and runs on the show's frames
-from then on, and there is no governor to read.
-
-On the Mac runner, with a renderer up (#203's run on a9ba205), each window was
-handed 50.5 to 56.4 of a 60 Hz display's refreshes a second, the gate drew 51.5 to
-55.4, and the governor was fed a median 17.0 ms at half a refresh behind. The
-display's rate misleads there, so the wall's ceiling and the governor's bar are no
-longer taken from it. They are taken from the refreshes either window was handed,
-counted in slots as the gate spaces its draws: the wall's refreshes at the time its
-frames are handed over, and a new slot only 0.6 of a refresh after the last began.
-Draws are held to 1.05 of the slots, and the governor's median to 0.9 of the median
-gap between them. Matching the two windows' timestamps instead (tried first) reads a
-working gate as doubling at ¾ of a refresh behind whenever both windows miss a
-refresh, which a busy Mac does: two reviewers modelled 1.03 to 1.2 times at 3 to 30 %
-of refreshes missed. Controls on this tree, in a cloud session: the gate stamped when
-its callback ran, with 11.6 ms draws, 68.6 and 71.4 drawn for 59.8 and 59.5 slots
-(1.15 and 1.20, red; it passed the display's ceiling at 65.8). A gate that never
-turns anything down: 1.2 to 2.0 times (red). The gate: 1.00 to 1.01 at every line,
-also with a 22 ms long task every 150 ms. The cloud drops no refreshes, so how the
-slot count reads a Mac that does is still owed to the Mac's `tools` shard.
+**Shipped** (#203, #236): one draw a refresh with the wall up, and on a busy machine the wall no longer costs the show its own frames (`npm run wall`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 *Still owed:* the owner's look with a real projector on its own display. And stepping down under a wall at all: it is new behaviour, from 14b and
 14c together (the governor fed real intervals now, and a ladder built from the stage),
@@ -2103,76 +2176,7 @@ unchanged (28 and 20 a second, 120/60, 11.7 ms draws).
 
 ### 14c. The projector's resolution comes from the laptop's pixel ratio
 
-**Read in the code.** `qualityLadder` builds its rungs from `devicePixels()`, the
-laptop's ratio, and with a stage attached `canvasPixelsFor` scales the stage by
-`dpr / devicePx`. Two ways this goes wrong on a wall:
-
-- *A Retina laptop:* the show opens on the `dpr: 1` rung, so a 1920×1080 projector
-  starts at **960×540** (`npm run rungs` asserts exactly this half), and the 1024²
-  rung, written for projectors, is gated on `dpr <= 1` and never offered. At 150 %
-  Windows scaling it is 1280×720, stretched by 1.5. The mirror then scales with
-  `drawImage` and `imageSmoothingQuality` is never set, so it stays at `'low'`.
-- *A 1x laptop on a 4K projector:* `frac` is 1 on every rung, so every rung draws the
-  full 3840×2160, and the governor has only the grid to give up while the plate's
-  shading, which is bound by pixels, stays where it was.
-
-*Fix:* when a stage is attached, build the pixel rungs from the stage (1.0, 0.75,
-0.5 of it) rather than from the laptop, offer 1024² by the stage's ratio, and set the
-mirror's smoothing to `'high'`. *Measure:* two new cases in `npm run rungs` (it runs
-anywhere): a Retina laptop with a 1080p stage starts at the stage's own pixels and
-offers 1024²; a 1x laptop with a 4K stage has a bottom rung with fewer pixels than its
-top. Then `npm run ladder` on the Mac with a stage.
-
-**Shipped** (2026-09-27). With a stage attached the ladder is the stage's
-(`stageLadder`, `lib/platform.ts`): a rung's `dpr` is its share of the projector's own
-width and height, and the laptop's ratio is not read. The show opens at the grid its
-GPU class opens on at every pixel the projector has; above that the grids climb at
-full pixels; at it the pixel rungs come first (0.75, then 0.5 of the stage), then the
-smaller grids at half. `canvasPixelsFor` draws a stage at the rung's share and no
-longer takes the laptop's ratio, so a fixed grid (the governor off), which asks for 1,
-now fills a Retina laptop's projector too. The governor is built again when a wall
-comes or goes, and only when the rungs differ; when the rung it is on is still among
-them (a wall window crossing 1920×1200 gains or loses only 1024²) it stays on it. After
-the GPU runs out of memory on a wall, the ladder is built again under the grid that
-failed and opens at the whole stage, where stepping down would have walked its pixel
-rungs to half the stage for good (`npm run rungs`: out of memory at 512², now 384² at
-1920×1080, walked down 384² at 960×540). The wall window scales with
-`imageSmoothingQuality` 'high', set after every resize because a canvas's new width
-resets it. With no stage the ladder is exactly what it was.
-
-1024² is offered by the stage's *pixels*, not its ratio: at most 1920×1200. The gate
-was measured as a pixel count (1024² held at 1.0 Mpx and fell to 22 fps at 4.1 Mpx,
-with the same step cost), and a projector's ratio stands for its pixels badly: a 4K
-projector at 1x has 8.3 Mpx, and a 1080p one behind 150 % scaling has a ratio of 1.5
-and the same 2.1 Mpx as at 100 %.
-
-`npm run rungs`, 73 of 73 (the old code, bridged to the new `canvasPixelsFor` signature,
-fails every new stage case). Two stage ladders are written out rung by rung, and the
-1024² gate is held at 1920×1200 (offered) and 2560×1440 (not). The Mac's
-`webgpu-smoke` asks the running show which ladder it is on (a rung at 0.75 of the wall
-while it is up, none once it closes) and reads the wall's smoothing across a resize that
-changes the canvas. A Retina laptop (2x) on a 1080p
-wall opened at **960×540** (1280×720 at 1.5x), now at **1920×1080**, on the hosted page
-and locally, for every GPU class. 1024² was not offered (grids 768, 512, 512, 384, 256),
-now at 1920×1080. A 1x laptop on a 4K wall had **8.29 Mpx** on its top rung and its
-bottom one; now 8.29 at the top (768²) and **2.07** at the bottom (256² at 1920×1080),
-and it is no longer offered 1024² at 8.3 Mpx. The canvas sizes a 1080p or 4K wall gets
-were five different ladders from a 1x, 1.25x, 1.5x, 2x and 3x laptop; now one. The old
-assertion that a rung of 1 drew a Retina laptop's wall at 960 of 1920 was this bug
-written down, and is replaced by what a share draws (1920×1080 at 1, 960×540 at 0.5).
-Eighteen no-stage ladders, printed before the change for every tier at 1x to 3x
-(phones included), are a fixture the new ladder matches rung for rung and start for
-start. The mirror's smoothing, read by hand from a wall window opened by the built app
-in a cloud session: 'low' when it opened and 'low' after a resize before, 'high' and
-'high' after; `npm run webgpu` asks the same on the Mac.
-
-*The phone:* no phone version, because a phone has no stage. The wall that follows a
-stage's pixels is the wall window (`StageMirror`), a second window on the same machine
-mirroring the show's canvas; the phone's own controls have no wall button, and a phone
-on a wall goes there through the phone's screen mirroring (AirPlay, Android's cast
-screen), which the page cannot see and which shows the phone's own pixels, or through
-a Chromecast, whose receiver runs its own show at its own pixels with no stage. The
-phone keeps the no-stage ladder, which the fixture holds (its 2.625x and 3x lines).
+**Shipped** (#194): a wall's pixels are the wall's, not the laptop's ratio (`npm run rungs`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 *Still owed, on the Mac:* whether 1024² holds on a 1080p wall. 2.07 Mpx sits between
 what was measured to hold (1.0) and to fail (4.1), so what `npm run ladder` with a
@@ -2202,32 +2206,7 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
 
 ### 14d. The beat clock hears a smoothed bass level, not the kick
 
-**Read in the code.** The frame loop feeds `BeatClock.update` with
-`currentAudioData.bass / 70` and the clock calls an onset when that crosses 0.45
-(`beatClock.ts`). That level has been smoothed twice (the analyser's time constant,
-then `LEVEL_SMOOTHING.bass`), so where the crossing lands moves by roughly 30–55 ms
-with how loud the kick is (worked from the constants), while the flux onset that
-`audioFeatures.ts` already computes for the kick goes unused here. `hear()` then snaps
-the phase fully to each onset, so that jitter goes straight into the next predicted
-beat. At the shipped trust of 0.7 the clock needs about seven kicks to lock, some
-three seconds at 120 bpm. `npm run learn` feeds the clock the flux kick at trust 1,
-so its "ahead of the microphone" figure (§5) describes a path the live show does not
-take.
-
-*Fix:* feed the clock the kick onset and its time, and pull the phase toward each
-onset by a gain (about 0.3) rather than snapping it. *Measure:* a `learn` case that
-drives the clock the way the live loop does (smoothed bass, trust 0.7) and prints
-kicks to lock and the spread of the lead.
-
-**Shipped.** The loop hands the clock the kick's onset and the time it landed (the
-reading's `at`, watched for a change, so no kick is lost between frames), and `npm
-run learn` drives the clock that way at the shipped trust, 0.7. `npm run kicks`
-measures it on the band's own score: locked after 8 kicks at 60, 30 and 20 fps (8
-or 9 before, the heard kicks it did lock on being early ones), 170 of 256 kicks
-fired ahead at 20 fps against 99, lead −8 ± 13 ms (−14 ± 20 before). The phase
-pull was tried at 0.3 and did no better on this band (spread 18 ms against 13 at
-20 fps), so `hear()` still snaps: with the onset's own time the snap's jitter is
-the onset's, a few ms, not the smoothed level's 30–55.
+**Shipped** (#199): the clock hears the kick's onset, by its time (`npm run kicks`); counting heard kicks in the app on the Mac is 10.4's. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ### 14e. The picture and the room disagree about when the kick is
 
@@ -2761,32 +2740,7 @@ performer would notice first:
 
 ### 15a. Only the Dropper lays the bottle's liquid (shipped)
 
-Pour, Spray, Splat and Streak laid the colour and nothing else. With Ferrofluid in
-the bottle, a Pour made a pool of near-black dye that the Magnet could not move.
-With Oil, it made orange water that never became an oil body. Soap, milk, silicone
-and glycerine were only colours. Every laying tool now lays the bottle
-(`layBottle`), and a magnetic bottle lays its own dose of dye instead of a heavy
-stain (`bottleDye`). The hands that are not the mouse (a replayed take, the pad,
-OSC: `performGesture`) had the same gap in their own copy of the tools. Their
-Dropper, Pour, Spray, Splat and Streak lay the bottle now too, and their Pour
-spreads from where it lands, as the mouse's does. The show's own pour (Evolve, the
-music, Seed, the looks' inject styles) still runs toward +y as it always has. Every
-tool lays the liquid no wider than the bottle's Dropper (`bottleReach`), once a step
-per hand. So a Pour of Oil is a held Dropper's worth of oil bodies, not a body a
-fifth of the plate across every step. Checked by `npm run bottles` on the Mac (tools shard).
-The app does not step on software WebGPU, so this check cannot run in a cloud
-session.
-
-Open: the Splat line's "following the hand" went red once on #203's Mac run (29
-pours on the stroke, 0 at the mirror, the order wrong), on a path that change
-does not reach (with no wall open nothing is gated). The line compares the
-first quarter of the pours with the last along the stroke, and a Splat throws
-its droplet up to 27 cells from the hand on a stroke 29 cells long. Modelled
-with the hand's steps evenly spread, that comparison reads a working Splat as
-not following on 0.07 % of strokes of 29 pours. So the likelier cause is steps
-bunched by a stall on the runner, which leaves the two quarters near one point.
-Judge each pour against where the hand was on that step (log the pointer with
-the pour), not by the order of scattered droplets.
+**Shipped** (#201): every laying tool lays the bottle's liquid (`npm run bottles`); the Splat line's "following the hand" was fixed in #214. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 
@@ -2815,38 +2769,7 @@ these numbers.
 
 ### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
-A moving Blow multiplied the dye under it by 0.8 every step, which cleared it, and
-its push is the one-step push of 15b. So did a second finger's Blow on the phone, a
-Blow on a plate that is not the lead, and every remote hand's (a directed blow
-thinned 15% a step at its middle). Now a hand's Blow that is not the straw is the
-wind (`blowWind`): it carries the colour the way the hand went, a take and a put as
-the Finger's carry, with the ferrofluid's numbers (`blowCarry`), so the colour and
-the ferrofluid go the same way. Held still (a puff that is not the straw) it blows
-the colour out from under it onto the Press's ring. With Oil Bodies the oil goes
-with its colour, along (`carryMix`) or onto the same ring (`pressOil`), cell for
-cell. Measured in the lab (`npm run wind`, 30 readings of a Blow drawn a sixth of
-the plate from a pool's middle): the old eraser kept 78.7% of the pool (a remote
-hand's directed one the same) and moved its middle 1.05% of the plate backwards; the
-wind keeps 100.0% and moves it 1.06% the wind's way (2.71% for a remote hand's wider
-one). `npm run tools` on the Mac now draws a Blow across a pool through the real
-pointer and asks that the stroke ran as the wind (the pointer's Blow counts its
-straw and wind steps and what the wind carried, `blowSteps` in `chromaglassDebug`),
-that the colour goes along and that it is kept.
-
-A held puff lands the oil on the Press's ring, and the ring's kernel worked out what
-each ring cell gets from the formula (1 / K), which a small palm's ring does not tile:
-a puff six cells across lost 3.3% of the oil it moved on the Mac (`npm run wind` went
-red on it). The kernel is now handed the share counted on its own grid, as the
-colour's is counted on the mirror's (`pressShare`), and the Press's own oil, which
-lost up to 1% of a press the same way, now keeps all of it (`npm run pressoil`:
-32768.0 → 32768.0 in the middle, off it and in a corner).
-
-The straw is now chosen by whether the hand has moved in the last 150 ms (the
-clock the ferrofluid's wind already used), not by whether it moved this step. Asked
-per step, a drag blew the straw on every step after a frame's first and on every
-frame the pointer did not report a move, so a drag left a string of straw bubbles
-and ran the wind a step a frame at best. The show's own puffs (a pour's burst, the
-automation's breath, a bubble's pop) still clear the dye under them, as their look.
+**Shipped** (#215): Blow's wind carries the colour and the oil the way the hand went, rather than erasing them (`npm run wind`, `npm run tools`). Its follow-ups are 15f and 15g. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
@@ -3923,6 +3846,14 @@ directly, as `checks.yml` already does for some; the strays deleted or wired;
 
 ### 19f. The plan and the docs, out of step with the code
 
+*2026-10-04 (#245):* the first three below are fixed (the order of work replaces "What
+comes next"; the openings and §12's table say what is built), `docs/judging.md`'s numbers
+were made unique in #230, and the order of work's "one home" table says where each
+piece of twice-written work lives. Left: the flaky-check notes in §0 and §11 (their home
+is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
+`docs/webgpu-plan.md` and `docs/evaluation-2026-09.md`, and `README.md`. CLAUDE.md's
+"about 38k" tokens for this file, which was about 75k, is corrected here.
+
 - "What comes next" (2026-09-26) still says the Mixer's steps 2 and 5 are small and step
   3 is next (2 to 5 have shipped, #189 to #196), that batch 10's steps 4 to 7 are to
   come (4 and 5 shipped, #185 and #179), and never mentions §12 onwards.
@@ -4026,6 +3957,164 @@ like day (`npm run macqueue -- --hours 24` for the time).
   `src/App.tsx` (#233) and the solver (#225). What no deploy measures now: two PRs in
   different site files moving the same picture; the next PR's own run, on main with both,
   measures that.
+
+
+### 19i. A green Mac result carries across a merge of main
+
+*Measured 2026-10-04 over 25 merged PRs (#204 to #244), 103 `Checks` runs.* A PR ran its
+checks about four times. Of those runs, 53 started on a push that only merged main in, and
+8 on a docs-only commit: together 61 of 103 runs and 2,011 of 3,124 Mac runner-minutes
+(64 %), on pushes that added none of the PR's own site code. They also held 20 of the 29
+runs that went red on their first attempt. Each restarts all four shards, 37 to 62
+minutes of wall time since #239 (75 before), at a time when the five Mac runners were 87
+to 91 % busy, so every one of them lengthened everyone else's queue too.
+
+*Fix:* the PR side of `deploygate.sh`'s rule 5. When the new head's tree differs from the
+tree of the PR's last green Mac run only in files main changed (and those are disjoint
+from the PR's own site files, `reach.mjs --site`), or only in files that never reach a Mac
+shard, the shards are skipped with the verdict "carried", and the deploy gate follows that
+chain back to the run that passed. The ship skill then merges without bringing main in
+whenever the gate would say `disjoint`. *What it leaves unmeasured* is what 19h-3 already
+accepted for deploys: two PRs in different files moving the same picture. To keep every
+check running on the combined tree, one full Mac run on main every N merges, or after each
+publish with 19o's rollback behind it. *Measure:* Mac minutes per merged PR and runs per
+PR over the next 25 PRs, against 125 and 4.1. *Size:* M.
+
+### 19j. A merge with no site change deploys nothing
+
+Ten of the last thirty merges changed no file the site is built from (`reach.mjs --site`):
+docs, check scripts, workflows. A docs-only merge still runs every Mac shard on its deploy
+(rule 3, because its PR skipped them): d027626 took 111 minutes to go live behind a
+53-minute Mac queue, 54f2d25 took 63. A check-only merge costs eight minutes of Measure.
+
+*Fix:* rule 6 in `deploygate.sh`. When no site file differs from the commit that is live,
+the tree that is live already passed every check; the deploy says so and stops, and the
+concurrency group is free for the merges behind it. A changed check script still ran on its
+own PR. *Measure:* `npm run deploygate -- --history 30` (10 of 30 answer "nothing to
+deploy"). *Size:* S.
+
+### 19k. One manifest of checks
+
+Every new check edits `.github/workflows/checks.yml` and `package.json` (13 and 14 of the
+last 30 merges), which is where three of the recorded merge conflicts were. Seven of the
+last 25 PRs changed only check scripts and needed one shard of four, but ran all four (17
+runs, about 30 Mac-minutes each). And `npm run check` runs about 35 scripts one after
+another, some 15 minutes, where its header says a minute.
+
+*Fix:* `scripts/checks.json`, one entry per check (its name, its shard, its command, the
+`src/` files it imports, from esbuild's metafile, as 19c traced). `checks.yml` builds each
+shard's steps from it; `package.json`'s scripts stay for hands, generated or checked against
+it. A PR that changes only check scripts runs the shards those scripts are in, plus Measure;
+a change to `src/`, a shared helper (`frame`, `chromium`, `lab`, `lab-entry`) or a workflow
+selects every shard. `npm run quick` reads the same map and runs, in parallel, the checks
+the diff reaches, which is CLAUDE.md's "which checks for which files" table made
+executable. *Measure:* Mac minutes on check-only PRs, and conflicts in `checks.yml` and
+`package.json`. *Size:* M.
+
+### 19l. App frames readable in a cloud session
+
+CLAUDE.md says the full app on software WebGPU returns zero readbacks, so `qa`, `tools`,
+`magnet`, `mirror` and the rest can only be run on the Mac, after a push and a queue.
+*Read 2026-10-04 in a cloud session, Chromium 141:* headless, the device is lost at the
+first canvas present ("A valid external Instance reference no longer exists"), which is
+why the lab, which never presents, works. Headed under `xvfb-run` with the same flags the
+device survives and `__cgFrame` returns the app's frame (1280×800, mean 0.29); `tools` gave
+7 of 15 real readings, where headless gave 3 of 14, all zeros. The rest failed on speed: the
+plate stepped 8 times a window against 21 to 25 on Metal.
+
+*Fix:* `scripts/chromium.mjs` launches headed under xvfb when `PW_WEBGPU=1` on Linux
+(`scripts/desktop.mjs` already re-executes itself under `xvfb-run`); checks wait for the
+engine rather than sleeping, and count windows in steps where they count seconds. CI stays
+on Metal, as 19h's "what would not help" found. A session can then reproduce the logic of
+a Mac check before it pushes; about a third of the Mac reds were the PR's own (19h).
+*Measure:* the same commit through `tools`, `magnet`, `mirror` and `bottles` in a cloud
+session and on the Mac: the lines that do not depend on the step rate agree. *Size:* M.
+
+### 19m. Fragments for the shared documents, and this file as an index
+
+Of 61 merges of main into PR branches, 25 recorded conflicts: `PLAN.md` 14, `docs/judging.md`
+7, `CHANGELOG.md` 4, `package.json` 3, `checks.yml` 1, `src/` 2, and none in `App.tsx` or
+`LiquidVisualizer.tsx`. `PLAN.md` is touched by 29 of 30 merges and is about 75k tokens
+whole (CLAUDE.md's "about 38k" is half the real figure), so a session that reads it pays for
+it on every step after.
+
+*Fix:* each PR writes its plan, judging and changelog notes as a new file in `plan.d/`,
+`judging.d/` and `changelog.d/`, which nothing else edits; a small fold puts them in place
+after merge. And `PLAN.md` becomes this order of work and the running order, with one file
+per section under `docs/plan/`, so a session reads the index and its section. Done in one
+PR at a quiet moment, with a table from old line ranges to new files so a branch caught
+mid-move can re-apply its edit. *Measure:* conflicts recorded per merge of main, and bytes a
+session reads to start. *Size:* M.
+
+### 19n. A shorter deploy
+
+A deploy that runs Measure and not the Mac takes 8.0 minutes: Measure's sound part is the
+critical path at 6.7 (`shape` and `downbeat` 96 s each, `bands` 48, `kicks` 44, and 23 s of
+apt installing ffmpeg), then 0.8 to build and publish. *Fix:* split the sound part in two,
+cache or vendor a static ffmpeg, and build beside Measure into a channel that
+`hosting:clone` makes live once Measure is green. About 5.5 minutes, and docs-only PR runs
+faster with it. *Size:* S.
+
+### 19o. A rollback in under a minute
+
+Today a bad deploy is undone by a revert PR, its checks and a deploy: 40 to 60 minutes, at
+a gig. *Fix:* a `workflow_dispatch` that runs `firebase hosting:clone` of the previous live
+version, and a `show-YYYY-MM-DD` tag on each green deploy the owner has judged, which 14p's
+`npm run show` plays. It is also what makes 19i's after-publish Mac run safe. *Measure:* the
+time from dispatch to the previous version live. *Size:* S.
+
+### 19p. A preview URL on every PR
+
+`docs/judging.md` is edited by 12 of the last 30 PRs, and every one of those waits for the
+owner's eyes after it is live, so a look that is wrong costs a follow-up PR and a deploy.
+*Fix:* `action-hosting-deploy` without `channelId` on pull requests posts a preview URL per
+PR (forks get no secrets, which is right), about a minute of ubuntu a push; the judging
+sheet (19t) links each item's preview. *Size:* S.
+
+### 19q. Auto-merge, and nothing merges red
+
+`main` has no protection, `allow_auto_merge` is off and there are no rulesets, so a session
+polls for green and merges by hand (a median of a minute after green, so it is quick, but
+each poll is a session's wake), and nothing stops a red merge. *Fix, in the owner's
+settings:* a ruleset requiring `Measure` and `WebGPU (macOS)`, and auto-merge on; a session
+arms it when it opens the PR ready. A merge queue is not offered on a repository owned by a
+user. *Size:* S.
+
+### 19r. Smaller, for the same pass
+
+- The open shard is back near its timeout after #239's rebalance: median 12.6 minutes, green
+  maximum 14.1, one cancelled at 15.3 (#240). `startup` (349 s) and the phone's fingers
+  (224 s) dominate it; move one, as #239 did.
+- `npm run lint` takes 18 to 24 s; `tsc --incremental` with a kept `tsbuildinfo` takes 3.5 s
+  warm. A Playwright cache on ubuntu saves 23 s a Measure part.
+- `tools`' "Pour lays more than Drop" passes at 0 against 0: a check that cannot fail on the
+  case it names (the `check-skeptic` rules, `docs/roadmap.md`).
+- Rejected with evidence: building once and sharing `dist` across shards (setup is 28 s of a
+  9.4-minute shard), a faster session start (`npm install` is 10 s warm), and moving app
+  checks to ubuntu (a third of Metal's step rate).
+
+### 19s. A ledger of reds, so the worst check is fixed first
+
+Over 2026-09-27 to 10-04, 26 failed jobs were re-run by hand and 14 went green with nothing
+changed; 12 of the last 25 PR runs were red on their first attempt, mostly on the plate,
+tools and open shards, and both deploys that failed since #239 were red on lines their PR
+did not touch. Each such red costs a push or a re-run and a queue. The record of them is
+spread over §0, §11 and 19h, and nobody can see which check costs most. A re-run that
+passes is never an answer here; the check is either wrong or measuring a real fault.
+
+*Fix:* `npm run reds -- --days 7`, from the Actions API: each failed line by check, how
+often, on which trees, whether the PR touched what it measures, and whether a re-run went
+green. The steward takes the top line first. The open ones today are listed in the order of
+work's 0.3, which is now their one home. *Size:* S, then one PR per check.
+
+### 19t. The owner's judging sheet
+
+47 items wait on the owner's eyes on the Mac (the order of work's Wave 2), spread through
+`docs/judging.md`, the running order and this file's sections. *Fix:* `npm run judging`
+writes one page: each item with the build it shipped in, the link that opens it (a preview
+URL from 19p, or the live site with its query), what to look at and what would be wrong,
+grouped so one sitting covers one area, gates first. The owner's verdicts go back as one
+commit. *Size:* S.
 
 ## 21. Looks after painters
 
