@@ -41,6 +41,7 @@
  *                 screen with no click and no key, mirrors the show there, and
  *                 is in the page's own full screen, so neither the wall nor
  *                 the laptop asks for a click to drop the title bar
+ *                 and shows no pointer on any of its elements
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
  *
@@ -383,7 +384,7 @@ try {
     castState = await electronApp.evaluate(async ({ BrowserWindow }, id) => {
       const w = BrowserWindow.fromId(id);
       if (!w) return null;
-      const doc = await w.webContents.executeJavaScript("({ full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0 })");
+      const doc = await w.webContents.executeJavaScript("({ full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0, elements: document.querySelectorAll('*').length, pointer: [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).cursor !== 'none').map((el) => el.tagName.toLowerCase()).slice(0, 4) })");
       return { windowFull: w.isFullScreen(), ...doc };
     }, cast.id);
   }
@@ -399,6 +400,14 @@ try {
     cast
       ? `opened ${cast.url.replace(/^http:\/\/localhost:\d+/, '')} at left=${askedLeft}${standIn === null ? '' : ` (the stand-in's edge is ${standIn})`}; page full screen ${castState?.full}, window full screen ${castState?.windowFull}, the mirror's canvas ${castState?.mirror ? 'there' : 'missing'}, click hint on the wall ${castState?.hint}, title-bar chip on the laptop ${chip > 0}`
       : 'no projector window opened');
+  // The owner's ask of 2026-10-04: no pointer on the wall, however the mouse
+  // gets there (index.css `.show-screen`; `npm run showcursor` asks it of the
+  // web's projector window and a receiver, with the mouse moving).
+  check('projector: no pointer on the wall',
+    // On the page itself, not just its <head>: a page that never drew has
+    // nothing to point at and would pass on its 24 head elements alone.
+    !!castState && castState.root > 0 && castState.mirror && castState.pointer.length === 0,
+    castState ? (castState.pointer.length ? `a pointer on ${castState.pointer.join(', ')}` : `none on ${castState.elements} elements`) : 'no projector window opened');
 
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
