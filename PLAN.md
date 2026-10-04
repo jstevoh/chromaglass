@@ -3162,8 +3162,7 @@ for, and the GPU was asked for only after they had arrived and drawn.
   device given at 0.42 s (was 0.95 s) and the first shader handed over at 0.81 s
   (was 0.96 s). Two lanes are not yet read on the Mac: `npm run startup`'s "built
   ahead" line is the before and after (11.46, 13.57, 11.83 s before).
-- *`npm run loadtime` is not in CI yet:* it needs no GPU and belongs in Measure; the
-  workflows were being reworked (#239) when it landed.
+- `npm run loadtime` runs in Measure's browser part (`checks.yml`, "The load").
 - *The plate is black while the opening compiles.* Seconds on a cold cache. A
   starting picture (the look's palette, still) would say the show is coming; it
   changes the first frame, so it is the owner's call.
