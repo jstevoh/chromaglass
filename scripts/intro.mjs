@@ -269,10 +269,14 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   const afterward = lastEnd === null ? [] : (at.moving ?? []).filter(([t]) => t > lastEnd);
   const stills = rec.still ?? [];
   const letGo = stills.length > 0 && stills.every(([, e]) => e !== null);
-  check('9. it holds still while the opening\'s render pipelines compile, and moves again after',
-    renders.length > 0 && during.length > 0 && during.every(([, m]) => !m) && letGo && lastEnd !== null
+  // One at a time, as the opening has always asked for them (`renderBusy` in
+  // gpu/prepare.ts): the hold must not let the lanes ask for several at once.
+  const sorted = [...renders].sort((a, b) => a[0] - b[0]);
+  const overlaps = sorted.filter((r, i) => i > 0 && (sorted[i - 1][1] === null || sorted[i - 1][1] > r[0])).length;
+  check('9. it holds still while the opening\'s render pipelines compile, one at a time, and moves again after',
+    overlaps === 0 && renders.length > 0 && during.length > 0 && during.every(([, m]) => !m) && letGo && lastEnd !== null
       && (afterward.some(([, m]) => m) || afterward.length <= 2),
-    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}; ${during.length} frames up during them, ${during.filter(([, m]) => m).length} of them moving; held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the last`);
+    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${during.length} frames up during them, ${during.filter(([, m]) => m).length} of them moving; held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the last`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {

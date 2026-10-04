@@ -224,7 +224,6 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   // The page held still across the render compiles (`Quiet`, below): asked
   // once, before the first of them, and let go when the last has settled.
   let renderLeft = quiet ? builds.filter((b) => b.kind === 'render').length : 0;
-  let stilled: Promise<void> | null = null;
   const take = (): Prep | undefined => {
     const i = renderBusy ? queue.findIndex((b) => b.kind !== 'render') : 0;
     return i < 0 ? undefined : queue.splice(i, 1)[0];
@@ -268,7 +267,6 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       const prep = take();
       // Only render pipelines are left and one is compiling: wait for it.
       if (!prep) { await renderBusy; continue; }
-      if (prep.kind === 'render' && quiet) await (stilled ??= quiet.still().catch(() => undefined));
       asked.push(prep.key);
       const b0 = performance.now();
       const stamps: BuildTimes = {};
@@ -291,6 +289,14 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       if (await built) ready++;
     }
   };
+  /*
+    Held still before any lane starts, not as a lane takes its first render
+    pipeline: an await between \`take\` and \`renderBusy\` let all three lanes
+    take a render pipeline while the first waited, and the opening asked for
+    three at once (#283's first Mac run: \`air/air splat\` 3.32 s, under way
+    through a 2.15 s frame gap). The render pipelines are asked first anyway.
+  */
+  if (renderLeft > 0) await quiet?.still().catch(() => undefined);
   await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
   // Gone, timed out or a build that never settled: never left held still.
   if (quiet && renderLeft > 0) quiet.go();

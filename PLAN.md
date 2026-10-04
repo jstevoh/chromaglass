@@ -3236,7 +3236,7 @@ for, and the GPU was asked for only after they had arrived and drawn.
   line 9 holds every frame against the opening's render compiles, read from outside
   the app: 242 frames up during them, none moving, held 2.02–6.18 s on SwiftShader,
   then turning on all 354 frames after; with the hold taken out, 178 of 178 moving
-  and the line red. The Mac's `npm run startup` is what says the stop has gone. This
+  and the line red. Its first version held still as each lane took its first render pipeline, which let three lanes ask for three at once (PR #283's first Mac run: a 2.15 s frame gap with `air/air splat` compiling 3.32 s); it now holds still before the lanes start, and line 9 also holds the opening to one render compile at a time (2 of 4 asked while another compiled with the first version). The Mac's `npm run startup` is what says the stop has gone; its intro line prints the stretches held still. This
   answers the open question of whether the swirl freezes: around the display's and
   the derive's compiles it does, and now it does so on purpose, still and not stalled.
 - *Does the intro also stop while Chromium starts the GPU on the Mac,* before any
