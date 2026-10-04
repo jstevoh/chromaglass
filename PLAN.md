@@ -157,7 +157,7 @@ Judged in this order, because these gate code:
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
-  look's own turning; **21c** dots and zoom; **3-highlight**; **18i** timed pops;
+  look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
   **0-bandbubbles** (#238).
 - **2.6** **P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).
@@ -232,7 +232,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
-  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22i**. Painters: **21b**, **21d**. The
+  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22k** (~~22h~~ this PR). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 
@@ -307,7 +307,7 @@ Where each batch stands, as of 2026-09-27:
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
-| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28); 22b–22i open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (this PR; `npm run turntable`, `npm run flick`); 22b–22g, 22i–22k open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -4610,14 +4610,46 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   integrated swirl it counted the gap twice and the palm read 0.045). Properly the
   dish's drag is a force in the thin solve's own momentum balance (A(k − k0)ẑ×r beside
   18a-2's forces), with no swirl field at all.
-- **22h. The look's own turning is still rigid.** A look's motor, the music routed
-  to rotation (eleven shipped looks) and a flick turn the picture as they always
-  have, with the flick's twist term, and not through the dish: sent through the
-  liquid's lag, a thin look's sway was smoothed over three seconds and the swirl ran
-  on every look with music, which is a change to shipped looks nobody has judged.
-  The turntable is a second dish under the look's. Once the lag has been seen on the
-  Mac (`docs/judging.md` §28), put the look's turning on the same dish, retire the
-  twist's flick term, and judge those eleven looks against main.
+- ~~**22h. The look's own turning is still rigid.**~~ **Shipped** (this PR). There is one
+  dish under a plate now. The look's motor, the music routed to rotation and a flick
+  turn the same glass as Auto Spin and the Spin tool; the speeds add, the liquid follows
+  their sum with its drag time τ = h²/12ν, and the picture turns with the liquid alone
+  (`dishFrame` in `src/lib/turntable.ts`). The twist's flick half, a stir in the current
+  standing in for the drag the rigid picture was not getting, is retired: kept, it
+  would have dragged the liquid twice. Measured (`npm run turntable`, checks 10–14):
+  - a look nobody turns is exactly still, ten minutes at 60 fps;
+  - a flick on water leaves the picture behind (0.061 of the glass's 1.83 rad/s after
+    0.1 s) and it comes up to the dish on the exact answer for a coasting dish, to
+    0.83% at 1 s and 3 s, at 60 and at 144 fps. On the thick liquid it is with the dish
+    (0.998) within half a second;
+  - a steady motor turns the picture at its speed, Ωτ behind where the rigid picture
+    was (0.00299 rad on acid-trip's motor, the fastest shipped);
+  - a sway every eight seconds reaches the picture at 1/√(1 + (ωτ)²) of the dish's:
+    0.391 through water, 0.993 through the thick liquid.
+  `npm run flick` (Mac, the tools shard) holds the frame to that arithmetic: a flick on
+  water at the drag time's speed, the picture through the liquid's angle and not the
+  glass's, the angle lost to the glass after two drag times to 15%, the turntable's
+  share through the same water, the solver handed Ω − ω_l and no twist.
+
+  What it changes on the shipped looks, worked out on the frame's own flywheel with a
+  made-up band (galaxy, acid-trip, solar-flare, deep-ocean): on the nine thin looks with
+  music routed to rotation the picture is within 0.035 rad (2°) of where the rigid one
+  was, and the swirl's drive Ω − ω_l is up to 0.011 rad/s, over 1e-3 about 90% of the
+  time, so the swirl runs while they play; on deep-ocean and neon-coral-reef (thick)
+  it is 0.003 rad and 0.0025 rad/s. Looks with no music and a motor (most) end Ωτ, a
+  few thousandths of a radian, behind. Looks that do not turn are unchanged to the bit.
+- **22j. The look's motor still stirs the middle.** The twist's motor half
+  (`rotationSpeed` × CUR_TWIST round the middle) is kept because every look is tuned
+  against it, but a dish turning steadily under its liquid drags the liquid round with
+  it and leaves nothing to stir once the liquid has caught up. Replace it with the dish
+  (the swirl already carries what the glass does), and retune the looks that lean on it.
+- **22k. The swirl runs on every look with music routed to rotation.** Since 22h a
+  music look's dish sways under its liquid, so Ω − ω_l is over the swirl's 1e-3 rad/s
+  floor most of the time (above): thirteen more dispatches a step on the current's
+  half grid (spinSwirl, its divergence, ten pressure sweeps, the gradient). At 1e-3
+  rad/s the swirl moves the liquid at most 0.1 mm/s at the rim, a tenth of a cell a
+  second. Measure the cost on the Mac (`npm run stages`), and set the floor from the
+  travel it would make in the drag time (a fraction of a cell) rather than a speed.
 - **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
   angular speed round the middle, held to a turn and a half a second, because near
   the middle a small move is a large angle. A hand's real torque is its friction

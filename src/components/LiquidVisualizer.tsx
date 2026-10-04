@@ -30,7 +30,7 @@ import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
-import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dragSeconds, dyeDensityContrast, liquidFollow } from '../lib/turntable';
+import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
@@ -905,32 +905,17 @@ class FluidSimulation {
   temp: Float32Array;
   temp0: Float32Array;
   /**
-   * How fast this plate is actually turning, in radians a second.
-   *
-   * Set by the frame from the flywheel, and read by the twist below. The
-   * *setting* is a motor — what the plate is asked to hold — and this is what
-   * it is doing, which after a flick are very different numbers.
-   */
-  plateSpin = 0;
-  /**
-   * The turntable under the dish (PLAN.md §22, lib/turntable.ts): how fast
-   * Auto Spin and a hand on the Spin tool turn the dish, and how fast the
-   * liquid's bulk follows it with the drag time of a thin gap, in radians a
-   * second. The picture turns at `plateSpin` plus `liquidSpin`, and the
-   * solver drags the liquid toward the dish by the difference (the swirl).
-   * Both are zero on a dish nobody spins, which is every look as shipped.
+   * The dish under this plate (PLAN.md §22, lib/turntable.ts dishFrame), in
+   * radians a second: how fast the glass turns, everything that turns it
+   * together (the look's motor, its music and a flick, Auto Spin, a hand on
+   * the Spin tool), and how fast the liquid's bulk follows it with the drag
+   * time of a thin gap. The picture turns with the liquid; the solver drags
+   * the liquid toward the dish by the difference (the swirl) and flings it
+   * by the liquid's own speed (the centrifuge). Both are zero on a dish
+   * nobody turns, and the swirl does not run.
    */
   dishSpin = 0;
   liquidSpin = 0;
-  /**
-   * How fast the liquid really goes round, for the centrifuge: the look's
-   * turn and the turntable's liquid together, while the turntable is
-   * turning; zero otherwise, so a look nobody spins is no centrifuge (22h).
-   * Not the turntable's liquid alone: a hand held still on a flicked plate
-   * stops the picture by turning the turntable against the flick, and the
-   * liquid it holds still is flung nowhere.
-   */
-  spinCentrifuge = 0;
   /**
    * The angle the dish is drawn turned to, and how far down from its centre
    * the plate is still on screen (in plate widths). Gravity is the room's,
@@ -1046,10 +1031,10 @@ class FluidSimulation {
    *   - `clockLean`, the phrase's slow lean on the timestep (slewed over 2.5
    *     s, so it is never quite where the render's reset phrase would put
    *     it): every step's `dt` is multiplied by it;
-   *   - `plateAngle` and `plateSpin`, which the frame sets from the flywheel
-   *     only after the solver has stepped, so the render's first steps read
-   *     the live plate's angle (gravity's direction) and spin (the twist)
-   *     rather than the ones the look was just laid with;
+   *   - `plateAngle` and the dish's spin, which the frame sets only after
+   *     the solver has stepped, so the render's first steps read the live
+   *     plate's angle (gravity's direction) and spin (the swirl) rather than
+   *     the ones the look was just laid with;
    *   - the bubbles' bookkeeping (`prevPacked`, `coverPacked`, the holes
    *     still filling, the mirror's sequence the rim deposit keys on): the
    *     bubbles are cleared with the look, and a list of last frame's bubbles
@@ -1067,10 +1052,8 @@ class FluidSimulation {
   forgetHistory(angle: number, viewHalfW: number, viewHalfH: number): void {
     this.forgetPress();
     this.clockLean = 1;
-    this.plateSpin = 0;
     this.dishSpin = 0;
     this.liquidSpin = 0;
-    this.spinCentrifuge = 0;
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
@@ -3304,9 +3287,6 @@ class FluidSimulation {
     // or gradients and reads as a static colour wash. A macro frame needs
     // empty ground around its subject, so the budget drops hard while the
     // closeup camera is running.
-    // What the motor asks for, in the flywheel's units, so the twist below can
-    // tell the plate's own momentum apart from the speed it was told to hold.
-    const motorSpin = (settings.rotationSpeed ?? 0) * 0.01 * (this.layerIndex % 2 === 0 ? 1 : -1);
     // Eased down over the zoom's travel, not dropped at the first notch: the
     // plate emptying at 1.05x was a jump of its own (reported as the zoom
     // not being smooth, "especially at the beginning steps").
@@ -3533,35 +3513,31 @@ class FluidSimulation {
       rockY: this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
-        The liquid is dragged round by the glass it is touching.
+        A stir round the middle at the look's motor setting, kept because
+        every look is tuned against it (PLAN 22j names it as the shortcut it
+        is: a dish turning steadily under its liquid drags it round with it,
+        and leaves nothing to stir once the liquid has caught up).
 
-        The first term is the motor's, unchanged, because every look is tuned
-        against it. The second is the part of the plate's motion that the
-        motor did not ask for — what a flick put there — and it is what makes
-        dye follow a spun plate instead of sitting still while the plate turns
-        underneath it.
-
-        Scaled by how hard the plates are pressed together, because that is
-        what contact means here: a plate barely touching drags its liquid
-        weakly, and one squeezed down on it takes the liquid with it. Couette
-        drag, in the one place this solver can express it without giving the
-        current pass the gap field to read.
-
-        The turntable's dish (Auto Spin, the Spin tool) is not in it: its drag
-        on the liquid is the swirl below, from the gap and the viscosity.
+        It had a second half, the plate's motion the motor did not ask for,
+        what a flick put there, scaled by how hard the glass was pressed: a
+        stand-in for the glass dragging its liquid, there because the flick
+        turned the picture rigidly and nothing else moved the liquid. The
+        flick now turns the dish under the liquid (PLAN 22h, dishFrame), the
+        liquid follows it through the gap with its own drag time and the
+        swirl grips it where the glass is pressed close, which is that drag
+        itself, so the stand-in went: kept, it would have dragged the liquid
+        twice.
       */
-      twist: (Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1)
-        + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
-          * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
+      twist: Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1) * CUR_TWIST,
       /*
         The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
         frame that turns with the liquid, the liquid's own speed (the
         centrifuge), the bulk's drag time at the rest gap, and the liquid.
-        All but the last are zero on a dish nobody spins, and the swirl
+        All but the last are zero on a dish nobody turns, and the swirl
         does not run.
       */
       spinDish: this.dishSpin - this.liquidSpin,
-      spinLiquid: this.spinCentrifuge,
+      spinLiquid: this.liquidSpin,
       spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
       spinNu: carrierViscosity(settings.viscosity),
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
@@ -5634,6 +5610,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
+        // A plate added is a dish at rest with still liquid, not the speeds a
+        // plate dropped from this index left behind (the picture turns with
+        // the liquid, so a stale one turned a fresh plate).
+        dishSpinRef.current[i] = 0;
+        liquidSpinRef.current[i] = 0;
 
       }
     } else if (currentCount > targetCount) {
@@ -7778,24 +7759,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // Dry friction, toward the motor's speed: with no motor that is rest (dishFollow).
             const vel = dishFollow(vel0, motor, dragRate, realDt);
             if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
-            // The plate is told what it is doing, so the liquid touching it
-            // can be dragged round by it (the twist in paramsFor).
-            if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
             /*
-              The turntable (PLAN §22, lib/turntable.ts): a dish of its own
-              under the look's, turned by Auto Spin and by a hand on the Spin
-              tool, with the same bed and drag as the look's flywheel.
-
-              Why two and not one. The look's own turning (its motor, the
-              music routed to rotation on eleven shipped looks, a flick) turns
-              the picture as it always has, rigidly, because those looks are
-              tuned against exactly that: sent through the liquid's lag
-              below, a thin look's sway was smoothed over three seconds and a
-              flick trailed, and the swirl ran on every look with music. So
-              only what is new goes through the physics, and with Auto Spin
-              off and no hand on the dish every number here is zero and the
-              plate is today's to the bit. Moving the look's own turning onto
-              the dish too is PLAN 22h, once it has been seen on the Mac.
+              The turntable (PLAN §22, lib/turntable.ts): Auto Spin's motor
+              and a hand on the Spin tool, with the same bed and drag as the
+              look's flywheel above. It is the same dish, not a second one
+              (22h): the two speeds add, and the liquid follows their sum
+              below. They are kept apart only because they are steered
+              apart: the look's motor by the look and the music, this by
+              Auto Spin, its tempo lock and the hand.
 
               Auto Spin's direction is the plate's (which layer, Spin
               Direction) and the Rate's sign, and nothing else: the music's
@@ -7836,31 +7807,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const dishNow = dishSpinRef.current[l] ?? 0;
             if (Number.isFinite(dishNow * realDt)) dishAngleRef.current[l] = (dishAngleRef.current[l] ?? 0) + dishNow * realDt;
             /*
-              And the liquid follows the turntable with the drag time of its
-              gap: seconds for water, a tenth of one for oil. The picture
-              turns with the liquid, because the liquid is what the lamp
-              shines through; the dish itself is never seen.
+              And the liquid follows the whole dish with the drag time of its
+              gap: three seconds for water, a sixth of one for the thick
+              liquid. The picture turns with the liquid, because the liquid
+              is what the lamp shines through; the dish itself is never seen.
+
+              The whole dish, the look's turning included (PLAN 22h). Until
+              then the look's motor, its music and a flick turned the picture
+              rigidly, as if the liquid were bolted to the glass, and only
+              the turntable went through the gap. That made a flicked plate
+              of water go round at once and a turntable's the same speed
+              trail by three seconds, two dishes of one glass. One dish now:
+              a flick on a thin look leaves the water behind for a moment
+              and it catches up (`npm run turntable`: 63% in one drag time,
+              to 2%), and the solver's swirl, the dish's drag where the glass
+              is pressed close (Ω − ω_l), and its centrifuge (ω_l) see every
+              turn of the dish, not just the turntable's.
+
+              What it changes on the shipped looks, measured in `npm run
+              turntable` rather than guessed: a look with a steady motor ends
+              where it did, Ωτ behind (a few thousandths of a radian on any
+              of them); a thick look is unchanged to within its 0.15 s; the
+              nine thin looks with music routed to rotation have their sway
+              smoothed by the water's three seconds, as a dish of water
+              would, and the swirl runs while they play. Judged on the Mac,
+              `docs/judging.md` §28.
+
+              An angle that accumulates cannot be allowed to go non-finite
+              (the note above); dishFrame returns a finite turn or none.
             */
             const tau = dragSeconds(carrierViscosity(currentSettings.viscosity));
-            const liq = liquidFollow(liquidSpinRef.current[l] ?? 0, dishNow, realDt, tau);
-            if (Number.isFinite(liq)) liquidSpinRef.current[l] = liq;
-            // The solver drags the liquid toward the dish by the difference (the swirl).
+            const frame = dishFrame(spinVelRef.current[l] ?? 0, dishNow, liquidSpinRef.current[l] ?? 0, realDt, tau);
+            if (Number.isFinite(frame.liquid)) liquidSpinRef.current[l] = frame.liquid;
             if (fluidsRef.current[l]) {
-              const liqNow = liquidSpinRef.current[l] ?? 0;
-              fluidsRef.current[l].dishSpin = dishNow;
-              fluidsRef.current[l].liquidSpin = liqNow;
-              fluidsRef.current[l].spinCentrifuge = dishNow !== 0 || liqNow !== 0 ? (spinVelRef.current[l] ?? 0) + liqNow : 0;
+              fluidsRef.current[l].dishSpin = frame.dish;
+              fluidsRef.current[l].liquidSpin = liquidSpinRef.current[l] ?? 0;
             }
-            /*
-              An angle that accumulates cannot be allowed to go non-finite —
-              see the note above, which is why both of these are guarded and
-              not just the sum. The turntable's turn is added only when there
-              is one, so a plate nobody spins sums exactly what it did.
-            */
-            const turn = (spinVelRef.current[l] ?? 0) * realDt;
-            if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
-            const liquidTurn = (liquidSpinRef.current[l] ?? 0) * realDt;
-            if (liquidTurn !== 0 && Number.isFinite(liquidTurn)) rotationAnglesRef.current[l] += liquidTurn;
+            rotationAnglesRef.current[l] += frame.turn;
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
@@ -8729,6 +8712,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         rotation: rotationAnglesRef,
         /** Angular velocity per layer, rad/s, and the flick that adds to it. */
         spin: spinVelRef,
+        /** The turntable's share of each dish's speed, and the liquid following the whole dish, rad/s (PLAN 22h). */
+        turntable: dishSpinRef,
+        liquidSpin: liquidSpinRef,
         flick: flickSpin,
         /** Whether the projector's output pass is built (it is not, unless it would change a pixel). */
         outputConfig: outputCfgRef.current,

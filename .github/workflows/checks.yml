@@ -710,6 +710,16 @@ jobs:
       - name: The sound's renders, with a plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/renders.mjs
+      # A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md
+      # 22h): the look's own turning goes through the liquid's drag time like
+      # the Spin tool's, the picture turns with the liquid, and the flick no
+      # longer stirs the current with a term of its own. It reads the plate's
+      # refs, not its frames, but the frame loop only steps on a GPU that
+      # draws. About twenty-five seconds, on the tools shard, the shortest by
+      # the medians above.
+      - name: A flicked plate's liquid trails the glass
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        run: node scripts/flick.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
       # a flat plate has to be untouched however high the dial goes, and a

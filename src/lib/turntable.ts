@@ -117,6 +117,37 @@ export function liquidFollow(omegaL: number, dish: number, dt: number, tau: numb
   return Number.isFinite(next) ? next : omegaL;
 }
 
+/**
+ * One frame of the whole dish (PLAN 22h): what turns it, what its liquid
+ * does, and how far the picture turns.
+ *
+ * There is one dish under a plate, and everything that turns it turns the
+ * same glass: the look's own motor, the music routed to rotation and a
+ * flick (the look's flywheel, `look`), and Auto Spin and a hand on the Spin
+ * tool (the turntable, `turntable`). Their speeds add, because they are two
+ * motors and a push on one wheel. Until 22h only the turntable's share went
+ * through the liquid; the look's turned the picture rigidly, as if the
+ * liquid were bolted to the glass, so a flicked plate of water went round at
+ * once where a real one stays put for a moment and catches up over its drag
+ * time, and the flick dragged the dye round with a stirring term of its own
+ * in the current (the twist's flick half) to stand in for the drag it was
+ * not getting. Now the whole dish's speed is what the liquid follows, and the
+ * picture turns with the liquid alone: that is the drag through the gap
+ * doing the work the stirring term imitated, and it is retired.
+ *
+ * `dish` is the dish's speed Ω, `liquid` the bulk's ω_l after this frame
+ * (liquidFollow, so it comes to rest exactly when the dish does), and `turn`
+ * the angle the picture turns this frame, ω_l dt. The solver's swirl is
+ * driven by Ω − ω_l and its centrifuge by ω_l, both from these.
+ */
+export interface DishFrame { dish: number; liquid: number; turn: number }
+export function dishFrame(look: number, turntable: number, liquid: number, dt: number, tau: number): DishFrame {
+  const dish = (Number.isFinite(look) ? look : 0) + (Number.isFinite(turntable) ? turntable : 0);
+  const next = liquidFollow(liquid, dish, dt, tau);
+  const turn = next * dt;
+  return { dish, liquid: next, turn: Number.isFinite(turn) ? turn : 0 };
+}
+
 /** Wrap an angle difference to (−π, π]. */
 export function wrapPi(a: number): number {
   const t = a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
