@@ -1473,6 +1473,7 @@ class FluidSimulation {
    * stencil. `keep` is what survives in the middle, rising to 1 at the rim.
    */
   thinPatch(cx: number, cy: number, radius: number, keep: number): void {
+    if (this.layerIndex === 0) (window as unknown as { __cgSink?: { thin: string[] } }).__cgSink?.thin.push(`patch@${this.stepIndex}(${cx.toFixed(0)},${cy.toFixed(0)})r${radius.toFixed(0)}`); // DIAG
     const N = this.size;
     const R = Math.max(2, radius);
     const k = Math.max(0, Math.min(1, keep));
@@ -1768,6 +1769,7 @@ class FluidSimulation {
    * of sitting under them for minutes.
    */
   thinDye(factor: number) {
+    if (this.layerIndex === 0) (window as unknown as { __cgSink?: { thin: string[] } }).__cgSink?.thin.push(`dye@${this.stepIndex}x${factor.toFixed(3)}`); // DIAG
     const f = Math.max(0, Math.min(1, factor));
     if (f >= 1) return;
     if (this.gpu) {
@@ -2981,6 +2983,17 @@ class FluidSimulation {
 
     const p = this.deriveStep(settings, audioData, time, noise2D);
     this.lastStep = p;
+    if (this.layerIndex === 0) { // DIAG: temporary, two-finger Drop flake
+      const w = window as unknown as { __cgSink?: { evapMin: number; dtMax: number; mean: number; air: number; mul: string[]; thin: string[] } };
+      const k = w.__cgSink;
+      if (k) {
+        k.evapMin = Math.min(k.evapMin, p.evapFactor); k.dtMax = Math.max(k.dtMax, p.dt); k.mean = Math.max(k.mean, this.meanDensity);
+        if ((this.gpu as unknown as { air?: { any?: boolean } } | null)?.air?.any) k.air++;
+        let lo = 1, n = 0, sx = 0, sy = 0;
+        for (let i = 0; i < GRID_AREA; i++) { const m = this.mul[i]; if (m < 0.999) { n++; sx += i % GRID_SIZE; sy += Math.floor(i / GRID_SIZE); if (m < lo) lo = m; } }
+        if (n) k.mul.push(`${this.stepIndex}:${n}c min ${lo.toFixed(3)} at (${(sx / n).toFixed(0)},${(sy / n).toFixed(0)})`);
+      }
+    }
     // The closeup's cells ride this: as far as this step moves the dye.
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 

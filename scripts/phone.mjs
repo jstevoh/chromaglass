@@ -1169,7 +1169,7 @@ try {
             await pg.evaluate(() => window.chromaglassAction('clear'));
             await pg.waitForTimeout(2500);
             const b0 = await snapP();
-            const k0 = await pg.evaluate(() => { window.__cgTouchLog = []; return window.chromaglassDebug().kicks(); });
+            const k0 = await pg.evaluate(() => { window.__cgTouchLog = []; window.__cgSink = { evapMin: 1, dtMax: 0, mean: 0, air: 0, mul: [], thin: [] }; return window.chromaglassDebug().kicks(); });
             const t0 = await stepsP();
             await tch('touchStart', [{ ...DA, id: 1 }]);
             await tch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
@@ -1194,15 +1194,17 @@ try {
             }
             const k1 = await pg.evaluate(() => window.chromaglassDebug().kicks());
             const log = await pg.evaluate(() => window.__cgTouchLog ?? []);
+            const sink = await pg.evaluate(() => { const k = window.__cgSink; window.__cgSink = undefined; return k; });
             const rows = hh.length === 2 ? hh.map((h, i) => `${'AB'[i]} (${h.x},${h.y}) laid ${h.laid.steps}st ${h.laid.dye.toFixed(0)} under ${sumAt(a, b0, h, R).toFixed(0)} near ${sumAt(a, b0, h, 3 * R, hh[1 - i]).toFixed(0)}`).join('; ') : `${hh.length} hands`;
             const blob = best.v >= 0 ? `; most elsewhere at (${best.x},${best.y}) ${best.v.toFixed(2)}, ${sumAt(a, b0, best, R).toFixed(0)} round it` : '';
             console.log(`  diag ${tag} ${round}: ${rows}; plate gained ${total.toFixed(0)} over ${t1 - t0}+ steps; ${k1 - k0} kicks${blob}`);
             console.log(`    mid ${mids.join(' ; ')}`);
             console.log(`    trails ${JSON.stringify(hh.map(h => h.laid.trail))}`);
+            console.log(`    sink evap ${sink?.evapMin?.toFixed(5)} dt ${sink?.dtMax?.toFixed(5)} mean ${sink?.mean?.toFixed(3)} air ${sink?.air} thin ${(sink?.thin ?? []).slice(0, 8).join(' ')} mul(${sink?.mul?.length}) ${(sink?.mul ?? []).slice(0, 6).join(' ')}`);
             console.log(`    touch ${log.filter((l, i) => !l.startsWith('mousemove') || i < 40).join(' ')}`);
           }
         };
-        await rounds(page, touch, 'band', 10);
+        await rounds(page, touch, 'band', 14);
         // And a page that never starts the band (as #238's mirror check does), the same places.
         const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
         await ctx2.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ } });
@@ -1213,6 +1215,11 @@ try {
         await p2.evaluate(() => window.chromaglassSettings({ rotationSpeed: 0, plateRock: 0, beatSqueeze: 0, audioImpact: 0 }));
         await p2.waitForTimeout(1500);
         await p2.getByTestId('phone-tool-dropper').click();
+        for (let i = 0; i < 20; i++) {
+          const a0 = await p2.evaluate(() => window.chromaglassDebug().fluids[0].stepCount);
+          await p2.waitForTimeout(500);
+          if ((await p2.evaluate(() => window.chromaglassDebug().fluids[0].stepCount)) > a0) break;
+        }
         await p2.evaluate(() => window.chromaglassSettings({ turbulenceScale: 0, rainDrip: 0, glassSmear: 0, bubbles: 0, beads: 0, fingering: 0 }));
         const cdp2 = await ctx2.newCDPSession(p2);
         const touch2 = (type, pts) => cdp2.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
