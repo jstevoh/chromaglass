@@ -360,8 +360,10 @@ try {
           strawFirst: (steps1?.strawFirst ?? NaN) - (steps0?.strawFirst ?? NaN),
         };
       };
-      const fwd = await windRun(A, B, 1);
-      const back = await windRun(B, A, -1);
+      // Both from the plate's middle, out to either side (below).
+      const C = [0.5, 0.5], half = (B[0] - A[0]);
+      const fwd = await windRun(C, [C[0] + half, C[1]], 1);
+      const back = await windRun(C, [C[0] - half, C[1]], -1);
       /*
         The plate's own drift, signed, at its rate toward where the stroke
         went in the window before it, over the solver steps the stroke
@@ -407,8 +409,9 @@ try {
         not charging it guesses the other, and the second guess passes a
         wind that pushed nothing on a plate that starts drifting toward B
         when the stroke does.
-        So the wind is drawn both ways, each on its own fresh pool: A to B on
-        a pool at A, and B to A on a pool at B, the mirror of it. Each has to
+        So the wind is drawn both ways, each on its own fresh pool laid in the
+        plate's middle, out to the right and out to the left (the same length
+        as A to B). Each has to
         beat the window before it (the plate on its own, toward that stroke's
         end, never below zero) by 0.002. A drift the wind did not make goes
         the same way whichever way the wind blows, so it helps one stroke
@@ -416,12 +419,22 @@ try {
         nothing fails one of the two. The windows after, in halves, are
         printed for both, not judged: if they turn round with the wind, the
         drift after is the wind's.
+        From the middle and not A to B and back, after the check-skeptic
+        review of the two-way version: pools at A and B sit either side of
+        the middle and both strokes ran in through it, so a drift toward the
+        middle (the plate's rim, its pressure) would have turned round with
+        the wind too. From the middle, such a drift moves neither pool's
+        middle. A drift toward wherever the pointer is turns round as well,
+        and that one is the Hover line's (moving with no button down changes
+        nothing). And a wind that blows the colour off the plate rather than
+        along it reads its centre of mass from what is left, so each stroke
+        has to keep half its pool to be judged at all.
       */
       const pct = (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
-      const { wind, straw, carried, strawFirst, wa, wb } = fwd;
+      const { wind, straw, carried, strawFirst } = fwd;
       console.log(`     the stroke ran ${wind} wind steps and ${straw} straw steps; the wind carried ${carried.toFixed(1)} of colour (back the other way: ${back.wind}, ${back.straw}, ${back.carried.toFixed(1)})`);
-      check('Blow drawn across a pool is the wind, and the wind carries colour', wind > straw && carried > 1,
-        `${wind} wind steps against ${straw} straw, ${carried.toFixed(1)} carried`);
+      check('Blow drawn across a pool is the wind, and the wind carries colour', wind > straw && carried > 1 && back.wind > back.straw && back.carried > 1,
+        `${wind} wind steps against ${straw} straw, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.carried.toFixed(1)}`);
       /*
         And no straw where it was pressed. A straw step blows a real bubble,
         whose air takes the dye under it off the plate while it sits there
@@ -435,18 +448,22 @@ try {
         the stroke has to have run as a Blow at all (wind steps), or a tool pick
         that missed would blow no straw either.
       */
-      check('and blows no straw where it was pressed', strawFirst === 0 && wind > 0,
-        `${Number.isFinite(strawFirst) ? strawFirst : 'no count of'} straw step(s) before the stroke's first move`);
+      check('and blows no straw where it was pressed', strawFirst === 0 && wind > 0 && back.strawFirst === 0 && back.wind > 0,
+        `${Number.isFinite(strawFirst) ? strawFirst : 'no count of'} straw step(s) before the stroke's first move, ${Number.isFinite(back.strawFirst) ? back.strawFirst : 'no count of'} the other way`);
       const pushed = (r, name) => !r.stepsOk
         ? `${name}: the plate did not step through every window (${r.before.steps}, ${r.strokeSteps}, ${r.early.steps}, ${r.late.steps} steps)`
-        : `${name}: ${pct(r.along)} over ${r.strokeSteps} steps against ${pct(r.idle)} over ${r.before.steps} left alone before (${pct(r.bar)} to beat), from a pool of ${r.wa.total.toFixed(0)}; after it ${pct(r.earlyAlong)} over ${r.early.steps} then ${pct(r.lateAlong)} over ${r.late.steps} (printed, not judged)`;
-      const beats = (r) => r.stepsOk && r.wa.total > 20 && r.along > r.bar;
-      check('and pushes the colour along, whichever way it blows', beats(fwd) && beats(back) && back.wind > back.straw,
-        `centre of mass moved toward where the stroke went: ${pushed(fwd, 'A to B')}; ${pushed(back, 'B to A')}`);
-      const lowIdle = Math.min(fwd.before.total, fwd.early.total + fwd.late.total);
-      const afterTotal = fwd.early.total + fwd.late.total;
-      check('and keeps it rather than erasing it', wa.total > 20 && (wb.total - wa.total) - lowIdle > -(0.1 * wa.total + 5),
-        `${wa.total.toFixed(0)} → ${wb.total.toFixed(0)}, against ${fwd.before.total >= 0 ? '+' : ''}${fwd.before.total.toFixed(0)} before and ${afterTotal >= 0 ? '+' : ''}${afterTotal.toFixed(0)} after with the plate left alone as long; ${straw} straw step(s) in the stroke`);
+        : `${name}: ${pct(r.along)} over ${r.strokeSteps} steps against ${pct(r.idle)} over ${r.before.steps} left alone before (${pct(r.bar)} to beat), from a pool of ${r.wa.total.toFixed(0)} (${r.wb.total.toFixed(0)} after); after it ${pct(r.earlyAlong)} over ${r.early.steps} then ${pct(r.lateAlong)} over ${r.late.steps} (printed, not judged)`;
+      const beats = (r) => r.stepsOk && r.wa.total > 20 && r.wb.total > 0.5 * r.wa.total && r.along > r.bar;
+      check('and pushes the colour along, whichever way it blows', beats(fwd) && beats(back),
+        `centre of mass moved toward where the stroke went: ${pushed(fwd, 'out to the right')}; ${pushed(back, 'out to the left')}`);
+      const sgn = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(0)}`;
+      const kept = (r) => {
+        const after = r.early.total + r.late.total, lowIdle = Math.min(r.before.total, after);
+        return { ok: r.wa.total > 20 && (r.wb.total - r.wa.total) - lowIdle > -(0.1 * r.wa.total + 5),
+          says: `${r.wa.total.toFixed(0)} → ${r.wb.total.toFixed(0)}, against ${sgn(r.before.total)} before and ${sgn(after)} after with the plate left alone as long; ${r.straw} straw step(s) in the stroke` };
+      };
+      const kf = kept(fwd), kb = kept(back);
+      check('and keeps it rather than erasing it', kf.ok && kb.ok, `${kf.says}; the other way ${kb.says}`);
     } finally {
       // Caught, so a page already dead says why it died, not that this failed.
       await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true)).catch((e) => console.log(`     [seeding not put back] ${e.message}`));

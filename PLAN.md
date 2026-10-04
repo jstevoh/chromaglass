@@ -2971,9 +2971,10 @@ split in halves on #254's first run it read +0.30% then +0.16% (no dying away wi
 the thin gap's tenth of a second), and charged at the second half's rate the wind's
 +0.64% met +0.69%. Charging it or not is a guess either way, and not charging it
 would pass a wind that pushed nothing on a plate that starts drifting with the
-stroke. So the wind is now drawn both ways, A to B on a pool at A and B to A on a
-pool at B, and each has to beat the window before it by 0.002: a drift the wind did
-not make helps one stroke as much as it holds back the other. The windows after are
+stroke. So the wind is now drawn both ways, out to the right and out to the left
+from a fresh pool in the plate's middle each time, and each has to beat the window
+before it by 0.002: a drift the wind did not make helps one stroke as much as it
+holds back the other, and from the middle a drift toward the middle moves neither. The windows after are
 printed in halves for both; if they turn round with the wind, the drift is the
 wind's.
 
