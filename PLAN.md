@@ -4557,19 +4557,18 @@ ones report.
   so the fault the phase is for (the gate turning down the show's own next frame)
   cleared it. On one refresh the slots served must now be at most 1.15 of either
   window's frames (the Mac reads 1.00 to 1.02).
-- `wall`'s busy phases' "missed from one book" can pair a refresh with its neighbour.
-  Red once in about 24 tools-shard runs (f350e75, #255, 2026-10-04; green on re-run):
-  the wall's stamp for a refresh read −8.3 to +8.3 ms from the show's, against the
-  line's 4 ms allowance. The book matches a window's refresh to the nearest entry
-  within half a 60 Hz refresh (8.33 ms), and on the Mac the two windows' stamps for one
-  refresh are 4 to 8 ms apart (#236's first run), so a stamp near 8.3 ms is as near the
-  next refresh's entry as its own, and which one it takes is a coin toss. Not the
-  projector line's cause (that was the projector page loading, §13). *Fix:* pair by the
-  offset the two windows actually keep (the median `d` the idle phases read) rather
-  than the raw nearest stamp, or by the refresh's index on the display's clock, so the
-  radius is half a refresh around where the other window's stamp is expected, not
-  around the stamp itself. Held red by the `check-skeptic` on a book whose windows sit
-  half a refresh apart.
+- ~~`wall`'s busy phases' "missed from one book" can pair a refresh with its neighbour~~
+  **Fixed 2026-10-04:** red once in 91 tools-shard runs of 2026-10-03/04 (f350e75, #255;
+  green on re-run), reading "the wall's stamp 8.3 ms after the show's (-8.3 to 8.3)" in
+  both busy phases on a 60.6 Hz display, whose half refresh (8.25 ms) is under the
+  book's 8.33 ms radius. The two windows' stamps sit a different gap apart each run
+  (the 91 runs read -7.5 to +8.3 ms, each within 0.1 to 0.3 ms), so once in a few dozen
+  runs the gap is within jitter of half a refresh and the nearest raw stamp is a coin
+  toss. The book (`bookEntry` in `scripts/wall.mjs`) now pairs around the gap the first
+  refresh both windows looked up set, reset each busy phase, so a refresh's neighbours
+  are a whole refresh away at any gap. The line is unchanged. A model of the book on two
+  windows at every gap from -R/2 to +R/2 on a starved thread: 0 of 410 red, the book as
+  it was red in 20 (all at half a refresh, "d -8.3 to 8.3", the CI signature).
 - `wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
   own next frame on a runner whose two windows are handed different refreshes (the Mac
   read 1.69 slots per window's frame there once, with the gate right); only the one-refresh
@@ -4612,6 +4611,23 @@ ones report.
   nothing between, still goes to check 4; which promise settled at 1.0 s on that run
   is not known (the opening line now names it); and the rule's cases could run in
   Measure, being pure Node, if #239's owner of the workflows adds them.
+- ~~`startup`'s reds on PRs that never touched the opening, after #242~~ **Fixed
+  2026-10-04 (this PR).** Of the thirteen startup reds of 3-4 October, eleven were a
+  PR's own (#241's, #242's, #261's `spinSwirl`) or read lines since mended (#235,
+  #241, #242, #254). Two were neither. 1b's ratio read 5.28× on #257's run (37216108435):
+  the control asked all 47 inside a 2.02 s stop of its own long task, then its frames
+  stopped 16.27 s from 0.33 s later while the GPU compiled them, a stop no build sat
+  in, so unpriced. A stop begun within a second of one the builds sat in is now the
+  same compile (18.29 s; the show's own 1.36 s held to the control's 0.71 s, 0.58×).
+  And the half behind the show ran out of `gpu/prepare.ts`'s thirty seconds with 52 of
+  54 built (37209299356; 21 to 24 s on the other four runs, and growing with the
+  list): that cap is now per build behind the show, so a list nobody waits for is
+  finished rather than left to compile on the frame. *Still open:* 4b's hold, since
+  #249 asked for the display first, is the GPU process compiling it while Chromium
+  readies the page (2.92 to 4.00 s on the four runs since #254, against a 4.5 s cap
+  and 1.54 to 3.50 s before #249): the page's own compile inside the window 4b excuses
+  as Chromium's. A compute kernel first would put it back; it costs the opening the
+  display's seconds at the end.
 
 *Fix:* `CRASH_GPU=1`; `songs` into Measure; `shelf`, `sw` and `bubbles` on a Mac shard,
 or written into CLAUDE.md as by hand; `check.mjs` reading `scripts/*.mjs` paths as well

@@ -177,7 +177,8 @@ const OPENING_LANES = (() => {
 
 /**
  * `builds`, `lanes` at a time (above), until they are done, the device is
- * gone or PREPARE_TIMEOUT_MS has passed. A device lost part way would
+ * gone or PREPARE_TIMEOUT_MS has passed (in the opening, since it began;
+ * behind the show, on any one build: see the lane). A device lost part way would
  * otherwise have every remaining build refused one after another, each
  * counted as a try.
  */
@@ -238,7 +239,27 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   let lastSettled = t0;
   const lane = async () => {
     while (queue.length && !gone && !timedOut) {
-      const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
+      /*
+        The opening's half has the whole PREPARE_TIMEOUT_MS between them,
+        because the show waits on its starting frame for all of them. The
+        half behind the show has it for each build: nobody waits for that
+        half, and what a cap on it is for is a driver that never answers,
+        which one build that never settles shows as well as the list does.
+        A cap on the whole list stopped building with pipelines still to
+        build, and those are built on the frame when a look first draws with
+        them, the freeze this file exists to take away, mid-show.
+
+        What was measured: the half behind the show is fifty-odd builds one
+        at a time beside a running show, and took 21.16 to 24.17 s on four
+        of the open shard's runs of 4 October (`npm run startup`, "behind
+        it in"), up from 18 to 23 s for the forty-nine before #249. On the
+        fifth (run 37209299356, a PR that never touched the opening) it ran
+        out of the thirty seconds with 52 of 54 built, its builds slower
+        by a tenth of a second or so each, all through the same list (the flipped display
+        asked at 38.35 s, against 30.17 to 33.86 s on the others), and
+        startup's check of the half went red.
+      */
+      const left = stage === 'later' ? PREPARE_TIMEOUT_MS : t0 + PREPARE_TIMEOUT_MS - performance.now();
       if (left <= 0) { timedOut = true; break; }
       const prep = take();
       // Only render pipelines are left and one is compiling: wait for it.
