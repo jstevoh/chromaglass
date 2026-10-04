@@ -26,9 +26,9 @@ export const PRESS_RING = 1.7;
 export const PRESS_STRETCH = PRESS_RING * PRESS_RING - 1;
 
 /** Whether a palm point (dx, dy from the palm's middle, cells) lands on a plate of N cells. */
-function landsOnPlate(cx: number, cy: number, dx: number, dy: number, R: number, N: number): boolean {
+function landsOnPlate(cx: number, cy: number, dx: number, dy: number, R: number, N: number, K = PRESS_STRETCH): boolean {
   const s = Math.hypot(dx, dy);
-  const f = Math.sqrt(R * R + s * s * PRESS_STRETCH) / Math.max(s, 1e-9);
+  const f = Math.sqrt(R * R + s * s * K) / Math.max(s, 1e-9);
   const x = cx + dx * f, y = cy + dy * f;
   // A cell x covers x - 0.5 to x + 0.5; the kernel asks the same of (x + 0.5) / N in 0..1.
   return x >= -0.5 && y >= -0.5 && x < N - 0.5 && y < N - 0.5;
@@ -56,31 +56,9 @@ export interface DyeOut {
  */
 export function pressDye(dye: ArrayLike<number>, N: number, cx: number, cy: number, R: number, take: number, out: DyeOut): number {
   if (!(take > 0)) return 0;
-  const O = R * PRESS_RING;
-  const yl = Math.max(0, Math.floor(cy - O)), yh = Math.min(N - 1, Math.ceil(cy + O));
-  const xl = Math.max(0, Math.floor(cx - O)), xh = Math.min(N - 1, Math.ceil(cx + O));
-  const disc: number[] = [];
-  const gets: number[] = [];
+  const { disc, gets } = pressCells(N, cx, cy, R);
   let mass = 0;
-  for (let y = yl; y <= yh; y++) {
-    for (let x = xl; x <= xh; x++) {
-      const dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
-      if (r < R) {
-        if (!landsOnPlate(cx, cy, dx, dy, R, N)) continue;
-        const i = x + y * N;
-        disc.push(i);
-        const v = dye[i * 4 + 3];
-        if (v > 1e-5) mass += v * take;
-      } else if (r < O) {
-        const f = Math.sqrt((r * r - R * R) / PRESS_STRETCH) / r;
-        const qx = Math.floor(cx + dx * f + 0.5), qy = Math.floor(cy + dy * f + 0.5);
-        if (qx < 0 || qy < 0 || qx >= N || qy >= N) continue;
-        // Only from a palm cell that gives: one whose own landing is on the plate.
-        if (Math.hypot(qx - cx, qy - cy) >= R || !landsOnPlate(cx, cy, qx - cx, qy - cy, R, N)) continue;
-        gets.push(x + y * N, qx + qy * N);
-      }
-    }
-  }
+  for (const i of disc) { const v = dye[i * 4 + 3]; if (v > 1e-5) mass += v * take; }
   if (!(mass > 1e-4)) return 0;
   for (const i of disc) out.mul[i] *= 1 - take;
   /*
@@ -93,7 +71,7 @@ export function pressDye(dye: ArrayLike<number>, N: number, cx: number, cy: numb
     cell among exactly the ring cells that read it was tried and is worse (2%):
     some palm cells are read by none, and their share went nowhere.
   */
-  const w = take * disc.length / Math.max(1, gets.length / 2);
+  const w = take * pressShareOf(disc, gets);
   for (let k = 0; k < gets.length; k += 2) {
     const i = gets[k], q4 = gets[k + 1] * 4;
     if (!(dye[q4 + 3] > 1e-5)) continue;
@@ -101,6 +79,53 @@ export function pressDye(dye: ArrayLike<number>, N: number, cx: number, cy: numb
     out.densityR[i] += dye[q4] * w; out.densityG[i] += dye[q4 + 1] * w; out.densityB[i] += dye[q4 + 2] * w;
   }
   return mass;
+}
+
+const pressShareOf = (disc: number[], gets: number[]): number => disc.length / Math.max(1, gets.length / 2);
+
+/**
+ * What one ring cell receives of the palm cell it reads, counted on a grid
+ * of N cells: the palm's giving cells over the ring's receiving ones (see
+ * pressDye). The oil's kernel is handed this, counted on its own grid
+ * (pressMix, src/gpu/fluid.ts), rather than working out 1 / K from the
+ * formula, which a small palm's ring does not tile: a puff (the Blow held
+ * still off the straw, a palm six cells across: PLAN.md 15c) lost 3.3% of
+ * the oil it moved on a Mac (`npm run wind`). `ring` is the ring's outer edge
+ * in palms (PRESS_RING unless the caller's differs).
+ */
+export function pressShare(N: number, cx: number, cy: number, R: number, ring = PRESS_RING): number {
+  const { disc, gets } = pressCells(N, cx, cy, R, ring);
+  return pressShareOf(disc, gets);
+}
+
+/**
+ * The palm cells that give (their landing is on the plate) and the ring
+ * cells that receive, each with the palm cell it reads: pairs in `gets`.
+ */
+function pressCells(N: number, cx: number, cy: number, R: number, ring = PRESS_RING): { disc: number[]; gets: number[] } {
+  const O = R * ring;
+  const K = ring * ring - 1;
+  const yl = Math.max(0, Math.floor(cy - O)), yh = Math.min(N - 1, Math.ceil(cy + O));
+  const xl = Math.max(0, Math.floor(cx - O)), xh = Math.min(N - 1, Math.ceil(cx + O));
+  const disc: number[] = [];
+  const gets: number[] = [];
+  for (let y = yl; y <= yh; y++) {
+    for (let x = xl; x <= xh; x++) {
+      const dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
+      if (r < R) {
+        if (!landsOnPlate(cx, cy, dx, dy, R, N, K)) continue;
+        disc.push(x + y * N);
+      } else if (r < O) {
+        const f = Math.sqrt((r * r - R * R) / K) / r;
+        const qx = Math.floor(cx + dx * f + 0.5), qy = Math.floor(cy + dy * f + 0.5);
+        if (qx < 0 || qy < 0 || qx >= N || qy >= N) continue;
+        // Only from a palm cell that gives: one whose own landing is on the plate.
+        if (Math.hypot(qx - cx, qy - cy) >= R || !landsOnPlate(cx, cy, qx - cx, qy - cy, R, N, K)) continue;
+        gets.push(x + y * N, qx + qy * N);
+      }
+    }
+  }
+  return { disc, gets };
 }
 
 /**

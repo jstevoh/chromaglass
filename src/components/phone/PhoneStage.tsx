@@ -179,6 +179,13 @@ export interface PhoneStageProps {
   fingering: number;
   onFingering: (v: number) => void;
   /**
+   * Magnet Size, on the Magnet's own Amount panel (lib/magnetSize.ts): how
+   * far the magnet under the finger reaches, a coin to a palm. Beside the
+   * pull, as the desk's Magnet options have it.
+   */
+  magnetSize: number;
+  onMagnetSize: (v: number) => void;
+  /**
    * Ben-Day Dots (wgsl/plate.ts benDay): the plate printed as a comic, the
    * Roy look's own control. On the Looks sheet when it opens on a printed
    * plate, because it is part of the look rather than a hand.
@@ -386,6 +393,20 @@ export function PhoneStage(p: PhoneStageProps) {
               touch
               testId="phone-press-fingering"
               midiKey="setting:fingering"
+            />
+          )}
+          {p.tool === 'magnet' && (
+            <Slider
+              label="Magnet · size"
+              value={p.magnetSize}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={p.onMagnetSize}
+              display={`${Math.round(p.magnetSize * 100)}%`}
+              touch
+              testId="phone-magnet-size"
+              midiKey="setting:magnetSize"
             />
           )}
         </div>

@@ -383,6 +383,13 @@ export interface VisualizerSettings {
   magnetStrength: number;
   /** How far the magnet wanders on its own around (magnetX, magnetY). 0 holds it still. */
   magnetWalk: number;
+  /**
+    How big the hand's magnet is, 0 to 1: a button magnet at 0, a block the
+    width of a palm at 1. The Magnet tool's, not the look's (lookFade's
+    RIG_KEYS): it is the magnet in the performer's hand, as the tool's Amount
+    is. 0.5 is the magnet the tool always was (lib/magnetSize.ts).
+  */
+  magnetSize: number;
   /*
     The liquids' own physics and chemistry (docs/physics-plan.md). All 0..1
     and off by default, so a look that does not ask for them is the look it
@@ -812,6 +819,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   magnetHeight: 0.25,
   magnetStrength: 0,
   magnetWalk: 0,            // still: a look that places its magnet keeps it there
+  magnetSize: 0.5,          // the hand's magnet as it always was (lib/magnetSize.ts)
   vorticityConfinement: 0,
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it

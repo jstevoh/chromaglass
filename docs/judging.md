@@ -576,7 +576,7 @@ Magnet pressed under a pool:
 
 ---
 
-## 22. The Press on the ferrofluid (PLAN 15d)
+## 23. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
 leave it the size it was. Now, with Thin Gap on (Settings → Squish Plate → Thin Gap),
@@ -604,7 +604,7 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
-## 23. Beams, and tiles with no seam
+## 24. Beams, and tiles with no seam
 
 PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
 both with Light on **Add**:
@@ -620,7 +620,24 @@ both with Light on **Add**:
 
 ---
 
-## 23. The Mac app, on the Mac and on a projector
+## 25. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+
+On Classic (a look with no ferrofluid), desk and phone:
+
+- pick the Magnet (M, or its button): the plate should not change at all;
+- touch and hold: a small black pool should appear under the hand and stand up
+  into spikes; drag it, and it should come with you. Say whether it is the right
+  amount of ferrofluid to start with;
+- right-click the Magnet on the desk (or tap it twice on the phone) and move
+  Size: a small magnet raises a few spikes under the fingertip, a big one a wide
+  hedgehog and pulls more gently from further off. Say whether the range is right
+  at both ends;
+- the pool still reads as a black disc with domes round its rim, not domes with
+  colour between them. That is the standing-domes work (PLAN 9t), not this.
+
+---
+
+## 26. The Mac app, on the Mac and on a projector
 
 The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
 server in one Electron app. CI opens the packed app on its Mac runner and
@@ -651,7 +668,7 @@ or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
   your Mac; if it does, the app should use a borderless window over the
   projector's screen instead.
 
-## 24. Roy, 1963: the plate printed as a comic (PLAN 21)
+## 27. Roy, 1963: the plate printed as a comic (PLAN 21)
 
 Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
 panel: flat red, yellow and blue on white, a black line round every solid shape
@@ -666,7 +683,7 @@ and where two colours meet, and the pale washes round the shapes as even dots.
 - zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
   them to grow with the zoom, as the accidental ones did.
 
-## 25. Spinning the dish (PLAN 22)
+## 28. Spinning the dish (PLAN 22)
 
 Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
 lab measured the swirl (`npm run dish`), not the picture. On the Mac:
@@ -697,6 +714,23 @@ press makes is visible or wants more.
 ```
 
 ---
+
+---
+
+## 26. Blow's wind (PLAN 15c)
+
+The Blow drawn across the plate used to wipe a trail out of the colour. Now it
+pushes the colour along and keeps it. On Classic, with a pool laid:
+
+- draw the Blow slowly through the pool: a tongue of colour should be pushed ahead
+  of the hand and pile up where it stopped, with no dark trail behind it;
+- stop and hold: the straw's bubble should start within a tenth of a second, and a
+  drag should no longer leave a string of small straw bubbles behind it;
+- on the phone, hold one finger (the straw) and drag a second across the colour: the
+  second pushes it; hold the second still and it should blow a small clear ring;
+- on Oil & Water, blow across a body: the oil and its colour should go together.
+
+Say if the wind now reads as too strong or too weak next to the Finger.
 
 ---
 
