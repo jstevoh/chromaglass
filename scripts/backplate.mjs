@@ -287,7 +287,7 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
   // is `layPlate`: it must leave a back plate with its own look, its angle
   // and its spin as they were. Only a device lost with nothing carried
   // across lays it again, from its own look.
-  const lay = lv.slice(lv.indexOf('const layPlate = (presetId: string, layBack = false) => {'), lv.indexOf('const layPlateRef = useRef(layPlate);'));
+  const lay = lv.slice(lv.indexOf('const layPlate = (presetId: string, layBack = false'), lv.indexOf('const layPlateRef = useRef(layPlate);'));
   check('a cut on the front leaves a back plate with its own look as it was; a lost device lays it again from its look',
     /const keepBack = !!backDyesRef\.current && !layBack;\s*const laid = keepBack \? fluidsRef\.current\.slice\(0, 1\) : fluidsRef\.current;\s*for \(const fluid of laid\) fluid\.clearAll\(\);/.test(lay)
     && /rotationAnglesRef\.current\.map\(\(a, i\) => \(i < laid\.length/.test(lay) && /spinVelRef\.current\.map\(\(v, i\) => \(i < laid\.length/.test(lay)
