@@ -31,6 +31,7 @@ import { SPLAT_FLOATS, type SplatList } from './splats';
 import type { GpuStepParams } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
+import { DISH_GAP_RANGE, OIL_NU, dragSeconds } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 
@@ -242,6 +243,29 @@ const HAND_SCREEN = 0.04;
 const BZ_GRID = 256;
 const LIES_GRID = 128;
 const CURRENT_ITERS = 10;
+/*
+  The spun dish's swirl (spinSwirl, PLAN.md §22).
+
+  It runs while the dish and its liquid are moving against each other, or
+  the liquid is turning fast enough to be a centrifuge, and then for five of
+  the slowest drag times the plate can have (its widest gap, the look's own
+  liquid) so what it made dies away rather than stopping dead; then its field
+  is emptied and it stops. A plate nobody spins never runs it.
+
+  The two thresholds are where it stops being visible. The dish against its
+  liquid: at 1e-3 rad/s the swirl at the rim is under 5e-4 plate widths a
+  second, a cell of 768 in three seconds, for as long as the lag lasts. The
+  centrifuge: at 0.05 rad/s water's drift outward is 3e-4 plate widths a
+  second at the rim with the heaviest dye. Both speeds are the turntable's
+  alone (Auto Spin and the Spin tool): a look's own turning, its motor, the
+  music routed to rotation and a flick, turns the picture rigidly as it
+  always has and never reaches here, so every shipped look leaves both at
+  exactly zero.
+*/
+const SWIRL_DISH_MIN = 1e-3;
+const SWIRL_SPIN_MIN = 0.05;
+/** The oil's density under the look's liquid, Δρ/ρ (lib/turntable.ts, dyeDensityContrast's note). */
+const SPIN_OIL_LIGHT = 0.12;
 const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
 const DYE_ITERS = 4;
@@ -406,6 +430,14 @@ export class WebGPUFluid {
   private readonly spress: GPUBuffer;
   private readonly cur: PingPong;
   private readonly curP: PingPong;
+  /** The spun dish's swirl, on the current's grid, and its projection's pressure and divergence (spinSwirl). */
+  private readonly swirl: PingPong;
+  private readonly swirlP: PingPong;
+  private readonly swirlDiv: GPUTexture;
+  /** Whether the swirl holds anything: it is added to the flow only while it does. */
+  private swirlLive = false;
+  /** Seconds the swirl runs on after its forcing stops, so what it made can die away. */
+  private swirlTail = 0;
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
   /*
@@ -642,6 +674,8 @@ export class WebGPUFluid {
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
       ['addCurrent', [VEL], true],
+      // The spun dish (PLAN §22): no look spins at opening, so built behind.
+      ['spinSwirl', [VEL], false],
       ['decayDye', [dye], true],
       ['decayVel', [VEL], true],
       ['packView', ['rgba32uint'], true],
@@ -789,6 +823,9 @@ export class WebGPUFluid {
     }));
     this.cur = pp(this.M, VEL, 'current');
     this.curP = pp(this.M, R32, 'current pressure');
+    this.swirl = pp(this.M, VEL, 'swirl');
+    this.swirlP = pp(this.M, R32, 'swirl pressure');
+    this.swirlDiv = tex(this.M, R32, 'swirl divergence');
     this.grain = opts.float32Filterable ? pp(this.N, RGBA32, 'grain') : null;
     this.div = tex(this.N, R32, 'divergence');
     this.divRaw = tex(this.N, R32, 'divergence raw');
@@ -981,6 +1018,9 @@ export class WebGPUFluid {
     this.phaseGapPrimed = false;
     for (const t of [this.cur.a, this.cur.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     for (const t of [this.curP.a, this.curP.b, this.curDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
+    for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b, this.swirlDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
+    this.swirlLive = false;
+    this.swirlTail = 0;
     if (this.grain) {
       // Identity coordinates: seedGrain with both phases reseeded. It reads the
       // other texture of the pair — a dispatch may not sample what it writes.
@@ -1505,6 +1545,30 @@ export class WebGPUFluid {
       this.vel.swap();
     }, (p.vorticity ?? 0) > 0.001);
     /*
+      8.8. The spun dish's swirl (PLAN §22): only while something spins.
+      Worked out ahead of either solve, because it reads nothing they write
+      and a thin gap takes it in before its solve, with the current: the
+      swirl is a speed the dish's drag holds the liquid to against the
+      glass, which is what the thin solve takes a current to be, and the
+      solve then makes it conserve liquid with everything else. There the
+      swirl field holds the drive as a speed at the rest gap, a/k0, not the
+      integrated swirl: the thin solve brings the liquid to whatever it is
+      given at k0 and then drags it with its own 12ν/h², so handed the swirl
+      itself it counted the gap twice and a pressed palm went round at 0.045
+      of the dish's turn where the old plate gives 0.53 (measured in the lab,
+      the press of `npm run dish`, which now runs both plates). On the old
+      plate it is laid over the flow after both projections, as the current
+      is, and it is divergence-free already (stepSwirl projects it).
+    */
+    const swirlOn = this.swirlWanted(p);
+    stage('swirl', (pass) => {
+      if (swirlOn) { this.stepSwirl(pass, p, thin); return; }
+      for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
+    }, swirlOn || this.swirlLive);
+    this.swirlLive = swirlOn;
+    const swirlScale = swirlOn ? (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7) : 0;
+
+    /*
       A thin gap takes the stirring in with the other forces, before the
       solve, so it lasts through the drag time like any push and the flow it
       makes conserves liquid; then one projection with the drag in it, and no
@@ -1529,7 +1593,7 @@ export class WebGPUFluid {
       */
       stage('current', (pass) => {
         this.stepCurrent(pass);
-        this.run(pass, 'addCurrent', this.vel.write, [this.vel.read, this.cur.read, this.squeeze.read], this.arg('current grid thin', [0, this.M, 0, 0]));
+        this.run(pass, 'addCurrent', this.vel.write, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('current grid thin', [0, this.M, 0, swirlScale]));
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
@@ -1555,8 +1619,8 @@ export class WebGPUFluid {
       this.stepCurrent(pass);
       // The gap rides along: the plate's depth is a mobility on the flow that
       // carries the dye (F), and this is the field that carries it.
-      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read],
-        this.arg('current grid', [0, this.M, p.depthDrag, 0]));
+      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read],
+        this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
     // 9. Dye: diffuse, then advect through the forced velocity
@@ -2092,9 +2156,8 @@ export class WebGPUFluid {
     if (!this.viewTex) {
       const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
       this.viewTex = this.disposer.track(this.device.createTexture({ label: 'view', size: [this.N, this.N], format: 'rgba32uint', usage }));
-      this.blankR = this.disposer.track(this.device.createTexture({ label: 'blank r', size: [1, 1], format: R32, usage }));
-      this.blankRGBA = this.disposer.track(this.device.createTexture({ label: 'blank rgba', size: [1, 1], format: 'rgba32float', usage }));
     }
+    this.blank('r');
     const has = [this.phaseLive, this.mixLive && !!this.mix, this.rxnLive && !!this.rxn, this.liesLive && !!this.lies];
     this.run(pass, 'packView', this.viewTex, [
       has[0] ? this.phase.read : this.blankR!,
@@ -2359,6 +2422,35 @@ export class WebGPUFluid {
     return { n, gap, rate };
   }
 
+  /**
+   * The spun dish's swirl (spinSwirl), read back whole on its own grid: m × m
+   * velocities (x, y), plate widths a second, in the frame turning with the
+   * liquid. For `npm run dish`, not for a frame.
+   */
+  async readSwirl(): Promise<{ m: number; data: Float32Array }> {
+    const m = this.M;
+    const row = Math.ceil((m * 8) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read swirl', size: row * m, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read swirl' });
+    enc.copyTextureToBuffer({ texture: this.swirl.read }, { buffer: buf, bytesPerRow: row }, [m, m]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const halves = new Uint16Array(buf.getMappedRange().slice(0));
+    buf.unmap();
+    buf.destroy();
+    const half = (h: number): number => {
+      const e = (h >> 10) & 0x1f, f = h & 0x3ff, sgn = h & 0x8000 ? -1 : 1;
+      return e === 0 ? sgn * f * 2 ** -24 : e === 31 ? (f ? NaN : sgn * Infinity) : sgn * (1 + f / 1024) * 2 ** (e - 15);
+    };
+    const data = new Float32Array(m * m * 2);
+    const stride = row / 2;
+    for (let y = 0; y < m; y++) for (let x = 0; x < m; x++) {
+      data[(y * m + x) * 2] = half(halves[y * stride + x * 4]);
+      data[(y * m + x) * 2 + 1] = half(halves[y * stride + x * 4 + 1]);
+    }
+    return { m, data };
+  }
+
   async readAir(): Promise<{ n: number; data: Float32Array } | null> {
     if (!this.air) return null;
     const n = this.N;
@@ -2591,6 +2683,55 @@ export class WebGPUFluid {
     pass.setBindGroup(0, ggroup);
     pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
     this.vel.swap();
+  }
+
+  /**
+   * Whether the spun dish's swirl runs this step (see SWIRL_DISH_MIN): while
+   * the dish and its liquid move against each other or the liquid is a
+   * centrifuge, and for five of the slowest drag times after.
+   */
+  private swirlWanted(p: GpuStepParams): boolean {
+    const dish = Math.abs(p.spinDish ?? 0), spin = Math.abs(p.spinLiquid ?? 0);
+    if (!Number.isFinite(dish) || !Number.isFinite(spin)) return false;
+    const nu = Math.max(1e-7, p.spinNu ?? 1e-6);
+    if (dish > SWIRL_DISH_MIN || spin > SWIRL_SPIN_MIN) {
+      this.swirlTail = 5 * dragSeconds(nu, DISH_GAP_RANGE[1]);
+      return true;
+    }
+    this.swirlTail -= Math.max(0, p.magnetSeconds ?? 1 / 60);
+    return this.swirlTail > 0;
+  }
+
+  /** The swirl: the dish's drag and the centrifuge, then the current's projection on its own textures. */
+  private stepSwirl(pass: GPUComputePassEncoder, p: GpuStepParams, thin: boolean): void {
+    const spin = p.spinLiquid ?? 0;
+    const tau = Math.max(1e-4, p.spinTau ?? 1);
+    const mixOn = this.mixLive && !!this.mix;
+    this.run(pass, 'spinSwirl', this.swirl.write, [
+      this.swirl.read, this.dye.read, this.squeeze.read,
+      mixOn ? this.mix!.read : this.blank('rgba'),
+      this.phaseLive ? this.phase.read : this.blank('r'),
+    ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
+      Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT]), this.M);
+    this.swirl.swap();
+    const m = this.arg('current grid', [0, this.M, 0, 0]);
+    this.run(pass, 'curDivergence', this.swirlDiv, [this.swirl.read], m, this.M);
+    for (let k = 0; k < CURRENT_ITERS; k++) {
+      this.run(pass, 'curPressure', this.swirlP.write, [this.swirlP.read, this.swirlDiv], m, this.M);
+      this.swirlP.swap();
+    }
+    this.run(pass, 'curGradient', this.swirl.write, [this.swirl.read, this.swirlP.read], m, this.M);
+    this.swirl.swap();
+  }
+
+  /** A 1×1 texture of zeros, for a pass whose optional field a plate does not have. */
+  private blank(kind: 'r' | 'rgba'): GPUTexture {
+    if (!this.blankR || !this.blankRGBA) {
+      const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
+      this.blankR = this.disposer.track(this.device.createTexture({ label: 'blank r', size: [1, 1], format: R32, usage }));
+      this.blankRGBA = this.disposer.track(this.device.createTexture({ label: 'blank rgba', size: [1, 1], format: 'rgba32float', usage }));
+    }
+    return kind === 'r' ? this.blankR : this.blankRGBA;
   }
 
   /**

@@ -36,6 +36,12 @@ export type MidiAction =
    * does nothing.
    */
   | 'spin-front' | 'spin-back'
+  /**
+   * Auto Spin from a pad (PLAN §22): turn the dish the other way round, and
+   * step the motor Off, Rate, Tempo. A reverse is a moment in a song, the
+   * drop where the whole wall turns back on itself, and a moment wants a pad.
+   */
+  | 'spin-reverse' | 'spin-auto'
   | 'play-toggle' | 'automate-toggle' | 'overlays-toggle' | 'macro-toggle'
   | 'seq-play-pause' | 'seq-next' | 'seq-prev' | 'seq-stop'
   | 'preset-next' | 'preset-prev'
@@ -397,6 +403,7 @@ export function targetLabel(t: MidiTarget, presetName?: (id: string) => string |
 export const ACTION_LABELS: Record<MidiAction, string> = {
   'seed': 'Seed', 'clear': 'Clear', 'drain': 'Drain', 'lucky': 'Randomise',
   'spin-front': 'Spin Front Plate', 'spin-back': 'Spin Back Plate',
+  'spin-reverse': 'Reverse Spin', 'spin-auto': 'Auto Spin: Next',
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
@@ -537,6 +544,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // same reason: a DJ set wants the scenes on the drops, a band that plays
   // through its changes may want them planned.
   { key: 'songFollow',      label: 'Follow the Song',  min: 0, max: 1 },
+  // The dish's own motor (PLAN §22). The Rate is a knob because a turntable's
+  // speed is ridden: slowed into a breakdown, wound up into a drop, and through
+  // zero to turn it back. The mode and the beats a turn are stepped choices.
+  { key: 'spinRpm',         label: 'Spin Rate',        min: -45, max: 45 },
+  { key: 'spinAuto',        label: 'Auto Spin',        min: 0, max: 2, step: 1 },
+  { key: 'spinBeats',       label: 'Beats a Turn',     min: 1, max: 64, step: 1 },
   /*
     The mixer (lib/mixer.ts): each source's level and its four grade controls.
     Learnable because they are what a video mixer's channel strip is, and a

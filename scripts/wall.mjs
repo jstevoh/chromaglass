@@ -928,6 +928,7 @@ let failed = 0;
         wallServable: (b.wallRafs - a.wallRafs - (b.wallHeld - a.wallHeld)) / s,
         asks: (b.asks - a.asks) / s,
         askCount: b.asks - a.asks,
+        seconds: s,
         frameMs: d.governor?.frameMs ?? null,
         refreshMs,
         servedHz: served.length / s,
@@ -1005,8 +1006,30 @@ let failed = 0;
       `${f1(alone.drawn)} a second against a ${f1(alone.hz)} Hz display, ${f1(alone.asks)} asks a second`);
     if (ownLoop) {
       const refreshMs = 1000 / Math.max(1, alone.hz);
+      /*
+        How many of a clock's refreshes, asks or frames a phase must count
+        before its lines judge anything: twenty in the seconds measured. The
+        lines below are ratios (drawn to served, asks to the wall's
+        refreshes, drawn to either window's frames), and a ratio of nothing
+        passes: a wall that never asked holds "asks at least 0.8 of its
+        refreshes" at 0 of 0, and one clock alone is always under the
+        ceiling. This is what guards against that.
+
+        A count, where it was ten a second (#203): the same twenty in the two
+        seconds every phase measured then, but a rate also judged the
+        runner. The busy phases below miss half the refreshes on purpose, so
+        a Mac runner already handing its windows 22 of 60 hands them 11, and
+        half a refresh behind the harness's own late timer holds a few more:
+        #223's tools shard read the wall's asks at 8.9 a second, 0.9x under
+        the ceiling and 11.4 drawn against a floor of 10.3, and went red on
+        the guard alone (2026-10-04). A stopped clock still counts none, and
+        the busy phases measure for longer instead (see there), so they
+        count as many refreshes as an idle phase does.
+      */
+      const enough = 20;
       /** The lines every phase is held to: a ceiling, a floor, and both clocks offering. */
       const judge = (m, label, { floor = true } = {}) => {
+        const counted = (perSecond) => Math.round(perSecond * m.seconds);
         const faster = Math.max(m.hz, m.wallHz);
         // The display's rate, from the gaps between refreshes, which a busy
         // machine's dropped frames do not lower (see `__rafTs`).
@@ -1028,8 +1051,8 @@ let failed = 0;
         */
         const oneDisplay = m.servedHz <= 1.05 * display;
         check(`both windows animating, the wall ${label}: at most 1.05 times the refreshes served, one display's`,
-          m.drawn <= 1.05 * m.servedHz && oneDisplay && m.asks > 10,
-          `${f1(m.drawn)} drawn a second against ${f1(m.servedHz)} refreshes served (${f1(m.drawn / Math.max(1, m.servedHz))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second, the display ${f1(display)} Hz${m.refreshMs ? '' : ' by rate, no gaps to measure'}${oneDisplay ? '' : ', so the served count is not one display\'s'}), ${f1(m.asks)} asks a second`);
+          m.drawn <= 1.05 * m.servedHz && oneDisplay && m.askCount >= enough,
+          `${f1(m.drawn)} drawn a second against ${f1(m.servedHz)} refreshes served (${f1(m.drawn / Math.max(1, m.servedHz))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second, the display ${f1(display)} Hz${m.refreshMs ? '' : ' by rate, no gaps to measure'}${oneDisplay ? '' : ', so the served count is not one display\'s'}), ${f1(m.asks)} asks a second (${m.askCount} in ${f1(m.seconds)} s${m.askCount >= enough ? '' : `, under the ${enough} that make two clocks`})`);
         /*
           The floor: the wall must not cost the show its frames. What the show
           draws on its own is every frame its window is handed, so the floor
@@ -1065,8 +1088,8 @@ let failed = 0;
         if (floor) {
           const alone = Math.max(m.hz, m.wallServable);
           const least = 0.9 * alone;
-          check('  and at least 0.9 times what either window alone would have drawn in the same seconds', m.drawn >= least && alone > 10,
-            `${f1(m.drawn)} a second against ${f1(least)} (0.9 of ${f1(alone)}: the show's window handed ${f1(m.hz)}, the wall's ${f1(m.wallServable)} the harness did not hold)`);
+          check('  and at least 0.9 times what either window alone would have drawn in the same seconds', m.drawn >= least && counted(alone) >= enough,
+            `${f1(m.drawn)} a second against ${f1(least)} (0.9 of ${f1(alone)}: the show's window handed ${f1(m.hz)}, the wall's ${f1(m.wallServable)} the harness did not hold; ${counted(alone)} in ${f1(m.seconds)} s)`);
         }
         /*
           Each clock against its own window's refresh: the show's frames
@@ -1099,8 +1122,12 @@ let failed = 0;
           check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran${m.fallbacks && m.misses ? ` since the page opened (${m.misses.ahead} ahead of now, the worst by ${f1(m.misses.aheadMs)} ms; ${m.misses.stale} over a second old, the worst ${f1(m.misses.staleMs)} ms; the last ${f1((m.missedAgo ?? 0) / 1000)} s before this reading)` : ''}`);
         }
         check('  and both clocks were offering, each at its own window\'s rate',
-          m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.wallServable > 10 && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0, offered);
+          m.offered !== null && m.offered.frame >= 0.8 * m.hz && counted(m.wallServable) >= enough && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0,
+          `${offered}; ${counted(m.wallServable)} of the wall's in ${f1(m.seconds)} s${counted(m.wallServable) >= enough ? '' : `, under the ${enough} that make a clock`}`);
       };
+      // The display's refresh: the shortest any idle phase read (see the busy
+      // phases below for why).
+      let displayMs = null;
       for (const frac of [0, 0.25, 0.5, 0.75]) {
         /*
           The phase is a fraction of the refresh the windows are keeping now,
@@ -1111,10 +1138,21 @@ let failed = 0;
           double (the check-skeptic, 2026-09-27).
         */
         const pre = await measure(500);
-        const phaseMs = frac * (pre.refreshMs ?? 1000 / Math.max(1, pre.hz, pre.wallHz));
+        /*
+          Or the shortest refresh an earlier phase read over its 2 s, where
+          that is shorter: a runner missing most refreshes can read 500 ms of
+          them as two refreshes a gap (see the busy phases below), and three
+          quarters of a refresh behind became one and a half, where the
+          harness's late timer held most of the wall's frames (the
+          check-skeptic's starved emulation, 7.5 asks a second of 24 handed).
+          The first phase is on one refresh and needs none.
+        */
+        const read = Math.min(pre.refreshMs ?? Infinity, displayMs ?? Infinity);
+        const phaseMs = frac * (Number.isFinite(read) ? read : 1000 / Math.max(1, pre.hz, pre.wallHz));
         await wall.evaluate((p) => { window.__phaseMs = p; }, phaseMs);
         await show.waitForTimeout(300);
         const m = await measure(2000);
+        if (m.refreshMs) displayMs = Math.min(displayMs ?? Infinity, m.refreshMs);
         judge(m, frac === 0 ? 'on its own clock' : `${frac} of a refresh behind`);
         /*
           And the governor, fed the interval between draws: what the show fed
@@ -1180,17 +1218,39 @@ let failed = 0;
         two clocks make about 44 slots of 29.5 refreshes each, and the old
         gate passed the floor at 31.5 against 26.5 (the check-skeptic).
       */
+      /*
+        The refresh the busy phases are placed and judged by is the shortest
+        the four idle phases read, 2 s each, not a reading of their own: a
+        window missing refreshes has gaps of two and three, and on a runner
+        starved enough that it misses most of them the shortest gap that
+        recurs can be two refreshes. Then "half a refresh behind" is a whole
+        one, where nothing can double, and "at most 0.6 of the display" is
+        1.2 of it. The check-skeptic's starved emulation (each window missing
+        the same 68 % of refreshes) read a 500 ms reading, which was here, as
+        33.2 ms, and the phase landed 1.00 of a refresh behind (2026-10-04).
+        A machine that drops refreshes can only make the gap read longer,
+        never shorter, so the shortest of the idle readings is the display's.
+      */
+      const busyRefresh = displayMs ?? refreshMs;
       for (const frac of [0, 0.5]) {
-        const pre = await measure(500);
-        const refresh = pre.refreshMs ?? 1000 / Math.max(1, pre.hz, pre.wallHz);
-        await wall.evaluate((p) => { window.__phaseMs = p; }, frac * refresh);
-        await show.evaluate(() => { window.__busy = 0.5; });
+        await wall.evaluate((p) => { window.__phaseMs = p; }, frac * busyRefresh);
+        /*
+          Measured for 2 s over the share of refreshes the busy machine
+          leaves, 4 s at half, so the windows are handed as many refreshes to
+          judge on as an idle phase's 2 s (see `enough` above). Not a busy
+          machine sized to the runner, missing fewer refreshes where the
+          runner already misses many: the runner's own misses are each
+          window's own, and the book that makes both windows miss the same
+          refresh is the machine this phase is for.
+        */
+        const missedShare = 0.5;
+        await show.evaluate((x) => { window.__busy = x; }, missedShare);
         await show.waitForTimeout(300);
-        const m = await measure(2000);
+        const m = await measure(2000 / (1 - missedShare));
         await show.evaluate(() => { window.__busy = 0; });
         const label = frac === 0 ? 'on its own clock, thread busy' : `${frac} of a refresh behind, busy`;
         judge(m, label);
-        const display = 1000 / (m.refreshMs ?? refresh);
+        const display = 1000 / Math.min(m.refreshMs ?? Infinity, busyRefresh);
         /*
           At most 0.6 of the display, not merely under it: missing a fifth
           of the refreshes, the old gate passed the floor (39.4 against
@@ -1200,6 +1260,36 @@ let failed = 0;
         const b = m.book;
         check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4,
           `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows${b.apart ? `, the wall's stamp ${f1(b.apart.median)} ms after the show's (${f1(b.apart.least)} to ${f1(b.apart.most)})` : ''}, the projector's own book ${b.wallOwn ?? '-'}`);
+        /*
+          And, on one refresh, both windows handed the same refreshes: the
+          slots served at most 1.15 of the more of the two windows' frames.
+          The book makes both windows miss the refreshes it misses, but a
+          starved runner misses more of its own, each window its own, and
+          then the two clocks' frames fall in different refreshes and a
+          correct gate draws well over either window alone: the floor's bar
+          is far under what it should be, and the gate that turns down the
+          show's own next frame, the fault this phase is for, clears it. The
+          check-skeptic's mutant of that gate passed every line here on a
+          starved emulation, each window missing 63 % of its refreshes on its
+          own (drawn 1.07 to 1.14 of either window alone; the right gate
+          1.36 to 1.39), served reading 1.47 to 1.54 of the windows' frames.
+          Four Mac runs since #236 read 1.00 to 1.02 here; its first run,
+          whose two windows kept two books, 1.48.
+
+          Only on one refresh: half a refresh apart the Mac reads up to 1.69
+          with the gate right (#236's second run: 21.8 served, the windows
+          handed 12.9 and 13.9), its late timers parting the two windows'
+          frames by themselves, so the line would judge the runner there.
+          The gate's fault shows on one refresh first (23.4 drawn of 29.4
+          handed, where half a refresh apart it drew 26.0 of 29.5).
+        */
+        const oneMachine = m.servedHz / Math.max(1, m.hz, m.wallHz);
+        if (frac === 0) {
+          check('  and both windows were handed the same refreshes: the slots served at most 1.15 of either window\'s', oneMachine <= 1.15,
+            `${f1(m.servedHz)} served a second, the windows handed ${f1(m.hz)} and ${f1(m.wallHz)} (${oneMachine.toFixed(2)}x)`);
+        } else {
+          console.log(`  (the slots served ${oneMachine.toFixed(2)} of either window's frames, not judged half a refresh apart)`);
+        }
       }
       await wall.evaluate(() => { window.__phaseMs = 0; });
       /*
