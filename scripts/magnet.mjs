@@ -43,10 +43,58 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
 
+/*
+  Nine seconds of the plate left alone, read once a second: the disc 0.12
+  round the middle (its mean ferrofluid), the magnet the solver was stepped
+  with, the bubbles on the plate and the plate's tempo. For the 1b window
+  and for the band's run at the end; printed, the line after it judges.
+*/
+const settle = async (page, seconds = 9) => {
+  const seen = [];
+  for (let s = 0; s < seconds; s++) {
+    await page.waitForTimeout(1000);
+    seen.push(await page.evaluate(async () => {
+      const d = window.chromaglassDebug(), f = await d.readPhase(), st = d.fluids?.[0]?.lastStep;
+      let sum = 0, c = 0;
+      if (f) for (let y = 0; y < f.n; y++) for (let x = 0; x < f.n; x++) {
+        if (Math.hypot((x + 0.5) / f.n - 0.5, (y + 0.5) / f.n - 0.5) < 0.12) { sum += f.data[x + y * f.n]; c++; }
+      }
+      const b = d.bubbles?.bubbles ?? [];
+      const near = b.filter(q => Math.hypot(q.x / 192 - 0.5, q.y / 192 - 0.5) < 0.2).length;
+      return `${c ? (sum / c).toFixed(3) : '?'} m${st ? (+st.magnetStrength).toFixed(2) : '?'} b${b.length}/${near} t${(+(d.fluids?.[0]?.tempoMul ?? NaN)).toFixed(2)}`;
+    }));
+  }
+  return seen.join(' | ');
+};
+
 const browser = await launchChromium(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
+  /*
+    And no band. The first pointerdown on a fresh browser starts the
+    simulated band (App.tsx, until a source has been chosen), and the click
+    below that gives the page the keyboard is that pointerdown. The settings
+    held at zero further down take the band's push out of the flow, but not
+    its kicks: each one can still drop bubbles in the densest dye near the
+    middle (LiquidVisualizer, the bubble loop), and Audio Impact does not
+    gate them. While a still bubble poured liquid out over the whole plate
+    (the standing air term, gone in wgsl/fluid.ts), that outflow kept the
+    ring out of the middle: eight runs of this check on other PRs read the
+    disc's mean 0.058 to 0.099 at the start and 0.054 to 0.184 nine seconds
+    on. With the outflow gone and the band left playing, the first Mac run
+    read 0.180 at the start and 0.501 nine seconds on, with the solver
+    stepped with no magnet at all (the line before it): the band moving the
+    ferrofluid, not the magnet. The lab, with the same step, the same pour
+    and four bubbles held near the middle, kept the disc at 0.095 to 0.086
+    without the outflow (0.062 with it), so what the band does to the middle
+    is not yet found, and is a PLAN.md item of its own. This check is about
+    the magnet, so it is judged in silence, chosen the way a person chooses
+    it, and the line after the settle says the plate heard nothing.
+  */
+  await page.addInitScript(() => {
+    try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ }
+  });
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
@@ -164,6 +212,10 @@ try {
     Object.assign(d.settings, {
       rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
       turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
+      // And the clock off the music: in silence Tempo Sync would run the plate
+      // at the pace of no music (tempoPace.ts), slower than every run these
+      // bars were set on, which had the band.
+      tempoSync: 0,
       /*
         And an ordinary plate clock. The magnet acts in plate time, and
         Classic runs the plate slowest of any look (0.00924); the music was
@@ -185,12 +237,30 @@ try {
   */
   let middleEnd = null, laysEnd = null;
   for (let k = 0; k < 3; k++) {
-    await page.waitForTimeout(9000);
+    const seen = await settle(page);
+    console.log(`     the middle, second by second: ${seen}`);
     middleEnd = await middleMean(); laysEnd = await lays();
     if (laysEnd === laysStart && middleEnd.n === middleStart.n) break;
     console.log(`     the ferrofluid was laid again (lays ${laysStart} → ${laysEnd}, grid ${middleStart.n} → ${middleEnd.n}) while the middle was watched; again`);
     middleStart = middleEnd; laysStart = laysEnd;
   }
+  /*
+    In silence, as the page was opened (above). Three readings, because one
+    alone can read silence with the band playing: kicks() and heardKicks()
+    are counted in the plate's loop, so where the loop does not run (a cloud
+    session's software GPU) both stay at 0 with the band 13 kicks in; and
+    window.__band, which App.tsx defines whenever the simulated band starts
+    and never takes away, says nothing of the drone, a mic or a file, which
+    heardKicks() does. And the bubbles on the plate, which on Classic are
+    what the band's kicks drop.
+  */
+  const music = await page.evaluate(() => {
+    const d = window.chromaglassDebug?.();
+    return { band: typeof window.__band === 'function', kicks: d?.kicks?.() ?? null, heard: d?.heardKicks?.() ?? null, bubbles: d?.bubbles?.bubbles?.length ?? null };
+  });
+  check('and the plate hears no music while the middle is watched',
+    !music.band && music.kicks === 0 && music.heard === 0,
+    `the band ${music.band ? 'playing' : 'not started'}, ${music.kicks} kicks fired, ${music.heard} heard, ${music.bubbles} bubbles on the plate`);
   // 1b's second half (above): no pool in the middle with no hand on the plate.
   check('and the ferrofluid poured round the middle does not gather into it',
     laysStart >= 0 && laysEnd === laysStart && middleEnd.n === middleStart.n && middleEnd.mean >= 0 && middleEnd.mean < 0.3,
@@ -450,6 +520,34 @@ try {
   check('moving Magnet Across takes it from where the hand left it',
     asLook(placed) && Math.abs(placed.x - across) < 0.02 && Math.abs(placed.y - corner.y) < 0.02,
     `Magnet Across ${corner.x} → ${across}; the solver was given ${fmt(placed)}`);
+
+  /*
+    TEMPORARY, for #238: 1b's window again on a fresh page with the band
+    left on, as a first visit has it, read the same way and printed only,
+    to find what the band does to the middle (PLAN.md, "with the band
+    playing, the ferrofluid poured round Classic's middle drifts into it").
+  */
+  {
+    const p2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await p2.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+    await p2.waitForTimeout(9000);
+    await p2.mouse.click(5, 5);
+    await p2.keyboard.press('m');
+    const pick = await settle(p2, 3);
+    await p2.evaluate(() => {
+      const d = window.chromaglassDebug();
+      Object.assign(d.settings, {
+        rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
+        turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0, tempoSync: 0, globalSpeed: 0.025,
+      });
+    });
+    const held = await settle(p2);
+    const m2 = await p2.evaluate(() => { const d = window.chromaglassDebug?.(); return { band: typeof window.__band === 'function', kicks: d?.kicks?.(), heard: d?.heardKicks?.() }; });
+    console.log(`     band on (diagnostic): the band ${m2.band ? 'playing' : 'not started'}, ${m2.kicks} kicks, ${m2.heard} heard`);
+    console.log(`     band on, the three seconds after the pick: ${pick}`);
+    console.log(`     band on, held as 1b holds it: ${held}`);
+    await p2.close();
+  }
 } finally {
   await browser.close();
 }

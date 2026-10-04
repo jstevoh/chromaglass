@@ -198,6 +198,24 @@ have bubbles at all; the check now chooses silence (`scripts/mirror.mjs`). Wheth
 Audio Impact 0 should mean the music touches nothing, bubbles included, is a look
 question: gating them would change only plates set to 0.
 
+*Found 2026-10-04 (#238), not yet done:* **with the band playing, the ferrofluid
+poured round Classic's middle drifts into it.** Picking the Magnet on Classic pours a
+ring round the middle; `npm run magnet` watches the disc 0.12 round the middle for
+nine seconds with the solver stepped with no magnet at all. While a still bubble
+poured liquid out over the whole plate (the standing air term #238 removed), eight
+runs on other PRs read the disc's mean 0.058–0.099 at the start and 0.054–0.184 at
+the end; with that outflow gone and the band left playing (the check's own click
+starts it), the Mac read 0.180 and 0.501. So the outflow was hiding something the
+band does to the middle. Not found in the lab: the app's own step (sound drives held
+at zero, as the check holds them), the same pour, and four bubbles held or kicked on
+and off near the middle keep the disc at 0.095 → 0.083–0.086 without the outflow
+(0.062–0.069 with it), and dense dye with no bubbles moves it 0.095 → 0.103. Left to
+look at: the band's bubbles as the app moves them (carried by the flow, pressed,
+popped with a puff of air), and the first 2.5 s, when Beat Squeeze and the band's
+turbulence still run and the disc already reads 0.180. The magnet check now runs in
+silence (it is about the magnet); measure this with the band on, in the app, on the
+Mac. #230 takes the pour out of the pick, so its check will not see it either.
+
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
 the One, default 0, which leaves every kick's weight at exactly 1) read 0.040 → 0.046
