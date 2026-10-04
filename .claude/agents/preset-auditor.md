@@ -11,12 +11,13 @@ each is wrong.
 
 A cloud session cannot photograph the app (no GPU), so the gallery runs in CI:
 
-1. Find a `gallery.yml` run on the branch to audit. It runs by itself on
-   every PR push that touches the presets, the fade, the plate shader or the
-   solver (its `paths:` list), so a recent one usually exists: list the
-   workflow's runs filtered by branch and take the newest on the PR's head.
-   A cloud session's GitHub access cannot start a workflow by hand (403 on
-   `workflow_dispatch`); if no run exists, ask the owner to press
+1. Find a `gallery.yml` run on the branch to audit: list the workflow's runs
+   filtered by branch and take the newest on the PR's head. It runs only when
+   asked (PLAN.md 19a: on every push it held a third of the Mac runners), so
+   if there is none, label the PR `gallery` (the issue-write tool's labels;
+   to photograph a later push, remove the label and add it again). A cloud
+   session's GitHub access cannot start a workflow by hand (403 on
+   `workflow_dispatch`); for a branch with no PR, ask the owner to press
    **Run workflow** on the Preset gallery page of the Actions tab, and say
    which branch.
 2. Wait for it (about 20 to 40 minutes), then download its artifact: `gallery/contact.jpg`

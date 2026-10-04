@@ -80,6 +80,13 @@ jobs:
       - name: The panel
         run: npm run panel
 
+      # The workflows' own wiring: closed.yml cancels a merged PR's runs by
+      # joining their concurrency groups, which it spells by hand, and the
+      # gallery runs on its label rather than on every push (PLAN.md 19a).
+      # A rename in one file would quietly undo either.
+      - name: A closed PR stops its runs
+        run: npm run closedruns
+
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.
