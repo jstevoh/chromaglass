@@ -113,7 +113,12 @@ try {
       // What the plate draws of it: the film stock's grain takes the plate's
       // place (plateUniforms.ts), so a look on film has less of its own.
       const eff = g0 * (1 - Math.min(1, Math.max(0, Lk.settings.stock ?? 0)));
-      const shot = async (set) => new Uint8ClampedArray(await lab.render(SIZE, { ...Lk.settings, ...set }, { zoom: 1, macroAmount: 0, grain: true }));
+      // Roy's comic print (Ben-Day Dots) decides ink or paper for every pixel
+      // of the finished picture, by design: any change in the picture under it
+      // flips some, grain or not, so it is the plate under the print that is
+      // asked here. The print's own edges are benday's (and PLAN 1f).
+      const under = (Lk.settings.benDay ?? 0) > 0 ? { benDay: 0 } : {};
+      const shot = async (set) => new Uint8ClampedArray(await lab.render(SIZE, { ...Lk.settings, ...under, ...set }, { zoom: 1, macroAmount: 0, grain: true }));
       const z = await shot({ granulation: 0 }), g = await shot({}), g2 = await shot({ granulation: Math.min(1, 2 * g0) });
       const W = SIZE, P = W * W;
       const lum = (p) => { const L = new Float32Array(P); for (let i = 0; i < P; i++) L[i] = 0.2126 * p[4 * i] + 0.7152 * p[4 * i + 1] + 0.0722 * p[4 * i + 2]; return L; };
@@ -147,7 +152,7 @@ try {
       }
       if (e < 0.03 * P || b < 0.03 * P) throw new Error(`${id}: ${e} edge and ${b} body pixels: too few to measure`);
       const f = (v, k = 2) => +v.toFixed(k);
-      return { id, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3) };
+      return { id: under.benDay === 0 ? `${id} (under its print)` : id, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3) };
     }, { id, SIZE, FLECK });
     rows.push(row);
     console.log(`  ${row.id.padEnd(20)} grain ${row.eff}  edges ${row.edge}%  body ${row.body}%  flecks ${row.flecks}%  edge moved ${row.edgeMove}  body texture ${row.texture} (x2 grain: ${row.texture2})`);

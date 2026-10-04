@@ -2159,6 +2159,16 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     the dye's own colour; and on an opaque body the grain is the most it
     can be, so its opacity should move least, which a multiple got backwards.
   */
+  /*
+    The liquid's own thickness, kept from before the grain for the soap
+    film below (thinFilm). The film's colour is interference, set by how
+    thick the liquid is, and it cycles every few hundredths of opacity: read
+    after the grain, every grain was a jump round the rainbow, and Sunny Side
+    Up and Soap Film threw single pixels of another colour along every thin
+    edge (npm run grainedge: 7.1% and 3.0% of the edges' pixels flecks).
+    Pigment settling deeper in a place does not make the liquid thicker there.
+  */
+  let film0 = fluid0.a;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
     fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
@@ -2483,14 +2493,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  if (U.thinFilm > 0.001 && fluid0.a > 0.004 && fluid0.a < 0.4) {
-    let thin = smoothstep(0.4, 0.04, fluid0.a) * smoothstep(0.004, 0.03, fluid0.a);
-    let filmT = fluid0.a * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
+  if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
+    let thin = smoothstep(0.4, 0.04, film0) * smoothstep(0.004, 0.03, film0);
+    let filmT = film0 * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
     // The soap film's thickness: the dye amount, with a little of the same
     // grain centred on it. The rainbow's phase carries 1.4 periods of noise,
     // which as thickness would be up to 290 nm that is not the dye's, and
     // would put the thinnest film at straw rather than black.
-    let filmThick = fluid0.a * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
+    let filmThick = film0 * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
     let filmC = filmColourAt(filmT + U.time * 0.02, filmThick);
     outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
   }

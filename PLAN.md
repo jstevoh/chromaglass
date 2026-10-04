@@ -779,7 +779,8 @@ fully on or off. **Shipped:** the grain is drawn after the edge, as optical dept
 (`grainedDepth`, wgsl/plate.ts). `npm run grainedge`, seven looks in the lab: flecks (edge pixels
 moved over 40 levels in a channel) 6–35% before, 0–0.61% after, every look held under 2%;
 the bodies keep a grain that is a texture, weaker than before inside thick pools, where
-the dye already stops nearly all the light. The owner's eyes on a laptop: `docs/judging.md` §34.
+the dye already stops nearly all the light. The soap film's colour reads the liquid's thickness from before the
+grain (Sunny Side Up 7.1% → 0.25%, Soap Film 3.0% → 0.2% on the edge check). The owner's eyes on a laptop: `docs/judging.md` §34.
 
 Found with it, open:
 
@@ -803,6 +804,11 @@ Found with it, open:
   measures a plate a quarter thinner in optical depth than the app's. `benday` had its
   washes tuned on that (re-laid in 1a). Draw with the grain by default, and re-read the
   checks that move.
+- **1f. Roy's print flips ink on the grain** (PLAN 21). The Ben-Day print decides ink or
+  paper per pixel from the finished picture's coverage, so the grain under it flips
+  pixels at every tint's threshold: 8.2% of Roy's edge pixels on the Mac against 0.02%
+  for the plate under the print. A print should read the dye's coverage before the grain
+  (or Roy ship without one); the owner's eye decides which (judging §34).
 
 ### 2. Lacing
 
