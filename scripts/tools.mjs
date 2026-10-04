@@ -366,11 +366,30 @@ try {
           above does), and the drift is scaled to the stroke's span.
         Both windows' drifts are printed signed, so the next failure says which
         way the plate was going.
+
+        And only the window before the stroke is the plate's own, since the
+        seeder is off. Main's deploy of 5505a2a (run 37196539858) went red on
+        a wind that ran 57 wind steps and carried 277.1: its middle moved
+        +0.70% toward B against +0.56% to beat, all of it from the window
+        after (+0.39%), the one before reading -0.00%. Over the five runs
+        with the seeder off that reached this line (#249's three, main's
+        deploy and one PR after it, 4 October) the window before read -0.08%
+        to +0.00%, the plate going nowhere, and the window after +0.24% to
+        +0.39%, toward B on every one: never away, never nothing. A plate drifting on its own goes
+        whichever way it goes, before the stroke as after it; one that drifts
+        only after the wind, and only the way the wind blew, is the wind's
+        liquid still moving once it is let go (with Thin Gap on in every look,
+        #248, the push the stroke itself makes is smaller: +0.70% to +2.31% on
+        the four on main's code, against +0.76% to +4.15% on the eighteen runs
+        of 3-4 October before, so what goes on after it is a larger share). Charged against the wind, the wind was judged
+        against its own push. So the window after is printed, not judged; a
+        wind that pushed nothing starts nothing to go on after it, and has the
+        window before, the plate on its own, to beat.
       */
       const strokeSteps = await page.evaluate(() => window.__toolSnaps.wind1.step - window.__toolSnaps.wind0.step);
       const stepsOk = wIdle.steps > 0 && wIdleAfter.steps > 0 && strokeSteps > 0;
       const idleB = toB(wIdle.cx, wIdle.cy), idleBAfter = toB(wIdleAfter.cx, wIdleAfter.cy);
-      const idleAlong = Math.max(idleB / Math.max(1, wIdle.steps), idleBAfter / Math.max(1, wIdleAfter.steps)) * strokeSteps;
+      const idleAlong = Math.max(0, idleB / Math.max(1, wIdle.steps)) * strokeSteps;
       const pct = (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
       const straw = (steps1?.straw ?? 0) - (steps0?.straw ?? 0), wind = (steps1?.wind ?? 0) - (steps0?.wind ?? 0);
       const carried = (steps1?.carried ?? 0) - (steps0?.carried ?? 0);
@@ -395,7 +414,7 @@ try {
         `${Number.isFinite(strawFirst) ? strawFirst : 'no count of'} straw step(s) before the stroke's first move`);
       check('and pushes the colour along', stepsOk && wa.total > 20 && wAlong > 0.002 + idleAlong,
         !stepsOk ? `the plate did not step through every window (${wIdle.steps}, ${strokeSteps}, ${wIdleAfter.steps} steps)`
-          : `centre of mass moved ${pct(wAlong)} of the plate toward where the stroke went over ${strokeSteps} steps, against ${pct(idleB)} over ${wIdle.steps} before and ${pct(idleBAfter)} over ${wIdleAfter.steps} after left alone (${pct(idleAlong)} at the faster rate toward it over the stroke's steps), from a pool of ${wa.total.toFixed(0)}`);
+          : `centre of mass moved ${pct(wAlong)} of the plate toward where the stroke went over ${strokeSteps} steps, against ${pct(idleB)} over ${wIdle.steps} left alone before (${pct(idleAlong)} toward it at that rate over the stroke's steps); ${pct(idleBAfter)} over ${wIdleAfter.steps} after it, the wind's liquid going on (printed, not judged); from a pool of ${wa.total.toFixed(0)}`);
       const lowIdle = Math.min(wIdle.total, wIdleAfter.total);
       check('and keeps it rather than erasing it', wa.total > 20 && (wb.total - wa.total) - lowIdle > -(0.1 * wa.total + 5),
         `${wa.total.toFixed(0)} → ${wb.total.toFixed(0)}, against ${wIdle.total >= 0 ? '+' : ''}${wIdle.total.toFixed(0)} before and ${wIdleAfter.total >= 0 ? '+' : ''}${wIdleAfter.total.toFixed(0)} after with the plate left alone as long; ${straw} straw step(s) in the stroke`);

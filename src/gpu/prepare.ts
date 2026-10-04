@@ -88,7 +88,7 @@ export interface Prepared {
   ms: number;
   /** Whether it stopped waiting at the timeout. */
   timedOut: boolean;
-  /** What it asked for, by the ledger's `scope/name`. */
+  /** What it asked for, by the ledger's `scope/name`, in the order it asked (any it never reached last). */
   keys: string[];
   /**
    * Each build as it went: its key, and the stretch of the opening's wall
@@ -192,8 +192,38 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   const times: Prepared['builds'] = [];
   const raw: Prepared['raw'] = [];
   // Each lane takes the next build in the list when its last one settles, so
-  // the order they are asked in is the list's, as it was with one.
-  let next = 0;
+  // the order they are asked in is the list's, as it was with one, but for
+  // the one render pipeline at a time (`renderBusy`, below).
+  const queue = builds.slice();
+  const asked: string[] = [];
+  /*
+    One render pipeline compiling at a time, the other lanes taking the
+    compute kernels behind it in the meantime.
+
+    What was reported: main's deploy of 5505a2a (run 37196539858) went red
+    on startup 4b, the page's thread held from outside it for 4.98 s from
+    0.96 s against a 4.5 s cap. What was measured, over the open shard's 30
+    runs of 3-4 October: the hold begins at 0.92 to 1.07 s on every
+    opening, before #249 and after (Chromium readying the page's GPU), and
+    lasts until the GPU process is free. Before #249 the first thing asked
+    was a compute kernel, and the hold ran 1.54 to 3.50 s. #249 asked for
+    the render pipelines first, so three of them (the display, derive and
+    the air's splat) compiled at once from about 0.5 s, and by their times
+    they did not run beside each other but queued in the GPU process: each
+    took 5.22 to 5.24 s on the red run, where the display alone had taken 1.03 to 2.49 s
+    on every run before #249 and derive a few tenths. Chromium's hold
+    waited behind them, 1.92 to 4.98 s on the seven runs since. So three
+    render compiles at once bought nothing (they were served one after
+    another anyway) and held the page for all three.
+    The display is still asked for first, as #249 chose, for the reason it
+    gave: it is the one compile of seconds, and asked last it ran alone
+    while the other lanes stood idle.
+  */
+  let renderBusy: Promise<void> | null = null;
+  const take = (): Prep | undefined => {
+    const i = renderBusy ? queue.findIndex((b) => b.kind !== 'render') : 0;
+    return i < 0 ? undefined : queue.splice(i, 1)[0];
+  };
   /*
     What each build is charged in `builds`: the opening's wall time from the
     later of its own ask and the last build to settle, to its own settle. One
@@ -207,14 +237,19 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   */
   let lastSettled = t0;
   const lane = async () => {
-    while (next < builds.length && !gone && !timedOut) {
+    while (queue.length && !gone && !timedOut) {
       const left = t0 + PREPARE_TIMEOUT_MS - performance.now();
       if (left <= 0) { timedOut = true; break; }
-      const prep = builds[next++];
+      const prep = take();
+      // Only render pipelines are left and one is compiling: wait for it.
+      if (!prep) { await renderBusy; continue; }
+      asked.push(prep.key);
       const b0 = performance.now();
       const stamps: BuildTimes = {};
       const built = prep.build(stamps);
-      const settled = await within(built.then(() => undefined), left);
+      const waited = within(built.then(() => undefined), left);
+      if (prep.kind === 'render') renderBusy = waited.then(() => { renderBusy = null; });
+      const settled = await waited;
       const now = performance.now();
       const from = Math.max(b0, lastSettled);
       lastSettled = now;
@@ -241,7 +276,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
-    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: builds.map((b) => b.key), builds: times, raw, useWait,
+    at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: [...asked, ...queue.map((b) => b.key)], builds: times, raw, useWait,
   };
   prepareLog.push(done);
   return done;
@@ -281,6 +316,11 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     kernel moves one field, and the slowest compute in any run read was
     0.44 s. Sorted, not reordered by hand, so a new render pipeline in any
     owner's list takes its place without anyone remembering this.
+
+    First in the list, not all at once: `buildInTurn` compiles one render
+    pipeline at a time and gives the other lanes the kernels behind it (why
+    there), so the display goes first and the other render pipelines follow
+    it one by one while the kernels run beside them.
   */
   const ahead = builds.filter((b) => !b.later).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'render' ? -1 : 1));
   const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES);
