@@ -24,7 +24,7 @@
 import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup, type Prep } from './kit';
 import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
-import { spikesOnAxis } from './wgsl/spikes';
+import { SPIKE_ONSET, fieldOnAxis, spikesOnAxis } from './wgsl/spikes';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
@@ -35,6 +35,7 @@ import { pressShare } from '../lib/pressRing';
 import { DISH_GAP_RANGE, OIL_NU, dragSeconds } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
+import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 
 /*
   How many bubbles the air field has room for.
@@ -192,31 +193,34 @@ const MAZE_UNIFORM = 0.45;
   the pool packed round under the magnet, the one round blob that was
   reported, and the domes need the liquid to be able to spread out between
   them. The maze's flow at twice: it is what carries the liquid into the
-  domes and out of the valleys (mazeForce, from μ, which now has the
-  spikes' wells in it); at the maze's own gain the pool had barely begun to
-  part after four seconds. Both were chosen by rendering the lab's Magnet
-  Garden with the magnet held, pull 1 and 0.5, flow 1, 2 and 4: at pull 1
-  the domes stayed packed in one raspberry, and at four times the flow the
-  pool thinned to grey, the plate past half full falling from 8.6% to 7.3%
-  in five seconds on 384². Without a maze field (the Magnet on Classic,
-  which pours ferrofluid to gather) the pull stays whole: gathering along
-  the hand is what `npm run magnet` holds that tool to, and the domes were
-  only tuned on the ferrofluid looks. SPIKE_RELAX: see the phase stage.
+  domes and out of the valleys (mazeForce, from μ); at the maze's own gain
+  the pool had barely begun to part after four seconds. Both were chosen by
+  rendering the lab's Magnet Garden with the magnet held, pull 1 and 0.5,
+  flow 1, 2 and 4: at pull 1 the domes stayed packed in one raspberry, and
+  at four times the flow the pool thinned to grey, the plate past half full
+  falling from 8.6% to 7.3% in five seconds on 384². Without a maze field
+  (the Magnet on Classic, which pours ferrofluid to gather) the pull stays
+  whole: gathering along the hand is what `npm run magnet` holds that tool
+  to, and the domes were only tuned on the ferrofluid looks.
 
-  The half is a tuning, not physics: a magnet's pull on a ferrofluid does
-  not weaken because peaks have formed. It stands in for what the model
-  lacks, a layer that can stand taller than full: a real Rosensweig peak
+  The half was a tuning, not physics: a magnet's pull on a ferrofluid does
+  not weaken because peaks have formed. It stood in for what the model
+  lacked, a layer that can stand taller than full: a real Rosensweig peak
   rises out of the layer and draws the liquid from the valleys into it,
-  while ours is capped at full, so a pool pulled together can only spread
-  sideways and the domes stand shoulder to shoulder, the gaps between them
-  16% of the plate near the magnet (PLAN.md §9f, `npm run domes`). A pull
-  eased further while the hand was held still opened them to 41% and kept
-  a dragged pool following, but it was a second tuning on the first and
-  was dropped; the domes standing up is PLAN.md §9t.
+  while the plate's was capped at full, so a pool pulled together could
+  only spread sideways and the domes stood shoulder to shoulder, the gaps
+  between them 16% of the plate near the magnet (PLAN.md §9f, `npm run
+  domes`). That layer is now there (PLAN §9t, src/gpu/standing.ts), and
+  both these act only past its window: under it the film moves the layer
+  and the plate's pull, maze flow and advection step aside (STAND_ASIDE).
+  What is left of them is the ring between the window (0.083 of the plate
+  from the magnet on 384², fading out by 0.125) and the spikes' reach
+  (0.155), where they still carry the pool's edge in and the fingers out
+  (9i), and the values are the ones those were judged with. Whether that
+  ring wants them now is PLAN 9t's question for a look on the Mac.
 */
 const SPIKE_PULL = 0.5;
 const SPIKE_FLOW = 2;
-const SPIKE_RELAX = 16;
 /*
   Past the spikes, fingers (PLAN.md §9i, `npm run fingers`). A pool bigger
   than the spikes' reach stayed round past them: the maze's repulsion was
@@ -589,6 +593,22 @@ export class WebGPUFluid {
   private psi: PingPong | null = null;
   /** Its chemical potential (phaseMu), kept for the next step's maze force. */
   private phaseMuT: GPUTexture | null = null;
+  /*
+    The ferrofluid standing up under a close magnet (standing.ts, PLAN §9t):
+    the film, made the first time a magnet is that close, and the window the
+    plate's own passes step aside by (zero wherever no film runs; standOn
+    says whether the last step wrote one, to clear it once when it stops).
+  */
+  private film: StandingFilm | null = null;
+  private stand: GPUTexture | null = null;
+  private standOn = false;
+  private filmHeld = false;
+  /**
+    The steps the film has run in, for checks (`npm run standing`): a check
+    that a layer stays flat, or lies back down, passes as well with the film
+    never running, because the plate's own cap at full holds a pool flat.
+  */
+  filmSteps = 0;
   /**
    * The gap the ferrofluid last moved in, a cell at a time, so a step can
    * tell how far the glass closed on it (phaseAdvect, Thin Gap). Not primed
@@ -939,7 +959,7 @@ export class WebGPUFluid {
     if (!group) {
       const gap = this.ensurePhaseGap();
       group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, this.velForced, this.phase.write, this.press, this.squeeze.read, gap,
-        thin ? this.hsP! : gap, thin ? this.hsMob! : gap]);
+        thin ? this.hsP! : gap, thin ? this.hsMob! : gap, this.ensureStand()]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -1000,6 +1020,7 @@ export class WebGPUFluid {
 
   /** Wipe the plate: no dye, no motion, the gap at rest. */
   clear(): void {
+    this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
     // The sim buffer only needs its grid sizes for a fill.
@@ -1256,6 +1277,28 @@ export class WebGPUFluid {
     */
     const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
     const spikes = spikeAmt > 0;
+    /*
+      And whether the layer stands up under them (standing.ts): each magnet
+      past the onset on its own axis gets a patch of film, the hand's and a
+      phone's other fingers (at the hand's height and strength, as writeSim
+      gives them), once the film's kernels are built. Once on, it stays on
+      as the field is turned down until it is under FILM_FROM of the onset,
+      so the film lowers the domes it raised (standing.ts, FILM_FROM). Not
+      started below the onset: a
+      look's own magnet (Magnet Garden's is at 0.14, the onset 0.18) keeps
+      its maze, which the film does not model.
+    */
+    const onAxis = this.phaseLive && p.magnetStrength > 0.0001 ? fieldOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    if (spikes) this.filmHeld = true;
+    else if (onAxis < FILM_FROM * SPIKE_ONSET) this.filmHeld = false;
+    const filmMags: FilmMagnet[] = [];
+    if (this.filmHeld) {
+      filmMags.push({ x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength });
+      for (const m of (p.extraMagnets ?? []).slice(0, 3)) filmMags.push({ x: m.x, y: m.y, height: p.magnetHeight, strength: p.magnetStrength });
+    }
+    if (filmMags.length && !this.film) this.film = new StandingFilm(this.device, this.pipelines, this.disposer, this.N);
+    const filmOn = filmMags.length > 0 && !!this.film?.isReady();
+    if (filmOn) this.filmSteps++;
     const field = maze > 0.001 ? Math.max(maze, spikeAmt) : 0;
     // Never under twelve cells a period: the edge is three or four wide, and
     // on 192² (8.6 cells) the stripes washed out to grey. Maze Detail divides
@@ -1462,7 +1505,7 @@ export class WebGPUFluid {
         // rings round it rather than a maze (the gradient orders the
         // stripes across it). Still enough that the maze follows the hand.
         const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
-        this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read],
+        this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read, this.ensureStand()],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
             Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
         this.vel.swap();
@@ -1473,7 +1516,7 @@ export class WebGPUFluid {
     if (mazeFlow) {
       stage('maze force', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
-        this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!],
+        this.run(pass, 'mazeForce', this.vel.write, [this.vel.read, this.phase.read, this.phaseMuT!, this.ensureStand()],
           this.arg('maze force', [MAZE_GAIN * (1 + (SPIKE_FLOW - 1) * spikeAmt) * (N / 256) * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
         this.vel.swap();
       });
@@ -1800,6 +1843,14 @@ export class WebGPUFluid {
       Skipped entirely on a plate with no phase on it, which is most looks.
     */
     stage('phase', (pass) => {
+      /*
+        The window first: the advection's grid filter, the relax and the
+        separation below all step aside by it.
+      */
+      const stand = this.ensureStand();
+      if (filmOn) this.film!.window(pass, filmMags, stand);
+      else if (this.standOn) this.run(pass, 'fill', stand, [], this.arg('stand clear', [0, 0, 0, 0, N, N, 0, 0]));
+      this.standOn = filmOn;
       // With a magnet on, the flow near it can carry the ferrofluid further
       // than one flux step may (0.45 of a cell): so in substeps.
       // And under Thin Gap, where a press moves the liquid as fast as the
@@ -1825,12 +1876,12 @@ export class WebGPUFluid {
       for (let k = 0; k < subs; k++) {
         this.runPhaseAdvect(pass, adv(k));
         this.phase.swap();
-        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read], grid);
+        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read, stand], grid);
         this.phase.swap();
       }
       this.runPhaseGapSeen(pass);
       for (let k = 0; k < PHASE_RELAX; k++) {
-        this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
+        this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read, stand], none);
         this.phase.swap();
       }
       /*
@@ -1862,23 +1913,19 @@ export class WebGPUFluid {
         0.006 + 0.012 * Math.max(0, Math.min(1, p.phaseSharp ?? 0.35)), field > 0.001 ? mazeK.alpha * (0.5 + 0.5 * field) : 0, MAZE_UNIFORM * maze / Math.max(field, 1e-6), p.time ?? 0]);
       for (let k = 0; k < CH_SUBSTEPS; k++) {
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
-        this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu], args);
+        this.run(pass, 'phaseCH', this.phase.write, [this.phase.read, mu, stand], args);
         this.phase.swap();
       }
       /*
-        Under spikes, the pressure again after the separation. The spikes'
-        wells draw the liquid into each dome by the Cahn–Hilliard flux, and
-        μ reads the phase clamped to full, so nothing in it pushes back once
-        a dome is past full. Measured (npm run spikes, the fullest cell):
-        1.17 with no passes here, 1.04 with six, 1.008 with sixteen. Run
-        between the substeps instead, the same passes spread each dome back
-        into its valleys before it had parted, so they run after.
+        The layer standing up round each magnet close enough (standing.ts):
+        after the separation, which has stepped aside under it, so what the
+        film leaves is what the plate draws and the next step carries.
       */
-      if (spikes) {
-        for (let j = 0; j < SPIKE_RELAX; j++) {
-          this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read], none);
+      if (filmOn) {
+        filmMags.forEach((m, k) => {
+          this.film!.step(pass, k, m, p.magnetSeconds ?? 1 / 60, this.phase.read, this.phase.write);
           this.phase.swap();
-        }
+        });
       }
       if (maze > 0.001 || spikes) {
         // Once more on where the phase ended, for the next step's force.
@@ -2114,6 +2161,7 @@ export class WebGPUFluid {
    */
   clearPhase(): void {
     this.phaseLive = false;
+    this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear phase' });
     const pass = enc.beginComputePass({ label: 'clear phase' });
     for (const t of [this.phase.a, this.phase.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
@@ -2783,6 +2831,37 @@ export class WebGPUFluid {
       })();
     }
     return this.hsBuilding;
+  }
+
+  /**
+   * A cleared plate starts the standing layer afresh: no magnet holding it
+   * on, and the noise drawn from its first step again, so a plate cleared
+   * and run again is the same run (the seeded renders, `npm run seed`).
+   */
+  private resetFilm(): void {
+    this.filmHeld = false;
+    this.film?.reset();
+  }
+
+  /**
+   * The film's kernels built now, as prepareThinGap builds the thin gap's:
+   * for checks, which measure the film from a magnet's first step. The app
+   * builds them behind the show, the first time a magnet is close enough.
+   */
+  prepareFilm(): Promise<void> {
+    if (!this.film) this.film = new StandingFilm(this.device, this.pipelines, this.disposer, this.N);
+    return this.film.prepare();
+  }
+
+  /** The standing layer's window (see standOn), made once, zero until a film writes it. */
+  private ensureStand(): GPUTexture {
+    if (!this.stand) {
+      this.stand = this.disposer.track(this.device.createTexture({
+        label: 'stand', size: [this.N, this.N], format: R32,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    }
+    return this.stand;
   }
 
   /** The thin-gap solver's storage, made once; returns the velocity snapshot. */
