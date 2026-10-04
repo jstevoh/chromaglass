@@ -2063,6 +2063,11 @@ export const PRESETS: Preset[] = [
         Nothing that shades: no gloss, no hot-spot, no second lamp, no
         bubbles or beads, because a print has no light in it.
       */
+      // Flat inks: a comic is printed in solid colour, so the depth ramp
+      // every other look now draws (Transmission 1, PLAN 18l) is held at the
+      // old half, and the print's dots stay the screen's (npm run benday:
+      // 88% of the dots held under a turn at 1, against its 90%).
+      transmission: 0.5,
       benDay: 1,
       globalSpeed: 0.0105,
       surge: 0.45,
