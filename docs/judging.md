@@ -799,10 +799,10 @@ through the dye, and the back plate is a second filter in the light. It turns th
 picture over, so it is a choice per look, not a fix: the pale lace of the reference
 still (PLAN 20) can only show on it. Please say:
 
-- ~~which looks you want on the lamp ground~~ **answered by rule (#262, PLAN 18b-1)**: ten
+- ~~which looks you want on the lamp ground~~ **answered by rule (#262, PLAN 18b-1)**: eleven
   looks ship on the lamp (Timbre Shifter, Microscopic Chaos, Poster 1969, Fillmore East
   1969, Crowd Plate, Milk Marbling, Red Cabbage, Chemical Clock, Home Movie, Clock
-  Glass); the gallery page linked from #262 has every look on both grounds with the
+  Glass, and Sensual Laboratory, which you found washed out on black); the gallery page linked from #262 has every look on both grounds with the
   reason for its pick. Say which you would overrule (Save Look keeps your choice); the
   dishes too dark on the lamp with their black-ground dye are PLAN 18b-8;
 - whether the fade between the two (a MIDI fader on Lamp Ground) is worth playing,

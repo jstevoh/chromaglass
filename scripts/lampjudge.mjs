@@ -81,6 +81,20 @@ const GLARE = 0.45, INK = 0.30, LIT = 0.20, KEEP = 0.6, SAME = 0.06;
 /** What each look is going for: 'dish' (liquid in a dish; to the lamp if it
  *  reads), 'light' (draws light itself) or 'picture' (a photograph or print
  *  with its own ground), and the description's words that say so. */
+/** Where the owner has looked and overruled the rule: the ground, and their
+ *  words. The rule's own verdict is still printed beside it, so a later
+ *  change to the rule shows whether it now agrees. */
+export const OWNER = {
+  // 2026-10-04, on the look as it shipped on black: "sensual laboratory
+  // looks washed out by the light". Its Multiply blend already lays the dye
+  // over a cream platen at Lamp Ground 0, as grey paint on cream; on the lamp
+  // the graphite is a filter and reads dark against the platen (the gallery's
+  // pair at 30 s). The rule kept it on black on the colour gates (0% lit
+  // colour on either ground: a graphite look has none to keep) and the bare
+  // platen (70%), which for reactions on a platen is the look.
+  'sensual-laboratory': [1, 'the owner found it washed out on black ("looks washed out by the light"); on the lamp its graphite reads dark on the platen'],
+};
+
 export const INTENT = {
   classic: ['dish', '"the 1960s overhead projector at its most meditative"'],
   galaxy: ['light', '"spiral arms of starlight swirl through the void"'],
@@ -159,7 +173,11 @@ export const verdictOf = (id, name, pairs) => {
   else if (worst.change < SAME) { ground = 0; reason = `A dish (${why}), but it draws the same on both grounds (at one moment the pictures differ by ${(worst.change * 100).toFixed(1)}% on average): its own dye already draws the lamp's white, so it keeps what it ships with.`; }
   else if (fails.length) { ground = 0; reason = `A dish (${why}), but on the lamp ${fails.join('; ')}.`; }
   else { ground = 1; reason = `A dish on a lamp (${why}), and it reads there: ${Math.round(worst.lit * 100)}% lit colour, ${Math.round(worst.glare * 100)}% bare lamp, ${Math.round(worst.ink * 100)}% black at worst.`; }
-  return { id, name, kind, ground, reason, fails, worst, pairs };
+  if (OWNER[id] && whole) {
+    const [g, words] = OWNER[id];
+    return { id, name, kind, ground: g, reason: `The owner's pick: ${words}. (The rule alone: ${ground ? 'the lamp' : 'black'}. ${reason})`, rule: ground, fails, worst, pairs };
+  }
+  return { id, name, kind, ground, reason, rule: ground, fails, worst, pairs };
 };
 
 /** Decode the gallery's two pictures of each moment in a page and read them

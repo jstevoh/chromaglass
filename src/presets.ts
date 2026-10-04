@@ -770,6 +770,8 @@ export const PRESETS: Preset[] = [
     name: 'Sensual Laboratory',
     description: 'Mark Boyle\u2019s London: reactions on the platen instead of oil in a dish. Coral and cells grow from the plate in graphite and rust, then the flow carries them off.',
     settings: {
+      // On the lamp: the owner found it washed out on black (PLAN 18b-1, `npm run lampjudge`'s OWNER).
+      lampGround: 1,
       globalSpeed: 0.0126,
       surge: 0.3,
       layerCount: 1,
