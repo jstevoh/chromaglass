@@ -106,7 +106,7 @@ is the plate or the stroke; then the advection fix below, which is what makes th
 check green for good. Laying the pool by solver steps rather than milliseconds would
 make it one size every run, but only after the fault is fixed, or it hides it.
 
-*Found 2026-09-27, **fixed in #225** (2026-10-03; every mirror line green on the Mac):* **the mirror check's "and nowhere else" goes red at
+*Found 2026-09-27, **fixed in #225 and #238** (2026-10-03/04; #238's first Mac run, with silence chosen, read 0.4, 0.4 and 3.7 past the drift against allowances of 10.7, 27.1 and 12.8):* **the mirror check's "and nowhere else" goes red at
 exactly its limit on changes that cannot move a pixel.** It was the plate, not the
 check. Six rounds of measurement on the Mac runner found the calm Classic plate
 starting a single plate-wide flow out from the middle (0.63–0.88 of it radial, mean
@@ -125,7 +125,13 @@ floor. The projection's right-hand side is now made zero-mean exactly on the GPU
 press pushed out. And the memory takes over only once a press has gone, never past
 the floor (`squeezeUpdate`). `npm run heldpress` (lab, Classic's glass): a held
 press's far plate once steady 3.28e-2 on main, as fast as while it closed, half of
-it radial; 4.6e-5 after. The original report follows.
+it radial; 4.6e-5 after. It went red again after #225 (#218, #230, #237 and main's
+997c71f deploy, all the same shape: drops 1 and 2 clean, then the middle moving by
+itself). #238 found the bubbles were the simulated band's, started by the check's own
+first drop, and that the air's standing source in `divergence` poured liquid out of
+every still bubble with the whole plate as the sink (the item on a still bubble
+below). It takes the term out and has the check choose silence and assert that no
+band played. The original report follows.
  #191 (PLAN.md only) read
 "Classic, calm, layer 1 turned a quarter: and nowhere else" at 11.1 past drift
 against an allowance of 11.1, at the tool's mirror through the centre
@@ -159,23 +165,38 @@ under a strong flow (its divergence by central differences is not the projection
 Both renders also show a vertical seam down the middle of the plate, on main as well:
 its own item, unmeasured.
 
-*Found 2026-10-03 (#225), not yet done:* **a still bubble presses the glass.** Every
+*Found 2026-10-03 (#225), **half done in #238** (the air's standing source is gone):* **a still bubble presses the glass.** Every
 step, each bubble lays a standing press of 0.0035 over 0.85 of its radius
 (`LiquidVisualizer`, "A bubble is air between the plates"), which holds the gap
-under it at the floor so the dye is pumped out from under it, and the air's own
-standing term in `divergence` does the same with a source where the air is and a
-sink everywhere else. Both are shortcuts that imitate how a trapped bubble looks
-rather than simulate it: in a real cell a bubble spans the gap and displaces the
-liquid only while it grows, shrinks or moves, and a still one pushes nothing, while
-this keeps a flow going for as long as it sits there. #225 made the solve balance
-them exactly, so they no longer move the whole plate, but they still stir the
-liquid round every bubble. And the press's memory (`gapMemory`) still pushes
+under it at the floor so the dye is pumped out from under it. The air's own
+standing term in `divergence` did the same with a source where the air is and a
+sink everywhere else, and that half is what still moved the whole plate after
+#225: balancing a source with a uniform sink is exactly a flow out over the whole
+plate, for as long as the bubble lasts. On the Mac, four bubbles near the middle of
+a calm Classic plate took its mean speed from 1.3 to 40–138 (thousandths), 0.70 of
+it outward; in the lab (`npm run heldpress`, trapped bubbles) the far plate held at
+4.57e-3, 0.79 of it out from them, and 1.83e-5 with the term taken out (#238). Both
+were shortcuts that imitate how a trapped bubble looks rather than simulate it: in
+a real cell a bubble spans the gap and displaces the liquid only while it grows,
+shrinks or moves, and a still one pushes nothing. What is left is the press, which
+#225 balanced and which reaches the floor and stops (heldpress), but which still
+stirs the liquid round every bubble. And the press's memory (`gapMemory`) still pushes
 liquid after a press without moving the gap, so a release's remembered squeeze is
 liquid from nowhere: a real squeeze film is overdamped and pushes out exactly what
 its gap loses, as fast as the viscous film lets it close. Replace both with the air excluding the liquid by
 itself (the bubble as a region the flow goes round: a no-flux boundary, or the
 Hele-Shaw permeability going to zero inside it), and measure it with `npm run pops`,
 `npm run straw` and `npm run heldpress`, which should then need no press to hold.
+
+*Found 2026-10-04 (#238), not yet done, the owner's call:* **the simulated band's
+kicks release bubbles whatever Audio Impact says.** The first click on a browser that
+never chose a sound source starts the band (`App.tsx`, the first visit's wake), and
+from then on a kick may release bubbles into the densest dye near the middle of the
+plate (`LiquidVisualizer`, "A few bubbles at a time"). Audio Impact 0 and every
+mapping set to none leave that on, which is how the drop check's calm plate came to
+have bubbles at all; the check now chooses silence (`scripts/mirror.mjs`). Whether
+Audio Impact 0 should mean the music touches nothing, bubbles included, is a look
+question: gating them would change only plates set to 0.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -1904,9 +1925,10 @@ while this batch's plan was going in (#177), and no cause is known yet:
   a tenth of 300. It asks the gain against what was there, on a hand path drawn at
   random each run, so a run whose best spot starts full reads low; worth reading
   the gain's spread over the last runs before touching its tenth.
-- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225**, green on the Mac: the
+- `mirror.mjs`, "Classic, calm, layer 1: and nowhere else" (**fixed in #225 and #238**: the
   region starting to move by itself was the bubbles' press leaking a net source into
-  the pressure solve; see the mirror item near the top): on #189 (the Mixer's gel
+  the pressure solve, then the air's standing source, under bubbles the simulated band
+  released after the check's first drop; see the mirror item near the top): on #189 (the Mixer's gel
   and lumia rows, whose default picture renders the same to the byte as main's), 16.3
   past its drift at the hand's left/right mirror cell against an allowance of 16.1.
   The cell's drift climbed drop by drop (3.2, 5.9, 18.3, 49.5) and its change with it

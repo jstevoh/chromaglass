@@ -78,23 +78,33 @@ const SCENARIOS = [
   The printed-only plates take a minute of CI between them and can fail
   nothing, so they run when asked for (MIRROR_ALL=1) rather than on every push.
 */
-const DIAG = [
-  { name: 'DIAG Classic, calm, layer 1, the band on the first touch', look: 'classic', layer: 0, rotation: [0, 0], settings: { layerCount: 2 }, judge: false, band: true },
-  { name: 'DIAG Classic, calm, layer 1, the band, no bubbles', look: 'classic', layer: 0, rotation: [0, 0], settings: { layerCount: 2, bubbles: 0 }, judge: false, band: true },
-];
-const RUN = [...(process.env.MIRROR_ALL ? SCENARIOS : SCENARIOS.filter((sc) => sc.judge !== false)), ...DIAG];
+const RUN = process.env.MIRROR_ALL ? SCENARIOS : SCENARIOS.filter((sc) => sc.judge !== false);
 
 const browser = await launchChromium(chromium);
 try {
   for (const sc of RUN) {
     const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-    await page.addInitScript((band) => {
+    /*
+      And a chosen silence, before the page loads. The first drop is the
+      page's first pointerdown, and on a browser that has never chosen a
+      sound source that gesture starts the simulated band (App.tsx, the
+      first visit's wake). CALM holds the music's own reactions still, but
+      the band's kicks release bubbles into the densest dye near the middle
+      of the plate whatever Audio Impact says, and from the second drop on
+      the middle of the preview moved by itself. On the Mac, with the band
+      let start: 29 kicks over the four drops, four bubbles near the middle
+      from the second, and the middle cells' drift 1.7 1.6 16.3 12.8, against
+      cells that sat at their drift with the band off. "None" written here
+      is a choice made, so the wake leaves it alone. The printed-only plates
+      are photographed silent too, the reported one included.
+    */
+    await page.addInitScript(() => {
       try {
         localStorage.setItem('chromaglass-desk-mode', 'design');
-        if (!band) localStorage.setItem('chromaglass-audio-source', 'none');
+        localStorage.setItem('chromaglass-audio-source', 'none');
       } catch { /* none */ }
-    }, !!sc.band);
+    });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${sc.look}${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(8000);
     await page.evaluate(({ sc, CALM }) => {
@@ -142,43 +152,8 @@ try {
     // Each drop's own maps, for the median below.
     const driftReps = [], changeReps = [];
     let hand = null;
-    // DIAG: where the preview's corners are on the plate, then what moves.
-    await page.mouse.move(hole.x + 1, hole.y + 1);
-    await page.waitForTimeout(150);
-    const c0 = await page.evaluate(() => window.chromaglassDebug?.().pointer?.());
-    await page.mouse.move(hole.x + hole.width - 1, hole.y + hole.height - 1);
-    await page.waitForTimeout(150);
-    const c1 = await page.evaluate(() => window.chromaglassDebug?.().pointer?.());
-    console.log(`     DIAG ${sc.name}: preview corners on the plate ${JSON.stringify(c0)} ${JSON.stringify(c1)}`);
-    const probe = (tag) => page.evaluate(({ tag, c0, c1, G }) => {
-      const d = window.chromaglassDebug?.();
-      if (!c0 || !c1 || c0.x === c1.x || c0.y === c1.y) { c0 = { x: 0, y: 0 }; c1 = { x: d?.gridSize ?? 1, y: d?.gridSize ?? 1 }; }
-      const f = d?.fluids?.[0];
-      const N = d?.gridSize ?? 0;
-      const sp = Array.from({ length: G }, () => Array(G).fill(0)), cnt = Array.from({ length: G }, () => Array(G).fill(0));
-      let rad = 0, tot = 0;
-      if (f && N) {
-        const vx = f.readVx, vy = f.readVy;
-        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-          const i = x + y * N, u = vx[i], v = vy[i];
-          const sp2 = Math.hypot(u, v); tot += sp2;
-          const rx = x - N / 2, ry = y - N / 2, rl = Math.hypot(rx, ry) || 1;
-          rad += (u * rx + v * ry) / rl;
-          const fx = (x - c0.x) / (c1.x - c0.x), fy = (y - c0.y) / (c1.y - c0.y);
-          if (fx < 0 || fx >= 1 || fy < 0 || fy >= 1) continue;
-          const gx = Math.floor(fx * G), gy = Math.floor(fy * G);
-          sp[gy][gx] += sp2; cnt[gy][gx]++;
-        }
-      }
-      const map = sp.map((r, y) => r.map((v, x) => (1000 * v / Math.max(1, cnt[y][x])).toFixed(1)).join(' ')).join(' | ');
-      const bs = (d?.bubbles?.bubbles ?? []).map((b) => {
-        const fx = (b.x - c0.x) / (c1.x - c0.x), fy = (b.y - c0.y) / (c1.y - c0.y);
-        return `${fx.toFixed(2)},${fy.toFixed(2)} r${b.r.toFixed(1)} a${b.age.toFixed(1)}`;
-      });
-      return `     DIAG ${tag}: speed x1000 by cell ${map}; plate mean ${(1000 * tot / Math.max(1, N * N)).toFixed(2)}, outward ${(rad / Math.max(1e-9, tot)).toFixed(2)}; bubbles ${bs.length} [${bs.join('; ')}]; beads ${d?.beads}; kicks ${d?.kicks?.()}; heard ${d?.heardKicks?.()}`;
-    }, { tag, c0, c1, G });
     for (let rep = 0; rep < REPS; rep++) {
-      const a = await shot(); console.log(await probe(`drop ${rep + 1} a`)); await page.waitForTimeout(1300); const b = await shot(); console.log(await probe(`drop ${rep + 1} b`));
+      const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
       await page.mouse.move(hx, hy);
       await page.mouse.down();
       if (!hand) hand = await page.evaluate(() => window.chromaglassDebug?.().pointer?.());
@@ -186,9 +161,8 @@ try {
       await page.mouse.up();
       await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
       await page.waitForTimeout(500);
-      const c = await shot(); console.log(await probe(`drop ${rep + 1} c`));
+      const c = await shot();
       const d = await grid(a, b), ch = await grid(b, c);
-      console.log(`     DIAG drop ${rep + 1} change ${ch.map((r) => r.map((v) => v.toFixed(0)).join(' ')).join(' | ')}; drift ${d.map((r) => r.map((v) => v.toFixed(0)).join(' ')).join(' | ')}`);
       add(drift, d); add(change, ch); driftReps.push(d); changeReps.push(ch);
       await page.evaluate(() => { window.__shots = {}; });
     }
@@ -275,13 +249,24 @@ try {
     if (sc.judge !== false) check(`${sc.name}: the tool changes the picture where it is used`, here > 3,
       `${here.toFixed(1)} round the hand`);
     if (sc.judge === false) {
-      const heard = await page.evaluate(() => window.chromaglassDebug?.().kicks?.() ?? null);
-      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} past its drift at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}; each drop ${worst.reps}, drift ${worst.dreps}` : 'nothing'}; ${heard} kicks heard)`);
+      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} past its drift at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
       await page.close();
       continue;
     }
-    const kicks = await page.evaluate(() => window.chromaglassDebug?.().kicks?.() ?? null);
-    check(`${sc.name}: the plate hears no music while it is judged`, kicks === 0, `${kicks} kicks heard over the ${REPS} drops`);
+    /*
+      That the plate was silent, asked of the band itself: the band's own
+      hook (window.__band, which App.tsx defines whenever the band starts
+      under ?debug) as well as the kicks the plate and the ear counted. The
+      counts alone can read 0 with the band playing on a page that is not
+      drawing (check-skeptic): the plate counts a kick only in the frame
+      loop. On the Mac, with the band let start, they read 29 and 26.
+    */
+    const music = await page.evaluate(() => {
+      const d = window.chromaglassDebug?.();
+      return { band: typeof window.__band === 'function', kicks: d?.kicks?.() ?? null, heard: d?.heardKicks?.() ?? null };
+    });
+    check(`${sc.name}: the plate hears no music while it is judged`, !music.band && music.kicks === 0 && music.heard === 0,
+      `${music.band ? 'the band was started' : 'no band started'}, ${music.kicks} kicks reached the plate and the ear heard ${music.heard}, over the ${REPS} drops`);
     check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
       worst ? `most away from the hand ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'nothing');
     await page.close();
