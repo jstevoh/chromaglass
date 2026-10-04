@@ -1606,7 +1606,8 @@ own when few branches are editing this file (every open branch touches it).
 ## 12. ChromaGlass in the App Store and Google Play
 
 Asked on 2026-09-27: "What would it take to create an Apple iPhone app and put it in
-the store?", then "expand on this idea with the Android store". Nothing is built. The
+the store?", then "expand on this idea with the Android store". Steps 1, 4 and 4a are
+built; the running order has where each step stands. The
 full iPhone write-up, with a table of every browser feature the app leans on, is in
 the project files (`iphone-app/iphone-app-plan.md`); this is the plan.
 
@@ -1621,7 +1622,7 @@ web views differ in what matters here:
 | Web MIDI | None in WebKit; a CoreMIDI plugin later | Chrome has it, so USB controllers work from day one |
 | Record and Render | A web download does not save in a web view: route to the share sheet or Photos | Chrome downloads as it does now |
 | Updates | A new App Store build each time (guideline 2.5.2: no downloading code that changes the app) | Every deploy to `main` reaches the app at once; the store only sees a new build when the shell changes |
-| Offline | Everything is inside the app | The service worker (`public/sw.js`) already caches the build |
+| Offline | Everything is inside the app | The service worker (`public/sw.js`) caches a file only once it has been fetched; precaching the build is 14h |
 | Account | Apple Developer Program, $99 a year | Google Play Console, $25 once |
 | Tools | Xcode on the Mac | Bubblewrap (JDK and Android SDK), on the Mac or in CI; Android Studio optional |
 
@@ -1728,7 +1729,8 @@ feature ships its phone version is what keeps them whole.
 Asked on 2026-09-27: "Integrate into popular VJ software." It came up alongside
 "have we reached the point where we need to grow beyond the web?" The answer to that
 (project files, `beyond-web/beyond-web.md`) was *not yet for the show itself*.
-Handing video to another app was the one place a page cannot go. Nothing is built.
+Handing video to another app was the one place a page cannot go. Step 1, the Mac app,
+is built (#207); steps 2 to 6 are not.
 
 **What integration means here.** A VJ app (Resolume Arena and Avenue, VDMX,
 TouchDesigner, MadMapper, Millumin, OBS) meets ChromaGlass in four ways, and each one
@@ -1866,8 +1868,8 @@ latency, and quality updates would help us". The code was read for it the same d
 four ways at once (what a frame costs, how late the plate answers, what the wall
 shows, what stops a set), against this plan, `docs/roadmap.md`,
 `docs/stability-plan.md`, `docs/webgpu-plan.md`, `docs/filters-plan.md` and
-`docs/rig-plan.md`, so that nothing below is already written somewhere else. Nothing
-is built. Each item says what the code does now, with where, whether that is read in
+`docs/rig-plan.md`, so that nothing below is already written somewhere else. Items have
+shipped since; the running order says which. Each item says what the code does now, with where, whether that is read in
 the code or inferred from how a browser behaves, and what would measure a fix. The
 order is what a performer or an audience would notice first.
 
@@ -3015,7 +3017,7 @@ the GPU solver, so whether glycerine "crawls" on the real plate is unmeasured. A
 minor, in `performGesture`: a remote Finger is half as strong as the mouse's, and a
 remote Blow never makes a straw bubble.
 
-### 15f. The Comb: marbling's rake, as a tool (proposed 2026-09-28)
+### 15h. The Comb: marbling's rake, as a tool (proposed 2026-09-28)
 
 Marbling is one of this plan's three reference columns (5.6 % of pixels on a hard edge
 and a contrast of 6.5, against our 2.4 % and 0.8), and its structure comes from a rake
@@ -3702,7 +3704,7 @@ Laplace-arc walls. The Airy thin-film table.
 
 Found 2026-09-28 by reading `.github/workflows/`, `scripts/` and the build, and by
 reading 14 recent `Checks` runs and 96 `gallery.yml` runs through the Actions API.
-Nothing is built. The first two cost the most: they are much of why a deploy took 37 to
+19a, 19b and 19h have shipped since (#234, #239). The first two cost the most: they are much of why a deploy took 37 to
 77 minutes on 2026-09-27. (Numbered 19 because 16 and 18 are in flight, in #204 and
 #207.)
 
