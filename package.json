@@ -103,6 +103,7 @@
     "macqueue": "node scripts/macqueue.mjs",
     "physics": "node scripts/physics.mjs",
     "bodies": "node scripts/bodies.mjs",
+    "clockglass": "node scripts/clockglass.mjs",
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",

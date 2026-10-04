@@ -855,6 +855,25 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 
 ---
 
+## 33. Clock Glass and Ferro Paint after their references (PLAN 4a-clock)
+
+- **Clock Glass** now lays a purple water with a dozen bodies of red, amber and cobalt
+  oil scattered over the dish, each with a dark rim, the way a clock-glass dish at the
+  Fillmore looked. Bodies that touch merge and mix their colours, as dyed oils do. Say
+  whether there are enough of them, whether they are too big, and whether the purple
+  should be another water colour. The automation's drops still land any of the dyes
+  anywhere, so over a minute or two watch whether the water keeps one colour or drifts.
+- **Ferro Paint** opens with amber, teal and coral in their own patches instead of
+  one green. They still blur together over a minute as new drops land.
+- **Oil & Water**, and any plate where oil is poured with colour already on it: the
+  oil now keeps the colour that was in it when its bodies are first tracked, instead
+  of letting it run out into the water. If oil you pour onto a coloured plate looks
+  more tinted than before, that is why.
+- Ferro Maze, Magnet Garden and Ferro Paint's maze are unchanged: still coarser than
+  the references, with a brown haze. That is PLAN 9z, its own change.
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real

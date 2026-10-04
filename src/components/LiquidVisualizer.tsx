@@ -6,6 +6,7 @@ import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
+import { clockGlassBodies } from '../lib/oilLay';
 import { phasePour } from '../lib/phasePour';
 import { sizedMagnet } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
@@ -2374,11 +2375,19 @@ class FluidSimulation {
         // A patchwork of the three dyes over the whole plate, touching, so
         // the ferrofluid fingers through colour everywhere and amber meets
         // teal (the references' green) along the seams.
+        //
+        // Each patch a Gaussian a tenth of the plate wide (0.09 S), on a
+        // grid a quarter of the plate apart. The radius was S × 0.15 in
+        // splatBlob's 128-grid units, which it scales by GRID_SCALE again:
+        // 0.225 of the plate, nearly the spacing, so the sixteen patches lay
+        // on top of each other and the plate opened as one mixed green
+        // (the Mac gallery at 12 s and 30 s: a green plate with black
+        // holes, where Colored I and II hold amber, teal and coral apart).
         for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
           const c = col(i + j * 2);
           const x = S * (0.14 + i * 0.24) + Math.sin(j * 1.7 + i) * 4 * k;
           const y = S * (0.14 + j * 0.24) + Math.cos(i * 1.3 + j) * 4 * k;
-          this.splatBlob(x, y, S * 0.15, 2.0, c.r, c.g, c.b);
+          this.splatBlob(x, y, (S * 0.09) / k, 2.6, c.r, c.g, c.b);
         }
         break;
       }
@@ -2397,11 +2406,49 @@ class FluidSimulation {
       }
 
       case 'clock-glass': {
-        // Curved glasses gather the liquid in the middle; seed it there, in
-        // rings, so the dome has something to hold from the first frame.
-        for (let ring = 0; ring < 3; ring++) {
-          const c = col(ring);
-          this.splatBlob(cx, cy, S * (0.3 - ring * 0.09), 2.4, c.r, c.g, c.b);
+        /*
+          A clock-glass dish is coloured water and oil that will not mix
+          (src/lib/oilLay.ts, and why): the water is the first dye, laid wide
+          and deepest in the middle where the bowed glasses hold the most,
+          and bodies of oil are laid over it across the dish, each with one
+          of the other dyes in it. With Oil Bodies on (the look's) each body
+          keeps its colour while it moves, and two only mix where they merge,
+          as two dyed oils do. The oil is laid only where the solver is there
+          to take it; before it is, the colours still land, as spots in the
+          water.
+        */
+        const water = col(0);
+        const bodies = clockGlassBodies(this.rng.float, harmony.length);
+        /*
+          Each cell is oil as far as a body covers it (addMix lays a body
+          flat to its edge; here with a cell of antialiasing), and the dye
+          is laid to match: a
+          body's colour in its oil and nowhere else, the water's in what is
+          left. Laid as Gaussians (splatBlob) the colours did not keep to
+          their liquids: a body's ran out past its oil into a ring in the
+          water, and the water's under it turned each body a mix with the
+          purple (in the lab, amber read as itself over 0.3% of the dish;
+          npm run clockglass). The water is the old wash, a quarter of the
+          plate wide and deepest in the middle.
+        */
+        const sigma = 34 * k, reach = Math.ceil(sigma * 2.6);
+        const g = this.gpu;
+        for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
+        for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
+          const x = Math.floor(cx) + dx, y = Math.floor(cy) + dy;
+          if (x < 1 || x >= S - 1 || y < 1 || y >= S - 1) continue;
+          let oil = 0, mine = -1;
+          bodies.forEach((b, q) => {
+            const d = Math.hypot((x + 0.5) / S - b.x, (y + 0.5) / S - b.y);
+            const c = Math.max(0, Math.min(1, (b.r - d) * S + 0.5));
+            if (c > oil) { oil = c; mine = q; }
+          });
+          const w = Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma));
+          if (w >= 0.01 && oil < 1) this.addDensity(x, y, 1.3 * w * (1 - oil), water.r, water.g, water.b);
+          if (mine >= 0) {
+            const c = col(bodies[mine].dye);
+            this.addDensity(x, y, 2.6 * oil, c.r, c.g, c.b);
+          }
         }
         break;
       }
