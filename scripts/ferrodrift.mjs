@@ -55,6 +55,13 @@ await new Promise(r => setTimeout(r, 2500));
   0.088 → 0.184 with the band, 0.104 → 0.255 with no centre gravity, and the
   ferrofluid's mean distance from the middle growing in every one, which is
   the ring spreading both ways, not drifting in.
+
+  The second, held: on the thin gap the band moved nothing in (the disc
+  0.097 → 0.082 with it, 0.114 → 0.117 in silence), and on the old plate it
+  still did, 0.099 → 0.150 with the mean distance falling 0.310 → 0.298,
+  against 0.107 → 0.098 in silence. So the old plate with no bubbles is
+  asked here, the band's bubbles being the one thing it does there that a
+  held plate keeps.
 */
 const HELD = {
   rotationSpeed: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0, globalSpeed: 0.025,
@@ -62,9 +69,9 @@ const HELD = {
 const VARIANTS = [
   { name: 'held, silence', band: false, held: true, set: {} },
   { name: 'held, band', band: true, held: true, set: {} },
-  { name: 'held, band, no bubbles', band: true, held: true, set: { bubbles: 0 } },
   { name: 'held, silence, old plate', band: false, held: true, set: {}, oldPlate: true },
   { name: 'held, band, old plate', band: true, held: true, set: {}, oldPlate: true },
+  { name: 'held, band, old plate, no bubbles', band: true, held: true, set: { bubbles: 0 }, oldPlate: true },
 ];
 const only = process.env.DRIFT_ONLY ? process.env.DRIFT_ONLY.split(',') : null;
 
