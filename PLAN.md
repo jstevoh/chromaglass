@@ -245,7 +245,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13.5** OSC out and Link,
   **13-port**, **13-intel**, **13-icon**, **13-update** (after signing), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
-  MIDI route written up with 13.4).
+  MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
@@ -303,7 +303,7 @@ Where each batch stands, as of 2026-09-27:
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 7 not started (7, a DAW bridge plugin, added 2026-10-04) |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 8 not started (7, a DAW bridge plugin, and 8, a native renderer core for later, added 2026-10-04) |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
@@ -2080,7 +2080,7 @@ Asked on 2026-09-27: "Integrate into popular VJ software." It came up alongside
 "have we reached the point where we need to grow beyond the web?" The answer to that
 (project files, `beyond-web/beyond-web.md`) was *not yet for the show itself*.
 Handing video to another app was the one place a page cannot go. Step 1, the Mac app,
-is built (#207); steps 2 to 7 are not.
+is built (#207); steps 2 to 8 are not.
 
 **What integration means here.** A VJ app (Resolume Arena and Avenue, VDMX,
 TouchDesigner, MadMapper, Millumin, OBS) meets ChromaGlass in four ways, and each one
@@ -2097,8 +2097,8 @@ takes a different route:
 **Not doing: a plugin inside the VJ app.** FFGL (Resolume) and ISF (VDMX, MadMapper)
 run OpenGL fragment shaders inside the host. The plate is dozens of WebGPU compute
 passes a frame, with a pressure solve, which means porting the solver back to GLSL.
-That is the native rewrite `beyond-web.md` argues against. Streaming the plate into
-the host gives the VJ the same layer without it.
+That is the native rewrite `beyond-web.md` argues against (kept for later as step 8).
+Streaming the plate into the host gives the VJ the same layer without it.
 The same holds for drawing the plate inside a DAW plugin's window (asked 2026-10-04,
 about an ad for a visualiser sold as an AU/VST plugin plus a standalone app): a
 plugin's window is a native view, and the plate needs Chromium's WebGPU and Web MIDI.
@@ -2189,6 +2189,25 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    the link's switch and its slot bindings are in the More sheet.
    Before any of it, the MIDI route in the table above, tried once in Logic and
    Ableton and written up with step 4. *Not started.*
+
+8. **Later: one renderer core, native as well as on the web** (asked 2026-10-04,
+   the owner: "add it to the plan for later"). Not scheduled: it is what the plate
+   drawing *inside* a host would need (a DAW plugin's window, a Resolume FFGL effect,
+   a TouchDesigner operator), which steps 2 to 7 do without. Sized on main that day:
+   the renderer is about 9.2k lines of WGSL (26 compute, 11 fragment and 8 vertex
+   entry points) and 8.4k lines of TypeScript in `src/gpu/`; what decides each frame
+   (settings, presets, sound, MIDI, the Mixer, the tools, much of it in
+   `LiquidVisualizer.tsx`) is most of the other 62k lines; and 96 of the 135 scripts
+   in `scripts/` drive a browser. The route that does not fork the show: `src/gpu/`
+   ported to Rust on wgpu, whose WGSL is ours nearly as written, built to
+   WebAssembly on WebGPU for the site and natively for a plugin, with the web app
+   still the brain and handing the core a frame's settings and splats. One kernel
+   group at a time, each held to the lab's numbers (`physics`, `derive`, `maze` and
+   the rest) on both builds. What it would buy beyond hosts: shaders shipped
+   compiled (most of the opening is compiling, 14v), the projector's frame timing,
+   120 Hz and HDR (H4) in our hands, and CoreMIDI on the iPhone and iPad. Not frame
+   speed: Chrome's WebGPU already runs on Metal (inferred, not measured). Start only
+   when the owner wants the plate drawn inside a host. *Not started.*
 
 Until step 2 lands, the plate still reaches a VJ app the way it can today: OBS
 captures the projector window and sends it on through its Syphon or NDI plugin, and a
