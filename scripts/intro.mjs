@@ -23,10 +23,11 @@
  *   3. once the app is up it is in the plate's frame and the plate's size,
  *      on the desk and on a phone, and never what a press lands on
  *   4. it starts to leave on the frame the plate first steps, not before
- *      and not after, and is gone from the page within its fade
+ *      and not after, fades (not a cut), and is gone from the page
  *   5. a press on the desk leaves it up; a press on it, or a key, takes it away
  *   6. a browser with no WebGPU sees the failure screen, not the intro
- *   7. the remote and a cast never show it, not even on their first frame
+ *   7. the remote and a cast never show it, not even before the app has run
+ *   8. an app that never arrives: it leaves when the way out appears
  *
  * And it prints how much of the wait it covered: from the first paint to
  * the plate's first step, the share of that time the intro was up.
@@ -68,20 +69,43 @@ const browser = await launchChromium(chromium);
 */
 const instruments = () => {
   const w = window;
-  const at = w.__introAt = { frames: 0 };
+  const at = w.__introAt = { frames: 0, shown: 0, hidden: 0 };
   const frame = () => {
     const n = ++at.frames;
     const el = document.getElementById('cg-intro');
+    const on = !!el && el.isConnected;
+    const style = on ? getComputedStyle(el) : null;
+    // Seen and showing, or there and hidden by the page itself: the remote
+    // and a cast must have the second and never the first, on every frame,
+    // not only on one that might come after the app has removed it.
+    if (on && style.display !== 'none') at.shown++;
+    if (on && style.display === 'none') at.hidden++;
     if (n === 1) {
       at.firstFrame = performance.now();
-      at.firstFrameIntro = !!el && el.isConnected && getComputedStyle(el).display !== 'none' && getComputedStyle(el).opacity === '1';
+      at.firstFrameIntro = on && style.display !== 'none' && style.opacity === '1';
     }
-    if (at.leaving === undefined && (!el || el.classList.contains('cg-out'))) { at.leaving = n; at.leavingAt = performance.now(); }
+    if (at.leaving === undefined && at.shown > 0 && (!on || el.classList.contains('cg-out'))) { at.leaving = n; at.leavingAt = performance.now(); }
+    /*
+      The fade, as the page started it: a transition on opacity, and how
+      long. Not its opacity frame by frame: on a software plate the first
+      steps stall the page's frames for a second and a half just after it
+      starts, so samples of it were a coin flip between four readings of 1
+      and one of 0.94 (the compositor runs it whether or not they come).
+    */
+    if (at.leaving !== undefined && on && at.fade === undefined) {
+      const t = el.getAnimations().find((a) => a.transitionProperty === 'opacity');
+      if (t) at.fade = { ms: +t.effect.getTiming().duration, to: +getComputedStyle(el).getPropertyValue('opacity') };
+    }
+    if (at.leaving !== undefined && !on && at.goneAt === undefined) at.goneAt = performance.now();
     if (at.stepped === undefined) {
-      const steps = w.chromaglassDebug?.()?.fluids?.[0]?.stepIndex ?? 0;
-      if (steps > 0) { at.stepped = n; at.steppedAt = performance.now(); }
+      const f = w.chromaglassDebug?.()?.fluids?.[0];
+      if (f && typeof f.stepCount !== 'number') at.noCount = true;
+      if ((f?.stepCount ?? 0) > 0) { at.stepped = n; at.steppedAt = performance.now(); }
     }
-    if (at.stepped === undefined || at.leaving === undefined || n < 3) requestAnimationFrame(frame);
+    // Every frame until the intro has gone from the page and the plate has
+    // stepped (or three seconds of frames on a page that never shows it).
+    const done = at.goneAt !== undefined && at.stepped !== undefined;
+    if (!done && !(at.shown === 0 && performance.now() - at.firstFrame > 3000) && n < 20000) requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 };
@@ -113,6 +137,7 @@ const intro = (page) => page.evaluate(() => {
   const hit = r ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
   return {
     there: !!el && el.isConnected,
+    leaving: !!el && el.classList.contains('cg-out'),
     inPlate: !!el && !!frame && frame.contains(el),
     rect: r ? [r.left, r.top, r.width, r.height].map(Math.round) : null,
     frame: f ? [f.left, f.top, f.width, f.height].map(Math.round) : null,
@@ -150,8 +175,7 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'desk-opening.png') });
   // The plate's first step, and the fade, for up to a minute and a half (a
   // software plate compiles slowly).
-  const stepped = await waitFor(page, () => window.__introAt?.stepped !== undefined && window.__introAt?.leaving !== undefined, null, 90000);
-  await page.waitForTimeout(1500);
+  const stepped = await waitFor(page, () => window.__introAt?.stepped !== undefined && window.__introAt?.goneAt !== undefined, null, 90000);
   const after = await intro(page);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'desk-plate.png') });
   const timing = await page.evaluate(() => {
@@ -170,10 +194,21 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   check('3. on the desk it is in the plate\'s frame, the plate\'s size, and no press lands on it',
     up.inPlate && sameRect(up.rect, up.frame) && !up.hitIsIntro,
     `in the frame: ${up.inPlate}; intro ${up.rect?.join(',')} vs frame ${up.frame?.join(',')} in a ${up.window.join('×')} window; the centre is ${up.hit}`);
-  const leftOnStep = stepped && rec.reason === 'plate' && at.leaving >= at.stepped && at.leaving - at.stepped <= 1;
-  check('4. it leaves on the frame the plate first steps, and is gone within its fade',
-    leftOnStep && !after.there && rec.gone !== undefined && rec.gone - rec.out <= 1200,
-    `${stepped ? `plate stepped on frame ${at.stepped} (${s(at.steppedAt)}), intro leaving on frame ${at.leaving} (${s(at.leavingAt)}) for "${rec.reason}"` : 'the plate never stepped'}; gone ${rec.gone !== undefined ? `${Math.round(rec.gone - rec.out)} ms after` : 'never'}`);
+  /*
+    Seen from outside, every frame: the frame the lead plate's step count
+    first went above nought, the first frame the intro was leaving, the
+    first it was off the page, and its opacity in between. The fade is
+    0.9 s; the bound on its being gone is three, because a software
+    plate's frames can stall a second and a half while it compiles, and
+    what it guards is "it went", not the fade's length. A cut would start
+    no transition, or one of no length.
+  */
+  const leftOnStep = stepped && !at.noCount && at.leaving >= at.stepped && at.leaving - at.stepped <= 1;
+  const faded = at.fade !== undefined && at.fade.ms >= 500;
+  const goneIn = at.goneAt !== undefined && at.goneAt - at.leavingAt <= 3000;
+  check('4. it leaves on the frame the plate first steps, fades, and is gone from the page',
+    leftOnStep && faded && goneIn && !after.there,
+    `${at.noCount ? 'no stepCount on the lead plate to read; ' : ''}${stepped ? `plate stepped on frame ${at.stepped} (${s(at.steppedAt)}), intro leaving on frame ${at.leaving} (${s(at.leavingAt)}) for "${rec.reason}"` : 'the plate never stepped, or the intro never went'}; ${at.fade ? `a ${at.fade.ms} ms fade on opacity` : 'no fade started'}; gone ${at.goneAt !== undefined ? `${Math.round(at.goneAt - at.leavingAt)} ms after` : 'never'}`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {
@@ -191,20 +226,37 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   const up = await intro(page);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'phone-opening.png') });
   const dock = await page.evaluate(() => {
-    // Whatever of the phone's controls is drawn over the plate: still drawn
-    // over it with the intro up.
+    /*
+      The dock's buttons drawn over the intro, read in paint order. The intro
+      takes no presses, so a hit test looks straight through it and would
+      call the dock "over" it wherever it was drawn: for the reading only,
+      the intro is made a target, and the topmost thing at each of the
+      dock's buttons must still be the button. Every one, and at least one:
+      the phone has a dock by design, and finding none is not a pass.
+    */
     const el = document.getElementById('cg-intro');
     const r = el?.getBoundingClientRect();
     if (!r) return null;
-    for (let y = r.bottom - 4; y > r.top; y -= 8) {
-      const hit = document.elementFromPoint(r.left + r.width / 2, y);
-      if (hit && hit.closest('button')) return { y: Math.round(y), over: !el.contains(hit) };
+    const buttons = [...document.querySelectorAll('button')].filter((b) => {
+      const q = b.getBoundingClientRect();
+      const x = q.left + q.width / 2, y = q.top + q.height / 2;
+      return q.width > 0 && q.height > 0 && x > r.left && x < r.right && y > r.top && y < r.bottom;
+    });
+    const probe = document.createElement('style');
+    probe.textContent = '#cg-intro, #cg-intro * { pointer-events: auto !important; }';
+    document.head.append(probe);
+    let under = 0;
+    for (const b of buttons) {
+      const q = b.getBoundingClientRect();
+      const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+      if (!hit || el.contains(hit) || !b.contains(hit)) under++;
     }
-    return null;
+    probe.remove();
+    return { buttons: buttons.length, under };
   });
   check('3b. on a phone it is in the plate\'s frame, the plate\'s size, and under the dock',
-    up.inPlate && sameRect(up.rect, up.frame) && !up.hitIsIntro && (dock ? dock.over : true),
-    `intro ${up.rect?.join(',')} vs frame ${up.frame?.join(',')}; the centre is ${up.hit}; ${dock ? `a button at y ${dock.y} is ${dock.over ? 'over it' : 'UNDER it'}` : 'no button over the plate found'}`);
+    up.inPlate && sameRect(up.rect, up.frame) && !up.hitIsIntro && !!dock && dock.buttons > 0 && dock.under === 0,
+    `intro ${up.rect?.join(',')} vs frame ${up.frame?.join(',')}; the centre is ${up.hit}; ${dock ? `${dock.buttons} of the dock's buttons over the plate, ${dock.under} of them under the intro` : 'no intro to read'}`);
   await page.context().close();
 }
 
@@ -215,35 +267,44 @@ const hang = () => {
 };
 {
   const page = await open('?debug&look=classic', { prep: hang });
-  await waitFor(page, () => !!document.querySelector('[data-testid="plate-frame"] #cg-intro'), null, 30000);
+  const adopted = await waitFor(page, () => !!document.querySelector('[data-testid="plate-frame"] #cg-intro'), null, 30000);
   const before = await intro(page);
+  if (!adopted || !before.frame) throw new Error('intro: the intro never went into the plate\'s frame with the GPU held, so 5 has nothing to press');
   // A press on the desk, away from the plate's frame.
   const f = before.frame;
   const desk = f && f[0] > 40 ? [Math.round(f[0] / 2), Math.round(before.window[1] - 20)] : null;
-  let deskLeft = null;
+  // At 1440 the plate is framed in the desk: a desk with nowhere to press
+  // beside the plate is a failure of this check, not a pass.
+  let deskLeft = 'no desk beside the plate to press';
   if (desk) {
     // Somewhere on the desk that is not a control: its own background.
     const spot = await page.evaluate(([x, y]) => { const h = document.elementFromPoint(x, y); return h && !h.closest('button,input,select,a,[role="slider"],[role="button"]') ? 'bare' : h?.tagName; }, desk);
-    if (spot === 'bare') { await page.mouse.click(desk[0], desk[1]); await page.waitForTimeout(200); deskLeft = (await intro(page)).record.reason ?? null; } else deskLeft = `no bare desk at ${desk.join(',')} (${spot})`;
+    if (spot === 'bare') {
+      await page.mouse.click(desk[0], desk[1]);
+      await page.waitForTimeout(1300);
+      const after = await intro(page);
+      deskLeft = after.there && !after.leaving ? null : 'it went';
+    } else deskLeft = `no bare desk at ${desk.join(',')} (${spot})`;
   }
   await page.mouse.click(f[0] + f[2] / 2, f[1] + f[3] / 2);
   await page.waitForTimeout(1300);
   const pressed = await intro(page);
   check('5. a press on the desk leaves it up, a press on it takes it away',
     before.inPlate && deskLeft === null && pressed.record.reason === 'skip' && !pressed.there,
-    `${desk ? `after the desk's press: ${deskLeft === null ? 'still up' : `"${deskLeft}"`}` : 'the plate fills the window, no desk to press'}; after a press on it: ${pressed.record.reason ?? 'still up'}${pressed.there ? ', still on the page' : ''}`);
+    `after the desk's press: ${deskLeft === null ? 'still up' : deskLeft}; after a press on it: ${pressed.record.reason ?? 'still up'}${pressed.there ? ', still on the page' : ''}`);
   await page.context().close();
 
   const keyed = await open('?debug&look=classic', { prep: hang });
-  await waitFor(keyed, () => !!document.querySelector('[data-testid="plate-frame"] #cg-intro'), null, 30000);
+  const keyedUp = await waitFor(keyed, () => !!document.querySelector('[data-testid="plate-frame"] #cg-intro'), null, 30000);
   await keyed.keyboard.press('Shift');
-  const shift = (await intro(keyed)).record.reason ?? null;
+  await keyed.waitForTimeout(1300);
+  const sh = await intro(keyed);
   await keyed.keyboard.press('Escape');
-  await keyed.waitForTimeout(200);
+  await keyed.waitForTimeout(1300);
   const k = await intro(keyed);
   check('5b. a key takes it away (Shift alone does not)',
-    shift === null && k.record.reason === 'skip',
-    `after Shift: ${shift ?? 'still up'}; after Escape: ${k.record.reason ?? 'still up'}`);
+    keyedUp && sh.there && !sh.leaving && !k.there && k.record.reason === 'skip',
+    `${keyedUp ? 'up in the plate' : 'NEVER up in the plate'}; after Shift: ${sh.there && !sh.leaving ? 'still up' : 'went'}; after Escape: ${k.there ? 'still on the page' : `gone ("${k.record.reason}")`}`);
   await keyed.context().close();
 }
 
@@ -267,15 +328,50 @@ const hang = () => {
 }
 
 // ── The remote and a cast ─────────────────────────────────────────────
+/*
+  On the slowed network, so the page draws frames before its entry has run:
+  there the intro is in the page and hidden by `index.html`'s own script,
+  which is the claim, and not merely already taken out by the app. Read on
+  every frame, not one: shown on any frame is a failure.
+*/
 for (const q of ['?remote=1', '?cast=true']) {
-  const page = await open(q);
+  const page = await open(q, { slow: true });
   await page.waitForLoadState('load');
-  await page.waitForTimeout(1500);
+  await waitFor(page, () => window.__cgIntro?.out !== undefined, null, 30000);
+  await page.waitForTimeout(500);
   const r = await intro(page);
-  check(`7. ${q} never shows it`,
-    r.at.firstFrame !== undefined && r.at.firstFrameIntro === false && !r.there && r.record.reason === 'elsewhere',
-    `first frame ${r.at.firstFrameIntro ? 'WITH' : 'without'} it; ${r.there ? 'still on the page' : 'gone'}${r.record.reason ? ` ("${r.record.reason}")` : ''}`);
+  check(`7. ${q} never shows it, not even before the app has run`,
+    r.at.frames > 0 && r.at.shown === 0 && r.at.hidden > 0 && !r.there && r.record.reason === 'elsewhere',
+    `${r.at.frames} frames read: shown on ${r.at.shown}, there and hidden on ${r.at.hidden}; ${r.there ? 'still on the page' : 'gone'}${r.record.reason ? ` ("${r.record.reason}")` : ''}`);
   await page.context().close();
+}
+
+// ── The app that never arrives ────────────────────────────────────────
+/*
+  main.tsx's Loading turns into a "Clear the cache and reload" button after
+  eight seconds of an app chunk that has not come. The intro sits over that
+  rectangle, so it must leave when the button comes, or the way out is
+  under it.
+*/
+{
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  await page.route(/\/assets\/App-[^/]*\.js$/, () => { /* never answered */ });
+  await page.addInitScript(instruments);
+  await page.goto(`${base}/?look=classic`, { waitUntil: 'domcontentloaded' });
+  const slowShown = await waitFor(page, () => [...document.querySelectorAll('button')].some((b) => /Clear the cache/.test(b.textContent ?? '')), null, 20000);
+  await page.waitForTimeout(1300);
+  const r = await intro(page);
+  const onTop = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /Clear the cache/.test(x.textContent ?? ''));
+    const q = b?.getBoundingClientRect();
+    const hit = q ? document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2) : null;
+    return !!hit && !!b && b.contains(hit);
+  });
+  check('8. an app that never arrives: the intro leaves when the way out appears',
+    slowShown && onTop && r.at.shown > 0 && !r.there,
+    `button ${slowShown ? (onTop ? 'up and on top' : 'up but covered') : 'never shown'}; intro shown on ${r.at.shown} frames, ${r.there ? 'still on the page' : `then gone ("${r.record.reason ?? 'no record'}")`}`);
+  await context.close();
 }
 
 await browser.close();
