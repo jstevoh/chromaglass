@@ -625,7 +625,11 @@ function bookEntry(book, lock, who, at, draw) {
         const both = book.filter((e) => e.show && e.wall);
         const d = both.map((e) => e.d).sort((x, y) => x - y);
         const shifts = new Set([...index.entries()].filter(([e]) => e.show && e.wall).map(([, v]) => v.wall - v.show));
-        const ok = d.length >= 10 && d[d.length - 1] - d[0] <= 4 && shifts.size === 1;
+        // And where, not only whether (check-skeptic on #278): one pairing
+        // for every refresh also passes a book that always pairs the wall
+        // with the show's refresh before (d about a refresh), so each pair has
+        // to be the nearest, within half a refresh and a jitter's margin.
+        const ok = d.length >= 10 && d[d.length - 1] - d[0] <= 4 && shifts.size === 1 && d.every((x) => Math.abs(x) <= R / 2 + 1);
         runs++;
         if (!ok) {
           red++;
@@ -1388,8 +1392,14 @@ let failed = 0;
           38.6), so a busy machine that is only a little busy measures
           nothing. And the same refreshes missed in both windows.
         */
+        /*
+          And the gap the book pairs around within half a refresh (check-skeptic
+          on #278): a first lock taken a refresh out pairs every refresh with
+          its neighbour, one pairing and a narrow spread, and at half a
+          refresh behind nothing else in this phase would catch it.
+        */
         const b = m.book;
-        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4,
+        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4 && b.lock !== null && Math.abs(b.lock) <= busyRefresh / 2 + 1,
           `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows${b.apart ? `, the wall's stamp ${f1(b.apart.median)} ms after the show's (${f1(b.apart.least)} to ${f1(b.apart.most)}), paired around ${f1(b.lock)}` : ''}, the projector's own book ${b.wallOwn ?? '-'}`);
         /*
           And, on one refresh, both windows handed the same refreshes: the

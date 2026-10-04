@@ -265,7 +265,9 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
   // plate it is pouring on: the Evolve's random plate, the Seed button (each
   // plate), the ambient orbits and the music (the active plate), and a hand.
   const sites = {
-    evolve: /const li = fluidsRef\.current\.indexOf\(af\);\s*const color = harmonyColor\(harmonyOf\(li\)\);\s*const styles = stylesOf\(li\);/,
+    // On a look built on areas (lib/plateAreas.ts) the drop's colour is its
+    // area's dye, read for the same plate (areaColor(li, …)).
+    evolve: /const li = fluidsRef\.current\.indexOf\(af\);\s*const color = (?:area \? areaColor\(li, area\) : )?harmonyColor\(harmonyOf\(li\)\);\s*const styles = stylesOf\(li\);/,
     evolveLiquid: /doseLiquid\(af, liquidsOf\(li\)/,
     seed: /fluidsRef\.current\.forEach\(\(fluid, li\) => \{[\s\S]{0,200}const styles = stylesOf\(li\);[\s\S]{0,300}harmonyColor\(harmonyOf\(li\)\)[\s\S]{0,400}doseLiquid\(fluid, liquidsOf\(li\)/,
     ambient: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.25/,
@@ -287,7 +289,7 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
   // is `layPlate`: it must leave a back plate with its own look, its angle
   // and its spin as they were. Only a device lost with nothing carried
   // across lays it again, from its own look.
-  const lay = lv.slice(lv.indexOf('const layPlate = (presetId: string, layBack = false) => {'), lv.indexOf('const layPlateRef = useRef(layPlate);'));
+  const lay = lv.slice(lv.indexOf('const layPlate = (presetId: string, layBack = false'), lv.indexOf('const layPlateRef = useRef(layPlate);'));
   check('a cut on the front leaves a back plate with its own look as it was; a lost device lays it again from its look',
     /const keepBack = !!backDyesRef\.current && !layBack;\s*const laid = keepBack \? fluidsRef\.current\.slice\(0, 1\) : fluidsRef\.current;\s*for \(const fluid of laid\) fluid\.clearAll\(\);/.test(lay)
     && /rotationAnglesRef\.current\.map\(\(a, i\) => \(i < laid\.length/.test(lay) && /spinVelRef\.current\.map\(\(v, i\) => \(i < laid\.length/.test(lay)

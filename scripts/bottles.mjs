@@ -37,8 +37,9 @@
  *   - Finger and Blow with Ferrofluid in the bottle lay none (they lay nothing)
  *   - Water in the bottle lays no soap
  *   - a replayed Finger with Ferrofluid in the bottle lays none
- *   - only calls near the hand count: picking the Ferrofluid bottle pours the
- *     look's own ferrofluid over the whole plate, and that is not the tool
+ *   - only calls near the hand count: a look's own ferrofluid lands over the
+ *     whole plate, and that is not the tool (picking the Ferrofluid bottle
+ *     used to lay it; it lays nothing now, the first arm below)
  *   - the grid is pinned (`sim=256`) and every arm asks that the solver it
  *     listened to is still the plate's: a governor that moved the grid would
  *     hand the plate a new solver with no listener on it, and every "lays
@@ -114,12 +115,13 @@ try {
 
   // A calm plate, with Oil Bodies on so an oil pour has a body to become, and
   // no drop height, so the Dropper lays every step as the others do.
-  await page.evaluate(() => window.chromaglassSettings({
+  const calm = () => page.evaluate(() => window.chromaglassSettings({
     rotationSpeed: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0,
     rainDrip: 0, glassSmear: 0, vibrationFrequency: 0, centerGravity: 0, bubbles: 0, beads: 0, automateRate: 0,
     dropHeight: 0, oilTension: 0.6, oilBodies: 1, surfactantFlow: 0.5,
     audioMappings: { velocity: 'none', density: 'none', color: 'none', rotation: 'none' },
   }));
+  await calm();
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
   const screen = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
@@ -311,30 +313,93 @@ try {
 
   const LAYING = ['dropper', 'pour', 'spray', 'splatter', 'streak'];
 
-  // ── Ferrofluid ───────────────────────────────────────────────────
-  await clear();
-  await bottle('ferrofluid');
-  const ferro = {};
-  for (const t of [...LAYING, 'finger', 'blow']) {
-    ferro[t] = await arm(t);
-    console.log(`     Ferrofluid ${t.padEnd(8)} ${ferro[t].phase.n} pours of ferrofluid along the stroke (amount ${ferro[t].phase.a.toFixed(2)}), ${ferro[t].phase.mirror} at its mirror, dye ${ferro[t].dye.toFixed(1)}`);
-  }
-  for (const t of LAYING) {
-    const r = ferro[t];
-    check(`${t} with the Ferrofluid bottle lays ferrofluid along the stroke, and not at its mirror`,
-      r.same && r.phase.n >= 8 && r.phase.a > 0.5 && r.phase.follows && r.phase.mirror === 0,
-      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand (off it by ${r.phase.off.toFixed(3)} on average), ${r.phase.mirror} at the mirror${same(r)}`);
-  }
-  check('Finger and Blow with the Ferrofluid bottle lay none',
-    ferro.finger.same && ferro.blow.same && ferro.finger.phase.n === 0 && ferro.blow.phase.n === 0,
-    `Finger ${ferro.finger.phase.n}, Blow ${ferro.blow.phase.n}${same(ferro.finger)}${same(ferro.blow)}`);
+  /*
+    ── Picking a bottle lays nothing ──────────────────────────────────
 
-  // Read back: the ferrofluid a Pour laid is on the plate along the stroke, not only asked for.
+    The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits
+    a huge chunk on the canvas. It shouldn't do that. I want to pour it on
+    myself. Same with all of the other liquids." Picking the Ferrofluid
+    bottle turned Ferrofluid (phaseAmount) up to 0.6 for the drops to show,
+    and with it up the look's ring of ferrofluid was laid by whatever laid
+    the look's ferrofluid next: a new solver, and the next look (laid by the
+    amount the settings still held, a render before the new look's arrived).
+
+    So, with nothing touching the plate: every bottle on the bench is picked
+    in turn (through the same call the shelf, the phone and the remote make),
+    and nothing may land: no ferrofluid (addPhase), no oil (addMix), no lay
+    of the look's ferrofluid (phaseLays), and Ferrofluid left at 0, since
+    every way the look's ring is laid asks for it above 0. Then a look is cued with the Ferrofluid bottle still in the
+    hand, which is where the ring landed before: still no lay, and still 0
+    (with Magnet Garden before it, which has ferrofluid of its own and lays
+    it). And after the hand has poured, a Go to a look with none, faded,
+    lays none half way through the fade.
+    Soap and dye are not asked: Classic doses its own soap now and then and
+    the ambient orbits lay dye every frame, and neither field can say who
+    poured it. The control that the listeners hear
+    at all is the arms below, which need the same listeners to see every pour
+    of every laying tool; and the list of bottles must hold the Ferrofluid
+    one, so a hook that returned nothing does not pass on an empty loop.
+
+    And the bottle's ferrofluid is drawn once the hand pours it: after the
+    first Dropper stroke with it, Ferrofluid is up, and the look's ring was
+    not laid for it (phaseLays unchanged).
+  */
+  // Neither reads a missing hook as nothing: a counter that is not there would read "no lays" at both ends.
+  const lays = async () => {
+    const n = await page.evaluate(() => { const f = window.chromaglassDebug().phaseLays; return typeof f === 'function' ? f() : null; });
+    if (typeof n !== 'number') throw new Error('chromaglassDebug().phaseLays is missing: the lays below cannot be counted');
+    return n;
+  };
+  const amount = async () => {
+    const a = await page.evaluate(() => window.chromaglassSettings().phaseAmount);
+    if (typeof a !== 'number') throw new Error('the settings have no phaseAmount: Ferrofluid cannot be read');
+    return a;
+  };
+  await clear();
   await page.evaluate(() => window.chromaglassDebug().fluids[0].gpu.clearPhase());
-  await settle(400);
-  const poured = await arm('pour');
-  await settle(600);
-  const onPlate = await page.evaluate(async ({ path }) => {
+  const ids = await page.evaluate(() => window.chromaglassBottles?.() ?? []);
+  const picks = [];
+  for (const id of ids) {
+    await reset();
+    const laysBefore = await lays();
+    await bottle(id);
+    const r = await along([[0.5, 0.5]], 2);
+    picks.push({ id, phase: r.phase.n, oil: r.oil.n, lays: (await lays()) - laysBefore, amount: await amount(), same: r.same });
+  }
+  const quiet = (p) => p.same && p.phase === 0 && p.oil === 0 && p.lays === 0 && p.amount <= 0.002;
+  console.log(`     picked ${picks.map((p) => `${p.id} (${p.phase} ferrofluid, ${p.oil} oil, ${p.lays} lays, Ferrofluid ${p.amount})`).join('; ')}`);
+  check('picking each bottle on the bench lays nothing and leaves Ferrofluid at 0',
+    ids.includes('ferrofluid') && picks.every(quiet),
+    `${picks.length} bottles (${ids.join(', ')}); ${picks.filter((p) => !quiet(p)).map((p) => p.id).join(', ') || 'none'} laid or turned it up`);
+  /*
+    Magnet Garden first, the control: a look with ferrofluid of its own lays
+    it when cued, so the counter can count. Then Galaxy straight after it with
+    the Ferrofluid bottle in the hand: the cue reaches the plate while the
+    settings still hold Magnet Garden's 0.9, so it asks that the plate lays a
+    look by the amount the look asks for (passed with the cue), not by them.
+  */
+  await bottle('ferrofluid');
+  await reset();
+  const laysGarden = await lays();
+  await page.evaluate(() => window.chromaglassApplyPreset('magnet-garden'));
+  await settle(4000);
+  const garden = { lays: (await lays()) - laysGarden, amount: await amount() };
+  check('a look with ferrofluid of its own still lays it when cued', garden.lays >= 1 && garden.amount > 0.002,
+    `Magnet Garden laid its ferrofluid ${garden.lays} times, Ferrofluid ${garden.amount}`);
+  await reset();
+  const laysCue = await lays();
+  await page.evaluate(() => window.chromaglassApplyPreset('galaxy'));
+  await settle(4000);
+  const cuedAlong = await along([[0.5, 0.5]], 2);
+  const cued = { phase: cuedAlong.phase.n, lays: (await lays()) - laysCue, amount: await amount(), same: cuedAlong.same };
+  check('a look with none, cued from one with some and the Ferrofluid bottle in the hand, lays none', cued.same && cued.lays === 0 && cued.phase === 0 && cued.amount <= 0.002,
+    `${cued.lays} lays of the look's ferrofluid, ${cued.phase} pours, Ferrofluid ${cued.amount}${same(cued)}`);
+  await page.evaluate(() => window.chromaglassApplyPreset('classic'));
+  await settle(3000);
+  await calm();
+
+  /** The ferrofluid in the solver, read back: along a path, at its mirror, and in all. */
+  const phaseAlong = (path) => page.evaluate(async ({ path }) => {
     const d = window.chromaglassDebug();
     if (typeof d.readPhase !== 'function') return null;
     const f = await d.readPhase();
@@ -346,10 +411,77 @@ try {
       if (path.some((p) => Math.hypot(x / f.n - (1 - p[0]), y / f.n - (1 - p[1])) < 0.12)) m += v;
     }
     return { total: t, near: n, mirror: m };
-  }, { path: poured.path });
+  }, { path });
+
+  // ── Ferrofluid ───────────────────────────────────────────────────
+  /*
+    Not cleared first: Classic, cued above after Magnet Garden, asks for no
+    ferrofluid and so leaves Magnet Garden's ring in the solver, unseen with
+    Ferrofluid at 0. The first stroke must turn the amount up for its own
+    pour and not bring that ring back with it: read back after it, the
+    ferrofluid in the solver is the stroke's.
+  */
+  await clear();
+  await bottle('ferrofluid');
+  const laysFerro = await lays();
+  const amountPicked = await amount();
+  const ferro = {};
+  ferro.dropper = await arm('dropper');
+  await settle(600);
+  const amountPoured = await amount();
+  const firstPour = await phaseAlong(ferro.dropper.path);
+  check('the first pour shows only itself: none of a look\'s ferrofluid left unseen in the solver',
+    firstPour && firstPour.near > 0.5 && firstPour.near > 0.6 * firstPour.total && firstPour.mirror < 0.05 * firstPour.near,
+    firstPour ? `${firstPour.near.toFixed(1)} of ${firstPour.total.toFixed(1)} along the stroke, ${firstPour.mirror.toFixed(1)} at its mirror` : 'the phase does not read back');
+  for (const t of [...LAYING, 'finger', 'blow']) {
+    if (t !== 'dropper') ferro[t] = await arm(t);
+    console.log(`     Ferrofluid ${t.padEnd(8)} ${ferro[t].phase.n} pours of ferrofluid along the stroke (amount ${ferro[t].phase.a.toFixed(2)}), ${ferro[t].phase.mirror} at its mirror, dye ${ferro[t].dye.toFixed(1)}`);
+  }
+  const ferroAmount = await amount();
+  const ferroLays = (await lays()) - laysFerro;
+  for (const t of LAYING) {
+    const r = ferro[t];
+    check(`${t} with the Ferrofluid bottle lays ferrofluid along the stroke, and not at its mirror`,
+      r.same && r.phase.n >= 8 && r.phase.a > 0.5 && r.phase.follows && r.phase.mirror === 0,
+      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand (off it by ${r.phase.off.toFixed(3)} on average), ${r.phase.mirror} at the mirror${same(r)}`);
+  }
+  check('the hand\'s first pour turns Ferrofluid up, and lays none of the look\'s',
+    amountPicked <= 0.002 && amountPoured > 0.002 && ferroLays === 0,
+    `Ferrofluid ${amountPicked} with the bottle picked, ${amountPoured} after one Dropper stroke (${ferroAmount} after them all); the look's ferrofluid laid ${ferroLays} times while they poured`);
+  check('Finger and Blow with the Ferrofluid bottle lay none',
+    ferro.finger.same && ferro.blow.same && ferro.finger.phase.n === 0 && ferro.blow.phase.n === 0,
+    `Finger ${ferro.finger.phase.n}, Blow ${ferro.blow.phase.n}${same(ferro.finger)}${same(ferro.blow)}`);
+
+  // Read back: the ferrofluid a Pour laid is on the plate along the stroke, not only asked for.
+  await page.evaluate(() => window.chromaglassDebug().fluids[0].gpu.clearPhase());
+  await settle(400);
+  const poured = await arm('pour');
+  await settle(600);
+  const onPlate = await phaseAlong(poured.path);
   check('a Ferrofluid Pour is ferrofluid on the plate along the stroke, read back',
     onPlate && onPlate.near > 0.5 && onPlate.near > 0.6 * onPlate.total && onPlate.mirror < 0.05 * onPlate.near,
     onPlate ? `${onPlate.near.toFixed(1)} of ${onPlate.total.toFixed(1)} along the stroke, ${onPlate.mirror.toFixed(1)} at its mirror` : 'the phase does not read back');
+
+  /*
+    A Go after the pour, faded: the look fading in lays its ferrofluid half
+    way through, and half way the settings are half way between the looks,
+    so from the pour's Ferrofluid 0.6 to Galaxy's 0 they read 0.3 there. Laid
+    by them, Galaxy's ring landed over the pour; laid by what Galaxy asks
+    for (passed with the Go), nothing does.
+  */
+  const goFrom = await amount();
+  const laysGo = await lays();
+  await reset();
+  await page.evaluate(() => window.chromaglassGo('galaxy', 2));
+  await settle(3500);
+  const wentAlong = await along([[0.5, 0.5]], 2);
+  const went = { lays: (await lays()) - laysGo, phase: wentAlong.phase.n, same: wentAlong.same };
+  check('a faded Go to a look with none, after the hand poured, lays none of its ferrofluid half way',
+    goFrom > 0.002 && went.same && went.lays === 0 && went.phase === 0,
+    `Ferrofluid ${goFrom} before the Go; ${went.lays} lays of the look's ferrofluid, ${went.phase} pours${same(went)}`);
+  await page.evaluate(() => window.chromaglassApplyPreset('classic'));
+  await settle(3000);
+  await calm();
 
   // ── Oil and Soap ─────────────────────────────────────────────────
   await bottle('oil');

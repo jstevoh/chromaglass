@@ -57,6 +57,15 @@
       @keyframes cg-breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { #cg-intro *, #cg-intro { animation: none !important; transition: none !important; } }
     </style>
+    <!--
+      A show screen (?cast=: the projector window, a cast receiver) never shows
+      the pointer, from its first paint: set here rather than in main.tsx,
+      whose stylesheet and script arrive later, and in the waiting black
+      before them the arrow was on the wall for the first tens of
+      milliseconds. CastDisplay.tsx says why; `npm run showcursor` holds it.
+    -->
+    <style>html.show-screen, html.show-screen * { cursor: none !important; }</style>
+    <script>if (/[?&]cast(=|&|$)/.test(location.search)) document.documentElement.classList.add('show-screen');</script>
   </head>
   <body>
     <div id="root"></div>

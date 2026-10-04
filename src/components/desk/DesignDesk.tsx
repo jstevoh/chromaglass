@@ -61,6 +61,14 @@ export interface DesignDeskProps {
   layers: number;
   onLayer: (n: number) => void;
   onAddLayer: () => void;
+  /**
+   * Take the back layer off. Absent while the back plate has a look of its
+   * own (PLAN.md §16a): the stage keeps that plate whatever the look says,
+   * so a minus that could not take it away would only look broken.
+   */
+  onRemoveLayer?: () => void;
+  /** Why the back layer cannot come off just now, for the minus's tooltip. */
+  layerHeld?: string | null;
   /** What is on each live layer, for the tabs. */
   layerReport?: { index: number; fill: number; colour: string }[];
 
@@ -322,22 +330,57 @@ export function DesignDesk(p: DesignDeskProps) {
                       className="h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
                       style={{ background: rep?.colour ?? '#111111' }}
                     />
-                    Layer {i + 1}
-                    <span className="h-1 w-6 shrink-0 overflow-hidden rounded-full bg-border" aria-hidden>
+                    {/*
+                      Below 1280 the word and the bar go: at 1024 the plate's
+                      column is 408 px, and the name, Record, two whole tabs
+                      and the plus or minus beside them came to 480, so the
+                      minus sat under the Recipe (the layout check's cover
+                      test, once a two-layer look had a button there). The
+                      dot and the number stay, and the tab's title still says
+                      how full it is.
+                    */}
+                    <span><span className="hidden xl:inline">Layer </span>{i + 1}</span>
+                    <span className="hidden h-1 w-6 shrink-0 overflow-hidden rounded-full bg-border xl:block" aria-hidden>
                       <span className="block h-full rounded-full bg-text-2" style={{ width: `${Math.round((rep?.fill ?? 0) * 100)}%` }} />
                     </span>
                   </button>
                 );
               })}
             </div>
-            {p.layers < 2 && (
+            {/*
+              Add and take off a layer, on every look.
+
+              Reported by the owner: layers could be added on some presets and
+              not others, and taken off on none. The plus showed only while a
+              look had one layer and there was no minus at all, so on the
+              twenty-odd looks that carry two the desk offered nothing, and a
+              layer added to a one-layer look stayed until Settings › Plates
+              & LED. Two is the most the plate has (the display pass is at
+              WebGPU's sixteen sampled textures, PLAN.md §16d), so the button
+              is a plus on one layer and a minus on two: the same place, the
+              one thing that can be done.
+            */}
+            {p.layers < 2 ? (
               <button
                 onClick={p.onAddLayer}
                 className="h-8 w-8 rounded-md border border-border-strong text-[15px] text-muted transition-colors hover:bg-hover hover:text-text"
-                title="Another layer of liquid over this one"
+                title="Another layer of liquid behind this one"
                 aria-label="Add a layer"
                 data-testid="add-layer"
               >+</button>
+            ) : (
+              <button
+                onClick={p.onRemoveLayer}
+                disabled={!p.onRemoveLayer}
+                className="h-8 w-8 rounded-md border border-border-strong text-[15px] text-muted transition-colors hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-muted"
+                title={p.onRemoveLayer
+                  ? `Take layer ${p.layers} off this look`
+                  : p.layerHeld
+                    ? `The back plate is on ${p.layerHeld}, so it stays until it follows the front again`
+                    : 'The back plate is fading back to the front, and comes off once it lands'}
+                aria-label="Remove a layer"
+                data-testid="remove-layer"
+              >−</button>
             )}
           </span>
         </div>

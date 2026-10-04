@@ -1153,7 +1153,17 @@ const waitOf = (x, oldWay) => {
       const n = Math.max(0, Math.min(s + len, steady) - from);
       const follows = holds[i] === 0 && s - compiling <= 1;
       const taken = (holds[i] > 0 || follows) && n >= 0.25;
-      if (holds[i] > 0 || taken) compiling = s + len;
+      /*
+        Only a stop the builds sat in, and one priced at that, opens the
+        second's window for the next (check-skeptic on #278): a priced stop
+        that only followed passed the window on, so runner stalls 0.9 s apart
+        chained without end into the control's compile (2.02 s of builds and
+        three stalls read 16.02 s, against 5.02 s), and a builds' stop wholly
+        inside Chromium's own hold (n under 0.25, unpriced) armed it for a
+        15 s stall after it with no build in it, so "the cache was not cold"
+        and 1b judged a stall. #257's run still prices its 18.29 s.
+      */
+      if (holds[i] > 0 && n >= 0.25) compiling = s + len;
       return { from: from - t0, len: n, builds: holds[i], follows, taken };
     });
     for (const st of stops.filter((st) => st.taken)) {
