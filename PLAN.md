@@ -3143,6 +3143,30 @@ for, and the GPU was asked for only after they had arrived and drawn.
   device is asked for: asking at boot did not move it there. Whether it moves on
   the web, where the app's download takes longer, is unmeasured.
 
+### 14w. The pointer on the wall (shipped)
+
+The owner, 2026-10-04: the mouse cursor must never show on the show, though it may on
+the design screen. The projector window and a cast receiver (`CastDisplay.tsx`)
+showed the arrow on any movement and hid it after 2.5 s (3 s) still, so it was on the
+wall as the window opened and whenever the hand crossed the projector's screen; clean
+screen hid it over the plate's canvas only, so it came back over the letterbox and the
+"needs WebGPU" card. Now a script and a rule in `index.html`'s head put `show-screen`
+on `<html>` of any `?cast=` page before anything else loads, and `.show-screen *` /
+`.overlays-hidden *` are `cursor: none !important` (a child's own cursor, the canvas's
+crosshair, beat an inherited one). Every
+way the show reaches a second screen is that one page: the web projector window
+(StageMirror), the Mac app's projector window, the multi-projector surfaces (drawn into
+that window by `gpu/output.ts`) and a receiver. `npm run showcursor` asks each, as it
+opens, with the mouse sweeping it and later, at a grid of points and on every element,
+and that the design screen keeps its crosshair (12 lines; 9 of them red before the
+change); `npm run desktop` adds "projector: no pointer on the wall". Nothing else is
+drawn at the pointer: the projector copies the plate's canvas only, and no shader marks
+where the mouse is. Left as it is: the gamepad's ring (`App.tsx`) still shows on the
+laptop in clean screen while the sticks move, since without it the stick is aimed blind;
+on one screen that ring is on the show. A setting to hide it, if the owner wants one, is
+the next step. The phone needs nothing: a touch screen draws no pointer, and a phone or
+tablet showing `?cast=` gets the same page.
+
 ## 15. Every tool on every liquid
 
 Asked 2026-09-27 ("Shouldn't blowing and finger also move around the ferrofluid?",
