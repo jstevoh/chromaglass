@@ -53,6 +53,9 @@ when it ships, strikes the step here in the same PR (`~~…~~ #NNN`) and marks i
 shipped. What it finds along the way goes into the section it belongs to, and here only
 if it changes the order.
 
+**The owner's QA list** (below, after the duplicates table) is ranked separately: a fix
+thread for a QA item takes the top open line in its tier.
+
 **Why this order.** Five rules, in priority:
 
 1. **First, whatever makes every later PR cheaper.** On 2026-10-03, 46 % of the PR check
@@ -288,6 +291,48 @@ and to mark shipped, and the others now point to it.
 | The checks red on trees they do not measure | Wave 0's list | §0, §11, 19h |
 | Press dye on the GPU | 18a-3 | 15d |
 | An input per channel | 24.1 | 5-channels |
+
+### QA list: what the owner found playing it (from 2026-10-04)
+
+The owner's QA rounds, one line per fault, ranked by how much it costs a show. A fix
+thread takes the top open item in a tier; the PR that fixes it strikes the line here
+(`~~…~~ #NNN`, and "live" once deployed). Where it shows: **desk** (the laptop's
+Perform and Design desks), **phone**, **wall** (the show screen or projector), **Mac**
+(the desktop app).
+
+**Tier 1. Seen by the room, or it stops the show.**
+
+- **QA-1** The plate pulses each time a control is pressed or a tool is picked. Desk;
+  the pulse reaches the wall. Thread "Plate pulses on control clicks", no PR yet.
+- **QA-2** The mouse pointer shows on the show screen. Wall, Mac. Draft #271.
+
+**Tier 2. A control does the wrong thing, or cannot be reached.**
+
+- **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
+  phone. Draft #269 (PLAN 15i).
+- **QA-4** Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
+  top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
+  The chip is `fixed top-3 … translate-y-9` in `src/App.tsx` (the `macroZoom > 1.05`
+  block, about line 3984) and lands on the desk's top strip, where
+  `PerformanceButton` sits (`PerformDesk.tsx:466`; Design has the same button,
+  `DesignDesk.tsx:291`, check it there too). Not on the phone (the chip is desk-only).
+- **QA-5** Layers: + appears only on one-plate looks and there is no −. Desk, phone.
+  Thread "Layers on every preset", no PR yet (a third plate is 16d).
+- **QA-6** The Magnet lays a fixed grid of spikes. Desk, phone. Draft #247 deletes the
+  lattice (9t); thread "Magnet without the grid".
+
+**Tier 3. On the wall, it looks wrong.**
+
+- **QA-7** Looks read as pixelated, "very digital", on a laptop. Wall, desk. Draft #267.
+- **QA-8** Sensual Laboratory is washed out by the lamp. Wall. Draft #262 (18b-1).
+- **QA-9** Clock Glass and the ferrofluid looks fall short of their references. Wall.
+  Thread "Clock glass and ferro looks", no PR yet.
+- **QA-10** Velvet Underground and Lumia are underwhelming: one area of interest, not
+  several. Wall. Thread "More going on in every look", no PR yet.
+
+**Tier 4. Polish.**
+
+- (none yet)
 
 ## Running order
 
