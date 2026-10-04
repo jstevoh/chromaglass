@@ -37,9 +37,8 @@
  * So this asks the thin gap, held, with the band playing and its bubbles
  * certainly on the plate: the band's dice drop bubbles on some runs and not
  * others, and a run with none would pass whatever the bubbles do. Four are
- * set down where the band sets them (between the middle and the ring, in
- * the densest dye near the middle being where the ring is poured) and kept
- * at four. Against silence on the same plate, held the same way, which has
+ * set down within the band's range (just outside the disc that is read)
+ * and kept at four. Against silence on the same plate, held the same way, which has
  * to be silent and still itself. And the old plate the same, which has to
  * gather by more than the bar: the instrument shown to see the drift it was
  * built for, until the old plate's bubbles stop pressing and that line turns
@@ -81,8 +80,16 @@ const PAGES = [
   { name: 'the band and its bubbles', band: true, bubbles: true, oldPlate: false },
   { name: 'the band and its bubbles, old plate', band: true, bubbles: true, oldPlate: true },
 ];
-/** Where the bubbles are set down: a fifth of the plate out from the middle, four ways round. */
-const SPOTS = [0, 1, 2, 3].map((k) => ({ x: 0.5 + 0.2 * Math.cos(k * Math.PI / 2 + 0.4), y: 0.5 + 0.2 * Math.sin(k * Math.PI / 2 + 0.4) }));
+/*
+  Where the bubbles are set down: 0.15 out from the middle, four ways round,
+  just outside the disc that is read, inside the band's own range (6 to 46
+  steps of 128 from the middle, 0.05 to 0.36). At 0.2 the old plate's
+  drift read +0.020 against the bar's +0.012 on its first run: the press
+  pulls the ring toward the bubbles, and a bubble halfway to the ring pulls
+  little of it into the disc. Nearer, the same pull lands in the disc, and
+  the thin gap is asked under the same bubbles.
+*/
+const SPOTS = [0, 1, 2, 3].map((k) => ({ x: 0.5 + 0.15 * Math.cos(k * Math.PI / 2 + 0.4), y: 0.5 + 0.15 * Math.sin(k * Math.PI / 2 + 0.4) }));
 
 const browser = await launchChromium(chromium);
 const results = [];
