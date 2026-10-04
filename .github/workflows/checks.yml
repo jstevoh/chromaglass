@@ -213,6 +213,16 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run kicks
 
+      # A click is not a beat (PLAN.md 14w): the ear in arithmetic, a click a
+      # tick and a thump, in a quiet room and under the band. With no gesture
+      # marked it takes the clicks for kicks (the control); marked, no onset in
+      # a click's moment at 10 to 200 ms of input latency, every kick of the
+      # band outside one still heard, and the beat clock firing the band's
+      # kicks through them. At 48 and 44.1 kHz. About a minute and a half.
+      - name: A click is not a beat
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run clicks
+
       # The one (PLAN.md §10, step 3): the beats and which of them is the one,
       # on eight synthesised songs whose bars are known (four on the floor
       # and a rock beat, a chord a bar or every two), 20 dB down, at 30 fps,
@@ -417,6 +427,15 @@ jobs:
       - name: The sound's renders
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/renders.mjs
+      # The same in the app (scripts/clicks.mjs --app): the microphone a
+      # stand-in that knocks as it is pressed, the way a laptop's hears a
+      # click. Knocks with no hand on anything are heard as kicks; tools picked
+      # and the Speed ride pressed on the Perform desk, and tools and the
+      # Amount slider tapped on the phone, are not; on the band the gate is
+      # off. No GPU: it reads the ear, not the plate. On the phone's dist/.
+      - name: A click is not a beat, in the app
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run clicks -- --app
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU

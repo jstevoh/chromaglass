@@ -160,7 +160,8 @@
     "ferropress": "node scripts/ferropress.mjs",
     "desktop": "npm run build && node scripts/desktop.mjs",
     "app": "npm run build && npm --prefix desktop start",
-    "mac-app": "npm run build && npm --prefix desktop run dist"
+    "mac-app": "npm run build && npm --prefix desktop run dist",
+    "clicks": "esbuild scripts/clicks.mjs --bundle --platform=node --format=esm --external:playwright --log-level=warning --outfile=node_modules/.cache/clicks.mjs && node node_modules/.cache/clicks.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
