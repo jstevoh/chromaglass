@@ -158,16 +158,33 @@ fn lightThrough(unit: vec3f, thickness: f32) -> vec3f {
 fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t, uv); }
 
 /*
+  The lamp ground at this pixel (PLAN 18b): the lamp at full, through what
+  the mixer has under the glass (the LED ring, the gel, the lumia), set by
+  the display pass beside bgColor, which stays the black ground the dye was
+  always painted on. Two grounds, not one at Lamp Ground's brightness: a
+  fader halfway is then half of each picture, where one grey ground under
+  both drew the paint lifted by grey and the lamp's half at a quarter (the
+  pre-push review).
+*/
+var<private> lampBg: vec3f = vec3f(1.0);
+
+/*
   A decoded dye f over the ground bg, on the ground the look asks for
-  (Lamp Ground, PLAN 18b): at 0 the tint painted over it at its opacity, as
-  the plate always drew; at 1 the ground filtered through the dye, which is
+  (Lamp Ground, PLAN 18b): at 0 the tint painted over bg at its opacity, as
+  the plate always drew; at 1 the lamp filtered through the dye, which is
   what a lamp under a dish does; between, the one fading into the other.
   through is the dyeThrough the decode of f left.
 */
 fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
   let painted = mix(bg, f.rgb, f.a);
   if (U.lampGround <= 0.001) { return painted; }
-  return mix(painted, bg * through, U.lampGround);
+  return mix(painted, lampBg * through, U.lampGround);
+}
+
+/* The bare ground, where no plate is: the black one, the lamp, or between. */
+fn groundOf(bg: vec3f) -> vec3f {
+  if (U.lampGround <= 0.001) { return bg; }
+  return mix(bg, lampBg, U.lampGround);
 }
 
 /*
@@ -1968,9 +1985,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── LED platform, the photograph's paper, the gel wheel, the lumia ──
-  // The lamp under the dish (Lamp Ground, PLAN 18b): a black ground at 0, as
-  // the plate always was, the lamp at full brightness at 1.
-  var bgColor = select(vec3f(U.lampGround), vec3f(1.0), darkBlend);
+  var bgColor = select(vec3f(0.0), vec3f(1.0), darkBlend);
   if (U.photo > 0.5) {
     let pp = uv * vec2f(aspect, 1.0);
     let g = smoothstep(-0.15, 1.15, uv.x * 0.55 + uv.y * 0.65 + (fbm3(pp * 2.2 + 3.1) - 0.5) * 0.5 - 0.1);
@@ -1983,6 +1998,18 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // stack has under the front plate, bottom up. Anything of the three that is
   // higher is laid over the glass (mixSourcesAt), and the glass is lit without it.
   bgColor = mixLamp(bgColor, uv);
+  /*
+    And the lamp ground (lampBg): the same rows over the lamp at full, as
+    bright as the hot-spot (below) leaves its brightest point. The hot-spot
+    multiplies the whole picture by up to 1.28 over the lamp, which on a
+    white ground burnt the middle out, clear liquid and pale washes alike:
+    the check that twice the dye lets through the square of what once does
+    read the clipped lamp there and failed by 0.07 (npm run lamp). So the
+    lamp is set down by the hot-spot's peak, here, on the lamp's own term
+    only: divided at the hot-spot instead, the paint's half of a fader was
+    divided too, and halfway was not half of each (3 bytes off).
+  */
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w); }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2124,10 +2151,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let depth = U.macroDepth * macroAmt;
     let fiber = fbm3(uv * vec2f(aspect, 1.0) * 230.0);
     bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
+    lampBg = mix(lampBg, lampBg * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
     let shA = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.008, -0.008), c0, s0)).a) * 2.6);
     let shB = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.022, -0.022), c0, s0)).a) * 1.6);
     let shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
     bgColor *= mix(1.0, 0.18, shadow * depth);
+    lampBg *= mix(1.0, 0.18, shadow * depth);
   }
 
   var outColor = bgColor;
@@ -2393,7 +2422,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   // ── The mixer: the front plate's grade and level ─────────────────
   // Its level fades the plate back to the bare lamp under it.
-  outColor = mixLevelled(bgColor, gradeMix(outColor, U.mixGrade[1]), U.mixLevel.y);
+  outColor = mixLevelled(groundOf(bgColor), gradeMix(outColor, U.mixGrade[1]), U.mixLevel.y);
   // And takes its lens with it: the camera pass refracts through, and
   // focuses on, what these say is on the glass, and a plate faded out is not.
   auxN *= U.mixLevel.y;
@@ -2514,21 +2543,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.lamp.w > 0.001) {
     let dl = length(fuvBase - U.lamp.xy);
     let glow = exp(-dl * dl * 3.5);
-    /*
-      On the lamp ground (PLAN 18b) the pool is the lamp's own fall-off, so
-      its brightest point is the lamp at full, not 1.28 times it: over a
-      white ground the old gain burnt the middle of the plate out, clear
-      liquid and pale washes alike, and the check that twice the dye lets
-      through the square of what once does read the clipped lamp there and
-      failed by 0.07 (npm run lamp). Divided by its peak, by as much as the
-      ground is the lamp, so at 0 it is the gain it always was.
-    */
-    let pool = mix(vec3f(1.0), vec3f(1.05, 0.98, 0.9), glow * 0.5) * mix(0.78, 1.25, glow) / mix(1.0, 1.28125, U.lampGround);
+    let pool = mix(vec3f(1.0), vec3f(1.05, 0.98, 0.9), glow * 0.5) * mix(0.78, 1.25, glow);
     outColor *= mix(vec3f(1.0), pool, U.lamp.w);
     if (U.lamp2.w > 0.001) {
       let d2 = length(fuvBase - U.lamp2.xy);
       let glow2 = exp(-d2 * d2 * 3.5);
-      outColor *= mix(vec3f(1.0), mix(vec3f(1.0), vec3f(0.9, 0.97, 1.12) * 1.25, glow2) / mix(1.0, 1.4, U.lampGround), U.lamp2.w * U.lamp.w);
+      outColor *= mix(vec3f(1.0), mix(vec3f(1.0), vec3f(0.9, 0.97, 1.12) * 1.25, glow2), U.lamp2.w * U.lamp.w);
     }
   }
 

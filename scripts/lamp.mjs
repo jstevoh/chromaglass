@@ -40,7 +40,9 @@
  *   5. two plates are two filters: the lamp through the back plate and the
  *      front is the product of each, pixel by pixel, with the back plate turned
  *      half round so its dye is somewhere the front's is not
- *   6. the photograph keeps its paper: renderStyle photo draws the same at 0
+ *   6. halfway, the picture is half of each: a fader on it fades from one to
+ *      the other, pixel by pixel, rather than lifting the paint with grey
+ *   7. the photograph keeps its paper: renderStyle photo draws the same at 0
  *      and at 1
  *
  * Checks 2 to 5 render with the grade and the plate's painted texture
@@ -93,9 +95,9 @@ const BEFORE_LAMP = {
         if (found !== n) throw new Error(`lamp: the before-lamp control found ${found} of ${n} ${what} in wgsl/plate.ts`);
         s = s.replace(re, to);
       };
-      edit('lamp grounds', /select\(vec3f\(U\.lampGround\), vec3f\(1\.0\), darkBlend\)/g, 'select(vec3f(0.0), vec3f(1.0), darkBlend)', 1);
+      edit('lamp grounds', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ lampBg = [^\n]*\}/g, '', 1);
+      edit('front plate levels', /mixLevelled\(groundOf\(bgColor\)/g, 'mixLevelled(bgColor', 1);
       edit('decodes through the lamp', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ dyeThrough = [^\n]*\}/g, '', 2);
-      edit('hot-spots held to the lamp', / \/ mix\(1\.0, [\d.]+, U\.lampGround\)/g, '', 2);
       edit('back plates through the lamp', /if \(U\.lampGround > 0\.001\) \{\n\s*let lit1[\s\S]*?\} else \{\n\s*outColor = painted1;\n\s*\}/g, 'outColor = painted1;', 1);
       // Each call site of the two composites back to the mix it was.
       for (const [fn, n, to] of [
@@ -118,7 +120,7 @@ const BEFORE_LAMP = {
         }
         if (done !== n) throw new Error(`lamp: the before-lamp control rewrote ${done} of ${n} ${fn} calls in wgsl/plate.ts`);
       }
-      if (/U\.lampGround/.test(s.replace(/fn (?:onGround|chemOnGround)\([\s\S]*?\n\}/g, ''))) {
+      if (/U\.lampGround/.test(s.replace(/fn (?:onGround|chemOnGround|groundOf)\([\s\S]*?\n\}/g, ''))) {
         throw new Error('lamp: the before-lamp control left a read of U.lampGround outside the two composites');
       }
       return { contents: s, loader: 'ts' };
@@ -190,6 +192,7 @@ try {
     // 4 and 5. One pool of blue over a gel, and the same plate twice.
     await lab.create(128); lab.dye(0.5, 0.5, 0.3, BLUE, 0.5); lab.flush(); await lab.step(1);
     out.poolWhite = await r({ lampGround: 1 });
+    out.poolHalf = await r({ lampGround: 0.5 });
     out.poolGel = await r({ lampGround: 1, gelWheel: 1 });
     out.poolGelBlack = await r({ lampGround: 0, gelWheel: 1 });
     out.bareGelBlack = await r({ lampGround: 0, gelWheel: 1 });
@@ -356,7 +359,21 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
     `mean error ${f2(err / Math.max(1, n))} over ${n} readings; ${front} pixels under the front's dye alone, ${back} under the back's, ${both} under both`);
 }
 
-// ── 6. The photograph ────────────────────────────────────────────────
+// ── 6. Halfway ───────────────────────────────────────────────────────
+{
+  let err = 0, n = 0;
+  for (let k = 0; k < shots.poolHalf.length; k++) {
+    if (k % 4 === 3) continue;
+    err += Math.abs(shots.poolHalf[k] - (shots.blackWhite[k] + shots.poolWhite[k]) / 2); n++;
+  }
+  const pool = disc(0.2);
+  check('halfway, the picture is half the dye on black and half the lamp through it, pixel by pixel',
+    // The two pictures it is between must differ, or half of each is either.
+    err / n <= 1 && Math.abs(lum(mean(shots.poolWhite, pool)) - lum(mean(shots.blackWhite, pool))) > 20,
+    `mean error ${f2(err / n)} of a byte; the pool ${r0(mean(shots.blackWhite, pool))} on black, ${r0(mean(shots.poolHalf, pool))} halfway, ${r0(mean(shots.poolWhite, pool))} on the lamp`);
+}
+
+// ── 7. The photograph ────────────────────────────────────────────────
 {
   let worst = 0;
   for (let k = 0; k < shots.photo0.length; k++) if (k % 4 !== 3) worst = Math.max(worst, Math.abs(shots.photo0[k] - shots.photo1[k]));

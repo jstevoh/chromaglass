@@ -20,11 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a second filter, and the pH, BZ and Liesegang colours are absorbers in the
   light rather than paint. Between, the two pictures fade, so a fader plays it.
   Evolve leaves it alone; the photograph keeps its paper.
-- On the lamp ground the hot-spot's brightest point is the lamp at full, not
-  1.28 times it, which burnt the middle of a white plate out.
+- On the lamp ground the lamp is set down by the hot-spot's peak, so the
+  brightest point is the lamp at full, not 1.28 times it, which burnt the
+  middle of a white plate out. Halfway, the picture is half of each.
 - `npm run lamp` (CI, open shard): every look at 0 is the plate as it was before,
   byte for byte; a clear pool throws the whole lamp; twice the dye lets through
-  the square; a gel and the back plate filter through the dye.
+  the square, in the dye's own colour; a gel and the back plate filter through
+  the dye; halfway is half of each.
 
 ### Changed — Thin Gap on in every look (PLAN 18a-every)
 

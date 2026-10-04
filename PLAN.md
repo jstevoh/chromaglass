@@ -3749,8 +3749,8 @@ its frame rate live. "Free" means no new passes or texture reads.
   transmission to 0.49 of a byte (164 on black, the old fault); two plates multiply
   to 0.61 of a byte, pixel by pixel; the photograph does not change. Found on the way:
   the hot-spot lifted the middle to 1.28 times the lamp, which burnt a white ground
-  out (the doubling read 0.89 where the law says 0.96); on the lamp ground its peak
-  is now the lamp. The gooey edge's contrast is left out of the amount (18b-4)
+  out (the doubling read 0.89 where the law says 0.96); the lamp ground is now set
+  down by the hot-spot's peak. Halfway the picture is half of each to a byte. The gooey edge's contrast is left out of the amount (18b-4)
 - **18b-1. The owner picks the looks** (judging §31). Each look's dyes and Dye Budget
   were set for black; one moved to the lamp may want less dye.
 - **18b-2. The dark ground the physical way.** A look that stays dark should get there
@@ -3778,8 +3778,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   ground now).
 - **18b-7. What `npm run lamp` does not read yet.** The closeup's and the particles'
   decode (`decodeFluidRaw`, which has no Colour Body factor where `decodeFluid` has
-  one), the spectral branch, the chemistry as filters, the bubbles' rim and lens on
-  the lamp, values between 0 and 1, and the second lamp's divide. Each wants a case
+  one), the spectral branch, the chemistry as filters, and the bubbles' rim and lens on
+  the lamp. And the Second Lamp is not held to the lamp as the hot-spot is: near its
+  spot it can lift a white ground past full and clip (its colour is up to 1.4 in
+  blue). Dividing it by its peak dimmed the whole plate by 1/1.4 away from it, which
+  is worse; a second lamp on a lamp ground wants its light added, not multiplied. Each wants a case
   in the check, or a reason it does not need one.
 
 ### 18c. A pour adds liquid, not only colour
