@@ -4106,6 +4106,32 @@ ones report.
   Mac runner~~ **Fixed 2026-10-03 (§14b-2):** the floor was measured against a different
   two seconds than it judged, and the gate on a starved machine really did turn down the
   show's own next frame; both fixed, and `wall` now makes the busy machine itself.
+- ~~`wall`'s busy phase half a refresh behind goes red on a starved Mac runner with the
+  gate right~~ **Fixed 2026-10-04:** #223's tools shard read the wall's asks at 8.9 a
+  second (0.9x under the ceiling, 11.4 drawn against a floor of 10.3) and went red on
+  the lines' fixed guard of more than 10 a second, which is there so that a clock that
+  never ran cannot pass a ratio at 0 of 0. The busy machine misses half the refreshes
+  on purpose, so a runner handing 22 of 60 hands 11. The guard is now 20 counted in the
+  seconds measured (the same 10 a second for the 2 s idle phases), and the busy phases
+  measure for 4 s, so they count as many refreshes as an idle phase. Five Mac runs
+  since #236 read the busy wall's asks at 8.9 to 24.3 a second, 36 to 97 counted now.
+  The `check-skeptic` found what the old guard had been standing in for, both now
+  checked: the busy phases were placed by a 500 ms reading of the refresh, which a
+  starved runner can read as two (half a refresh behind landed a whole one behind), and
+  are now placed by the shortest refresh the idle phases read (and the idle phases by the
+  shortest read so far, which put three quarters behind at one and a half on the same
+  emulation); and a runner whose two
+  windows miss different refreshes puts the floor's bar under what a right gate draws,
+  so the fault the phase is for (the gate turning down the show's own next frame)
+  cleared it. On one refresh the slots served must now be at most 1.15 of either
+  window's frames (the Mac reads 1.00 to 1.02).
+- `wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
+  own next frame on a runner whose two windows are handed different refreshes (the Mac
+  read 1.69 slots per window's frame there once, with the gate right); only the one-refresh
+  busy phase and the arithmetic catch it. The `check-skeptic`'s mutant turning down one of
+  the show's frames in two passed every in-app clock line, idle and busy, though the
+  comment on the floor says it is under it; only the arithmetic lines caught it. Build
+  that mutant as a control and make an in-app line see it.
 - `render-app`'s "the live loop draws again after every render" wants more than 5
   frames in the half second after each render, and read 5 after render M (music
   playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
