@@ -456,8 +456,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # swirl-laptop and swirl-phone: PLAN 22k's measurement, for this PR only.
-        shard: [show, tools, plate, open, swirl-laptop, swirl-phone]
+        shard: [show, tools, plate, open]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -658,18 +657,6 @@ jobs:
       - name: The ferrofluid through the whole plate
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run ferropour
-      # PLAN 22k, for this PR only: what the spun dish's swirl costs on the
-      # nine thin looks with music routed to rotation (scripts/swirlcost.mjs).
-      - name: The swirl's cost
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && startsWith(matrix.shard, 'swirl-') }}
-        run: node scripts/swirlcost.mjs --screen ${{ matrix.shard == 'swirl-phone' && 'phone' || 'laptop' }}
-      # And three of them with the motors #261 (PLAN 22j) gives them.
-      - name: The swirl's cost, with #261's motors
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && startsWith(matrix.shard, 'swirl-') }}
-        run: >-
-          node scripts/swirlcost.mjs --screen ${{ matrix.shard == 'swirl-phone' && 'phone' || 'laptop' }}
-          --looks acid-trip,cyberpunk,stardust-collapse
-          --patch '{"acid-trip":{"rotationSpeed":0.421},"cyberpunk":{"rotationSpeed":0.287},"stardust-collapse":{"rotationSpeed":0.282}}'
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

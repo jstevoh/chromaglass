@@ -234,7 +234,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
-  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22k** (~~22h~~ #252). Painters: **21b**, **21d**. The
+  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22j** (~~22h~~ #252, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 
@@ -310,7 +310,7 @@ Where each batch stands, as of 2026-09-27:
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
-| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22b–22g, 22i–22k open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`). 22k, what the swirl costs on the music looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22j open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -5069,13 +5069,55 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   against it, but a dish turning steadily under its liquid drags the liquid round with
   it and leaves nothing to stir once the liquid has caught up. Replace it with the dish
   (the swirl already carries what the glass does), and retune the looks that lean on it.
-- **22k. The swirl runs on every look with music routed to rotation.** Since 22h a
-  music look's dish sways under its liquid, so Ω − ω_l is over the swirl's 1e-3 rad/s
-  floor most of the time (above): thirteen more dispatches a step on the current's
-  half grid (spinSwirl, its divergence, ten pressure sweeps, the gradient). At 1e-3
-  rad/s the swirl moves the liquid at most 0.1 mm/s at the rim, a tenth of a cell a
-  second. Measure the cost on the Mac (`npm run stages`), and set the floor from the
-  travel it would make in the drag time (a fraction of a cell) rather than a speed.
+- ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and
+  cut** (#258). Since 22h a music look's dish sways under its liquid, so Ω − ω_l is over the
+  swirl's 1e-3 rad/s floor nearly all the time: on CI's Mac, with the built-in band playing,
+  the swirl ran on 91–100% of the nine thin looks' steps. It was thirteen dispatches a step on
+  the current's half grid (spinSwirl, its divergence, ten Jacobi sweeps, the gradient).
+
+  What it cost, timed on the GPU (`npm run swirlcost`: a run of swirl stages back to back,
+  submit to done, the slope between two counts so the submit's own cost drops out), laptop
+  and phone layouts, the governor's own grid (256² on CI's Mac):
+
+  | | thirteen dispatches (before) | one (now) | GPU share now, at the steps that ran it |
+  |---|---|---|---|
+  | phone, nine looks (median) | 105 µs a step | 45 µs | 0.07% (14 steps/s) |
+  | laptop, nine looks (median) | 272 µs | 75 µs | 0.17% (22 steps/s) |
+  | Acid Trip, Cyberpunk, Stardust Collapse at #261's motors, phone | 97–110 µs | 41–51 µs | 0.07–0.08% |
+
+  So it was never a frame-rate problem: under 1% of the GPU's time before, under 0.2% now,
+  and the frame rate alone cannot see either. The same page alternated swirl on and off
+  read 26.4 against 27.3 fps on the phone and 40.9 against 42.2 on the laptop, but each
+  look's own pair scattered by five frames either way and an earlier run of the same app
+  read 30.6 against 30.3. The laptop's bench is the noisier: its first form (20 and 220
+  stages) read three looks in twelve negative, so the script now times 20 and 1020; the
+  table's laptop row is the median of that first form.
+
+  The cut is physics, not a shortcut. On a thin plate the swirl field is the dish's drive,
+  a speed at the rest gap, handed to the thin solve with the current; the solve makes the
+  whole flow conserve liquid, ∇·(hu) = 0, by its multigrid. Projecting the drive first by
+  ten Jacobi sweeps of ∇·u = 0 did a weaker version of the same job with the operator that
+  ignores the gap, so it is gone: one dispatch, spinSwirl alone. `npm run dish` (lab): a
+  pressed palm 0.307 → 0.306 of A r, the plate away from it 6.08e-3 → 6.04e-3. The old plate
+  (Thin Gap off) keeps its projection, because nothing after the swirl projects it there.
+
+  The floor stays a speed. Set from the travel it makes in a drag time, it would have saved
+  steps; at a twentieth of a percent of the GPU there is nothing worth saving, and a lower
+  floor would only run the swirl on more of a song.
+
+  Found along the way:
+  - **CI's Mac grants no timestamp queries.** `chromaglassDebug().webgpu.timestamps` reads
+    false there and the profiler reads nothing, so `npm run stages` and `npm run ladder`
+    measure nothing on CI; only the owner's machine gives per-pass times. `benchSwirl`'s
+    submit-to-done timing is the way round it for one stage.
+  - **`npm run flick` read the plate between frames.** It went red once on #258 (water at
+    0.117 against the drag time's 0.179) on an app it had passed an hour before: it took the
+    page's clock at the read against the last frame's speeds. It now times by the plate's
+    own clock (`chromaglassDebug().frameAt`) and read 0.188 against 0.188.
+  - **22g's thin palm reads 0.307 in the lab, not the 0.607 written there,** on main before
+    this change. Still over the check's half of the old plate's 0.534, but by 15% where it
+    was by more than double. Find what moved it (#248 Thin Gap everywhere, #255 the thin
+    forces, or the lab's own plate) and either restore it or write down why it moved.
 - **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
   angular speed round the middle, held to a turn and a half a second, because near
   the middle a small move is a large angle. A hand's real torque is its friction
