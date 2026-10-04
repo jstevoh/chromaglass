@@ -1168,13 +1168,19 @@ Open, from building 9i:
   0.5, 1 and 2). It is the performer's, kept across looks (`RIG_KEYS`) and never
   drifted, on the Settings sheet, the desks' Magnet options (right-click the Magnet)
   and the phone's Magnet panel (tap the Magnet twice), and MIDI-learnable. The
-  governor's new solver gets the pool back where the magnet is, not the look's ring.
+  governor's new solver gets the pool back where the magnet is, not the look's ring,
+  and nothing at all while the Magnet is picked and untouched.
   The tools' options (right-click a tool) opened beneath the plate on the Design desk,
   only their bottom edge showing under the canvas; they go to the page's body now.
   `npm run magnet` asks that picking pours nothing and puts no magnet under the
   plate, nine seconds on too; that the first touch brings one pool under the hand
   and draws it; that a drag carries it at least half way to where the hand ends;
-  and that Size reaches the solver's step as height ×k and strength ×k³. `npm run
+  that Size reaches the solver's step as height ×k and strength ×k³; and, on its own
+  page with the governor held at 512² (`rung=2`) and stepped down on purpose
+  (`stepDownFrames`) twice, that a new grid
+  lays nothing on an untouched plate and only the hand's pool, once, at the magnet
+  moved from where the pool was poured (another PR's run caught main's ring laid again by the governor, lays 1 → 2,
+  grid 384² → 256²). `npm run
   phone` asks that Size is under the Magnet's Amount and moves the setting. The
   pool still reads as a black disc with domes round its rim, because the plate
   cannot open gaps between domes yet: that is 9t's standing-domes plate PR.

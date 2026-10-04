@@ -26,6 +26,9 @@
  *   6. Magnet Size reaches the solver: a bigger magnet is the same field
  *      reaching further (lib/magnetSize.ts), k times deeper with k³ the
  *      strength, so the spikes over it start where they did
+ *   7. a new grid (the quality governor stepping down) with the Magnet in
+ *      hand lays nothing on an untouched plate, and only the hand's pool,
+ *      at the magnet, once it has brought one: never the look's ring again
  *
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
@@ -454,6 +457,128 @@ try {
   check('Magnet Size makes the held magnet reach further with the same field over it',
     sizes[0] === 0.1 && sizes[1] === 0.9 && !!small?.held && !!big?.held && Math.abs(hRatio / k - 1) < 0.01 && Math.abs(sRatio / (k ** 3) - 1) < 0.01,
     `set from the desk's Magnet options: ${sizes.join(', then ')}; held at Size 0.1: ${fmt(small)}; at 0.9: ${fmt(big)}; height ×${hRatio.toFixed(3)} (asked ×${k.toFixed(3)}), strength ×${sRatio.toFixed(3)} (asked ×${(k ** 3).toFixed(3)})`);
+
+  /*
+    7. A new grid while the Magnet is in hand lays only what the hand brought.
+
+    The quality governor moves the solver to another grid when the machine
+    falls behind, and a new solver is given the ferrofluid again (the frame
+    loop's phaseSolverRef). Before 9x that lay was the look's ring: main's
+    old check of the ring read "the ferrofluid was laid again (lays 1 → 2,
+    grid 384 → 256) while the middle was watched" on another PR's run, the
+    governor stepping down and pouring the ring afresh. The pick pours
+    nothing now, so the same path must lay nothing on an untouched plate,
+    and only the pool, at the magnet, once a hand has brought one: never the
+    ring, never the magnet under the middle, and not a second pool beside
+    the one carried across (the held magnet's own pour asks whether the
+    solver has a phase, which the carry has given it by then).
+
+    Its own page, because the drag above pins its grid (sim=256) to keep the
+    governor still, and a pinned grid turns the governor off. Here the
+    governor is on and held on one rung (rung=2, 512² at one device pixel)
+    so it neither climbs nor falls on its own, and it is stepped down on
+    purpose (stepDownFrames, the same door crash.mjs uses for S3; a lost
+    rung is never climbed back to) until the lead solver really is a new
+    size: 512² for the untouched plate, 384² for the held one. Opened at
+    gpu=mid's own 384² the second step had nowhere to go but 256², the
+    bottom, and the first page is closed so its show is not drawing on the
+    same GPU meanwhile.
+  */
+  await page.close();
+  const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page2.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
+  await page2.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&rung=2&set=magnetSize=0.9${engineQuery()}`, { waitUntil: 'load' });
+  await page2.waitForTimeout(9000);
+  const counts2 = () => page2.evaluate(() => {
+    const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep;
+    return {
+      grid: d.fluids?.[0]?.gpu?.N ?? 0, lays: d.phaseLays?.() ?? -1, pools: d.magnetPools?.() ?? -1, relays: d.magnetRelays?.() ?? -1,
+      strength: st ? +st.magnetStrength : null, magnets: d.magnets?.().length ?? null, governed: !!d.status?.governed,
+    };
+  });
+  const phase2 = (at = null, reach = 0.18) => page2.evaluate(async ({ at, reach }) => {
+    const f = await window.chromaglassDebug().readPhase();
+    if (!f) return { total: -1, x: 0, y: 0, near: 0, n: 0 };
+    const { n, data } = f;
+    let total = 0, cx = 0, cy = 0, near = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const v = data[x + y * n];
+      total += v; cx += v * (x / n); cy += v * (y / n);
+      if (at && Math.hypot((x + 0.5) / n - at.x, (y + 0.5) / n - at.y) < reach) near += v;
+    }
+    return { total: total / (n * n), x: total ? cx / total : 0, y: total ? cy / total : 0, near: total ? near / total : 0, n };
+  }, { at, reach });
+  /**
+   * Step the governor down until the lead solver is on a new grid: the grids
+   * it went through, and whether it got there (a solver, of another size: a
+   * moment with none between two of the same size is not a new grid).
+   */
+  const newGrid = async () => {
+    const from = (await counts2()).grid, seen = [from];
+    for (let i = 0; i < 4; i++) {
+      await page2.evaluate(() => window.chromaglassDebug().stepDownFrames(1));
+      await page2.waitForTimeout(2500);
+      const g = (await counts2()).grid;
+      if (g !== seen[seen.length - 1]) seen.push(g);
+      if (g > 0 && from > 0 && g !== from) return { seen, moved: true };
+    }
+    return { seen, moved: false };
+  };
+  const bare = await phase2();
+  await page2.mouse.click(5, 5);
+  await page2.keyboard.press('m');
+  await page2.waitForTimeout(1500);
+  const picked2 = await counts2();
+  const grids1 = await newGrid();
+  await page2.waitForTimeout(3000);
+  const regrid1 = await counts2(), plate1 = await phase2();
+  check('a new grid with the Magnet picked and untouched lays nothing: no ring, no magnet under the middle',
+    grids1.moved && grids1.seen[0] === 512 && picked2.lays >= 0 && picked2.relays >= 0
+      && regrid1.lays === picked2.lays && regrid1.pools === 0 && regrid1.relays === picked2.relays
+      && regrid1.strength === 0 && regrid1.magnets === 0 && plate1.total >= 0 && plate1.total <= Math.max(0, bare.total) + 0.001,
+    `grid ${grids1.seen.join(' → ')}² (governed ${regrid1.governed}); laid ${picked2.lays} → ${regrid1.lays} times, ${regrid1.pools} pools, ` +
+    `carried ${picked2.relays} → ${regrid1.relays}; the step's magnet strength ${regrid1.strength}, ${regrid1.magnets} magnets; ` +
+    `ferrofluid ${(bare.total * 100).toFixed(2)}% of the plate before, ${(plate1.total * 100).toFixed(2)}% after`);
+
+  // Still, for the same reasons as the drag above: the carry goes where the magnet is.
+  await page2.evaluate(() => {
+    const d = window.chromaglassDebug();
+    Object.assign(d.settings, {
+      rotationSpeed: 0, audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' },
+      turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0, globalSpeed: 0.025,
+    });
+  });
+  const box2 = await (await page2.$('canvas')).boundingBox();
+  await page2.mouse.move(box2.x + box2.width * 0.25, box2.y + box2.height * 0.5);
+  await page2.mouse.down();
+  await page2.waitForTimeout(1500);
+  const touched2 = await counts2();
+  /*
+    Then moved, held, 0.2 of the canvas on, so the magnet is no longer where
+    the pool was poured: a carry laid at the pool's first place rather than
+    at the magnet reads under 0.7 near the hand, since the new solver starts
+    with no phase of its own.
+  */
+  for (let i = 1; i <= 10; i++) {
+    await page2.mouse.move(box2.x + box2.width * (0.25 + 0.02 * i), box2.y + box2.height * 0.5);
+    await page2.waitForTimeout(60);
+  }
+  await page2.waitForTimeout(500);
+  const grids2 = await newGrid();
+  await page2.waitForTimeout(2000);
+  const hand2 = await page2.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  const handAt = hand2 ? { x: Math.max(0.05, Math.min(0.95, hand2.x)), y: Math.max(0.05, Math.min(0.95, hand2.y)) } : null;
+  const regrid2 = await counts2(), plate2 = await phase2(handAt);
+  await page2.mouse.up();
+  const offMiddle2 = handAt ? Math.hypot(handAt.x - 0.5, handAt.y - 0.5) : 0;
+  const ofPool = plate2.total / POOL;
+  check('and once the hand has brought its pool, a new grid carries that pool to the magnet and nothing else',
+    grids2.moved && touched2.pools === 1 && regrid2.pools === 1 && regrid2.lays === picked2.lays && regrid2.relays === touched2.relays + 1
+      && ofPool > 0.5 && ofPool < 1.6 && plate2.near > 0.7 && offMiddle2 > 0.15,
+    `grid ${grids2.seen.join(' → ')}²; ${touched2.pools} pool from the touch, ${regrid2.pools} after; laid ${picked2.lays} → ${regrid2.lays} times; ` +
+    `carried ${touched2.relays} → ${regrid2.relays}; ferrofluid ${(plate2.total * 100).toFixed(2)}% of the plate, ${ofPool.toFixed(2)} of the pool's ` +
+    `(the ring is about 22%), ${(100 * plate2.near).toFixed(0)}% of it within 0.18 of the hand at ${handAt ? `${handAt.x.toFixed(2)},${handAt.y.toFixed(2)}` : 'nowhere'}, ` +
+    `${offMiddle2.toFixed(2)} from the middle; centre of mass ${plate2.x.toFixed(2)},${plate2.y.toFixed(2)}`);
 } finally {
   await browser.close();
 }

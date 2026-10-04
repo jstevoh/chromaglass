@@ -561,7 +561,8 @@ jobs:
       # working", then "a giant black hole as soon as you pick it"): picked
       # it changes nothing on the plate, the first touch brings a pool under
       # the hand as big as Magnet Size, a drag carries that pool with it,
-      # and Size reaches the solver.
+      # Size reaches the solver, and a new grid (the governor stepping down)
+      # lays nothing but that pool, never the look's ring.
       - name: The magnet moves the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run magnet
