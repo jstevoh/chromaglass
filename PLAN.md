@@ -2880,7 +2880,7 @@ for, and the GPU was asked for only after they had arrived and drawn.
   restrict and zero) could be one dispatch writing both, which is fewer compiles and
   fewer dispatches a step. Each fusion changes the solver's step, so each wants
   `physics`, `thingap` and the Mac's frame time, not just `startup`.
-- **Fixed after it shipped (2026-10-04): one render pipeline compiling at a time.**
+- **Changed after it shipped (2026-10-04, #254): one render pipeline compiling at a time.**
   Main's deploy of 5505a2a (run 37196539858) went red on `startup` 4b: the page's
   thread held 4.98 s from 0.96 s, against the 4.5 s cap. The three render pipelines
   asked first (display, derive, the air's splat) did not compile side by side: each
@@ -2891,7 +2891,8 @@ for, and the GPU was asked for only after they had arrived and drawn.
   to 4.5 s in whatever was compiling, once with nothing asked yet. So
   `buildInTurn` now compiles one render pipeline at a time, the display still
   first, the other lanes taking kernels beside it. So what the page asks does move
-  when Chromium's hold at the GPU's start ends: it can lengthen it.
+  when Chromium's hold at the GPU's start ends: it can lengthen it. Its Mac numbers
+  (the hold, the display's compile alone, the first step) go here once read.
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure
@@ -2957,17 +2958,21 @@ the hand held both 150 ms and three frames with no move (`BLOW_STRAW_FRAMES`).
 `tools` asks that the stroke blows no straw before its first move
 (`blowSteps.strawFirst`), and prints the stroke's straw steps under "keeps it".
 
-**Fixed after it shipped (2026-10-04): the push was judged against its own wake.**
+**Changed after it shipped (2026-10-04): the push was judged against what came after it.**
 Main's deploy of 5505a2a (run 37196539858) went red on `tools`' "pushes the colour
 along": the wind moved the pool's middle +0.70% of the plate toward B, against
 +0.56% to beat, all of it from the window left alone *after* the stroke (+0.39%;
 the window before read -0.00%). With the ambient seeder off (#249) the window before
 read -0.08% to +0.00% on all five runs that reached the line, and the window after
-+0.24% to +0.39%, toward B every time: the wind's liquid still going once let go, not
-the plate's own drift. And since Thin Gap is on in every look (18a-every) the stroke's
-own push is smaller (+0.70% to +2.31% on main's code, was +0.76% to +4.15%), so its
-wake is a larger share. The push is now held to the window before only; the window
-after is printed, not judged.
++0.24% to +0.39%, toward B every time. And since Thin Gap is on in every look
+(18a-every) the stroke's own push is smaller (+0.70% to +2.31% on main's code, was +0.76% to +4.15%), so the
+drift is a larger share. Whether it is the wind's liquid still going is not settled:
+the thin gap lets go of a velocity in about a tenth of a second, and the window opens
+0.7 s after the stroke; a drift that starts with the stroke and runs on would also
+pass a wind that pushed nothing. So the window after is split in two: the plate's own
+drift is the faster of the window before and the second half after (never below
+zero), and the first half after is printed, not judged. What the two halves read on
+the Mac says which it is.
 
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
