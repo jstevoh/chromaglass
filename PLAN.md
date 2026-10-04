@@ -334,6 +334,14 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   Hold, write the camera's current centre into the aim. Desk, phone
   (`PhoneStage.tsx`), and it shows on the wall.
 
+- **QA-16** On Roy, 1963 a green dye cannot be added: it prints as another colour.
+  Desk (the owner's report from the corner dot, plate `roy`). Likely cause, read in
+  the code but not yet run: the Ben-Day print snaps every pixel's hue to the nearest of
+  three inks (`benDayInkIndex` in `src/gpu/wgsl/plate.ts`, red, yellow or blue), so a
+  green lands on yellow or blue. A real comic printed green as yellow and blue dots
+  overlapping on the paper; doing that keeps the three inks and gives back green,
+  orange and purple. Next to QA-15; deferred with it.
+
 **Tier 3. On the wall, it looks wrong.**
 
 - **QA-7** Looks read as pixelated, "very digital", on a laptop. Wall, desk. Draft #267.
