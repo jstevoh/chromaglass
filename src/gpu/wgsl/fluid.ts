@@ -708,7 +708,7 @@ fn upwind(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
   not pour each dome into the gap beside it.
 
   What was reported: with the domes on, a pool held under the hand threw
-  half the fingers past its rim (npm run fingers: 6/4/5/2 on the Mac
+  half the fingers past its rim (6/4/5/2 on the Mac in npm run fingers,
   against main's 12/9/9/3). Measured in the lab at the end of that run,
   the film's window held 7212 of the pool's 13029 where the same run
   with the film off held 5429: the window had stepped the plate's flow
