@@ -32,8 +32,8 @@
  *      liquid, not a push spread over the plate.
  *   2. The colour on the stroke's path goes the stroke's way: the bands'
  *      centre of mass within 0.02 of the path moves at least 2% of the
- *      plate along it (2.8% measured in software), where left alone it
- *      moves under 0.5%.
+ *      plate along it (2.2% measured in software, 2.8% on the carries' old
+ *      faces), where left alone it moves under 0.5%.
  *   3. A pool of ferrofluid on the path is carried along it by the flow
  *      alone, at least 6% of the plate (13.8% measured; the Finger's
  *      hand-written carry was held to 2% in `npm run ferrohands`), and
@@ -43,21 +43,25 @@
  *      hand faster than they allow left the pool behind it: 8.6% against
  *      13.1% before they followed the hand, 12.6% against 13.8% after.
  *   4. A drop of oil on the path is carried along it, at least 6% of the
- *      plate (12.2% measured).
- *   5. Nothing is made or lost: the colour and the ferrofluid each to
- *      0.5%, the oil to 1% (check 5 says why the oil's is wider), and the
- *      plate left alone keeps its colour to 0.1%.
+ *      plate (10.4% measured, 12.2% on the carries' old faces).
+ *   5. Nothing is made or lost: the colour, the ferrofluid and the oil
+ *      each to 0.5%, and the plate left alone keeps its colour to 0.1%.
  *   6. And it stops when the hand stops: half a second on, the liquid
  *      where the hand stopped goes at under twice what the gap's drag time
  *      leaves of the hand's speed, e^(−0.5/τ).
+ *   7. A full pool (5.5 at its middle, the plate's cap is 6) keeps its
+ *      colour to 0.5% under a hand drawn as the pointer draws one, a cell
+ *      every third step, and the same pool left alone to 0.1%. Found by
+ *      the Mac's `npm run tools`: 40.5% of it was cut at the cap before the
+ *      carries took the thin solve's own faces.
  *
  * The old push (the velocity fingerDrag laid before) is run and printed as
  * the before: on a thin gap it moved the bands 0.13% and the pool 0.04%, as
  * the plate moves them alone.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
- * Linux box's software WebGPU anywhere else (PW_WEBGPU=1). About twenty
- * minutes in a cloud session.
+ * Linux box's software WebGPU anywhere else (PW_WEBGPU=1). About half an
+ * hour in a cloud session.
  */
 import { openLab } from './lab.mjs';
 
@@ -265,19 +269,20 @@ try {
   // 5.
   {
     /*
-      The colour and the ferrofluid to 0.5%, the oil to 1%. The oil is the
-      one field clamped to [0, 1] after its carry, so where the carry's face
-      velocities, rebuilt from the cells' (PLAN 18a-8), squeeze it at the
-      hand's soft edge it is cut and not kept: 0.44% of a drop drawn 0.4 of
-      the plate, measured in software, and 1.2% with a hand edge of a cell
-      and a half (lib/handSolid.ts, handEdge). And the plate left alone keeps
-      its colour to 0.1%, so the hand's share is not the plate's own.
+      The colour, the ferrofluid and the oil each to 0.5%. The oil had 1%:
+      it is the one field clamped to [0, 1] after its carry, and while the
+      carries crossed faces rebuilt from the cells' velocities (PLAN 18a-8)
+      they squeezed it at the hand's soft edge and the clamp cut it, 0.44%
+      of a drop drawn 0.4 of the plate (1.2% with a hand edge of a cell and
+      a half). On the thin solve's own faces (THIN_FACE) it keeps 100.00%,
+      as the colour does, so it is held to the colour's bar. And the plate
+      left alone keeps its colour to 0.1%, so the hand's share is not the
+      plate's own.
     */
     const ks = ['solid', 'solid fast', 'solid ferro', 'solid ferro fast', 'solid oil', 'solid maze fast', 'alone'];
     const off = (m, key) => Math.abs(m.t2[key] / m.t0[key] - 1);
-    const bar = (k) => k === 'solid oil' ? 0.01 : 0.005;
     check('none of the colour, the ferrofluid or the oil is made or lost',
-      need(...ks) && ks.every((k) => off(got[k], 'dye') < (k === 'alone' ? 0.001 : 0.005) && (got[k].t0.mass === 0 || off(got[k], 'mass') < bar(k))),
+      need(...ks) && ks.every((k) => off(got[k], 'dye') < (k === 'alone' ? 0.001 : 0.005) && (got[k].t0.mass === 0 || off(got[k], 'mass') < 0.005)),
       ks.filter((k) => got[k]).map((k) => `${k}: colour ${pc(got[k].t2.dye / got[k].t0.dye - 1)}${got[k].t0.mass > 0 ? `, the ${k.includes('oil') ? 'oil' : 'ferrofluid'} ${pc(got[k].t2.mass / got[k].t0.mass - 1)}` : ''}`).join('; '));
   }
   // 6.

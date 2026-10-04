@@ -3116,8 +3116,9 @@ export class WebGPUFluid {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       this.hsMob = buf('thin gap mobility', this.N);
-      // The thin solve's own P, packed as the old solver's pressure is. hsGradient
-      // hands the advections c·P in that one (wgsl/thinGap.ts, hsGradient).
+      // The thin solve's own P, packed as the old solver's pressure is. The thin
+      // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
+      // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
       this.hsGap = buf('thin gap before', this.N);
       this.hsMobC = this.mg.map((lv) => buf(`thin gap rim ${lv.n}`, lv.n));

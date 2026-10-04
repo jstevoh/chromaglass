@@ -226,7 +226,6 @@ fn packedAt(x: i32, y: i32, n: i32) -> f32 {
 }
 `;
 
-/** The same, sampled between cells, matching `bilerpN` exactly. */
 /*
   A face's velocity on a thin gap, as the thin solve made it conserve liquid
   (wgsl/thinGap.ts), for the carries that move what the liquid holds across
@@ -247,11 +246,12 @@ fn packedAt(x: i32, y: i32, n: i32) -> f32 {
   it as the pointer drags one, a cell every third step: the colour
   piled past the plate's cap of 6 a cell at the hand's rim, the cap cut it
   (capDye), and the pool lost 43% of itself in a stroke 0.16 of the plate
-  long (Mac CI's \`tools\` check: 222 → 161). The same flow through these
+  long (40.5% on the lab's longer Classic step, `npm run fingerflow`'s
+  check 7; Mac CI's `tools` check: 222 → 161). The same flow through these
   faces gathers nothing a converged solve did not.
 
-  Needs \`vel\` (the flow the carries ride, hsGradient's), \`pr\` bound to the
-  solve's own P, \`sq\` (the gap), \`mob\` (the mobility, negative past the
+  Needs `vel` (the flow the carries ride, hsGradient's), `pr` bound to the
+  solve's own P, `sq` (the gap), `mob` (the mobility, negative past the
   open rim, where P is held at zero) and the rest gap in A.b.w.
 */
 const THIN_FACE = /* wgsl */ `
@@ -281,6 +281,7 @@ fn thinFaceVel(a: vec2i, e: vec2i, n: i32) -> f32 {
 }
 `;
 
+/** The same, sampled between cells, matching `bilerpN` exactly. */
 const PACKED_BILERP = /* wgsl */ `
 fn packedBilerp(uv: vec2f, n: f32) -> f32 {
   let p = uv * n - 0.5;
@@ -3677,7 +3678,7 @@ function substepped(name: string): string {
 /*
   The same carries on a thin gap, through the faces the thin solve made
   conserve liquid (THIN_FACE) in place of faces rebuilt from the cells'
-  velocities: \`pr\` is bound to the solve's own P, and the gap and the
+  velocities: `pr` is bound to the solve's own P, and the gap and the
   mobility follow everything the kernel already takes. A.b.w is the rest gap.
 */
 function thinFaced(src: string, name: string): string {

@@ -46,13 +46,14 @@ export const HAND_GRIP = 40;
  * beside it reaches out over the Brinkman screening length, h/√12 for a gap
  * h (the in-plane viscosity against the glass's drag), about 1.7 mm in the
  * plate's 6 mm middle. So χ ramps from 1 to 0 over two of those, ending at
- * the finger's radius. It is the numbers' reason too: a hard edge (a cell
- * and a half, the first try) is a forty-fold jump in the liquid's mobility
- * within a cell, where the carries' face velocities are rebuilt from the
- * cells' (PLAN 18a-8), and a drop of oil drawn 0.4 of the plate lost 1.2% of
- * itself at the jump; over two Brinkman lengths (3.3 cells on the app's
- * 192), 0.44%, the stroke carrying it 12.2% of the plate against 12.5%
- * (`npm run fingerflow`, lab).
+ * the finger's radius. It was the numbers' reason too, while the carries
+ * crossed faces rebuilt from the cells' velocities (PLAN 18a-8): a hard edge
+ * (a cell and a half, the first try) is a forty-fold jump in the liquid's
+ * mobility within a cell, and a drop of oil drawn 0.4 of the plate lost 1.2%
+ * of itself at the jump, 0.44% over two Brinkman lengths (3.3 cells on the
+ * app's 192). The carries now cross the thin solve's own faces (THIN_FACE),
+ * which keep it whole (`npm run fingerflow`, lab), so the edge is the
+ * physics' alone.
  */
 export function handEdge(L: number): number {
   return (2 * 0.03 * L) / Math.sqrt(12);

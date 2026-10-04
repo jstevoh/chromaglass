@@ -691,6 +691,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     c·P is exact where c is flat and never corrects more than P would where
     it is not (c ≤ 1). The solve keeps P in a buffer of its own, so the old
     solver's pressure buffer only ever holds a pressure in its own sense.
+
+    On a thin gap the colour's and the oil's carries, carryCourant and the
+    ferrofluid's volume carry no longer read it: they cross the solve's own
+    faces from P and the mobility (THIN_FACE in wgsl/fluid.ts, PLAN 15b),
+    which are exact where c is not flat, at a hand's rim above all. What
+    still reads c·P here is phaseAdvect's area form (Phase Volume off, or
+    the step before it is primed) and the old plate's carries.
   */
   seen[hsPacked(q.x, q.y, n)] = select(pi * mi / h, 0.0, mob[q.x + q.y * n] < 0.0);
 }`,
