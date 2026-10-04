@@ -59,7 +59,7 @@ struct Sim {
   curDamp: f32,
   curBuoy: f32,
   curGrav: f32,
-  twist: f32,
+  spare25: f32,       // the motor's stir until PLAN 22j: the dish drags the liquid now
   meanD: f32,
   maxCur: f32,
   rock: vec2f,
@@ -1950,8 +1950,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
   if (r > 1e-4) { f += (toC / r) * (S.curGrav * dd); }
-  let w = 1.0 - smoothstep(0.0, 0.5, r);
-  f += S.twist * w * w * vec2f(toC.y, -toC.x);
   c = c * S.curDamp + f * (1.0 - S.curDamp);
   let s = length(c);
   if (s > S.maxCur) { c *= S.maxCur / s; }

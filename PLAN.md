@@ -234,7 +234,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: **20b, 20c, 20e, 20f**.
 - **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, **9v**, **9w**, **9m**,
-  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22k** (~~22h~~ #252). Painters: **21b**, **21d**. The
+  **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #259). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 
@@ -310,7 +310,7 @@ Where each batch stands, as of 2026-09-27:
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
-| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22b–22g, 22i–22k open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#259; `npm run turntable` 15); 22b–22g, 22i, 22k–22m open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -3703,7 +3703,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     at a time against `finger`, `wind`, `pressoil`, `ferrohands`, `tools`.
   - **18a-4, the current into the field.** The lasting current (`cur`) is fed into the
     thin solve as a force, but it still has its own solver on the M grid; its forces
-    (rock, twist, buoyancy, centre gravity) belong in the main field, and then the
+    (rock, buoyancy, centre gravity) belong in the main field, and then the
     current's solver and its 0.4 ms go.
   - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
     step, so the displaced volume leaves in one step, faster than the dye's face
@@ -4982,11 +4982,53 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
   time, so the swirl runs while they play; on deep-ocean and neon-coral-reef (thick)
   it is 0.003 rad and 0.0025 rad/s. Looks with no music and a motor (most) end Ωτ, a
   few thousandths of a radian, behind. Looks that do not turn are unchanged to the bit.
-- **22j. The look's motor still stirs the middle.** The twist's motor half
-  (`rotationSpeed` × CUR_TWIST round the middle) is kept because every look is tuned
-  against it, but a dish turning steadily under its liquid drags the liquid round with
-  it and leaves nothing to stir once the liquid has caught up. Replace it with the dish
-  (the swirl already carries what the glass does), and retune the looks that lean on it.
+- ~~**22j. The look's motor still stirs the middle.**~~ **Shipped** (#259). The
+  Rotation Speed dial stirred the current round the middle as well as turning the
+  dish: `rotationSpeed` × 30 in the solver's units, a swirl w(r)² fastest at the
+  centre and nothing at the rim (w = 1 − smoothstep(0, 0.5, r)), on the look's own
+  clock. A dish turning steadily under its liquid drags it round through the gap until
+  it turns with the glass, and leaves nothing to stir, so the stir is gone from the
+  solver (GPU and CPU) and the dish does what the glass does (22h's dishFrame and the
+  swirl). Its speed is ω(r) = 30 · dial · w(r)² · dt · Advection · 190/192 · 60
+  rad/s, and the lab held the stir to that before it went (thin gap and old plate
+  alike, within 2% from r = 0.05 to 0.35): acid-trip's 0.87 rad/s at r = 0.05 where
+  the formula says 0.89, 0.95 at the centre, against its motor's 0.001; Classic's
+  0.0019 at the centre against 0.00008. On every look with a motor the stir moved the liquid
+  twenty to a thousand times faster than the motor turned the dish. So each look's
+  dial was moved up the dial to turn its dish at the mean speed the stir and the old
+  motor gave the liquid in the projector's 16:9 window (the plate is drawn at 1.5
+  times the window's width, so the window is the middle ±1/3 by ±3/16 of the plate;
+  the stir's mean speed there is that of a rigid turn at 0.322 of its centre's), on the look's clock at rest, for the front plate: acid-trip 0.1 → 0.421
+  (0.306 rad/s, a turn every 20 s), cyberpunk 0.05 → 0.287 and stardust-collapse
+  0.06 → 0.282 (0.10 rad/s), boiling-point 0.218, timbre-shifter 0.202, fractal-dream
+  0.187, solar-flare 0.183 (0.02–0.04 rad/s), the rest 0.008 to 0.156 (under 0.01
+  rad/s), each to 3% of its target (`presets.ts`, the note above the list). And the
+  music's sway no longer carries the motor: with a band routed to rotation gone quiet
+  the sway is −0.8, which reversed the dial's share with the band's; harmless at a
+  thousandth of a radian a second, it would have turned acid-trip backwards at 0.24
+  rad/s in every quiet bar (`lookMotor`, `npm run turntable` 15). Lucky's dial rolls
+  0 to 0.2 (was 0.025). Judged on the Mac, `docs/judging.md` §28.
+- **22l. Nothing winds the middle against the rim now.** The stir was a differential
+  rotation, and some looks read by it (galaxy's spiral arms; its preset said so). A
+  steady dish under one liquid cannot make one; what does in a real show is a second,
+  smaller glass pressed into the middle and turned against the dish: under it the
+  liquid is sheared between two glasses and goes round at about the mean of their
+  speeds (Couette flow through the gap), outside it at the dish's, so the middle winds
+  against the rim along the top glass's edge. If the owner misses the spiral (§28),
+  build that as a tool or a setting, with the drag worked out from the gap as the
+  swirl's is, not as a stir.
+- **22m. What the retune left behind.** (1) The stir sped up and slowed with the
+  look's clock (the phrase's lean, the tempo's pace, a scene's swell, the Speed dial);
+  a motor does not, so a look whose clock leans a long way turns a little less with
+  its swells than it did. (2) The match is the front plate's; a back plate whose
+  Background Loop slows its clock had a slower stir, and now turns its dish as fast as
+  the front's. (3) Saved looks, scenes and set lists written before keep their old
+  dial (0.1 and under) and so lose most of their turn: a load could move an old
+  look's dial the way the presets were moved (it needs the look's Speed and Advection,
+  which a saved look has). (4) Since the motor is most of what turns acid-trip,
+  cyberpunk and stardust-collapse, their liquid turns faster than 0.05 rad/s all the
+  time and the swirl's centrifuge runs on every step there, not only while they play
+  (22k measures what the swirl costs).
 - **22k. The swirl runs on every look with music routed to rotation.** Since 22h a
   music look's dish sways under its liquid, so Ω − ω_l is over the swirl's 1e-3 rad/s
   floor most of the time (above): thirteen more dispatches a step on the current's

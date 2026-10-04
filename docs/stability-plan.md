@@ -198,11 +198,11 @@ Chromium, the day it was found) or read in the code.
       stored; the comment at the current's `tanh` records this failure once already
       ("the flow was wiped every step after it"). From the current, `safeVel` then
       zeroes the forced velocity in every cell, every step, until a rung change.
-      `writeSim` (`fluid.ts`) passes the step's parameters (twist, rock, mean density,
+      `writeSim` (`fluid.ts`) passes the step's parameters (rock, mean density,
       the gap's spring, …) unchecked, so one non-finite uniform is enough.
 
     **Do:** those stores guarded with `select(0, x, finite)`; `GpuStepParams` sanitised in
-    `writeSim`. **Measure:** a lab check that sets one step's twist to NaN and finds the
+    `writeSim`. **Measure:** a lab check that sets one step's rock to NaN and finds the
     plate moving again two steps later.
 19. **S19 — Dye Particles at full on a 1024² grid invalidates every step.**
     - *Read in the code.* `capacity = grid² × PER_CELL` (4) and `groups = ceil(live /

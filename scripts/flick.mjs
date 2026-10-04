@@ -29,8 +29,9 @@
  *      angle the liquid's speed integrates to, within 1.5× (about a twentieth
  *      of the glass's turn; rigid reads all of it);
  *   4. the solver was handed the dish's drag, Ω − ω_l, at least half the
- *      dish's speed, and the twist is the motor's alone, zero here: the
- *      flick no longer stirs the current with a term of its own;
+ *      dish's speed, and no stir of its own: the flick's stir in the
+ *      current went in 22h and the motor's in 22j, so the step has no
+ *      `twist` at all;
  *   5. two drag times later, the angle the picture has lost to the glass is
  *      the drag time's, to 15%: the speeds have nearly met by then and cannot
  *      tell τ apart, but the angle lost on the way is ∫(Ω − ω_l) and grows
@@ -85,7 +86,7 @@ try {
   check('the page is running the build that was just made', has, has ? 'flick() and liquidSpin present' : 'stale bundle');
   if (!has) process.exit(1);
 
-  // One plate, no motor, no music, no Auto Spin, no ambient drift on the twist:
+  // One plate, no motor, no music, no Auto Spin:
   // a flick is the only thing that turns the dish.
   const quiet = (viscosity) => page.evaluate(({ viscosity, drag }) => {
     const d = window.chromaglassDebug();
@@ -103,7 +104,7 @@ try {
     return {
       at: performance.now(), frames: d.frames ?? 0, dish: (d.spin.current[0] ?? 0) + (d.turntable.current[0] ?? 0),
       liquid: d.liquidSpin.current[0] ?? 0, angle: d.rotation.current[0] ?? 0,
-      handed: st ? (st.spinDish ?? 0) : null, twist: st ? (st.twist ?? 0) : null,
+      handed: st ? (st.spinDish ?? 0) : null, stir: st ? 'twist' in st : null,
     };
   });
   const flick = () => page.evaluate(() => {
@@ -169,8 +170,8 @@ try {
   check('and the picture turns with the liquid, not the glass', turned > 1 / 1.5 && turned < 1.5,
     `${(w.angle - f.angle).toFixed(4)} rad, the liquid's ${liquidTurn(f.dish, t).toFixed(4)}, the glass's ${glassTurn(f.dish, t).toFixed(3)}`);
   check('the solver is handed the dish\'s drag on the liquid, and the flick stirs nothing of its own',
-    w.handed !== null && Math.abs(w.handed) > 0.5 * Math.abs(w.dish) && w.twist === 0,
-    `Ω − ω_l ${w.handed?.toFixed(3)} rad/s, twist ${w.twist}`);
+    w.handed !== null && Math.abs(w.handed) > 0.5 * Math.abs(w.dish) && w.stir === false,
+    `Ω − ω_l ${w.handed?.toFixed(3)} rad/s, ${w.stir ? 'a twist in the step' : 'no twist in the step'}`);
 
   // ── 5: caught up ──
   await page.waitForTimeout(2 * TAU.thin * 1000);
