@@ -195,6 +195,18 @@ export interface GpuStepParams {
  * which is WebGL's alone, so the WebGL renderer narrows to its own class at
  * the one place it needs it.
  */
+/**
+ * What one solver hands the next when the grid moves (PLAN 9w): the liquids
+ * that live only on the GPU, copied out before the old solver goes. Opaque
+ * here; `gpu/fluid.ts` holds what is in it.
+ */
+export interface SolverCarry {
+  /** The grid it was copied from. */
+  readonly n: number;
+  /** Let its copies go. */
+  destroy(): void;
+}
+
 export interface PlateSolver {
   /** The physical grid it is solving on. */
   readonly N: number;
@@ -235,6 +247,15 @@ export interface PlateSolver {
   addRxn?(x: number, y: number, radius: number, what: { bz?: number; bzWake?: number }): void;
   addLiesegang?(x: number, y: number, radius: number, amount?: number): void;
   readonly chemistryLive?: { rxn: boolean; lies: boolean };
+  /**
+   * The liquids that never cross to the CPU (the ferrofluid, the mix, the
+   * reactions), copied for the solver that replaces this one, and laid onto
+   * that one's grid (PLAN 9w). Optional because only the WebGPU solver holds
+   * any; `takeOver` is false when it could not take the carry (another
+   * device's).
+   */
+  handOver?(): SolverCarry | null;
+  takeOver?(carry: SolverCarry): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number): void;
   /** Start a read and take whatever has landed; false before the first. */

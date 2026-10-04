@@ -3601,7 +3601,57 @@ fn main() {
   sub[2] = c;
 }`,
 
-  // Clear a field to a constant (A.a), used by clear() and the pressure warm start.
+  /*
+    A field carried onto a new grid (PLAN 9w): the old solver's texture, read
+    whole, written at this solver's size. A.a = (the old grid, this grid).
+
+    Each new cell takes the mean of the old cells under it, weighted by how
+    much of each it covers, which is the one resampling that keeps what the
+    field holds: a cell's value times its area, summed over the plate, comes
+    out the same on either grid to the last rounding. That matters because
+    these fields are amounts. The ferrofluid's is how much of each cell it
+    fills; the oil's is the same, and Cahn–Hilliard holds the total exactly
+    from then on (npm run physics). A bilinear read would put a little more
+    or less liquid on the plate at every move of the grid, and the governor
+    moves it whenever the frame time crosses a rung.
+
+    What it does not keep is an edge sharper than the coarser grid: going up,
+    an edge that was one old cell wide is a step two or three new cells wide,
+    which the field's own separation (phaseSeparate, mixRelax) narrows back
+    to its own width in a few steps; going down, an edge narrower than a new
+    cell is averaged into it, as it would be by any grid that size. Nothing
+    is clamped: a mean of values between 0 and 1 is between them already.
+
+    Reads by textureLoad, never a sampler, because the phase is r32float
+    and not filterable on every device.
+  */
+  carryArea: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  // Counted in integers, in old cells times the new grid: a new cell spans
+  // [id·old, (id+1)·old) and an old one [k·new, (k+1)·new), so every
+  // overlap is exact. In floats, a cell's edge 255 cells in was off by
+  // about 1e-5 of a cell and so was its weight.
+  let oldN = i32(A.a.x);
+  let newN = i32(A.a.y);
+  let me = vec2i(id.xy);
+  if (me.x >= newN || me.y >= newN) { return; }
+  let lo = me * oldN;
+  let hi = lo + vec2i(oldN);
+  let k0 = lo / newN;
+  let k1 = min((hi - vec2i(1)) / newN, vec2i(oldN - 1));
+  var sum = vec4f(0.0);
+  for (var y = k0.y; y <= k1.y; y++) {
+    let wy = min(hi.y, (y + 1) * newN) - max(lo.y, y * newN);
+    for (var x = k0.x; x <= k1.x; x++) {
+      let wx = min(hi.x, (x + 1) * newN) - max(lo.x, x * newN);
+      sum += f32(wx * wy) * textureLoad(src, vec2i(x, y), 0);
+    }
+  }
+  textureStore(dst, me, sum / (f32(oldN) * f32(oldN)));
+}`,
+
   fill: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {

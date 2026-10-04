@@ -33,7 +33,7 @@ import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
-import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
+import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
@@ -1151,6 +1151,23 @@ class FluidSimulation {
   */
   private gpuLanded = false;
   private seed: Float32Array[] | null = null;
+  /*
+    The liquids that never cross to the CPU (the ferrofluid, the mix, the
+    reactions), handed from the last solver to this one (PLAN 9w; handOver
+    in gpu/fluid.ts says why a copy on the GPU). Kept until this solver's
+    first readback lands, for the same reason as the seed above: a solver
+    swapped out before it has spoken (out of memory straight after a climb)
+    hands the next one this, not whatever it managed in a frame.
+  */
+  private carry: SolverCarry | null = null;
+  private carried = false;
+  /**
+   * Whether the attached solver opened on what the one before it handed
+   * over. The frame loop lays a look's ferrofluid on a new solver only when
+   * it did not: a solver that opened on the last one's plate already has
+   * the plate's ferrofluid, or none because there was none.
+   */
+  get openedOnCarry(): boolean { return this.carried; }
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
@@ -1284,12 +1301,10 @@ class FluidSimulation {
 
   /** Move the simulation onto the GPU. Whatever the CPU arrays hold becomes the opening state. */
   attachGpu(gpu: PlateSolver) {
-    if (this.gpu) {                       // resolution change: carry the field across
-      this.pullStateFromGpu();
-      this.gpu.dispose();
-    }
+    if (this.gpu) this.releaseGpu();      // resolution change: carry the field across
     this.gpu = gpu;
     gpu.clear();
+    this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -1308,9 +1323,23 @@ class FluidSimulation {
   /** Bring the field back to the CPU arrays and release the GPU solver. */
   detachGpu() {
     if (!this.gpu) return;
-    this.pullStateFromGpu();
-    this.gpu.dispose();
+    this.releaseGpu();
     this.gpu = null;
+  }
+
+  /**
+   * The plate off the attached solver before it goes: the dye and the flow
+   * to the CPU arrays, the rest as a carry for the next solver (handOver).
+   */
+  private releaseGpu() {
+    const gpu = this.gpu!;
+    this.pullStateFromGpu();
+    const next = gpu.handOver?.() ?? null;
+    if (next) {
+      this.carry?.destroy();
+      this.carry = next;
+    }
+    gpu.dispose();
   }
 
   /**
@@ -1385,6 +1414,8 @@ class FluidSimulation {
     // One frame of latency instead of a pipeline stall every frame.
     if (!this.gpu.readbackAsync()) return;
     this.gpuLanded = true;
+    // This solver has spoken, and has whatever it was handed: the copies can go.
+    if (this.carry) { this.carry.destroy(); this.carry = null; }
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
     for (let i = 0; i < GRID_AREA; i++) {
@@ -6310,23 +6341,33 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
         }
         /*
-          The phase goes to each new solver the lead plate gets, not only
-          the first. The governor rebuilds the solver a few seconds into a
-          show when it moves the grid, and the dye is carried across that
-          but the phase is not: Magnet Garden had its ferrofluid at 8 s and
-          a bare gold pool by 20.
+          The look's ferrofluid, laid on a new solver only when the plate's
+          own could not come with it.
 
-          The lay is the look's own pour, so ferrofluid a hand put down (the
-          bottle) is not what comes back: it comes back as the look's ring
-          while Ferrofluid is up. Carrying the phase across as the dye is
-          carried is PLAN 9w. Until 9x was taken out again the Magnet's own
-          pool was the one exception, laid again at the magnet; the Magnet
-          brings no ferrofluid now, so there is no pool of its own to carry.
+          The governor rebuilds the solver a few seconds into a show when it
+          moves the grid. The dye was carried across that and the phase was
+          not (Magnet Garden had its ferrofluid at 8 s and a bare gold pool
+          by 20), so every new solver got the look's ring again while
+          Ferrofluid was up. That put back the wrong ferrofluid: a pool
+          dragged into a shape came back as the ring, and ferrofluid poured
+          from the bottle on a look with none (Classic) came back as a ring
+          nobody poured, a different amount in a different place.
+
+          Now the old solver hands its ferrofluid to the new one, resampled
+          by area so the amount is the same (handOver and takeOver in
+          gpu/fluid.ts, PLAN 9w), and a solver that opened on that carry is
+          left alone, ferrofluid or none: a plate that had none had none
+          poured, and a new grid lays nothing on it (which `npm run magnet`
+          asks). The look's pour is for a solver that opened on nothing it
+          could take: the first one, for a look laid before it existed
+          (phasePending), or one after the device was lost, whose plate
+          comes back from the CPU's copy and whose ferrofluid never had one.
         */
-        const leadGpu = fluidsRef.current[0]?.gpu ?? null;
+        const lead = fluidsRef.current[0];
+        const leadGpu = lead?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
-          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+          if (leadGpu?.addPhase && (phasePendingRef.current || ((settingsRef.current.phaseAmount ?? 0) > 0.002 && !lead?.openedOnCarry))) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
