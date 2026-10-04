@@ -270,6 +270,32 @@ try {
     check(`${label}: a second tap on it opens its Amount`, amountUp);
     const magnetFingers = await visible(page, 'phone-press-fingering');
     const magnetGlass = (await visible(page, 'phone-press-thin')) || (await visible(page, 'phone-press-lift'));
+    /*
+      Magnet Size on the Magnet's own Amount (lib/magnetSize.ts), the
+      owner's "a magnet that I can control the size of": there under the
+      Amount with the Magnet in hand, and it moves the setting the solver's
+      magnet is sized by, read back from the app (not the slider's words,
+      which a slider wired to nothing would still change). Put back to the
+      middle after, the tool as it always was.
+    */
+    const magnetSize = await visible(page, 'phone-magnet-size');
+    let sizeUnder = false, sizeUp = null, sizeBack = null, sizeReset = null;
+    if (magnetSize) {
+      const amountBox = await box(page, 'phone-amount-slider'), sizeBox = await box(page, 'phone-magnet-size');
+      sizeUnder = !!amountBox && !!sizeBox && sizeBox.y >= amountBox.y + amountBox.height - 1;
+      const setting = () => page.evaluate(() => window.chromaglassDebug?.().settings?.magnetSize ?? null);
+      await page.getByTestId('phone-magnet-size').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(200);
+      sizeUp = await setting();
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(200);
+      sizeBack = await setting();
+      // Ten steps of 0.05 back to the middle, through the slider, and read back.
+      for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(200);
+      sizeReset = await setting();
+    }
     await tap(page, 'phone-tool-magnet');
     /*
       Fingering on the Press tool's own Amount (lib/squish.ts: the glass
@@ -325,6 +351,10 @@ try {
     check(`${label}: the Press's Amount has Thin Gap and Press Lift beside Fingering, and both reach the plate`,
       thinShown && liftShown && !magnetGlass && thinOn === 1 && /On/.test(thinSaid) && thinOff === 0 && liftUp === 1 && liftBack === 0,
       `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOn} ("${thinSaid}") then ${thinOff}; Press Lift ${liftUp} then ${liftBack}`);
+    const pressSize = await visible(page, 'phone-magnet-size');
+    check(`${label}: the Magnet's Amount has Size under it, and only the Magnet's, and it moves Magnet Size end to end`,
+      magnetSize && !pressSize && sizeUnder && sizeUp === 1 && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
+      `on the Magnet ${magnetSize}, on the Press ${pressSize}, under the Amount ${sizeUnder}, Magnet Size ${sizeUp} then ${sizeBack}, then ${sizeReset} put back`);
     await tap(page, 'phone-tool-press');
     await tap(page, 'phone-tool-magnet');
     // Closed, with the dock still up and Magnet still in hand: "not visible"

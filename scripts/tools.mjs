@@ -18,7 +18,9 @@
  *   Streak      lays dye along the stroke
  *   Finger      carries dye along the stroke, adds none, and stops when the
  *               hand stops (it used to go on pushing while held still)
- *   Blow        clears dye from under it
+ *   Blow        held still, blows a bubble that clears the dye from under it
+ *               to its rim; drawn across a pool, pushes the colour along and
+ *               keeps it (it erased it: PLAN.md §15c, and `npm run wind`)
  *   Press       pushes dye out from under the palm into a ring, keeping it
  *   Press, let go, on a thin gap (Thin Gap, PLAN §18a): the colour goes out
  *               under the palm and comes back when the hand lets go
@@ -278,6 +280,93 @@ try {
     `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after with the plate left alone as long`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
+
+  // ── Blow, moved ─────────────────────────────────────────────────
+  /*
+    The wind (PLAN.md §15c). A Blow drawn across the plate multiplied the
+    dye under it by 0.8 a step and moved nothing, so it wiped a trail out of
+    a pool rather than pushing it; it now carries the colour as the Finger
+    does. `npm run wind` measures the carry itself in the lab, where the old
+    eraser lost 21% of a pool and moved its middle 1.05% of the plate the
+    wrong way (it cleared the side the wind went to) while the carry kept
+    all of it and moved it 1.06% the wind's way. This asks the same of the
+    app through the real pointer, which is what the lab cannot: that a
+    moving Blow reaches the wind, not the straw or the old eraser.
+
+    Each against the plate left alone, before and after the stroke (the
+    Finger's bracket above): the pool the Dropper lays in 1.5 s varies with
+    the runner's speed (49 to 279 for the Finger's), and a settling pool
+    gains or loses on its own. So "along" has to beat the pool's own drift
+    by 0.002 of the plate (a fifth of the lab's move), and "keeps" may lose
+    no more than a tenth of the pool beyond the lower of the two windows
+    left alone, which the eraser's 21% fails even on the smallest pool.
+
+    And the app has to have run the wind, not the straw: the pointer's Blow
+    counts its steps each way and what the wind carried (blowSteps in
+    chromaglassDebug). A slow runner whose moves come further apart than
+    the 150 ms the wind is held for would blow the straw along the stroke,
+    and a middle that moved then would be the straw's, not the wind's.
+  */
+  {
+    await clear();
+    await pool(A);
+    await settle(3000);
+    const idleWindow = async (ms) => {
+      const p = await snap('wIdle0'); await settle(ms); await snap('wIdle1');
+      const a = await measure('wIdle0', p), b = await measure('wIdle1', p);
+      const steps = await page.evaluate(() => window.__toolSnaps.wIdle1.step - window.__toolSnaps.wIdle0.step);
+      return { total: b.total - a.total, cx: b.cx - a.cx, cy: b.cy - a.cy, steps };
+    };
+    const wIdle = await idleWindow(2500);
+    const steps0 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
+    const w0p = await snap('wind0');
+    await stroke('blow', A, B, 1500);
+    await settle(700);
+    await snap('wind1');
+    const steps1 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
+    const wIdleAfter = await idleWindow(2500);
+    const wa = await measure('wind0', w0p), wb = await measure('wind1', w0p);
+    const toB = (dx, dy) => (dx * dirB.x + dy * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
+    const wAlong = toB(wb.cx - wa.cx, wb.cy - wa.cy);
+    /*
+      The plate's own drift, signed, at the larger of the two rates toward
+      where the stroke went, over the solver steps the stroke spanned. The
+      first version took the larger drift either way (the absolute value) of
+      each window as it came. On CI that failed a wind that ran 40 wind steps
+      and carried 34.7 of colour: its middle moved 2.09% of the plate toward
+      B against 2.50% "left alone", from a pool of 56, and that printout never
+      said which way the plate had drifted. Two things were wrong with it,
+      and the check-skeptic review found the second:
+      - a drift away from B was charged against the wind, though it can only
+        hide a push, never fake one; only a drift toward B can pass a wind
+        that pushed nothing, so that is the one the stroke has to beat;
+      - the windows are not the same length. Each idle window is one 2.5 s
+        wait, but the stroke's is 2.5 s of waits plus the tool pick, 32
+        pointer round trips and React, so a plate drifting steadily toward B
+        at CI's 2.5% a window passes a wind that does nothing once the
+        stroke's window is about 8% longer. So each window is counted in the
+        steps it spanned (stepIndex, kept with the dye, as the Hover check
+        above does), and the drift is scaled to the stroke's span.
+      Both windows' drifts are printed signed, so the next failure says which
+      way the plate was going.
+    */
+    const strokeSteps = await page.evaluate(() => window.__toolSnaps.wind1.step - window.__toolSnaps.wind0.step);
+    const stepsOk = wIdle.steps > 0 && wIdleAfter.steps > 0 && strokeSteps > 0;
+    const idleB = toB(wIdle.cx, wIdle.cy), idleBAfter = toB(wIdleAfter.cx, wIdleAfter.cy);
+    const idleAlong = Math.max(idleB / Math.max(1, wIdle.steps), idleBAfter / Math.max(1, wIdleAfter.steps)) * strokeSteps;
+    const pct = (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
+    const straw = (steps1?.straw ?? 0) - (steps0?.straw ?? 0), wind = (steps1?.wind ?? 0) - (steps0?.wind ?? 0);
+    const carried = (steps1?.carried ?? 0) - (steps0?.carried ?? 0);
+    console.log(`     the stroke ran ${wind} wind steps and ${straw} straw steps; the wind carried ${carried.toFixed(1)} of colour`);
+    check('Blow drawn across a pool is the wind, and the wind carries colour', wind > straw && carried > 1,
+      `${wind} wind steps against ${straw} straw, ${carried.toFixed(1)} carried`);
+    check('and pushes the colour along', stepsOk && wa.total > 20 && wAlong > 0.002 + idleAlong,
+      !stepsOk ? `the plate did not step through every window (${wIdle.steps}, ${strokeSteps}, ${wIdleAfter.steps} steps)`
+        : `centre of mass moved ${pct(wAlong)} of the plate toward where the stroke went over ${strokeSteps} steps, against ${pct(idleB)} over ${wIdle.steps} before and ${pct(idleBAfter)} over ${wIdleAfter.steps} after left alone (${pct(idleAlong)} at the faster rate toward it over the stroke's steps), from a pool of ${wa.total.toFixed(0)}`);
+    const lowIdle = Math.min(wIdle.total, wIdleAfter.total);
+    check('and keeps it rather than erasing it', wa.total > 20 && (wb.total - wa.total) - lowIdle > -(0.1 * wa.total + 5),
+      `${wa.total.toFixed(0)} → ${wb.total.toFixed(0)}, against ${wIdle.total >= 0 ? '+' : ''}${wIdle.total.toFixed(0)} before and ${wIdleAfter.total >= 0 ? '+' : ''}${wIdleAfter.total.toFixed(0)} after with the plate left alone as long`);
+  }
 
   // ── Blow and Press ──────────────────────────────────────────────
   for (const t of ['blow', 'press']) {

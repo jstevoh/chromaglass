@@ -136,6 +136,7 @@ const SECTION_OF: Record<string, string> = {
   kaleidoSpin: 'kaleidoscope',
   kaleidoZoom: 'kaleidoscope',
   mazeDetail: 'physics',
+  magnetSize: 'physics',
   filmPhysics: 'camera',
   phaseDisplace: 'physics',
   oilBodies: 'physics',

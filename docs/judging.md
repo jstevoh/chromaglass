@@ -576,23 +576,7 @@ Magnet pressed under a pool:
 
 ---
 
-## 23. Beams, and tiles with no seam
-
-PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
-both with Light on **Add**:
-
-- one on **Front** and one on **Back**: where they cross is brighter, both
-  plates at once, and reads as two beams meeting;
-- both on **Wall**, each showing its own slice (Its own slice): the join
-  should vanish, no brighter band and no darker one, and the picture carries
-  on across it;
-- a little Edge on each: the outer edges soften and the join stays invisible;
-- whether the overlap of two plates is a light show's overlap is the
-  judgement this is for.
-
----
-
-## 24. The Press on the ferrofluid (PLAN 15d)
+## 23. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
 leave it the size it was. Now, with Thin Gap on (Settings → Squish Plate → Thin Gap),
@@ -620,33 +604,36 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
+## 24. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
 ---
 
-## 25. The Press draws the liquid back when you let go (Thin Gap, PLAN 18a)
+## 25. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
 
-With Thin Gap on, the Press no longer moves the colour out to a ring by hand: the
-glass bends into a bowl under the palm, the liquid it squeezes out carries the
-colour and the oil with it, and when you let go the glass comes back up in about a
-second and a half (half way, at the default Press Lift) and draws them back in. With
-Thin Gap off, every look presses as it did. Turn it on with Settings → Squish Plate
-→ Thin Gap, `?set=thinGap=1`, or on the phone on the Press's own Amount (tap Press
-twice).
+On Classic (a look with no ferrofluid), desk and phone:
 
-On Classic, then Oil & Water (Oil Bodies), then the look you play most:
-
-- press and hold for a second, then let go: the colour under the palm should go out
-  in a smooth ring and come back in as the glass lifts, most of the way within a
-  few seconds. Say if the return is too slow or too fast; Press Lift sets it (on the
-  phone, "Press · glass lifts");
-- on Oil & Water, the oil should go out and come back with its colour, not leave it
-  behind;
-- press near the dish's edge: what goes over the rim should come back over it;
-- with Fingering up: the lift still breaks into the spokes, now only as the glass
-  opening along them (the colour is drawn in by the flow, not pushed);
-- the frame time while pressing (below): the colour's carry runs in up to 33 short
-  substeps for the few steps the glass is closing fastest, and in one otherwise;
-- the owner picked every look (2026-10-03); that is its own PR, and until it lands
-  Thin Gap is off in every look.
+- pick the Magnet (M, or its button): the plate should not change at all;
+- touch and hold: a small black pool should appear under the hand and stand up
+  into spikes; drag it, and it should come with you. Say whether it is the right
+  amount of ferrofluid to start with;
+- right-click the Magnet on the desk (or tap it twice on the phone) and move
+  Size: a small magnet raises a few spikes under the fingertip, a big one a wide
+  hedgehog and pulls more gently from further off. Say whether the range is right
+  at both ends;
+- the pool still reads as a black disc with domes round its rim, not domes with
+  colour between them. That is the standing-domes work (PLAN 9t), not this.
 
 ---
 
@@ -727,6 +714,51 @@ press makes is visible or wants more.
 ```
 
 ---
+
+---
+
+## 29. Blow's wind (PLAN 15c)
+
+The Blow drawn across the plate used to wipe a trail out of the colour. Now it
+pushes the colour along and keeps it. On Classic, with a pool laid:
+
+- draw the Blow slowly through the pool: a tongue of colour should be pushed ahead
+  of the hand and pile up where it stopped, with no dark trail behind it;
+- stop and hold: the straw's bubble should start within a tenth of a second, and a
+  drag should no longer leave a string of small straw bubbles behind it;
+- on the phone, hold one finger (the straw) and drag a second across the colour: the
+  second pushes it; hold the second still and it should blow a small clear ring;
+- on Oil & Water, blow across a body: the oil and its colour should go together.
+
+Say if the wind now reads as too strong or too weak next to the Finger.
+
+---
+
+## 30. The Press draws the liquid back when you let go (Thin Gap, PLAN 18a)
+
+With Thin Gap on, the Press no longer moves the colour out to a ring by hand: the
+glass bends into a bowl under the palm, the liquid it squeezes out carries the
+colour and the oil with it, and when you let go the glass comes back up in about a
+second and a half (half way, at the default Press Lift) and draws them back in. With
+Thin Gap off, every look presses as it did. Turn it on with Settings → Squish Plate
+→ Thin Gap, `?set=thinGap=1`, or on the phone on the Press's own Amount (tap Press
+twice).
+
+On Classic, then Oil & Water (Oil Bodies), then the look you play most:
+
+- press and hold for a second, then let go: the colour under the palm should go out
+  in a smooth ring and come back in as the glass lifts, most of the way within a
+  few seconds. Say if the return is too slow or too fast; Press Lift sets it (on the
+  phone, "Press · glass lifts");
+- on Oil & Water, the oil should go out and come back with its colour, not leave it
+  behind;
+- press near the dish's edge: what goes over the rim should come back over it;
+- with Fingering up: the lift still breaks into the spokes, now only as the glass
+  opening along them (the colour is drawn in by the flow, not pushed);
+- the frame time while pressing (below): the colour's carry runs in up to 33 short
+  substeps for the few steps the glass is closing fastest, and in one otherwise;
+- the owner picked every look (2026-10-03); that is its own PR, and until it lands
+  Thin Gap is off in every look.
 
 ---
 

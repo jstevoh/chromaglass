@@ -16,7 +16,7 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
 import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
-import { fingerCarry, blowCarry } from '../src/lib/handCarry';
+import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
@@ -224,6 +224,46 @@ const api = {
   },
   /** What a hand's Finger and Blow carry of the ferrofluid, as the app works it out (lib/handCarry.ts). */
   fingerCarry, blowCarry,
+  /**
+   * A hand's Blow on the colour, as blowWind runs it on the app's mirror
+   * (lib/handCarry.ts: blowDye): `dye` is the mirror (rgba, L x L), the
+   * hand in its cells. With `apply` the take and the put go into the lab's
+   * own deltas, landing on the next flush as the app's do; either way it
+   * returns what moved, and the take and the put cell by cell.
+   */
+  blowDye(dye: number[], x: number, y: number, radius: number, strength: number, dx: number, dy: number, apply = true) {
+    const { L, dyeAdd, mul } = lab!;
+    const out = { mul: new Float32Array(L * L).fill(1), density: new Float32Array(L * L), densityR: new Float32Array(L * L), densityG: new Float32Array(L * L), densityB: new Float32Array(L * L) };
+    const moved = blowDye(dye, L, x, y, radius, strength, dx, dy, out);
+    if (apply) {
+      for (let i = 0; i < L * L; i++) {
+        mul[i] *= out.mul[i];
+        dyeAdd[i * 4] += out.densityR[i]; dyeAdd[i * 4 + 1] += out.densityG[i]; dyeAdd[i * 4 + 2] += out.densityB[i]; dyeAdd[i * 4 + 3] += out.density[i];
+      }
+    }
+    return { moved, mul: Array.from(out.mul), density: Array.from(out.density) };
+  },
+  /** The Blow's size and strength as the app's hands give them (lib/handCarry.ts). */
+  BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius,
+  /** The oil's half of the same Blow (blowOil), through the solver, as blowWind runs it. */
+  blowOil(x: number, y: number, radius: number, strength: number, dx: number, dy: number, N: number) { blowOil(lab!.solver, x, y, radius, strength, dx, dy, N); },
+  /**
+   * The old Blow on the colour, for the control (before PLAN.md §15c): a
+   * puff (blowAir) thinned every cell under it by 0.8, a directed blow (a
+   * remote hand's, blowDirected) by 0.15 at its middle falling to none at
+   * its rim. One step's worth.
+   */
+  eraseDye(x: number, y: number, radius: number, directed = false) {
+    const { L, mul } = lab!;
+    const r = Math.round(radius * L / 128), r2 = r * r;
+    for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
+      const d2 = i * i + j * j, nx = x + i, ny = y + j;
+      if (nx <= 0 || ny <= 0 || nx >= L - 1 || ny >= L - 1) continue;
+      if (directed) { if (d2 < r2) mul[nx + ny * L] *= 1 - 0.15 * (1 - Math.sqrt(d2) / r); continue; }
+      if (d2 >= r2 || d2 === 0) continue;
+      mul[nx + ny * L] *= 0.8;
+    }
+  },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */

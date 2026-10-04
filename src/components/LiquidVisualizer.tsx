@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import { fingerCarry, blowCarry } from '../lib/handCarry';
+import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
@@ -7,6 +7,7 @@ import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/draw
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
+import { sizedMagnet, magnetReach, MAGNET_POOL_RADIUS, MAGNET_POOL_FILL } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -183,10 +184,12 @@ interface LiquidVisualizerProps {
   soundBindings?: readonly SoundBinding[];
   onSoundTrigger?: (binding: SoundBinding) => void;
   /**
-   * A hand has just put a magnet under a look that has none of its own
-   * (magnetStrength 0): the app gives the look the magnet's strength, so
-   * that once let go it stays under the glass where the hand set it down
-   * (magnetFor). Called once per hold, from the frame that first holds it.
+   * A hand is holding a magnet under a look that has none of its own
+   * (magnetStrength 0), or no ferrofluid drawn (phaseAmount 0): the app gives
+   * the look the magnet's strength, so that once let go it stays under the
+   * glass where the hand set it down, and turns Ferrofluid up so the pool the
+   * hand brought is drawn (magnetFor). Asked a few times a second while held,
+   * until the settings say both.
    */
   onMagnetInHand?: () => void;
   /**
@@ -975,7 +978,7 @@ class FluidSimulation {
   // read* accessors, which serve a 192² downsample of the GPU field.
   gpu: PlateSolver | null = null;
   private dirty = false;
-  private mul: Float32Array;        // multiplicative dye change (blowAir thins by 0.8)
+  private mul: Float32Array;        // multiplicative dye change (a carry's take; the show's own puffs thin by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
   private squishSteps = 0;
   private squishLastAt = 0;
@@ -1102,7 +1105,7 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
-  /** The Press's oil, once a dye reading (squeezeOut). */
+  /** The Press's oil and the Blow's (squeezeOut, blowWind), once a dye reading. */
   private oilPressAfter = 0;
   /*
     A move not yet handed to the GPU. The reading to wait for was counted
@@ -2527,7 +2530,14 @@ class FluidSimulation {
     this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
   };
 
-  blowAir(x: number, y: number, radius: number, strength: number) {
+  /**
+   * A puff of air: out from the middle, with a swirl, and (`erase`) the dye
+   * under it thinned by 0.8 a step. The show's own puffs erase: a pour's
+   * burst, the automation's breath and a bubble's pop, where a clearing is
+   * the look. A hand's Blow does not (blowWind, PLAN.md §15c). No default:
+   * a new hand that called this for a breath would erase without a word.
+   */
+  blowAir(x: number, y: number, radius: number, strength: number, erase: boolean) {
     radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
     for (let i = -radius; i <= radius; i++) {
@@ -2562,6 +2572,7 @@ class FluidSimulation {
           const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
           this.vx[idx] += ((i / dist) + (-j / dist) * swirl) * strength;
           this.vy[idx] += ((j / dist) + (i / dist) * swirl) * strength;
+          if (!erase) continue;
           if (this.gpu) {
             this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
           } else {
@@ -2677,37 +2688,14 @@ class FluidSimulation {
    */
   private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): boolean {
     if (!this.gpu || !this.dyeMirrorCurrent()) return false;
-    let moved = false;
-    const dye = this.gpu.rbDyeView;
-    const N = this.size;
     // A short hop: far enough to read as carried, short enough that the dye
     // lands somewhere the finger is still touching.
     const hop = Math.max(1, Math.round(r * 0.45));
-    const r2 = r * r;
-    for (let j = -r; j <= r; j++) {
-      for (let i = -r; i <= r; i++) {
-        const d2 = i * i + j * j;
-        if (d2 > r2) continue;
-        const sx = Math.round(cx + i), sy = Math.round(cy + j);
-        const tx = Math.round(sx + ux * hop), ty = Math.round(sy + uy * hop);
-        if (sx < 1 || sy < 1 || sx >= N - 1 || sy >= N - 1) continue;
-        if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1) continue;
-        const si = sx + sy * N, ti = tx + ty * N;
-        const s4 = si * 4;
-        const amount = dye[s4 + 3];
-        if (!(amount > 1e-5)) continue;
-        const w = take * (1 - Math.sqrt(d2) / r);
-        if (!(w > 1e-4)) continue;
-        this.dirty = true;
-        moved = true;
-        this.mul[si] *= 1 - w;
-        this.density[ti] += amount * w;
-        this.densityR[ti] += dye[s4] * w;
-        this.densityG[ti] += dye[s4 + 1] * w;
-        this.densityB[ti] += dye[s4 + 2] * w;
-      }
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    if (carryDyeAlong(this.gpu.rbDyeView, this.size, cx, cy, r, ux, uy, take, hop, out) > 0) {
+      this.dirty = true;
+      this.dyeMoved();
     }
-    if (moved) this.dyeMoved();
     return true;
   }
 
@@ -2741,11 +2729,45 @@ class FluidSimulation {
           const sgn = side >= 0 ? 1 : -1;
           this.vx[idx] += (dx + (-j / r) * sgn * BLOW_SWIRL) * strength * w;
           this.vy[idx] += (dy + (i / r) * sgn * BLOW_SWIRL) * strength * w;
-          if (this.gpu) this.mul[idx] *= 1 - 0.15 * w;
-          else { const k = 1 - 0.15 * w; this.density[idx] *= k; this.densityR[idx] *= k; this.densityG[idx] *= k; this.densityB[idx] *= k; }
         }
       }
     }
+  }
+
+  /**
+   * A hand's Blow that is not the straw: the wind. It pushes the flow
+   * (along the way the hand went, or out from the middle held still) and
+   * carries the colour, and with Oil Bodies the oil with it, rather than
+   * erasing the colour under it as it did (PLAN.md §15c; blowDye in
+   * lib/handCarry.ts has the story and the numbers, `npm run wind` the
+   * check). The ferrofluid's half is blowPhase, which the hands call
+   * alongside, straw or wind. `dx`, `dy` of zero is held still.
+   *
+   * The carry acts once per reading of the dye, as the Finger's and the
+   * Press's do (dyeMoveAfter): the mirror is a frame or two old, and a carry
+   * run every step would take the colour it had already moved and put it
+   * down again. The oil keeps its own clock, the Press's (oilPressAfter),
+   * so a breath over a body with no colour under it is not carried every
+   * step at a share sized for one carry a reading. Returns the colour it
+   * moved (in the mirror's units), for `npm run tools`.
+   */
+  blowWind(x: number, y: number, radius: number, strength: number, dx: number, dy: number): number {
+    const moving = Math.hypot(dx, dy) > 1e-4;
+    if (moving) this.blowDirected(x, y, radius, strength, dx, dy);
+    else this.blowAir(x, y, radius, strength, false);
+    if (!this.gpu) return 0;
+    const N = this.size;
+    if ((this.lastSettings?.oilBodies ?? 0) > 0.001 && this.gpu.rbDyeLanded >= this.oilPressAfter) {
+      blowOil(this.gpu, x, y, radius, strength, dx, dy, N);
+      this.oilPressAfter = this.gpu.rbDyeIssued + 1;
+    }
+    if (!this.dyeMirrorCurrent()) return 0;
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    const moved = blowDye(this.gpu.rbDyeView, N, x, y, radius, strength, dx, dy, out);
+    if (!(moved > 1e-4)) return 0;
+    this.dirty = true;
+    this.dyeMoved();
+    return moved;
   }
 
   /**
@@ -4497,6 +4519,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
   const blowDirRef = useRef<BlowDir | undefined>(undefined);
+  /** The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`. */
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -4615,7 +4639,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     }
     // And it lands: a pour pushes the plate out of the way.
-    af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
+    af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25, true);
     if (bubbles > 0) {
       bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
     }
@@ -4763,12 +4787,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
+        // The wind carries the colour and the oil, as the mouse's does
+        // (blowWind, PLAN.md §15c); a directed one erased 15% a step at
+        // its middle, a puff 20% everywhere under it.
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
-          af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
-          af.blowPhase(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
+          af.blowPhase(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
         } else {
-          af.blowAir(x, y, 4, 0.06 * amt);
-          af.blowPhase(x, y, 4, 0.06 * amt, 0, 0);
+          af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
+          af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
         if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
@@ -4984,6 +5011,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // mount) owes its phase to the solver when it attaches: laid here it
       // went nowhere, and Magnet Garden opened as a bare gold pool.
       phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
+      // A look laid owes its own ferrofluid, not the Magnet's old pool.
+      if (phasePendingRef.current) magnetPoolRef.current = null;
       layPhaseRef.current(presetId);
     }
     for (const later of laid.slice(1)) {
@@ -5023,6 +5052,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
       phaseLaysRef.current++;
+      magnetPoolRef.current = null;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
@@ -5544,6 +5574,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
   /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
   const magnetToldRef = useRef(-Infinity);
+  /** How many pools the Magnet has brought to a bare plate (magnetFor), for the harness. */
+  const magnetPoolsRef = useRef(0);
+  /** The pool the Magnet brought, while it is the plate's ferrofluid: a look's lay (layPhase) or a clear forgets it. */
+  const magnetPoolRef = useRef<{ x: number; y: number; r: number } | null>(null);
+  /** How many times a new solver has been given that pool again, at the magnet, for the harness: a pool laid again is not a pool carried. */
+  const magnetRelaysRef = useRef(0);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5849,7 +5885,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           a hold told only once would then set down a magnet with none. The
           app ignores a call when the look already has its magnet.
         */
-        if (held && (settingsRef.current.magnetStrength ?? 0) <= 0 && now - magnetToldRef.current > 250) {
+        /*
+          And the ferrofluid, on a plate with none: a pool under the hand,
+          as big as this magnet stands up (lib/magnetSize.ts), the first time
+          it touches. Picking the Magnet used to pour the look's ring over the
+          whole plate, which was the owner's "giant black hole as soon as you
+          pick it". Laid here, before the app turns Ferrofluid up (so the
+          plate draws it), so the solver already has its phase when the
+          amount rises and the bare-plate pour below leaves it alone.
+        */
+        const leadGpu = held && hand ? lead?.gpu : null;
+        if (hand && leadGpu?.addPhase && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
+          const r = MAGNET_POOL_RADIUS * magnetReach(look.magnetSize ?? settingsRef.current.magnetSize);
+          const px = Math.max(0.05, Math.min(0.95, hand.x)), py = Math.max(0.05, Math.min(0.95, hand.y));
+          leadGpu.addPhase(px, py, r, MAGNET_POOL_FILL);
+          magnetPoolRef.current = { x: px, y: py, r };
+          magnetPoolsRef.current++;
+        }
+        const told = settingsRef.current;
+        if (held && ((told.magnetStrength ?? 0) <= 0 || (told.phaseAmount ?? 0) <= 0.002) && now - magnetToldRef.current > 250) {
           magnetToldRef.current = now;
           onMagnetInHandRef.current?.();
         }
@@ -5876,6 +5930,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
         }
+        /*
+          The magnet's size (Magnet Size, lib/magnetSize.ts): held or set
+          down it is the same magnet, k times deeper with k³ the strength,
+          so the same field over it reaching k times as far. Not the walk's:
+          that is the look's own magnet, which nobody's hand chose. Read
+          from the folded look, so a patch (a fader's LFO, the room, the
+          sound) aimed at Magnet Size moves it as it moves any other setting.
+        */
+        if (held || placed) ({ strength: ms, height: mh } = sizedMagnet(ms, mh, look.magnetSize ?? settingsRef.current.magnetSize));
         lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
         // The other fingers' magnets, while the first is held (see the hands
         // loop): each finger that held one within the same quarter second.
@@ -6247,7 +6310,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const leadGpu = fluidsRef.current[0]?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
-          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+          /*
+            Unless the ferrofluid on the plate is the pool the Magnet brought
+            (magnetFor): a new solver would pour the look's ring in its place,
+            the very pour picking the Magnet no longer makes. The pool goes
+            back where the magnet now is, which is where it had gathered.
+          */
+          const pool = phasePendingRef.current ? null : magnetPoolRef.current;
+          if (pool && leadGpu?.addPhase) {
+            const m = lastMagnetRef.current;
+            leadGpu.addPhase(m?.x ?? pool.x, m?.y ?? pool.y, pool.r, MAGNET_POOL_FILL);
+            magnetRelaysRef.current++;
+          } else if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
@@ -6284,14 +6358,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /*
           Ferrofluid turned up on a plate that has none: pour it. The phase
           was only ever laid with a look, so the Ferrofluid slider raised
-          mid-show (or the Magnet picked on a look without any) changed the
-          setting and left the plate bare.
+          mid-show changed the setting and left the plate bare.
         */
         {
           const amt = settingsRef.current.phaseAmount ?? 0;
           // Not when it was turned up for the Ferrofluid bottle: that one
-          // goes where it is dropped, not over the whole plate.
-          const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0 && activeToolRef.current !== 'magnet';
+          // goes where it is dropped, not over the whole plate. (The Magnet
+          // needs no exception: picking it no longer turns the amount up,
+          // and its first hold lays its pool before it does, so the plate
+          // is not bare by the time the amount rises: phaseIsLive.)
+          const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0;
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
               && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
             layPhaseRef.current();
@@ -6574,11 +6650,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const now = performance.now();
                 if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now };
                 const going = hand.blowDir && now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
-                af.blowPhase(x, y, 4, 0.06 * k, going ? going.x : 0, going ? going.y : 0);
-                if (activeLayerRef.current === 0 && still && primary) {
+                af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                /*
+                  The straw only when the hand is held, not moved, by the same
+                  clock the ferrofluid goes by. Asked of `still` (no move this
+                  step), a drag blew the straw on every step after a frame's
+                  first and on every frame the pointer did not report a move,
+                  which is most of them: a drag left a string of straw bubbles
+                  and ran the wind a step a frame at best, so the wind's carry
+                  (PLAN.md §15c) waited on the rare step that was both a wind
+                  step and a fresh reading of the dye.
+                */
+                if (activeLayerRef.current === 0 && !going && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
+                  blowStepsRef.current.straw++;
                 } else {
-                  af.blowAir(x, y, 4, 0.06 * k);
+                  // The wind: it carries the colour (and an oil body's oil)
+                  // the way the hand last went, as the ferrofluid above, or
+                  // out from under it held still; it used to erase it.
+                  blowStepsRef.current.carried += af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  blowStepsRef.current.wind++;
                   if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                     bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                   }
@@ -6814,7 +6905,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
-                  af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05);
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05, true);
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && DICE.evolve.float() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + DICE.evolve.int(3), 4 * GRID_SCALE);
@@ -6993,7 +7084,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (h.dosed === 1 && p >= 0.5) {
                 h.dosed = 2;
                 if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
-                else lead?.gpu?.clearPhase?.();
+                else { lead?.gpu?.clearPhase?.(); magnetPoolRef.current = null; }
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
                     doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
@@ -7438,7 +7529,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               for (const ev of bubbles.events) {
                 if (ev.kind === 'pop' && lead) {
                   const px = Math.round(ev.x), py = Math.round(ev.y);
-                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035);
+                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035, true);
                 }
               }
             }
@@ -8529,6 +8620,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /** The pointer's Blow since the page loaded: steps as the straw, steps as the wind, and the colour the wind carried. */
+        blowSteps: { ...blowStepsRef.current },
         /*
           The seed the show is running on (lib/rng.ts), which a crash report
           then carries too, so a night that went wrong can be played again on
@@ -9519,6 +9612,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
           phaseLays: () => phaseLaysRef.current,
+          magnetPools: () => magnetPoolsRef.current,
+          magnetRelays: () => magnetRelaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;

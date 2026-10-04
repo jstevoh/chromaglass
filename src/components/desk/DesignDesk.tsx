@@ -54,6 +54,9 @@ export interface DesignDeskProps {
   /** How much the tool in hand does (ToolAmount). */
   toolAmount?: number;
   onToolAmount?: (v: number) => void;
+  /** How big the Magnet is (Magnet Size), in the Magnet's options. */
+  magnetSize?: number;
+  onMagnetSize?: (v: number) => void;
   layer: number;
   layers: number;
   onLayer: (n: number) => void;
@@ -372,6 +375,8 @@ export function DesignDesk(p: DesignDeskProps) {
               onChange={(v) => p.onAmountFor!(toolMenu.tool, v)}
               at={toolMenu.at}
               onClose={() => setToolMenu(null)}
+              magnetSize={p.magnetSize}
+              onMagnetSize={p.onMagnetSize}
             />
           )}
         </div>

@@ -497,6 +497,11 @@ jobs:
       - name: The press moves the oil
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run pressoil
+      # A hand's Blow that is not the straw pushes the colour along and keeps
+      # it, the oil going with its colour; it erased it (PLAN §15c).
+      - name: The wind carries the colour
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run wind
       # A spun dish drags its liquid round through the gap, harder where the
       # gap is tight, flings the heavy dye out and draws the oil in; with
       # nothing spinning the flow is a still plate's to the bit (PLAN §22).
@@ -707,9 +712,11 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: npm run depth
       # The Magnet in the hand (reported: "magnet tool isn't really
-      # working"): picked on a look with no ferrofluid it pours some, and
-      # dragged across the plate the ferrofluid goes with it, against the
-      # same plate left alone.
+      # working", then "a giant black hole as soon as you pick it"): picked
+      # it changes nothing on the plate, the first touch brings a pool under
+      # the hand as big as Magnet Size, a drag carries that pool with it,
+      # Size reaches the solver, and a new grid (the governor stepping down)
+      # lays nothing but that pool, never the look's ring.
       - name: The magnet moves the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run magnet
