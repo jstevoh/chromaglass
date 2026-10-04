@@ -713,7 +713,7 @@ not yet reach, and it needs a render change rather than a solver one.
 
 **Shipped**: what each preset puts in its dish. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-**4a-clock. Clock Glass and Ferro Paint after their references** (**shipped**, this PR).
+**4a-clock. Clock Glass and Ferro Paint after their references** (**shipped**, #280).
 The owner, 2026-10-04: "the clock glass preset is really underwhelming as is the ferro
 presets. They don't look anything like the inspirations." Judged against the Mac gallery
 of that morning (`/mnt/project-files/lamp-ground/gallery/`, 12 s and 30 s):
