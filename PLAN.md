@@ -2307,6 +2307,28 @@ network):
   check that times out because its machine is slow says nothing about the app.
   Wait for the reload on the page's own first frame rather than `load`, or say
   "skip" when the covered reading shows the page was starved, as the lit plate does.
+- ~~`npm run desktop`'s projector line goes red on CI's Mac on PRs that never touched
+  it ("the mirror's canvas missing", #255 and #262 on 2026-10-04)~~ **Fixed 2026-10-04
+  (#263):** the line read the projector once, 2.5 s after its window appeared, and on
+  the Mac the mirror comes up 3.15 s after the projector's page opens (the first run
+  that printed it). Until then the page is `main.tsx`'s black loading fallback: the
+  projector shares the show window's renderer, and the show has just reloaded and is
+  in its opening, so the page's first animation frame is held as long as the show's
+  (in the cloud 0.48–0.58 s with 11–66 ms of script, the mirror at 0.39–0.65 s). The
+  line now waits for the mirror (`#stage-canvas`) up to the app's own 8 s loading bar,
+  prints how long it took and the longest frame the page sat in before it, and reads
+  the click hint 2 s after the mirror came up: the hint is timed from the mirror's
+  mount, so the old read could judge it before it was due. The second read must be of
+  the same page (its `timeOrigin`), at least 1.5 s after the mirror, with the show
+  window still there and one projector window (the `check-skeptic`). Red on a build
+  with no mirror canvas (missing at 8.02 s), on one whose hint ignores full screen,
+  and on that one again with the projector reloading, or closing, 1 s after the mirror.
+  Keeping the solver's 668 kB chunk out of the mirror's page was tried and moved
+  nothing in the cloud (0.42–0.63 s against 0.39–0.65 s), so it was left out. *Still
+  open:* whether the Mac's 3 s is Chromium's GPU-start hold (`npm run startup` reads
+  a cold show's at 2.5–3.2 s) or the show's own opening code is what the printed
+  frame says; if it is script, it is the show's opening to shorten (§14), since the
+  wall is black for those seconds after the projector is plugged in.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
@@ -4421,6 +4443,19 @@ ones report.
   so the fault the phase is for (the gate turning down the show's own next frame)
   cleared it. On one refresh the slots served must now be at most 1.15 of either
   window's frames (the Mac reads 1.00 to 1.02).
+- `wall`'s busy phases' "missed from one book" can pair a refresh with its neighbour.
+  Red once in about 24 tools-shard runs (f350e75, #255, 2026-10-04; green on re-run):
+  the wall's stamp for a refresh read −8.3 to +8.3 ms from the show's, against the
+  line's 4 ms allowance. The book matches a window's refresh to the nearest entry
+  within half a 60 Hz refresh (8.33 ms), and on the Mac the two windows' stamps for one
+  refresh are 4 to 8 ms apart (#236's first run), so a stamp near 8.3 ms is as near the
+  next refresh's entry as its own, and which one it takes is a coin toss. Not the
+  projector line's cause (that was the projector page loading, §13). *Fix:* pair by the
+  offset the two windows actually keep (the median `d` the idle phases read) rather
+  than the raw nearest stamp, or by the refresh's index on the display's clock, so the
+  radius is half a refresh around where the other window's stamp is expected, not
+  around the stamp itself. Held red by the `check-skeptic` on a book whose windows sit
+  half a refresh apart.
 - `wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
   own next frame on a runner whose two windows are handed different refreshes (the Mac
   read 1.69 slots per window's frame there once, with the gate right); only the one-refresh
