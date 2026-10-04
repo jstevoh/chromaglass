@@ -233,6 +233,11 @@ export class PipelineCache {
     } catch { return false; /* built on the frame instead (above) */ }
   }
 
+  /** Whether `computePipeline` would find this one built, without building or asking for it. */
+  hasCompute(name: string, code: string, entryPoint = 'main'): boolean {
+    return this.computeSlot(name, entryPoint).has(code);
+  }
+
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
   async prepareRender(name: string, make: RenderRecipe, use = false): Promise<boolean> {
     if (this.render.has(name)) return true;

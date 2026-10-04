@@ -331,14 +331,17 @@ try {
     let thinOn = null, thinOff = null, thinSaid = '', liftUp = null, liftBack = null;
     if (thinShown && liftShown) {
       const was = { thin: await setting('thinGap'), lift: await setting('plateSpring') };
+      // Off first, then on: Thin Gap is on by default in every look (PLAN
+      // 18a-every), so an On read before the slider had moved it would prove
+      // nothing; both halves have to move the setting.
       await page.getByTestId('phone-press-thin').locator('input').focus();
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      thinOff = await setting('thinGap');
       await page.keyboard.press('End');
       await page.waitForTimeout(150);
       thinOn = await setting('thinGap');
       thinSaid = (await page.getByTestId('phone-press-thin').innerText()).replace(/\s+/g, ' ');
-      await page.keyboard.press('Home');
-      await page.waitForTimeout(150);
-      thinOff = await setting('thinGap');
       await page.getByTestId('phone-press-lift').locator('input').focus();
       await page.keyboard.press('End');
       await page.waitForTimeout(150);
@@ -346,11 +349,11 @@ try {
       await page.keyboard.press('Home');
       await page.waitForTimeout(150);
       liftBack = await setting('plateSpring');
-      await page.evaluate((w) => window.chromaglassSettings?.({ thinGap: w.thin ?? 0, plateSpring: w.lift ?? 0.35 }), was);
+      await page.evaluate((w) => window.chromaglassSettings?.({ thinGap: w.thin ?? 1, plateSpring: w.lift ?? 0.35 }), was);
     }
     check(`${label}: the Press's Amount has Thin Gap and Press Lift beside Fingering, and both reach the plate`,
       thinShown && liftShown && !magnetGlass && thinOn === 1 && /On/.test(thinSaid) && thinOff === 0 && liftUp === 1 && liftBack === 0,
-      `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOn} ("${thinSaid}") then ${thinOff}; Press Lift ${liftUp} then ${liftBack}`);
+      `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOff} then ${thinOn} ("${thinSaid}"); Press Lift ${liftUp} then ${liftBack}`);
     const pressSize = await visible(page, 'phone-magnet-size');
     check(`${label}: the Magnet's Amount has Size under it, and only the Magnet's, and it moves Magnet Size end to end`,
       magnetSize && !pressSize && sizeUnder && sizeUp === 1 && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,

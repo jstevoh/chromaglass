@@ -150,7 +150,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 
 Judged in this order, because these gate code:
 
-- **2.1** **18a-11** Thin Gap's cost (`docs/judging.md` §19a): gates 18a-every and 18a-10.
+- **2.1** **18a-11** Thin Gap's cost (`docs/judging.md` §19a): gates 18a-10, and says whether
+  Thin Gap, on in every look since #248, needs a look turned back off.
 - **2.2** **15b** the tools' feel: gates 15g.
 - **2.3** **16b-cost** a source pass's cost and **13-twoproj** two popup projectors: gate 16d.
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
@@ -219,7 +220,8 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
 
-- **6.1** **18a-every** Thin Gap in every look (after #228 and 2.1), then **15b**, **15g**,
+- **6.1** ~~**18a-every** Thin Gap in every look~~ #248 (the owner's pick came before 2.1's
+  reading; 2.1 still reads it), then **15b**, **15g**,
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
 - **6.2** **18b** the lamp through the dye, then **18f** heat from the lamp (which unblocks 10.6
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
@@ -302,7 +304,7 @@ Where each batch stands, as of 2026-09-27:
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
-| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac, and Thin Gap still off in every look (the owner picked every look; that is its own PR next); 18a-2 to 18a-11 left, each its own PR |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28); 22b–22i open |
@@ -2981,7 +2983,8 @@ sheet. Judged on the Mac: `docs/judging.md` §23.
 - **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
   carry a press (15b), and dividing by the gap there piled twelve times a pool's volume
   under the palm (lab). The press moves to Thin Gap ("Press draws liquid back on lift",
-  18a-3): turning Thin Gap on in the ferrofluid looks is what shows this in a show.
+  18a-3), which is on in every look since #248, so only a look turned back to the old
+  plate shows this now.
 - **The glass flattens the spikes.** A Rosensweig spike stands from a free surface; under
   a palm pressed to a sixth of the gap there is no room for one, and the field there
   makes a flat labyrinth instead. The spikes (`spikes.ts`, `phaseMu`'s wells) do not
@@ -3414,11 +3417,55 @@ its frame rate live. "Free" means no new passes or texture reads.
     Σc·h. Under the volume form they now move volume (`phaseGrid`,
     `phaseCHVolume`): kept exactly, 0.01570 → 0.01570, 7/7.
 - **Found along the way, open:**
-  - **Thin Gap in every look.** The owner picked every look (2026-10-03, over "off
-    until tried" and "Classic only"). It changes how every look moves and what the
-    app checks measure, so it is its own PR after this one
-    (handoff/thin-gap-every-look.md in the project's files); until it lands Thin Gap
-    is off in every look. To judge on the Mac: docs/judging.md §30.
+  - **Thin Gap in every look: shipped (#248).** The owner picked every look
+    (2026-10-03, over "off until tried" and "Classic only"), knowing every look would
+    move the thin-gap way before anyone saw it at 60 fps; the owner's complaint it
+    answers (2026-10-04): letting go of a press "ends up wiping all the liquids down
+    the drain". It overrides the operating rule that a new default keeps today's look
+    for this one setting; it is not a new rule. What it changed:
+    - `thinGap` defaults to 1 (`src/types.ts`); no preset sets it.
+    - Saved looks: a look saves every setting, so one saved while Thin Gap was off
+      by default said 0 without anyone choosing it. A saved look is now version 2;
+      one from before reads with Thin Gap on, one saved since keeps what it says,
+      off included (`PRESET_VERSION` in `src/lib/userPresets.ts`; `npm run setlist`).
+    - The opening: every look's first step is now a thin one, so the thin gap's
+      fifteen pipelines (the kernels, the velocity's snapshot, the dye's carry in
+      substeps; the mix's carry only where the look opens with the mix) are waited
+      for before the show opens (`WebGPUFluid.prepare`, `Opening.thinGap`), and the
+      first step finds them built and runs thin at once (`thinGapOn`), where before
+      it ran the old way until an await said they were in. The ferrofluid's volume
+      forms (`phaseGrid`, `phaseCHVolume`) wait in the ferrofluid looks for the same
+      reason. `?prepare=0`, `npm run startup`'s control, builds them on the frame
+      like everything else, so the check prices the same compiles on both sides.
+    - The phone: nothing new to build. Its Press Amount sheet already has Thin Gap
+      and Press Lift (#228), and it now reads On.
+    - To judge on the Mac: docs/judging.md §30, now every look.
+    - And the other way, the old plate's own pipelines (its projections, the
+      velocity's self-advection, the squeeze's own solve, the dye's backtrace:
+      fourteen, which a thin step never asks for) are waited for only where a look
+      opens with Thin Gap off; a show that opened thin builds them when Thin Gap is
+      first turned off (`prepareOldPlate`) and stays thin until they are in. Every
+      opening otherwise built both solvers, about 3.4 s of a cold Mac's opening for
+      nothing, which `npm run startup`'s 1b would have counted as the show's own wait.
+    - Checks that measured the old plate's Press by default: `bottles`' Press-moves-
+      the-oil lines (`squeezeOut` and `pressMix`, which a thin gap retires) now turn
+      Thin Gap off for themselves and say so in a line of their own; `tools`' "Press
+      pushes the dye out from under the palm" reads with the palm still down, since
+      on a thin gap the lift draws the colour back; `press.mjs` (not in CI) opens on
+      the old plate. Set lists bring old saved looks in with Thin Gap on too.
+  - **The oil's press on a thin gap has no app check** (found with 18a-every). On a
+    thin gap the flow carries Oil Bodies' oil and its colour out and back; `bottles`
+    measures only the old plate's move. Add an Oil & Water leg to `tools`' let-go
+    check: the oil under the palm goes out and comes back with its colour.
+  - **Thin Gap's cost on the Mac is still unread** (18a-11, Wave 2's 2.1). The owner
+    picked every look before it was read. The governor steps the grid down if a
+    Mac cannot keep up, so the risk is a coarser plate, not a stopped one; read it.
+  - **The lab still steps the old plate.** Its step parameters (`BASE` in
+    `scripts/lab-entry.ts`) have no `thinGap`, so every lab check and `look` render
+    that does not ask for the thin gap measures the plate no look plays now. Decide,
+    check by check, which measure the solver as shipped (move them to the thin gap,
+    and rebaseline only what moved for a reason the check names) and which measure
+    the old plate on purpose as a control.
   - **The ferrofluid's carry is not in these substeps.** Since #229 `phaseAdvect`
     carries the ferrofluid as a volume on the thin solve's face fluxes, in a fixed
     six substeps (PHASE_SUBSTEPS) where the Press at 1× asks up to 21 of 0.4 a
@@ -3476,8 +3523,10 @@ its frame rate live. "Free" means no new passes or texture reads.
     drop's splash still lays flat discs with pushes and dye multiplies, and Blow
     held still still moves the colour with `pressDye`'s ring (18a-3).
   - **The old solver's glass still springs on the look's clock**, about 14 s
-    to half way on Classic. Every look is tuned on it, so it stays until Thin Gap
-    replaces it.
+    to half way on Classic. Since #248 a look runs it only with Thin Gap turned off;
+    on a thin gap the glass lifts in the show's seconds (1.55 s to half way at the
+    default Press Lift), so a look tuned on the old 14 s may feel bouncier: part of
+    judging §30.
 - **Left for later PRs, each its own thread (the shortcuts this one keeps, named):**
   - **18a-2, forces that are forces.** The look's stirring (`forcesB`: turbulence,
     spin, tension, drip, air) and every other force are still the old per-step

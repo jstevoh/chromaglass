@@ -95,12 +95,14 @@ try {
   }, { keep, at, r, ring });
 
   const A = [0.42, 0.5], B = [0.58, 0.5];
-  const hold = async (t, at, ms) => {
+  const hold = async (t, at, ms, held = null) => {
     await tool(t);
     await settle(300);   // the pick is a React render away: pressing at once used the last tool for a moment
     await page.mouse.move(...screen(...at));
     await page.mouse.down();
     await settle(ms);
+    // Read with the hand still down (the Press on a thin gap, below).
+    if (held) await held();
     await page.mouse.up();
   };
   const stroke = async (t, from, to, ms, stay = 0) => {
@@ -390,9 +392,21 @@ try {
     await pool(A);
     const idle = await idleChange(A, 2500);
     const p = await snap(`${t}0`);
-    await hold(t, A, 1500);
-    await settle(700);
-    await snap(`${t}1`);
+    /*
+      The Press is read with the palm still down. Every look runs on a thin
+      gap now (PLAN 18a-every), where the press's flow is reversible and the
+      lift draws the colour back in: 0.7 s after letting go, where this read
+      it on the old plate, the colour under the palm is part way home (the
+      lab's 34% at 1 s), so the push would be measured against its own
+      return. What it pushes is what the palm holds out; that it comes back
+      is the let-go check's below.
+    */
+    if (t === 'press') await hold(t, A, 1500, () => snap(`${t}1`));
+    else {
+      await hold(t, A, 1500);
+      await settle(700);
+      await snap(`${t}1`);
+    }
     // Held still, the Blow is a straw: it blows a bubble, and what it clears
     // is what is under the bubble, pushed out to the bubble's rim.
     let bubble = null;
@@ -611,11 +625,15 @@ try {
     let off, on, thin = false;
     try {
       await settle(3000);
-      // The Press as the owner has it, Thin Gap off.
+      // The Press on the old plate, Thin Gap off: what every look had before
+      // Thin Gap went on in all of them (PLAN 18a-every), and the bar the
+      // thin gap's return is read against.
       off = await readRun('off', await pressLift('off'));
 
       await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 1 }));
-      // The thin gap's pipelines are built when it is first asked for; the plate runs the old way until they are in.
+      // The thin gap's pipelines are built before the show opens now that every
+      // look opens on one, so this finds it at once; a show that opened with it
+      // off would run the old way until they were built.
       const thinBy = Date.now() + 20000;
       while (!thin && Date.now() < thinBy) {
         await settle(250);
@@ -624,7 +642,9 @@ try {
       await settle(3000);
       on = await readRun('lift', await pressLift('lift'));
     } finally {
-      await page.evaluate((b) => window.chromaglassSettings?.({ ...b, thinGap: 0 }), before);
+      // Back as it was, Thin Gap included: on, as every look has it, so the
+      // checks after this one run on the plate the show plays.
+      await page.evaluate((b) => window.chromaglassSettings?.({ ...b }), before);
       await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true));
     }
 
