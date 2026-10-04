@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
 import {
-  DEFAULT_OUTPUT, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_SHAPES,
+  DEFAULT_OUTPUT, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
-  type OutputConfig, type Surface, type SurfaceShape,
+  type OutputConfig, type Surface, type SurfaceBlend, type SurfaceShape, type SurfaceSource,
 } from '../lib/outputConfig';
 
 /**
@@ -33,6 +33,20 @@ const HANDLE_LABELS = ['top left', 'top right', 'bottom right', 'bottom left'] a
 
 const SHAPE_LABELS: Record<SurfaceShape, string> = {
   rect: 'Rectangle', ellipse: 'Circle', triangle: 'Triangle', diamond: 'Diamond',
+};
+
+const SOURCE_LABELS: Record<SurfaceSource, string> = { wall: 'Wall', front: 'Front', back: 'Back', film: 'Film' };
+const SOURCE_HINTS: Record<SurfaceSource, string> = {
+  wall: 'The finished picture, everything the Mixer stacks',
+  front: 'The front plate alone, lit as the Mixer lights it, without the back plate or the film',
+  back: 'The back plate alone, over the bare lamp: a second projector with only the back dish in it',
+  film: 'The film alone, without the plates or the lamp',
+};
+
+const BLEND_LABELS: Record<SurfaceBlend, string> = { over: 'Over', add: 'Add' };
+const BLEND_HINTS: Record<SurfaceBlend, string> = {
+  over: 'Laid over what is under it, as a slide over a slide',
+  add: 'Added to what is under it, as a second projector\'s beam: brighter where different pictures cross, and blended without a seam where two carry the same picture',
 };
 
 /**
@@ -545,6 +559,49 @@ export function MappingPanel({ output, onChange }: {
             >
               Delete
             </button>
+          </div>
+          {/* What this surface shows (PLAN.md §16b): the finished frame, or
+              one source alone, so two projectors can each carry their own
+              plate the way a light show's did. A thumb's size on a touch
+              screen, where the phone reaches it (More, Settings, Mapping):
+              the rest of this editor is laid out for a mouse, but the source
+              is the one choice here someone at a gig makes from a phone. */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[12px] text-white/40">Source</span>
+            <div className="flex flex-1 gap-1" role="radiogroup" aria-label="What this surface shows" data-testid="surface-source">
+              {SURFACE_SOURCES.map(k => (
+                <button
+                  key={k}
+                  role="radio"
+                  aria-checked={active.source === k}
+                  onClick={() => patchSurface(active.id, { source: k })}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.source === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  title={SOURCE_HINTS[k]}
+                  data-testid={`surface-source-${k}`}
+                >
+                  {SOURCE_LABELS[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* How its light meets the wall (§16c): over, or added as a beam. */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-[12px] text-white/40">Light</span>
+            <div className="flex flex-1 gap-1" role="radiogroup" aria-label="How this surface's light meets the wall" data-testid="surface-blend">
+              {SURFACE_BLENDS.map(k => (
+                <button
+                  key={k}
+                  role="radio"
+                  aria-checked={active.blend === k}
+                  onClick={() => patchSurface(active.id, { blend: k })}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.blend === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  title={BLEND_HINTS[k]}
+                  data-testid={`surface-blend-${k}`}
+                >
+                  {BLEND_LABELS[k]}
+                </button>
+              ))}
+            </div>
           </div>
           <Row label="Opacity" value={active.opacity} min={0} max={1} step={0.01}
             onChange={v => patchSurface(active.id, { opacity: v })} />

@@ -107,13 +107,34 @@ export interface GpuStepParams {
   plateCurve: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
   depthDrag: number;
+  /**
+   * The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): over 0.5, the
+   * flow between the glasses has the gap's drag and a variable-mobility
+   * projection with an open rim, in place of the speed clamp. Off (0) is the
+   * solver every look was made on.
+   */
+  thinGap?: number;
+  /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
+  gapThickness?: number;
+  /**
+   * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
+   * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the
+   * lab sets it, to hold a check against a ferrofluid as thick as the clear
+   * liquid round it.
+   */
+  ferroViscosity?: number;
+  /**
+   * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
+   * as before the Press on the ferrofluid (PLAN 15d), so `npm run
+   * ferropress` can hold its checks against what was there. Unset is on.
+   */
+  phaseVolume?: number;
   /** How fast the plates spring back toward that dome, per step. */
   gapSpring: number;
   /** How much of a press's squeeze survives into the next step. */
   gapMemory: number;
   /** How hard the hand is on the glass: scales the press's push on the flow. */
   platePressure: number;
-  fingering: number;
   vibIntensity: number;
   vibFrequency: number;
   drip: number;         // rainDrip (0 = off)
@@ -134,6 +155,18 @@ export interface GpuStepParams {
   twist: number;            // the top glass turning: a differential rotation, fastest inside
   meanDensity: number;
   maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
+  /**
+   * The spinning dish (PLAN.md §22, lib/turntable.ts, `spinSwirl` in
+   * wgsl/fluid.ts). The solver works in a frame turning with the liquid's
+   * bulk; these say how the dish and the liquid move against that frame.
+   * All absent or zero and the swirl never runs: a plate nobody spins steps
+   * exactly as it did.
+   */
+  spinDish?: number;        // the dish's speed in the liquid's frame, Ω − ω_l, rad/s
+  spinLiquid?: number;      // the liquid bulk's own speed, ω_l, rad/s: the centrifuge
+  spinTau?: number;         // the bulk's drag time h²/12ν at the rest gap, s: the frame's own lag
+  spinNu?: number;          // the look's liquid, m²/s (lib/turntable.ts, carrierViscosity)
+  spinDyeWeight?: number;   // the dye's density over the liquid's, less one (dyeDensityContrast)
   /**
    * Dye carried by particles (H1): how much of the picture they are, 0 = off.
    *
@@ -189,6 +222,12 @@ export interface PlateSolver {
   readonly oilCover?: number;
   /** Oil Bodies: the oil dragged along a gesture as its colour is (carryDye), in plate units. */
   carryMix?(x: number, y: number, radius: number, ux: number, uy: number, take: number, hop: number): void;
+  /**
+   * Whether the last step ran the plate as a thin gap (PLAN §18a): then a
+   * hand on the glass lays only the glass, and the flow carries the liquid
+   * (lib/squish.ts). Optional because only the WebGPU solver has one.
+   */
+  readonly thinGapLive?: boolean;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */

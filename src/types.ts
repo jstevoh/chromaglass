@@ -335,6 +335,38 @@ export interface VisualizerSettings {
   */
   depthDrag: number;
   /*
+    The plate as a Hele-Shaw cell (PLAN §18a, src/gpu/wgsl/thinGap.ts).
+
+    A switch, 0 or 1. At 1 the flow between the glasses is solved as what it
+    is: a thin layer whose velocity the glass drags back at 12ν/h², so a
+    push lasts as long as the liquid and the gap say (seconds for water in the
+    deep middle of the plate, a tenth of a second for a light oil, nothing for
+    glycerine) instead of the one step the old speed clamp allowed; a
+    pressure solve in which a tight gap carries less than an open one (the
+    mobility h³/12μ); and an open rim, so what a press squeezes out leaves the
+    dish across its edge and comes back when the glass lifts, where the old
+    plate spread it as a uniform sink everywhere.
+
+    It is on in every look. That breaks the rule that a new default keeps
+    today's look (PLAN.md, Operating rules), and on purpose: the owner was asked (2026-10-03)
+    whether to turn it on in no look yet, in Classic only, or in every look,
+    knowing that every look would then move the thin-gap way before anyone
+    had seen it at 60 fps, and picked every look, so that the Press draws the
+    liquid back when it lifts wherever it is played. With it off, a press
+    squeezed the liquid out into a sink spread over the whole plate, and on
+    the lift about a third of it came back: "the release from pressing ends up
+    wiping all the liquids down the drain" (the owner, 2026-10-04). That
+    pick is the exception, not a new rule. Off is still here, a switch away,
+    for any look that turns out to need the old plate (PLAN §18a), and no
+    preset sets it, so this line is every look's.
+
+    `gapThickness` is the liquid's viscosity for it, 0 to 1 on a log scale
+    from water (1 mm²/s) to glycerine (about 1000): it sets how long a push
+    lasts. It does nothing while Thin Gap is off.
+  */
+  thinGap: number;
+  gapThickness: number;
+  /*
     The second phase, and the magnet under the glass (H7,
     docs/bubbles-plan.md B).
 
@@ -362,6 +394,13 @@ export interface VisualizerSettings {
   magnetStrength: number;
   /** How far the magnet wanders on its own around (magnetX, magnetY). 0 holds it still. */
   magnetWalk: number;
+  /**
+    How big the hand's magnet is, 0 to 1: a button magnet at 0, a block the
+    width of a palm at 1. The Magnet tool's, not the look's (lookFade's
+    RIG_KEYS): it is the magnet in the performer's hand, as the tool's Amount
+    is. 0.5 is the magnet the tool always was (lib/magnetSize.ts).
+  */
+  magnetSize: number;
   /*
     The liquids' own physics and chemistry (docs/physics-plan.md). All 0..1
     and off by default, so a look that does not ask for them is the look it
@@ -469,6 +508,23 @@ export interface VisualizerSettings {
   spinAudioDepth: number;
   /** How hard one flick hits, as a fraction of a turn a second. */
   spinImpulse: number;
+  /*
+    Auto Spin (PLAN.md §22, lib/turntable.ts): a motor of its own under the
+    dish, on top of the look's Rotation Speed.
+
+    `spinAuto` is 0 Off, 1 Rate, 2 Tempo. Off is the default and what every
+    look had: nothing added. Rate turns the dish at `spinRpm` revolutions a
+    minute, negative the other way round (Spin Direction still picks which
+    plate goes which way). Tempo turns it once every `spinBeats` beats of the
+    beat clock, locked to the beat, and at the Rate until a tempo is heard.
+
+    The dish is what turns; the liquid follows it with the drag of its gap
+    (seconds for water, a tenth of one for oil), and a spun dish is a
+    centrifuge. What the picture does is the liquid's (the solver's swirl).
+  */
+  spinAuto?: number;
+  spinRpm?: number;
+  spinBeats?: number;
   centerGravity: number;
   ledPlatform: boolean;
   ledMode: LedMode;
@@ -529,11 +585,13 @@ export interface VisualizerSettings {
   // Light Show Look (rendering)
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
-  blobSurfaceTension: number; // lower = more elongation/shear, higher = more circular
+  blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
   boundaryContrast: number;   // bright edge-line strength where two dye colors meet
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;
+  /** Ben-Day dots: the finished picture printed as a comic, flat inks with the tints in even dots (the Roy look). 0 is off. */
+  benDay?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
@@ -761,6 +819,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   */
   plateCurve: 0,
   depthDrag: 0,
+  thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
+  gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,
@@ -770,6 +830,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   magnetHeight: 0.25,
   magnetStrength: 0,
   magnetWalk: 0,            // still: a look that places its magnet keeps it there
+  magnetSize: 0.5,          // the hand's magnet as it always was (lib/magnetSize.ts)
   vorticityConfinement: 0,
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
@@ -803,6 +864,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   spinWander: 0,            // a motor holds its speed until it is asked not to
   spinAudioDepth: 0,        // the nine looks that route a band keep exactly what they had
   spinImpulse: 0.5,
+  spinAuto: 0,              // off: no look turns its dish by itself unless it asks to
+  spinRpm: 6,               // a slow turntable: a turn every ten seconds when Auto Spin is on
+  spinBeats: 16,            // four bars of four a turn: 7.5 rpm at 120 bpm
   centerGravity: 0.0,
   ledPlatform: false,
   ledMode: 'rainbow',
@@ -847,10 +911,11 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
-  blobSurfaceTension: 0.3,  // mostly loose — dye elongates and pinches with flow
+  blobSurfaceTension: 0.3,  // colours hold apart loosely
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
+  benDay: 0,                // no print: only the Roy look lays Ben-Day dots
   dyeBudget: 0.85,
   edgeRelief: 0.4,
   lacing: 0,

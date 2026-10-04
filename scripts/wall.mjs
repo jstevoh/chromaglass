@@ -18,10 +18,14 @@
  *   corner pin  outside the pinned quad is black, inside it is the picture
  *   flip        the picture reverses inside the quad while the quad stays put
  *   grade       gain lifts what is on the wall, and gamma is not gain
+ *   sources     a projector showing the front plate, the back plate or the
+ *               film alone shows that and not the wall (PLAN.md §16b), and
+ *               what each extra picture costs the GPU
  *   one clock   with the projector window open and both windows animating,
  *               the plate draws at most once for each refresh either window
- *               was handed (1.05 times them) and at least 0.9 of what the
- *               show drew alone, at every phase
+ *               was handed (1.05 times them) and at least 0.9 of what
+ *               either window alone would have drawn in the same seconds,
+ *               at every phase and on a busy machine
  *               between the two clocks, and with draws that hold the thread
  *               for 0.7 of a refresh; covered, every ask the projector makes
  *               draws, however raggedly (PLAN.md §14b; lib/drawGate.ts in
@@ -383,12 +387,128 @@ const check = (name, ok, detail = '') => {
     check('with no wall asking, every one of the show\'s own frames draws, even two 3 ms apart', drawn === offered, `${drawn} of ${offered}`);
   }
   /*
-    The stamp: a refresh's own time when there is a believable one (held up
-    behind a draw, it is older than now, which is the point), and the time
-    now when there is none or it is from some other clock.
+    A busy machine: one 60 Hz display, and a thread that misses some of its
+    refreshes, for both windows at once (they share it) and a few more for
+    one window or the other. That is what the Mac runner is: its windows are
+    handed 28 to 55 of 60 refreshes a second, and a missed refresh leaves a
+    gap of two or three in each clock, never a shorter one. The clocks above
+    are regular, 28 a second evenly spaced, which is not how a machine gets
+    slow, and the gate passed them while on the Mac it drew 24.3 a second
+    with the show's own window handed 28.3: the median of a clock's gaps
+    read two refreshes, 0.6 of that is 1.2, and the show's next frame one
+    refresh after its own draw was turned down with nothing drawn in its
+    place (lib/drawGate.ts, "a clock's own next refresh").
+
+    Held to the floor the app's phases below are held to, judged on the same
+    clocks: at least 0.95 of the frames either window alone would have drawn
+    (every refresh it was handed), at every phase and every pattern of
+    misses. And to the ceiling: no more than one draw for each slot the two
+    clocks' refreshes make together (refreshes less than 0.6 of one apart
+    are one slot, as `served` counts them in the app). Beside it, the gate
+    as it was, which fell to 0.75 here and has to fail the floor, or these
+    clocks could not tell.
   */
   {
-    const cases = [[990, 1000, 990], [700, 1000, 700], [undefined, 1000, 1000], [NaN, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
+    class GateAsItWas extends DrawGate {
+      offer(source, now) {
+        const gap = now - this.lastOffer[source];
+        const g = this.gaps[source];
+        if (gap > 250) g.length = 0;
+        else if (gap > 0) { g.push(gap); if (g.length > 8) g.shift(); }
+        this.lastOffer[source] = now;
+        if (this.twoClocks(now) && now - this.lastDraw < 0.6 * this.refreshMs(now)) { this.skipped[source]++; return false; }
+        this.lastDraw = now;
+        this.drawn[source]++;
+        return true;
+      }
+    }
+    const R = 1000 / 60;
+    const busy = (Gate, { both, own, phase, jitter, seed }) => {
+      const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const offers = [];
+      const handed = { frame: 0, ask: 0 };
+      for (let i = 0; i * R < 5000; i++) {
+        if (rand() > both) continue;
+        for (const [source, at] of [['frame', i], ['ask', i + phase]]) {
+          if (rand() > own) continue;
+          offers.push({ source, at, t: at * R + (rand() - 0.5) * jitter });
+          if (i * R >= 1000) handed[source]++;
+        }
+      }
+      offers.sort((x, y) => x.t - y.t);
+      const gate = new Gate();
+      let drawn = 0, slots = 0, slotAt = -Infinity;
+      for (const o of offers) if (gate.offer(o.source, o.t) && o.t >= 1000) drawn++;
+      for (const o of offers) if (o.t >= 1000 && o.t - slotAt >= 0.6 * R) { slots++; slotAt = o.t; }
+      return { drawn, alone: Math.max(handed.frame, handed.ask), slots };
+    };
+    const sweepBusy = (Gate) => {
+      let low = { r: Infinity }, high = { r: -1 };
+      for (const both of [1, 0.8, 0.6, 0.5, 0.4]) for (const own of [1, 0.9, 0.75]) for (const jitter of [0, 2]) for (const seed of [3, 7, 11]) for (let i = 0; i < 20; i++) {
+        const x = busy(Gate, { both, own, phase: i / 20, jitter, seed });
+        const at = `${Math.round(both * own * 60)} of 60 handed, ${i / 20} of a refresh behind${jitter ? `, ${jitter} ms jitter` : ''}`;
+        if (x.drawn / x.alone < low.r) low = { r: x.drawn / x.alone, at, ...x };
+        if (x.drawn / x.slots > high.r) high = { r: x.drawn / x.slots, at, ...x };
+      }
+      return { low, high };
+    };
+    const now = sweepBusy(DrawGate), was = sweepBusy(GateAsItWas);
+    console.log(`  a busy 60 Hz display (900 runs)                      gate ${now.low.r.toFixed(2)} to ${now.high.r.toFixed(2)}; the gate as it was ${was.low.r.toFixed(2)} to ${was.high.r.toFixed(2)}`);
+    check('a busy machine, its refreshes missed for both windows and for each: at least 0.95 of what either window alone would draw, at every phase',
+      now.low.r >= 0.95, `${now.low.drawn} drawn where one window was handed ${now.low.alone} (${now.low.r.toFixed(2)}), at worst: ${now.low.at}`);
+    check('  and at most one draw a slot of the two clocks\' refreshes',
+      now.high.drawn <= now.high.slots, `${now.high.drawn} drawn for ${now.high.slots} slots (${now.high.r.toFixed(2)}), at most: ${now.high.at}`);
+    check('  control: the gate as it was draws under 0.9 of it somewhere',
+      was.low.r < 0.9, `${was.low.drawn} drawn where one window was handed ${was.low.alone} (${was.low.r.toFixed(2)}): ${was.low.at}`);
+    /*
+      A clock's own next refresh draws; the same refresh offered again does
+      not. A loop that asks twice in one refresh (a frame re-asked for, a
+      stamp a millisecond off) offers within a 240 Hz refresh of its own last
+      offer, and that is the refresh it already had, drawn or turned down.
+    */
+    const g = new DrawGate();
+    for (let t = 0; t < 500; t += R) { g.offer('frame', t); g.offer('ask', t + 0.25 * R); }
+    const T = 30 * R;
+    const sameAgain = [g.offer('frame', T), g.offer('frame', T + 2), g.offer('ask', T + 4), g.offer('ask', T + 6), g.offer('frame', T + R)];
+    check('  and a clock\'s offer within a 240 Hz refresh of its own last is that refresh again, turned down',
+      sameAgain.join() === 'true,false,false,false,true', `the show's frame, again 2 ms later, the ask, again 2 ms later, the next refresh: ${sameAgain.join(', ')}`);
+    /*
+      Out of order: both clocks on one 60 Hz display, and one ask in five
+      whose callback runs after the show's frame for the next refresh (held
+      behind a draw), stamped with its own refresh's time as it should be.
+      That ask is turned down, being behind the last draw; it must not then
+      let the projector's next ask draw again in a refresh that has a draw
+      (the second pre-push review found 16 % of refreshes drawn twice so).
+    */
+    {
+      for (const phase of [0, 0.25, 0.5]) {
+        const gate = new DrawGate();
+        let seed = 13, drawn = 0, refreshes = 0;
+        const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        let heldAsk = null;
+        for (let i = 0; i < 300; i++) {
+          const t = i * R;
+          const offers = [['frame', t]];
+          if (heldAsk !== null) { offers.push(['ask', heldAsk]); heldAsk = null; }
+          if (rand() < 0.2) heldAsk = t + phase * R; else offers.push(['ask', t + phase * R]);
+          for (const [source, at] of offers) if (gate.offer(source, at) && i >= 60) drawn++;
+          if (i >= 60) refreshes++;
+        }
+        check(`  and asks run late, after the next refresh's frame, ${phase} of a refresh behind: at most one draw a refresh`, drawn <= refreshes && drawn >= 0.95 * refreshes,
+          `${drawn} drawn in ${refreshes} refreshes`);
+      }
+    }
+  }
+  /*
+    The stamp: a refresh's own time when there is a believable one (held up
+    behind a draw, it is older than now, which is the point), and the time
+    now when there is none or it is from some other clock. A stamp a little
+    ahead of now is believed: the Mac runners stamp some refreshes up to
+    2.4 ms ahead (1002.4 here), and the bound is one 240 Hz refresh; past
+    that (1005) it would name the next refresh, so it is not.
+  */
+  {
+    const cases = [[990, 1000, 990], [700, 1000, 700], [1002.4, 1000, 1002.4], [undefined, 1000, 1000], [NaN, 1000, 1000], [1005, 1000, 1000], [1500, 1000, 1000], [-5000, 1000, 1000]];
     const wrong = cases.filter(([ts, now, want]) => refreshStamp(ts, now) !== want);
     check('an offer is stamped with its refresh\'s time, or now when that is missing or not believable', wrong.length === 0,
       wrong.length ? wrong.map(([ts, now, want]) => `${ts} at ${now} gave ${refreshStamp(ts, now)}, not ${want}`).join('; ') : `${cases.length} cases`);
@@ -470,8 +590,9 @@ let failed = 0;
 
   Each phase is held to a ceiling and a floor: at most 1.05 times the
   refreshes either window was handed (one draw a refresh, however many the
-  machine dropped), and at least 0.9 times what the show drew on its own
-  (or the display's refresh, if that is lower). A gate that froze the plate,
+  machine dropped), and at least 0.9 times what either window alone would
+  have drawn in the same seconds (every refresh it was handed; see the floor
+  in `judge`). A gate that froze the plate,
   or turned down one frame in two, passed the ceiling alone in review. And
   both clocks have to have been offering: the gate turns down about one
   offer a refresh when they are, so a run where one of them had quietly
@@ -528,7 +649,58 @@ let failed = 0;
         (the draws costing 0.7 of one, below) reads as twice the refresh.
       */
       window.__rafTs = [];
+      /*
+        `__busy`, set in the show's window: a busy machine, made on purpose.
+        That fraction of the display's refreshes, chosen by a fixed sequence,
+        is missed by both windows at once, every loop in them (these counts,
+        the show's loop, the projector's), as a Mac runner's starved thread
+        misses them: its windows were handed 28 to 55 of 60 refreshes a
+        second. Made by the harness because a cloud session will not miss
+        any: with every core loaded (eight busy processes on four) it handed
+        60.0, and with the thread held 1.2 refreshes on half of them, 56.9.
+        Which refreshes are missed is decided once per refresh, by its time
+        on the shared clock, in a book kept in the show's window that the
+        projector reads too, so a refresh one window misses the other does.
+
+        Matched to the nearest entry within half a 60 Hz refresh, not within
+        4 ms, which was first here: on the Mac the two windows' stamps for
+        one refresh are 4 to 8 ms apart on the shared clock (#236's first
+        run: of the book's 64 refreshes none was looked up by both windows,
+        and 30 were entered twice, closer than 8 ms), so each window missed
+        refreshes of its own and the busy machine was not the starved
+        thread it stands for. A cloud session's are under a millisecond
+        apart. How far apart they were is kept (`d`, the wall's stamp less
+        the show's), so the check can say the pairing held: one refresh
+        matched to its neighbour would put `d` a whole refresh away from the
+        rest.
+      */
+      const host = () => (window.opener && !window.opener.closed && window.opener.__missBook ? window.opener : window);
+      window.__busy = 0;
+      window.__missBook = [];
+      // Each window its own seed: two windows that each kept a book of their
+      // own would still agree by chance on one seed, and the agreement
+      // counted below could not see it (the check-skeptic, 2026-10-03).
+      let busySeed = new URLSearchParams(location.search).has('cast') ? 99991 : 17;
+      window.__busyRand = () => (busySeed = (busySeed * 16807) % 2147483647) / 2147483647;
+      const missed = (ts) => {
+        const h = host();
+        if (!(h.__busy > 0) || typeof ts !== 'number') return false;
+        const at = performance.timeOrigin + ts;
+        const who = new URLSearchParams(location.search).has('cast') ? 'wall' : 'show';
+        let seen = null, nearest = 1000 / 120;
+        for (const e of h.__missBook) { const d = Math.abs(e.at - at); if (d < nearest) { nearest = d; seen = e; } }
+        if (seen) {
+          if (!seen[who]) { seen[who] = true; seen.d = who === 'wall' ? at - seen.at : seen.at - at; }
+          return seen.missed;
+        }
+        const entry = { at, missed: h.__busyRand() < h.__busy, [who]: true };
+        h.__missBook.push(entry);
+        if (h.__missBook.length > 64) h.__missBook.shift();
+        return entry.missed;
+      };
+      window.__missed = missed;
       const count = (ts) => {
+        if (missed(ts)) { raf(count); return; }
         window.__rafs++;
         if (window.__holding > 0) window.__held++;
         if (typeof ts === 'number') { window.__rafTs.push(ts); if (window.__rafTs.length > 600) window.__rafTs.splice(0, 100); }
@@ -563,7 +735,7 @@ let failed = 0;
         let late = false;
         window.requestAnimationFrame = (cb) => {
           const deliver = (ts) => {
-            if (window.__mute) { raf(deliver); return; }
+            if (window.__mute || missed(ts)) { raf(deliver); return; }
             late = !late;
             const p = window.__phaseMs + (window.__ragged && late ? 12 : 0);
             if (p > 0) { window.__holding++; setTimeout(() => { window.__holding--; handOver(cb, ts + p); }, p); } else handOver(cb, ts);
@@ -593,13 +765,28 @@ let failed = 0;
       window.__covered = false;
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__covered });
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (window.__covered ? 'hidden' : 'visible') });
+      /*
+        A refresh the busy machine missed is asked for again, under the id
+        the loop was given: the show cancels its pending frame when an ask
+        draws, and a cancel that missed the re-asked one would leave it two.
+      */
+      const pending = new Map();
       window.requestAnimationFrame = (cb) => {
-        if (!window.__covered) return raf((ts) => costly(() => cb(ts)));
         const id = nextId++;
-        held.set(id, cb);
+        if (window.__covered) { held.set(id, cb); return id; }
+        const run = (ts) => {
+          if (missed(ts)) { pending.set(id, raf(run)); return; }
+          pending.delete(id);
+          costly(() => cb(ts));
+        };
+        pending.set(id, raf(run));
         return id;
       };
-      window.cancelAnimationFrame = (id) => { if (!held.delete(id)) caf(id); };
+      window.cancelAnimationFrame = (id) => {
+        if (held.delete(id)) return;
+        if (pending.has(id)) { caf(pending.get(id)); pending.delete(id); return; }
+        caf(id);
+      };
       window.__uncover = () => {
         window.__covered = false;
         const cbs = [...held.values()];
@@ -741,13 +928,41 @@ let failed = 0;
         wallServable: (b.wallRafs - a.wallRafs - (b.wallHeld - a.wallHeld)) / s,
         asks: (b.asks - a.asks) / s,
         askCount: b.asks - a.asks,
+        seconds: s,
         frameMs: d.governor?.frameMs ?? null,
         refreshMs,
         servedHz: served.length / s,
         servedGapMs: servedGaps.length >= 5 ? servedGaps[servedGaps.length >> 1] : null,
         fedN,
         fedMedian,
+        /*
+          Whether the two windows kept one book of missed refreshes: the
+          projector's own book empty (it used the show's), the show's
+          holding refreshes both windows looked up, and the pairing one
+          pairing: how far apart the two windows' stamps were for each
+          refresh both looked up (`d` above) spread over no more than 4 ms,
+          where a refresh matched to its neighbour would spread it over most
+          of one. Not the share of
+          refreshes both looked up: a busy Mac hands the two windows
+          different refreshes of its own accord (the show 28.3 a second, the
+          wall 38.7, on one run), so that share is under one on a book that
+          works (the second pre-push review). Two books, which the
+          check-skeptic's mutant made, passed the old gate at 38.5 drawn
+          against 27.0.
+        */
+        book: (() => {
+          const book = window.__missBook;
+          const d = book.filter((e) => e.show && e.wall).map((e) => e.d).sort((x, y) => x - y);
+          return {
+            entries: book.length,
+            both: d.length,
+            apart: d.length ? { least: d[0], most: d[d.length - 1], median: d[d.length >> 1] } : null,
+            wallOwn: wallW ? wallW.__missBook.length : null,
+          };
+        })(),
         fallbacks: d.drawGate?.stampFallbacks ?? null,
+        misses: d.drawGate?.stampMisses ?? null,
+        missedAgo: d.drawGate?.stampMisses?.lastAt ? performance.now() - d.drawGate.stampMisses.lastAt : null,
         engine: d.engine,
       };
     }, ms);
@@ -791,8 +1006,30 @@ let failed = 0;
       `${f1(alone.drawn)} a second against a ${f1(alone.hz)} Hz display, ${f1(alone.asks)} asks a second`);
     if (ownLoop) {
       const refreshMs = 1000 / Math.max(1, alone.hz);
+      /*
+        How many of a clock's refreshes, asks or frames a phase must count
+        before its lines judge anything: twenty in the seconds measured. The
+        lines below are ratios (drawn to served, asks to the wall's
+        refreshes, drawn to either window's frames), and a ratio of nothing
+        passes: a wall that never asked holds "asks at least 0.8 of its
+        refreshes" at 0 of 0, and one clock alone is always under the
+        ceiling. This is what guards against that.
+
+        A count, where it was ten a second (#203): the same twenty in the two
+        seconds every phase measured then, but a rate also judged the
+        runner. The busy phases below miss half the refreshes on purpose, so
+        a Mac runner already handing its windows 22 of 60 hands them 11, and
+        half a refresh behind the harness's own late timer holds a few more:
+        #223's tools shard read the wall's asks at 8.9 a second, 0.9x under
+        the ceiling and 11.4 drawn against a floor of 10.3, and went red on
+        the guard alone (2026-10-04). A stopped clock still counts none, and
+        the busy phases measure for longer instead (see there), so they
+        count as many refreshes as an idle phase does.
+      */
+      const enough = 20;
       /** The lines every phase is held to: a ceiling, a floor, and both clocks offering. */
       const judge = (m, label, { floor = true } = {}) => {
+        const counted = (perSecond) => Math.round(perSecond * m.seconds);
         const faster = Math.max(m.hz, m.wallHz);
         // The display's rate, from the gaps between refreshes, which a busy
         // machine's dropped frames do not lower (see `__rafTs`).
@@ -814,12 +1051,45 @@ let failed = 0;
         */
         const oneDisplay = m.servedHz <= 1.05 * display;
         check(`both windows animating, the wall ${label}: at most 1.05 times the refreshes served, one display's`,
-          m.drawn <= 1.05 * m.servedHz && oneDisplay && m.asks > 10,
-          `${f1(m.drawn)} drawn a second against ${f1(m.servedHz)} refreshes served (${f1(m.drawn / Math.max(1, m.servedHz))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second, the display ${f1(display)} Hz${m.refreshMs ? '' : ' by rate, no gaps to measure'}${oneDisplay ? '' : ', so the served count is not one display\'s'}), ${f1(m.asks)} asks a second`);
+          m.drawn <= 1.05 * m.servedHz && oneDisplay && m.askCount >= enough,
+          `${f1(m.drawn)} drawn a second against ${f1(m.servedHz)} refreshes served (${f1(m.drawn / Math.max(1, m.servedHz))}x; the windows were handed ${f1(m.hz)} and ${f1(m.wallHz)} a second, the display ${f1(display)} Hz${m.refreshMs ? '' : ' by rate, no gaps to measure'}${oneDisplay ? '' : ', so the served count is not one display\'s'}), ${f1(m.asks)} asks a second (${m.askCount} in ${f1(m.seconds)} s${m.askCount >= enough ? '' : `, under the ${enough} that make two clocks`})`);
+        /*
+          The floor: the wall must not cost the show its frames. What the show
+          draws on its own is every frame its window is handed, so the floor
+          is 0.9 of that, counted in these same two seconds (`hz`, this
+          window's refreshes), or of the wall's refreshes the harness did not
+          hold (`wallServable`, every one of which asked) if those are more:
+          neither window should get fewer frames than it would alone.
+
+          Not what the show drew alone at the start of the run, which is what
+          this was: a different two seconds, and a Mac runner's rate moves by
+          a third within a run (#203). That went red when the runner was
+          starved in a phase and not at the start (16a's PR: 36.4 drawn
+          against 37.7, 0.9 of a wall window handed 41.9, 12 of whose
+          refreshes a second were the harness's own late timer, never asked
+          for), and passed when it was starved at the start and not later,
+          so it judged the runner more than the gate. Judged in the same
+          seconds, the 53 Mac runs before this read 0.86 to 1.0, and the
+          three under 0.9 were not the runner: all with both clocks on one
+          refresh, the gate drawing 24.3 a second while the show's own
+          window was handed 28.3, which is the gate turning down the show's
+          own next frame (lib/drawGate.ts, "a clock's own next refresh"; the
+          busy machine in the arithmetic above). The busy phases below make
+          that machine on purpose, so it is measured on every run and not
+          only when a runner happens to be starved.
+
+          The frames handed, not the frames the loop asked for: a loop that
+          asked for fewer would set its own bar. A frozen gate, or one that
+          turned down one frame in two, is under it at half a refresh behind
+          and on the busy machine (at 0, a quarter and three quarters on an
+          idle one the other clock fills the refresh it turned down, 60.0
+          against 54.0: the check-skeptic's mutant), and in the arithmetic.
+        */
         if (floor) {
-          const least = 0.9 * Math.min(faster, alone.drawn);
-          check('  and at least 0.9 times what the show drew on its own', m.drawn >= least,
-            `${f1(m.drawn)} a second against ${f1(least)} (0.9 of ${f1(Math.min(faster, alone.drawn))})`);
+          const alone = Math.max(m.hz, m.wallServable);
+          const least = 0.9 * alone;
+          check('  and at least 0.9 times what either window alone would have drawn in the same seconds', m.drawn >= least && counted(alone) >= enough,
+            `${f1(m.drawn)} a second against ${f1(least)} (0.9 of ${f1(alone)}: the show's window handed ${f1(m.hz)}, the wall's ${f1(m.wallServable)} the harness did not hold; ${counted(alone)} in ${f1(m.seconds)} s)`);
         }
         /*
           Each clock against its own window's refresh: the show's frames
@@ -842,17 +1112,22 @@ let failed = 0;
         const offered = m.offered ? `the show's frames ${f1(m.offered.frame)} a second against ${f1(m.hz)} Hz, the wall's asks ${f1(m.offered.ask)} against the ${f1(m.wallServable)} refreshes the harness did not hold (its display ${f1(m.wallHz)} Hz, ${f1(m.wallFrames)} handed)` : 'this build has no draw gate to ask';
         /*
           And every refresh's timestamp believed. A wall whose time origin was
-          converted the wrong way, or a clock ahead of this one, falls back to
-          the time its callback ran, which is the stamping that let a slow
+          converted the wrong way (seconds behind, since the wall opens five
+          seconds after the show), or a clock ahead of this one by more than a
+          240 Hz refresh, falls back to the time its callback ran, which is the stamping that let a slow
           frame's second clock draw too; on one display the gate still holds
           without the draw cost, so the rate lines would not see it.
         */
         if (m.fallbacks !== null) {
-          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran`);
+          check('  and every refresh\'s own timestamp was believed', m.fallbacks === 0, `${m.fallbacks} fell back to the time the callback ran${m.fallbacks && m.misses ? ` since the page opened (${m.misses.ahead} ahead of now, the worst by ${f1(m.misses.aheadMs)} ms; ${m.misses.stale} over a second old, the worst ${f1(m.misses.staleMs)} ms; the last ${f1((m.missedAgo ?? 0) / 1000)} s before this reading)` : ''}`);
         }
         check('  and both clocks were offering, each at its own window\'s rate',
-          m.offered !== null && m.offered.frame >= 0.8 * m.hz && m.wallServable > 10 && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0, offered);
+          m.offered !== null && m.offered.frame >= 0.8 * m.hz && counted(m.wallServable) >= enough && m.offered.ask >= 0.8 * m.wallServable && m.skipped > 0,
+          `${offered}; ${counted(m.wallServable)} of the wall's in ${f1(m.seconds)} s${counted(m.wallServable) >= enough ? '' : `, under the ${enough} that make a clock`}`);
       };
+      // The display's refresh: the shortest any idle phase read (see the busy
+      // phases below for why).
+      let displayMs = null;
       for (const frac of [0, 0.25, 0.5, 0.75]) {
         /*
           The phase is a fraction of the refresh the windows are keeping now,
@@ -863,10 +1138,21 @@ let failed = 0;
           double (the check-skeptic, 2026-09-27).
         */
         const pre = await measure(500);
-        const phaseMs = frac * (pre.refreshMs ?? 1000 / Math.max(1, pre.hz, pre.wallHz));
+        /*
+          Or the shortest refresh an earlier phase read over its 2 s, where
+          that is shorter: a runner missing most refreshes can read 500 ms of
+          them as two refreshes a gap (see the busy phases below), and three
+          quarters of a refresh behind became one and a half, where the
+          harness's late timer held most of the wall's frames (the
+          check-skeptic's starved emulation, 7.5 asks a second of 24 handed).
+          The first phase is on one refresh and needs none.
+        */
+        const read = Math.min(pre.refreshMs ?? Infinity, displayMs ?? Infinity);
+        const phaseMs = frac * (Number.isFinite(read) ? read : 1000 / Math.max(1, pre.hz, pre.wallHz));
         await wall.evaluate((p) => { window.__phaseMs = p; }, phaseMs);
         await show.waitForTimeout(300);
         const m = await measure(2000);
+        if (m.refreshMs) displayMs = Math.min(displayMs ?? Infinity, m.refreshMs);
         judge(m, frac === 0 ? 'on its own clock' : `${frac} of a refresh behind`);
         /*
           And the governor, fed the interval between draws: what the show fed
@@ -919,6 +1205,93 @@ let failed = 0;
           }
         }
       }
+      /*
+        A busy machine, made on purpose (`__busy` above): half the display's
+        refreshes missed by both windows together, both clocks on one refresh
+        and then half of one apart. The phases above meet a machine like this
+        only when a runner happens to be starved, and the gate that turned
+        down the show's own next frame passed them whenever it was not.
+        Held to every line the phases are; each window must also have been
+        handed at most 0.6 of the display's refreshes, the same ones, or the
+        machine was not the one meant and the line says so rather than
+        passing. Not three quarters apart, which was first here: there the
+        two clocks make about 44 slots of 29.5 refreshes each, and the old
+        gate passed the floor at 31.5 against 26.5 (the check-skeptic).
+      */
+      /*
+        The refresh the busy phases are placed and judged by is the shortest
+        the four idle phases read, 2 s each, not a reading of their own: a
+        window missing refreshes has gaps of two and three, and on a runner
+        starved enough that it misses most of them the shortest gap that
+        recurs can be two refreshes. Then "half a refresh behind" is a whole
+        one, where nothing can double, and "at most 0.6 of the display" is
+        1.2 of it. The check-skeptic's starved emulation (each window missing
+        the same 68 % of refreshes) read a 500 ms reading, which was here, as
+        33.2 ms, and the phase landed 1.00 of a refresh behind (2026-10-04).
+        A machine that drops refreshes can only make the gap read longer,
+        never shorter, so the shortest of the idle readings is the display's.
+      */
+      const busyRefresh = displayMs ?? refreshMs;
+      for (const frac of [0, 0.5]) {
+        await wall.evaluate((p) => { window.__phaseMs = p; }, frac * busyRefresh);
+        /*
+          Measured for 2 s over the share of refreshes the busy machine
+          leaves, 4 s at half, so the windows are handed as many refreshes to
+          judge on as an idle phase's 2 s (see `enough` above). Not a busy
+          machine sized to the runner, missing fewer refreshes where the
+          runner already misses many: the runner's own misses are each
+          window's own, and the book that makes both windows miss the same
+          refresh is the machine this phase is for.
+        */
+        const missedShare = 0.5;
+        await show.evaluate((x) => { window.__busy = x; }, missedShare);
+        await show.waitForTimeout(300);
+        const m = await measure(2000 / (1 - missedShare));
+        await show.evaluate(() => { window.__busy = 0; });
+        const label = frac === 0 ? 'on its own clock, thread busy' : `${frac} of a refresh behind, busy`;
+        judge(m, label);
+        const display = 1000 / Math.min(m.refreshMs ?? Infinity, busyRefresh);
+        /*
+          At most 0.6 of the display, not merely under it: missing a fifth
+          of the refreshes, the old gate passed the floor (39.4 against
+          38.6), so a busy machine that is only a little busy measures
+          nothing. And the same refreshes missed in both windows.
+        */
+        const b = m.book;
+        check('  and the machine was busy: each window handed at most 0.6 of the display\'s refreshes, missed from one book', m.hz <= 0.6 * display && m.wallHz <= 0.6 * display && b.wallOwn === 0 && b.both >= 10 && b.apart !== null && b.apart.most - b.apart.least <= 4,
+          `the show's window ${f1(m.hz)} and the wall's ${f1(m.wallHz)} a second, of ${f1(display)}; the book's last ${b.entries} refreshes, ${b.both} looked up by both windows${b.apart ? `, the wall's stamp ${f1(b.apart.median)} ms after the show's (${f1(b.apart.least)} to ${f1(b.apart.most)})` : ''}, the projector's own book ${b.wallOwn ?? '-'}`);
+        /*
+          And, on one refresh, both windows handed the same refreshes: the
+          slots served at most 1.15 of the more of the two windows' frames.
+          The book makes both windows miss the refreshes it misses, but a
+          starved runner misses more of its own, each window its own, and
+          then the two clocks' frames fall in different refreshes and a
+          correct gate draws well over either window alone: the floor's bar
+          is far under what it should be, and the gate that turns down the
+          show's own next frame, the fault this phase is for, clears it. The
+          check-skeptic's mutant of that gate passed every line here on a
+          starved emulation, each window missing 63 % of its refreshes on its
+          own (drawn 1.07 to 1.14 of either window alone; the right gate
+          1.36 to 1.39), served reading 1.47 to 1.54 of the windows' frames.
+          Four Mac runs since #236 read 1.00 to 1.02 here; its first run,
+          whose two windows kept two books, 1.48.
+
+          Only on one refresh: half a refresh apart the Mac reads up to 1.69
+          with the gate right (#236's second run: 21.8 served, the windows
+          handed 12.9 and 13.9), its late timers parting the two windows'
+          frames by themselves, so the line would judge the runner there.
+          The gate's fault shows on one refresh first (23.4 drawn of 29.4
+          handed, where half a refresh apart it drew 26.0 of 29.5).
+        */
+        const oneMachine = m.servedHz / Math.max(1, m.hz, m.wallHz);
+        if (frac === 0) {
+          check('  and both windows were handed the same refreshes: the slots served at most 1.15 of either window\'s', oneMachine <= 1.15,
+            `${f1(m.servedHz)} served a second, the windows handed ${f1(m.hz)} and ${f1(m.wallHz)} (${oneMachine.toFixed(2)}x)`);
+        } else {
+          console.log(`  (the slots served ${oneMachine.toFixed(2)} of either window's frames, not judged half a refresh apart)`);
+        }
+      }
+      await wall.evaluate(() => { window.__phaseMs = 0; });
       /*
         Draws that cost 0.7 of a refresh, both clocks on one refresh. No floor
         here: on a machine whose own draw already costs most of a refresh, a
@@ -991,19 +1364,46 @@ try {
       if (!live) return false;
       return live.flipX === c.flipX && live.flipY === c.flipY
         && live.gain === c.gain && live.gamma === c.gamma
+        && (c.flashGuard === undefined || live.flashGuard === c.flashGuard)
         && live.maskTop === c.maskTop && live.maskRight === c.maskRight
         && live.maskBottom === c.maskBottom && live.maskLeft === c.maskLeft
         && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6)
         && (live.surfaces ?? []).length === (c.surfaces ?? []).length
         && (live.surfaces ?? []).every((s, i) => {
           const w = (c.surfaces ?? [])[i];
-          return w && s.shape === w.shape && s.enabled === w.enabled
+          return w && s.shape === w.shape && s.enabled === w.enabled && (s.source ?? 'wall') === (w.source ?? 'wall')
             && s.corners.every((v, j) => Math.abs(v - w.corners[j]) < 1e-6);
         });
     }, want, { timeout: 20000 });
+    /*
+      And drawn with, counted in the stage's own frames, not the browser's.
+
+      Four animation frames were taken to mean the new config had been
+      drawn, and nothing makes that so: the stage draws from the render
+      loop, not from this page's requestAnimationFrame, and on a loaded Mac
+      runner the two need not keep step. A grab taken before the stage drew
+      the config photographs the one before, and the gain check reads that
+      as no lift at all. Over 40 tools
+      shards on 2026-09-27 its lift sat between 1.52 and 1.90 in 37, with
+      two reds at 1.15 and 1.19 (#184's shard, main's deploy of #196) and
+      two highs at 2.20 and 2.27: single odd frames rather than a spread,
+      which is what one reading taken a config early looks like (inferred,
+      not seen; the gain check below now prints every reading so the next
+      one shows which). So the wait also asks the stage for two frames
+      drawn after the config was live, where it can say (webgpu.frames);
+      on a page without it the four animation frames are all there is.
+    */
     await page.evaluate(() => new Promise((done) => {
+      const drawn = () => window.chromaglassDebug?.().webgpu?.frames ?? null;
+      const from = drawn();
+      const start = performance.now();
       let n = 0;
-      const tick = () => (++n >= 4 ? done() : requestAnimationFrame(tick));
+      const tick = () => {
+        n++;
+        const now = drawn();
+        const enough = from === null || now === null ? n >= 4 : n >= 4 && now >= from + 2;
+        if (enough || performance.now() - start > 5000) done(); else requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
     }));
   };
@@ -1473,19 +1873,24 @@ try {
   const bracket = async (cfg, rounds = 3) => {
     let off = 0;
     let on = 0;
+    // Every reading in the order taken, plain and graded alternating, so a
+    // red run says whether one frame was odd or the whole bracket was.
+    const seq = [];
     for (let i = 0; i < rounds; i++) {
       await withOutput({ flashGuard: false });
-      off += meanOver(await gridOf(), () => true);
+      const a = meanOver(await gridOf(), () => true);
       await withOutput({ ...cfg, flashGuard: false });
-      on += meanOver(await gridOf(), () => true);
+      const b = meanOver(await gridOf(), () => true);
+      off += a; on += b; seq.push(a, b);
     }
     await withOutput({ flashGuard: false });
-    off += meanOver(await gridOf(), () => true);
-    return { it: on / rounds, base: off / (rounds + 1) };
+    const z = meanOver(await gridOf(), () => true);
+    off += z; seq.push(z);
+    return { it: on / rounds, base: off / (rounds + 1), seq: seq.map((v) => v.toFixed(3)).join(' ') };
   };
   const gain = await bracket({ gain: 2.2 });
   check('output gain lifts what reaches the wall', gain.it > gain.base * 1.25,
-    `${gain.base.toFixed(3)} -> ${gain.it.toFixed(3)}`);
+    `${gain.base.toFixed(3)} -> ${gain.it.toFixed(3)} (plain, graded, … in order: ${gain.seq})`);
   const gamma = await bracket({ gamma: 2.2 });
   check('output gamma darkens the mid-tones', gamma.it < gamma.base * 0.95,
     `${gamma.base.toFixed(3)} -> ${gamma.it.toFixed(3)}`);
@@ -1658,6 +2063,167 @@ try {
     const dark = await gridOf();
     check('a shape switched off lights nothing', region(dark, 0, 0, 1, 1) < 0.005,
       `${region(dark, 0, 0, 1, 1).toFixed(4)}`);
+  }
+
+  // ── 7c. A projector's own source (PLAN.md §16b) ──────────────────────
+  //
+  // Two projectors side by side, each the whole picture squeezed into its
+  // own half of the frame, so a cell in the left half and the cell sixteen
+  // columns over are the same place on the plate in the same frame. Every
+  // claim is between the two halves of one frame: across two frames the
+  // liquid has moved, and a difference between them would be the liquid's.
+  //
+  // Each source is held to a reference drawn in the same frame: the left
+  // projector shows the wall with that source's other rows set to 0 on the
+  // running plate (the settings hook), the right one the source. They must
+  // be one picture, to within what two quads a pixel apart differ by (the
+  // control, both on the wall); and with the settings put back, the two must
+  // be apart. A source routed to another source's texture, or never drawn,
+  // fails the first; a source that is only the wall fails the second.
+  //
+  // On Fillmore East, two plates, with the camera and the film stock off, so
+  // the wall is the plate's display pass as the sources are: section 6 left
+  // Oil on Water up, one plate under a lens, where the back plate alone and
+  // the film alone are both the bare lamp and could not be told apart.
+  //
+  // Fillmore and not Classic, and a film playing, because each source has to
+  // have something of its own to show. The first Mac run (#226) was on
+  // Classic with no film: Classic lays its back plate empty (`layPlate`
+  // clears every plate and seeds only the front; the back fills only as the
+  // automation pours into it), so the back source and its reference were both
+  // black, the front source was the wall to 0.001 because the back added
+  // nothing to it, and the film alone was black because nothing was loaded.
+  // All three were measuring a moment of the plate, not the routing. Fillmore
+  // is the look made of two projectors: the back plate is laid with its own
+  // wash (`laySecondPlate`) and the film row is at 0.7. The film is the
+  // browser's fake camera (scripts/chromium.mjs asks for one), started from
+  // Settings, Film, Camera, as a person would.
+  // `npm run mixer` holds each source to the exact picture on a lab plate;
+  // this asks the app's frame on a real GPU, and prints what each costs.
+  {
+    const half = (x0, source) => ({
+      id: `half-${x0}-${source}`, shape: 'rect', corners: [x0, 0, x0 + 0.5, 0, x0 + 0.5, 1, x0, 1],
+      src: [0, 0, 1, 1], enabled: true, opacity: 1, feather: 0, source,
+    });
+    /** Left against right, cell by cell: the mean luminance of each and the mean difference between them. */
+    const halves = async (left, right) => {
+      await withOutput({ surfaces: [half(0, left), half(0.5, right)], flashGuard: false });
+      const g = await gridOf();
+      const cols = g.cols / 2;
+      let l = 0, r = 0, d = 0, n = 0;
+      for (let y = 0; y < g.rows; y++) for (let x = 0; x < cols; x++) {
+        const a = g.lum[y * g.cols + x], b = g.lum[y * g.cols + x + cols];
+        l += a; r += b; d += Math.abs(a - b); n++;
+      }
+      return { left: l / n, right: r / n, diff: d / n };
+    };
+    const set = async (patch) => {
+      await page.evaluate((p) => window.chromaglassSettings?.(p), patch);
+      await page.waitForFunction((p) => {
+        const now = window.chromaglassSettings?.();
+        return !!now && Object.entries(p).every(([k, v]) => now[k] === v);
+      }, patch, { timeout: 20000 });
+      await page.waitForTimeout(400);
+    };
+    const f3 = (v) => v.toFixed(3);
+    const timings = () => page.evaluate(() => {
+      const d = window.chromaglassDebug?.().webgpu;
+      return d ? { on: !!d.timestamps, t: { ...(d.timings ?? {}) } } : null;
+    });
+
+    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
+    await set({ camera: 0, stock: 0 });
+    await page.getByTestId('open-all-settings').click();
+    await page.getByTestId('settings-nav-film').click();
+    await page.getByTestId('film-camera').click();
+    // Playing, not only started: `startFilmCamera` names the film a camera
+    // before its first frame, and the plate counts a film as on only once the
+    // video has a frame and a size (gpu/plateUniforms.ts). The check below
+    // asks the same, so a camera that never sends a frame is reported as that
+    // and not as a source routed wrong.
+    const filmPlaying = () => {
+      const v = window.chromaglassDebug?.().film?.video;
+      return window.chromaglassDebug?.().film?.kind === 'camera' && !!v && v.readyState >= 2 && v.videoWidth > 0;
+    };
+    await page.waitForFunction(filmPlaying, null, { timeout: 15000 }).catch(() => {});
+    await page.keyboard.press('Escape');
+    const look = await page.evaluate(() => {
+      const s = window.chromaglassSettings?.();
+      return s ? {
+        layers: s.layerCount, camera: s.camera ?? 0, stock: s.stock ?? 0, levels: [s.frontLevel ?? 1, s.backLevel ?? 1],
+        film: window.chromaglassDebug?.().film?.kind ?? null, filmMix: s.filmMix ?? 0,
+        frames: (() => { const v = window.chromaglassDebug?.().film?.video; return v ? { ready: v.readyState, width: v.videoWidth } : null; })(),
+      } : null;
+    });
+    const playing = !!look?.frames && look.frames.ready >= 2 && look.frames.width > 0;
+    check('the sources are asked on a two-plate look with no camera and no film stock, and a film playing',
+      !!look && look.layers === 2 && look.camera === 0 && look.stock === 0 && look.levels.every(v => v > 0.5)
+        && look.film === 'camera' && playing && look.filmMix > 0.3, JSON.stringify(look));
+    // Let the plate fill before anything is measured on it.
+    await withOutput({ flashGuard: false });
+    for (let i = 0; i < 20 && !(meanOver(await gridOf(), () => true) > LIT); i++) await page.waitForTimeout(500);
+    const before = await timings();
+
+    const same = await halves('wall', 'wall');
+    check('two projectors both on the wall show the same picture', same.left > LIT && same.diff < 0.1 * same.left,
+      `left ${f3(same.left)}, right ${f3(same.right)}, apart by ${f3(same.diff)}`);
+    // Within twice the control, and never under a floor of 0.004 of full
+    // scale: two quads a pixel apart can agree better than a cell's dither.
+    const near = Math.max(2 * same.diff, 0.004);
+    const OFF = {
+      front: { backLevel: 0, filmMix: 0 },
+      back: { frontLevel: 0, filmMix: 0, markMix: 0 },
+      film: { frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0 },
+    };
+    const live = await page.evaluate(() => window.chromaglassSettings?.());
+    // The film source draws a Multiply film as Add (lib/plateSources.ts), so
+    // its reference on the wall has to as well, or it is black by design.
+    if (live.filmBlend === 'multiply') OFF.film.filmBlend = 'add';
+    const drawn = {};
+    for (const kind of ['front', 'back', 'film']) {
+      const restore = Object.fromEntries(Object.keys(OFF[kind]).map(k => [k, live[k] ?? (k === 'filmMix' || k === 'markMix' || k === 'gelWheel' || k === 'lumia' ? 0 : 1)]));
+      await set(OFF[kind]);
+      const ref = await halves('wall', kind);
+      await set(restore);
+      const apart = await halves('wall', kind);
+      drawn[kind] = (await timings())?.t?.[`plate ${kind}`];
+      check(`the ${kind} source is the wall with its other rows at 0, drawn in the same frame, and not the wall itself`,
+        ref.left > LIT && ref.diff <= near && apart.diff > 4 * same.diff,
+        `against its reference ${f3(ref.diff)} (within ${f3(near)}); against the wall ${f3(apart.diff)} (the control ${f3(same.diff)}); it ${f3(ref.right)}, the reference ${f3(ref.left)}`);
+    }
+    // And the film alone is the film: with its row at 0 the film's projector
+    // goes dark. Without this the film line above would pass on anything else
+    // still lit in a view whose plates are off (the lamp's rim, the beads),
+    // since that view always differs from the wall.
+    {
+      await set({ filmMix: 0 });
+      const dark = await halves('wall', 'film');
+      await set({ filmMix: live.filmMix });
+      check('the film source is lit by the film: with the film row at 0 its projector is dark',
+        dark.right < LIT, `film source ${f3(dark.right)} at Film Mix 0 (dark under ${LIT}), the wall beside it ${f3(dark.left)}`);
+    }
+    // What each picture costs: its own display pass, timed under its own
+    // label, absent before any projector asked for it and fresh while one
+    // does (the profiler decays an old label rather than dropping it, so
+    // "present" alone would be true a minute after the pass stopped).
+    if (before?.on) {
+      const t = (await timings()).t;
+      const absent = ['front', 'back', 'film'].filter(k => typeof before.t[`plate ${k}`] === 'number');
+      check('each source is drawn as its own pass, timed only once a projector asks for it',
+        absent.length === 0 && ['front', 'back', 'film'].every(k => drawn[k] > 0.001),
+        `before: ${absent.length ? absent.join(', ') + ' already there' : 'none'}; wall ${t.plate?.toFixed(2)} ms, ${['front', 'back', 'film'].map(k => `${k} ${drawn[k]?.toFixed(2)} ms`).join(', ')}`);
+    } else {
+      console.log(' skip  each source\'s cost: this device has no timestamp queries');
+    }
+    // Off is disabled with no film playing, and a click on it would wait out
+    // Playwright's thirty seconds and lose every section after this one.
+    if (look?.film === 'camera') {
+      await page.getByTestId('open-all-settings').click();
+      await page.getByTestId('settings-nav-film').click();
+      await page.getByTestId('film-off').click();
+      await page.keyboard.press('Escape');
+    }
+    await withOutput({ flashGuard: true });
   }
 
   // ── 8. Back to nothing ─────────────────────────────────────────────

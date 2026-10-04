@@ -30,10 +30,19 @@
  *      diffusion or none, and the reported spread around it within five
  *   2. on a pressed plate like the reported one, the grid-scale ripple the
  *      presses make is held down against the same plate with the pass off
+ *      (to 0.68 since the press source was balanced; see there)
  *   3. what is not grid noise stays: lines and edges along either axis
  *      exactly; a hard disc's edge as hard, with no ring beside it; a soft
  *      blob; diagonal texture four and six cells across
  *   4. dye is made or lost only by the limiter's clamp, and by little
+ *   5. (a later report, not the checkerboard) no push grows a spinodal
+ *      grating of stripes, dots and labyrinths in the pools, and the plate
+ *      keeps its dye: the old fingering push, put back in a lab of its own,
+ *      is the control (the comment above section 5 says why)
+ *   6. two fingers holding the Drop, as the phone's check holds them, each
+ *      keep a pool of what they laid, the two alike: the same push took
+ *      one held pool to a third of the other's on the Mac (the phone's
+ *      two-finger Drop reds; the comment above section 6 has them)
  *
  * Every measure is taken in all four of the dye's channels and the worst one
  * judged: the grating is colour (blue and white over violet), so a pass that
@@ -45,6 +54,7 @@
  * Metal and the lab both give full float, so this is measured on that.
  */
 import { openLab } from './lab.mjs';
+import { readFileSync } from 'node:fs';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -204,9 +214,42 @@ try {
       return Math.sqrt(2 * e) / (N * N) / mean;
     });
   }, [N, { ...STILL, platePressure: 0.35, gridDamp }]);
+  /*
+    Held under 0.68, not the third it was written with (re-baselined
+    with the owner's word, 2026-10-03, in the PR that balanced the press
+    source). The third was measured on a plate whose presses did almost
+    nothing: the press's source was balanced by a guess at its plate mean
+    that was wrong, and that error went into the pressure solve as a net
+    source the solve could not meet (the mirror check's "and nowhere else",
+    `scripts/heldpress.mjs`). With the source exactly balanced these presses
+    really push the dye about (the dye under them barely moved before), and
+    the moving dye makes content in this band faster than the pass, at the
+    5% a step section 1 pins, takes it out; the flow is the same with the
+    pass on or off, so this is not the pass stirring anything. So the ratio
+    now reads 64% in the lab and 65% on the Mac, and no honest version of
+    the fix reads under a third: one that balanced only before the gap's
+    clamp read 74%, and measured away from the moving fronts the fix still
+    reads 62 to 70% (main 37 to 38% there), so it is not the fronts' own
+    edges (both measured by hand on the PR, not kept here; PLAN.md's item
+    has them). The renders of Red Cabbage's pressed closeup at 2.8x and 8x show
+    no 45-degree grate with the fix.
+
+    What the line still asks is that the pass is there and at strength: in
+    the lab the pass at 3.5% a step (30% weaker) reads 70.0%, at 2.5% 75%,
+    at 1.5% 82% and at 1% 87%, so the limit sits between the 64% the pass
+    reads as it ships (65% on the Mac) and a pass 30% weaker.
+
+    It cannot tell a pass that works from presses that stopped moving the
+    dye: were the press source to go unbalanced again, this plate would
+    read near the old 22% and pass the more easily. That is what the
+    held-press check (`scripts/heldpress.mjs`) guards, and this line leans
+    on it.
+    Whether the pass should hold more of this band against moving fronts is
+    a PLAN.md item (the grid pass against presses that move the dye).
+  */
   const off = await pressed(0), on = await pressed(undefined);
   const ratio = Math.max(...on.map((v, c) => v / off[c]));
-  check('on a pressed plate, the grid-scale ripple is held to a third of what grows without the pass', ratio < 1 / 3,
+  check('on a pressed plate, the grid-scale ripple is held under 0.68 of what grows without the pass', ratio < 0.68,
     `${on[3].toExponential(2)} of the dye against ${off[3].toExponential(2)} after ten seconds, worst channel ${pc(ratio)}`);
 
   // ── 3. The liquid's own detail stays ──────────────────────────────
@@ -295,6 +338,308 @@ try {
 } finally {
   await close();
 }
+
+// ── 5. No push grows a grating in the pools ───────────────────────
+/*
+  Reported next (Classic, 2026-09-27): stripes three to eight cells across at
+  every angle, and a quarter of an hour in, red dots in a lattice ten cells
+  apart with labyrinths between them. Not the checkerboard above: that is
+  locked to the grid's diagonals, and this pointed anywhere. It was the
+  fingering push in forcesB (gone now; the comment where it was says why),
+  which pushed the dye up its own gradient wherever its noise was negative:
+  diffusion run backwards, which grows a spinodal pattern in every pool, at
+  about four logical cells (ten texels at 512) and the waves near it.
+
+  Asked on Classic's step as the app ran it when the report was saved (no
+  diffusion; the glass smear and evaporation left out, neither a source of
+  grid-scale texture), on the app's geometry: a 512 grid under the 192-cell
+  logical plate, which is what set the pattern's size. Forty pools, stirred
+  once, then ten seconds, read at five and at ten. Measured as the share of
+  the dye's variance in waves 2.6 to 16 texels across (the reported 3 to 8
+  and 10, and the push's four logical cells), each of the dye's four channels
+  on its own and the worst one judged: the report was coloured dots, and a
+  push in colour alone (the tension force next door has the same shape)
+  would leave the density flat. Read from the solver's own texture
+  (lab.field reads the 192-cell plate, coarser than the pattern).
+
+    as it is      the step as it ships
+    control       the old push put back (a lab built with it) at Classic's
+                  strength then, 0.165: it must grow the grating
+    weak control  the same at a quarter of it: a push too weak to saturate
+                  in ten seconds must still read as growing, or the check
+                  only sees a plate the push has already wrecked
+
+  What a spinodal pattern does that the stirring does not is grow
+  exponentially, so the as-is plate is asked for a rate as well as a level.
+  The stirring's own share grows too, because it draws the pools' edges out
+  sharper (a one-texel edge on these pools reads about nine times what they
+  are laid with), but along with the stretching, not by compounding: in the
+  run this was written against it went 52 laid, 75 at five seconds, 107 at
+  ten, so 1.4 times over the second five seconds. The weak control, a
+  quarter of the push, went 238 to 819 over the same five, 3.4 times. The
+  gates sit between those and are drawn against the weak control where they
+  can be, so a lab that runs a little hotter or cooler (Metal against
+  SwiftShader) moves both sides together:
+
+    rate    from five seconds to ten, under twice, and under the weak
+            control's own growth over one and a half
+    level   under four times what the pools were laid with, and under a
+            third of the weak control at ten seconds (the old push: 2518)
+
+  And the dye kept, both ways: the push lost 57% of the plate in ten
+  seconds, which was the Finger's "adds none" red (the plate alone lost dye,
+  so a stroke that stopped the loss read as adding it), and backward
+  diffusion carried conservatively makes dye up to the 6.0 ceiling. The step
+  as it is loses a little of the worst channel here, 2.6% (the advection's
+  limiter and hold; not traced further than that); the weak control 11%,
+  the old push 59%. So within 5% either way. The lab has no evaporation.
+*/
+const oldPush = (strength) => ({
+  name: `old-fingering-push-${strength}`,
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]fluid\.ts$/ }, (args) => {
+      const src = readFileSync(args.path, 'utf8');
+      const at = '  /*\n    There was a fingering push here, and it is gone on purpose.';
+      if (!src.includes(at)) throw new Error('grating: the control could not find where the fingering push was in fluid.ts');
+      // The push as it shipped until it was taken out.
+      const push = `  if (d >= 0.05) {
+    let gx = (bilerpN(dye, uv + eL, S.n).a - bilerpN(dye, uv - eL, S.n).a) * 0.5;
+    let gy = (bilerpN(dye, uv + eL.yx, S.n).a - bilerpN(dye, uv - eL.yx, S.n).a) * 0.5;
+    let g2 = gx * gx + gy * gy;
+    if (g2 > 0.005) {
+      let g = sqrt(g2);
+      let n = snoise(p * 0.02 + vec2f(0.0, S.time * 0.05));
+      v = vec4f(v.xy - (vec2f(gx, gy) / g) * (n * ${strength.toFixed(5)} * g * 4.0), v.z, v.w);
+    }
+  }
+`;
+      return { contents: src.replace(at, push + at), loader: 'ts' };
+    });
+  },
+});
+const CLASSIC = {
+  dt: 0.000674, visc: 1.5, nu: 0.00015, diff: 0, buoyancy: 0.4, gravity: 0.006, advection: 0.35,
+  sharpness: 0, damping: 0.988, heatDecay: 0.992, turbScale: 0.576, turbDetail: 3, spin: 0.013, immiscibility: 0.02296,
+  phaseSharp: 0.35, phaseTension: 0.18, gapSpring: 0.0003, gapMemory: 0.998, platePressure: 0.25,
+  vibIntensity: 0.0048, vibFrequency: 0.288, drip: 0.15, currentDamp: 0.988, currentBuoy: 0.12, currentGrav: 0.03,
+  twist: 0.24, meanDensity: 0.38, maxCurrent: 16.7, gravityReach: 0.21,
+};
+const FN = 512, HALF = 300, LO = 2.6, HI = 16;
+/*
+  The share of a field's variance in waves `lo` to `hi` texels across: a 2D
+  FFT (radix 2, rows then columns) of the field less its mean, summed by the
+  wave's length. Parts in ten thousand. Run in the page, on each channel, so
+  the fields never cross to node. (A sine 5.12 texels across reads 10,000;
+  one of 8.2 reads 439 against the old 2.6 to 8 band's edge; white noise about
+  4,200 of the 2.6 to 8 band.)
+*/
+const band = (a, N, lo, hi) => {
+  const re = Float64Array.from(a), im = new Float64Array(N * N);
+  let mean = 0; for (const v of a) mean += v; mean /= a.length;
+  for (let k = 0; k < re.length; k++) re[k] -= mean;
+  const fft = (off, stride) => {
+    for (let i = 1, j = 0; i < N; i++) {
+      let bit = N >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+      if (i < j) { const p = off + i * stride, q = off + j * stride; [re[p], re[q]] = [re[q], re[p]]; [im[p], im[q]] = [im[q], im[p]]; }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+      const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < N; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const p = off + (i + k) * stride, q = off + (i + k + len / 2) * stride;
+          const tr = re[q] * cr - im[q] * ci, ti = re[q] * ci + im[q] * cr;
+          re[q] = re[p] - tr; im[q] = im[p] - ti; re[p] += tr; im[p] += ti;
+          const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+        }
+      }
+    }
+  };
+  for (let y = 0; y < N; y++) fft(y * N, 1);
+  for (let x = 0; x < N; x++) fft(x, N);
+  let inBand = 0, all = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const fx = (x < N / 2 ? x : x - N) / N, fy = (y < N / 2 ? y : y - N) / N;
+    const k = Math.hypot(fx, fy);
+    if (k === 0) continue;
+    const p = re[y * N + x] ** 2 + im[y * N + x] ** 2;
+    all += p;
+    if (1 / k >= lo && 1 / k < hi) inBand += p;
+  }
+  if (!(all > 0)) throw new Error('grating: a flat field has no spectrum to read');
+  return inBand / all * 1e4;
+};
+const pools = (page) => page.evaluate(async ([N, half, over, lo, hi, bandSrc]) => {
+  const band = eval(`(${bandSrc})`);
+  await lab.create(N, 192);
+  let s = 12345; const r = () => (s = s * 16807 % 2147483647) / 2147483647;
+  const cols = [[0.1, 1.2, 1.0], [1.3, 0.2, 0.3], [0.3, 1.1, 0.1], [1.0, 1.0, 0.1], [0.2, 0.4, 1.3]];
+  for (let k = 0; k < 40; k++) lab.dye(r(), r(), 0.03 + r() * 0.1, cols[k % 5], 0.6 + r() * 1.2);
+  for (let k = 0; k < 20; k++) lab.vel(r(), r(), 0.05 + r() * 0.1, [(r() - 0.5) * 3, (r() - 0.5) * 3, 0, 0]);
+  lab.flush(over.dt);
+  const sv = lab.solver(), dev = sv.device;
+  const format = sv.dye.read.format;
+  // The four channels as the solver holds them, every texel.
+  const channels = async () => {
+    const f32 = format === 'rgba32float';
+    const bytesPerRow = N * (f32 ? 16 : 8);
+    const buf = dev.createBuffer({ size: bytesPerRow * N, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = dev.createCommandEncoder();
+    enc.copyTextureToBuffer({ texture: sv.dye.read }, { buffer: buf, bytesPerRow }, [N, N]);
+    dev.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const raw = buf.getMappedRange().slice(0); buf.unmap(); buf.destroy();
+    const half16 = (x) => {
+      const e = (x >> 10) & 31, m = x & 1023, sg = x & 0x8000 ? -1 : 1;
+      if (e === 31) return m ? NaN : sg * Infinity;
+      return sg * (e ? (1 + m / 1024) * 2 ** (e - 15) : m / 1024 * 2 ** -14);
+    };
+    const src = f32 ? new Float32Array(raw) : new Uint16Array(raw);
+    const out = [0, 1, 2, 3].map(() => new Float64Array(N * N));
+    for (let k = 0; k < N * N; k++) for (let c = 0; c < 4; c++) {
+      const v = f32 ? src[k * 4 + c] : half16(src[k * 4 + c]);
+      if (!Number.isFinite(v)) throw new Error(`grating: the dye went non-finite (${v}) at texel ${k}`);
+      out[c][k] = v;
+    }
+    return out;
+  };
+  const read = (ch) => ({ band: ch.map((a) => band(a, N, lo, hi)), total: ch.map((a) => a.reduce((t, v) => t + v, 0)) });
+  const at0 = await channels();
+  await lab.step(half, over);
+  const mid = read(await channels());
+  await lab.step(half, over);
+  const at10 = await channels();
+  let moved = 0;
+  for (let k = 0; k < N * N; k++) moved = Math.max(moved, Math.abs(at10[3][k] - at0[3][k]));
+  return { format, start: read(at0), mid, end: read(at10), moved };
+}, [FN, HALF, CLASSIC, LO, HI, band.toString()]);
+// The worst channel's reading, and each channel's dye kept, from one run.
+const measure = (r) => ({
+  format: r.format,
+  moved: r.moved,
+  start: Math.max(...r.start.band), mid: Math.max(...r.mid.band), end: Math.max(...r.end.band),
+  kept: r.end.total.map((t, c) => t / r.start.total[c]),
+});
+/*
+  ── 6. Two held Drops keep their dye, alike ──────────────────────────
+
+  The phone's check (`npm run phone`, PHONE_GPU=1 on the Mac) holds two
+  fingers on the Drop for 1.2 s and asks for a pool under each, the two
+  within 0.4 of each other. It went red with one finger's pool at about a
+  third of the other's while both had laid the same dye on the same steps:
+  A 69 to B 229 and A 236 to B 84 on main's deploys of 2026-10-03 (05:11 and
+  06:06 UTC), A 197 to B 72 on a branch at 07:57, and four times on
+  2026-09-27/28 (PLAN.md, batch 11). Every one of them ran on a tree from
+  before #222 took this push out (08:38 UTC 2026-10-03); in the 80-odd Mac
+  runs of the line since and 146 holds of a diagnostic on the Mac (PR #240),
+  not one. The push moves dye up its own gradient where its noise is
+  negative, a held pool is the steepest gradient on the plate, and the
+  advection's hold and cap throw away what it piles up; where the noise is
+  positive the pool keeps its dye. So which finger lost hung on where the
+  plate's angle put each finger in the noise, and when: it looked like a
+  flake because it was a place and a moment.
+
+  Replayed here on the phone's grid (256) at two of those runs' cells (the
+  07:57 branch run's, and the first run's of 2026-10-03), each at ten
+  moments of the show's clock 15 s apart, since the noise drifts with it (the lab's
+  plate starts at 0, so without `setTime` every replay would be the same
+  first second). The step is the one the check asks for: Classic with the
+  motor off (twist 0), silent (spin 0, Classic's vibration at silence,
+  0.0036), no turbulence or rain, the current's ceiling recomputed for the
+  app's dt as the app does, at the dt the phone's plate stepped at in the
+  diagnostic (0.0011). What a held Drop lays is the app's with Water in the
+  bottle and Amount 1 (the hands loop in LiquidVisualizer: radius
+  round(3 × 1.5) = 5 cells, 0.6 at the middle falling as the square, in
+  Water's colour as addDensity logs it, heat 0.05 the same way): 7.9 a step, which is what the red lines print. Laid on
+  30 steps and read 17 later, the steps a red run's plate took in its 1.2 s
+  hold and 0.7 s after; the disk is the check's own (0.06 of the grid).
+
+  Measured (the lab on SwiftShader, 2026-10-04): as it is, every pool kept
+  191 or 192 of the 237 laid, at both places and all ten moments, the two
+  of a pair 1.00 of each other. With the push back the pools read 82 to
+  238, a pair as uneven as 94 to 235 (0.40, the phone's own red line) and
+  four of the twenty under 0.6. The control asks for half, so it goes red
+  if the push no longer splits held pools at all, not on where in its noise
+  the twenty land.
+*/
+const HELD = [[[81, 45], [68, 120]], [[113, 46], [76, 126]]];
+const MOMENTS = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135];
+const HELD_DT = 0.0011;
+const HELD_STEP = {
+  ...CLASSIC, turbScale: 0, spin: 0, twist: 0, vibIntensity: 0.0036, drip: 0, dt: HELD_DT,
+  maxCurrent: 0.75 / (HELD_DT * CLASSIC.advection * 190), meanDensity: 0.012,
+};
+const held = (page) => page.evaluate(async ([pairs, moments, over]) => {
+  const L = 192, rows = [];
+  for (const pair of pairs) for (const t0 of moments) {
+    await lab.create(256, L);
+    lab.setTime(t0);
+    const laid = [0, 0];
+    for (let s = 0; s < 47; s++) {
+      if (s < 30) for (const [h, [cx, cy]] of pair.entries()) {
+        const rr = 5, amt = 0.6, heat = 0.05, dye = new Array(L * L * 4).fill(0), vel = new Array(L * L * 4).fill(0);
+        for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) {
+          const d = Math.hypot(dx, dy); if (d > rr) continue;
+          const w = (1 - d / rr) ** 2, k = ((cx + dx) + (cy + dy) * L) * 4;
+          dye[k] += amt * w * 1.32; dye[k + 1] += amt * w * 0.63; dye[k + 3] += amt * w;
+          vel[k + 2] += heat * w;
+          laid[h] += amt * w;
+        }
+        lab.addDye(dye);
+        lab.addVel(vel);
+      }
+      lab.flush(over.dt);
+      await lab.step(1, over, true);
+    }
+    const f = await lab.field('dye');
+    const disk = ([cx, cy]) => { let t = 0; for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - cx, y - cy) < 0.06 * L) t += Math.max(0, f[(x + y * L) * 4 + 3]); return t; };
+    rows.push({ pair, t0, laid, under: pair.map(disk) });
+  }
+  return rows;
+}, [HELD, MOMENTS, HELD_STEP]);
+const heldRuns = {};
+const runs = {};
+for (const [name, plugins] of [['asIs', []], ['old', [oldPush(0.16485)]], ['weak', [oldPush(0.16485 / 4)]]]) {
+  const l = await openLab({ plugins, tag: plugins.length ? plugins[0].name.replace(/\./g, '_') : '' });
+  try {
+    runs[name] = measure(await pools(l.page));
+    if (name !== 'weak') heldRuns[name] = await held(l.page);
+  } finally { await l.close(); }
+}
+const { asIs, old, weak } = runs;
+const g = (m) => `${m.start.toFixed(0)} laid, ${m.mid.toFixed(0)} at 5 s, ${m.end.toFixed(0)} at 10 s; dye kept ${m.kept.map((k) => `${(k * 100).toFixed(1)}%`).join(' ')}`;
+console.log(`   (dye ${asIs.format}; worst channel, variance in waves ${LO} to ${HI} texels, parts in 10,000)`);
+console.log(`   as it is:     ${g(asIs)}`);
+console.log(`   control:      ${g(old)}`);
+console.log(`   weak control: ${g(weak)}`);
+check('the plate moved (the as-is run is not a still field that nothing could grow on)', asIs.moved > 0.1,
+  `largest change in density ${asIs.moved.toFixed(2)}`);
+check('the control: the old fingering push grows the reported grating', old.end > 10 * asIs.end,
+  `${(old.end / asIs.end).toFixed(0)}x what the step as it is leaves after ten seconds`);
+check('and at a quarter of its strength, still growing where it started', weak.end > 1.5 * weak.mid && weak.end > 2 * asIs.end,
+  `${weak.mid.toFixed(0)} at 5 s to ${weak.end.toFixed(0)} at 10 s, against ${asIs.end.toFixed(0)} as it is`);
+const growth = (m) => m.end / m.mid;
+check('Classic\'s step grows no grating: not compounding from five seconds to ten',
+  growth(asIs) < 2 && growth(asIs) < growth(weak) / 1.5,
+  `${asIs.mid.toFixed(0)} to ${asIs.end.toFixed(0)}, ${growth(asIs).toFixed(2)}x (the weak control: ${growth(weak).toFixed(2)}x)`);
+check('and no pattern left at the level the push leaves', asIs.end < 4 * asIs.start && asIs.end < weak.end / 3,
+  `${asIs.end.toFixed(0)} against ${asIs.start.toFixed(0)} laid and ${weak.end.toFixed(0)} for the weak control (the old push: ${old.end.toFixed(0)})`);
+const worstKept = asIs.kept.reduce((w, k) => (Math.abs(k - 1) > Math.abs(w - 1) ? k : w), 1);
+check('and keeps the plate\'s dye, neither losing nor making it', Math.abs(worstKept - 1) < 0.05,
+  `worst channel ${(worstKept * 100).toFixed(1)}% of what was laid (the weak control: ${(Math.min(...weak.kept) * 100).toFixed(1)}%, the old push: ${(Math.min(...old.kept) * 100).toFixed(1)}%)`);
+
+const heldText = (rows) => HELD.map((pair) => `${pair.map((c) => `(${c})`).join(' ')}: ${rows.filter((r) => r.pair === pair || String(r.pair) === String(pair)).map((r) => r.under.map((u) => u.toFixed(0)).join('/')).join(', ')}`).join('; ');
+const whole = (rows) => rows.length === HELD.length * MOMENTS.length && rows.every((r) => r.laid.every((v) => v > 200) && r.under.every(Number.isFinite));
+const evenness = (rows) => Math.min(...rows.map((r) => Math.min(...r.under) / Math.max(...r.under)));
+const keeps = (rows) => Math.min(...rows.flatMap((r) => r.under.map((u, i) => u / r.laid[i])));
+console.log(`   held Drops, each pool's dye at each moment (${heldRuns.asIs[0]?.laid[0].toFixed(0)} laid each):`);
+console.log(`     as it is: ${heldText(heldRuns.asIs)}`);
+console.log(`     control:  ${heldText(heldRuns.old)}`);
+check('the control: with the old push, at some place and moment one held Drop keeps under half of what the other does',
+  whole(heldRuns.old) && evenness(heldRuns.old) < 0.5, `the weakest pair ${evenness(heldRuns.old).toFixed(2)} of each other`);
+check('two held Drops keep their dye alike at every place and moment: within 0.9 of each other, and over 0.6 of what they laid',
+  whole(heldRuns.asIs) && evenness(heldRuns.asIs) >= 0.9 && keeps(heldRuns.asIs) > 0.6,
+  `the weakest pair ${evenness(heldRuns.asIs).toFixed(2)} of each other, the least kept ${keeps(heldRuns.asIs).toFixed(2)} (the old push: ${evenness(heldRuns.old).toFixed(2)} and ${keeps(heldRuns.old).toFixed(2)})`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} failed` : `\nall ${checks.length} ok`);

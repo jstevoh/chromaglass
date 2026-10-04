@@ -25,7 +25,8 @@ export const OUTPUT_FIELDS: Field[] = [
   { name: 'cornerAB', type: 'vec4f', count: MAX_SURFACES, note: 'the quad on the wall: x0 y0 x1 y1, screen space' },
   { name: 'cornerCD', type: 'vec4f', count: MAX_SURFACES, note: 'x2 y2 x3 y3' },
   { name: 'src', type: 'vec4f', count: MAX_SURFACES, note: 'which piece of the plate fills it: x, y, w, h' },
-  { name: 'form', type: 'vec4f', count: MAX_SURFACES, note: 'shape index, shape feather, opacity, unused' },
+  { name: 'form', type: 'vec4f', count: MAX_SURFACES, note: 'shape index, shape feather, opacity, source (0 wall, 1 front, 2 back, 3 film)' },
+  { name: 'lay', type: 'vec4f', count: MAX_SURFACES, note: 'x: how it meets the wall (0 over, 1 add, the beam); yzw spare' },
   // Per frame.
   { name: 'mask', type: 'vec4f', note: 'blanking inset from top, right, bottom, left' },
   { name: 'flip', type: 'vec2f', note: '1 or -1 per axis' },
@@ -33,6 +34,7 @@ export const OUTPUT_FIELDS: Field[] = [
   { name: 'feather', type: 'f32', note: 'how soft the blanking edge is' },
   { name: 'gain', type: 'f32' },
   { name: 'gamma', type: 'f32' },
+  { name: 'quads', type: 'f32', note: 'how many quads are in the arrays above, for a beam to find the others it crosses' },
 ];
 
 export const OUTPUT_LAYOUT = layOut(OUTPUT_FIELDS);

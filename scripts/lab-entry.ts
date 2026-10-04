@@ -1,26 +1,29 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { BeadField, rasterDrops } from '../src/lib/beads';
-import { fillPlateUniforms, magnetsOnPlate } from '../src/gpu/plateUniforms';
+import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
+import { sourceSettings } from '../src/lib/plateSources';
+import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
+import { normalizeOutput } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { PRESETS } from '../src/presets';
 import { phasePourShape } from '../src/presetPlate';
-import { squishDisc, PressLift, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
-import { fingerCarry, blowCarry } from '../src/lib/handCarry';
+import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
   dt: 0.004, visc: 0.5, nu: 0.00005, diff: 0.0001, buoyancy: 0, gravity: 0, tiltX: 0, tiltY: 0,
   advection: 1, sharpness: 0, damping: 0.99, heatDecay: 0.98, turbScale: 0, turbDetail: 3, spin: 0,
   immiscibility: 0, phaseSharp: 0.35, phaseTension: 0.18, magnetX: 0.5, magnetY: 0.5, magnetHeight: 0.2,
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
-  platePressure: 0.4, fingering: 0, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
+  platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
   air: 0, evapFactor: 1, time: 0, currentDamp: 0.98, currentBuoy: 0, rockX: 0, rockY: 0, currentGrav: 0,
   twist: 0, meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
 } as GpuStepParams;
@@ -94,6 +97,19 @@ const api = {
     const bytes = f32 ? new Float32Array(data).buffer : halves(data);
     solver['device'].queue.writeTexture({ texture: od.read }, bytes, { bytesPerRow: row }, [N, N]);
   },
+  /** Any velocity, heat and gap at all, cell for cell: L × L × 4 (vx, vy, temp, gap), added on the next flush. */
+  addVel(data: number[]) {
+    const { velAdd } = lab!;
+    if (data.length !== velAdd.length) throw new Error(`addVel: ${data.length} values for a ${velAdd.length}-value plate`);
+    for (let k = 0; k < velAdd.length; k++) velAdd[k] += data[k];
+  },
+  /**
+   * Where the plate's clock stands, in seconds: the solver's noises (the
+   * turbulence, the old fingering push `npm run grating` puts back) are
+   * drawn at it, so a check can ask one moment of a show and not only the
+   * first second of a new plate.
+   */
+  setTime(t: number) { lab!.time = t; },
   /** A velocity kick / heat / gap delta at (x, y): channels vx, vy, temp, gap. */
   vel(x: number, y: number, r: number, v: [number, number, number, number]) {
     const { L, velAdd } = lab!;
@@ -111,12 +127,14 @@ const api = {
    * `radius` cells. The app's plate is 192 cells, the lab's L by default, so
    * a press the app makes at radius 30 × GRID_SCALE is radius 45 here too.
    */
-  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0) {
+  squish(x: number, y: number, radius: number, amount: number, fingering: number, stroke: Stroke, pile = 0, thin = false) {
     const { L, velAdd, mul } = lab!;
     squishDisc(L, x, y, radius, amount, fingering, stroke, pile, (idx, gap, vx, vy, m) => {
       velAdd[idx * 4] += vx; velAdd[idx * 4 + 1] += vy; velAdd[idx * 4 + 3] += gap; mul[idx] *= m;
-    });
+    }, thin);
   },
+  /** The carries' substeps on the last thin step, and the Courant number that asked for them (carryPlan). */
+  async carry() { return lab!.solver.readCarry(); },
   /**
    * What a stroke would lay, without laying it: the gap delta cell by cell
    * (L × L). `npm run lift` holds the plate's picture against this, so it
@@ -131,23 +149,43 @@ const api = {
   },
   /** The press's memory, as the plate keeps it: `npm run lift` presses and lets go through this. */
   PressLift,
+  /** The glass's spring a step, as the app derives it from Press Lift (`npm run presslift`). */
+  glassSpring,
+  /** The most substeps a thin gap's carry takes in a step (carryPlan). */
+  carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
     l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
   },
-  async step(n: number, over: Partial<GpuStepParams> = {}) {
+  /*
+    `flushed` says the first of these steps follows a flush, as the app's
+    loop says it (`gpu.step(p, applied)`): the gap then takes its press and
+    its spring in the one update the flush ran, not a second spring-only
+    update in the step as well. Every check before `npm run heldpress`
+    stepped without it, and a press held step after step then had its gap
+    sprung twice a step, a local opening the app never has.
+  */
+  async step(n: number, over: Partial<GpuStepParams> = {}, flushed = false) {
     const l = lab!;
+    // The app builds Thin Gap's pipelines before its first step (every look
+    // opens on a thin gap); the lab builds them here, so it measures the
+    // thin gap from its first step too. BASE has no thinGap: a lab check
+    // runs the old plate unless it asks for the thin one (PLAN 18a).
+    if ((over.thinGap ?? 0) > 0.5) await l.solver.prepareThinGap();
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
-      l.solver.step(p, false);
+      l.solver.step(p, flushed && k === 0);
       l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /** Thin Gap's viscosity for a Thickness, and the ferrofluid's (src/gpu/fluid.ts), so a check never copies either. */
+  thinGapViscosity,
+  ferroViscosity: FERRO_NU,
   /** A shipped look's settings and the shape it pours its ferrofluid in, as the app reads them. */
   look(id: string) {
     const p = PRESETS.find(q => q.id === id);
@@ -156,6 +194,8 @@ const api = {
     // is the default there, not off.
     return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id) };
   },
+  /** Every shipped look's id, for a check that asks something of all of them. */
+  lookIds() { return PRESETS.map(p => p.id); },
   /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */
   pour(shape: PhasePourShape, scale: number) {
     const drops = phasePour(shape, scale);
@@ -184,6 +224,8 @@ const api = {
   },
   async field(which: 'dye' | 'vel' | 'oilDye') { return Array.from(await lab!.solver.readField(which)); },
   async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /** The spun dish's swirl on its own grid (readSwirl): `npm run dish`. */
+  async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
   /** The oil's half of a press, through the app's own function (squeezeOut): mirror cells, N across. */
@@ -197,10 +239,106 @@ const api = {
   },
   /** What a hand's Finger and Blow carry of the ferrofluid, as the app works it out (lib/handCarry.ts). */
   fingerCarry, blowCarry,
+  /**
+   * A hand's Blow on the colour, as blowWind runs it on the app's mirror
+   * (lib/handCarry.ts: blowDye): `dye` is the mirror (rgba, L x L), the
+   * hand in its cells. With `apply` the take and the put go into the lab's
+   * own deltas, landing on the next flush as the app's do; either way it
+   * returns what moved, and the take and the put cell by cell.
+   */
+  blowDye(dye: number[], x: number, y: number, radius: number, strength: number, dx: number, dy: number, apply = true) {
+    const { L, dyeAdd, mul } = lab!;
+    const out = { mul: new Float32Array(L * L).fill(1), density: new Float32Array(L * L), densityR: new Float32Array(L * L), densityG: new Float32Array(L * L), densityB: new Float32Array(L * L) };
+    const moved = blowDye(dye, L, x, y, radius, strength, dx, dy, out);
+    if (apply) {
+      for (let i = 0; i < L * L; i++) {
+        mul[i] *= out.mul[i];
+        dyeAdd[i * 4] += out.densityR[i]; dyeAdd[i * 4 + 1] += out.densityG[i]; dyeAdd[i * 4 + 2] += out.densityB[i]; dyeAdd[i * 4 + 3] += out.density[i];
+      }
+    }
+    return { moved, mul: Array.from(out.mul), density: Array.from(out.density) };
+  },
+  /** The Blow's size and strength as the app's hands give them (lib/handCarry.ts). */
+  BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius,
+  /** The oil's half of the same Blow (blowOil), through the solver, as blowWind runs it. */
+  blowOil(x: number, y: number, radius: number, strength: number, dx: number, dy: number, N: number) { blowOil(lab!.solver, x, y, radius, strength, dx, dy, N); },
+  /**
+   * The old Blow on the colour, for the control (before PLAN.md §15c): a
+   * puff (blowAir) thinned every cell under it by 0.8, a directed blow (a
+   * remote hand's, blowDirected) by 0.15 at its middle falling to none at
+   * its rim. One step's worth.
+   */
+  eraseDye(x: number, y: number, radius: number, directed = false) {
+    const { L, mul } = lab!;
+    const r = Math.round(radius * L / 128), r2 = r * r;
+    for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
+      const d2 = i * i + j * j, nx = x + i, ny = y + j;
+      if (nx <= 0 || ny <= 0 || nx >= L - 1 || ny >= L - 1) continue;
+      if (directed) { if (d2 < r2) mul[nx + ny * L] *= 1 - 0.15 * (1 - Math.sqrt(d2) / r); continue; }
+      if (d2 >= r2 || d2 === 0) continue;
+      mul[nx + ny * L] *= 0.8;
+    }
+  },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
+  /**
+   * The projector's pass alone (gpu/output.ts), on pictures made to order:
+   * each source a ramp from one colour to another, left to right, or top to
+   * bottom with a third entry 'y' (a flat colour when the two are the same),
+   * `cfg` the output config as Settings stores it. For `npm run beams`
+   * (PLAN.md §16c): with a picture whose every pixel is known, what two
+   * beams give where they cross can be read against what each gives alone.
+   *
+   * The pictures are written the way the app's passes leave the frame for
+   * the projector, rows the other way up from a canvas (the display's
+   * FLIP_Y), so the projection of a whole picture is the picture upright:
+   * the ramp's first colour at the top. Gives back the pixels and how many
+   * quads the pass drew, so a check can tell its surfaces from the full
+   * frame the pass falls back to when there are none.
+   */
+  async projector(size: number, cfg: unknown, pictures: Partial<Record<'wall' | 'front' | 'back' | 'film', [number[], number[], 'y'?]>>) {
+    const device = lab!.solver['device'] as GPUDevice;
+    const out = new WebGPUOutput(device, 'rgba8unorm');
+    const quads = fillOutputUniforms(out.pack, normalizeOutput(cfg), size, size);
+    const enc = device.createCommandEncoder();
+    const ramp = (view: GPUTextureView, [a, b, axis]: [number[], number[], 'y'?]) => {
+      const v = (c: number[]) => `vec3f(${c.map(x => x.toFixed(6)).join(', ')})`;
+      const module = device.createShaderModule({ code: `
+        @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+          let p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+          return vec4f(p[i], 0.0, 1.0);
+        }
+        @fragment fn fs(@builtin(position) at: vec4f) -> @location(0) vec4f {
+          return vec4f(mix(${v(a)}, ${v(b)}, ${axis === 'y' ? `1.0 - at.y / ${size.toFixed(1)}` : `at.x / ${size.toFixed(1)}`}), 1.0);
+        }` });
+      const pipe = device.createRenderPipeline({
+        layout: 'auto', vertex: { module, entryPoint: 'vs' },
+        fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] },
+        primitive: { topology: 'triangle-list' },
+      });
+      const pass = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
+      pass.setPipeline(pipe); pass.draw(3); pass.end();
+    };
+    ramp(out.sceneView(size, size), pictures.wall ?? [[0, 0, 0], [0, 0, 0]]);
+    for (const kind of ['front', 'back', 'film'] as const) {
+      const p = pictures[kind];
+      if (p) ramp(out.sourceView(kind, size, size), p);
+    }
+    const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+    out.draw(enc, target.createView(), quads);
+    const row = Math.ceil(size * 4 / 256) * 256;
+    const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
+    device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const src = new Uint8Array(buf.getMappedRange());
+    const px = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) px.set(src.subarray(y * row, y * row + size * 4), y * size * 4);
+    buf.unmap(); buf.destroy(); target.destroy(); out.dispose();
+    return { pixels: Array.from(px), quads };
+  },
   /**
    * The finished picture of the lab's plate, as the app would draw it with
    * these settings and this camera: RGBA bytes, size x size. `shot.zoom` is
@@ -225,6 +363,18 @@ const api = {
         be told from the right one.
       */
       film?: CanvasImageSource; mark?: CanvasImageSource; backPlate?: boolean; backRotation?: number;
+      /*
+        Projectors' own sources (PLAN.md §16b). Each is the plate's display
+        drawn again with that source's uniforms, after the wall's draw and in
+        the same encoder, as the app's frame does: the source reuses what the
+        wall's draw packed and derived, and one encoder is where two displays
+        could be handed each other's uniforms (every writeBuffer lands before
+        the command buffer runs). With sources asked for, the render gives
+        back `{ wall, front?, back?, film? }` in place of the wall's pixels.
+      */
+      sources?: ('front' | 'back' | 'film')[];
+      /** Draw the wall as it is drawn into a texture (see `flipped` below); with sources, always. */
+      flip?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -241,8 +391,7 @@ const api = {
     if (cam.mark) plate.setSource('mark', cam.mark);
     const [fw, fh] = cam.film ? size2(cam.film) : [0, 0];
     const [mw, mh] = cam.mark ? size2(cam.mark) : [1, 1];
-    fillPlateUniforms(plate.pack, {
-      view: {
+    const view: PlateView = {
         // The plate's clock can be set apart from the solver's, to ask what
         // the picture does with time alone (in `npm run filmlook`, the film's
         // thickness must not drift with it).
@@ -257,24 +406,57 @@ const api = {
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
         mark: cam.mark ? { aspect: mw / Math.max(1, mh) } : null,
         film: cam.film ? { kind: 'file', video: { readyState: 4, videoWidth: fw, videoHeight: fh } } : { kind: 'none', video: null },
-      },
-      fluids: cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }],
-      width: size, height: size, derived: true, grid: l.N,
-    });
+    };
+    const fluids = cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }];
+    fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
-    plate.draw(enc, target.createView(), { width: size, height: size }, cam.backPlate ? [layer, { ...layer, air: null }] : [layer]);
+    const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
+    /*
+      With sources, the wall goes to a texture as the app's does when a
+      projector is on (the output pass reads it), and a texture's rows run the
+      other way from a canvas's, so the display flips (FLIP_Y). The sources are
+      always drawn so. The pictures are turned upright again as they are read,
+      as the output pass does. The dither is laid by the pixel's place on the
+      target, so a flipped picture turned upright is a step or two off an
+      unflipped one here and there: a wall to compare with a source is drawn
+      flipped too (`flip`).
+    */
+    const flipped = cam.flip || !!cam.sources?.length;
+    plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    // As the app fills them: the frame's settings with the other rows at
+    // nothing, no camera and no chain, so each display does its own finish.
+    const owns = (cam.sources ?? []).map((kind) => {
+      fillPlateUniforms(plate.sourcePack(kind), {
+        view: { ...view, settings: sourceSettings(kind, view.settings) }, fluids,
+        width: size, height: size, derived: true, grid: l.N, cameraOn: false, postChain: false,
+      });
+      const tex = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+      plate.drawSource(enc, kind, tex.createView(), { width: size, height: size }, layers, undefined, 'rgba8unorm');
+      return { kind: kind as string, tex };
+    });
     const row = Math.ceil(size * 4 / 256) * 256;
-    const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-    enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
+    const reads = [{ kind: 'wall', tex: target }, ...owns].map(({ kind, tex }) => {
+      const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: row }, [size, size]);
+      return { kind, tex, buf };
+    });
     device.queue.submit([enc.finish()]);
-    await buf.mapAsync(GPUMapMode.READ);
-    const src = new Uint8Array(buf.getMappedRange());
-    const out = new Uint8Array(size * size * 4);
-    for (let y = 0; y < size; y++) out.set(src.subarray(y * row, y * row + size * 4), y * size * 4);
-    buf.unmap(); buf.destroy(); target.destroy(); plate.dispose();
-    return Array.from(out);
+    const pictures: Record<string, number[]> = {};
+    for (const { kind, tex, buf } of reads) {
+      await buf.mapAsync(GPUMapMode.READ);
+      const src = new Uint8Array(buf.getMappedRange());
+      const out = new Uint8Array(size * size * 4);
+      for (let y = 0; y < size; y++) {
+        const from = flipped ? size - 1 - y : y;
+        out.set(src.subarray(from * row, from * row + size * 4), y * size * 4);
+      }
+      buf.unmap(); buf.destroy(); tex.destroy();
+      pictures[kind] = Array.from(out);
+    }
+    plate.dispose();
+    return cam.sources ? pictures : pictures.wall;
   },
 };
 (window as unknown as { lab: typeof api }).lab = api;

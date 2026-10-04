@@ -177,7 +177,12 @@ try {
       g.__bottleSpied = true;
       window.__bottleGpu = g;
       const addPhase = g.addPhase.bind(g);
-      g.addPhase = (x, y, r, a) => { window.__bottleLog.phase.push({ x, y, a }); return addPhase(x, y, r, a); };
+      // Where the hand was when each pour was made, for `follows` below.
+      g.addPhase = (x, y, r, a) => {
+        const p = window.chromaglassDebug().pointer();
+        window.__bottleLog.phase.push({ x, y, a, hx: p.x / p.grid, hy: p.y / p.grid });
+        return addPhase(x, y, r, a);
+      };
       const addMix = g.addMix.bind(g);
       g.addMix = (x, y, r, what) => { if ((what?.oil ?? 0) > 0) window.__bottleLog.oil.push({ x, y, a: what.oil }); return addMix(x, y, r, what); };
       const pressMix = g.pressMix.bind(g);
@@ -206,8 +211,26 @@ try {
     What the log holds along a path of points (plate 0..1), and at its point
     reflection. For each kind: how many calls landed within `rad` of the path
     and their summed amount, how many landed within `rad` of the reflected
-    path, and whether the calls follow the path: the first quarter of them
-    nearer its start than the last quarter.
+    path, and whether the calls follow the hand: on average they landed
+    where the hand was when they were made (the mean offset from it under
+    0.04 of the plate, over every call, not only those near the path), and
+    the hand had gone at least a quarter of the way along the path between
+    the first quarter of them and the last.
+
+    It read the pours' own places, the first quarter's nearer the start than
+    the last quarter's, and went red on Splat once, on a Mac run of #209 (a
+    docs-only PR). A Splat lays its liquid with its first droplet, flung 4.5
+    to 27 cells from the hand in any direction, on a stroke 29 cells long
+    (the grid is 192). A model of that scatter alone makes the old
+    comparison flip rarely (0.2% of runs), so the red was more likely a
+    pour the show made by itself near the path; either way the question was
+    the wrong one. The hand's own place at each pour has no scatter; a
+    fling in every direction averages out, and a pour made anywhere but
+    near the hand (the stroke's start, a fixed spot) moves the mean: the
+    model passes a healthy Splat on 99.5% of runs and one stuck at the
+    stroke's start on 0.07%. Asking every pour to be near its hand failed
+    a healthy Splat on 59%: about one in eight of its flings land past
+    0.12 of the plate (23 cells).
   */
   const along = (pts, rad) => page.evaluate(({ pts, rad }) => {
     const l = window.__bottleLog;
@@ -219,9 +242,15 @@ try {
       const on = list.filter((c) => near(c, pts));
       const q = Math.max(1, Math.floor(on.length / 4));
       const mean = (xs) => xs.reduce((a, c) => a + t(c), 0) / Math.max(1, xs.length);
+      const hand = (c) => ({ x: c.hx, y: c.hy });
+      const withHand = list.length > 0 && list.every((c) => c.hx !== undefined);
+      const off = withHand ? Math.hypot(
+        list.reduce((a, c) => a + c.x - c.hx, 0) / list.length,
+        list.reduce((a, c) => a + c.y - c.hy, 0) / list.length) : Infinity;
       return {
-        n: on.length, a: on.reduce((a, c) => a + c.a, 0), mirror: list.filter((c) => near(c, mirror)).length,
-        follows: on.length >= 4 && mean(on.slice(0, q)) < mean(on.slice(-q)),
+        n: on.length, a: on.reduce((a, c) => a + c.a, 0), mirror: list.filter((c) => near(c, mirror)).length, off,
+        follows: withHand && on.length >= 4 && off < 0.04
+          && mean(on.slice(-q).map(hand)) - mean(on.slice(0, q).map(hand)) > 0.25,
       };
     };
     return {
@@ -294,7 +323,7 @@ try {
     const r = ferro[t];
     check(`${t} with the Ferrofluid bottle lays ferrofluid along the stroke, and not at its mirror`,
       r.same && r.phase.n >= 8 && r.phase.a > 0.5 && r.phase.follows && r.phase.mirror === 0,
-      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand, ${r.phase.mirror} at the mirror${same(r)}`);
+      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand (off it by ${r.phase.off.toFixed(3)} on average), ${r.phase.mirror} at the mirror${same(r)}`);
   }
   check('Finger and Blow with the Ferrofluid bottle lay none',
     ferro.finger.same && ferro.blow.same && ferro.finger.phase.n === 0 && ferro.blow.phase.n === 0,
@@ -459,8 +488,29 @@ try {
     return { ...calls, holds, squeezed, readings: read1 - read0, before, after };
   };
   await bottle('oil');
-  const pOn = await hold(true);
-  const pOff = await hold(false);
+  /*
+    On the old plate, Thin Gap off. These measure the Press's own move of the
+    oil (squeezeOut and pressMix), which a thin gap retires: there the flow
+    carries the oil out and back with its colour (PLAN 18a, the Press's
+    carries retired), and squeezeOut returns before it moves anything. Every
+    look runs on a thin gap since PLAN 18a-every, so without this the calls
+    counted here never come and the lines below would read the thin flow,
+    not the move they are about. The old plate is still a switch away, and
+    this is still its Press. The oil's press on a thin gap has no app check
+    of its own yet (PLAN 18a).
+  */
+  await page.evaluate(() => window.chromaglassSettings({ thinGap: 0 }));
+  // Turned off in a show that opened thin, the plate stays thin until the old plate's pipelines are built.
+  for (let k = 0; k < 400 && (await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap)); k++) await settle(50);
+  const oldPlate = await page.evaluate(() => !window.chromaglassDebug().fluids?.[0]?.thinGap);
+  let pOn, pOff;
+  try {
+    pOn = await hold(true);
+    pOff = await hold(false);
+  } finally {
+    await page.evaluate(() => window.chromaglassSettings({ thinGap: 1 }));
+  }
+  check('the Press\'s oil checks below ran on the old plate they measure', oldPlate, oldPlate ? 'Thin Gap off and the plate stepping without it' : 'the plate was still on a thin gap after 20 s');
   const b = pOn.before, a = pOn.after;
   console.log(`     Press, Oil Bodies on: ${pOn.mouse} oil presses held over ${pOn.readings} readings and ${pOn.replay} of 8 replayed, ${pOn.placed} of ${pOn.n} under the palm, ${pOn.mirror} at its mirror; oil under the palm ${b?.palm.toFixed(1)} → ${a?.palm.toFixed(1)}, ring ${b?.ring.toFixed(1)} → ${a?.ring.toFixed(1)}, all ${b?.all.toFixed(1)} → ${a?.all.toFixed(1)}; off: ${pOff.n} oil presses in ${pOff.squeezed} presses`);
   check('the Press moves the oil with Oil Bodies on: out from under the palm onto the ring, and keeps it',

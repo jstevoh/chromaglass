@@ -30,7 +30,7 @@
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { PIN_RANGE } from './deskPins';
-import { MIX_KEYS } from './mixer';
+import { MIX_KEYS, MIX_FADE_KEYS } from './mixer';
 
 /**
  * What belongs to the room rather than to a look.
@@ -57,6 +57,10 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   ...MIX_KEYS,
   'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',
   'simResolution',
+  // The magnet in the performer's hand, as the tool's Amount is (kept in the
+  // browser, lib/toolAmount.ts): a look change must not swap the magnet they
+  // are holding for another size.
+  'magnetSize',
 ]);
 
 /**
@@ -129,7 +133,7 @@ export function keepRoom(step: VisualizerSettings, now: VisualizerSettings): Vis
 }
 
 /**
- * One tick of a look fade (a Go, a Back, a new song's look), as the App's
+ * One tick of a look fade (a Go, a new song's look; a Back is `backStep`), as the App's
  * timer lays it down: the blend `t` of the way from `from` to `to`, over the
  * room as it is now (`keepRoom`), and over whatever `held` names as it is now.
  *
@@ -156,37 +160,72 @@ export function lookStep(
 }
 
 /**
- * The room's settings a look change moved by itself, before and after: for a
- * Back to put back. A look fade leaves the room as it is (`keepRoom`), so a
- * Back that runs through one puts back nothing of the room, which is right for
- * a film taken out since the Go (the hand's, not the Go's) and wrong for what
- * the change itself did: Lucky rolls the microphone's Sensitivity and Bass
- * Boost, which are the room's, and Back after Lucky left the roll in place
- * once each step kept the room. So the change says what it moved, and Back
- * puts back each of those the hand has not touched since (`roomBack`).
+ * The room's settings a Back leaves where they are: how this machine is set up
+ * (the grid it can hold, the microphone's latency and prediction, whether a new
+ * song changes the look, how the room camera's picture is read, the set's
+ * pacing), as against what is on the wall (the dimmer, the film, the logo, the
+ * Mixer, the microphone's gain). A Back that put the grid back would rebuild
+ * the solver mid-show; one that put back a latency measured since would undo a
+ * calibration nobody meant to undo. Kept separate from `RIG_KEYS` because a Go
+ * leaves all of the room alone and a Back only these.
  */
-export interface RoomMove { before: Partial<VisualizerSettings>; after: Partial<VisualizerSettings> }
-export function roomMoved(before: VisualizerSettings, after: VisualizerSettings): RoomMove {
-  const b = before as unknown as Record<string, unknown>;
-  const a = after as unknown as Record<string, unknown>;
-  const out: RoomMove = { before: {}, after: {} };
-  for (const key of RIG_KEYS) {
-    if (JSON.stringify(b[key]) === JSON.stringify(a[key])) continue;
-    (out.before as Record<string, unknown>)[key] = b[key];
-    (out.after as Record<string, unknown>)[key] = a[key];
-  }
-  return out;
-}
-/** What a Back puts back of the room: each setting the change moved that is still where the change left it. */
-export function roomBack(move: RoomMove, now: VisualizerSettings): Partial<VisualizerSettings> {
+export const SETUP_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof VisualizerSettings>([
+  'autoCalibrate', 'beatPrediction', 'beatLead', 'onNewSong',
+  'pacing', 'songFollow',
+  'sceneDeadzone', 'sceneSmooth', 'scenePeople', 'sceneMirror',
+  'simResolution',
+  // Where the logo sits and how big it is: placed once for the room, like a
+  // projector, not ridden in a show.
+  'markX', 'markY', 'markScale',
+  // Each row's take time: the desk's own setting, never seen on the wall.
+  ...MIX_FADE_KEYS,
+]);
+
+/**
+ * One tick of a Back: the blend `t` of the way from the plate as it was when
+ * Back was pressed to the plate as it was before the change, the room's levels
+ * with it, over the machine's setup as it is now (`SETUP_KEYS`) and whatever
+ * `held` names as it is now.
+ *
+ * Back used to run through the Go's own step (`lookStep`), which keeps the
+ * room as it is: right for a Go, which must not flatten a film brought in
+ * while it runs, and wrong for Back, whose job is undo. A film brought up, the
+ * dimmer pulled or the Mixer regraded after the Go stayed where it was on
+ * Back, and the owner asked for Back to go fully back (2026-09-27). So a Back
+ * fades the wall's part of the room too, from where it is to where it was.
+ *
+ * `held` is what a hand (or a take button, or a song's glide) wrote after the
+ * Back began: a later hand wins everywhere else on the desk, so it wins here,
+ * to the end of the Back, as a take pressed during a Go does (`lookStep`).
+ */
+export function backStep(
+  from: VisualizerSettings, to: VisualizerSettings, t: number, now: VisualizerSettings, held: Iterable<string> = [],
+): VisualizerSettings {
+  const out = { ...(t >= 1 ? to : blendLooks(from, to, t)) } as unknown as Record<string, unknown>;
   const live = now as unknown as Record<string, unknown>;
-  const after = move.after as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const [key, was] of Object.entries(move.before)) {
-    if (JSON.stringify(live[key]) === JSON.stringify(after[key])) out[key] = was;
-  }
-  return out as Partial<VisualizerSettings>;
+  for (const key of SETUP_KEYS) if (key in live) out[key] = live[key];
+  for (const key of held) if (key in live) out[key] = live[key];
+  return out as unknown as VisualizerSettings;
 }
+
+/**
+ * When each setting was last written by something other than a look fade (a
+ * hand on a slider or a fader, the remote, a take, a song's glide, a sequence
+ * stage), for a Back to leave what was written after it began. A clock of the
+ * App's own (`showNow`), so a render's clock that runs faster than the wall's
+ * counts the same way the fades do.
+ */
+export class LaterWrites {
+  private at = new Map<string, number>();
+  mark(keys: Iterable<string>, now: number): void { for (const k of keys) this.at.set(k, now); }
+  /** The settings written strictly after `since`: a write in the same instant as the press is the press's own. */
+  since(since: number): string[] { return [...this.at].filter(([, t]) => t > since).map(([k]) => k); }
+  /** A render runs on a clock of its own, from far ahead (lib/showClock.ts); its stamps are dropped on its way in and out. */
+  clear(): void { this.at.clear(); }
+}
+
+/** Which step a look fade lays down: a Back's, which puts the room back too, or a Go's, which keeps it. */
+export const lookFadeStep = (back: boolean): typeof lookStep => (back ? backStep : lookStep);
 
 /** Where a look change is aiming: the room as it is, with the look complete over it. */
 export function targetLook(current: VisualizerSettings, look: Partial<VisualizerSettings>): VisualizerSettings {

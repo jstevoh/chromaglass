@@ -1,16 +1,17 @@
 import React, { useRef, useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import { fingerCarry, blowCarry } from '../lib/handCarry';
+import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
-import { DrawGate, refreshStamp, stampFallbacks } from '../lib/drawGate';
+import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
+import { sizedMagnet, magnetReach, MAGNET_POOL_RADIUS, MAGNET_POOL_FILL } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
-import { WebGPUFluid } from '../gpu/fluid';
+import { WebGPUFluid, THIN_GAP_THICKNESS } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
@@ -26,8 +27,10 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
-import { DEFAULT_OUTPUT, outputIsIdentity, type OutputConfig } from '../lib/outputConfig';
+import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
+import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
+import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dragSeconds, dyeDensityContrast, liquidFollow } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
@@ -40,11 +43,12 @@ import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
+import { BackLook } from '../lib/backLook';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -117,7 +121,7 @@ interface LiquidVisualizerProps {
     real string gets through. Give the project `@types/react` and the
     compiler reports all five comparisons at once as unreachable.
   */
-  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet';
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin';
   isAutomated?: boolean;
   isActive?: boolean;
   /**
@@ -159,6 +163,12 @@ interface LiquidVisualizerProps {
   /** Reports which solver is running, at what resolution, and how the governor is doing. */
   onEngineStatus?: (status: EngineStatus) => void;
   /**
+   * The back plate's own look was let go of without anyone pressing Follow
+   * the front: a render began or ended (see `resetStamps`). So the desk, the
+   * phone and the Mixer stop saying the back plate is on a look it is not on.
+   */
+  onBackLookCleared?: () => void;
+  /**
    * Where the tempo comes from when it is not the microphone: a MIDI clock,
    * a tapped tempo, a typed one. A ref for the same reason the room's reading
    * is one — it is read once a frame by the render loop and by nothing else,
@@ -173,6 +183,15 @@ interface LiquidVisualizerProps {
    */
   soundBindings?: readonly SoundBinding[];
   onSoundTrigger?: (binding: SoundBinding) => void;
+  /**
+   * A hand is holding a magnet under a look that has none of its own
+   * (magnetStrength 0), or no ferrofluid drawn (phaseAmount 0): the app gives
+   * the look the magnet's strength, so that once let go it stays under the
+   * glass where the hand set it down, and turns Ferrofluid up so the pool the
+   * hand brought is drawn (magnetFor). Asked a few times a second while held,
+   * until the settings say both.
+   */
+  onMagnetInHand?: () => void;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -271,7 +290,33 @@ const FINGER_SWIRL = 0.8;
   of stopping, which reads as at once.
 */
 const BLOW_DIR_HOLD_MS = 150;
-type BlowDir = { x: number; y: number; at: number };
+/*
+  And the Blow is a straw only once the hand has been held for that long and
+  for this many frames in which the pointer reported no move, counting the
+  press itself as a move (PLAN.md §15c).
+
+  The straw used to be "not going": no move within BLOW_DIR_HOLD_MS. Two holes
+  in that, and the deploy after #230 fell into one: a Blow drawn across a pool
+  lost 54 of its 229 of dye (main's deploy, run 37177982848), the old eraser's
+  size of loss, though the wind had run 49 steps and carried 156.5. The
+  stroke had also run 5 straw steps, and a straw step blows a real bubble,
+  whose air takes the dye under it off the plate (airExclude) for as long as
+  the bubble sits there.
+  - A press has no move before it, so every step between the press and the
+    first move the pointer reports was a straw step: a drag began by blowing
+    a bubble in the middle of whatever it was drawn through. At 10 to 30
+    frames a second, as the Mac runner draws, that is a frame or two of steps
+    before the first move arrives (2, 3, 5 and 7 straw steps on its runs).
+  - On a slow frame rate a hand that never stops reports its moves a frame
+    apart, and 150 ms is a frame and a half at 10 fps: a drag on a struggling
+    machine was a straw every time a move came a frame late.
+  So the press starts the hold's clock as a move does, and the hold is both
+  the time (a hand on a fast machine still reads as held within a sixth of a
+  second) and a few frames with no move in them (a hand on a slow one that is
+  moving reports a move every frame, and is not held).
+*/
+const BLOW_STRAW_FRAMES = 3;
+type BlowDir = { x: number; y: number; at: number; still: number; moved: boolean };
 /*
   Oil Bodies' pours (the onDeposit hook): a body is this many times the
   bottle's own radius (Oil's is 2, so about a tenth of the plate across
@@ -284,6 +329,17 @@ const BODY_COVER = 0.35;
 
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 const DROP_EVERY = 10;
+/*
+  What one hand's Drop has handed the plate since it landed: the solver steps
+  it was held on the plate, the drops it let go of (Drop Height up), and the
+  dye it gave, the sum of every cell's share it put into the deltas (a drop
+  counts its whole amount). Each finger keeps its own, so a second finger
+  that started late or was skipped on some steps shows it here, before the
+  solver has touched anything; `npm run phone` holds two fingers' counts to
+  each other and the plate's dye to them.
+*/
+type DropLaid = { steps: number; drops: number; dye: number };
+const freshLaid = (): DropLaid => ({ steps: 0, drops: 0, dye: 0 });
 
 /*
   The bottle, from every tool that lays liquid.
@@ -702,6 +758,14 @@ export interface LiquidVisualizerHandle {
   adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
   handoff: (seconds: number) => void;
+  /**
+   * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
+   * follow the front again. Over `seconds`: its solver settings fade the way
+   * a Go's do, its old dye thins and the look's own is laid in, and from then
+   * on it pours the look's dyes, styles and liquids while the front pours
+   * its own. `extras` is a user preset's dyes, as for `adoptPreset`.
+   */
+  sendBack: (presetId: string | null, look: VisualizerSettings | null, seconds: number, name?: string | null, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
   /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
   setPaletteWindow: (size: number | null, lead: number) => void;
   setInjectStyle: (styles: string[]) => void;
@@ -720,7 +784,7 @@ export interface LiquidVisualizerHandle {
    * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => void;
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => void;
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -849,6 +913,25 @@ class FluidSimulation {
    */
   plateSpin = 0;
   /**
+   * The turntable under the dish (PLAN.md §22, lib/turntable.ts): how fast
+   * Auto Spin and a hand on the Spin tool turn the dish, and how fast the
+   * liquid's bulk follows it with the drag time of a thin gap, in radians a
+   * second. The picture turns at `plateSpin` plus `liquidSpin`, and the
+   * solver drags the liquid toward the dish by the difference (the swirl).
+   * Both are zero on a dish nobody spins, which is every look as shipped.
+   */
+  dishSpin = 0;
+  liquidSpin = 0;
+  /**
+   * How fast the liquid really goes round, for the centrifuge: the look's
+   * turn and the turntable's liquid together, while the turntable is
+   * turning; zero otherwise, so a look nobody spins is no centrifuge (22h).
+   * Not the turntable's liquid alone: a hand held still on a flicked plate
+   * stops the picture by turning the turntable against the flick, and the
+   * liquid it holds still is flung nowhere.
+   */
+  spinCentrifuge = 0;
+  /**
    * The angle the dish is drawn turned to, and how far down from its centre
    * the plate is still on screen (in plate widths). Gravity is the room's,
    * not the dish's: set by the frame, read by the step below.
@@ -921,7 +1004,7 @@ class FluidSimulation {
   // read* accessors, which serve a 192² downsample of the GPU field.
   gpu: PlateSolver | null = null;
   private dirty = false;
-  private mul: Float32Array;        // multiplicative dye change (blowAir thins by 0.8)
+  private mul: Float32Array;        // multiplicative dye change (a carry's take; the show's own puffs thin by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
   private squishSteps = 0;
   private squishLastAt = 0;
@@ -985,6 +1068,9 @@ class FluidSimulation {
     this.forgetPress();
     this.clockLean = 1;
     this.plateSpin = 0;
+    this.dishSpin = 0;
+    this.liquidSpin = 0;
+    this.spinCentrifuge = 0;
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
@@ -1045,7 +1131,7 @@ class FluidSimulation {
    * that already includes its last move, and takes more when it does.
    */
   private dyeMoveAfter = 0;
-  /** The Press's oil, once a dye reading (squeezeOut). */
+  /** The Press's oil and the Blow's (squeezeOut, blowWind), once a dye reading. */
   private oilPressAfter = 0;
   /*
     A move not yet handed to the GPU. The reading to wait for was counted
@@ -1395,6 +1481,17 @@ class FluidSimulation {
    * halves read the same mirror.
    */
   squeezeOut(cx: number, cy: number, radius: number, amount: number): void {
+    /*
+      Not on a thin gap (PLAN §18a): there the flow does what this was
+      written to stand in for. The glass closing pushes the liquid out with
+      its colour and its oil, and the glass coming back up draws them back
+      in, which a carry here could never do: it took the colour out to a
+      ring and nothing ever brought it home, so a press only pushed things
+      away (the owner, 2026-09-28: "it just pushes everything out instead of
+      bringing it back when you release"). On top of the flow it moved the
+      colour out twice and back once.
+    */
+    if (this.thinGap) return;
     if (!this.gpu || !this.dyeMirrorCurrent()) return;
     const N = this.size;
     const R = Math.max(2, radius);
@@ -2303,6 +2400,19 @@ class FluidSimulation {
         break;
       }
 
+      case 'roy': {
+        // A panel's shapes: a few big flat pools of the three inks, each in a
+        // thin wash of itself twice as wide, so the print (benDay) has solid
+        // ink to outline and a tint round it to lay as dots from the start.
+        const shapes: [number, number, number][] = [[0.3, 0.32, 0.16], [0.68, 0.4, 0.18], [0.42, 0.7, 0.14], [0.75, 0.75, 0.1]];
+        shapes.forEach(([fx, fy, fr], i) => {
+          const c = col(i);
+          this.splatBlob(fx * S, fy * S, S * fr * 1.8, 0.5, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, S * fr, 2.6, c.r, c.g, c.b);
+        });
+        break;
+      }
+
       case 'clock-glass': {
         // Curved glasses gather the liquid in the middle; seed it there, in
         // rings, so the dome has something to hold from the first frame.
@@ -2379,10 +2489,11 @@ class FluidSimulation {
     // whether a kick's press reached the plate at all, and whether the kick's
     // release gave back what it took.
     let laid = 0, depth = 0;
+    // On a thin gap a press lays only the glass, as a bowl, and the flow moves the liquid (squishDisc).
     squishDisc(this.size, x, y, radius, amount, fingering, stroke, pile, (idx, g, vx, vy, m) => {
       if (Number.isInteger(idx) && g < 0) { laid++; depth -= g; }
       this.squishCell(idx, g, vx, vy, m);
-    });
+    }, this.thinGap);
     this.pressedCells[who] += laid;
     this.pressedDepth[who] += depth;
   }
@@ -2402,7 +2513,7 @@ class FluidSimulation {
       squishDisc(this.size, lift.x, lift.y, lift.radius, lift.amount, lift.fingering, 'lift', 0, (idx, gap, vx, vy, m) => {
         if (Number.isInteger(idx)) cells++;
         this.squishCell(idx, gap, vx, vy, m);
-      });
+      }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
     // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
@@ -2422,8 +2533,11 @@ class FluidSimulation {
     this.applySquish(x, y, 40, amount, fingering, true, 'press', 'kick');
     this.applySquish(x, y, 27, amount, fingering, false, 'press', 'kick');
     this.applySquish(x, y, 15, amount, fingering, false, 'press', 'kick');
-    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount);
+    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
   }
+
+  /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
+  get thinGap(): boolean { return !!this.gpu?.thinGapLive; }
 
   /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
   private readonly squishCell = (idx: number, gap: number, vx: number, vy: number, m: number): void => {
@@ -2442,7 +2556,14 @@ class FluidSimulation {
     this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
   };
 
-  blowAir(x: number, y: number, radius: number, strength: number) {
+  /**
+   * A puff of air: out from the middle, with a swirl, and (`erase`) the dye
+   * under it thinned by 0.8 a step. The show's own puffs erase: a pour's
+   * burst, the automation's breath and a bubble's pop, where a clearing is
+   * the look. A hand's Blow does not (blowWind, PLAN.md §15c). No default:
+   * a new hand that called this for a breath would erase without a word.
+   */
+  blowAir(x: number, y: number, radius: number, strength: number, erase: boolean) {
     radius = Math.round(radius * GRID_SCALE);
     const r2 = radius * radius;
     for (let i = -radius; i <= radius; i++) {
@@ -2477,6 +2598,7 @@ class FluidSimulation {
           const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
           this.vx[idx] += ((i / dist) + (-j / dist) * swirl) * strength;
           this.vy[idx] += ((j / dist) + (i / dist) * swirl) * strength;
+          if (!erase) continue;
           if (this.gpu) {
             this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
           } else {
@@ -2592,37 +2714,14 @@ class FluidSimulation {
    */
   private carryDye(cx: number, cy: number, r: number, ux: number, uy: number, take: number): boolean {
     if (!this.gpu || !this.dyeMirrorCurrent()) return false;
-    let moved = false;
-    const dye = this.gpu.rbDyeView;
-    const N = this.size;
     // A short hop: far enough to read as carried, short enough that the dye
     // lands somewhere the finger is still touching.
     const hop = Math.max(1, Math.round(r * 0.45));
-    const r2 = r * r;
-    for (let j = -r; j <= r; j++) {
-      for (let i = -r; i <= r; i++) {
-        const d2 = i * i + j * j;
-        if (d2 > r2) continue;
-        const sx = Math.round(cx + i), sy = Math.round(cy + j);
-        const tx = Math.round(sx + ux * hop), ty = Math.round(sy + uy * hop);
-        if (sx < 1 || sy < 1 || sx >= N - 1 || sy >= N - 1) continue;
-        if (tx < 1 || ty < 1 || tx >= N - 1 || ty >= N - 1) continue;
-        const si = sx + sy * N, ti = tx + ty * N;
-        const s4 = si * 4;
-        const amount = dye[s4 + 3];
-        if (!(amount > 1e-5)) continue;
-        const w = take * (1 - Math.sqrt(d2) / r);
-        if (!(w > 1e-4)) continue;
-        this.dirty = true;
-        moved = true;
-        this.mul[si] *= 1 - w;
-        this.density[ti] += amount * w;
-        this.densityR[ti] += dye[s4] * w;
-        this.densityG[ti] += dye[s4 + 1] * w;
-        this.densityB[ti] += dye[s4 + 2] * w;
-      }
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    if (carryDyeAlong(this.gpu.rbDyeView, this.size, cx, cy, r, ux, uy, take, hop, out) > 0) {
+      this.dirty = true;
+      this.dyeMoved();
     }
-    if (moved) this.dyeMoved();
     return true;
   }
 
@@ -2656,11 +2755,45 @@ class FluidSimulation {
           const sgn = side >= 0 ? 1 : -1;
           this.vx[idx] += (dx + (-j / r) * sgn * BLOW_SWIRL) * strength * w;
           this.vy[idx] += (dy + (i / r) * sgn * BLOW_SWIRL) * strength * w;
-          if (this.gpu) this.mul[idx] *= 1 - 0.15 * w;
-          else { const k = 1 - 0.15 * w; this.density[idx] *= k; this.densityR[idx] *= k; this.densityG[idx] *= k; this.densityB[idx] *= k; }
         }
       }
     }
+  }
+
+  /**
+   * A hand's Blow that is not the straw: the wind. It pushes the flow
+   * (along the way the hand went, or out from the middle held still) and
+   * carries the colour, and with Oil Bodies the oil with it, rather than
+   * erasing the colour under it as it did (PLAN.md §15c; blowDye in
+   * lib/handCarry.ts has the story and the numbers, `npm run wind` the
+   * check). The ferrofluid's half is blowPhase, which the hands call
+   * alongside, straw or wind. `dx`, `dy` of zero is held still.
+   *
+   * The carry acts once per reading of the dye, as the Finger's and the
+   * Press's do (dyeMoveAfter): the mirror is a frame or two old, and a carry
+   * run every step would take the colour it had already moved and put it
+   * down again. The oil keeps its own clock, the Press's (oilPressAfter),
+   * so a breath over a body with no colour under it is not carried every
+   * step at a share sized for one carry a reading. Returns the colour it
+   * moved (in the mirror's units), for `npm run tools`.
+   */
+  blowWind(x: number, y: number, radius: number, strength: number, dx: number, dy: number): number {
+    const moving = Math.hypot(dx, dy) > 1e-4;
+    if (moving) this.blowDirected(x, y, radius, strength, dx, dy);
+    else this.blowAir(x, y, radius, strength, false);
+    if (!this.gpu) return 0;
+    const N = this.size;
+    if ((this.lastSettings?.oilBodies ?? 0) > 0.001 && this.gpu.rbDyeLanded >= this.oilPressAfter) {
+      blowOil(this.gpu, x, y, radius, strength, dx, dy, N);
+      this.oilPressAfter = this.gpu.rbDyeIssued + 1;
+    }
+    if (!this.dyeMirrorCurrent()) return 0;
+    const out = { mul: this.mul, density: this.density, densityR: this.densityR, densityG: this.densityG, densityB: this.densityB };
+    const moved = blowDye(this.gpu.rbDyeView, N, x, y, radius, strength, dx, dy, out);
+    if (!(moved > 1e-4)) return 0;
+    this.dirty = true;
+    this.dyeMoved();
+    return moved;
   }
 
   /**
@@ -2983,9 +3116,8 @@ class FluidSimulation {
     // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
     if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
 
-    // 7. Immiscibility & fingering
+    // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
     this.applyImmiscibility(p.immiscibility, time, noise2D);
-    if (p.fingering > 0) this.applyFingering(p.fingering, time, noise2D);
 
     // 8. Vibration — only when explicitly cranked up
     if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
@@ -3139,9 +3271,10 @@ class FluidSimulation {
       }
     }
 
-    // blobSurfaceTension trades cohesion for shear: low tension gives weak
-    // cohesion and strong fingering (amoeba-like elongation and pinching),
-    // high tension the reverse (rounder, self-contained blobs).
+    // blobSurfaceTension is how strongly two colours hold apart
+    // (immiscibility, below). It also set a fingering push, a noise pushing
+    // the dye along its own gradient, which grew a grating in every pool
+    // and is gone (forcesB in wgsl/fluid.ts, and why).
     const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
 /*
@@ -3157,7 +3290,6 @@ class FluidSimulation {
       told the same lie.
     */
     const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
-    const fingering = polarity * 0.15 * (0.4 + (1 - tension) * 1.8);
 
     let smearX = 0, smearY = 0;
     if (settings.glassSmear > 0.2) {
@@ -3308,7 +3440,7 @@ class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, immiscibility, fingering,
+      turbScale, turbDetail, spin, immiscibility,
       /*
         The two glasses (2026-09-21).
 
@@ -3365,7 +3497,26 @@ class FluidSimulation {
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
-      gapSpring: 1 - Math.pow(0.5, this.dt / Math.max(0.02, 2.2 * (1 - (settings.plateSpring ?? 0.35)) + 0.12)),
+      // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
+      thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
+      gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
+      /*
+        The half-life the comment above means is in seconds, and `this.dt`
+        is not one: it is the look's step, Speed × 0.2, so on Classic
+        (0.0018 a step) Press Lift's default 1.55 s half-life came out at
+        about fourteen seconds, and the glass was still half down long after
+        the hand had gone. On the old solver that only shapes how long the
+        film stays thin, and every look is tuned on it, so it stays. On a
+        thin gap the glass coming up is what draws the liquid back under the
+        palm, so it rises in the show's seconds, `dtSeconds`, as a hand
+        lets go of it: the ring a press pushed out is a third of the way
+        back in a second and within 3% of where it began once the glass is
+        (`npm run presslift`, Classic's glass; on the look's clock, 4% in
+        that second). Keyed on the thin gap running, not the setting: while
+        its pipelines build, or where it cannot run, the old solver steps,
+        and its glass stays on the clock its looks were tuned on.
+      */
+      gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
       platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
@@ -3395,10 +3546,25 @@ class FluidSimulation {
         weakly, and one squeezed down on it takes the liquid with it. Couette
         drag, in the one place this solver can express it without giving the
         current pass the gap field to read.
+
+        The turntable's dish (Auto Spin, the Spin tool) is not in it: its drag
+        on the liquid is the swirl below, from the gap and the viscosity.
       */
       twist: (Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1)
         + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
           * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
+      /*
+        The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
+        frame that turns with the liquid, the liquid's own speed (the
+        centrifuge), the bulk's drag time at the rest gap, and the liquid.
+        All but the last are zero on a dish nobody spins, and the swirl
+        does not run.
+      */
+      spinDish: this.dishSpin - this.liquidSpin,
+      spinLiquid: this.spinCentrifuge,
+      spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
+      spinNu: carrierViscosity(settings.viscosity),
+      spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
       particles: settings.particles ?? 0,
       particleLife: 4,
       meanDensity: this.meanDensity,
@@ -3557,28 +3723,6 @@ class FluidSimulation {
         const noiseMod = 1.0 + n * 2.0;
         this.vx[idx] -= colorDiffX * strength * d * noiseMod;
         this.vy[idx] -= colorDiffY * strength * d * noiseMod;
-      }
-    }
-  }
-
-  private applyFingering(strength: number, time: number, noise2D: (x: number, y: number) => number) {
-    for (let j = 1; j < this.size - 1; j++) {
-      for (let i = 1; i < this.size - 1; i++) {
-        const idx = i + j * this.size;
-        const d = this.density[idx];
-        if (d < 0.05) continue;
-        const gradX = (this.density[idx + 1] - this.density[idx - 1]) * 0.5;
-        const gradY = (this.density[idx + this.size] - this.density[idx - this.size]) * 0.5;
-        const gradMagSq = gradX * gradX + gradY * gradY;
-        if (gradMagSq > 0.005) {
-          const gradMag = Math.sqrt(gradMagSq);
-          const nx = gradX / gradMag;
-          const ny = gradY / gradMag;
-          const n = noise2D(i * 0.02, j * 0.02 + time * 0.05);
-          const force = n * strength * gradMag * 4.0;
-          this.vx[idx] -= nx * force;
-          this.vy[idx] -= ny * force;
-        }
       }
     }
   }
@@ -4017,8 +4161,8 @@ function rgbToHex(r: number, g: number, b: number): string {
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
-  isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus,
-  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger,
+  isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
+  output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4101,6 +4245,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
   const paletteWindowRef = useRef<{ size: number | null; lead: number }>({ size: null, lead: 0 });
   const journeyRef = useRef({ lead: 0, lastAt: -1 });
+  /*
+    The back plate's own look (PLAN.md §16a; the why is in lib/backLook.ts).
+
+    Two halves. How it moves is `backLookRef`, which the patch bay folds in as
+    the back plate's base, so the solver for layer 1 steps with the look's
+    settings and every patch still rides them. What it pours is
+    `backDyesRef`: the look's dyes, pour styles and liquids, which every pour
+    aimed at plate 1 reads through `harmonyOf` and its two siblings instead
+    of the front's refs. Null is the back plate following the front, which is
+    every show until someone presses Go to Back Plate, so nothing here changes
+    a plate that never asks for it.
+
+    While the back plate has dyes of its own a front Go is the front's: its
+    handoff thins and lays plate 0 only. It thinned every plate before, which
+    was right for twins and would wipe a back plate that had just been given
+    a look of its own.
+  */
+  const backLookRef = useRef(new BackLook());
+  const backDyesRef = useRef<{ id: string; contract: number[] | null; harmony: number[]; styles: string[]; liquids: string[] } | null>(null);
+  const backHandoffRef = useRef<{ start: number; dur: number; last: number; poured: number; seed: Float32Array[] | null } | null>(null);
+  /** The fold's per-plate bases, one array reused: [front (always its own fold), back]. */
+  const platesScratchRef = useRef<(VisualizerSettings | null)[]>([null, null]);
+  /** The palette plate `layer` pours from. A palette the user pinned wins on every plate. */
+  const harmonyOf = (layer: number): number[] => {
+    const own = layer >= 1 ? backDyesRef.current : null;
+    return own ? (harmonyLockRef.current ?? own.harmony) : harmonyRef.current;
+  };
+  const stylesOf = (layer: number): string[] => (layer >= 1 && backDyesRef.current ? backDyesRef.current.styles : injectStyleRef.current);
+  const liquidsOf = (layer: number): string[] => (layer >= 1 && backDyesRef.current ? backDyesRef.current.liquids : plateLiquidsRef.current);
   /**
    * The working harmony for the current contract: the sequencer's window if
    * it set one, else the hue journey's window (one dye short of the contract,
@@ -4236,6 +4409,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   */
   const spinVelRef = useRef<number[]>([]);
   const lastFlickRef = useRef(0);
+  /*
+    The turntable (PLAN.md §22, lib/turntable.ts), one per layer, beside the
+    look's own flywheel above: the dish's speed (Auto Spin and the Spin
+    tool), the liquid's bulk speed following it (added to the picture's
+    turn), the dish's angle (for Tempo's lock), Auto Spin's motor, and the
+    hands on the Spin tool.
+  */
+  const dishSpinRef = useRef<number[]>([]);
+  const liquidSpinRef = useRef<number[]>([]);
+  const dishAngleRef = useRef<number[]>([]);
+  const autoSpinRef = useRef<AutoSpin[]>([]);
+  const spinHandsRef = useRef<SpinHand[]>([]);
+  const spinHandOf = (layer: number): SpinHand => (spinHandsRef.current[layer] ??= new SpinHand());
 
   /**
    * The GL context, lost and got back.
@@ -4280,7 +4466,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     thins to a little under half and six pours of the new palette arrive
     through the second half, so the colours change hands with the settings.
   */
-  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null } | null>(null);
+  const handoffRef = useRef<{ start: number; dur: number; last: number; poured: number; dosed: number; seeds: (Float32Array[] | null)[] | null; plates?: number } | null>(null);
   /**
    * The largest grid this GPU has shown it can hold, learned the hard way.
    * A rebuild makes a new governor, which starts at the ladder's usual rung;
@@ -4330,6 +4516,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const aimProbeRef = useRef({ downs: 0, altDowns: 0, aims: 0, zoom: 0, hasAim: false });
   const isAutomatedRef = useRef(isAutomated);
   const isActiveRef = useRef(isActive);
+  /*
+    `ambientSeed(false)`: the three Lissajous orbits stop laying their dye
+    (the "Ambient seeding" block below). They lay 0.05 a frame each, every
+    frame on every look, wherever they are, so a cleared plate gathers
+    their trails a quarter to a third of the plate out from its middle. A
+    check that reads where a hand's colour went reads those trails too: on
+    the Mac the tools check's pool, settled 1.5, 8 or 12 of the plate's
+    seconds, drifted out from the palm at the same 0.004 of the plate a
+    second whatever its age (a spreading drop slows as it ages; a source
+    that never stops does not), and the plate's colour grew 6% in three
+    seconds with nothing touching it. Only a harness turns it off;
+    a ref, so a rebuild of the frame loop (a self-heal, a lost device) keeps it.
+  */
+  const ambientSeedRef = useRef(true);
   const isMouseDownRef = useRef(false);
   const mousePosRef = useRef({ x: 0, y: 0 });
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -4345,6 +4545,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const strokeLastRef = useRef<{ x: number; y: number } | null>(null);
   // The pointer's Blow's last way of travel (BlowDir), kept like its stroke.
   const blowDirRef = useRef<BlowDir | undefined>(undefined);
+  /** The pointer's Blow steps, straw and wind, and the colour the wind carried: read by `npm run tools`. */
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -4356,7 +4558,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * own way) and its own drop clock (so each lays its first drop as it lands).
    * Keyed by the touch's identifier; emptied when the fingers leave.
    */
-  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number; blowDir?: BlowDir }>());
+  const extraHandsRef = useRef(new Map<number, { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; laid: DropLaid; magnetAt?: number; blowDir?: BlowDir }>());
   /** Which touch is the pointer, while one is. */
   const primaryTouchRef = useRef<number | null>(null);
   /**
@@ -4463,7 +4665,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     }
     // And it lands: a pour pushes the plate out of the way.
-    af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25);
+    af.blowAir(Math.floor(cx), Math.floor(cy), Math.floor(R * 0.45), 0.22 + energy * 0.25, true);
     if (bubbles > 0) {
       bubblesRef.current.disturb(Math.floor(cx), Math.floor(cy), R * 0.6, 'dye', 1);
     }
@@ -4506,6 +4708,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const gestureFrameRef = useRef(0); // throttles gesture recording to ~15 Hz
   const beadFrameRef = useRef(0);    // the beads' own frame clock (see the populate call)
   const dropClockRef = useRef(0);    // solver steps since the dropper was pressed (Drop Height lets go of drops on it)
+  const dropLaidRef = useRef<DropLaid>(freshLaid());  // what the pointer's Drop has laid since it was pressed (DropLaid)
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
@@ -4522,6 +4725,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** What the catch-up rule allowed last frame, for the debug readout. */
   const catchUpRef = useRef(4);
   const onEngineStatusRef = useRef(onEngineStatus);
+  const onBackLookClearedRef = useRef(onBackLookCleared);
+  onBackLookClearedRef.current = onBackLookCleared;
   const outputCfgRef = useRef(output);
   outputCfgRef.current = output;
   const gpuSupportedRef = useRef<boolean | null>(null);   // null = not probed yet
@@ -4563,7 +4768,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * of hand be added without teaching it about bubbles, beads or the squeeze
    * film all over again.
    */
-  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => {
+  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => {
     // The magnet moves no fluid itself: it is held where the gesture is, and
     // the next solver step pulls the ferrofluid toward it. Ahead of the drain
     // gate, since holding it over an emptying plate is harmless.
@@ -4571,6 +4776,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'magnet':
         magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: showNow() };
         return;
+      /*
+        A hand on the dish from anywhere but this screen's pointer: the
+        remote's pad, a pen, OSC. Its point is the plate as the audience sees
+        it (normalised, y up), so its angle round the middle is the hand's
+        own. It moves no liquid: the dish turns under it (the frame's
+        flywheel reads the hand), and a hand not heard from for a quarter of
+        a second has let go (forgetQuiet there), since a pad's lift is not
+        sent. Ahead of the drain gate, as the magnet is: a dish can be
+        turned while it empties.
+      */
+      case 'spin': {
+        const layer = Math.max(0, Math.floor(g.layer ?? activeLayerRef.current));
+        // Each finger its own hand: two on one pad, or two remotes on one
+        // plate, sharing one would read the jump between them as a whirl.
+        const id = `gesture:${Number.isFinite(g.id) ? g.id : 0}`;
+        if (Number.isFinite(g.x) && Number.isFinite(g.y)) spinHandOf(layer).move(id, g.x - 0.5, g.y - 0.5, showNow());
+        return;
+      }
     }
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
@@ -4582,7 +4805,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const S = GRID_SIZE;
     const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
-    const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyRef.current);
+    const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyOf(layer));
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
     // And the amount set for this tool, on top of how hard this hand pressed.
     const kTool = toolAmountRef.current;
@@ -4590,12 +4813,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
+        // The wind carries the colour and the oil, as the mouse's does
+        // (blowWind, PLAN.md §15c); a directed one erased 15% a step at
+        // its middle, a puff 20% everywhere under it.
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
-          af.blowDirected(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
-          af.blowPhase(x, y, 4 + 2 * amt, 0.06 * amt, g.dx, g.dy);
+          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
+          af.blowPhase(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
         } else {
-          af.blowAir(x, y, 4, 0.06 * amt);
-          af.blowPhase(x, y, 4, 0.06 * amt, 0, 0);
+          af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
+          af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
         if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
           bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
@@ -4742,7 +4968,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (presetId === 'fillmore-1969') fluid.seedPreset('fillmore-wash', noise2D);
   };
 
-  const layPlate = (presetId: string) => {
+  const layPlate = (presetId: string, layBack = false) => {
     /*
       The plate's dice start again, from (seed, stream, this look), before
       anything below draws, so the numbers this look is laid with do not
@@ -4758,11 +4984,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     restartStreams(`look:${presetId}`, 'plate.');
     laidPresetRef.current = presetId;
-    for (const fluid of fluidsRef.current) fluid.clearAll();
+    /*
+      A back plate with a look of its own (§16a) is not the front's to lay: a
+      cut on the front (the preset strip, a MIDI preset step, a user look)
+      leaves it, its angle and its spin exactly as they were, as a Go on the
+      front does. Only a plate that has to be laid again whatever it held
+      (the device lost with nothing carried across, `layBack`) lays it too,
+      from its own look.
+    */
+    const keepBack = !!backDyesRef.current && !layBack;
+    const laid = keepBack ? fluidsRef.current.slice(0, 1) : fluidsRef.current;
+    for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
     chemRef.current.reset();
-    rotationAnglesRef.current = rotationAnglesRef.current.map(() => DICE.lay.angle());
-    spinVelRef.current = spinVelRef.current.map(() => 0);
+    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
+    spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
+    // The turntable likewise: a kept back plate keeps its dish turning.
+    dishSpinRef.current = dishSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
+    liquidSpinRef.current = liquidSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
+    autoSpinRef.current.forEach((a, i) => { if (i < laid.length) a?.release(); });
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
     const fluid = fluidsRef.current[0];
@@ -4797,9 +5037,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // mount) owes its phase to the solver when it attaches: laid here it
       // went nowhere, and Magnet Garden opened as a bare gold pool.
       phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
+      // A look laid owes its own ferrofluid, not the Magnet's old pool.
+      if (phasePendingRef.current) magnetPoolRef.current = null;
       layPhaseRef.current(presetId);
     }
-    for (const later of fluidsRef.current.slice(1)) laySecondPlate(later, presetId);
+    for (const later of laid.slice(1)) {
+      // Laid again with a look of its own: from that look, and its handover,
+      // if one was running, is over (the plate it was rising into is gone).
+      const own = backDyesRef.current;
+      if (own) {
+        backHandoffRef.current = null;
+        const seeded = later.seedPreset(own.id, noise2D);
+        if (!own.contract && seeded.length > 0) own.harmony = seeded;
+        for (let i = 0; i < 15; i++) doseLiquid(later, own.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
+      } else laySecondPlate(later, presetId);
+    }
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
     // The plate is laid with its liquids as well as its dye, rather than
@@ -4825,12 +5077,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const amt = settingsRef.current.phaseAmount ?? 0;
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
+      phaseLaysRef.current++;
+      magnetPoolRef.current = null;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
     }
   };
   const layPhaseRef = useRef(layPhase);
+  /** How many times the ferrofluid has been laid afresh (layPhase), for the harness: a lay clears what was there. */
+  const phaseLaysRef = useRef(0);
   layPhaseRef.current = layPhase;
   /** Through a ref, because the context-loss listener is installed once, above this. */
   const layPlateRef = useRef(layPlate);
@@ -5025,6 +5281,42 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (!(seconds > 0)) { handoffRef.current = null; return; }
       const now = showNow();
       handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null };
+    },
+    sendBack: (presetId, look, seconds, name = null, extras) => {
+      // Not while a render has the plate (a pad pressed mid-render): the
+      // render owns both plates until it hands back (see `resetStamps`).
+      if (stageRef.current) { onBackLookClearedRef.current?.(); return; }
+      const now = showNow();
+      if (presetId === null || !look) {
+        // Following the front again: the solver settings fade back to the
+        // front's, and from now the back plate pours the front's dyes. What
+        // is on it stays; the front's pours take it over the way a stage
+        // change does, rather than a wipe.
+        backLookRef.current.send(null, settingsRef.current, now, seconds);
+        backDyesRef.current = null;
+        backHandoffRef.current = null;
+        return;
+      }
+      // A user preset's dyes, registered as `adoptPreset` does, without
+      // touching the front's refs.
+      if (extras?.contract && extras.contract.length) PRESET_CONTRACTS[presetId] = extras.contract;
+      if (extras?.injectStyles && extras.injectStyles.length) PRESET_INJECT_STYLES[presetId] = extras.injectStyles;
+      if (extras?.liquids) PRESET_LIQUIDS[presetId] = extras.liquids;
+      const contract = PRESET_CONTRACTS[presetId] ?? null;
+      backDyesRef.current = {
+        id: presetId,
+        contract,
+        // The front's sequencer windows and hue journey are the front's; the
+        // back plate takes its look's dyes whole, as a look laid fresh does.
+        // A look with no dyes of its own takes what its seed lays (below).
+        harmony: contract ? (contract.length <= 3 ? windowOf(contract, null, 0) : harmonyWithin(contract)) : harmonyRef.current,
+        styles: PRESET_INJECT_STYLES[presetId] || ['drop'],
+        liquids: PRESET_LIQUIDS[presetId] ?? [],
+      };
+      backLookRef.current.send(look, settingsRef.current, now, seconds, presetId, name);
+      // The same handover a Go gives the front, over at least a second: a
+      // cut to a look on a plate full of the last one reads as a glitch.
+      backHandoffRef.current = { start: now, dur: Math.max(1, seconds) * 1000, last: now, poured: 0, seed: null };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
       paletteWindowRef.current = { size: size === null ? null : Math.max(1, Math.round(size)), lead: Math.round(lead) };
@@ -5252,12 +5544,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           break;
         }
         case 'motion': { // fast streaks in the current harmony
-          const c = harmonyColor(harmonyRef.current);
+          const c = harmonyColor(harmonyOf(activeLayerRef.current));
           af.autoInject('streak', rx(), rx(), amt, c.r, c.g, c.b, Math.min(1, energy + 0.3));
           break;
         }
         default: {
-          const c = harmonyColor(harmonyRef.current);
+          const c = harmonyColor(harmonyOf(activeLayerRef.current));
           af.autoInject('drop', rx(), rx(), amt, c.r, c.g, c.b, energy);
         }
       }
@@ -5304,6 +5596,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { isAutomatedRef.current = isAutomated; }, [isAutomated]);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { onManualGestureRef.current = onManualGesture; }, [onManualGesture]);
+  const onMagnetInHandRef = useRef(onMagnetInHand);
+  useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
+  /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
+  const magnetToldRef = useRef(-Infinity);
+  /** How many pools the Magnet has brought to a bare plate (magnetFor), for the harness. */
+  const magnetPoolsRef = useRef(0);
+  /** The pool the Magnet brought, while it is the plate's ferrofluid: a look's lay (layPhase) or a clear forgets it. */
+  const magnetPoolRef = useRef<{ x: number; y: number; r: number } | null>(null);
+  /** How many times a new solver has been given that pool again, at the magnet, for the harness: a pool laid again is not a pool carried. */
+  const magnetRelaysRef = useRef(0);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5325,7 +5627,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
           }
         }
-        if (i > 0 && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
+        // A back plate built for a look of its own is built by a Go to Back
+        // Plate on a one-plate look (App keeps it on the stage for as long as
+        // it has the look), and that Go's handover lays it.
+        if (i > 0 && !backDyesRef.current && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
@@ -5508,7 +5813,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
       }, settingsRef.current.layerCount ?? 1, showNow(),
       // Sound learn's mappings: the rig's, not the look's, folded the same way.
-      soundLearnRef.current.patchesOf(soundBindingsRef.current));
+      soundLearnRef.current.patchesOf(soundBindingsRef.current),
+      // The back plate's own look, when it has one (§16a): its base, which
+      // the patches then ride. Null, which is every show that never sends it
+      // one, leaves the fold exactly as it was.
+      (platesScratchRef.current[1] = backLookRef.current.base(settingsRef.current, showNow()), platesScratchRef.current));
       // The picture. Everything aimed at one plate reaches it through
       // `patch.layer(i)` where the solver is stepped, and nowhere else: a
       // setting the render pass reads is global whatever it was aimed at,
@@ -5587,6 +5896,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const energy = Math.min(1, currentAudioData.energy);
           field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
         }
+        /*
+          A hand bringing a magnet to a look that has none: the look takes
+          it, at the strength the Magnet tool has always given such a look,
+          so that let go it is set down under the glass where the hand left
+          it (placed, below) rather than taken away with the hand.
+
+          Read from the settings as the app holds them, not the folded look:
+          the app answers from its own Magnet Strength, and a sound-learn
+          patch riding the folded one must not decide whether the look has
+          a magnet. And asked again a few times a second for as long as the
+          hand holds it, rather than once a hold: a look fade that lands
+          during the hold sets the strength back to the target look's, and
+          a hold told only once would then set down a magnet with none. The
+          app ignores a call when the look already has its magnet.
+        */
+        /*
+          And the ferrofluid, on a plate with none: a pool under the hand,
+          as big as this magnet stands up (lib/magnetSize.ts), the first time
+          it touches. Picking the Magnet used to pour the look's ring over the
+          whole plate, which was the owner's "giant black hole as soon as you
+          pick it". Laid here, before the app turns Ferrofluid up (so the
+          plate draws it), so the solver already has its phase when the
+          amount rises and the bare-plate pour below leaves it alone.
+        */
+        const leadGpu = held && hand ? lead?.gpu : null;
+        if (hand && leadGpu?.addPhase && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
+          const r = MAGNET_POOL_RADIUS * magnetReach(look.magnetSize ?? settingsRef.current.magnetSize);
+          const px = Math.max(0.05, Math.min(0.95, hand.x)), py = Math.max(0.05, Math.min(0.95, hand.y));
+          leadGpu.addPhase(px, py, r, MAGNET_POOL_FILL);
+          magnetPoolRef.current = { x: px, y: py, r };
+          magnetPoolsRef.current++;
+        }
+        const told = settingsRef.current;
+        if (held && ((told.magnetStrength ?? 0) <= 0 || (told.phaseAmount ?? 0) <= 0.002) && now - magnetToldRef.current > 250) {
+          magnetToldRef.current = now;
+          onMagnetInHandRef.current?.();
+        }
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
           // as still held once the hand has gone stale.
@@ -5610,6 +5956,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
         }
+        /*
+          The magnet's size (Magnet Size, lib/magnetSize.ts): held or set
+          down it is the same magnet, k times deeper with k³ the strength,
+          so the same field over it reaching k times as far. Not the walk's:
+          that is the look's own magnet, which nobody's hand chose. Read
+          from the folded look, so a patch (a fader's LFO, the room, the
+          sound) aimed at Magnet Size moves it as it moves any other setting.
+        */
+        if (held || placed) ({ strength: ms, height: mh } = sizedMagnet(ms, mh, look.magnetSize ?? settingsRef.current.magnetSize));
         lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
         // The other fingers' magnets, while the first is held (see the hands
         // loop): each finger that held one within the same quarter second.
@@ -5981,7 +6336,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const leadGpu = fluidsRef.current[0]?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
-          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+          /*
+            Unless the ferrofluid on the plate is the pool the Magnet brought
+            (magnetFor): a new solver would pour the look's ring in its place,
+            the very pour picking the Magnet no longer makes. The pool goes
+            back where the magnet now is, which is where it had gathered.
+          */
+          const pool = phasePendingRef.current ? null : magnetPoolRef.current;
+          if (pool && leadGpu?.addPhase) {
+            const m = lastMagnetRef.current;
+            leadGpu.addPhase(m?.x ?? pool.x, m?.y ?? pool.y, pool.r, MAGNET_POOL_FILL);
+            magnetRelaysRef.current++;
+          } else if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
@@ -6018,14 +6384,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /*
           Ferrofluid turned up on a plate that has none: pour it. The phase
           was only ever laid with a look, so the Ferrofluid slider raised
-          mid-show (or the Magnet picked on a look without any) changed the
-          setting and left the plate bare.
+          mid-show changed the setting and left the plate bare.
         */
         {
           const amt = settingsRef.current.phaseAmount ?? 0;
           // Not when it was turned up for the Ferrofluid bottle: that one
-          // goes where it is dropped, not over the whole plate.
-          const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0 && activeToolRef.current !== 'magnet';
+          // goes where it is dropped, not over the whole plate. (The Magnet
+          // needs no exception: picking it no longer turns the amount up,
+          // and its first hold lays its pool before it does, so the plate
+          // is not bare by the time the amount rises: phaseIsLive.)
+          const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0;
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
               && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
             layPhaseRef.current();
@@ -6191,11 +6559,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
 
           // ── Manual injection ───────────────────────────────────
-          // The dropper's clock runs while it is held and starts again at 0 on
-          // the next press, so every press lands a drop at once.
-          if (!isMouseDownRef.current) { dropClockRef.current = 0; strokeLastRef.current = null; blowDirRef.current = undefined; }
-          else if (simStep > 0 || dropClockRef.current > 0) dropClockRef.current++;
-          for (const h of extraHandsRef.current.values()) if (simStep > 0 || h.clock > 0) h.clock++;
+          /*
+            The dropper's clock: the steps a hand has held it, 0 on the step
+            it lands (so every press lets go of a drop at once) and counted up
+            after each step it is held, below.
+
+            It was counted up here, before the hands, and only "if this is not
+            a frame's first step, or the clock has already started", so that
+            a press's first step read 0. But a frame that runs one step has no
+            other step, so a clock still at 0 stayed at 0 for as long as the
+            frames ran one step each, which is every frame of a plate stepping
+            at the display's own rate: a held Drop with Drop Height up let go
+            of a splashing drop on every step instead of every tenth, until the
+            first frame that happened to owe two. Counted after use, the first
+            step is 0 and the next is 1 whatever the frames do.
+          */
+          if (!isMouseDownRef.current) {
+            dropClockRef.current = 0; strokeLastRef.current = null; blowDirRef.current = undefined;
+            if (dropLaidRef.current.steps > 0) dropLaidRef.current = freshLaid();
+          }
           /*
             Every hand on the glass: the pointer, then each other finger on a
             touch screen (extraHandsRef). The same tool at the same Amount for
@@ -6204,9 +6586,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             pointer's stroke is written back to its ref for the next step; the
             other fingers' live in their own entries.
           */
-          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; magnetAt?: number; blowDir?: BlowDir };
+          type Hand = { x: number; y: number; stroke: { x: number; y: number } | null; clock: number; laid: DropLaid; magnetAt?: number; blowDir?: BlowDir };
           const hands: { hand: Hand; primary: boolean }[] = [];
-          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, blowDir: blowDirRef.current }, primary: true });
+          if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, laid: dropLaidRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
           for (const { hand, primary } of hands) {
             if (drainFrameRef.current !== 0) break;
@@ -6214,6 +6596,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const af = fluidsRef.current[activeLayerRef.current];
             if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
               const tool = activeToolRef.current;
+              // The Spin tool turns the dish (the pointer handlers and the
+              // frame's flywheel); it lays, presses and stirs nothing.
+              if (tool === 'spin') continue;
               const liq = selectedLiquidRef.current;
               const strokeFrom = hand.stroke ?? { x, y };
               const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
@@ -6289,13 +6674,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   swept, leaving a trench of holes and not a pushed tongue.
                 */
                 const now = performance.now();
-                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now };
-                const going = hand.blowDir && now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
-                af.blowPhase(x, y, 4, 0.06 * k, going ? going.x : 0, going ? going.y : 0);
-                if (activeLayerRef.current === 0 && still && primary) {
+                // The press counts as a move, with no direction (BLOW_STRAW_FRAMES).
+                // The press step starts the frame count at 0 rather than counting itself.
+                if (!still) hand.blowDir = { x: strokeDx, y: strokeDy, at: now, still: 0, moved: true };
+                else if (!hand.blowDir) hand.blowDir = { x: 0, y: 0, at: now, still: 0, moved: false };
+                else if (simStep === 0) hand.blowDir.still++;
+                const going = now - hand.blowDir.at < BLOW_DIR_HOLD_MS ? hand.blowDir : null;
+                const held = !going && hand.blowDir.still >= BLOW_STRAW_FRAMES;
+                af.blowPhase(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                /*
+                  The straw only when the hand is held, not moved, by the same
+                  clock the ferrofluid goes by and a few frames with no move
+                  (BLOW_STRAW_FRAMES). Asked of `still` (no move this step), a
+                  drag blew the straw on every step after a frame's first and
+                  on every frame the pointer did not report a move, which is
+                  most of them: a drag left a string of straw bubbles and ran
+                  the wind a step a frame at best, so the wind's carry
+                  (PLAN.md §15c) waited on the rare step that was both a wind
+                  step and a fresh reading of the dye.
+                */
+                if (activeLayerRef.current === 0 && held && primary) {
                   bubblesRef.current.blow(x, y, simStepS, k);
+                  blowStepsRef.current.straw++;
+                  // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
+                  if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
                 } else {
-                  af.blowAir(x, y, 4, 0.06 * k);
+                  // The wind: it carries the colour (and an oil body's oil)
+                  // the way the hand last went, as the ferrofluid above, or
+                  // out from under it held still; it used to erase it.
+                  blowStepsRef.current.carried += af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  blowStepsRef.current.wind++;
                   if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                     bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                   }
@@ -6411,8 +6819,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // DROP_EVERY steps while it is held, each carrying the dye the
                 // stream would have laid in that time and each landing with its
                 // splash (autoInject's drop reads the height).
+                hand.laid.steps++;
                 if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
+                  hand.laid.drops++;
+                  hand.laid.dye += amt;
                   af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
                   if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k);
@@ -6424,6 +6835,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // not show; a drop with more in it spreads further.
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
                 const amt = (liq?.injectAmount ?? 0.8) * k;
+                hand.laid.steps++;
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -6431,6 +6843,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const nx = x + dx, ny = y + dy;
                     if (nx < 1 || nx >= GRID_SIZE - 1 || ny < 1 || ny >= GRID_SIZE - 1) continue;
                     const w = (1 - dist / r) ** 2;
+                    hand.laid.dye += amt * w;
                     af.addDensity(nx, ny, amt * w, rgb.r, rgb.g, rgb.b);
                     if (heat > 0) af.addTemp(nx, ny, heat * w);
                   }
@@ -6441,7 +6854,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k);
               }
             }
-            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; }
+            // Counted after the step it was read on (see the clock above).
+            hand.clock++;
+            if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; dropClockRef.current = hand.clock; }
           }
 
           // ── Automation logic ───────────────────────────────────
@@ -6524,14 +6939,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
                 if (isBlow) {
-                  af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05);
+                  af.blowAir(rx, ry, 2 + Math.floor(energy * 2), 0.03 + energy * 0.05, true);
                   if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0 && DICE.evolve.float() < 0.12 + (currentSettings.bubbles ?? 0) * 0.25
                       && bubblesRef.current.bubbles.length < 3 + Math.round(14 * (currentSettings.bubbles ?? 0))) {
                     bubblesRef.current.spawn(rx, ry, (1.0 + energy * 1.5) * GRID_SCALE, 2 + DICE.evolve.int(3), 4 * GRID_SCALE);
                   }
                 } else {
-                  const color = harmonyColor(harmonyRef.current);
-                  const styles = injectStyleRef.current;
+                  const li = fluidsRef.current.indexOf(af);
+                  const color = harmonyColor(harmonyOf(li));
+                  const styles = stylesOf(li);
                   const style = DICE.evolve.pick(styles);
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
@@ -6540,7 +6956,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   af.addTemp(rx, ry, 0.3 + trebleBoost * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
-                  doseLiquid(af, plateLiquidsRef.current, rx, ry, 0.25 + energy * 0.25);
+                  doseLiquid(af, liquidsOf(li), rx, ry, 0.25 + energy * 0.25);
                 }
               }
             }
@@ -6658,7 +7074,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // in at the rate it thins, so what is left of the old look at
               // the end is HANDOFF_KEEP and the new look is all the rest.
               const lambda = -Math.log(HANDOFF_KEEP);
-              for (const fluid of fluidsRef.current) fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
+              // The plates this Go is for: all of them, or only the front
+              // while the back plate has a look of its own (see backDyesRef).
+              // Decided on the handover's first frame and kept: a Follow the
+              // front pressed half way through must not start thinning plate
+              // 1 with no seed of this look to rise into it.
+              h.plates ??= backDyesRef.current ? 1 : fluidsRef.current.length;
+              const handed = fluidsRef.current.slice(0, h.plates);
+              for (const fluid of handed) fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
               const id = livePresetRef.current;
               const lead = fluidsRef.current[0];
               /*
@@ -6675,9 +7098,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 new look is all but HANDOFF_KEEP of the plate.
               */
               if (!h.seeds) {
-                for (const fluid of fluidsRef.current) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
                 chemRef.current.reset();
-                h.seeds = fluidsRef.current.map((fluid, i) => {
+                h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
                   if (i === 0) {
                     let seeded: number[] = [];
@@ -6690,12 +7113,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 h.dosed = 1;
               }
               const share = Math.min(1, lambda * dtMs / h.dur);
-              h.seeds.forEach((seed, i) => { if (seed) fluidsRef.current[i]?.addSeedShare(seed, share); });
+              h.seeds.forEach((seed, i) => { if (seed && i < handed.length) fluidsRef.current[i]?.addSeedShare(seed, share); });
               // The second phase, once, half way: it is a body, not a wash.
               if (h.dosed === 1 && p >= 0.5) {
                 h.dosed = 2;
                 if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
-                else lead?.gpu?.clearPhase?.();
+                else { lead?.gpu?.clearPhase?.(); magnetPoolRef.current = null; }
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
                     doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
@@ -6706,7 +7129,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const due = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.5)) * HANDOFF_POURS + 1e-6);
               while (h.poured < Math.min(due, HANDOFF_POURS)) {
                 h.poured++;
-                const fluid = fluidsRef.current[h.poured % Math.max(1, fluidsRef.current.length)];
+                const fluid = handed[h.poured % Math.max(1, handed.length)];
                 if (!fluid) break;
                 const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
                 const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
@@ -6720,30 +7143,81 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
           }
 
+          // ── The back plate taking a look of its own (§16a) ──
+          /*
+            The front's handover above, for plate 1 alone: its dye thins to
+            HANDOFF_KEEP over the fade while the look's seed rises into it,
+            then the look's palette is poured through the second half. Its
+            chemistry and liquids are cleared at the start, as the front's
+            are, and the room's chemistry field is left alone because it is
+            the front's. Waits, rather than running out, while plate 1 is
+            still being built: App raises the plate count on the same press.
+          */
+          {
+            const h = backHandoffRef.current;
+            const dyes = backDyesRef.current;
+            const fluid = fluidsRef.current[1];
+            if (h && dyes && isActiveRef.current && drainFrameRef.current === 0) {
+              const nowMs = showNow();
+              if (!fluid) { h.start = nowMs; h.last = nowMs; }
+              else {
+                const p = Math.min(1, (nowMs - h.start) / h.dur);
+                const dtMs = Math.max(0, Math.min(100, nowMs - h.last));
+                h.last = nowMs;
+                const lambda = -Math.log(HANDOFF_KEEP);
+                fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
+                if (!h.seed) {
+                  if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry();
+                  fluid.liquid.clear();
+                  let seeded: number[] = [];
+                  h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });
+                  if (!dyes.contract && seeded.length > 0) dyes.harmony = seeded;
+                  for (let i = 0; i < 4; i++) {
+                    doseLiquid(fluid, dyes.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
+                  }
+                }
+                fluid.addSeedShare(h.seed, Math.min(1, lambda * dtMs / h.dur));
+                const due = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.5)) * HANDOFF_POURS + 1e-6);
+                while (h.poured < Math.min(due, HANDOFF_POURS)) {
+                  h.poured++;
+                  const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                  const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                  const color = harmonyColor(harmonyOf(1));
+                  fluid.autoInject(DICE.lay.pick(dyes.styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+                  fluid.addTemp(rx, ry, 1.2);
+                  doseLiquid(fluid, dyes.liquids, rx, ry, 0.8);
+                }
+                if (p >= 1) backHandoffRef.current = null;
+              }
+            }
+          }
+
           // ── Seed trigger ───────────────────────────────────────
           if (seedCountRef.current > lastSeedCount.current && drainFrameRef.current === 0) {
             lastSeedCount.current = seedCountRef.current;
             macroCamRef.current.reset();
             harmonyRef.current = harmonyLockRef.current ?? pickHarmony();
-            const styles = injectStyleRef.current;
-            for (const fluid of fluidsRef.current) {
+            fluidsRef.current.forEach((fluid, li) => {
+              // Each plate from its own look's dyes (§16a); the front's for a
+              // back plate that follows it.
+              const styles = stylesOf(li);
               for (let i = 0; i < 8; i++) {
                 const rx = DICE.lay.int(GRID_SIZE - 20) + 10;
                 const ry = DICE.lay.int(GRID_SIZE - 20) + 10;
-                const color = harmonyColor(harmonyRef.current);
+                const color = harmonyColor(harmonyOf(li));
                 const style = DICE.lay.pick(styles);
                 fluid.autoInject(style, rx, ry, 10.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 2.0);
                 // A fresh plate is laid with its liquids, not dosed into them.
-                doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 1.4);
+                doseLiquid(fluid, liquidsOf(li), rx, ry, 1.4);
               }
-            }
+            });
           }
 
           if (isActiveRef.current && drainFrameRef.current === 0) {
             // ── Ambient seeding ────────────────────────────────
             const af = fluidsRef.current[activeLayerRef.current];
-            if (af) {
+            if (af && ambientSeedRef.current) {
               // Three Lissajous orbits, each carrying its own harmony color —
               // keeps several distinct hues alive in the frame at all times.
               const phase = time * 0.18;
@@ -6759,7 +7233,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               injPts.forEach((pt, idx) => {
                 const px = Math.floor(pt.x), py = Math.floor(pt.y);
                 if (px > 0 && px < GRID_SIZE - 1 && py > 0 && py < GRID_SIZE - 1) {
-                  const c = harmonyCycle(harmonyRef.current, time * 0.25 + idx * 1.4);
+                  const c = harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.25 + idx * 1.4);
                   af.addDensity(px, py, 0.05, c.r, c.g, c.b);
                   af.addTemp(px, py, 0.02);
                 }
@@ -6785,7 +7259,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (impact > 0.01 && currentAudioData.volume > 3) {
                 // Each audio feature carries a different color from the harmony,
                 // so bass, mids and swells paint distinguishable hues.
-                const colFor = (off: number) => harmonyCycle(harmonyRef.current, time * 0.3 + colorMod * Math.PI + off);
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.3 + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
                 const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
 
@@ -6807,7 +7281,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
-                  const aStyles = injectStyleRef.current;
+                  const aStyles = stylesOf(activeLayerRef.current);
                   const aStyle = () => DICE.music.pick(aStyles);
 
                   // Center pulse — scales with density mapping
@@ -6855,7 +7329,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     // leave the rest of the plate clean.
                     {
                       const da = DICE.music.angle();
-                      doseLiquid(activeFluid, plateLiquidsRef.current,
+                      doseLiquid(activeFluid, liquidsOf(activeLayerRef.current),
                         centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
                     }
                   }
@@ -7089,7 +7563,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               for (const ev of bubbles.events) {
                 if (ev.kind === 'pop' && lead) {
                   const px = Math.round(ev.x), py = Math.round(ev.y);
-                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035);
+                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035, true);
                 }
               }
             }
@@ -7239,7 +7713,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               finally a visible range: about a turn every fifteen seconds at
               half, and a flick's worth at the top.
             */
-            const asked = Math.max(0, currentSettings.rotationSpeed ?? 0);
+            // This plate's own motor: `rotationSpeed` is a solver key, so a
+            // back plate with a look of its own (§16a), or a patch aimed at
+            // one plate, turns that dish at its own speed, not the front's.
+            const asked = Math.max(0, patch.layer(l).rotationSpeed ?? 0);
             const motorRate = asked <= 0.1
               ? asked * 0.01
               : 0.001 + Math.pow((asked - 0.1) / 0.9, 2) * 2.4;
@@ -7287,7 +7764,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const motor = rotationSpeed * dirMod;
             const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
-              * (1 + (currentSettings.platePressure ?? 0) * 0.8);
+              * (1 + (patch.layer(l).platePressure ?? 0) * 0.8);
             /*
               The range was measured and widened. At (0.15 + drag*3) a flicked
               plate lost three-quarters of its speed in 2s at the slowest
@@ -7298,21 +7775,92 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const dragRate = (0.04 + (currentSettings.spinDrag ?? 0.25) * 1.2) * bed;
             const vel0 = spinVelRef.current[l] ?? 0;
-            let vel = vel0 + (motor - vel0) * (1 - Math.exp(-dragRate * realDt));
-            // Dry friction, toward the motor's speed: with no motor that is rest.
-            const grip = dragRate * 0.02 * realDt;
-            vel = Math.abs(vel - motor) <= grip ? motor : vel - Math.sign(vel - motor) * grip;
+            // Dry friction, toward the motor's speed: with no motor that is rest (dishFollow).
+            const vel = dishFollow(vel0, motor, dragRate, realDt);
             if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
             // The plate is told what it is doing, so the liquid touching it
             // can be dragged round by it (the twist in paramsFor).
             if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
             /*
+              The turntable (PLAN §22, lib/turntable.ts): a dish of its own
+              under the look's, turned by Auto Spin and by a hand on the Spin
+              tool, with the same bed and drag as the look's flywheel.
+
+              Why two and not one. The look's own turning (its motor, the
+              music routed to rotation on eleven shipped looks, a flick) turns
+              the picture as it always has, rigidly, because those looks are
+              tuned against exactly that: sent through the liquid's lag
+              below, a thin look's sway was smoothed over three seconds and a
+              flick trailed, and the swirl ran on every look with music. So
+              only what is new goes through the physics, and with Auto Spin
+              off and no hand on the dish every number here is zero and the
+              plate is today's to the bit. Moving the look's own turning onto
+              the dish too is PLAN 22h, once it has been seen on the Mac.
+
+              Auto Spin's direction is the plate's (which layer, Spin
+              Direction) and the Rate's sign, and nothing else: the music's
+              sway moves the look's motor, not this one, or a dish locked to
+              the tempo would be pushed off the beat by the music it is
+              locked to. Its lock reads this dish's angle alone for the same
+              reason.
+            */
+            const way = dirChoice > 0.5 ? 1 : dirChoice < -0.5 ? -1 : (l % 2 === 0 ? 1 : -1);
+            const auto = (autoSpinRef.current[l] ??= new AutoSpin());
+            const clock = beatClockRef.current;
+            const tempo = clock.period > 0 && clock.confidence >= 0.5 && clock.nextBeat > 0
+              ? { periodMs: clock.period, nextBeatMs: clock.nextBeat, nowMs: showNow() } : null;
+            const autoRate = way * auto.target(Math.round(currentSettings.spinAuto ?? 0), currentSettings.spinRpm ?? 6,
+              currentSettings.spinBeats ?? 16, tempo, way * (dishAngleRef.current[l] ?? 0));
+            const dish0 = dishSpinRef.current[l] ?? 0;
+            /*
+              A hand on the dish turns it: the dish takes the hand's speed
+              round its middle, times the tool's Amount, as fast as a hand
+              grips glass, and a hand held still stops it. What the hand
+              sets is the whole dish's speed, the look's turning included, so
+              the turntable takes up the difference; let go, it coasts back
+              to Auto Spin's speed on its drag. Tempo's lock lets go under a
+              hand, so it does not wind the dish back to the beat against it.
+            */
+            const hands = spinHandsRef.current[l];
+            hands?.forgetQuiet(showNow(), 250, 'gesture');
+            const held = hands?.rate(showNow()) ?? null;
+            let dishVel: number;
+            if (held !== null && Number.isFinite(held)) {
+              const want = held - (spinVelRef.current[l] ?? 0);
+              dishVel = dish0 + (want - dish0) * (1 - Math.exp(-realDt / GRIP_SECONDS));
+              auto.release();
+            } else {
+              dishVel = dishFollow(dish0, Number.isFinite(autoRate) ? autoRate : 0, dragRate, realDt);
+            }
+            if (Number.isFinite(dishVel)) dishSpinRef.current[l] = dishVel;
+            const dishNow = dishSpinRef.current[l] ?? 0;
+            if (Number.isFinite(dishNow * realDt)) dishAngleRef.current[l] = (dishAngleRef.current[l] ?? 0) + dishNow * realDt;
+            /*
+              And the liquid follows the turntable with the drag time of its
+              gap: seconds for water, a tenth of one for oil. The picture
+              turns with the liquid, because the liquid is what the lamp
+              shines through; the dish itself is never seen.
+            */
+            const tau = dragSeconds(carrierViscosity(currentSettings.viscosity));
+            const liq = liquidFollow(liquidSpinRef.current[l] ?? 0, dishNow, realDt, tau);
+            if (Number.isFinite(liq)) liquidSpinRef.current[l] = liq;
+            // The solver drags the liquid toward the dish by the difference (the swirl).
+            if (fluidsRef.current[l]) {
+              const liqNow = liquidSpinRef.current[l] ?? 0;
+              fluidsRef.current[l].dishSpin = dishNow;
+              fluidsRef.current[l].liquidSpin = liqNow;
+              fluidsRef.current[l].spinCentrifuge = dishNow !== 0 || liqNow !== 0 ? (spinVelRef.current[l] ?? 0) + liqNow : 0;
+            }
+            /*
               An angle that accumulates cannot be allowed to go non-finite —
               see the note above, which is why both of these are guarded and
-              not just the sum.
+              not just the sum. The turntable's turn is added only when there
+              is one, so a plate nobody spins sums exactly what it did.
             */
             const turn = (spinVelRef.current[l] ?? 0) * realDt;
             if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
+            const liquidTurn = (liquidSpinRef.current[l] ?? 0) * realDt;
+            if (liquidTurn !== 0 && Number.isFinite(liquidTurn)) rotationAnglesRef.current[l] += liquidTurn;
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
@@ -7764,6 +8312,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       magnetWalkAtRef.current = 0;
       magnetHandRef.current = null;
       handoffRef.current = null;
+      /*
+        The back plate's own look (§16a), let go of. A render lays its look on
+        every plate, as the look says, from its seed: a back plate on a look of
+        the evening's is not something a render can reproduce, and its fade and
+        handover are stamped on the live clock, which the film's clock (2^20 ms
+        in) would put either all at once or twenty minutes in the future. On the
+        way out the plate is the film's last frame, which is the front's look
+        on both plates, so the back plate follows the front from there too.
+      */
+      if (backLookRef.current.active || backDyesRef.current) {
+        backLookRef.current.clear();
+        backDyesRef.current = null;
+        backHandoffRef.current = null;
+        onBackLookClearedRef.current?.();
+      }
       externalTiltRef.current = { x: 0, y: 0, at: -1e9 };
       journeyRef.current.lastAt = -1;
       flashRef.current.reset();
@@ -7819,6 +8382,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       beadsRef.current.clear();
       fxFrameRef.current = 0;
       dropClockRef.current = 0;
+      dropLaidRef.current = freshLaid();
       beadFrameRef.current = 0;
       gestureFrameRef.current = 0;
       /*
@@ -8071,7 +8635,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
-        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks },
+        drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks, stampMisses: { ...stampMisses } },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
         beat: { period: beatClockRef.current.period, confidence: beatClockRef.current.confidence },
         /** The sound level the next frame will read (`npm run ears` asks whether it keeps moving while this window is hidden). */
@@ -8090,6 +8654,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           layers: fluidsRef.current.length,
         }),
         externalTilt: externalTiltRef.current,
+        /** The pointer's Blow since the page loaded: steps as the straw, steps as the wind, and the colour the wind carried. */
+        blowSteps: { ...blowStepsRef.current },
         /*
           The seed the show is running on (lib/rng.ts), which a crash report
           then carries too, so a night that went wrong can be played again on
@@ -8145,7 +8711,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
          */
         magnets: () => magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
         hands: () => ({
-          hands: [...(isMouseDownRef.current ? [{ ...mousePosRef.current }] : []), ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y }))],
+          hands: [
+            ...(isMouseDownRef.current ? [{ ...mousePosRef.current, laid: { ...dropLaidRef.current } }] : []),
+            ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y, laid: { ...h.laid } })),
+          ],
           pinch: pinchRef.current !== null,
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
@@ -8219,6 +8788,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
+        ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
         ...(renderer?.debug?.() ?? {}),
       });
@@ -8407,6 +8977,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let stage: WebGPUStage | null = null;
     let camera: WebGPUCamera | null = null;
     let projector: WebGPUOutput | null = null;
+    /** The projector sources last frame drew, to scope the frame a new one is built on. */
+    let sourcesBefore = '';
     let probe: WebGPUFrameProbe | null = null;
     let chain: WebGPUPostChain | null = null;
     /** The compositor, so the cleanup releases it by name rather than leaving it to the device's destroy (S13). */
@@ -8451,7 +9023,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // `?prepare=0` opens the show the old way, every pipeline built on the
       // frame that first needs it: `npm run startup`'s control, so a run
       // measures the freeze it guards against as well as its absence.
-      if (PREPARE_OFF) return s;
+      // The thin gap's pipelines too, which otherwise wait for nothing but
+      // build behind the old plate (WebGPUFluid.buildAhead says why).
+      if (PREPARE_OFF) { WebGPUFluid.buildAhead = false; return s; }
       /*
         Never the reason the show does not open. The builds themselves cannot
         fail (a pipeline that will not build ahead is left to the frame), but
@@ -8603,7 +9177,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (glLostRef.current) {
         const kept = plateKeptRef.current;
         plateKeptRef.current = false;
-        if (!kept) layPlateRef.current(livePresetRef.current);
+        if (!kept) layPlateRef.current(livePresetRef.current, true);
         glLostRef.current = false;
         setGlLost(false);
         crashLog.recovered(`a new device (${s.gpu.label}), ${kept ? 'the plate carried across' : `${livePresetRef.current} laid again`}`);
@@ -8795,6 +9369,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // With a chain, the finish happens at the end of it instead.
               postChain: !!post,
             });
+            /*
+              A projector's own source (PLAN.md §16b): the front plate alone,
+              the back plate alone or the film alone, for each one an enabled
+              surface asks for, and nothing at all when every surface shows
+              the wall. Each is filled from the frame's settings with the
+              other rows at nothing (lib/plateSources.ts), with no camera and
+              no chain, so its display pass does its own finish: the dimmer,
+              the flash guard's gain and the logo, as the wall has them.
+            */
+            const sourcesNow = out ? sourcesAskedFor(view.outputCfg) : [];
+            // A source picked mid-show allocates two canvas-sized textures on
+            // its first frame (the output's and the plate's second target):
+            // scope that frame, as a new projector's is, so running out of
+            // memory there steps the governor down rather than blacking every
+            // projector with a bind group that fails each frame.
+            const sourcesKey = sourcesNow.join(' ');
+            if (sourcesKey !== sourcesBefore) { if (sourcesNow.some(k => !sourcesBefore.split(' ').includes(k))) scopeSoon = 2; sourcesBefore = sourcesKey; }
+            plate.keepSources(sourcesNow);
+            out?.keepSources(sourcesNow);
+            for (const kind of sourcesNow) {
+              fillPlateUniforms(plate.sourcePack(kind), {
+                view: { ...view, settings: sourceSettings(kind, view.settings) }, fluids,
+                width: canvas.width, height: canvas.height,
+                derived: true,
+                grid: fields[0].dye.width,
+                cameraOn: false,
+                postChain: false,
+              });
+            }
             // What the finish needs, taken from the uniforms the plate was
             // just given rather than worked out a second time here: the
             // dimmer with the flash guard folded in, and the mark's fader
@@ -8850,6 +9453,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // filled for; the shader samples by that number.
               if (live[0].dye.width !== fields[0].dye.width) {
                 plate.pack.set('gridSize', live[0].dye.width);
+                for (const kind of sourcesNow) plate.sourcePack(kind).set('gridSize', live[0].dye.width);
               }
               // Where each pass hands the frame on: the projector's texture
               // if there is one, else the canvas; the chain's picture if
@@ -8925,7 +9529,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   markBlend: markBlendNow,
                 }, stage?.profiler.renderPass('finish'), !!out);
               }
-              if (out) out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              // Each projector source, from the plates this frame just packed
+              // and derived: only the full-screen display again, timed on its
+              // own so the Mac can say what a second picture costs.
+              if (out) {
+                for (const kind of sourcesNow) {
+                  plate.drawSource(encoder, kind, out.sourceView(kind, size.width, size.height), size, live,
+                    stage?.profiler.renderPass(`plate ${kind}`), stageFormat);
+                }
+                out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+              }
               return true;
             };
           }
@@ -9034,6 +9647,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
+          phaseLays: () => phaseLaysRef.current,
+          magnetPools: () => magnetPoolsRef.current,
+          magnetRelays: () => magnetRelaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;
@@ -9150,7 +9766,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
     };
     drawnRectRef.current = drawnRect;
-    const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
+    /*
+      Where a pointer is, in the plate's cells, not rounded: the Spin tool
+      reads a hand's angle round the middle from it, and a pointer rounded to
+      a cell is an angle rounded to a sixtieth of a radian at a third of the
+      plate out, which at sixty readings a second is a turn a second of noise.
+    */
+    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect) => {
       const cxp = clientX - rect.left - rect.width / 2;
       const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
       const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
@@ -9174,7 +9796,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const ca = Math.cos(-angle), sa = Math.sin(-angle);
         const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
         dx = px; dy = py;
-        return { x: Math.floor((0.5 + dx * 0.5) * GRID_SIZE), y: Math.floor((0.5 + dy * 0.5) * GRID_SIZE) };
+        return { x: (0.5 + dx * 0.5) * GRID_SIZE, y: (0.5 + dy * 0.5) * GRID_SIZE };
       }
       let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
       let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
@@ -9184,7 +9806,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
         fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
       }
-      return { x: Math.floor(fx), y: Math.floor(fy) };
+      return { x: fx, y: fy };
+    };
+    const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
+      const p = fluidPointAt(clientX, clientY, rect);
+      return { x: Math.floor(p.x), y: Math.floor(p.y) };
+    };
+    /*
+      A hand on the Spin tool (PLAN §22): where it is from the dish's middle
+      as the audience sees it, in plate widths. The plate's cells turn with
+      the liquid (`rotationAnglesRef`), so the point is turned back out by
+      that angle; the hand's angle is then the room's, and its speed round
+      the middle is what the dish is asked to turn at (lib/turntable.ts,
+      SpinHand).
+    */
+    const spinHand = (id: string, clientX: number, clientY: number, landing: boolean) => {
+      const p = fluidPointAt(clientX, clientY, drawnRect());
+      const fx = p.x / GRID_SIZE - 0.5, fy = p.y / GRID_SIZE - 0.5;
+      const a = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const dx = fx * Math.cos(a) - fy * Math.sin(a), dy = fx * Math.sin(a) + fy * Math.cos(a);
+      const hand = spinHandOf(activeLayerRef.current);
+      if (landing) hand.down(id, dx, dy, showNow(), toolAmountRef.current); else hand.move(id, dx, dy, showNow(), toolAmountRef.current);
+    };
+    const spinLetGo = (id?: string) => {
+      for (const h of spinHandsRef.current) { if (!h) continue; if (id === undefined) h.clear(); else h.up(id); }
     };
 
     /*
@@ -9232,6 +9877,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         hand's spot emptied (187 to 108) while a ring 0.15-0.2 out filled.
       */
       if (activeToolRef.current === 'magnet') return;
+      // The Spin tool turns the dish under the pointer and touches no liquid.
+      if (activeToolRef.current === 'spin') {
+        if (isMouseDownRef.current) spinHand('mouse', e.clientX, e.clientY, false);
+        return;
+      }
       /*
         And only while the button is down. This ran on every move, so moving
         the mouse across the plate to reach a control pressed and stirred the
@@ -9287,6 +9937,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       isMouseDownRef.current = true;
+      // A fresh press's own clock and count, even if no step has run since
+      // the last let go (the step loop's reset needs a step with no hand).
+      dropClockRef.current = 0;
+      dropLaidRef.current = freshLaid();
+      if (activeToolRef.current === 'spin') spinHand('mouse', e.clientX, e.clientY, true);
     };
     const handleMouseUp = (e: MouseEvent) => {
       const drag = aimDragRef.current;
@@ -9297,6 +9952,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       isMouseDownRef.current = false;
+      spinLetGo('mouse');
     };
 
     /*
@@ -9333,6 +9989,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       isMouseDownRef.current = false;
       primaryTouchRef.current = null;
       extraHandsRef.current.clear();
+      spinLetGo();
     };
     const applyPinch = (pinch: NonNullable<typeof pinchRef.current>, span: { d: number; mx: number; my: number }) => {
       onPinchZoomRef.current?.(Math.max(1, Math.min(16, pinch.zoom0 * span.d / pinch.d0)));
@@ -9372,15 +10029,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       for (const t of Array.from(e.changedTouches)) {
         const p = touchCell(t);
+        // Every finger on the Spin tool is a hand on the dish; two go round together.
+        if (activeToolRef.current === 'spin') spinHand(`touch${t.identifier}`, t.clientX, t.clientY, true);
         if (primaryTouchRef.current === null) {
           primaryTouchRef.current = t.identifier;
           isMouseDownRef.current = true;
+          dropClockRef.current = 0;
+          dropLaidRef.current = freshLaid();
           // From here, not from where the last finger lifted: the recorder's
           // first gesture of a touch takes its direction from this.
           lastMousePosRef.current = { ...p };
           mousePosRef.current = p;
         } else if (t.identifier !== primaryTouchRef.current) {
-          extraHandsRef.current.set(t.identifier, { ...p, stroke: null, clock: 0 });
+          extraHandsRef.current.set(t.identifier, { ...p, stroke: null, clock: 0, laid: freshLaid() });
         }
       }
     };
@@ -9396,6 +10057,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       for (const t of Array.from(e.changedTouches)) {
+        spinLetGo(`touch${t.identifier}`);
         if (t.identifier === primaryTouchRef.current) {
           const next = extraHandsRef.current.entries().next();
           if (next.done) {
@@ -9411,6 +10073,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             lastMousePosRef.current = { x: h.x, y: h.y };
             strokeLastRef.current = h.stroke;
             dropClockRef.current = h.clock;
+            dropLaidRef.current = h.laid;
           }
         } else {
           extraHandsRef.current.delete(t.identifier);
@@ -9432,6 +10095,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const activeFluid = fluidsRef.current[activeLayerRef.current];
       for (const t of Array.from(e.changedTouches)) {
         const { x, y } = touchCell(t);
+        if (activeToolRef.current === 'spin') { spinHand(`touch${t.identifier}`, t.clientX, t.clientY, false); continue; }
         if (t.identifier === primaryTouchRef.current) {
           lastMousePosRef.current = { ...mousePosRef.current };
           mousePosRef.current = { x, y };

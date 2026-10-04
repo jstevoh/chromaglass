@@ -47,6 +47,63 @@ export type SurfaceShape = 'rect' | 'ellipse' | 'triangle' | 'diamond';
 
 export const SURFACE_SHAPES: SurfaceShape[] = ['rect', 'ellipse', 'triangle', 'diamond'];
 
+/**
+ * What a surface shows (PLAN.md §16b, the second step of many plates).
+ *
+ * A light show was several projectors, each its own source, their beams
+ * meeting on the wall (docs/rig-plan.md R1). Here every surface was a window
+ * onto one finished frame, so two projectors could only ever show two crops
+ * of the same picture. Now a surface can show:
+ *
+ * - `wall`: the finished frame, as every surface did (the default, so a
+ *   stored setup opens as it was);
+ * - `front`: the front plate alone, drawn as the Mixer draws it with the
+ *   back plate and the film taken out;
+ * - `back`: the back plate alone, the front plate's row at nothing, so under
+ *   it is the bare lamp, which is what a second projector with only the back
+ *   dish in its gate puts on the wall;
+ * - `film`: the film alone, with every plate and lamp row taken out.
+ *
+ * The plate sources are drawn by the plate's own display pass again, from
+ * the plates already stepped and packed this frame, into a texture of their
+ * own, and only when an enabled surface asks for one. They carry the dimmer,
+ * the flash guard and the logo like the wall does; they do not carry the
+ * closeup camera or the post effects, which are the wall's frame's.
+ */
+export type SurfaceSource = 'wall' | 'front' | 'back' | 'film';
+
+export const SURFACE_SOURCES: SurfaceSource[] = ['wall', 'front', 'back', 'film'];
+
+/**
+ * The plate sources the enabled surfaces ask for, in a fixed order. Empty
+ * when every surface shows the wall, which is every setup made before this:
+ * nothing extra is drawn.
+ */
+export function sourcesAskedFor(cfg: OutputConfig): Exclude<SurfaceSource, 'wall'>[] {
+  const asked = new Set(cfg.surfaces.filter(s => s.enabled && s.opacity > 0).map(s => s.source));
+  return (['front', 'back', 'film'] as const).filter(k => asked.has(k));
+}
+
+/**
+ * How a surface's light meets what is already on the wall (PLAN.md §16c,
+ * docs/rig-plan.md R3).
+ *
+ * - `over`: laid over what is under it by its opacity, as every surface
+ *   always was (the default, so a stored setup opens as it was). A slide in
+ *   front of a slide.
+ * - `add`: added to it, as a second projector's beam is: light on light,
+ *   brighter where they cross. Two beams of different sources cross as the
+ *   sum of both, which is the overlap a light show was played on. Two of the
+ *   same source are two projectors carrying one picture between them, tiled
+ *   with an overlap, and there they are edge-blended: across the overlap
+ *   each fades out towards its own edge as the other fades in, in the
+ *   proportion of how far inside each the point is, so the two always sum to
+ *   one and no bright seam shows where they cross.
+ */
+export type SurfaceBlend = 'over' | 'add';
+
+export const SURFACE_BLENDS: SurfaceBlend[] = ['over', 'add'];
+
 export interface Surface {
   /** Stable across reorders and edits, so a drag knows what it has hold of. */
   id: string;
@@ -73,6 +130,10 @@ export interface Surface {
   opacity: number;
   /** How soft the shape's own edge is, in its local space. 0 is a hard cut. */
   feather: number;
+  /** What it shows: the finished frame, one plate alone or the film alone (see `SurfaceSource`). */
+  source: SurfaceSource;
+  /** Laid over what is under it, or added to it as a beam (see `SurfaceBlend`). */
+  blend: SurfaceBlend;
 }
 
 export interface OutputConfig {
@@ -235,6 +296,11 @@ export function normalizeSurfaces(raw: unknown): Surface[] {
       enabled: s.enabled !== false,
       opacity: clamp(s.opacity === undefined ? 1 : Number(s.opacity) || 0, 0, 1),
       feather: clamp(s.feather === undefined ? 0.01 : Number(s.feather) || 0, 0, 0.5),
+      // Stored before there was a choice, or a name this build does not know:
+      // the wall, which is what every surface showed.
+      source: SURFACE_SOURCES.includes(s.source as SurfaceSource) ? (s.source as SurfaceSource) : 'wall',
+      // Likewise laid over, as every surface was.
+      blend: SURFACE_BLENDS.includes(s.blend as SurfaceBlend) ? (s.blend as SurfaceBlend) : 'over',
     });
   }
   return out;
@@ -263,6 +329,8 @@ export function makeSurface(shape: SurfaceShape = 'rect', at = 0): Surface {
     enabled: true,
     opacity: 1,
     feather: 0.01,
+    source: 'wall',
+    blend: 'over',
   };
 }
 

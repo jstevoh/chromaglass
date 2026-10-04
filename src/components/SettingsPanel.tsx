@@ -17,6 +17,7 @@ import { Segmented, Sheet } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
+import { SPIN_AUTO_NAMES } from '../lib/turntable';
 
 /**
  * Pinning a control onto a desk.
@@ -111,6 +112,8 @@ interface SettingsPanelProps {
   markLoaded?: boolean;
   /** The Mixer rows' take buttons (lib/mixFade.ts). */
   mixTakes?: MixTakes;
+  /** The look the back plate is on, for the Mixer's Back Plate row (PLAN.md §16a). */
+  backLook?: string | null;
   onMarkFile?: (file: File) => void;
   onMarkClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
@@ -339,7 +342,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -643,6 +646,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           hasMark={markLoaded}
           chips={(k) => <PinChips settingKey={k} />}
           onFade={mixTakes?.onFade}
+          backLook={backLook}
           fading={mixTakes?.fading}
           testId="settings-mixer-panel"
         />
@@ -1091,7 +1095,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Layer Scale Variety"
-          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 Layers'}
+          disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.layerScaleVariety ?? 0.5}
           min={0}
           max={1.0}
@@ -1126,6 +1130,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ colourBody: v })}
           settingKey="colourBody"
+        />
+        {/* The plate printed as a comic: flat inks, black outlines, the tints in even dots. The Roy look's own control. */}
+        <Slider
+          label="Ben-Day Dots"
+          value={settings.benDay ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ benDay: v })}
+          settingKey="benDay"
         />
         <Slider
           label="Glossiness"
@@ -1230,7 +1244,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Background Loop"
-          disabled={(settings.layerCount ?? 1) < 2 && 'needs 2 Layers'}
+          disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.backgroundLoop ?? 0}
           min={0}
           max={1.0}
@@ -2699,6 +2713,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ magnetHeight: v })}
           settingKey="magnetHeight"
         />
+        {/* The Magnet tool's own size (lib/magnetSize.ts): a coin at the
+            left, a palm at the right, the tool as it always was in the
+            middle. The same field over it, reaching further across. */}
+        <Slider
+          label="Magnet Size"
+          value={settings.magnetSize ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ magnetSize: v })}
+          settingKey="magnetSize"
+        />
         <Slider
           label="Magnet Across"
           value={settings.magnetX ?? 0.5}
@@ -2887,6 +2913,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ depthDrag: v })}
           settingKey="depthDrag"
         />
+        {/*
+          The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
+          two stops, as Layers is, so a MIDI button and a desk can hold it
+          too. Thickness is how long a push lasts in it, so it only shows
+          while it is on.
+        */}
+        <Slider
+          label="Thin Gap"
+          value={settings.thinGap ?? 1}
+          min={0}
+          max={1}
+          step={1}
+          onChange={(v: number) => onUpdate({ thinGap: v })}
+          settingKey="thinGap"
+        />
+        {(settings.thinGap ?? 1) > 0.5 && (
+          <Slider
+            label="Thickness"
+            value={settings.gapThickness ?? 0.45}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(v: number) => onUpdate({ gapThickness: v })}
+            settingKey="gapThickness"
+          />
+        )}
         <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}
@@ -3153,6 +3205,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ layerCount: Math.round(v) })}
           settingKey="layerCount"
         />
+        {/* The look's own count, which a back plate with a look of its own
+            (PLAN.md §16a) keeps at two on the stage whatever it says, so the
+            slider at 1 with two plates showing is explained, not a fault. */}
+        {backLook && (settings.layerCount ?? 1) < 2 && (
+          <p className="col-span-full text-[12px] text-dim" data-testid="settings-back-plate-on">
+            The back plate is on {backLook}, so it stays on the stage until it follows the front again.
+          </p>
+        )}
         <Slider
           label="Rotation Speed"
           value={settings.rotationSpeed}
@@ -3192,6 +3252,56 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             </button>
           ))}
         </div>
+        {/*
+          Auto Spin (PLAN §22): the dish turned by a motor of its own, at a
+          rate or at the tempo. Stepped like Spin Direction, since it is three
+          answers. The Rate is signed: its sign is the way round, and Reverse
+          flips it (a pad can too, as Reverse Spin), so reversing a dish in
+          the middle of a song is one press and not a trip to a slider.
+        */}
+        <Slider
+          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
+          value={settings.spinAuto ?? 0}
+          min={0}
+          max={2}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinAuto: Math.round(v) })}
+          settingKey="spinAuto"
+        />
+        <Slider
+          label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
+          value={settings.spinRpm ?? 6}
+          min={-45}
+          max={45}
+          step={0.5}
+          onChange={(v: number) => onUpdate({ spinRpm: v })}
+          settingKey="spinRpm"
+        />
+        <Slider
+          label={`Beats a Turn — ${Math.round(settings.spinBeats ?? 16)}`}
+          value={settings.spinBeats ?? 16}
+          min={1}
+          max={64}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinBeats: Math.round(v) })}
+          settingKey="spinBeats"
+        />
+        <div className="flex gap-2 mt-1 mb-2">
+          <button
+            onClick={() => onUpdate({ spinRpm: -(settings.spinRpm ?? 6) })}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+                       hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all"
+            data-testid="spin-reverse"
+            title="Turn Auto Spin the other way round"
+          >
+            Reverse Spin
+          </button>
+        </div>
+        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+          The dish turns and the liquid follows it: water lags for a few seconds, oil goes at once,
+          and a fast dish flings the heavy colour outward. Tempo turns once every so many beats,
+          locked to the beat; with no beat heard yet it turns at the Rate.
+        </p>
         {/*
           Which way, how steadily, and what drives it.
 

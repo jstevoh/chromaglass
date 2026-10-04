@@ -20,6 +20,7 @@ export const TOOL_AMOUNT_MEANS: Record<string, string> = {
   press: 'pressure',
   finger: 'drag',
   magnet: 'pull',
+  spin: 'turn',
 };
 
 const STORE_KEY = 'chromaglass-tool-amounts';

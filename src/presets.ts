@@ -45,7 +45,7 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.55,         // audible music visibly drives the fluid
       turbulenceScale: 0.5,      // lively multi-scale ripple
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.35,  // loose amoeba shapes, slow pinch-and-merge
+      blobSurfaceTension: 0.35,  // colours hold apart loosely
       boundaryContrast: 0.5,     // bright line where dyes meet
       saturationBoost: 1.45,
       glossiness: 0.0,           // flat backlit dye — the projector look
@@ -90,7 +90,7 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.4,
       turbulenceScale: 0.55,     // strong swirl — spiral arms shear and stretch
       turbulenceDetail: 4,       // fine filament detail down to star-cluster scale
-      blobSurfaceTension: 0.1,   // near-zero cohesion — matter fragments freely
+      blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
       glossiness: 0.0,
@@ -225,7 +225,7 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.9,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,  // shapes constantly tear and reform
+      blobSurfaceTension: 0.15,  // colours barely hold apart
       edgeRelief: 0.65,
       bubbles: 0.17,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces
@@ -2027,6 +2027,81 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.3,
       secondLamp: 0.2,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
+    }
+  },
+  {
+    id: 'roy',
+    name: 'Roy, 1963',
+    description: 'The plate printed as a Lichtenstein panel: flat red, yellow and blue on white, a black line round every shape and where two inks meet, and every pale wash laid as even Ben-Day dots of its own ink.',
+    settings: {
+      /*
+        The print (benDay in wgsl/plate.ts) is the look: it reads each pixel
+        as a comic's inks, so what the plate has to supply is what a panel
+        is drawn from. Big flat pools of the three primaries, hard edged,
+        with thin washes round them for the dots to print, on a white ground.
+        Nothing that shades: no gloss, no hot-spot, no second lamp, no
+        bubbles or beads, because a print has no light in it.
+      */
+      benDay: 1,
+      globalSpeed: 0.0105,
+      surge: 0.45,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.7,
+      rotationSpeed: 0.0,
+      centerGravity: 0.1,
+      // The paper: a white light table, as Ferro Maze's.
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#ffffff',
+      ledSpeed: 0.0,
+      diffusionRate: 0.00004,
+      buoyancy: 0.25,
+      advection: 0.4,
+      damping: 0.982,
+      heatDecay: 0.985,
+      automateRate: 0.1,
+      platePressure: 0.35,
+      glassSmear: 0.15,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      // Two primaries that meet stay two primaries, with a hard seam.
+      polarity: 1.0,
+      evaporationRate: 0.003,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.55,
+      turbulenceScale: 0.3,
+      turbulenceDetail: 2,
+      blobSurfaceTension: 0.6,
+      boundaryContrast: 0.0,
+      saturationBoost: 1.5,
+      colourBody: 0.5,
+      dyeBudget: 0.9,
+      glossiness: 0.0,
+      postBlurRadius: 0.1,
+      edgeRelief: 0.0,
+      bubbles: 0.0,
+      beads: 0,
+      cells: 0,
+      lacing: 0,
+      iridescence: 0,
+      lightPlay: 0,
+      lampHotspot: 0,
+      secondLamp: 0,
+      lampWarmth: 0,
+      plateRock: 0.4,
+      beatSqueeze: 0.6,
+      layerScaleVariety: 0,
+      hueJourney: 0,
+      // Zoomed in it is still a print: the closeup's paint cells, lacing,
+      // domes and ragged silhouette would each be outlined in black.
+      macroCells: 0,
+      macroLacing: 0,
+      macroDepth: 0,
+      macroEdgeDetail: 0,
+      macroRelief: 0,
+      audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
 ];

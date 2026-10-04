@@ -161,7 +161,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   // section three screens deep, and cutting a picture into shapes is a job of
   // its own.
   { id: 'mapping', name: 'Mapping', category: 'stage',
-    terms: 'projection mapping map shapes surfaces circle ellipse triangle rectangle diamond cube box panel pillar cut out quad corners dark between' },
+    terms: 'projection mapping map shapes surfaces circle ellipse triangle rectangle diamond cube box panel pillar cut out quad corners dark between source front plate back plate film alone light add beam beams over edge blend blending seam overlap tile tiles' },
   /*
     A section rather than a row under the wall, because loading a mark and
     placing it is a job somebody does once before doors and then leaves alone,
@@ -171,7 +171,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'mark', name: 'Logo & Titles', category: 'stage',
     terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
   { id: 'layers', name: 'Plates & LED', category: 'stage',
-    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick' },
+    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick auto spin turntable dish rpm tempo beats a turn reverse spin' },
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];

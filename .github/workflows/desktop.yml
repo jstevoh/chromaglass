@@ -1,0 +1,88 @@
+name: Mac app
+
+# Builds the Mac app (desktop/, PLAN.md §13 step 1), a .dmg and a .zip, then
+# checks the app they were built from: the show opens from the server inside
+# it with the network off, on a lit plate, OSC plays it, a projector gets the
+# show with no click, and it quits cleanly (`npm run desktop`,
+# scripts/desktop.mjs). The download is kept as this run's artifact.
+#
+# Its own workflow, like ios.yml: deploy.yml calls checks.yml, and the website
+# should not wait on, or be stopped by, the app's build. It runs on a pull
+# request when anything the app is made from changes: that is most of the
+# site, because the check is also what stops a font or a script from a CDN
+# creeping into a show that must open offline. By hand (Actions → Mac app →
+# Run workflow) for a download of today's show, and on a `desktop-v*` tag.
+#
+# Signing: with the secrets desktop/README.md lists, the download is signed
+# with the owner's Developer ID and notarized; without them it is signed ad hoc,
+# and macOS asks once before opening it.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'server/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'scripts/desktop.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Mac app (packed, checked, built)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix desktop
+      - run: npm run build
+      # The download is built first and the check opens the .app it was built
+      # from, signed as it ships, so a missing entitlement cannot ship unseen.
+      #
+      # An unset secret arrives as an empty string, which electron-builder
+      # takes for a certificate path (the folder itself) and stops on: unset
+      # them, and the config signs ad hoc. And electron-builder signs nothing
+      # on a pull request unless told to, which would leave the app with
+      # Electron's own signature, broken by the rename, and "damaged" on an
+      # Apple silicon Mac.
+      - name: Build the download
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_FOR_PULL_REQUEST: 'true'
+        run: |
+          if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; fi
+          npm --prefix desktop run dist
+          codesign --verify --deep --strict --verbose=1 desktop/release/mac-arm64/ChromaGlass.app
+      - name: Check the built app (npm run desktop)
+        run: node scripts/desktop.mjs --packaged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChromaGlass-mac
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+          if-no-files-found: error
+          retention-days: 30

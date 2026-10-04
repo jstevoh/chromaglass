@@ -405,6 +405,25 @@ one is enough for your own phone) and press Run. Worth looking at:
   plate; More › Laptop remote again goes straight back to the same laptop;
 - Record: known not to save yet (PLAN §12 step 5).
 
+## 17. The back plate's own look
+
+PLAN.md §16a. On the desk, cue a look with two plates in mind (Oil & Water on
+the front, say), press Go, then cue a different one (Boiling Point, Ferro
+Paint) and press **To Back Plate**. Worth looking at:
+
+- over the fade, the back plate's liquid changes how it moves and what colour
+  it pours while the front keeps its own; nothing cuts, and the front does not
+  thin or re-lay;
+- the Mixer's Back Plate row says "On" and the look's name; grading it and
+  moving it in the stack behave as before;
+- a Go on the front (and a cut from the preset strip) leaves the back plate on
+  its look;
+- **Follow Front** fades the back plate back into the front's twin; on a
+  one-plate front look the back plate goes when that fade lands;
+- the same from the phone: the looks sheet's Back plate switch, then a look;
+- whether two looks on two plates read as two projectors or as a muddle is
+  the judgement this is for.
+
 ---
 
 ## 16. The Magnet pulls a pool out in fingers
@@ -463,6 +482,298 @@ On Oil & Water (Oil Bodies on):
 - on Classic (no Oil Bodies), a press should still clear a ring the way it did, now
   going straight out: a stripe under the palm should come out as a stripe, not a smear
   round the whole ring. Say if the old even ring looked better.
+
+## 19. Thin Gap: the plate as a thin layer of liquid (PLAN 18a)
+
+Every look moves by a speed clamp: whatever pushes the liquid, it is cut back to
+one small speed at the end of the step, so a push lasts one frame. Thin Gap
+(Settings → Squish Plate, under Depth Drag) replaces the clamp with the drag of two
+glasses a few millimetres apart: a push lasts as long as the liquid and the gap say.
+It is off in every look, and nothing changes until you turn it on. `?set=thinGap=1`
+turns it on for a page load.
+
+On Classic, then Oil & Water, then a look with a Plate Shape:
+
+- turn it on: the plate should keep moving the way the look moves, not freeze or
+  race. The first time in a show it takes a few seconds to switch (its pipelines are
+  built then, off the frame), and there should be no stop while it does. Say if the look's stirring now reads as too strong or too weak;
+- Finger through the colour at Thickness 0 (water), 0.45 (the default, a light oil)
+  and 1 (glycerine): in water the liquid should keep sliding for a second or two
+  after the finger stops; at 1 it should stop the moment the finger does;
+- Press and hold, then let go: the colour should be pushed out by the press and drawn
+  back in when the glass lifts, and under the press the colour should pale (less
+  liquid between the glasses there) and come back as it lifts. At the dish's edge the
+  liquid should go out of the dish, not bunch up against it;
+- on a look with Plate Shape up: where the glasses are tight, the colour should
+  move slower than where they are open;
+- the frame time with it on and off (below): it should be the same or faster;
+- the same on the phone (Settings → Squish Plate → Thin Gap), and a MIDI pad
+  learned to it.
+
+---
+
+## 19. A held Drop with Drop Height up drops six times a second, not every step
+
+The held Drop's clock stayed at zero on frames of one solver step each, so with
+Drop Height up it let go of a splashing drop on every step (sixty a second at the
+display's rate) until a frame happened to owe two. It now drops as the finger lands
+and then every tenth step. Only Bass Drop (Drop Height 0.9) and Boiling Point (0.7)
+ship with it up, so those two look different under a held Drop now:
+
+- hold the Drop still on each for two seconds: a beat of separate drops, each with
+  its own splash and ring, where it was a near-continuous gush;
+- the pool should be about a tenth of what it used to be for the same hold. Say if
+  the old gush was the look you wanted on either, and it can be a setting instead.
+
+## 20. The fingering push taken out (PLAN §0)
+
+Classic drew stripes a few cells across over its pools, and after a while red dots
+in a lattice with labyrinths between them. It was a push, set by Polarity, that
+moved the dye along its own slope by a slow noise, and ran diffusion backwards
+through the inside of every pool. It is gone, on every look.
+
+On Classic, and on Velvet Underground on the iPhone (where it drew a fine
+crosshatch pinned to the grid), and one other look with Polarity up and Blob
+Surface Tension low (which made the push strongest):
+
+- leave it for ten minutes or more: no stripes, dots or labyrinths inside the
+  pools, and the plate should hold its dye rather than thin out;
+- watch a pool's edge: the slow pushing out and drawing back the push added is
+  gone. Say whether you miss it; real fingering, from a lift or a pour, is the
+  plan's next step for it, not a noise;
+- the Finger through a pool: it should carry the dye and not seem to add any.
+
+## 21. A projector picks its source
+
+PLAN.md §16b. With a projector (or a second window) on, open Settings,
+Mapping, add two rectangles side by side, and set one's Source to **Front** and
+the other's to **Back**, on a two-plate look (Classic). Worth looking at:
+
+- each rectangle carries one plate, and the two are the same liquid, turned
+  opposite ways, moving together;
+- **Film** on a surface with a film playing shows the film alone, graded as
+  the Mixer's film row is, with none of the plate's liquid in it;
+- the logo is on the front plate's projector and not the back's;
+- grading a row in the Mixer (the back plate's brightness, say) changes that
+  plate on its own projector as on the wall; the dimmer and a blackout take
+  every projector down;
+- the frame time with two or three sources on against one (`chromaglassDebug()`,
+  `webgpu.timings`: `plate`, `plate front`, `plate back`, `plate film`);
+- whether two plates on two projectors, overlapping on a wall, read as a light
+  show's two projectors is the judgement this is for (16c makes their overlap add).
+
+## 22. Colour between the domes
+
+The Magnet's domes used to stand in a dark amber film (PLAN §9f; `npm run
+domes` measures it in the lab). Worth looking at, on Magnet Garden with the
+Magnet pressed under a pool:
+
+- the gaps between the domes show the dye's own colour, not a brown film;
+  they are still narrow near the middle of the pool (PLAN §9t);
+- no seam or grid in the dye where the pool was, and the dye does not fade
+  under the pool over a minute of holding;
+- the same with a finger held on the Magnet on the phone.
+
+---
+
+## 23. The Press on the ferrofluid (PLAN 15d)
+
+A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
+leave it the size it was. Now, with Thin Gap on (Settings → Squish Plate → Thin Gap),
+a pool pressed between the glasses stays black and spreads, the way a drop of paint
+does between two plates, and draws back to its own size when the glass lifts. With
+Thin Gap off nothing has changed.
+
+On Ferro Paint, then Magnet Garden, with Thin Gap on:
+
+- press and hold on a pool: it should spread out under the palm, black all the way,
+  not grey, and stay spread while you hold;
+- let go: it should shrink back to about the pool it was over the next second;
+- press a pool with a ragged edge, at the default Thickness: its edge should push
+  out into the clear liquid in fingers rather than a smooth round front (the
+  ferrofluid is thinner than the default liquid). At Thickness 0 (water) the same
+  press should spread it rounder. Say if either is too weak to see;
+- hold the Magnet under a pool and press over it: the pool should still answer the
+  magnet, more slowly where the glass is down. The spikes under the palm do not yet
+  flatten (they should; PLAN 15d's open items);
+- with Thin Gap on, the ferrofluid now has its own viscosity in the gap, so the pool
+  answers the magnet faster at the default Thickness (about four times) and slower in
+  water (about five times). Say if either feels wrong for the liquid it is in;
+- the frame time with Thin Gap on, in a ferrofluid look (`?debug`,
+  `status.frameMs`): the ferrofluid's carry now runs six substeps under Thin Gap
+  where it ran fewer before, plus one small pass. Say if the governor steps down;
+- the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
+
+## 24. Beams, and tiles with no seam
+
+PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
+both with Light on **Add**:
+
+- one on **Front** and one on **Back**: where they cross is brighter, both
+  plates at once, and reads as two beams meeting;
+- both on **Wall**, each showing its own slice (Its own slice): the join
+  should vanish, no brighter band and no darker one, and the picture carries
+  on across it;
+- a little Edge on each: the outer edges soften and the join stays invisible;
+- whether the overlap of two plates is a light show's overlap is the
+  judgement this is for.
+
+---
+
+## 25. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+
+On Classic (a look with no ferrofluid), desk and phone:
+
+- pick the Magnet (M, or its button): the plate should not change at all;
+- touch and hold: a small black pool should appear under the hand and stand up
+  into spikes; drag it, and it should come with you. Say whether it is the right
+  amount of ferrofluid to start with;
+- right-click the Magnet on the desk (or tap it twice on the phone) and move
+  Size: a small magnet raises a few spikes under the fingertip, a big one a wide
+  hedgehog and pulls more gently from further off. Say whether the range is right
+  at both ends;
+- the pool still reads as a black disc with domes round its rim, not domes with
+  colour between them. That is the standing-domes work (PLAN 9t), not this.
+
+---
+
+## 26. The Mac app, on the Mac and on a projector
+
+The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
+server in one Electron app. CI opens the packed app on its Mac runner and
+measures it (`npm run desktop`): offline, a lit plate, OSC, a projector with
+no click (a stand-in second screen), and quitting. What only a real Mac with
+a real projector can say. Get it from Actions → *Mac app* → *Run workflow*,
+or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
+
+- Wi-Fi off before opening it: the show opens and plays, and the music
+  shelf plays its songs;
+- the plate at 60 fps against the same look in Chrome (`?debug`'s
+  `frameMs`): the app is the same Chromium, so a difference is a finding;
+- a projector plugged in *before* opening: the show is on it in full screen
+  with no title bar and no click. Unplug and plug back in: it comes back.
+  Settings → Wall → Ask: the chip is back, and Auto again sends it;
+- the laptop window covered by another app, and minimised: the wall keeps
+  moving, and the sound still moves it;
+- Show → Show Server Details…: the phone's address works, the key is the same
+  after quitting and reopening, and a phone linked before the restart
+  relinks by itself;
+- OSC from Resolume or TouchDesigner to UDP 9000, and Art-Net if the rig is
+  there;
+- the MIDI controller: works with no prompt;
+- the lid closed with the projector as the only screen: the show stays up;
+- the projector's full screen is macOS's own. With System Settings → Desktop
+  & Dock → "Displays have separate Spaces" off, a full-screen window takes
+  every display, so the laptop's screen may go black too. Say which it is on
+  your Mac; if it does, the app should use a borderless window over the
+  projector's screen instead.
+
+## 27. Roy, 1963: the plate printed as a comic (PLAN 21)
+
+Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
+panel: flat red, yellow and blue on white, a black line round every solid shape
+and where two colours meet, and the pale washes round the shapes as even dots.
+
+- are the dots the right size on the wall (32 rows down the picture), and the line
+  heavy enough? Say if either wants to be bigger or smaller;
+- does it hold up moving: do the dots sit still while the colour slides under them,
+  and does the line stay a line, not a flicker, as the shapes move and merge;
+- Ben-Day Dots (Settings → Look) from 0 to 100 % on Roy, and on Classic: is there a
+  point between where it looks better than either end;
+- zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
+  them to grow with the zoom, as the accidental ones did.
+
+## 28. Spinning the dish (PLAN 22)
+
+Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
+lab measured the swirl (`npm run dish`), not the picture. On the Mac:
+
+- the Spin tool (N): drag round the middle. The glass should go round with the
+  pointer, coast when you let go and stop when you hold still. On Classic (thick)
+  the picture should follow almost at once; on a thin look (Viscosity thin) the
+  liquid should visibly trail the glass for a couple of seconds, then catch up;
+- press (P) and hold with a spinning dish: the liquid under the palm should go round
+  with the glass while the rest lags, a whirl round the palm;
+- on Oil & Water, spun: the oil bodies should go round with the glass and the water
+  between them lag, and after a while of spinning hard (Spin Rate 30 or more), the
+  heavy dye should creep outward and the oil in;
+- Auto Spin at Rate 6: a slow, even turn; Reverse Spin turns it back through a stop,
+  not a jump;
+- Auto Spin at Tempo, 16 beats a turn, with music: the dish should turn once every
+  four bars and stay with the music; a flick with the Spin tool knocks it off and
+  it should come back to the beat within a bar or two, not settle somewhere new;
+- the phone: the Spin tool with one finger round the middle, and Auto Spin on the
+  Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
+
+Say if the lag is too long or too short to read as a liquid, and whether the swirl a
+press makes is visible or wants more.
+
+```
+?set=spinAuto=1;spinRpm=12     a dish turning at 12 rev/min, anticlockwise
+?set=spinAuto=2;spinBeats=8    a turn every 8 beats of the music
+```
+
+---
+
+---
+
+## 29. Blow's wind (PLAN 15c)
+
+The Blow drawn across the plate used to wipe a trail out of the colour. Now it
+pushes the colour along and keeps it. On Classic, with a pool laid:
+
+- draw the Blow slowly through the pool: a tongue of colour should be pushed ahead
+  of the hand and pile up where it stopped, with no dark trail behind it;
+- stop and hold: the straw's bubble should start within about a sixth of a second (a
+  little later on a machine drawing under 20 frames a second), a drag should no longer
+  leave a string of small straw bubbles behind it, and a drag should not start with a
+  bubble where it was pressed;
+- on the phone, hold one finger (the straw) and drag a second across the colour: the
+  second pushes it; hold the second still and it should blow a small clear ring;
+- on Oil & Water, blow across a body: the oil and its colour should go together.
+
+Say if the wind now reads as too strong or too weak next to the Finger.
+
+---
+
+## 30. The Press draws the liquid back when you let go (Thin Gap, PLAN 18a), in every look
+
+With Thin Gap on, the Press no longer moves the colour out to a ring by hand: the
+glass bends into a bowl under the palm, the liquid it squeezes out carries the
+colour and the oil with it, and when you let go the glass comes back up in about a
+second and a half (half way, at the default Press Lift) and draws them back in.
+Thin Gap is on in every look since PLAN 18a-every (#248, the owner's pick of 2026-10-03),
+and in looks you saved before it. To see the old plate beside it, turn it off with
+Settings → Squish Plate → Thin Gap, `?set=thinGap=0`, or on the phone on the
+Press's own Amount (tap Press twice).
+
+On Classic, then Oil & Water (Oil Bodies), then the look you play most, then the
+rest of the looks you play, since every look now moves the thin-gap way and none
+has been seen at 60 fps like this:
+
+- press and hold for a second, then let go: the colour under the palm should go out
+  in a smooth ring and come back in as the glass lifts, most of the way within a
+  few seconds. Say if the return is too slow or too fast; Press Lift sets it (on the
+  phone, "Press · glass lifts");
+- on Oil & Water, the oil should go out and come back with its colour, not leave it
+  behind;
+- press near the dish's edge: what goes over the rim should come back over it;
+- with Fingering up: the lift still breaks into the spokes, now only as the glass
+  opening along them (the colour is drawn in by the flow, not pushed);
+- the frame time while pressing (below): the colour's carry runs in up to 33 short
+  substeps for the few steps the glass is closing fastest, and in one otherwise;
+- a small pool right under the middle of the palm now spreads only a little while
+  held (as a film between closing glasses does: about 2.5 times wider at a sixth of
+  the gap), where the old plate threw it out to a ring; say if the press reads as
+  too weak;
+- every look, not only the Press: a push now lasts as long as the liquid and the gap
+  say, and the rim is open, so each look's drift and stirring may read differently.
+  Name any look that feels wrong, and whether it is better with Thin Gap off;
+- the opening, from a cold start (a new browser profile): the show now builds the
+  thin gap's pipelines before its first frame moves (PLAN 18a), so say if it opens
+  noticeably later than before;
+- a look you saved before this should open with Thin Gap on; one you save with it
+  off should stay off.
 
 ---
 

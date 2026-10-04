@@ -77,11 +77,18 @@ jobs:
   # up at the venue; a deploy gated only on the typechecker was a deploy gated
   # on nothing that an audience can see. That still holds: either this run
   # measures it, or `verified` found the PR run that measured this same tree.
+  #
+  # Since 2026-10-04 (the owner's choice, PLAN.md 19h-3) a third answer:
+  # `disjoint`, when the PR's run passed the Mac on an older main and the site
+  # files it changed are not ones main changed since. Then Measure runs on the
+  # exact tree and the Mac shards do not; the reasons are in deploygate.sh.
   checks:
     name: Checks
     needs: verified
     if: ${{ needs.verified.outputs.tested != 'true' }}
     uses: ./.github/workflows/checks.yml
+    with:
+      mac: ${{ needs.verified.outputs.tested != 'disjoint' }}
 
   deploy:
     name: Build and deploy

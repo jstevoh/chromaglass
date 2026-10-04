@@ -62,7 +62,12 @@ import { MIX_FADE_KEYS } from './mixer';
 // And the Mixer rows' fade times (lib/mixFade.ts): App reads one when its row's
 // take button is pressed, from the app's settings, so a patch on it would show
 // in the bay and change nothing.
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow',
+/*
+  Thin Gap is a solver mode, not an amount (PLAN §18a): a patch riding it
+  would switch the plate's physics every time the sound crossed half, so it
+  is held by hand, a pad or a desk, and its Thickness is what a patch rides.
+*/
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
@@ -107,6 +112,8 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',
+  // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
+  'thinGap', 'gapThickness',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
   'vorticityConfinement', 'oilTension', 'oilBodies', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   /*
@@ -232,13 +239,27 @@ export class PatchBay {
      * Turbulence add and clamp exactly as two patches in one look do.
      */
     extra?: readonly SceneMapping[],
+    /**
+     * A plate's own look, by layer, or nothing where the plate follows the
+     * front (PLAN.md §16a). Only its `PER_LAYER` keys are read: those are how
+     * that plate's solver moves, and every other key is the picture, which
+     * there is one of. It is the plate's *base*, not a patch over it, so the
+     * look's patches ride it exactly as they ride the front: a kick on
+     * Turbulence aimed at every plate adds to the back plate's own
+     * Turbulence, not to the front's. The back look's own patches are not
+     * folded; the patch bay is the front look's, and aims at plates by index.
+     */
+    plates?: readonly (VisualizerSettings | null | undefined)[],
   ): void {
     const layers = Math.max(1, Math.min(this.scratch.length - 1, layerCount));
     for (let i = 0; i < this.out.length; i++) this.out[i] = base;
 
+    let anyOwn = false;
+    if (plates) for (let i = 0; i < layers; i++) if (plates[i]) anyOwn = true;
+
     const own = base.sceneMappings;
-    const maps = extra && extra.length > 0 ? (own && own.length > 0 ? [...own, ...extra] : extra) : own;
-    if (!maps || maps.length === 0) return;
+    const maps = extra && extra.length > 0 ? (own && own.length > 0 ? [...own, ...extra] : extra) : (own ?? []);
+    if (maps.length === 0 && !anyOwn) return;
 
     // One pass to find what is actually live, so a patch list with nothing
     // plugged in on the other end costs a walk and no copying.
@@ -258,7 +279,7 @@ export class PatchBay {
       if (where === 'all') anyGlobal = true; else touched.add(where);
       live.push({ m, value: got.value, impact: got.impact });
     }
-    if (live.length === 0) return;
+    if (live.length === 0 && !anyOwn) return;
 
     // The picture first: the global fold is what a layer fold starts from, so
     // a patch on "all" reaches every plate through it rather than being
@@ -274,9 +295,22 @@ export class PatchBay {
 
     for (let i = 0; i < layers; i++) {
       this.out[1 + i] = pictureFor;
-      if (!touched.has(i)) continue;
+      const mine = plates?.[i];
+      if (!touched.has(i) && !mine) continue;
       const s = this.scratch[1 + i];
       Object.assign(s, pictureFor);
+      if (mine) {
+        // The global fold again, from this plate's own solver settings: what
+        // the picture's fold put on a `PER_LAYER` key it put on the front's
+        // value, so that key goes back to this plate's look and the patches
+        // aimed at every plate ride it from there. Keys the picture reads
+        // stay as the picture folded them.
+        const into = s as unknown as Record<string, unknown>;
+        const from = mine as unknown as Record<string, unknown>;
+        for (const key of PER_LAYER) if (key in from) into[key] = from[key];
+        for (const l of live) if (layerOf(l.m) === 'all' && PER_LAYER.has(l.m.setting)) this.ride(s, l);
+        this.land(s, live, 'all');
+      }
       for (const l of live) if (layerOf(l.m) === i) this.ride(s, l);
       this.land(s, live, i);
       this.out[1 + i] = s;

@@ -17,7 +17,7 @@
  *
  *   the choice    a phone gets the phone layout; a narrow laptop window, an
  *                 iPad and `?phone=0` do not (lib/phone.ts, run directly)
- *   every mode    all nine tools and every sheet's button are on screen at
+ *   every mode    all ten tools and every sheet's button are on screen at
  *                 once, at 48 pixels or more, uncovered, and each one works
  *   the plate     at least two thirds of a portrait screen is the plate, not
  *                 controls (half in landscape)
@@ -37,7 +37,7 @@
  *
  * The last two need the plate running. A runner with no WebGPU shows the
  * "needs WebGPU" screen instead and attaches no hands, so there they are
- * reported as not run, and `PHONE_GPU=1` (the tools shard in checks.yml)
+ * reported as not run, and `PHONE_GPU=1` (the open shard in checks.yml)
  * makes them required. `PW_WEBGPU=1` runs the fingers here in software; the
  * dye needs readbacks the software adapter does not give the app.
  */
@@ -132,7 +132,7 @@ const tap = async (page, testId) => { await page.getByTestId(testId).first().tap
 const visible = (page, testId) => page.getByTestId(testId).first().isVisible().catch(() => false);
 const box = (page, testId) => page.getByTestId(testId).first().boundingBox();
 
-const TOOLS = ['dropper', 'spray', 'splatter', 'pour', 'streak', 'blow', 'press', 'finger', 'magnet'];
+const TOOLS = ['dropper', 'spray', 'splatter', 'pour', 'streak', 'blow', 'press', 'finger', 'magnet', 'spin'];
 const DOCK = [...TOOLS.map(t => `phone-tool-${t}`), 'phone-open-dye', 'phone-open-looks', 'phone-open-sound', 'phone-open-play', 'phone-open-mix', 'phone-open-more'];
 
 try {
@@ -144,7 +144,7 @@ try {
     await ctx.close();
   }
 
-  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['the breakpoint', 800, 360, 0.5], ['under the breakpoint', 799, 360, 0.5], ['a small landscape', 740, 360, 0.5], ['the smallest landscape', 667, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
+  for (const [label, w, h, plateShare] of [['portrait', 390, 844, 2 / 3], ['a wide landscape', 932, 430, 0.5], ['landscape', 844, 390, 0.5], ['a narrower landscape', 812, 375, 0.5], ['the breakpoint', 860, 390, 0.5], ['under the breakpoint', 859, 390, 0.5], ['a small landscape', 740, 360, 0.5], ['the smallest landscape', 667, 375, 0.5], ['a small phone', 375, 667, 0.6]]) {
     const { ctx, page } = await phonePage(w, h);
     const up = await visible(page, 'phone-stage');
     check(`${label} ${w}×${h}: the phone layout is up`, up);
@@ -155,24 +155,25 @@ try {
     // Every mode in reach at once: on screen, a thumb's size, uncovered.
     const boxes = await Promise.all(DOCK.map(id => box(page, id)));
     const off = DOCK.filter((id, i) => !boxes[i] || boxes[i].x < 0 || boxes[i].y < 0 || boxes[i].x + boxes[i].width > w + 0.5 || boxes[i].y + boxes[i].height > h + 0.5);
-    check(`${label}: all nine tools and the six sheets are on screen at once`, off.length === 0, off.length ? `off screen: ${off.join(', ')}` : `${DOCK.length} buttons`);
+    check(`${label}: all ten tools and the six sheets are on screen at once`, off.length === 0, off.length ? `off screen: ${off.join(', ')}` : `${DOCK.length} buttons`);
     const small = DOCK.filter((id, i) => boxes[i] && Math.min(boxes[i].width, boxes[i].height) < 48);
     check(`${label}: each is 48 px or more`, small.length === 0,
       small.length ? small.map(id => { const b = boxes[DOCK.indexOf(id)]; return `${id} ${Math.round(b.width)}×${Math.round(b.height)}`; }).join(', ')
         : `smallest ${Math.round(Math.min(...boxes.filter(Boolean).map(b => Math.min(b.width, b.height))))} px`);
     /*
-      One row where it fits, two where it does not: a landscape phone 800 px
-      wide or more has the tools and the sheets side by side, since height is
+      One row where it fits, two where it does not: a landscape phone 860 px
+      wide or more (800 until Spin made the tools' side eleven buttons) has the tools and the sheets side by side, since height is
       what the plate is short of there, and a narrower one has the sheets
       under the tools (where one row put the tools at 42 px on a 740 and 35
       on a 667). Portrait is always two. Read from where the Dye and the
       Looks buttons sit, the last tool and the first sheet.
     */
-    if (boxes[9] && boxes[10]) {
-      const oneRow = Math.abs(boxes[9].y + boxes[9].height / 2 - (boxes[10].y + boxes[10].height / 2)) < 8;
-      const wantOne = w > h && w >= 800;
+    const [lastTool, firstSheet] = [boxes[TOOLS.length], boxes[TOOLS.length + 1]];
+    if (lastTool && firstSheet) {
+      const oneRow = Math.abs(lastTool.y + lastTool.height / 2 - (firstSheet.y + firstSheet.height / 2)) < 8;
+      const wantOne = w > h && w >= 860;
       check(`${label}: the dock is ${wantOne ? 'one row' : 'two rows'}`, oneRow === wantOne,
-        `the tools' row at ${Math.round(boxes[9].y)}, the sheets' at ${Math.round(boxes[10].y)}`);
+        `the tools' row at ${Math.round(lastTool.y)}, the sheets' at ${Math.round(firstSheet.y)}`);
     }
     /*
       The strip across the top between the look and the three buttons is the
@@ -268,6 +269,33 @@ try {
     if (amountUp) await shot(page, `${label.replace(/ /g, '-')}-amount`);
     check(`${label}: a second tap on it opens its Amount`, amountUp);
     const magnetFingers = await visible(page, 'phone-press-fingering');
+    const magnetGlass = (await visible(page, 'phone-press-thin')) || (await visible(page, 'phone-press-lift'));
+    /*
+      Magnet Size on the Magnet's own Amount (lib/magnetSize.ts), the
+      owner's "a magnet that I can control the size of": there under the
+      Amount with the Magnet in hand, and it moves the setting the solver's
+      magnet is sized by, read back from the app (not the slider's words,
+      which a slider wired to nothing would still change). Put back to the
+      middle after, the tool as it always was.
+    */
+    const magnetSize = await visible(page, 'phone-magnet-size');
+    let sizeUnder = false, sizeUp = null, sizeBack = null, sizeReset = null;
+    if (magnetSize) {
+      const amountBox = await box(page, 'phone-amount-slider'), sizeBox = await box(page, 'phone-magnet-size');
+      sizeUnder = !!amountBox && !!sizeBox && sizeBox.y >= amountBox.y + amountBox.height - 1;
+      const setting = () => page.evaluate(() => window.chromaglassDebug?.().settings?.magnetSize ?? null);
+      await page.getByTestId('phone-magnet-size').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(200);
+      sizeUp = await setting();
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(200);
+      sizeBack = await setting();
+      // Ten steps of 0.05 back to the middle, through the slider, and read back.
+      for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(200);
+      sizeReset = await setting();
+    }
     await tap(page, 'phone-tool-magnet');
     /*
       Fingering on the Press tool's own Amount (lib/squish.ts: the glass
@@ -291,6 +319,45 @@ try {
     check(`${label}: the Press's Amount has Fingering under it, and only the Press's, and it goes to 100 % and back`,
       pressFingers && !magnetFingers && under && fingersUp === '100' && fingersBack === '0',
       `on the Press ${pressFingers}, on the Magnet ${magnetFingers}, under the Amount ${under}, ${fingersUp}% then ${fingersBack}%`);
+    /*
+      And the glass under the Press (PLAN §18a): Thin Gap, with which the
+      press draws the liquid back as the glass lifts, and Press Lift, how
+      fast it lifts. On the Press's Amount, beside Fingering, and each
+      reaching the plate's settings: read back from the settings, not only
+      from the slider's own words, so a slider wired to nothing fails.
+    */
+    const setting = (k) => page.evaluate((k) => window.chromaglassSettings?.()?.[k], k);
+    const thinShown = await visible(page, 'phone-press-thin'), liftShown = await visible(page, 'phone-press-lift');
+    let thinOn = null, thinOff = null, thinSaid = '', liftUp = null, liftBack = null;
+    if (thinShown && liftShown) {
+      const was = { thin: await setting('thinGap'), lift: await setting('plateSpring') };
+      // Off first, then on: Thin Gap is on by default in every look (PLAN
+      // 18a-every), so an On read before the slider had moved it would prove
+      // nothing; both halves have to move the setting.
+      await page.getByTestId('phone-press-thin').locator('input').focus();
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      thinOff = await setting('thinGap');
+      await page.keyboard.press('End');
+      await page.waitForTimeout(150);
+      thinOn = await setting('thinGap');
+      thinSaid = (await page.getByTestId('phone-press-thin').innerText()).replace(/\s+/g, ' ');
+      await page.getByTestId('phone-press-lift').locator('input').focus();
+      await page.keyboard.press('End');
+      await page.waitForTimeout(150);
+      liftUp = await setting('plateSpring');
+      await page.keyboard.press('Home');
+      await page.waitForTimeout(150);
+      liftBack = await setting('plateSpring');
+      await page.evaluate((w) => window.chromaglassSettings?.({ thinGap: w.thin ?? 1, plateSpring: w.lift ?? 0.35 }), was);
+    }
+    check(`${label}: the Press's Amount has Thin Gap and Press Lift beside Fingering, and both reach the plate`,
+      thinShown && liftShown && !magnetGlass && thinOn === 1 && /On/.test(thinSaid) && thinOff === 0 && liftUp === 1 && liftBack === 0,
+      `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOff} then ${thinOn} ("${thinSaid}"); Press Lift ${liftUp} then ${liftBack}`);
+    const pressSize = await visible(page, 'phone-magnet-size');
+    check(`${label}: the Magnet's Amount has Size under it, and only the Magnet's, and it moves Magnet Size end to end`,
+      magnetSize && !pressSize && sizeUnder && sizeUp === 1 && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
+      `on the Magnet ${magnetSize}, on the Press ${pressSize}, under the Amount ${sizeUnder}, Magnet Size ${sizeUp} then ${sizeBack}, then ${sizeReset} put back`);
     await tap(page, 'phone-tool-press');
     await tap(page, 'phone-tool-magnet');
     // Closed, with the dock still up and Magnet still in hand: "not visible"
@@ -372,16 +439,67 @@ try {
         front plate, the one row every look has on the wall: a thumb's size
         beside the level, saying what a press does, lit while it runs, and
         the level walked down over two bars (four seconds at the 120 counted
-        when nothing is heard or sent) rather than cut. Read off the level
-        slider itself, so what is measured is what the show wrote, through
-        React, at whatever rate the page's timer really ran at. The curve's
+        when nothing is heard or sent) rather than cut. Its landing is read off
+        the level slider itself, so what is measured is what the show wrote,
+        through React, at whatever rate the page's timer really ran at; its
+        steps are read off the fade (below). The curve's
         own shape, step by step, is `npm run rowfade`'s; here the question
-        is only whether the phone's press reaches it and no sample jumps.
-        A jump is measured against the time between the two samples, not
+        is only whether the phone's press reaches it and it never jumps.
+        A jump is measured against the time between the two writes, not
         one number for all: the steepest part of a four-second fade moves
-        1.5 × dt / 4000 between samples dt apart (0.03 at 80 ms), and a
-        flat 0.2 let a timer slowed from 16 ms to 400 ms, writing steps of
-        0.13, through.
+        1.5 × dt / 4000 in dt (0.03 in 80 ms), and a flat 0.2 let a timer
+        slowed from 16 ms to 400 ms, writing steps of 0.13, through.
+
+        Between which two writes, and timed by whom, is the part that went
+        wrong. Until 2026-09-27 the harness read the slider every 80 ms from
+        outside and judged each step against the gap between its own reads.
+        But a read shows the level React last rendered into the slider, not
+        the level of the moment it is read, and on a loaded page a render
+        lands late and the next one catches up. #207's Checks run went red on
+        the one-bar take ("with a jump"), on a phone check that PR did not
+        touch, and here (no GPU, the plate drawing in software) the take went
+        red on 2 of 3 lines, then 1 of 3, in two runs. The trace of one: 0.58,
+        then 0.64 290 ms later, then 0.73 126 ms after that. Read back through
+        the curve, the 0.64 was about 120 ms staler than the reads either side
+        of it, and the page's own clock, read in the same call, put the reads
+        135 ms apart as the harness had: the lag was in the level shown, not
+        in the timing of the reads. Timing the slider's own writes did not
+        cure it (red on 3 of 3 lines in two runs, and 2 of 3 in two more once
+        React's re-writes of an unchanged level were dropped): a render that
+        lands late writes a level worked out tens of ms before, and the next
+        one, on time, looks like a step of 0.03 to 0.08 in a few ms.
+
+        So the take's steps are judged where the level is made: App pushes
+        every level a take works out into `window.__cgFadeLog`, stamped with
+        the page's own performance.now() at that moment (not the time the
+        fade was handed, so a fade handed the wrong time still shows), and
+        each is held to the time since the one before it. That alone would
+        pass the slowed timer, whose levels are 400 ms apart and each the
+        curve's over its 400 ms, so they are also held to coming about a tick
+        apart: the median gap while the level is on its way under 40 ms,
+        against the 16 ms timer (16 to 17 ms measured here, under load too).
+
+        And the slider is held to the fade, by how late it is rather than by
+        how far it steps: each read on the way, stamped by the page's clock in
+        the same call, is as late as the last moment the fade was at the level
+        it shows (to the slider's 0.01). A late render is late by what it
+        was, once; a slider that is not following the fade is late on every
+        read. The median read under 50 ms and none over 300 ms or at a level
+        the fade never had; and at least 0.6 as many different levels as
+        reads, since a slider that follows shows a new level on nearly every
+        read (the smoothstep's flat ends repeat a few). Without that half, a
+        show that worked the fade out every tick but put it in the slider (and
+        so on the plate) every 400 ms, or rounded to tenths, passed all three
+        lines, 243/243, found by the check-skeptic.
+
+        Measured here, three runs of the app as it is: the fade's steepest
+        step 0.38 to 0.42 of its allowance, 16 ms apart; the slider 6 to 10 ms
+        behind it, at most 19, with 37 to 38 levels in 39 reads; green. Red
+        on all three lines: the timer slowed to 400 ms (400 ms apart, the
+        slider 193 to 212 ms behind); the slider written one tick in 25 (197
+        ms behind, 9 levels in 38 reads); the level rounded to tenths (a level
+        the fade never had, 9 in 32); a clock a quarter second ahead on one
+        tick in ten (6.1 to 6.6 of the allowance).
       */
       const take = 'phone-mixer-front-take';
       const lvl = () => page.getByTestId('phone-mixer-frontLevel').locator('input').first().inputValue().then(Number);
@@ -390,36 +508,66 @@ try {
       await page.getByTestId(take).first().scrollIntoViewIfNeeded();
       const takeBox = await box(page, take);
       const saidOut = await say();
-      // `fadeMs` is the whole fade's time, for the steepest a sample may move.
+      // Every level the take works out, with the page's clock at that moment
+      // (App's traceFade, into an array the page puts at __cgFadeLog).
+      const record = () => page.evaluate(() => { window.__cgFadeLog = []; });
+      const shown = () => page.getByTestId('phone-mixer-frontLevel').locator('input').first().evaluate(el => [performance.now(), Number(el.value)]);
+      const written = () => page.evaluate(() => (window.__cgFadeLog ?? []).filter(e => e[1] === 'front').map(e => [e[0], e[2]]));
+      // Presses the take and follows it to `to`. `fadeMs` is the whole
+      // fade's time, for the steepest a write may move.
       const walk = async (to, ms, fadeMs = 4000) => {
+        await record();
+        await page.getByTestId(take).first().tap();
         const seen = [{ t: 0, v: await lvl() }];
         const t0 = Date.now();
         let litWhile = false;
         let saidWhile = '';
         while (Date.now() - t0 < ms) {
           await page.waitForTimeout(80);
-          const v = await lvl();
-          // Stamped as the level is read, before the other two reads, whose
-          // time varies with the page and would stretch or shrink the gap.
+          // The slider and the page's clock in one call, for its lag behind
+          // the fade (below).
+          const [at, v] = await shown();
           const t = Date.now() - t0;
           if (await lit()) { litWhile = true; if (!saidWhile) saidWhile = await say(); }
-          seen.push({ t, v });
+          seen.push({ t, v, at });
           if (v === to) break;
         }
-        // Twice the steepest the curve moves (1.5 × dt / fade), plus a tick
-        // for the page drawing the level a frame behind the fade, plus the
-        // slider's 0.01: 0.058 at 80 ms, against the 0.13 of a slowed timer.
-        const over = seen.slice(1).map((p, i) => Math.abs(p.v - seen[i].v) / (2 * (p.t - seen[i].t + 16) / fadeMs + 0.01));
+        // The writes, from the one the press made (the level it starts from,
+        // which on a turn is where the walk had got to). Each is held to
+        // twice the steepest the curve moves over the show time since the
+        // last (1.5 × dt / fade), plus a tick for the timer. No allowance for
+        // the slider's 0.01: these are the levels written, not the slider's
+        // rounding of them.
+        const writes = await written();
+        const steps = writes.slice(1).map(([t, v], i) => ({ at: Math.round(t - writes[0][0]), dt: t - writes[i][0], from: writes[i][1], to: v }));
+        const over = steps.map(st => Math.abs(st.to - st.from) / (2 * (st.dt + 16) / fadeMs));
+        const w = over.indexOf(Math.max(...over));
+        const gaps = steps.filter(st => st.from > 0 && st.from < 1).map(st => st.dt).sort((a, b) => a - b);
+        const gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : Infinity;
+        // And the slider held to the fade: each read on the way is as late
+        // as the last moment the fade was at the level it shows (to the
+        // slider's 0.01), and no later. A read the fade was never at is red.
+        const lags = seen.slice(1).filter(p => p.v > 0 && p.v < 1).map(p => {
+          let at = -Infinity;
+          for (const [t, v] of writes) if (t <= p.at && Math.abs(v - p.v) <= 0.0051) at = t;
+          return p.at - at;
+        }).sort((a, b) => a - b);
+        const lagMid = lags.length ? lags[Math.floor(lags.length / 2)] : Infinity;
+        const lagMax = lags.length ? lags[lags.length - 1] : Infinity;
+        const distinct = new Set(seen.slice(1).filter(p => p.v > 0 && p.v < 1).map(p => p.v)).size;
+        const jumped = !steps.length || over[w] > 1 || gap >= 40 || lagMid >= 50 || lagMax >= 300 || distinct < 0.6 * lags.length;
+        const worst = !steps.length ? 'no writes recorded'
+          : `${steps.length} writes, median ${gap.toFixed(0)} ms apart; steepest ${steps[w].from.toFixed(3)}→${steps[w].to.toFixed(3)} in ${steps[w].dt.toFixed(0)} ms at ${steps[w].at} ms, ${over[w].toFixed(2)} of allowed; the slider ${lagMid.toFixed(0)} ms behind it (at most ${lagMax.toFixed(0)}), ${distinct} levels in ${lags.length} reads`;
+        if (process.env.FADE_TRACE) console.log('      writes', JSON.stringify(steps.map(st => [st.at, +st.to.toFixed(4)])));
         const drops = seen.slice(1).map((p, i) => Math.abs(p.v - seen[i].v));
-        return { seen, litWhile, saidWhile, last: seen[seen.length - 1], most: Math.max(0, ...drops), jumped: Math.max(0, ...over) > 1, between: new Set(seen.map(p => p.v).filter(v => v > 0 && v < 1)).size };
+        return { seen, litWhile, saidWhile, worst, last: seen[seen.length - 1], most: Math.max(0, ...drops), jumped, between: new Set(seen.map(p => p.v).filter(v => v > 0 && v < 1)).size };
       };
-      await page.getByTestId(take).first().tap();
       const out = await walk(0, 8000);
       const outDown = out.seen.every((p, i) => !i || p.v <= out.seen[i - 1].v);
       check('portrait: a row\'s take button is a thumb\'s size and says Fade out; pressed, it is lit and says Fade in while the front plate walks down to 0, never back up, over about two bars and not in a jump',
         takeBox && takeBox.height >= 48 && saidOut === 'Fade out' && out.litWhile && out.saidWhile === 'Fade in' && outDown && out.last.v === 0
           && out.last.t >= 2500 && out.last.t <= 6500 && !out.jumped && out.between >= 8,
-        `${Math.round(takeBox?.height ?? 0)} px "${saidOut}", 0 at ${out.last.t} ms, ${out.between} levels on the way, largest step between samples ${out.most.toFixed(3)}${out.jumped ? ' (a jump for its time)' : ''}${out.litWhile ? `, "${out.saidWhile}" while lit` : ', never lit'}${outDown ? '' : ', went back up'}`);
+        `${Math.round(takeBox?.height ?? 0)} px "${saidOut}", 0 at ${out.last.t} ms, ${out.between} levels on the way, largest step between reads ${out.most.toFixed(3)}; ${out.worst}${out.jumped ? ' (a jump for its time)' : ''}${out.litWhile ? `, "${out.saidWhile}" while lit` : ', never lit'}${outDown ? '' : ', went back up'}`);
       // The slider shows the level to its step of 0.01, so it reads 0 for the
       // fade's last hundred-odd milliseconds, when the walk is still landing.
       let outLit = true;
@@ -430,13 +578,11 @@ try {
       await page.getByTestId(take).first().tap();
       await page.waitForTimeout(1200);
       const turnAt = await lvl();
-      await page.getByTestId(take).first().tap();
       const turned = await walk(0, 8000);
-      await page.getByTestId(take).first().tap();
       const home = await walk(1, 8000);
       check('portrait: pressed again part-way in, it turns round from there without a jump, and comes back to where it was',
         turnAt > 0 && turnAt < 1 && !turned.jumped && turned.last.v === 0 && home.last.v === 1 && !home.jumped,
-        `turned at ${turnAt.toFixed(2)}, largest step ${turned.most.toFixed(3)}${turned.jumped ? ' (a jump for its time)' : ''}; back to ${home.last.v}${home.jumped ? ', with a jump' : ''}`);
+        `turned at ${turnAt.toFixed(2)}, ${turned.worst}${turned.jumped ? ' (a jump for its time)' : ''}; back to ${home.last.v}, ${home.worst}${home.jumped ? ' (a jump for its time)' : ''}`);
       /*
         The hand wins: the level's own slider moved while the take runs stops
         the take where the hand put it, and the button goes out. The rule is
@@ -476,13 +622,11 @@ try {
       await page.waitForTimeout(200);
       const oneBar = await fadeText();
       const topAgain = await lvl();
-      await page.getByTestId(take).first().tap();
       const short = await walk(0, 8000, 2000);
       check('portrait: set to one bar in the drawer, the same take lands in about half the time',
         /Fade time 1 bar\b/.test(oneBar) && topAgain === 1 && short.last.v === 0 && short.last.t >= 1200 && short.last.t <= 3300
           && short.last.t < out.last.t * 0.7 && !short.jumped,
-        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms), largest step between samples ${short.most.toFixed(3)}${short.jumped ? ' (a jump for its time)' : ''}`);
-      await page.getByTestId(take).first().tap();
+        `${JSON.stringify(oneBar)}, 0 at ${short.last.t} ms (two bars: ${out.last.t} ms), ${short.worst}${short.jumped ? ' (a jump for its time)' : ''}`);
       await walk(1, 8000, 2000);
       await page.getByTestId('phone-mixer-frontFade').locator('input').first().focus();
       await page.keyboard.press('ArrowRight');
@@ -630,6 +774,119 @@ try {
       const named = (await page.getByTestId('phone-look-button').innerText()).trim();
       check('a look picked in the Looks sheet is the look named at the top, during its fade and after it',
         !!target && fadingName === target.name && named === target.name, `picked "${target?.name}", top says "${fadingName}" fading and "${named}" after`);
+
+      /*
+        Ben-Day Dots (wgsl/plate.ts benDay), the Roy look's own control, on
+        the Looks sheet: not there on a look that does not print, there once
+        Roy is picked, at Roy's own value, and it moves the setting from 0 to
+        100 % and back without taking itself away at 0.
+      */
+      await tap(page, 'phone-open-looks');
+      // Read with the sheet open, or a closed sheet would read as "hidden".
+      const looksOpen = await visible(page, 'phone-look-roy');
+      const printBefore = await visible(page, 'phone-ben-day');
+      await tap(page, 'phone-look-roy');
+      await page.waitForTimeout(3500);
+      await tap(page, 'phone-open-looks');
+      const printShown = await visible(page, 'phone-ben-day');
+      const printAt = printShown ? (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1] : null;
+      let printTop = null, printBottom = null;
+      if (printShown) {
+        await page.getByTestId('phone-ben-day').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        printBottom = (await visible(page, 'phone-ben-day')) ? (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1] : 'gone';
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        printTop = (await page.getByTestId('phone-ben-day').innerText()).match(/(\d+)%/)?.[1];
+      }
+      check('Ben-Day Dots is on the Looks sheet for Roy and not before it, at Roy\'s value, and goes to 0 % and 100 % without leaving',
+        looksOpen && printBefore === false && printShown && printAt === '100' && printBottom === '0' && printTop === '100',
+        `before Roy ${!looksOpen ? 'the Looks sheet did not open' : printBefore ? 'shown' : 'hidden'}; on Roy ${printShown ? `at ${printAt} %, then ${printBottom} % and ${printTop} %` : 'missing'}`);
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
+        A projector's source (PLAN.md §16b), from the phone: More, Settings,
+        Mapping, a shape added, and its source picked. The phone has no
+        second screen of its own, but it is the remote at a gig, and the
+        choice of which plate a projector carries is one made there. Each of
+        the four is a thumb's size and the one tapped is the one checked.
+        The shape is cleared after, so the checks below draw the plain plate.
+      */
+      await tap(page, 'phone-open-more');
+      await tap(page, 'phone-settings');
+      await tap(page, 'settings-nav-mapping');
+      await tap(page, 'add-surface-rect');
+      await tap(page, 'surface-source-back');
+      const picker = (prefix) => page.evaluate((prefix) => [...document.querySelectorAll(`[data-testid^="${prefix}"]`)]
+        .map(el => ({ id: el.dataset.testid.slice(prefix.length), h: Math.round(el.getBoundingClientRect().height), on: el.getAttribute('aria-checked') === 'true' })), prefix);
+      const sourcePick = await picker('surface-source-');
+      // Over before the tap, in the button and the show's config, so a
+      // default of Add with a dead button cannot pass for a working one.
+      const blendBefore = (await picker('surface-blend-')).filter(b => b.on).map(b => b.id).join();
+      const blendLiveBefore = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.blend ?? null);
+      await tap(page, 'surface-blend-add');
+      const blendPick = await picker('surface-blend-');
+      // What the renderer reads, not only what the button says.
+      const pickedLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.source ?? null);
+      const blendLive = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.at(-1)?.blend ?? null);
+      await tap(page, 'surfaces-clear');
+      const leftOver = await page.evaluate(() => window.chromaglassDebug?.().outputConfig?.surfaces?.length ?? null);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      check('a projector\'s source is picked from the phone\'s Settings: four of 48 px or more, the tapped one, Back plate, is the one on and the one the show draws, and clearing leaves no shape',
+        sourcePick.length === 4 && sourcePick.every(b => b.h >= 48) && sourcePick.filter(b => b.on).map(b => b.id).join() === 'back'
+        && pickedLive === 'back' && leftOver === 0,
+        `${sourcePick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${pickedLive}, ${leftOver} shapes after Clear all`);
+      // And how its light meets the wall (§16c), the same way.
+      check('and its light is set to add as a beam from there: two of 48 px or more, Add on, and the show draws it so',
+        blendBefore === 'over' && blendLiveBefore === 'over'
+        && blendPick.length === 2 && blendPick.every(b => b.h >= 48) && blendPick.filter(b => b.on).map(b => b.id).join() === 'add' && blendLive === 'add',
+        `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
+
+      /*
+        The back plate's own look (PLAN.md §16a), from the same sheet: the
+        switch at its top sends the next look picked to the back plate alone.
+        What has to be true is four things. The back plate says it is on that
+        look, in the sheet and on the Mixer's Back Plate row (which, on a look
+        with one plate, said the look had one). The front's look, named at the
+        top, is still the one it was. Follow front puts the back plate back.
+        And the switch goes back to Whole plate as soon as the look is sent,
+        so the next look picked is not sent to the back by a switch left over
+        from an hour ago. The check
+        above is this one's control: the same tap, without the switch, renames
+        the top.
+      */
+      await tap(page, 'phone-open-looks');
+      const frontBefore = (await page.getByTestId('phone-look-button').innerText()).trim();
+      const backSaid = (await page.getByTestId('phone-back-plate-on').innerText()).trim();
+      await tap(page, 'phone-send-to-back');
+      const backTarget = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('[data-testid="phone-sheet-looks"] [data-testid^="phone-look-"]')]
+          .filter(el => el.getAttribute('aria-pressed') === 'false');
+        const el = rows[6];
+        return el ? { id: el.dataset.testid, name: el.querySelector('span span')?.textContent ?? '' } : null;
+      });
+      if (backTarget) await tap(page, backTarget.id);
+      await page.waitForTimeout(2500);
+      const frontAfter = (await page.getByTestId('phone-look-button').innerText()).trim();
+      await tap(page, 'phone-open-looks');
+      const backOn = (await page.getByTestId('phone-back-plate-on').innerText()).trim();
+      const switchAfterPick = await page.getByTestId('phone-send-to-all').getAttribute('aria-pressed');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await tap(page, 'phone-open-mix');
+      const mixSays = await page.getByTestId('phone-mixer-back-look').first().innerText().catch(() => '(no line)');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await tap(page, 'phone-open-looks');
+      await tap(page, 'phone-back-follows-front');
+      const backAfter = (await page.getByTestId('phone-back-plate-on').innerText()).trim();
+      const switchBack = await page.getByTestId('phone-send-to-all').getAttribute('aria-pressed');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      check('a look sent to the back plate from the Looks sheet: the back plate and the Mixer\'s row name it, the front keeps its look, and Follow front puts it back',
+        !!backTarget && backTarget.name !== frontBefore && backSaid === 'Back plate: follows the front'
+        && backOn === `Back plate: ${backTarget.name}` && mixSays.trim() === `On ${backTarget.name}`
+        && frontAfter === frontBefore && backAfter === 'Back plate: follows the front' && switchAfterPick === 'true' && switchBack === 'true',
+        `sent "${backTarget?.name}"; sheet said "${backSaid}", then "${backOn}", then "${backAfter}"; Mixer row "${mixSays.trim()}"; top "${frontBefore}" → "${frontAfter}"; switch on Whole plate after the pick: ${switchAfterPick}, after Follow: ${switchBack}`);
 
       // Clean screen, and a still finger to bring it back.
       // Painting is a moving finger, so a drag over a second leaves the
@@ -858,8 +1115,13 @@ try {
       const readbacks = () => page.evaluate(() => window.chromaglassDebug().fluids[0].readbacks ?? -1);
       const rb0 = await readbacks();
       const before = await snap();
+      // The plate's own step count either side of the two touches, so what
+      // each finger laid is held to the steps it can have been down for.
+      const plateSteps = () => page.evaluate(() => window.chromaglassDebug().fluids[0].stepCount);
+      const s0 = await plateSteps();
       await touch('touchStart', [{ ...DA, id: 1 }]);
       await touch('touchStart', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
+      const s1 = await plateSteps();
       await settle(1200);
       /*
         Where the fingers are on the plate while they hold, not where the same
@@ -874,16 +1136,85 @@ try {
         right either way, and the drift in the line says which it was next
         time.
       */
-      const held = (await hands()).hands;
+      const { held, s2 } = await page.evaluate(() => {
+        const d = window.chromaglassDebug();
+        return { held: d.hands().hands, s2: d.fluids[0].stepCount };
+      });
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
       const after = await snap();
       const rb1 = await readbacks();
+      /*
+        What each finger laid is the app's own count, so it is asked wherever
+        the plate stepped through the hold, readbacks or none (the plate
+        below needs them). Each finger was down from before s1 to s2 and from
+        no earlier than s0, so each laid on at least s2 − s1 steps and at most
+        s2 − s0 (a frame's steps either way: the second touch may be handled
+        a frame after its send returns, and the read lands between frames). Held to the
+        plate's own count and not only to each other: two fingers that both
+        skipped every other step, or shared one counter, agree with each
+        other perfectly. And each step gave dye, the same a step for both.
+      */
+      const gave = held.map(h => h.laid ?? null);
+      const lo = s2 - s1 - 4, hi = s2 - s0 + 1;
+      const perStep = gave.map(g => g && g.steps > 0 ? g.dye / g.steps : 0);
+      const gaveOk = gave.length === 2 && gave.every(g => g && g.steps >= 10 && g.steps >= lo && g.steps <= hi)
+        && gave[1].steps <= gave[0].steps
+        && Math.min(...perStep) > 1 && Math.min(...perStep) >= 0.95 * Math.max(...perStep);
+      const gaveDetail = gave.length === 2 && gave.every(Boolean)
+        ? gave.map((g, i) => `${'AB'[i]} ${g.steps} steps, ${g.dye.toFixed(0)} dye (${perStep[i].toFixed(1)} a step)`).join('; ') + `; the plate took ${s2 - s1} to ${s2 - s0} steps with them down`
+        : `held ${held.length} hands, ${gave.filter(Boolean).length} with a count (chromaglassDebug().hands()[i].laid is gone?)`;
+      if (held.length === 2 && gave.some(g => !g)) {
+        // The count is plain JavaScript: gone is gone wherever this runs.
+        check('two fingers holding Drop each lay it on every step both are down, as much as the other', false, gaveDetail);
+      } else if (NEED_GPU || (gave.length === 2 && gave.every(g => g && g.steps >= 10))) {
+        check('two fingers holding Drop each lay it on every step both are down, as much as the other', gaveOk, gaveDetail);
+      } else {
+        console.log(` --   the plate took ${s2 - s0} steps under the two fingers here: what each laid is not asked (the Mac shard asks it)`);
+      }
       if (rb0 < 0) {
         check('the plate counts its readbacks, so the dye check knows it can look', false, 'fluids[0].readbacks is gone');
       } else if (!pick) {
         check('two places on the screen keep their mirrors clear, so the dye can be told from a wrong hand\'s', false, `${spots.length} places read`);
       } else if (rb1 - rb0 >= 3) {
+        /*
+          Two questions, asked apart, where this was one.
+
+          What each finger laid, by the app's own count (DropLaid in
+          LiquidVisualizer: the steps that finger held the Drop on the plate
+          and the dye it handed the solver). Both fingers are down from the
+          second touch to the lift, so the second's steps are the first's
+          less at most the frame or two between the two touches, and a step
+          of one finger's Drop gives exactly what a step of the other's does
+          (the same disc, wholly inside the plate). This is where a second
+          touch that started late, was skipped on some steps or laid a
+          fraction of the first would show, and it is asked of numbers the
+          solver has not touched.
+
+          And what the plate holds of it. Under each finger (the disk at its
+          held cell) there must be dye, three times anything at that finger's
+          mirrors. The balance, which held the two disks to within 0.4 of each
+          other, is now asked of the dye nearest each finger (every cell
+          within three disks of it and nearer it than the other), so it counts
+          a finger's dye wherever the plate carried it in the 1.9 s between
+          landing and reading, and not only the part still inside one disk.
+          The disks read 62 to 81 against 181 to 234 on four Mac runs (one
+          in 36 of the last), with both fingers 52 cells from the middle on
+          a cleared plate, and the plate's pools differed by up to 2.5 times
+          between runs too (74 to 269 for one finger), which the disk alone
+          could not tell from a finger that laid less. A finger that laid
+          less still fails both halves; one whose pool the plate moved fails
+          neither, and the line prints all three readings, so a red names
+          which it was.
+        */
+        const near = (c, other) => {
+          let sum = 0;
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            const d = Math.hypot(x - c.x, y - c.y);
+            if (d < 3 * R && d < Math.hypot(x - other.x, y - other.y)) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
+          }
+          return sum;
+        };
         const disk = (c) => {
           let sum = 0;
           for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < R) sum += Math.max(0, after[x + y * n]) - Math.max(0, before[x + y * n]);
@@ -891,16 +1222,36 @@ try {
         };
         const fingers = held.length === 2 ? held : [ref.DA, ref.DB];
         const drift = held.length === 2 ? Math.max(...held.map((h, i) => Math.hypot(h.x - [ref.DA, ref.DB][i].x, h.y - [ref.DA, ref.DB][i].y))) : NaN;
-        const rows = fingers.map(p => {
+        const rows = fingers.map((p, i) => {
           const laid = disk(p);
           const elsewhere = controlsOf(p).filter(clearOf(fingers)).map(disk);
-          return { laid, elsewhere, worst: Math.max(0, ...elsewhere) };
+          return { laid, near: near(p, fingers[1 - i]), elsewhere, worst: Math.max(0, ...elsewhere) };
         });
-        const ok = rows.every(r => r.laid > 5 && r.elsewhere.length >= 2 && r.laid > 3 * r.worst)
-          && Math.min(rows[0].laid, rows[1].laid) > 0.4 * Math.max(rows[0].laid, rows[1].laid);
+        /*
+          And at its own finger, not merely on its side of the plate: a held
+          cell that is where that finger alone lands (it has read 0.0 cells off
+          on every run that printed it), and at least a fifth of the dye
+          nearest a finger still inside its disk, so a finger laying a disk or
+          two off its cell, which the wider balance would let through, fails.
+        */
+        /*
+          And the whole plate's gain against what both fingers handed it, printed
+          only, so a red says whether the plate lost dye everywhere or one pool's
+          worth. The reds of 2026-10-03 with one finger at a third were the old
+          fingering push (#222 took it out; `npm run grating` §6 replays them),
+          but two after it read both fingers low at once: A 0 and B 0 on a branch,
+          and 74 and 76 of 285 and 277 in one of 146 holds of a diagnostic, where
+          the plate gained 159 of 562. Not yet explained (PLAN.md, batch 11).
+        */
+        let gained = 0;
+        for (let i = 0; i < after.length; i++) gained += Math.max(0, after[i]) - Math.max(0, before[i]);
+        const handed = gave.length === 2 && gave.every(Boolean) ? gave.reduce((t, g) => t + g.dye, 0).toFixed(0) : '?';
+        const placed = held.length === 2 && drift <= 2;
+        const ok = placed && rows.every(r => r.laid > 5 && r.elsewhere.length >= 2 && r.laid > 3 * r.worst && r.laid >= 0.2 * r.near)
+          && Math.min(rows[0].near, rows[1].near) > 0.4 * Math.max(rows[0].near, rows[1].near);
         check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
-          rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
-            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); ${rb1 - rb0} readbacks`);
+          rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} under it (${r.near.toFixed(0)} nearest it) against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
+            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); the plate gained ${gained.toFixed(0)} of ${handed} handed it; ${rb1 - rb0} readbacks`);
       } else if (NEED_GPU) {
         check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
       } else {
@@ -909,6 +1260,63 @@ try {
       }
 
       check('and the dye\'s fingers let go too', (await hands()).hands.length === 0);
+
+      /*
+        With Drop Height up a held Drop lets go of a drop as it lands and
+        then one every tenth step (DROP_EVERY), each carrying ten steps'
+        dye. Its clock was counted up only past a frame's first step until it
+        had started, so on frames of one step each, which is a plate stepping
+        at the display's rate, it stayed at 0 and a drop fell on every step:
+        ten times the dye and a splash a step. Asked of the finger's own
+        count, at one instant, so a slow runner's fewer steps change nothing.
+      */
+      await settings({ dropHeight: 0.9 });
+      // Until the plate has it: the setting reaches the frame loop through
+      // React, and a step laid before it is a stream step, counted as held
+      // with no drop, which would read one drop short on a correct clock.
+      await page.waitForFunction(() => (window.chromaglassDebug().fluids[0].dropHeight ?? 0) > 0.02, null, { timeout: 5000 }).catch(() => {});
+      const dropBefore = await snap();
+      const rbD0 = await readbacks();
+      const d0 = await plateSteps(), f0 = await page.evaluate(() => window.chromaglassDebug().frames), t0 = Date.now();
+      await touch('touchStart', [{ ...DA, id: 7 }]);
+      await settle(1000);
+      const { dropping, d1, f1 } = await page.evaluate(() => {
+        const d = window.chromaglassDebug();
+        return { dropping: d.hands().hands[0]?.laid ?? null, d1: d.fluids[0].stepCount, f1: d.frames };
+      });
+      const heldMs = Date.now() - t0;
+      await touch('touchEnd', [{ ...DA, id: 7 }]);
+      await settle(700);
+      const dropAfter = await snap();
+      const rbD1 = await readbacks();
+      await settings({ dropHeight: 0 });
+      /*
+        The count, and the drops on the plate: the count is the app's
+        bookkeeping, and a drop counted that never reached the solver must
+        not pass, so the disk under the finger must hold dye, three times
+        its mirrors, wherever the plate reads back. The rate is printed with
+        it: at two steps a frame the old clock counted right as well, so a
+        run whose steps came two a frame could not have caught it.
+      */
+      if (NEED_GPU || (dropping && dropping.steps >= 10)) {
+        const spot = ref.DA;
+        const dyeAt = (c) => {
+          let sum = 0;
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - c.x, y - c.y) < R) sum += Math.max(0, dropAfter[x + y * n]) - Math.max(0, dropBefore[x + y * n]);
+          return sum;
+        };
+        const landed = rbD1 - rbD0 >= 3 && spot ? dyeAt(spot) : null;
+        const mirrors = landed !== null ? controlsOf(spot).filter(c => Math.hypot(c.x - spot.x, c.y - spot.y) > 2.5 * R).map(dyeAt) : [];
+        const counted = !!dropping && dropping.steps >= 10 && dropping.drops === Math.ceil(dropping.steps / 10);
+        const onPlate = landed === null ? !NEED_GPU : landed > 5 && mirrors.length >= 2 && landed > 3 * Math.max(0, ...mirrors);
+        check('a finger holding Drop with Drop Height up lets go of a drop as it lands and one every ten steps after',
+          counted && onPlate,
+          (dropping ? `${dropping.drops} drops over ${dropping.steps} steps (${Math.ceil(dropping.steps / 10)} wanted)` : 'no hand, or chromaglassDebug().hands()[0].laid is gone')
+            + `; the plate stepped ${d1 - d0} times over ${f1 - f0} frames in ${heldMs} ms`
+            + (landed === null ? `; ${rbD1 - rbD0} readbacks, the plate not read` : `; ${landed.toFixed(0)} dye under it against ${mirrors.map(v => v.toFixed(0)).join('/') || 'no clear mirror'}`));
+      } else {
+        console.log(` --   the plate took ${dropping?.steps ?? '?'} steps under the held Drop here: its drops are not counted (the Mac shard counts them)`);
+      }
 
       /*
         Two fingers holding the Magnet are two magnets, each under its own

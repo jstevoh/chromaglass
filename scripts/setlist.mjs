@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { readSetListFile, writeSetListFile, moveItem } from '../src/lib/setList.ts';
+import { parsePresetFile, serializePreset } from '../src/lib/userPresets.ts';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => { if (ok) passed++; else failed++; console.log(`${ok ? ' ok ' : ' FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -53,6 +54,41 @@ const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message
   check('not JSON says so', /not a JSON/.test(throws(() => readSetListFile('{nope', known)) ?? ''));
   check('something else entirely says so', /not a set list/.test(throws(() => readSetListFile('{"hello":1}', known)) ?? ''));
   check('a set with nothing usable says why', /Nothing in it|no items/.test(throws(() => readSetListFile('{"format":"chromaglass-setlist","items":[{"fade":1}]}', known)) ?? ''));
+}
+/*
+  Thin Gap on in every look (PLAN §18a, the owner's pick of 2026-10-03), the
+  owner's saved looks included. A saved look keeps every setting, so one saved
+  while it was off by default says `thinGap: 0` without anyone having chosen
+  it, and would have kept the old plate's Press, which sends the liquid down
+  the drain, in exactly the looks the owner plays. Each line below is one of
+  the three ways a saved look can arrive, and the last is the one that must
+  not be overridden: a look saved since, with Thin Gap turned off on purpose.
+*/
+{
+  const base = { format: 'chromaglass-preset', id: 'user-mine-1', name: 'Mine', createdAt: '2026-10-03T20:00:00Z' };
+  const read = (version, thinGap) => {
+    const settings = { ...DEFAULT_SETTINGS };
+    if (thinGap === undefined) delete settings.thinGap; else settings.thinGap = thinGap;
+    return parsePresetFile(JSON.stringify({ ...base, version, settings }));
+  };
+  check('Thin Gap is on by default, and no look that ships turns it off',
+    DEFAULT_SETTINGS.thinGap === 1 && PRESETS.every((p) => p.settings.thinGap === undefined || p.settings.thinGap > 0.5),
+    `default ${DEFAULT_SETTINGS.thinGap}; ${PRESETS.filter((p) => p.settings.thinGap !== undefined && p.settings.thinGap <= 0.5).map((p) => p.id).join(', ') || 'none off'}`);
+  const old = read(1, 0), older = read(1, undefined), since = read(2, 0), sinceOn = read(2, 1);
+  check('a look saved while Thin Gap was off by default reads with it on, and one saved before it existed too',
+    old.settings.thinGap === 1 && older.settings.thinGap === 1, `${old.settings.thinGap}, ${older.settings.thinGap}`);
+  check('a look saved since with Thin Gap off keeps it off, and one with it on keeps it on',
+    since.settings.thinGap === 0 && sinceOn.settings.thinGap === 1, `${since.settings.thinGap}, ${sinceOn.settings.thinGap}`);
+  const again = parsePresetFile(serializePreset(old));
+  check('and an old look read once is saved as the new version, so reading it again changes nothing',
+    old.version === 2 && again.version === 2 && again.settings.thinGap === 1);
+  // And arriving inside a set list, which takes a saved look whole rather than through the file reader.
+  const inSet = (version) => readSetListFile(JSON.stringify({ format: 'chromaglass-setlist', version: 1, items: [{ saved: base.id }],
+    presets: [{ ...base, version, settings: { ...DEFAULT_SETTINGS, thinGap: 0 } }] }), known).presets[0];
+  const setOld = inSet(1), setSince = inSet(2);
+  check('and the same in a set list: an old look comes on, one saved since stays off, its id kept',
+    setOld?.settings.thinGap === 1 && setSince?.settings.thinGap === 0 && setOld?.id === base.id,
+    `${setOld?.settings.thinGap}, ${setSince?.settings.thinGap}, ${setOld?.id}`);
 }
 {
   const list = { name: 's', items: [{ id: 'a', kind: 'look', ref: 'x' }, { id: 'b', kind: 'look', ref: 'y' }, { id: 'c', kind: 'look', ref: 'z' }] };

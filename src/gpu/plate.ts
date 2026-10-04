@@ -115,6 +115,17 @@ export class WebGPUPlate {
   private sources = new Map<string, Source>();
   private aux: GPUTexture | null = null;
   private auxSize = [0, 0];
+  /**
+   * A projector's plate source (PLAN.md §16b): its own uniforms, filled by the
+   * frame from the settings with the other rows taken out, and its own
+   * buffer, because every `writeBuffer` lands before the command buffer runs:
+   * two displays in one encoder reading one buffer would both see the last
+   * write. And one second target for all of them, which nothing reads (the
+   * camera takes the wall's).
+   */
+  private readonly sourceSets = new Map<string, { pack: UniformPack; buffer: GPUBuffer }>();
+  private sourceAux: GPUTexture | null = null;
+  private sourceAuxSize = [0, 0];
   /** A stand-in for a texture the frame does not have: one transparent texel. */
   private readonly blank: GPUTexture;
   /** The same, for the packed view (unsigned integers). */
@@ -130,9 +141,12 @@ export class WebGPUPlate {
   static prepare(device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'plate');
     return [
+      // The display first: the opening asks for render pipelines first and
+      // in this order, and it is the longest compile of the show's opening
+      // (`gpu/prepare.ts`).
+      cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
       ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
-      cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
       // Into a texture rather than the canvas: the camera's, in the canvas's
       // format, and the film stock's picture.
       ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
@@ -306,7 +320,6 @@ export class WebGPUPlate {
     }
 
     // ── Display ─────────────────────────────────────────────────────
-    const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
 
     // The second target is what the camera pass reads: the normal, the dye's
     // height and the bubble mask. It is written whether or not that pass is
@@ -320,6 +333,73 @@ export class WebGPUPlate {
       this.auxSize = [size.width, size.height];
     }
 
+    this.display(encoder, target, this.aux.createView(), this.uniformBuffer, fields, timestamps, toTexture, format);
+  }
+
+  /** The uniforms for a projector's plate source, to fill with `fillPlateUniforms` before `drawSource`. */
+  sourcePack(kind: string): UniformPack {
+    let set = this.sourceSets.get(kind);
+    if (!set) {
+      set = {
+        pack: new UniformPack(PLATE_LAYOUT),
+        buffer: this.disposer.track(this.device.createBuffer({
+          label: `plate uniforms ${kind}`, size: PLATE_LAYOUT.size,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })),
+      };
+      this.sourceSets.set(kind, set);
+    }
+    return set.pack;
+  }
+
+  /**
+   * The display pass again, into `target`, with `kind`'s own uniforms (see
+   * `sourceSets`): the same plates, packed and derived by this frame's `draw`,
+   * which must already be in `encoder`. Only the full-screen display is
+   * repeated; the pack and the derive are the grid's and are not.
+   */
+  drawSource(
+    encoder: GPUCommandEncoder,
+    kind: string,
+    target: GPUTextureView,
+    size: { width: number; height: number },
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    timestamps?: GPURenderPassTimestampWrites,
+    format = this.format,
+  ): void {
+    const set = this.sourceSets.get(kind);
+    if (!set || !fields.length || this.layers.length < fields.length) return;
+    this.device.queue.writeBuffer(set.buffer, 0, set.pack.bytes);
+    if (!this.sourceAux || this.sourceAuxSize[0] !== size.width || this.sourceAuxSize[1] !== size.height) {
+      if (this.sourceAux) this.disposer.release(this.sourceAux);
+      this.sourceAux = this.disposer.track(this.device.createTexture({
+        label: 'aux (sources)', size: [size.width, size.height], format: 'rgba8unorm',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+      this.sourceAuxSize = [size.width, size.height];
+    }
+    this.display(encoder, target, this.sourceAux.createView(), set.buffer, fields, timestamps, true, format);
+  }
+
+  /** Let go of the sources no projector shows any more (their buffers are small; the aux is not). */
+  keepSources(asked: readonly string[]): void {
+    for (const [kind, set] of this.sourceSets) {
+      if (!asked.includes(kind)) { this.disposer.release(set.buffer); this.sourceSets.delete(kind); }
+    }
+    if (!asked.length && this.sourceAux) { this.disposer.release(this.sourceAux); this.sourceAux = null; this.sourceAuxSize = [0, 0]; }
+  }
+
+  private display(
+    encoder: GPUCommandEncoder,
+    target: GPUTextureView,
+    auxView: GPUTextureView,
+    uniforms: GPUBuffer,
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    timestamps: GPURenderPassTimestampWrites | undefined,
+    toTexture: boolean,
+    format: GPUTextureFormat,
+  ): void {
+    const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
     const grain = (i: number) => fields[i]?.grain ?? this.blank;
@@ -336,7 +416,7 @@ export class WebGPUPlate {
       label: 'plate',
       colorAttachments: [
         { view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } },
-        { view: this.aux.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } },
+        { view: auxView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } },
       ],
       // The frame's own timing goes on the pass that draws it, not on the
       // clear that used to stand in for it.
@@ -346,7 +426,7 @@ export class WebGPUPlate {
     pass.setBindGroup(0, this.device.createBindGroup({
       layout: display.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 0, resource: { buffer: uniforms } },
         { binding: 1, resource: this.sampler },
         { binding: 2, resource: one.dye.createView() },
         { binding: 3, resource: two.dye.createView() },

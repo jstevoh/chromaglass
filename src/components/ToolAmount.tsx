@@ -3,6 +3,7 @@
  * how strong the wind or the pull (lib/toolAmount.ts). One per tool, so the
  * dropper can be light while the press is heavy.
  */
+import { createPortal } from 'react-dom';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../lib/toolAmount';
 
 export function ToolAmount({ tool, value, onChange, className = '' }: {
@@ -35,7 +36,7 @@ export function ToolAmount({ tool, value, onChange, className = '' }: {
 /** Each tool's name, as the popover titles it. */
 const TOOL_NAMES: Record<string, string> = {
   dropper: 'Drop', spray: 'Spray', splatter: 'Splat', pour: 'Pour', streak: 'Streak',
-  blow: 'Blow', press: 'Press', finger: 'Finger', magnet: 'Magnet',
+  blow: 'Blow', press: 'Press', finger: 'Finger', magnet: 'Magnet', spin: 'Spin',
 };
 
 /**
@@ -47,20 +48,34 @@ const TOOL_NAMES: Record<string, string> = {
  * as a dot that could not be seen or clicked. This gives it a slider of its
  * own at a size a hand can use, for any tool, not only the one in hand.
  */
-export function ToolOptions({ tool, value, onChange, at, onClose }: {
+export function ToolOptions({ tool, value, onChange, at, onClose, magnetSize, onMagnetSize }: {
   tool: string;
   value: number;
   onChange: (v: number) => void;
   /** Where to open, in the window: the click, or the chip's corner. */
   at: { x: number; y: number };
   onClose: () => void;
+  /**
+   * The Magnet's size (Magnet Size, lib/magnetSize.ts), shown under its
+   * Amount: how far its pull reaches, where the Amount is how hard.
+   */
+  magnetSize?: number;
+  onMagnetSize?: (v: number) => void;
 }) {
   const means = TOOL_AMOUNT_MEANS[tool] ?? 'amount';
-  const W = 280, H = 150;
+  const sized = tool === 'magnet' && magnetSize !== undefined && !!onMagnetSize;
+  const W = 280, H = sized ? 210 : 150;
   const left = Math.max(8, Math.min(at.x, window.innerWidth - W - 8));
   const top = Math.max(8, Math.min(at.y - H - 8, window.innerHeight - H - 8));
   const fill = ((value - TOOL_AMOUNT.min) / (TOOL_AMOUNT.max - TOOL_AMOUNT.min)) * 100;
-  return (
+  /*
+    To the body. Opened from the tool row under the plate, it was drawn
+    inside the desk's own stacking, beneath the plate: on the Design desk at
+    1440 only its bottom edge showed under the canvas (a browser screenshot,
+    2026-10-03, while adding the Magnet's Size here), so the options could
+    be set by a script and not seen by a hand.
+  */
+  return createPortal(
     <div className="fixed inset-0 z-50" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <div
         onClick={(e) => e.stopPropagation()}
@@ -92,6 +107,27 @@ export function ToolOptions({ tool, value, onChange, at, onClose }: {
           onChange={(e) => onChange(Number(e.target.value))}
           data-testid="tool-options-amount"
         />
+        {sized && (
+          <>
+            <div className="mb-1 mt-3 flex items-center justify-between text-[12px] text-muted">
+              <span>Size</span>
+              <span className="text-faint">a coin to a palm</span>
+            </div>
+            <input
+              type="range"
+              className="set-range"
+              style={{ '--fill': `${magnetSize! * 100}%` } as React.CSSProperties}
+              min={0}
+              max={1}
+              step={0.05}
+              value={magnetSize}
+              aria-label="Magnet size: how far its pull reaches"
+              onChange={(e) => onMagnetSize!(Number(e.target.value))}
+              onDoubleClick={() => onMagnetSize!(0.5)}
+              data-testid="tool-options-size"
+            />
+          </>
+        )}
         <div className="mt-3 flex items-center justify-between">
           <span className="text-[11px] text-faint">[ and ] step it · double-click resets</span>
           <button
@@ -103,6 +139,7 @@ export function ToolOptions({ tool, value, onChange, at, onClose }: {
         </div>
       </div>
     </div>
+    , document.body,
   );
 }
 

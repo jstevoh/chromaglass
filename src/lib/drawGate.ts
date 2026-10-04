@@ -103,6 +103,28 @@
  * giving these windows, and one draw per tick of it is all anyone can see.
  * Before either clock has two offers to measure, 60 Hz.
  *
+ * Why a clock's own next refresh is never turned down, whatever the refresh
+ * reads. The gate is there to stop the two clocks drawing one refresh twice;
+ * one clock's consecutive offers are consecutive refreshes of its own display
+ * (one animation frame a refresh), never the same one. Turning one down
+ * because of that clock's own last draw, or because of a draw by the other
+ * clock whose refresh this clock has already offered for, is the wall
+ * costing the show a frame it would have drawn alone. And on a busy machine
+ * it did: a window handed only some of its refreshes has gaps of one, two or
+ * three refreshes, the median of them reads two, the gate's 0.6 of that is
+ * 1.2 refreshes, and the show's next frame one refresh after its own draw was
+ * turned down with nothing drawn in its place. `npm run wall` on the Mac
+ * runners, 53 runs: with both clocks on one refresh the gate drew 24.3 a
+ * second while the show's window was handed 28.3 (0.86), and 24.4 of 28.3,
+ * and 34.8 where the wall's window was handed 38.7; its arithmetic on a 60 Hz
+ * display missing refreshes, 0.75 of what either window alone would have
+ * drawn at worst, and 0.99 with this rule. So
+ * an offer within 0.6 of a refresh of the last draw is turned down only when
+ * that draw was the other clock's and it is this clock's first offer since:
+ * one turned down per clock per draw, which is all that one refresh holds.
+ * An offer stamped within a 240 Hz refresh of its own clock's last one is
+ * that same refresh again, and is judged as before.
+ *
  * A clock that has stopped (the show window covered, the projector closed) is
  * forgotten after `CLOCK_FRESH_MS`: its gaps are dropped, and its first gap
  * when it starts again, which is the time it was stopped, is not a refresh.
@@ -132,11 +154,28 @@ const GAPS = 8;
  * believed: a second. A callback held up behind a long draw, a collection or
  * another window's frame runs late but keeps its refresh's time, and that is
  * the whole point; a stamp older than a second is a clock that is not this
- * one. And never later than now, beyond the 2 ms that two windows' time
- * origins, rounded as browsers round them, can disagree by.
+ * one. And no later than one refresh of the fastest display ahead of now.
+ *
+ * That bound was 2 ms, on the belief that in Chrome a refresh's timestamp is
+ * never ahead of now and that 2 ms covers two windows' time origins rounded
+ * as browsers round them. The Mac runners say otherwise: `npm run wall`
+ * failed on four of one PR's five Mac runs with one to six stamps a run
+ * turned down, and once the fallbacks were told apart (`stampMisses` below)
+ * every one of them was ahead of now, the worst by 2.4 ms in every reading,
+ * none of them stale. Which clock runs ahead, the show's own frame or the
+ * wall's converted one, the page-wide count does not say (a Mac's display
+ * link stamping a frame with the refresh it is for would do it; inferred,
+ * not measured). It does not matter to the gate: an offer is turned down
+ * within 0.6 of a refresh of the last draw precisely so that a clock a
+ * millisecond or two early still counts as the refresh it belongs to, and a
+ * stamp up to a 240 Hz refresh ahead is still that refresh's at any rate the
+ * gate works to. Further ahead than that it would be naming the next one, so
+ * it is not believed. Turning a real stamp down is not the safe side either:
+ * the fallback stamps with the time the callback ran, which is the stamping
+ * that let a slow frame's second clock draw too.
  */
 const STAMP_OLDEST_MS = 1000;
-const STAMP_AHEAD_MS = 2;
+const STAMP_AHEAD_MS = REFRESH_MIN_MS;
 
 /**
  * The time to offer a frame at (ms, on this window's clock): its refresh's
@@ -146,6 +185,11 @@ export function refreshStamp(ts: unknown, now: number): number {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return now;
   if (ts > now + STAMP_AHEAD_MS || ts < now - STAMP_OLDEST_MS) {
     stampFallbacks++;
+    const ahead = ts > now;
+    const by = Math.abs(ts - now);
+    if (ahead) { stampMisses.ahead++; stampMisses.aheadMs = Math.max(stampMisses.aheadMs, by); }
+    else { stampMisses.stale++; stampMisses.staleMs = Math.max(stampMisses.staleMs, by); }
+    stampMisses.lastAt = now;
     return now;
   }
   return ts;
@@ -154,20 +198,38 @@ export function refreshStamp(ts: unknown, now: number): number {
 /**
  * How many timestamps `refreshStamp` did not believe, for `?debug`. A
  * fallback is stamping at the time the callback ran, which is the stamping
- * that let a slow frame's second clock draw too; in Chrome a refresh's
- * timestamp is never ahead of now (the second pre-push review measured the
- * show's 0.2 to 0.7 ms behind, the wall's converted one 6.3 to 6.9 ms), so
- * this should read 0. On another browser, or a wall whose time origin is
+ * that let a slow frame's second clock draw too. Headless on Linux a
+ * refresh's timestamp was never ahead of now (the second pre-push review
+ * measured the show's 0.2 to 0.7 ms behind, the wall's converted one 6.3 to
+ * 6.9 ms); on the Mac runners some were, by up to 2.4 ms, which the bound
+ * above now believes. So this should read 0. On another browser, or a wall whose time origin is
  * converted wrong, it is the one place that says so. A missing timestamp
  * (a call that is not an animation frame) is not counted.
  */
 export let stampFallbacks = 0;
+/**
+ * The same fallbacks told apart, for `?debug` and `npm run wall`: stamps
+ * ahead of now (a clock ahead of this one) and stamps older than a second
+ * (a callback held up that long, or a wall whose time origin was converted
+ * wrong: the wall opens after the show, so a missing or reversed conversion
+ * puts its stamps seconds behind, not ahead), each with the worst gap seen and when the last one was. The
+ * check went red on one PR's Mac runs with a single fallback, three runs
+ * out of three, and the total alone could not say which bound it was or
+ * when; this does not change what is believed, only what is reported.
+ */
+export const stampMisses = { ahead: 0, aheadMs: 0, stale: 0, staleMs: 0, lastAt: 0 };
 
 export class DrawGate {
   /** When anything was last drawn (ms). */
   lastDraw = -Infinity;
   private readonly lastOffer: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
+  /**
+   * Whether each clock has offered since the last draw (or made it): its one
+   * refresh that draw stands for is spent, so its next offer is a refresh of
+   * its own (see "a clock's own next refresh" above).
+   */
+  private readonly spent: Record<DrawSource, boolean> = { frame: false, ask: false };
   /** Offers drawn and turned down, by who offered them. For the check and `?debug`. */
   readonly drawn: Record<DrawSource, number> = { frame: 0, ask: 0 };
   readonly skipped: Record<DrawSource, number> = { frame: 0, ask: 0 };
@@ -206,11 +268,22 @@ export class DrawGate {
     this.lastOffer[source] = now;
     // Gated only while the other clock is running too: one clock alone, the
     // show with no wall or the wall with the show covered, draws every tick.
-    if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now)) {
+    // And never this clock's own next refresh (see above).
+    const ownNext = this.spent[source] && gap >= REFRESH_MIN_MS;
+    if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now) && !ownNext) {
+      // An offer stamped behind the last draw (its callback ran late, after
+      // the other clock's next refresh) is an earlier refresh, not the one
+      // that draw stands for, so it does not spend it: else this clock's
+      // next offer, in the drawn refresh, would draw it again (the second
+      // pre-push review: 4.9 % of refreshes drawn twice with one ask in
+      // twenty late, 0 with this).
+      this.spent[source] = now >= this.lastDraw - REFRESH_MIN_MS;
       this.skipped[source]++;
       return false;
     }
     this.lastDraw = now;
+    this.spent.frame = source === 'frame';
+    this.spent.ask = source === 'ask';
     this.drawn[source]++;
     return true;
   }
