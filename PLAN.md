@@ -251,7 +251,8 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
 - **7.5** Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
-  **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, then **23.7**.
+  **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
+  **23.7**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
   13.1-sign), then **24.4**.
@@ -5253,8 +5254,9 @@ version. The owner chose the split below the same day. Nothing is gated yet; thi
 section is the order to build it in.*
 
 **The rule.** The website keeps the whole plate and is the demo: anyone who opens it
-sees the best ChromaGlass there is, on their own laptop and one projector. What is
-paid is what turns the plate into a show rig, and most of that is what a page cannot
+sees the best ChromaGlass there is, on their own laptop and one projector. Home is
+what a listener wants for an evening with their own music (whatever the computer plays,
+the TV with no click, full recordings); Pro is what turns the plate into a show rig, and most of that is what a page cannot
 do at all, so the paid side is mostly the Mac app (§13 step 1), and the Windows app
 after it (13-win-app), rather than features cut from the site.
 
@@ -5272,34 +5274,37 @@ sit behind the key.
 
 ### The split
 
-| Feature | Free website | Paid app | Why |
-|---|---|---|---|
-| Every look, preset and photograph | ✓ | ✓ | The look is what sells it; a weaker demo loses the sale. |
-| Solver quality, grid and governor | ✓ | ✓ | Hobbling the picture makes the site a worse advert. |
-| Every tool and every liquid | ✓ | ✓ | Playing with the liquid is a first visit's "wow". |
-| Design desk; your own presets as files | ✓ | ✓ | People invest in it, and their presets carry into the app. |
-| Microphone, system audio, file player, beat clock, band in the box | ✓ | ✓ | Sound-reactivity is the core promise. |
-| MIDI controller, MIDI learn, tap tempo | ✓ | ✓ | A VJ tries it with their own controller before buying. |
-| One projector on HDMI (Cast → Second display) | ✓ | ✓ | A party or a first gig on the site is the best advert. |
-| Projector found and sent to with no click, back after a knocked cable | | ✓ | A page needs a gesture; this is gig reliability. |
-| The Mixer's stack on one plate | ✓ | ✓ | It is part of the look. |
-| Two or more projectors, each its own plate (§16) | | ✓ | Only multi-screen rigs need it, and they are paying jobs. |
-| Show Sequencer and set lists | ✓ | ✓ | Free to try; a cap on a site set list's length can come later. |
-| Lyrics overlay (LRCLIB) | ✓ | ✓ | A free service and a good party trick. |
-| Song ID | manual tag only | ✓ | Every lookup costs the owner money. |
-| Song maps, per-track identity, history | ✓ | ✓ | Work from a manual tag at no cost. |
-| Your own logo on the wall | ChromaGlass mark | ✓ | A club or a band putting its name up is a paying use. |
-| Record | short clips, small mark | full length, no mark, to disk | The site holds the take in memory anyway (§13 found along the way). |
-| Render a song | 720p, small mark | full resolution, no mark | A finished video is a paid use. |
-| Phone and tablet remote, network display | | ✓ | Needs the show server, which the app has built in. |
-| OSC in | | ✓ | The same show server; pro integration. |
-| Art-Net: the room's lights follow the plate | | ✓ | The same show server; only venues have DMX. |
-| Syphon, Spout, NDI out (13.2, 13.3) | | ✓ | Impossible from a page; the main reason to buy a native app. |
-| DAW bridge plugin (13.7) | | ✓ | It talks to the app, not the site. |
-| Works offline at a venue | best effort | ✓ | The app bundles the build. |
-| The room camera driving the plate | ✓ | ✓ | A demo moment that costs nothing. |
-| iPhone app playing the show itself (§12) | free | | Store rules take a cut of an in-app sale; keep it a demo. |
-| iPhone app as the laptop's remote | | via the laptop's key | The laptop's licence covers its remote, so no store sale. |
+| Feature | Free website | Home app | Pro app | Why |
+|---|---|---|---|---|
+| Every look, preset and photograph | ✓ | ✓ | ✓ | The look is what sells it; a weaker demo loses the sale. |
+| Solver quality, grid and governor | ✓ | ✓ | ✓ | Hobbling the picture makes the site a worse advert. |
+| Every tool and every liquid | ✓ | ✓ | ✓ | Playing with the liquid is a first visit's "wow". |
+| Design desk; your own presets as files | ✓ | ✓ | ✓ | People invest in it, and their presets carry into the app. |
+| Microphone, system audio, file player, beat clock, band in the box | ✓ | ✓ | ✓ | Sound-reactivity is the core promise. |
+| Whatever the computer plays (a streaming app, a music library), heard with no tab to share | | ✓ | ✓ | The listener's first wish, and a page can only hear a shared tab or a microphone. Whether Electron can take the Mac's system audio directly is not yet tested. |
+| An ambient mode: full screen on the TV for hours, cool and quiet (14j) | best effort | ✓ | ✓ | A listening session runs an album or an evening, not a set. |
+| MIDI controller, MIDI learn, tap tempo | ✓ | ✓ | ✓ | A VJ tries it with their own controller before buying. |
+| One projector or TV on HDMI (Cast → Second display) | ✓ | ✓ | ✓ | A party or a first gig on the site is the best advert. |
+| Projector or TV found and sent to with no click, back after a knocked cable | | ✓ | ✓ | A page needs a gesture; at home it is the TV coming on by itself. |
+| The Mixer's stack on one plate | ✓ | ✓ | ✓ | It is part of the look. |
+| Two or more projectors, each its own plate (§16) | | | ✓ | Only multi-screen rigs need it, and they are paying jobs. |
+| Show Sequencer and set lists | ✓ | ✓ | ✓ | Free to try; a cap on a site set list's length can come later. |
+| Lyrics overlay (LRCLIB) | ✓ | ✓ | ✓ | A free service and a good party trick. |
+| Song ID | manual tag only | ✓, a monthly cap | ✓ | Every lookup costs the owner money; the cap keeps Home's price above its cost. |
+| Song maps, per-track identity, history | ✓ | ✓ | ✓ | Work from a manual tag at no cost. |
+| Your own logo on the wall | ChromaGlass mark | ChromaGlass mark | ✓ | A club or a band putting its name up is a paying use. |
+| Record | short clips, small mark | full length, no mark, to disk | full length, no mark, to disk | The site holds the take in memory anyway (§13 found along the way). |
+| Render a song | 720p, small mark | full resolution, no mark | full resolution, no mark | Sharing a video of your own record is what a listener does. |
+| Phone and tablet remote | | ✓ | ✓ | Changing the look from the couch; needs the show server, which the app has built in. |
+| Network displays, OSC in | | | ✓ | The same show server; pro integration. |
+| Art-Net: the room's lights follow the plate | | | ✓ | The same show server; only venues have DMX. |
+| Syphon, Spout, NDI out (13.2, 13.3) | | | ✓ | Impossible from a page; the main reason a VJ buys a native app. |
+| DAW bridge plugin (13.7) | | | ✓ | It talks to the app, not the site. |
+| Modular patch inputs (§24): two channels / every channel; CV out | two channels | two channels | every channel, CV out | A page gets two input channels; the rest needs the app reading the interface natively. |
+| Works offline | best effort | ✓ | ✓ | The app bundles the build. |
+| The room camera driving the plate | ✓ | ✓ | ✓ | A demo moment that costs nothing. |
+| iPhone app playing the show itself (§12) | free | | | Store rules take a cut of an in-app sale; keep it a demo. |
+| iPhone app as the laptop's remote | | via the laptop's key | via the laptop's key | The laptop's licence covers its remote, so no store sale. |
 
 ### How it unlocks
 
@@ -5309,13 +5314,23 @@ sit behind the key.
 - **The key is a signed token** the app checks against a public key built into it, so
   it works with no internet at the gig: activated once online, two machines per key,
   moved from a settings page.
-- **One price with a year of updates**, the usual shape for VJ software. A
-  subscription would need the key to expire and the app to call home, which fights
-  the offline promise; if the owner wants one, it is a separate decision.
+- **Two tiers, each bought once with a year of updates** (the owner's choice,
+  2026-10-04, "I want more casual hobby buyers": people using it for their own
+  listening sessions on their stereos, not just VJs). **Home, $29–39**, for listeners:
+  what the hobby end of the market charges (Visual Lab Pro $39, Magic Music Visuals
+  $79.95). **Pro, $199**, for show rigs: what the closest products charge (Synesthesia
+  Standard $199, VDMX6 $199; Resolume Avenue is €299). Home to Pro costs the difference,
+  as Resolume's Avenue to Arena does. After the year, updates are an optional yearly
+  renewal (about $59 for Pro), and a lapsed key keeps the last version it had. A
+  founder price for the beta's first buyers and half off for students are the norm.
+  The exact Home price is the owner's, in 23.1. A subscription would need the key to
+  expire and the app to call home, which fights the offline promise; if the owner
+  wants one, it is a separate decision. Prices read 2026-10-04 from the vendors' pages.
 
 ### Steps
 
-- **23.1** *(owner)*: the merchant account, the price and the checkout page.
+- **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
+  and the checkout page.
 - **23.2** (one PR, lane B): a hosted-site build flag that shows each paid feature
   above as an "In the ChromaGlass app" tile with a link, off in the app and in a
   local `npm run dev`. *Measure:* a check that loads the site build and the app
@@ -5325,7 +5340,8 @@ sit behind the key.
   manner of `npm run report-worker`: no key refused, a bad signature refused, a good
   key answered.
 - **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
-  and the two-machine count, an "unlicensed" app that runs as the site does. Lands
+  and the two-machine count, the key's tier (Home or Pro) and the features each
+  opens, an upgrade key, and an "unlicensed" app that runs as the site does. Lands
   in the Windows app with 13-win-app. *Measure:* `npm run desktop` with a good, a
   bad and no key.
 - **23.5** (one PR, lane B): the site's Record capped to a short clip and Render to
@@ -5333,7 +5349,13 @@ sit behind the key.
   a take from each, its length, size and the mark's pixels.
 - **23.6** (one PR, lane B, after 23.2): the site's logo layer shows the ChromaGlass
   mark only; your own logo is the app's.
-- **23.7** *(owner)*: the free beta, then charging. Later, if wanted, the same key
+- **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
+  whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
+  for once), and an ambient mode runs the plate full screen on the TV for hours with
+  the frame cap and the quiet of 14j. *Measure:* in `npm run desktop`, a tone played by
+  another process reaches the ear; on the owner's Mac, an album through a streaming app
+  drives the plate (docs/judging.md, next free number at merge).
+- **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 
 ## 24. Modular rigs: patch the rack into the liquid
