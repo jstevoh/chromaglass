@@ -156,7 +156,7 @@ Judged in this order, because these gate code:
 
 - **2.1** **18a-11** Thin Gap's cost (`docs/judging.md` §19a): gates 18a-10, and says whether
   Thin Gap, on in every look since #248, needs a look turned back off.
-- **2.2** **15b** the tools' feel: gates 15g.
+- **2.2** **15b** the tools' feel (the Finger as a solid shipped; judging §33): gates 15g.
 - **2.3** **16b-cost** a source pass's cost and **13-twoproj** two popup projectors: gate 16d.
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
@@ -226,7 +226,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
 
 - **6.1** ~~**18a-every** Thin Gap in every look~~ #248 (the owner's pick came before 2.1's
-  reading; 2.1 still reads it), then **15b**, **15g**,
+  reading; 2.1 still reads it), then ~~**15b**~~ (the Finger, shipped), **15g**,
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground, 0 in every look;
   the owner picks the looks, judging §31), then **18f** heat from the lamp (which unblocks 10.6
@@ -376,7 +376,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 8 not started (7, a DAW bridge plugin, and 8, a native renderer core for later, added 2026-10-04); Windows (13-win-smoke, -app, -sign) planned 2026-10-04, never run on a PC |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (0 in every look, the owner picks which go on the lamp; `npm run lamp`), 18b-1 to 18b-6 left |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
@@ -3153,28 +3153,70 @@ performer would notice first:
 
 ### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 
-Every liquid rides one velocity field, which is held to `MAX_SPEED` 0.002
-(`src/gpu/fluid.ts`, `decayVel`). The idle plate already runs at that limit. A
-tool's velocity folds in before the step, carries the liquid once, and the clamp
-then cuts it back to idle. The comments in `fingerDrag` and `blowAir` say the
-projection removes the push. In the lab, the clamp accounts for about three times as
-much as the projection does. Lab, 256², fingerDrag's own velocity dragged 30 cells
-across a disc of dye and ferrofluid over 60 steps (centroid shift, cells):
+**Shipped for the Finger on a thin gap (every look; `npm run fingerflow`), not yet
+judged on the Mac (`docs/judging.md` §33).** The owner's OK for the feel change came
+2026-10-04 ("start with the making liquids real work").
 
-| | dye | ferrofluid |
-|---|---|---|
-| left alone | 0.00 | 0.00 |
-| today | 0.17 | 0.20 |
-| clamp lifted | 0.56 | 0.63 |
-| at the hand's own speed, no swirl, clamp on | 0.87 | 1.09 |
+What was found when it was picked up: the clamp this item was written about is
+already gone on a thin gap (`decayVel` neither damps nor clamps there, since 18a),
+and Thin Gap is on in every look since #248. The push still moved nothing. Lab,
+Classic's plate (384² under 192), the Finger's own velocity drawn 0.4 of the plate at
+two cells a step through bands of colour, a pool of ferrofluid and a drop of oil on
+its path: the bands moved 0.13% of the plate, as they do left alone, the pool 0.04%,
+the drop 0.03%. A disc of velocity laid over still liquid is mostly the divergent
+part of a flow, and the thin solve, which makes the flow conserve liquid, took it
+straight back out. Only the hand-written carries moved anything.
 
-Only liquids with a hand-written carry actually move under a tool: the dye (Finger's
-`carryDye`, Press's `squeezeOut`) and the oil (Finger's `carryMix`). A likely fix is
-to feed a hand's velocity into the lasting current (`cur`, capped at 0.75 of a cell a
-step, which remembers for about a hundred steps) instead of the clamped field. That
-would carry every field alike. It changes how every tool feels, so it goes to the owner
-first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
-these numbers.
+What shipped: the Finger is a solid in the layer, moving at the hand's own speed
+(Brinkman's penalised solid, inside the thin solve: `hsPrep`, `lib/handSolid.ts`). The
+liquid it touches moves with it and the liquid round it gives way as the flow past a
+moving disc in a Hele-Shaw cell does (a dipole, back the other way beside it at
+U·a²/d²), and the flow carries the colour, the oil and the ferrofluid alike. On a thin
+gap the Finger's carries (`carryDye`, `carryMix`, `fingerCarry`) and its push and swirl
+no longer run; `liquid.stir` still mixes the chemistry under it. The ferrofluid's
+carry, and the colour's under a Labyrinth's flow, take as many substeps as the fastest
+hand needs. The show's own Finger stroke (the automation's) keeps its colour carry on a
+plate with ferrofluid on it, as it did, so it does not pull tongues out of the pools. The numbers are in the PR and
+in `scripts/fingerflow.mjs`.
+
+Found by the Mac's `npm run tools` on the way: its Finger, drawn through a pool the Drop
+had laid, took the plate's colour from 222 to 161 where the plate left alone gained 17.
+The colour's and the oil's carries crossed faces rebuilt from the cells' velocities,
+with the pressure put back as if the drag were even (18a-8), and a solid is exactly
+where it is not: at the hand's rim those faces gathered liquid, a full pool's cells
+went past the plate's cap of 6, and the cap cut them. Bands at 1 never reached the cap,
+so the lab's first checks passed. The colour's and the oil's carries and the substeps'
+Courant number now cross the faces the thin solve made conserve liquid, as the
+ferrofluid's has since 15d (`THIN_FACE`, `wgsl/fluid.ts`): a full pool drawn as the
+pointer draws one (a cell every third step) kept 59.5% of its colour before and all of
+it after (`npm run fingerflow`, check 7).
+
+Left, each its own plan item:
+
+- **15b-blow.** Blow's push on a thin gap is still a disc of velocity (moved nothing
+  measurable for the Finger's; Blow keeps its carries, `blowDye`, `blowOil`,
+  `blowCarry`). Its real replacement is air's shear and the jet's dimple on the film,
+  15g, which can now be built on this.
+- **15b-old.** With Thin Gap off (and on the CPU engine) the old plate keeps the clamp
+  and the Finger keeps its push and its carries. Not worth a lasting-current route
+  while every look is thin; if a look is turned back off for its cost (judging 2.1),
+  revisit.
+- **15b-inside.** The penalised solid is a porous disc: the liquid (and its colour)
+  under the hand rides with it, where a real fingertip has no liquid inside it and
+  parts what is ahead of it. A pool the hand passes over is drawn along under it, and
+  at its tail the colour bleeds out through the disc's soft edge (two Brinkman lengths,
+  `handEdge`) as a trail. Measure against a stylus through marbling (Jaffer's tine
+  displacement, falling with distance from the path) and, if it shows, exclude the
+  hand's cells from what the carries move.
+- **15b-remote.** A hand's Finger moves at the rate its events come, not once a step:
+  the solid it lays moves as far as the hand moved since its last event, in the one
+  step after it, and is not laid on the steps between. A remote (the phone as the
+  laptop's remote, a pen, OSC) sends at message rate, and the pointer itself is no
+  smoother when its events come slower than the steps (tools.mjs's stroke is a cell
+  every third step), so such a stroke is a hand that stops and starts. It no longer
+  loses colour (fingerflow's check 7 draws it that way); whether it reads as a jerky
+  stroke on the Mac is judging §33's, and if it does, carry the hand's last speed
+  across the steps until its next event.
 
 ### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
@@ -3976,7 +4018,8 @@ its frame rate live. "Free" means no new passes or texture reads.
         does not turn with Tilt Direction. Kept as it was (every look with it was
         tuned on it); whether an updraft should rise against Rain Drip is a look
         question for the owner on the Mac (judging §32).
-  - **18a-3, tools as solids.** A hand's push is imposed along its direction (a
+  - **18a-3, tools as solids.** The Finger is one now (15b: Brinkman in the thin solve,
+    its carries retired on a thin gap, `npm run fingerflow`). The rest: a hand's push is imposed along its direction (a
     penalised solid in the limit where the solid wins), not a disc moving at the hand's
     velocity (Brinkman), and the hand-written carries (`carryDye`, `carryMix`,
     `fingerCarry`, `pressDye`, `pressMix`, `blowDye`, `blowOil`, `blowCarry`) still run
@@ -4007,9 +4050,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     cells outside it count as open too.
   - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
     which leaves a small checkerboard at a floored dent's edge; the advections'
-    Rhie–Chow faces are given c·P, exact only where the drag is even; and the face
-    fluxes' upwinding squares off a ring under a fast radial flow (the pressed rings in
-    the picture). A staggered grid takes all three, and `dampGrid`'s job.
+    Rhie–Chow faces were given c·P, exact only where the drag is even (on a thin gap
+    the colour's and the oil's carries and carryCourant now cross the solve's own
+    faces, `THIN_FACE`, as the ferrofluid's did: a Finger's solid is where the drag is
+    least even, 15b; off a thin gap the carries keep their Rhie–Chow faces, exact on
+    the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
+    radial flow (the pressed rings in the picture). A staggered grid takes all three,
+    and `dampGrid`'s job.
   - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
