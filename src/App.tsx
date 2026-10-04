@@ -1465,6 +1465,16 @@ export default function App() {
     for (const k of Object.keys(newSettings)) driftGlide.current.delete(k);
   };
 
+  /*
+    Adding and taking off the back layer, from the Design desk and the phone.
+    Two is the most the plate draws (PLAN.md §16d), so adding means two and
+    taking off means one, whatever the look carried. Taking off is not offered
+    while the back plate has a look of its own: the stage keeps that plate
+    (stageLayers above) and the button would do nothing anyone could see.
+  */
+  const addLayer = () => updateSettings({ layerCount: 2 });
+  const removeLayer = backLook ? undefined : () => updateSettings({ layerCount: 1 });
+
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
     lookTakesLevels();
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
@@ -4645,6 +4655,8 @@ export default function App() {
             layers={stageLayers}
             activeLayer={activeLayer}
             onLayer={setActiveLayer}
+            onAddLayer={addLayer}
+            onRemoveLayer={removeLayer}
             onClear={() => setClearTrigger(n => n + 1)}
             onDrain={() => setDrainTrigger(n => n + 1)}
             onSpin={() => flickPlate(activeLayer)}
@@ -4697,6 +4709,8 @@ export default function App() {
             onBenDay={(v) => updateSettings({ benDay: v })}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
+            clearFilm={settings.clearFilm ?? 0}
+            onClearFilm={(v) => updateSettings({ clearFilm: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
@@ -5308,7 +5322,9 @@ export default function App() {
           onLayer={setActiveLayer}
           // Two: the compositor draws the lead plate and one behind it, and a
           // third was simulated in full — a whole solver's GPU time — and never shown.
-          onAddLayer={() => updateSettings({ layerCount: Math.min(2, (settings.layerCount ?? 1) + 1) })}
+          onAddLayer={addLayer}
+          onRemoveLayer={removeLayer}
+          layerHeld={backLookName}
           layerReport={layerReport}
           settings={settings}
           onSetting={updateSettings}
