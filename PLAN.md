@@ -244,7 +244,8 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **12.7**, **12.8**; **12.4a**; later **12.9**.
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13.5** OSC out and Link,
   **13-port**, **13-intel**, **13-icon**, **13-update** (after signing), then **13.2**
-  Syphon, **13.3** NDI and Spout, **13.6** video in.
+  Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
+  MIDI route written up with 13.4).
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
@@ -302,7 +303,7 @@ Where each batch stands, as of 2026-09-27:
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 6 not started |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 7 not started (7, a DAW bridge plugin, added 2026-10-04) |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
@@ -2079,7 +2080,7 @@ Asked on 2026-09-27: "Integrate into popular VJ software." It came up alongside
 "have we reached the point where we need to grow beyond the web?" The answer to that
 (project files, `beyond-web/beyond-web.md`) was *not yet for the show itself*.
 Handing video to another app was the one place a page cannot go. Step 1, the Mac app,
-is built (#207); steps 2 to 6 are not.
+is built (#207); steps 2 to 7 are not.
 
 **What integration means here.** A VJ app (Resolume Arena and Avenue, VDMX,
 TouchDesigner, MadMapper, Millumin, OBS) meets ChromaGlass in four ways, and each one
@@ -2091,12 +2092,17 @@ takes a different route:
 | **Control in** | The VJ app or its controller plays ChromaGlass | OSC, which the show server already hears on UDP 9000 (`server/remote-server.js`, `oscToMessage`: `/chromaglass/setting/<key>`, `/action/<name>`, `/preset/<id>`, `/blow`, `/drop`, `/press`, `/tilt`, `/dye`) | The web app plus `npm run show`. Written up and templated, not built again |
 | **Tempo** | One beat shared by everything | Ableton Link, which Resolume, VDMX and TouchDesigner all speak. MIDI clock already comes in (`src/lib/midi.ts`) | A page cannot join Link. The show server can |
 | **Video in** | A VJ app's output as a ChromaGlass source | Syphon, Spout or NDI, arriving as a camera | **Today:** any virtual camera (OBS Virtual Camera, NDI Webcam Input), picked like a camera. **Properly:** the wrapper (step 6) |
+| **A DAW** | Logic or Ableton playing ChromaGlass from the song: its audio, its tempo and transport, and automation lanes moving settings | MIDI from the DAW: clock, Start, Stop and Continue, and MIDI timecode's quarter frames are already read (`src/lib/midi.ts`), and CC from an automation lane reaches any setting through MIDI learn | **Today:** the DAW's output into a loopback device (BlackHole, Loopback) picked as the input, and its MIDI out through the Mac's IAC bus (not written up, never tried end to end; 14s's input picker bug bites here). **Properly:** a bridge plugin (step 7) |
 
 **Not doing: a plugin inside the VJ app.** FFGL (Resolume) and ISF (VDMX, MadMapper)
 run OpenGL fragment shaders inside the host. The plate is dozens of WebGPU compute
 passes a frame, with a pressure solve, which means porting the solver back to GLSL.
 That is the native rewrite `beyond-web.md` argues against. Streaming the plate into
 the host gives the VJ the same layer without it.
+The same holds for drawing the plate inside a DAW plugin's window (asked 2026-10-04,
+about an ad for a visualiser sold as an AU/VST plugin plus a standalone app): a
+plugin's window is a native view, and the plate needs Chromium's WebGPU and Web MIDI.
+Step 7 is the part of that idea that fits: a plugin that draws nothing.
 
 **The wrapper comes first** (the owner, 2026-09-27: "Would a good option be to create a
 small native wrapper that allows us to integrate into other VJ apps and have a
@@ -2154,6 +2160,35 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    does. *Not started.*
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
    (§11), not through a virtual camera. *Not started.*
+
+7. **A DAW bridge plugin** (asked 2026-10-04; two or three PRs, after step 2): an
+   AU and VST3 plugin for Logic and Ableton that draws nothing and plays the running
+   app (the Mac app of step 1, which is the "standalone" half) over the show server
+   on localhost. It carries three things MIDI from a DAW carries badly or not at all:
+   - *Automation.* A fixed bank of automatable parameters (say 32 slots, so the DAW
+     sees a stable list), each bound to a setting, a preset or an action by the same
+     learn flow and binding map as MIDI learn (§5), at full resolution rather than
+     CC's 128 steps, named in the DAW's lane by what they are bound to.
+   - *Transport.* The host's tempo, play state and bar position every block, into the
+     beat clock the way MIDI clock goes in (`beatClock.setExternal`), with the bar's
+     phase exact rather than counted from 24 pulses, and a locate that lands a set
+     list's cue where the song is (what 14t's missing Song Position Pointer and full
+     MTC frames are for over MIDI).
+   - *Audio.* The track or sidechain the plugin sits on, as PCM to the app's one ear,
+     so kicks, bands, Audio Impact and song shape read the DAW's own mix with no
+     loopback device; and the host's latency report, so the ear can line the kick up
+     with the picture (14e).
+   Built in JUCE (C++), the AU validated with `auval` and both formats built on the
+   macOS runner, signed and notarised with the same Developer ID secrets the Mac app
+   waits on. The app side is a bridge link in the show server, which a node fake of
+   the plugin can check with no DAW: slots move settings, transport moves the clock,
+   PCM moves the bands. *Measure:* a settings move written in the fake arrives within
+   one frame; a tempo change reaches `musicPace` within a beat; the fake's kick and
+   the plate's kick within 14e's window. Then *(owner)*: Logic and Ableton on the
+   owner's Mac, an automation lane playing a look change on the bar. The phone rule:
+   the link's switch and its slot bindings are in the More sheet.
+   Before any of it, the MIDI route in the table above, tried once in Logic and
+   Ableton and written up with step 4. *Not started.*
 
 Until step 2 lands, the plate still reaches a VJ app the way it can today: OBS
 captures the projector window and sends it on through its Syphon or NDI plugin, and a
