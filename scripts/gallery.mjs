@@ -26,7 +26,7 @@
  *   GALLERY_GROUNDS=0,1   each moment once per Lamp Ground, files <id>-<t>s-lamp<g>.jpg
  *
  * GALLERY_GROUNDS is for choosing which looks go on the lamp (PLAN 18b-1;
- * `npm run lampjudge` reads what it writes). The two grounds are the same
+ * `npm run lampjudge` reads the pictures it writes, pixel against pixel). The two grounds are the same
  * moment of the same plate: Lamp Ground is read only by the plate pass, so the
  * setting is turned and the frame taken a few frames later, before the liquid
  * has moved enough to matter. Two page loads would be two different plates
@@ -41,7 +41,7 @@ import path from 'node:path';
 import { launchChromium } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, lastFrameRead, frameOf } from './frame.mjs';
-import { readingOf, groundOf } from './judge.mjs';
+import { readingOf } from './judge.mjs';
 
 const PORT = Number(process.env.GALLERY_PORT ?? 4344);
 const OUT = process.env.GALLERY_OUT ?? 'gallery';
@@ -134,10 +134,8 @@ try {
         fs.writeFileSync(path.join(OUT, file), Buffer.from(dataUrl.split(',')[1], 'base64'));
         const r3 = (n) => +n.toFixed(3);
         const metrics = m ? { luma: r3(m.luma), colours: r3(m.colours), flat: r3(m.flat), cast: r3(m.cast), motion: +m.motion.toFixed(4), detail: +m.detail.toFixed(4) } : null;
-        // As light through dye: bare lamp, dye gone black, lit colour (judge.mjs).
-        const light = fb && ground !== null ? Object.fromEntries(Object.entries(groundOf(fb)).map(([k, v]) => [k, r3(v)])) : undefined;
         const read = ground === null ? undefined : await page.evaluate(() => window.chromaglassDebug().settings.lampGround);
-        row.frames.push({ t, ground, read, file, engine: status.engine, plates: status.plates, metrics, light });
+        row.frames.push({ t, ground, read, file, engine: status.engine, plates: status.plates, metrics });
       }
       if (GROUNDS[0] !== null) await page.evaluate((g) => { window.chromaglassDebug().settings.lampGround = g; }, own);
     }

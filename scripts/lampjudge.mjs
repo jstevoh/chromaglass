@@ -31,18 +31,27 @@
  * 2. Does the look, with the dye it was given for black, read on the lamp?
  *    A real show keeps the dish full of colour with some lamp showing through;
  *    it is not a white wall with a few tints, and not a dark plate where the
- *    dye has taken all the light. So, on the lamp, at both moments
- *    (scripts/judge.mjs `groundOf`, a 240×150 read of the frame):
+ *    dye has taken all the light. So, on the lamp, at both moments, over the
+ *    dish (scripts/judge.mjs `groundPairOf`, the two pictures decoded and
+ *    read pixel against pixel at 240×150; a pixel black on both grounds is
+ *    the room round the dish, not the dish):
  *
- *      glare ≤ 0.45   at most this share of the frame is the bare lamp
+ *      glare ≤ 0.45   at most this share of the dish is the bare lamp
  *                     (bright and colourless: clear liquid, or no dye)
  *      ink   ≤ 0.30   at most this share has gone black (dye so deep it
  *                     takes the whole lamp)
  *      lit   ≥ 0.20, and ≥ 0.6 × the same look's lit share on black
- *                     the colour survives the turn: a fifth of the frame
+ *                     the colour survives the turn: a fifth of the dish
  *                     holds lit colour, and the lamp keeps most of what the
  *                     black ground showed
  *
+ *    A dish the ground does not reach (at some moment the two pictures differ
+ *    by under 6% of full scale on average: its own dye already draws the
+ *    light table's white) keeps what it ships with; turning it changes
+ *    nothing to judge. This gate was added after the first read, where the
+ *    gap it sits in was seen: the three photographs, which ignore the ground
+ *    by design, differ by 1%, Ferro Maze by 3%, and the least of any look the
+ *    ground does reach by 13% (Jellyfish Bloom; Poster, 1969 14%).
  *    A dish that passes goes on the lamp. A dish that fails stays on black,
  *    with the gate it failed as its reason: glare means it wants more dye (or
  *    a fuller dish) on the lamp, ink means less (PLAN 18b-1 says a look moved
@@ -50,14 +59,24 @@
  *    not the ground, and is written into PLAN as its own item.
  *
  * The thresholds were set before any picture was read, from what the gates
- * are for, and are not tuned to the result.
+ * are for, and are not tuned to the result. One thing changed after the
+ * first read, in what is measured rather than where the line is: the shares
+ * were of the whole frame, so the dark room round a round dish (Clock Glass,
+ * Home Movie, the Fillmore's screen) counted as dye gone black on the lamp.
+ * Clock Glass failed on it (37% black, of which about 30 points were the
+ * room); over the dish alone it reads 0%. And Ferro Maze, which draws its
+ * light table with its own dye and looks the same on both grounds, failed
+ * the bare-lamp gate as "too little dye"; the rule now says what it is.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { chromium } from 'playwright';
+import { launchChromium } from './chromium.mjs';
+import { groundPairOf } from './judge.mjs';
 
 const DIR = process.argv[2] ?? 'gallery';
-const GLARE = 0.45, INK = 0.30, LIT = 0.20, KEEP = 0.6;
+const GLARE = 0.45, INK = 0.30, LIT = 0.20, KEEP = 0.6, SAME = 0.06;
 
 /** What each look is going for: 'dish' (liquid in a dish; to the lamp if it
  *  reads), 'light' (draws light itself) or 'picture' (a photograph or print
@@ -108,26 +127,25 @@ export const INTENT = {
 
 const f2 = (v) => v.toFixed(2);
 
-/** One look's verdict from its frames (gallery index rows). */
-export const verdictOf = (row) => {
-  const [kind, why] = INTENT[row.id] ?? ['dish', 'not in the intent table: a dish by default'];
-  const times = [...new Set(row.frames.map((f) => f.t))].sort((a, b) => a - b);
-  const pairs = times.map((t) => ({
-    t,
-    black: row.frames.find((f) => f.t === t && f.ground === 0)?.light,
-    lamp: row.frames.find((f) => f.t === t && f.ground === 1)?.light,
-  }));
-  const whole = pairs.length > 0 && pairs.every((p) => p.black && p.lamp);
+/** One look's verdict from its readings: `pairs` is [{ t, reading }], one
+ *  per moment, each `groundPairOf(black, lamp)` (null where a frame is missing). */
+export const verdictOf = (id, name, pairs) => {
+  const [kind, why] = INTENT[id] ?? ['dish', 'not in the intent table: a dish by default'];
+  const whole = pairs.length > 0 && pairs.every((p) => p.reading);
   const worst = whole ? {
-    glare: Math.max(...pairs.map((p) => p.lamp.glare)),
-    ink: Math.max(...pairs.map((p) => p.lamp.ink)),
-    lit: Math.min(...pairs.map((p) => p.lamp.lit)),
-    keep: Math.min(...pairs.map((p) => p.lamp.lit / Math.max(1e-3, p.black.lit))),
+    glare: Math.max(...pairs.map((p) => p.reading.glare)),
+    ink: Math.max(...pairs.map((p) => p.reading.ink)),
+    lit: Math.min(...pairs.map((p) => p.reading.lit)),
+    keep: Math.min(...pairs.map((p) => p.reading.lit / Math.max(1e-3, p.reading.litBlack))),
+    // The least of the moments: the two pictures are taken about half a
+    // second apart, and a look moving fast (Ferro Maze fingering at 12 s,
+    // 0.18) differs that much by itself; the ground differs at every moment.
+    change: Math.min(...pairs.map((p) => p.reading.change)),
   } : null;
   const fails = [];
   if (worst) {
-    if (worst.glare > GLARE) fails.push(`the lamp is bare over ${Math.round(worst.glare * 100)}% of the frame (limit ${GLARE * 100}%): too little dye for the lamp`);
-    if (worst.ink > INK) fails.push(`${Math.round(worst.ink * 100)}% of the frame goes black (limit ${INK * 100}%): dye laid for black is too deep for the lamp`);
+    if (worst.glare > GLARE) fails.push(`the lamp is bare over ${Math.round(worst.glare * 100)}% of the dish (limit ${GLARE * 100}%): too little dye for the lamp`);
+    if (worst.ink > INK) fails.push(`${Math.round(worst.ink * 100)}% of the dish goes black (limit ${INK * 100}%): dye laid for black is too deep for the lamp`);
     if (worst.lit < LIT) fails.push(`only ${Math.round(worst.lit * 100)}% lit colour on the lamp (needs ${LIT * 100}%)`);
     if (worst.keep < KEEP) fails.push(`keeps ${Math.round(worst.keep * 100)}% of the lit colour it shows on black (needs ${KEEP * 100}%)`);
   }
@@ -135,17 +153,56 @@ export const verdictOf = (row) => {
   if (kind === 'light') { ground = 0; reason = `It draws light, not dye: ${why}.`; }
   else if (kind === 'picture') { ground = 0; reason = `A picture with its own ground, not a dish on a lamp: ${why}.`; }
   else if (!worst) { ground = 0; reason = 'No pair of frames on both grounds to judge; left as it ships.'; }
+  else if (worst.change < SAME) { ground = 0; reason = `A dish (${why}), but it draws the same on both grounds (at one moment the pictures differ by ${(worst.change * 100).toFixed(1)}% on average): its own dye already draws the lamp's white, so it keeps what it ships with.`; }
   else if (fails.length) { ground = 0; reason = `A dish (${why}), but on the lamp ${fails.join('; ')}.`; }
   else { ground = 1; reason = `A dish on a lamp (${why}), and it reads there: ${Math.round(worst.lit * 100)}% lit colour, ${Math.round(worst.glare * 100)}% bare lamp, ${Math.round(worst.ink * 100)}% black at worst.`; }
-  return { id: row.id, name: row.name, kind, ground, reason, fails, worst, pairs };
+  return { id, name, kind, ground, reason, fails, worst, pairs };
+};
+
+/** Decode the gallery's two pictures of each moment in a page and read them
+ *  pixel against pixel. Chromium decodes the JPEGs, which keeps this free of
+ *  an image library; it needs no GPU, so it runs anywhere. */
+const readPairs = async (index) => {
+  const browser = await launchChromium(chromium);
+  try {
+    const page = await browser.newPage();
+    const pixelsOf = (file) => page.evaluate(async (src) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const c = new OffscreenCanvas(240, 150);
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, 240, 150);
+      // Back as base64: an array of 144,000 numbers through the protocol
+      // took four seconds a picture.
+      const d = ctx.getImageData(0, 0, 240, 150).data;
+      let bin = '';
+      for (let i = 0; i < d.length; i += 8192) bin += String.fromCharCode(...d.subarray(i, i + 8192));
+      return btoa(bin);
+    }, `data:image/jpeg;base64,${fs.readFileSync(path.join(DIR, file)).toString('base64')}`).then((b64) => new Uint8Array(Buffer.from(b64, 'base64')));
+    const out = [];
+    for (const row of index) {
+      const times = [...new Set(row.frames.map((f) => f.t))].sort((a, b) => a - b);
+      const pairs = [];
+      for (const t of times) {
+        const b = row.frames.find((f) => f.t === t && f.ground === 0)?.file;
+        const l = row.frames.find((f) => f.t === t && f.ground === 1)?.file;
+        const reading = b && l ? groundPairOf(await pixelsOf(b), await pixelsOf(l)) : null;
+        pairs.push({ t, black: b ?? null, lamp: l ?? null, reading: reading && Object.fromEntries(Object.entries(reading).map(([k, v]) => [k, +v.toFixed(3)])) });
+      }
+      out.push([row, pairs]);
+    }
+    return out;
+  } finally { await browser.close(); }
 };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const index = JSON.parse(fs.readFileSync(path.join(DIR, 'index.json'), 'utf8'));
-  const verdicts = index.map(verdictOf);
+  const verdicts = (await readPairs(index)).map(([row, pairs]) => verdictOf(row.id, row.name, pairs));
   for (const v of verdicts) {
     const w = v.worst;
-    console.log(`  ${v.ground ? 'LAMP ' : 'black'}  ${v.id.padEnd(20)} ${v.kind.padEnd(7)} ${w ? `glare ${f2(w.glare)} ink ${f2(w.ink)} lit ${f2(w.lit)} keep ${f2(w.keep)}` : 'no frames'}`);
+    console.log(`  ${v.ground ? 'LAMP ' : 'black'}  ${v.id.padEnd(20)} ${v.kind.padEnd(7)} ${w ? `glare ${f2(w.glare)} ink ${f2(w.ink)} lit ${f2(w.lit)} keep ${f2(w.keep)} change ${f2(w.change)}` : 'no frames'}`);
     console.log(`         ${v.reason}`);
   }
   const lamp = verdicts.filter((v) => v.ground === 1).map((v) => v.id);

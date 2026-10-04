@@ -796,16 +796,19 @@ through the dye, and the back plate is a second filter in the light. It turns th
 picture over, so it is a choice per look, not a fix: the pale lace of the reference
 still (PLAN 20) can only show on it. Please say:
 
-- which looks you want on the lamp ground, and which stay on black (Save Look keeps
-  it); a look on the lamp may want less dye (Dye Budget) to read as colour rather
-  than dark, and its dyes are the ones it was given for black;
+- ~~which looks you want on the lamp ground~~ **answered by rule (#262, PLAN 18b-1)**: ten
+  looks ship on the lamp (Timbre Shifter, Microscopic Chaos, Poster 1969, Fillmore East
+  1969, Crowd Plate, Milk Marbling, Red Cabbage, Chemical Clock, Home Movie, Clock
+  Glass); the gallery page linked from #262 has every look on both grounds with the
+  reason for its pick. Say which you would overrule (Save Look keeps your choice); the
+  dishes too dark on the lamp with their black-ground dye are PLAN 18b-8;
 - whether the fade between the two (a MIDI fader on Lamp Ground) is worth playing,
   or only a setting;
 - edges on the lamp: the meniscus, the boundary line, lacing and cells were drawn
   for black and are carried over as a darkening or brightening of the light through
   the dye; say if they read wrong (18e makes them from refraction instead);
-- Roy, 1963 on the lamp: the print reads dense dye as black ink, so its pools print
-  black; it should probably stay on black;
+- Roy, 1963 stays on black (#262): a print with its own paper, and on the lamp every
+  pool printed as black ink (100% of the dish);
 - a look with the chemistry (Red Cabbage, Chemical Clock, Agate) on the lamp: the
   pH, BZ and Liesegang colours are now filters in the light, so a BZ wave is a pale
   blue band through the orange with the dye still showing.

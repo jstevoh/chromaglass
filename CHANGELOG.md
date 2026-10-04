@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — ten looks on the lamp (PLAN 18b-1)
+
+- Timbre Shifter, Microscopic Chaos, Poster 1969, Fillmore East 1969, Crowd
+  Plate, Milk Marbling, Red Cabbage, Chemical Clock, Home Movie and Clock Glass
+  now open with Lamp Ground at 1: clear liquid is the lamp's white and the dye a
+  filter in front of it. Picked by a written rule from pictures of every look on
+  both grounds (`npm run lampjudge`, from a PR labelled `lamp-gallery`): a dish
+  goes on the lamp when it still reads there with its own dye; a look that is
+  light itself or a picture with its own ground keeps black.
+
 ### Added — the lamp through the dye (PLAN 18b)
 
 - **Lamp Ground** (`lampGround`, Settings → Lamp & Light; MIDI, the desks, the

@@ -286,6 +286,8 @@ export const PRESETS: Preset[] = [
     name: 'Timbre Shifter',
     description: 'The brightness of the sound controls the color and rotation of the fluid.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0252,
       surge: 0.55,
       layerCount: 2,
@@ -371,6 +373,8 @@ export const PRESETS: Preset[] = [
     name: 'Microscopic Chaos',
     description: 'A stained slide on a bright field: magenta, violet and blue cells crowd, divide and jostle under the lamp.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0168,
       boundaryContrast: 0.7,
       beads: 0.45,
@@ -865,6 +869,8 @@ export const PRESETS: Preset[] = [
     name: 'Poster, 1969',
     description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: orange against ultramarine, the colours that vibrate.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0126,
       surge: 0.55,
       layerCount: 1,
@@ -1291,6 +1297,8 @@ export const PRESETS: Preset[] = [
     name: 'Fillmore East, 1969',
     description: 'The Joshua Light Show behind the Mothers: three projectors on one black screen, a big dish pressed into a radial sunburst, a field of dark-rimmed oil beads across the red and orange, cyan and blue against them.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.01008,
       surge: 0.6,
       layerCount: 2,
@@ -1352,6 +1360,8 @@ export const PRESETS: Preset[] = [
     name: 'Crowd Plate',
     description: 'The room plays it: the floor stirs the liquid, everyone dancing is a hand on the glass, and a busier room opens the turbulence.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       // A plate that wants stirring rather than one that is already busy: the
       // turbulence starts low so what the room adds is what is seen moving,
       // and the dye budget runs full so there is something there to move.
@@ -1421,6 +1431,8 @@ export const PRESETS: Preset[] = [
     name: 'Milk Marbling',
     description: 'The kitchen-table experiment: four spots of food colouring sitting still on a dish of milk until a drop of soap sends them running for the rim.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       surfactantFlow: 0.8,
       // The dish does almost nothing on its own. Turbulence, buoyancy, heat
       // and rotation are all near zero, because if the plate is already
@@ -1645,6 +1657,8 @@ export const PRESETS: Preset[] = [
     name: 'Red Cabbage',
     description: 'Violet red-cabbage dye as a pH indicator: acid dropped in blooms pink, base turns it green, and where the two meet they cancel back to purple.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0105,
       advection: 0.4,
       platePressure: 0.35,
@@ -1687,6 +1701,8 @@ export const PRESETS: Preset[] = [
     name: 'Chemical Clock',
     description: 'The Belousov-Zhabotinsky reaction in a dish of gel: waves of blue sweep through the red and curl into turning spirals, a clock that keeps its own time.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0084,
       advection: 0.3,
       platePressure: 0.2,
@@ -1820,6 +1836,8 @@ export const PRESETS: Preset[] = [
     name: 'Home Movie',
     description: 'A light show filmed on Super 8 from the back of the hall: warm, soft, grainy, the gate weaving, orange and coral against teal.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0105,
       surge: 0.55,
       layerCount: 2,
@@ -1867,6 +1885,8 @@ export const PRESETS: Preset[] = [
     name: 'Clock Glass',
     description: 'Two curved clock glasses with the dye between them: lavender, ice and magenta pool in the deep middle, and a press leaves a thin bright film that creeps back.',
     settings: {
+      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
+      lampGround: 1,
       globalSpeed: 0.0126,
       surge: 0.4,
       layerCount: 1,
