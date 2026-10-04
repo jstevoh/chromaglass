@@ -7,7 +7,7 @@ import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/draw
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { phasePour } from '../lib/phasePour';
-import { sizedMagnet, magnetReach, MAGNET_POOL_RADIUS, MAGNET_POOL_FILL } from '../lib/magnetSize';
+import { sizedMagnet } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -187,11 +187,12 @@ interface LiquidVisualizerProps {
    * A hand is holding a magnet under a look that has none of its own
    * (magnetStrength 0), or no ferrofluid drawn (phaseAmount 0): the app gives
    * the look the magnet's strength, so that once let go it stays under the
-   * glass where the hand set it down, and turns Ferrofluid up so the pool the
-   * hand brought is drawn (magnetFor). Asked a few times a second while held,
-   * until the settings say both.
+   * glass where the hand set it down, and, when there is ferrofluid in the
+   * solver (`ferrofluid`), turns Ferrofluid up so what is there is drawn
+   * (magnetFor). Never ferrofluid of its own: a magnet brings none. Asked a
+   * few times a second while held, until the settings say both.
    */
-  onMagnetInHand?: () => void;
+  onMagnetInHand?: (ferrofluid: boolean) => void;
   /**
    * The projector's geometry and grade: flip, corner pin, edge blanking and
    * output grade. A property of the room rather than of the look, so it
@@ -5022,8 +5023,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // mount) owes its phase to the solver when it attaches: laid here it
       // went nowhere, and Magnet Garden opened as a bare gold pool.
       phasePendingRef.current = (settingsRef.current.phaseAmount ?? 0) > 0.002 && !fluidsRef.current[0]?.gpu?.addPhase;
-      // A look laid owes its own ferrofluid, not the Magnet's old pool.
-      if (phasePendingRef.current) magnetPoolRef.current = null;
       layPhaseRef.current(presetId);
     }
     for (const later of laid.slice(1)) {
@@ -5063,7 +5062,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const lead = fluidsRef.current[0]?.gpu;
     if (amt > 0.002 && lead?.addPhase) {
       phaseLaysRef.current++;
-      magnetPoolRef.current = null;
       lead.clearPhase?.();
       const scale = settingsRef.current.phaseScale ?? 0.4;
       for (const d of phasePour(phasePourShape(presetId), scale)) lead.addPhase(d.x, d.y, d.r, d.amount);
@@ -5585,12 +5583,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { onMagnetInHandRef.current = onMagnetInHand; }, [onMagnetInHand]);
   /** When a hold last told the app it brought a magnet (onMagnetInHand), on the show's clock. */
   const magnetToldRef = useRef(-Infinity);
-  /** How many pools the Magnet has brought to a bare plate (magnetFor), for the harness. */
-  const magnetPoolsRef = useRef(0);
-  /** The pool the Magnet brought, while it is the plate's ferrofluid: a look's lay (layPhase) or a clear forgets it. */
-  const magnetPoolRef = useRef<{ x: number; y: number; r: number } | null>(null);
-  /** How many times a new solver has been given that pool again, at the magnet, for the harness: a pool laid again is not a pool carried. */
-  const magnetRelaysRef = useRef(0);
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
@@ -5902,26 +5894,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           app ignores a call when the look already has its magnet.
         */
         /*
-          And the ferrofluid, on a plate with none: a pool under the hand,
-          as big as this magnet stands up (lib/magnetSize.ts), the first time
-          it touches. Picking the Magnet used to pour the look's ring over the
-          whole plate, which was the owner's "giant black hole as soon as you
-          pick it". Laid here, before the app turns Ferrofluid up (so the
-          plate draws it), so the solver already has its phase when the
-          amount rises and the bare-plate pour below leaves it alone.
+          And no ferrofluid of its own. From 9x the first touch on a plate
+          with none laid a pool under the hand, as big as Magnet Size, so a
+          magnet over a bare plate did something; the owner, 2026-10-04: "Why
+          does the magnet add ferrofluid? It should only work on ferrofluid
+          that is already there." A magnet is a field. It moves the
+          ferrofluid that was poured, and over a dish with none it moves
+          nothing, which is what a real one does. The ferrofluid comes from
+          the bottle (the Ferrofluid liquid with a laying tool) or the look.
+
+          What the hold still tells the app is whether there is any in the
+          solver to draw (phaseIsLive: something laid it and nothing has
+          cleared it since), so Ferrofluid is turned up only over ferrofluid
+          that is there. Turned up over none, the frame loop's "turned up on
+          a bare plate" pour would lay the look's ring, which is the magnet
+          adding ferrofluid again by the back door.
         */
-        const leadGpu = held && hand ? lead?.gpu : null;
-        if (hand && leadGpu?.addPhase && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive) {
-          const r = MAGNET_POOL_RADIUS * magnetReach(look.magnetSize ?? settingsRef.current.magnetSize);
-          const px = Math.max(0.05, Math.min(0.95, hand.x)), py = Math.max(0.05, Math.min(0.95, hand.y));
-          leadGpu.addPhase(px, py, r, MAGNET_POOL_FILL);
-          magnetPoolRef.current = { x: px, y: py, r };
-          magnetPoolsRef.current++;
-        }
+        const ferroThere = !!(lead?.gpu as { phaseIsLive?: boolean } | undefined)?.phaseIsLive;
         const told = settingsRef.current;
-        if (held && ((told.magnetStrength ?? 0) <= 0 || (told.phaseAmount ?? 0) <= 0.002) && now - magnetToldRef.current > 250) {
+        if (held && ((told.magnetStrength ?? 0) <= 0 || (ferroThere && (told.phaseAmount ?? 0) <= 0.002)) && now - magnetToldRef.current > 250) {
           magnetToldRef.current = now;
-          onMagnetInHandRef.current?.();
+          onMagnetInHandRef.current?.(ferroThere);
         }
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
@@ -6322,22 +6315,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           show when it moves the grid, and the dye is carried across that
           but the phase is not: Magnet Garden had its ferrofluid at 8 s and
           a bare gold pool by 20.
+
+          The lay is the look's own pour, so ferrofluid a hand put down (the
+          bottle) is not what comes back: it comes back as the look's ring
+          while Ferrofluid is up. Carrying the phase across as the dye is
+          carried is PLAN 9w. Until 9x was taken out again the Magnet's own
+          pool was the one exception, laid again at the magnet; the Magnet
+          brings no ferrofluid now, so there is no pool of its own to carry.
         */
         const leadGpu = fluidsRef.current[0]?.gpu ?? null;
         if (leadGpu !== phaseSolverRef.current) {
           phaseSolverRef.current = leadGpu;
-          /*
-            Unless the ferrofluid on the plate is the pool the Magnet brought
-            (magnetFor): a new solver would pour the look's ring in its place,
-            the very pour picking the Magnet no longer makes. The pool goes
-            back where the magnet now is, which is where it had gathered.
-          */
-          const pool = phasePendingRef.current ? null : magnetPoolRef.current;
-          if (pool && leadGpu?.addPhase) {
-            const m = lastMagnetRef.current;
-            leadGpu.addPhase(m?.x ?? pool.x, m?.y ?? pool.y, pool.r, MAGNET_POOL_FILL);
-            magnetRelaysRef.current++;
-          } else if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
+          if (leadGpu?.addPhase && (phasePendingRef.current || (settingsRef.current.phaseAmount ?? 0) > 0.002)) {
             phasePendingRef.current = false;
             layPhaseRef.current();
           }
@@ -6380,9 +6369,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const amt = settingsRef.current.phaseAmount ?? 0;
           // Not when it was turned up for the Ferrofluid bottle: that one
           // goes where it is dropped, not over the whole plate. (The Magnet
-          // needs no exception: picking it no longer turns the amount up,
-          // and its first hold lays its pool before it does, so the plate
-          // is not bare by the time the amount rises: phaseIsLive.)
+          // needs no exception: neither picking nor holding it turns the
+          // amount up unless there is ferrofluid in the solver already, so
+          // the plate is never bare when it rises for the Magnet: phaseIsLive.)
           const pouringOwn = (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0;
           if (amt > 0.002 && phaseAmountRef.current <= 0.002 && leadGpu?.addPhase
               && !(leadGpu as { phaseIsLive?: boolean }).phaseIsLive && !pouringOwn) {
@@ -7108,7 +7097,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               if (h.dosed === 1 && p >= 0.5) {
                 h.dosed = 2;
                 if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
-                else { lead?.gpu?.clearPhase?.(); magnetPoolRef.current = null; }
+                else lead?.gpu?.clearPhase?.();
                 if (lead) {
                   for (let i = 0; i < 4; i++) {
                     doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
@@ -9672,8 +9661,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           magnetHand: () => magnetHandRef.current,
           magnetNow: () => lastMagnetRef.current,
           phaseLays: () => phaseLaysRef.current,
-          magnetPools: () => magnetPoolsRef.current,
-          magnetRelays: () => magnetRelaysRef.current,
           readPhase: async () => {
             const lead = fluidsRef.current[0];
             return lead?.gpu instanceof WebGPUFluid ? await lead.gpu.readPhase() : null;

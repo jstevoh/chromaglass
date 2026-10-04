@@ -298,7 +298,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, the first touch bringing a pool under the hand, with Magnet Size, 9x, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v and carrying the ferrofluid across a new solver 9w, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a disc 9v and carrying the ferrofluid across a new solver 9w, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -1046,6 +1046,26 @@ Open, from building 9i:
   gather into it" (the ring pour this item takes away) and `scripts/ferro.mjs`'s
   "not at its mirror", whose two arms ran on two grids when the governor moved the
   solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
+- **9y. The Magnet brings no ferrofluid** (**shipped**). Asked by the owner
+  (2026-10-04), on the build with 9x live: "Why does the magnet add ferrofluid? It
+  should only work on ferrofluid that is already there." 9x's first touch on a bare
+  plate laid a pool under the hand (`magnetFor`) and the app turned Ferrofluid up to
+  draw it; a new solver was given that pool again at the magnet. All three are gone,
+  on every path (desk, phone fingers, MIDI and the remote all hold the magnet through
+  `magnetFor`): a magnet is a field, and over a dish with none in it a real one moves
+  nothing. The hold still gives the look its magnet (Magnet Strength 0.8, so it is
+  set down where the hand lets go), and turns Ferrofluid up only when the solver has
+  ferrofluid to draw (`phaseIsLive`: poured, then hidden by the amount at 0 or a look
+  with none), since turned up over a bare plate the frame loop's "turned up on a bare
+  plate" pour would lay the look's ring. Magnet Size is the magnet's own size and
+  reach. Every look that shows ferrofluid (Magnet Garden, Ferro Maze, Ferro Paint)
+  pours its own when it is laid; none relied on the Magnet's pool. `npm run magnet`
+  now asks that a hold on a bare plate lays nothing (none in the solver, no look's
+  pour, Ferrofluid still down) while giving the look its magnet; that a pool poured
+  as the bottle pours it is drawn by the hold, not added to, and carried by the
+  drag; and that a new grid lays nothing on a bare plate, picked and untouched or
+  held. Found along the way: ferrofluid poured by hand is not what a new solver gets
+  back; it gets the look's ring while Ferrofluid is up (9w).
 - **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
   solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
   its face than a dipole, and a bigger one at the same gap is somewhat stronger at
@@ -1060,9 +1080,11 @@ Open, from building 9i:
   a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
   weakly at the edge of its reach than a real one.
 - **9w. Carry the ferrofluid across a new solver.** The dye is carried when the
-  governor moves the grid; the phase is not. The look's ring is poured again, and the
-  Magnet's pool laid again where the magnet is (9x), so a pool dragged into a
-  shape loses that shape at a grid move. Read the phase back and write it into the
+  governor moves the grid; the phase is not. The look's ring is poured again while
+  Ferrofluid is up, so a pool dragged into a shape loses that shape at a grid move,
+  and ferrofluid poured by hand from the bottle (on Classic, say) comes back as the
+  look's ring, ferrofluid nobody poured. (9x laid the Magnet's own pool again at the
+  magnet; 9y took that pool out with the rest of the Magnet's laying.) Read the phase back and write it into the
   new grid as the dye is.
 
 ### 10. Playing like a show

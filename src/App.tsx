@@ -1729,7 +1729,7 @@ export default function App() {
   }, [selectedLiquid, presetSeq]);
 
   /*
-    The Magnet brings its ferrofluid, and its magnet, with the hand.
+    The Magnet brings its magnet with the hand, and never ferrofluid.
 
     A magnet over a plate with none on it does nothing at all, which read as
     the tool being broken, so picking it on such a look poured the look's
@@ -1746,23 +1746,31 @@ export default function App() {
     middle, and at a big Ferrofluid Scale they run together across it.
 
     So picking the Magnet does nothing to the plate. Picking a magnet up is
-    taking it in the hand. The first hold over a bare plate brings both: the
-    visualizer lays a pool under the hand, as big as Magnet Size stands up
-    (magnetFor, lib/magnetSize.ts), and asks for the rest here
-    (onMagnetInHand): Ferrofluid turned up so the plate draws it, and a
-    magnet for the look, so the magnet is set down where the hand lets go of
-    it, as before.
+    taking it in the hand. For a day (9x) the first hold over a bare plate
+    then laid a pool under the hand, and the owner: "Why does the magnet add
+    ferrofluid? It should only work on ferrofluid that is already there." So
+    the Magnet brings no ferrofluid at all, on any path: a magnet is a field,
+    and over a dish with none in it a real one moves nothing. The ferrofluid
+    comes from the bottle or the look.
+
+    A hold asks only for what makes the magnet a magnet (onMagnetInHand): a
+    magnet for the look, so it is set down where the hand lets go of it, as
+    before. And Ferrofluid turned up only when the visualizer says there is
+    ferrofluid in the solver to draw (`ferrofluid`: poured, then hidden by
+    the amount at 0 or a look that has none). Turned up over a bare plate, it
+    would have the frame loop pour the look's ring, the magnet adding
+    ferrofluid by another door.
 
     Every hold asks, so a Magnet Strength set to 0 by hand comes back to 0.8
     the next time the Magnet is held: holding a magnet under the glass is
     giving the plate one, and the slider is how it is taken away again
     between holds.
   */
-  const magnetInHand = () => {
+  const magnetInHand = (ferrofluid: boolean) => {
     const s = settingsRef.current;
     const patch: Partial<VisualizerSettings> = {};
     if ((s.magnetStrength ?? 0) <= 0) patch.magnetStrength = 0.8;
-    if ((s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
+    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
     if (Object.keys(patch).length) updateSettings(patch);
   };
 
