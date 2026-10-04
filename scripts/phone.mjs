@@ -857,8 +857,8 @@ try {
         other button pressed to put it back: on Lumia (one plate) that is add,
         then take off; on Classic (two) the reverse. What is measured is the
         Front and Back pickers coming and going with the buttons, which are
-        App's plate count on the stage, and, where this machine runs a plate,
-        the solvers the engine has. A tap that did nothing leaves the sheet as
+        App's plate count on the stage, and the solvers the engine has (built
+        with or without a GPU, so asked everywhere: a missing count fails). A tap that did nothing leaves the sheet as
         it was, and the check wants the button to have flipped both times.
       */
       const platesOf = async () => {
@@ -874,7 +874,7 @@ try {
       // Pressed only when it is there, so a sheet without the button reads as
       // a FAIL that says what the sheet had, not a sixty-second timeout.
       const pressIf = async (testId) => { if (await visible(page, testId)) await tap(page, testId); };
-      const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''}${st.solvers == null ? '' : ` (${st.solvers} solvers)`}`;
+      const plateSays = (st) => `${st.two ? 'Front/Back' : 'one'}${st.add ? ' +add' : ''}${st.off ? ' +off' : ''} (${st.solvers ?? 'no'} solvers)`;
       for (const [id, plates] of [['lumia', 1], ['classic', 2]]) {
         await tap(page, 'phone-open-looks');
         await tap(page, `phone-look-${id}`);
@@ -888,8 +888,8 @@ try {
         const back = await platesOf();
         await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
         await page.waitForTimeout(250);
-        const one = (st) => !st.two && st.add && !st.off && (st.solvers == null || st.solvers === 1);
-        const two = (st) => st.two && !st.add && st.off && (st.solvers == null || st.solvers === 2);
+        const one = (st) => !st.two && st.add && !st.off && st.solvers === 1;
+        const two = (st) => st.two && !st.add && st.off && st.solvers === 2;
         const [a, b] = plates === 1 ? [one, two] : [two, one];
         check(`the Play sheet ${plates === 1 ? 'adds a back plate to' : 'takes the back plate off'} ${id} (${plates === 1 ? 'one plate' : 'two'}), and puts it back`,
           a(laid) && b(flipped) && a(back),

@@ -225,8 +225,9 @@ try {
     the desk offers turns on the look's layer count alone, and every
     built-in carries one or two, so taking Classic's second layer off and
     putting it back walks both states a preset can open in. Measured: the
-    tabs, and which of the two buttons is beside them, after each press. A
-    press that did nothing leaves the tabs as they were and fails.
+    tabs, which of the two buttons is beside them, and the solvers the
+    engine has (built without a GPU too), after each press. A press that
+    did nothing leaves the tabs as they were and fails.
   */
   {
     await clickOn('mode-segmented-design');
@@ -235,8 +236,9 @@ try {
       tabs: document.querySelectorAll('[data-testid^="layer-segmented-"]').length,
       add: !!document.querySelector('[data-testid="add-layer"]'),
       off: !!document.querySelector('[data-testid="remove-layer"]:not([disabled])'),
+      solvers: window.chromaglassDebug?.().solver?.().layers ?? null,
     }));
-    const says = (st) => `${st.tabs} tab${st.tabs === 1 ? '' : 's'}${st.add ? ', +' : ''}${st.off ? ', −' : ''}`;
+    const says = (st) => `${st.tabs} tab${st.tabs === 1 ? '' : 's'}${st.add ? ', +' : ''}${st.off ? ', −' : ''} (${st.solvers ?? 'no'} solvers)`;
     const opened = await deskLayers();
     if (opened.off) await clickOn('remove-layer');
     await settle(500);
@@ -245,9 +247,9 @@ try {
     await settle(500);
     const added = await deskLayers();
     check('the Design desk takes a layer off a two-layer look and puts it back',
-      opened.tabs === 2 && !opened.add && opened.off
-      && taken.tabs === 1 && taken.add && !taken.off
-      && added.tabs === 2 && !added.add && added.off,
+      opened.tabs === 2 && !opened.add && opened.off && opened.solvers === 2
+      && taken.tabs === 1 && taken.add && !taken.off && taken.solvers === 1
+      && added.tabs === 2 && !added.add && added.off && added.solvers === 2,
       `${says(opened)} → ${says(taken)} → ${says(added)}`);
   }
   await clickOn('mode-segmented-perform');

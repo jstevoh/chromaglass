@@ -375,7 +375,9 @@ export function DesignDesk(p: DesignDeskProps) {
                 className="h-8 w-8 rounded-md border border-border-strong text-[15px] text-muted transition-colors hover:bg-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-muted"
                 title={p.onRemoveLayer
                   ? `Take layer ${p.layers} off this look`
-                  : `The back plate is on ${p.layerHeld ?? 'a look of its own'}, so it stays until it follows the front again`}
+                  : p.layerHeld
+                    ? `The back plate is on ${p.layerHeld}, so it stays until it follows the front again`
+                    : 'The back plate is fading back to the front, and comes off once it lands'}
                 aria-label="Remove a layer"
                 data-testid="remove-layer"
               >−</button>
