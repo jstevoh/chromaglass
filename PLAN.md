@@ -95,7 +95,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
-  (19h-2, #240), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
+  (19h-2, #240, found: the old push), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
   on thin pools (0-finger), the wall's gain (0-wallgain), `qa` with no adapter
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
@@ -285,7 +285,7 @@ Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
-| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; real viscous fingering to replace it, open |
+| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
@@ -505,7 +505,7 @@ they do not measure (besides the Finger, the mirror and the wall's gain above): 
 drives the show's clock — 149.5 bpm tapped at 122"), the ear on #195's deploy ("the
 wall only where the frames stalled past 250 ms — 0 of 10 read within 250 ms"), the
 phone's two-finger Drop on #186's deploy (B 81 against 2/0/0, fine by eye; the check is
-split in two in batch 11's note on it), `qa` on
+split in two in batch 11's note on it, and its cause found there 2026-10-04: the fingering push), `qa` on
 #189's deploy with no WebGPU adapter in 10 s, and `startup`'s GPU-start stop at 3.52 s
 against 3.5 on #194 (that one: see the `startup` item in §0's CI list, fixed by
 telling Chromium's hold on the page apart by the page's own thread). Each wants what §0 asks of the Finger: find whether the check or
@@ -1669,6 +1669,33 @@ while this batch's plan was going in (#177), and no cause is known yet:
   both runs, the dye nearest each finger equalled the dye in its disk, so in these
   1.9 s the plate does not carry a pool off its finger. A red with equal counts is
   therefore dye the plate lost, not dye it moved.
+  **Found 2026-10-04 (#240): the plate lost it to the fingering push, which #222
+  took out.** Of the six reds handed over as this line's (2026-10-03), two were the
+  mutants above, run on purpose on #224's branch (commits 7efc16a and 81748e9 say
+  so), not flakes. Three more, one finger at a third with both counts equal (main's
+  deploys at 05:11Z, A 69 to B 229, and 06:06Z, A 236 to B 84; Roy's branch at
+  07:57Z, A 197 to B 72), and the four of 2026-09-27/28 above, all ran on trees
+  before #222 merged (08:38Z 2026-10-03). In the 80-odd Mac runs of the phone's
+  fingers since, none has read one finger low, and four diagnostic runs on the Mac
+  (PR #240, taken out again) held two Drops 146 times, most with the band playing, after
+  the Press as the check does and not, with every readback fresh (landed within two
+  of issued) and no drying, thinning, air or multiply near the fingers: none did
+  either. The push moved dye up its own gradient where its noise was negative, a
+  held pool is the steepest gradient on the plate, and the advection's hold and cap
+  threw away what it piled up; where the noise was positive the pool kept its dye,
+  so which finger lost hung on where the plate's angle put it, and when.
+  `npm run grating` §6 replays two held Drops (Water, 7.9 a step, as the red lines
+  print) at two red runs' cells on the phone's grid, at ten moments of the show's
+  clock: with the push back the pools read 82 to 238 of 237 laid, a pair as
+  uneven as 94 to 235 (0.40), four of twenty under 0.6; as it is, every pool keeps
+  191 or 192, the pairs 1.00 of each other. *Still open, and rarer:* both fingers low at once, after
+  #222. Once on #230's branch (16:07Z 2026-10-03, A 0 and B 0 with 214 and 206
+  laid, the mirrors at -0 to -3) and once in the 146 holds (74 and 76 of 285 and
+  277, the whole plate up 159 of 562 laid, low from the first reading 0.4 s in,
+  in the one diagnostic run that did not yet log drying or air). Not stale
+  readbacks; not seen in the few holds with the band never started, too few to
+  clear the band. The line now prints the whole plate's gain against what both
+  fingers handed it, so the next one says whether the plate lost dye everywhere.
 - **Found while reading it, and fixed with it: a held Drop with Drop Height up let
   go of a drop on every step, not every tenth.** Its clock (`dropClockRef`, and each
   finger's own) was counted up only past a frame's first step until it had started,
@@ -4183,6 +4210,11 @@ like day (`npm run macqueue -- --hours 24` for the time).
 - **19h-2. The phone's second finger lays a third as much as the first, or nothing.** "A 23
   steps, B 11 steps" with both down; the same pixels land on different cells run to run.
   Reads as a multi-touch Drop bug. Handoff: `handoff/ci-overhaul/phone-two-finger-drop.md`.
+  **Found (#240): not a multi-touch bug.** The one-finger-at-a-third reds were the fingering
+  push #222 took out, which threw away up to 60 % of a held pool by where and when it was
+  laid; `grating`'s §6 holds two Drops at ten moments and reads the old push 0.40 apart,
+  today's 1.00. The rarer case of both fingers low at once is still open (batch 11's
+  two-finger entry), and `phone` now prints what the plate gained of what it was handed.
 - **19h-3. The deploy's second Mac run. Shipped in the same PR, the owner's choice
   ("Skip if no overlap", 2026-10-04).** Every merge behind main (the owner's rule since
   2026-09-28) re-ran all four shards on the deploy: 14 of the last 20 merges, about 50

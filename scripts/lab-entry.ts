@@ -97,6 +97,19 @@ const api = {
     const bytes = f32 ? new Float32Array(data).buffer : halves(data);
     solver['device'].queue.writeTexture({ texture: od.read }, bytes, { bytesPerRow: row }, [N, N]);
   },
+  /** Any velocity, heat and gap at all, cell for cell: L × L × 4 (vx, vy, temp, gap), added on the next flush. */
+  addVel(data: number[]) {
+    const { velAdd } = lab!;
+    if (data.length !== velAdd.length) throw new Error(`addVel: ${data.length} values for a ${velAdd.length}-value plate`);
+    for (let k = 0; k < velAdd.length; k++) velAdd[k] += data[k];
+  },
+  /**
+   * Where the plate's clock stands, in seconds: the solver's noises (the
+   * turbulence, the old fingering push `npm run grating` puts back) are
+   * drawn at it, so a check can ask one moment of a show and not only the
+   * first second of a new plate.
+   */
+  setTime(t: number) { lab!.time = t; },
   /** A velocity kick / heat / gap delta at (x, y): channels vx, vy, temp, gap. */
   vel(x: number, y: number, r: number, v: [number, number, number, number]) {
     const { L, velAdd } = lab!;
