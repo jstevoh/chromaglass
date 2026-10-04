@@ -5503,7 +5503,10 @@ area's dye as a pool with its own rim of drops and each area's liquid into it; t
 automation's drops land in the areas (weighted by size), in each area's dye and
 liquid; the bass's ring, burst, pulse and squeeze land in the bass area (taking several
 in turn, kick by kick), the mid's stream circles the mid area's edge, the treble's
-sparks fall in the treble area. A Go and the sequencer pour into the same places. A
+sparks fall in the treble area (a look with no mid or treble area of its own takes its
+areas in turn, eight seconds each). The Color route still moves the colour, cycling
+between an area's dye and the next one, and a kick's ring is the other of the two
+against its pool. A Go and the sequencer pour into the same places. A
 hand that picks the plate's bottles keeps the areas' places and colours and pours what
 was picked. What happens in each area is the liquid's own physics already in the
 solver (liquidPhase.ts: glycerine's body, soap's Marangoni, syrup's weight); nothing
@@ -5511,7 +5514,7 @@ paints a region. A look without areas plays exactly as before, its dice drawn in
 same order. `npm run plate` checks every area look: real liquids the look lists, dyes
 in its set, inside the plate, areas apart, and the routing the app uses.
 
-Velvet Underground and Lumia are rebuilt on it (judging §33):
+Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
 
 - **Velvet Underground**: a magenta glycerine pool the mids circle (top left), a
   raspberry soap well the bass breaks open (right), ultramarine syrup glittering with
@@ -5571,9 +5574,12 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   difference is invisible; on a look that spins (acid-trip turns in about 20 s) the
   hands should stay put in the room and the areas' liquids turn away from them. Needs
   the dish's angle (`plateAngle`) to turn a room-frame point into the grid.
-- **25d. Areas on the back plate's own look and the second plate.** A back plate with a
-  look of its own takes that look's areas; the second plate of a two-plate look lays
-  nothing at first (laySecondPlate) and takes the automation's area drops only.
+- **25d. The second plate of a two-plate area look.** A back plate with a look of its
+  own takes that look's areas whole (its pools, liquids, hand-off pours, drops and
+  music). The second plate of a two-plate look (Velvet Underground) lays nothing at
+  first (laySecondPlate), as before, and takes the automation's area drops only; it
+  could lay its own pools offset from the front's, so the two plates' areas overlap
+  in part, as two projectors' do.
 - **25f. Cell Bloom's cells are drawn by the camera, not grown (a painted effect,
   not new here).** Paint Cells (`macroDetail`'s `cellField` in wgsl/plate.ts) draws
   rings over any dye under the closeup, clumped by noise; the silicone poured in its

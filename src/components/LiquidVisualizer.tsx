@@ -4264,12 +4264,38 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * Not from the working harmony, which a hue journey narrows by one dye, so
    * two of three areas would share a colour.
    */
-  const areaColor = (layer: number, a: PlateArea) => {
+  const areaDyeOf = (layer: number, a: PlateArea, shift = 0): number => {
     const own = layer >= 1 ? backDyesRef.current : null;
     const lock = harmonyLockRef.current;
-    if (own) return PALETTE_RGB[areaDye(a, lock ?? own.contract ?? own.harmony)];
+    if (own) return areaDye(a, lock ?? own.contract ?? own.harmony, shift);
     const lead = lock ? 0 : paletteWindowRef.current.lead + journeyRef.current.lead;
-    return PALETTE_RGB[areaDye(a, lock ?? presetContractRef.current ?? harmonyRef.current, lead)];
+    return areaDye(a, lock ?? presetContractRef.current ?? harmonyRef.current, lead + shift);
+  };
+  const areaColor = (layer: number, a: PlateArea) => PALETTE_RGB[areaDyeOf(layer, a)];
+  /**
+   * The music's colour in an area: the Color route's cycle (colFor's), run
+   * between the area's own dye and the next one, as its laid pool has them.
+   * So the route still moves the colour on an area look, and a kick's ring
+   * still shows as a colour against its pool, without the area taking on the
+   * whole palette and becoming every other area.
+   */
+  const areaCycle = (layer: number, a: PlateArea, t: number) => harmonyCycle([areaDyeOf(layer, a), areaDyeOf(layer, a, 1)], t);
+  /** An area look's liquids, poured into its areas: `per` doses each, where it lays its pools. */
+  const layAreaLiquids = (fluid: FluidSimulation, layer: number, areas: readonly PlateArea[], per: number) => {
+    for (const a of areas) for (let i = 0; i < per; i++) {
+      const p = pointInArea(a, GRID_SIZE, DICE.lay, 0.8);
+      doseArea(fluid, layer, a, p.x, p.y, 1.2);
+    }
+  };
+  /** One of a hand-off's palette pours on an area look: into an area, in its dye, with its liquid. */
+  const pourIntoArea = (fluid: FluidSimulation, layer: number, areas: readonly PlateArea[], styles: string[]) => {
+    const area = pickArea(areas, DICE.lay);
+    const at = pointInArea(area, GRID_SIZE, DICE.lay, 0.7);
+    const rx = Math.floor(at.x), ry = Math.floor(at.y);
+    const color = areaColor(layer, area);
+    fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+    fluid.addTemp(rx, ry, 1.2);
+    doseArea(fluid, layer, area, rx, ry, 0.8);
   };
   /** Pour into an area: its own liquid while the bottles are the look's, else one of the bottles picked. */
   const doseArea = (fluid: FluidSimulation, layer: number, a: PlateArea, x: number, y: number, strength: number) => {
@@ -5073,7 +5099,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         backHandoffRef.current = null;
         const seeded = later.seedPreset(own.id, noise2D);
         if (!own.contract && seeded.length > 0) own.harmony = seeded;
-        for (let i = 0; i < 15; i++) doseLiquid(later, own.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
+        const ownAreas = plateAreas(own.id);
+        if (ownAreas) layAreaLiquids(later, 1, ownAreas, 6);
+        else for (let i = 0; i < 15; i++) doseLiquid(later, own.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
       } else laySecondPlate(later, presetId);
     }
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
@@ -5090,12 +5118,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // doses apiece, under the pool its seed laid there: the liquid is what
     // makes that part of the plate behave unlike the rest.
     const areas = areasRef.current;
-    if (fluid && areas) {
-      for (const a of areas) for (let i = 0; i < 6; i++) {
-        const p = pointInArea(a, GRID_SIZE, DICE.lay, 0.8);
-        pourLiquid(fluid, a.liquid, p.x, p.y, 1.2);
-      }
-    } else if (fluid) for (let i = 0; i < 15; i++) {
+    if (fluid && areas) layAreaLiquids(fluid, 0, areas, 6);
+    else if (fluid) for (let i = 0; i < 15; i++) {
       doseLiquid(fluid, plateLiquidsRef.current,
         10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
     }
@@ -7161,13 +7185,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if ((settingsRef.current.phaseAmount ?? 0) > 0.002) layPhaseRef.current();
                 else lead?.gpu?.clearPhase?.();
                 const handedAreas = areasRef.current;
-                if (lead && handedAreas) {
-                  // An area look's liquids go into its areas, as laying it pours them.
-                  for (const a of handedAreas) for (let i = 0; i < 2; i++) {
-                    const p = pointInArea(a, GRID_SIZE, DICE.lay, 0.8);
-                    doseArea(lead, 0, a, p.x, p.y, 1.2);
-                  }
-                } else if (lead) {
+                // An area look's liquids go into its areas, as laying it pours them.
+                if (lead && handedAreas) layAreaLiquids(lead, 0, handedAreas, 2);
+                else if (lead) {
                   for (let i = 0; i < 4; i++) {
                     doseLiquid(lead, plateLiquidsRef.current, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
                   }
@@ -7181,16 +7201,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (!fluid) break;
                 // An area look's palette is poured into its areas, each its own dye.
                 const handedAreas = areasRef.current;
-                const area = handedAreas ? pickArea(handedAreas, DICE.lay) : null;
-                const at = area ? pointInArea(area, GRID_SIZE, DICE.lay, 0.7) : null;
-                const rx = at ? Math.floor(at.x) : Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
-                const ry = at ? Math.floor(at.y) : Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
-                const color = area ? areaColor(0, area) : harmonyColor(harmonyRef.current);
+                if (handedAreas) { pourIntoArea(fluid, 0, handedAreas, injectStyleRef.current); continue; }
+                const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
+                const color = harmonyColor(harmonyRef.current);
                 const styles = injectStyleRef.current;
                 fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
                 fluid.addTemp(rx, ry, 1.2);
-                if (area) doseArea(fluid, 0, area, rx, ry, 0.8);
-                else doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
+                doseLiquid(fluid, plateLiquidsRef.current, rx, ry, 0.8);
               }
               if (p >= 1) handoffRef.current = null;
             }
@@ -7225,7 +7243,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   let seeded: number[] = [];
                   h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });
                   if (!dyes.contract && seeded.length > 0) dyes.harmony = seeded;
-                  for (let i = 0; i < 4; i++) {
+                  const backAreas = plateAreas(dyes.id);
+                  if (backAreas) layAreaLiquids(fluid, 1, backAreas, 2);
+                  else for (let i = 0; i < 4; i++) {
                     doseLiquid(fluid, dyes.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
                   }
                 }
@@ -7233,6 +7253,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const due = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.5)) * HANDOFF_POURS + 1e-6);
                 while (h.poured < Math.min(due, HANDOFF_POURS)) {
                   h.poured++;
+                  const backAreas = plateAreas(dyes.id);
+                  if (backAreas) { pourIntoArea(fluid, 1, backAreas, dyes.styles); continue; }
                   const rx = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
                   const ry = Math.floor(GRID_SIZE * (0.18 + DICE.lay.float() * 0.64));
                   const color = harmonyColor(harmonyOf(1));
@@ -7314,7 +7336,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // so bass, mids and swells paint distinguishable hues.
                 const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.3 + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
-                const ar_a = audioCol.r, ag_a = audioCol.g, ab_a = audioCol.b;
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
                 if (activeFluid) {
@@ -7348,15 +7369,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     interest, and the looks are moved over one at a time.
                   */
                   const musicAreas = areasOf(activeLayerRef.current);
+                  // A kick moves the bass on to its next area (when the look
+                  // has several) before anything of this kick lands, so its
+                  // ring, its burst and Beat Squeeze's press all land together.
+                  if (musicAreas && kickRef.current.kick && simStep === 0) areaKicksRef.current++;
                   const bassArea = musicAreas ? areaForBand(musicAreas, 'bass', areaKicksRef.current) : null;
                   const bassAt = bassArea ? areaCentre(bassArea, GRID_SIZE) : null;
                   const bassX = bassAt ? Math.floor(bassAt.x) : centerX;
                   const bassY = bassAt ? Math.floor(bassAt.y) : centerY;
-                  const bassCol = bassArea ? areaColor(activeLayerRef.current, bassArea) : null;
+                  // The mid's and the treble's areas, where a look gives them
+                  // none of their own, take its areas in turn, a new one every
+                  // eight seconds of the show.
+                  const turn = Math.floor(time / 8);
+                  const areaTime = time * 0.3 + colorMod * Math.PI;
 
                   // Center pulse — scales with density mapping
                   if (densityMod > 0.005) {
-                    const pc = bassCol ?? audioCol;
+                    const pc = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime) : audioCol;
                     activeFluid.autoInject(aStyle(), bassX, bassY, densityMod * 0.025 * autoAmp, pc.r, pc.g, pc.b, densityMod);
                     activeFluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
                   }
@@ -7383,7 +7412,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // Beat edge: a fresh-colored ring of dye blooms outward on each
                   // kick so bass hits are visible in COLOR, not just motion
                   if (kickRef.current.kick && simStep === 0) {
-                    const ringCol = bassCol ?? colFor(2.0);
+                    // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
+                    const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
                     const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
                     const drops = 14;
@@ -7406,8 +7436,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       if (bassArea) {
                         doseArea(activeFluid, activeLayerRef.current, bassArea,
                           bassX + Math.cos(da) * ringR, bassY + Math.sin(da) * ringR, bass01);
-                        // The next kick goes to the next bass area, if the look has several.
-                        areaKicksRef.current++;
                       } else {
                         doseLiquid(activeFluid, liquidsOf(activeLayerRef.current),
                           centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
@@ -7419,9 +7447,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // Mid: orbital injection in its own hue
                   if (mid01 > 0.2) {
                     // On an area look, round the edge of its mid area, in that area's dye.
-                    const midArea = musicAreas ? areaForBand(musicAreas, 'mid', 0) : null;
+                    const midArea = musicAreas ? areaForBand(musicAreas, 'mid', turn) : null;
                     const midAt = midArea ? areaCentre(midArea, GRID_SIZE) : { x: centerX, y: centerY };
-                    const midCol = midArea ? areaColor(activeLayerRef.current, midArea) : colFor(1.3);
+                    const midCol = midArea ? areaCycle(activeLayerRef.current, midArea, areaTime + 0.65) : colFor(1.3);
                     const orbitR = midArea ? midArea.r * GRID_SIZE * 0.8 : GRID_SIZE * 0.3;
                     const mx = Math.floor(midAt.x + Math.cos(time * 0.6) * orbitR);
                     const my = Math.floor(midAt.y + Math.sin(time * 0.8) * orbitR);
@@ -7435,8 +7463,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // so high frequencies glitter instead of acting invisibly
                   if (treble01 > 0.2) {
                     // On an area look, in its treble area and that area's dye.
-                    const trebleArea = musicAreas ? areaForBand(musicAreas, 'treble', 0) : null;
-                    const sparkCol = trebleArea ? areaColor(activeLayerRef.current, trebleArea) : colFor(3.1);
+                    const trebleArea = musicAreas ? areaForBand(musicAreas, 'treble', turn + 1) : null;
+                    const sparkCol = trebleArea ? areaCycle(activeLayerRef.current, trebleArea, areaTime + 1.55) : colFor(3.1);
                     // Fewer, larger droplets: a cloud of one-cell specks blurs
                     // into fog, a handful of real drops stays drops.
                     const sparks = Math.floor(treble01 * 2 * impactMul);

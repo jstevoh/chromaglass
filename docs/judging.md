@@ -853,7 +853,7 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 - Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
   known, not this change.
 
-## 33. Several areas of interest: Velvet Underground, Lumia and Cell Bloom (PLAN 25a)
+## 34. Several areas of interest: Velvet Underground, Lumia and Cell Bloom (PLAN 25a)
 
 The owner found Velvet Underground, Lumia and Cell Bloom underwhelming, with one area of
 interest. All three are now built on areas of the dish (`src/lib/plateAreas.ts`): a few places apart
