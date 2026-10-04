@@ -2314,7 +2314,10 @@ try {
     const OFF = {
       front: { backLevel: 0, filmMix: 0 },
       back: { frontLevel: 0, filmMix: 0, markMix: 0 },
-      film: { frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0 },
+      // The film alone also drops the lamp ground (lib/plateSources.ts): on a
+      // look on the lamp, Fillmore East among them since PLAN 18b-1, its
+      // reference on the wall has to as well, or it is the bare lamp.
+      film: { frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0, lampGround: 0 },
     };
     const live = await page.evaluate(() => window.chromaglassSettings?.());
     // The film source draws a Multiply film as Add (lib/plateSources.ts), so
@@ -2322,7 +2325,7 @@ try {
     if (live.filmBlend === 'multiply') OFF.film.filmBlend = 'add';
     const drawn = {};
     for (const kind of ['front', 'back', 'film']) {
-      const restore = Object.fromEntries(Object.keys(OFF[kind]).map(k => [k, live[k] ?? (k === 'filmMix' || k === 'markMix' || k === 'gelWheel' || k === 'lumia' ? 0 : 1)]));
+      const restore = Object.fromEntries(Object.keys(OFF[kind]).map(k => [k, live[k] ?? (k === 'filmMix' || k === 'markMix' || k === 'gelWheel' || k === 'lumia' || k === 'lampGround' ? 0 : 1)]));
       await set(OFF[kind]);
       const ref = await halves('wall', kind);
       await set(restore);

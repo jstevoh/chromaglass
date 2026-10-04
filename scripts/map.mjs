@@ -317,8 +317,10 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
     zeroed('front') === [level('back'), level('film')].sort().join(' '), zeroed('front'));
   check('the back plate alone takes out the front plate, the film and the logo (which goes out on the front plate\'s projector), and nothing else',
     zeroed('back') === [level('front'), level('film'), level('mark')].sort().join(' '), zeroed('back'));
-  check('the film alone takes out both plates, the lamp rows and the logo, and nothing else',
-    zeroed('film') === ['front', 'back', 'led', 'gel', 'lumia', 'mark'].map(level).sort().join(' '), zeroed('film'));
+  // The lamp ground too: on a look on the lamp the film alone would otherwise
+  // be the bare lamp with the film over it (PLAN 18b-1).
+  check('the film alone takes out both plates, the lamp rows, the logo and the lamp ground, and nothing else',
+    zeroed('film') === [...['front', 'back', 'led', 'gel', 'lumia', 'mark'].map(level), 'lampGround'].sort().join(' '), zeroed('film'));
   check('and none of them touches the dimmer, so the dimmer and a blackout reach every projector',
     ['front', 'back', 'film'].every(k => m.sourceSettings(k, { ...base, dimmer: 0.37 }).dimmer === 0.37));
   // Multiply over the black under the film alone is black: the film alone draws a Multiply film as Add, and only it.
