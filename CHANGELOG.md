@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the lamp through the dye (PLAN 18b)
+
+- **Lamp Ground** (`lampGround`, Settings → Lamp & Light; MIDI, the desks, the
+  remote and the phone's Looks sheet): what the dye is seen on. At 0, as every
+  look ships, the dye glows on black as it always has. At 1 the lamp under the
+  dish shines up through it, as on a projector: what gets through is the lamp
+  times exp(−absorbance × amount), colour by colour (by six bands with Spectral
+  Optics), with no darkness fudge and no cap. Clear liquid is the lamp's white,
+  two dyes darken where they cross, a deep pool saturates and then goes dark, a
+  gel or the LED ring under the glass shows through the dye, the back plate is
+  a second filter, and the pH, BZ and Liesegang colours are absorbers in the
+  light rather than paint. Between, the two pictures fade, so a fader plays it.
+  Evolve leaves it alone; the photograph keeps its paper.
+- On the lamp ground the lamp is set down by the hot-spot's peak, so the
+  brightest point is the lamp at full, not 1.28 times it, which burnt the
+  middle of a white plate out. Halfway, the picture is half of each.
+- `npm run lamp` (CI, open shard): every look at 0 is the plate as it was before,
+  byte for byte; a clear pool throws the whole lamp; twice the dye lets through
+  the square, in the dye's own colour; a gel and the back plate filter through
+  the dye; halfway is half of each.
+
 ### Changed — Thin Gap on in every look (PLAN 18a-every)
 
 - **Every look runs on a thin gap**, so a press pushes the liquid out over the

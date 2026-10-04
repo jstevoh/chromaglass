@@ -680,6 +680,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <Slider label="Pushes Dye" field="phaseDisplace" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('phaseDisplace') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
+            Lamp Ground (PLAN 18b), always: the ground the dye is seen on,
+            black or the lamp through it, which turns a look over and is
+            worth a thumb from across the room.
+          */}
+          <Slider label="Lamp Ground" field="lampGround" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('lampGround') as number | undefined} {...sliderProps} connected={connected} />
+          {/*
             And Ben-Day Dots while the plate prints (the Roy look): how much
             of a comic it is, for a thumb.
           */}

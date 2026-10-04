@@ -775,6 +775,31 @@ has been seen at 60 fps like this:
 - a look you saved before this should open with Thin Gap on; one you save with it
   off should stay off.
 
+## 31. The lamp through the dye (Lamp Ground, PLAN 18b)
+
+Settings → Lamp & Light → **Lamp Ground** (also MIDI, the desks, the remote and the
+phone's Looks sheet). At 0, as every look ships, the dye glows on black as it always
+has. At 1 the lamp under the dish shines up through it, as a projector does: clear
+liquid is the lamp's white, two dyes over each other darken where they cross, a deep
+pool goes saturated and then dark, a gel or the LED ring under the glass shows
+through the dye, and the back plate is a second filter in the light. It turns the
+picture over, so it is a choice per look, not a fix: the pale lace of the reference
+still (PLAN 20) can only show on it. Please say:
+
+- which looks you want on the lamp ground, and which stay on black (Save Look keeps
+  it); a look on the lamp may want less dye (Dye Budget) to read as colour rather
+  than dark, and its dyes are the ones it was given for black;
+- whether the fade between the two (a MIDI fader on Lamp Ground) is worth playing,
+  or only a setting;
+- edges on the lamp: the meniscus, the boundary line, lacing and cells were drawn
+  for black and are carried over as a darkening or brightening of the light through
+  the dye; say if they read wrong (18e makes them from refraction instead);
+- Roy, 1963 on the lamp: the print reads dense dye as black ink, so its pools print
+  black; it should probably stay on black;
+- a look with the chemistry (Red Cabbage, Chemical Clock, Agate) on the lamp: the
+  pH, BZ and Liesegang colours are now filters in the light, so a BZ wave is a pale
+  blue band through the orange with the dye still showing.
+
 ---
 
 ## Reading the frame time while you do it

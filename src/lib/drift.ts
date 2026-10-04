@@ -53,6 +53,9 @@ const LIGHT_STACK = new Set([
   // The comic print (the Roy look): half a print is neither, so it moves
   // only by hand.
   'benDay',
+  // The ground the dye is seen on (PLAN 18b) turns the picture over, black
+  // to the lamp's white: a choice for a look, made by hand.
+  'lampGround',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

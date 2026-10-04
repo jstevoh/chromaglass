@@ -1499,8 +1499,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
         <Info>
-          One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything.
+          One lamp under the plate, and every material lit from where it sits: bubbles shaded as lenses with a caustic arc on the far side, dye rims bright toward the lamp and shadowed away from it. The lamp wanders, and rocks with the plate; a second lamp from the other side puts two lights across everything. Lamp Ground is what the dye is seen on: at 0 the dye glows on black, as a light show's slides always were drawn here; at 1 the lamp shines up through it, as a projector does, so clear liquid is the lamp's white and dense dye deepens and then goes dark.
         </Info>
+        {/* The lamp under the dish shining up through the dye (PLAN 18b), or the dye as light on black. */}
+        <Slider
+          label="Lamp Ground"
+          value={settings.lampGround ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lampGround: v })}
+          settingKey="lampGround"
+        />
         <Slider
           label="Light Play"
           value={settings.lightPlay ?? 0}
