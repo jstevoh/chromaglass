@@ -68,6 +68,7 @@ Where each batch stands, as of 2026-09-27:
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones) |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
+| 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §25); 22b–22i open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -4329,3 +4330,79 @@ a frame is for (inferred, not measured). And the line catches a wrongly converte
 only because the harness opens the wall five seconds after the show (the conversion's
 error is that gap, caught by the one-second stale bound); with under a second between
 them it would pass. The harness should check its own gap is over a second.
+
+## 22. Spin the plate
+
+Asked 2026-09-28: "spin the plate on command, or set it to spin automatically at some
+rate (or a rate controlled by some other factor, like music tempo); give me a control
+(like press) and a setting."
+
+**22a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the
+remote's pad), and **Auto Spin** (Off, Rate in rev/min either way round, Tempo at a turn
+every 1–64 beats) with **Reverse Spin**, on the sheet, the phone's Play sheet, the
+remote, MIDI and the desks. Off by default, so every look is as it was.
+
+The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, the
+`spinSwirl` kernel in `src/gpu/wgsl/fluid.ts`):
+
+- **The glass drags the liquid round through the gap.** The bulk of the liquid follows
+  the dish with the gap's drag time τ = h²/12ν: at the 6 mm rest gap water takes 3 s,
+  the thick liquid 0.15 s, oil 0.06 s. The picture is the liquid, so it trails the
+  glass by Ωτ at a steady turn. `npm run turntable`: 63% in one τ at any frame rate,
+  the lag Ωτ to 2%.
+- **Where the gap is tight the liquid is gripped harder.** What is left of the dish's
+  turn after the bulk (A = Ω − ω_l) drives a swirl w with the Hele-Shaw drag
+  k = 12ν/h² in each cell: dw/dt = A(k − k0) ẑ×r − k w, integrated exactly. A pressed
+  palm goes round with the glass (0.86 of A r) while the plate away from it barely
+  moves (0.029); a domed plate swirls at A r (1 − h²/h0²) to 1.3%; oil in water is
+  gripped harder than the water (0.69 against 0.087). `npm run dish`.
+- **Spun, the heavy goes out and the light comes in.** The centrifugal force on a
+  density contrast β is −∇(ω² r²/2)·β: dense dye (Solutal Buoyancy's contrast) is flung
+  outward and oil (12% lighter) drawn inward. `npm run dish`: +1.75e-2 and −1.12e-2.
+- **Tempo is locked to the beat**, not only to its speed: the dish is steered to where
+  the counted beats put it, so a knock is taken back (0.008 rad off, 20 s after a
+  0.5 rad/s flick) where a motor asking only for the speed stays knocked off (0.73).
+  With no beat heard it turns at the Rate; a beat once heard is held.
+- The swirl only runs while the dish and the liquid turn at different speeds (or the
+  liquid turns), and a tail after; otherwise it is zero-filled and skipped, and the
+  flow the dye rides is a still plate's to the bit (`npm run dish`, "largest
+  difference 0").
+- The phone's landscape dock now goes to one row at 860 px, not 800: eleven buttons on
+  the tools' side need 856. The desks' tool row wraps inside its column at 1024.
+
+**Shortcuts, named so they are replaced:**
+
+- **22b. The swirl is not carried by its own flow.** τU/L is about 1 for water spun
+  hard, so the swirl's inertia matters there; it is integrated in place. Advect it
+  with the velocity (a semi-Lagrangian step, as the current is).
+- **22c. Coriolis is left out.** In a flat gap it is a pure gradient for a
+  divergence-free flow and the projection takes it; with a varying gap a sliver is
+  left. Add 2ω_l ẑ×u where h varies, and measure what it changes.
+- **22d. The CPU solver gets the bulk lag and not the swirl.** Where there is no
+  WebGPU, `FluidSimulation`'s own step (`LiquidVisualizer.tsx`) turns the picture
+  with the liquid but has no swirl; give it `spinSwirl`'s few lines.
+- **22e. The liquid's drag on the dish is ignored.** The dish is a flywheel with its
+  own drag (the plate's old spin), not slowed by the liquid it drags; a thick liquid
+  should brake a flicked dish harder than water.
+- **22f. The performance recorder does not record a Spin hand.** A spin from the tool
+  replays as nothing; Auto Spin is a setting, so it replays.
+- **22g. With Thin Gap on (18a, #220).** The swirl field hands the thin solve the
+  dish's drive as a speed at the rest gap, a/k0, and the solve's own drag 12ν/h²
+  brings the liquid to a/k and makes it conserve liquid (`npm run dish`: a pressed
+  palm 0.607 against the old plate's 0.534, away from it 0.006 of that; handed the
+  integrated swirl it counted the gap twice and the palm read 0.045). Properly the
+  dish's drag is a force in the thin solve's own momentum balance (A(k − k0)ẑ×r beside
+  18a-2's forces), with no swirl field at all.
+- **22h. The look's own turning is still rigid.** A look's motor, the music routed
+  to rotation (eleven shipped looks) and a flick turn the picture as they always
+  have, with the flick's twist term, and not through the dish: sent through the
+  liquid's lag, a thin look's sway was smoothed over three seconds and the swirl ran
+  on every look with music, which is a change to shipped looks nobody has judged.
+  The turntable is a second dish under the look's. Once the lag has been seen on the
+  Mac (`docs/judging.md` §25), put the look's turning on the same dish, retire the
+  twist's flick term, and judge those eleven looks against main.
+- **22i. The hand reads its angle, not its grip.** A hand turns the dish at its
+  angular speed round the middle, held to a turn and a half a second, because near
+  the middle a small move is a large angle. A hand's real torque is its friction
+  times its lever arm: weight each hand by its radius and let a thick liquid's drag
+  push back (22e).

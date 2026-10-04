@@ -8,6 +8,7 @@ import {
   Laptop,
 } from 'lucide-react';
 import { Slider } from '../ui';
+import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
@@ -41,7 +42,7 @@ import type { Track } from '../../lib/musicLibrary';
  * press under 48 pixels, sliders with the touch track and handle.
  */
 
-export type PhoneTool = 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet';
+export type PhoneTool = 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin';
 
 const TOOLS: { id: PhoneTool; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { id: 'dropper', label: 'Drop', icon: Droplet },
@@ -53,6 +54,8 @@ const TOOLS: { id: PhoneTool; label: string; icon: ComponentType<{ size?: number
   { id: 'press', label: 'Press', icon: Hand },
   { id: 'finger', label: 'Finger', icon: Fingerprint },
   { id: 'magnet', label: 'Magnet', icon: Magnet },
+  // The dish under the finger (PLAN §22): go round the middle and it turns.
+  { id: 'spin', label: 'Spin', icon: RotateCw },
 ];
 
 export interface PhoneLook {
@@ -113,6 +116,13 @@ export interface PhoneStageProps {
   onDrain: () => void;
   onSpin: () => void;
   onLucky: () => void;
+  /*
+    Auto Spin (PLAN §22): the dish's own motor, Off, Rate or Tempo, its rate
+    in rev/min (signed: the sign is the way round) and, in Tempo, the beats
+    a turn. On the Play sheet beside the flick, since a turning dish is
+    something played, not set up.
+  */
+  spin: { auto: number; rpm: number; beats: number; onChange: (patch: Partial<VisualizerSettings>) => void };
   // The closeup
   zoom: number;
   onZoom: () => void;
@@ -394,13 +404,19 @@ export function PhoneStage(p: PhoneStageProps) {
         their own (61 px each at 667) and the sheets the row under it. In
         landscape every row is the 48 px a thumb needs and no more, and the
         gaps are 4 px, since the second row costs the plate its height.
+
+        Spin made it ten tools and the bottle (PLAN §22): six across in
+        portrait, still two rows (59 px each at 390), and all eleven in a
+        landscape row (55 px at 667). Beside the sheets they were 43 px at
+        800 wide and 47 on an 844 phone, so the side-by-side row now starts
+        at 860 (index.css), where all eleven have their 48.
       */}
       <div
         className="pointer-events-auto flex flex-col gap-1.5 landscape:gap-1 border-t border-border bg-black/55 px-2 pt-1.5 backdrop-blur-xl wide-land:flex-row wide-land:items-center"
         style={{ paddingBottom: 'max(6px, env(safe-area-inset-bottom))' }}
         data-testid="phone-dock"
       >
-        <div className="grid min-w-0 flex-1 grid-cols-5 gap-1 landscape:grid-cols-10" data-testid="phone-tools">
+        <div className="grid min-w-0 flex-1 grid-cols-6 gap-1 landscape:grid-cols-11" data-testid="phone-tools">
           {TOOLS.map(({ id, label, icon: Icon }) => {
             const on = p.tool === id;
             return (
@@ -731,9 +747,32 @@ export function PhoneStage(p: PhoneStageProps) {
               </div>
             </>
           )}
+          <SectionLabel>Turn the dish by itself</SectionLabel>
+          <div className="grid grid-cols-3 gap-1.5" data-testid="phone-spin-auto">
+            {(['Off', 'Rate', 'Tempo'] as const).map((name, mode) => (
+              <button key={name} onClick={() => p.spin.onChange({ spinAuto: mode })} aria-pressed={Math.round(p.spin.auto) === mode}
+                data-testid={`phone-spin-auto-${name.toLowerCase()}`}
+                className={`h-12 rounded-lg border text-[14px] ${Math.round(p.spin.auto) === mode ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                {name}
+              </button>
+            ))}
+          </div>
+          <div className={`mt-3 transition-opacity ${Math.round(p.spin.auto) === 0 ? 'opacity-50' : ''}`}>
+            <Slider label="Spin rate" value={p.spin.rpm} min={-SPIN_RPM_MAX} max={SPIN_RPM_MAX} step={0.5} onChange={(v) => p.spin.onChange({ spinRpm: v })}
+              display={`${p.spin.rpm.toFixed(1)} rpm`} touch testId="phone-spin-rate" midiKey="setting:spinRpm" />
+            {Math.round(p.spin.auto) === 2 && (
+              <Slider label="Beats a turn" value={p.spin.beats} min={SPIN_BEATS_RANGE[0]} max={SPIN_BEATS_RANGE[1]} step={1}
+                onChange={(v) => p.spin.onChange({ spinBeats: Math.round(v) })}
+                display={`${Math.round(p.spin.beats)}`} touch testId="phone-spin-beats" midiKey="setting:spinBeats" />
+            )}
+            <button onClick={() => p.spin.onChange({ spinRpm: -p.spin.rpm })} data-testid="phone-spin-reverse"
+              className="mt-1 h-12 w-full rounded-lg border border-border bg-elevated text-[14px] text-text-2 active:bg-active">
+              Reverse
+            </button>
+          </div>
           <SectionLabel>Do something to it</SectionLabel>
           <div className="grid grid-cols-4 gap-1.5">
-            <Tile icon={RotateCw} label="Spin" onPress={p.onSpin} testId="phone-spin" />
+            <Tile icon={RotateCw} label="Flick" onPress={p.onSpin} testId="phone-spin" />
             <Tile icon={Shuffle} label="Random" onPress={() => { p.onLucky(); close(); }} testId="phone-lucky" />
             <Tile icon={Waves} label="Drain" onPress={() => { p.onDrain(); close(); }} testId="phone-drain" />
             <Tile icon={Trash2} label="Clear" onPress={() => { p.onClear(); close(); }} testId="phone-clear" />

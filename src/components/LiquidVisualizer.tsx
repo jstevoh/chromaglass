@@ -29,6 +29,7 @@ import { FlashGuard } from '../lib/flashGuard';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
+import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dragSeconds, dyeDensityContrast, liquidFollow } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import type { GpuStepParams, PlateSolver } from '../gpu/solverTypes';
@@ -119,7 +120,7 @@ interface LiquidVisualizerProps {
     real string gets through. Give the project `@types/react` and the
     compiler reports all five comparisons at once as unreachable.
   */
-  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet';
+  activeTool?: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin';
   isAutomated?: boolean;
   isActive?: boolean;
   /**
@@ -754,7 +755,7 @@ export interface LiquidVisualizerHandle {
    * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => void;
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => void;
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -882,6 +883,25 @@ class FluidSimulation {
    * it is doing, which after a flick are very different numbers.
    */
   plateSpin = 0;
+  /**
+   * The turntable under the dish (PLAN.md §22, lib/turntable.ts): how fast
+   * Auto Spin and a hand on the Spin tool turn the dish, and how fast the
+   * liquid's bulk follows it with the drag time of a thin gap, in radians a
+   * second. The picture turns at `plateSpin` plus `liquidSpin`, and the
+   * solver drags the liquid toward the dish by the difference (the swirl).
+   * Both are zero on a dish nobody spins, which is every look as shipped.
+   */
+  dishSpin = 0;
+  liquidSpin = 0;
+  /**
+   * How fast the liquid really goes round, for the centrifuge: the look's
+   * turn and the turntable's liquid together, while the turntable is
+   * turning; zero otherwise, so a look nobody spins is no centrifuge (22h).
+   * Not the turntable's liquid alone: a hand held still on a flicked plate
+   * stops the picture by turning the turntable against the flick, and the
+   * liquid it holds still is flung nowhere.
+   */
+  spinCentrifuge = 0;
   /**
    * The angle the dish is drawn turned to, and how far down from its centre
    * the plate is still on screen (in plate widths). Gravity is the room's,
@@ -1019,6 +1039,9 @@ class FluidSimulation {
     this.forgetPress();
     this.clockLean = 1;
     this.plateSpin = 0;
+    this.dishSpin = 0;
+    this.liquidSpin = 0;
+    this.spinCentrifuge = 0;
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
@@ -3444,10 +3467,25 @@ class FluidSimulation {
         weakly, and one squeezed down on it takes the liquid with it. Couette
         drag, in the one place this solver can express it without giving the
         current pass the gap field to read.
+
+        The turntable's dish (Auto Spin, the Spin tool) is not in it: its drag
+        on the liquid is the swirl below, from the gap and the viscosity.
       */
       twist: (Math.max(0, Math.min(1, settings.rotationSpeed ?? 0)) * (this.layerIndex % 2 === 0 ? 1 : -1)
         + Math.max(-1, Math.min(1, (this.plateSpin - motorSpin) * 0.32))
           * (0.45 + 0.55 * Math.max(0, Math.min(1, settings.platePressure ?? 0)))) * CUR_TWIST,
+      /*
+        The spun dish (PLAN §22, lib/turntable.ts): the dish's speed in the
+        frame that turns with the liquid, the liquid's own speed (the
+        centrifuge), the bulk's drag time at the rest gap, and the liquid.
+        All but the last are zero on a dish nobody spins, and the swirl
+        does not run.
+      */
+      spinDish: this.dishSpin - this.liquidSpin,
+      spinLiquid: this.spinCentrifuge,
+      spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
+      spinNu: carrierViscosity(settings.viscosity),
+      spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
       particles: settings.particles ?? 0,
       particleLife: 4,
       meanDensity: this.meanDensity,
@@ -4292,6 +4330,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   */
   const spinVelRef = useRef<number[]>([]);
   const lastFlickRef = useRef(0);
+  /*
+    The turntable (PLAN.md §22, lib/turntable.ts), one per layer, beside the
+    look's own flywheel above: the dish's speed (Auto Spin and the Spin
+    tool), the liquid's bulk speed following it (added to the picture's
+    turn), the dish's angle (for Tempo's lock), Auto Spin's motor, and the
+    hands on the Spin tool.
+  */
+  const dishSpinRef = useRef<number[]>([]);
+  const liquidSpinRef = useRef<number[]>([]);
+  const dishAngleRef = useRef<number[]>([]);
+  const autoSpinRef = useRef<AutoSpin[]>([]);
+  const spinHandsRef = useRef<SpinHand[]>([]);
+  const spinHandOf = (layer: number): SpinHand => (spinHandsRef.current[layer] ??= new SpinHand());
 
   /**
    * The GL context, lost and got back.
@@ -4622,7 +4673,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * of hand be added without teaching it about bubbles, beads or the squeeze
    * film all over again.
    */
-  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number }) => {
+  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => {
     // The magnet moves no fluid itself: it is held where the gesture is, and
     // the next solver step pulls the ferrofluid toward it. Ahead of the drain
     // gate, since holding it over an emptying plate is harmless.
@@ -4630,6 +4681,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'magnet':
         magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: showNow() };
         return;
+      /*
+        A hand on the dish from anywhere but this screen's pointer: the
+        remote's pad, a pen, OSC. Its point is the plate as the audience sees
+        it (normalised, y up), so its angle round the middle is the hand's
+        own. It moves no liquid: the dish turns under it (the frame's
+        flywheel reads the hand), and a hand not heard from for a quarter of
+        a second has let go (forgetQuiet there), since a pad's lift is not
+        sent. Ahead of the drain gate, as the magnet is: a dish can be
+        turned while it empties.
+      */
+      case 'spin': {
+        const layer = Math.max(0, Math.floor(g.layer ?? activeLayerRef.current));
+        // Each finger its own hand: two on one pad, or two remotes on one
+        // plate, sharing one would read the jump between them as a whirl.
+        const id = `gesture:${Number.isFinite(g.id) ? g.id : 0}`;
+        if (Number.isFinite(g.x) && Number.isFinite(g.y)) spinHandOf(layer).move(id, g.x - 0.5, g.y - 0.5, showNow());
+        return;
+      }
     }
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
@@ -4832,6 +4901,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     chemRef.current.reset();
     rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
     spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
+    // The turntable likewise: a kept back plate keeps its dish turning.
+    dishSpinRef.current = dishSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
+    liquidSpinRef.current = liquidSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
+    autoSpinRef.current.forEach((a, i) => { if (i < laid.length) a?.release(); });
     presetContractRef.current = PRESET_CONTRACTS[presetId] ?? null;
     journeyRef.current = { lead: 0, lastAt: -1 };
     const fluid = fluidsRef.current[0];
@@ -6376,6 +6449,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const af = fluidsRef.current[activeLayerRef.current];
             if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
               const tool = activeToolRef.current;
+              // The Spin tool turns the dish (the pointer handlers and the
+              // frame's flywheel); it lays, presses and stirs nothing.
+              if (tool === 'spin') continue;
               const liq = selectedLiquidRef.current;
               const strokeFrom = hand.stroke ?? { x, y };
               const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
@@ -7529,21 +7605,92 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const dragRate = (0.04 + (currentSettings.spinDrag ?? 0.25) * 1.2) * bed;
             const vel0 = spinVelRef.current[l] ?? 0;
-            let vel = vel0 + (motor - vel0) * (1 - Math.exp(-dragRate * realDt));
-            // Dry friction, toward the motor's speed: with no motor that is rest.
-            const grip = dragRate * 0.02 * realDt;
-            vel = Math.abs(vel - motor) <= grip ? motor : vel - Math.sign(vel - motor) * grip;
+            // Dry friction, toward the motor's speed: with no motor that is rest (dishFollow).
+            const vel = dishFollow(vel0, motor, dragRate, realDt);
             if (Number.isFinite(vel)) spinVelRef.current[l] = vel;
             // The plate is told what it is doing, so the liquid touching it
             // can be dragged round by it (the twist in paramsFor).
             if (fluidsRef.current[l]) fluidsRef.current[l].plateSpin = spinVelRef.current[l] ?? 0;
             /*
+              The turntable (PLAN §22, lib/turntable.ts): a dish of its own
+              under the look's, turned by Auto Spin and by a hand on the Spin
+              tool, with the same bed and drag as the look's flywheel.
+
+              Why two and not one. The look's own turning (its motor, the
+              music routed to rotation on eleven shipped looks, a flick) turns
+              the picture as it always has, rigidly, because those looks are
+              tuned against exactly that: sent through the liquid's lag
+              below, a thin look's sway was smoothed over three seconds and a
+              flick trailed, and the swirl ran on every look with music. So
+              only what is new goes through the physics, and with Auto Spin
+              off and no hand on the dish every number here is zero and the
+              plate is today's to the bit. Moving the look's own turning onto
+              the dish too is PLAN 22h, once it has been seen on the Mac.
+
+              Auto Spin's direction is the plate's (which layer, Spin
+              Direction) and the Rate's sign, and nothing else: the music's
+              sway moves the look's motor, not this one, or a dish locked to
+              the tempo would be pushed off the beat by the music it is
+              locked to. Its lock reads this dish's angle alone for the same
+              reason.
+            */
+            const way = dirChoice > 0.5 ? 1 : dirChoice < -0.5 ? -1 : (l % 2 === 0 ? 1 : -1);
+            const auto = (autoSpinRef.current[l] ??= new AutoSpin());
+            const clock = beatClockRef.current;
+            const tempo = clock.period > 0 && clock.confidence >= 0.5 && clock.nextBeat > 0
+              ? { periodMs: clock.period, nextBeatMs: clock.nextBeat, nowMs: showNow() } : null;
+            const autoRate = way * auto.target(Math.round(currentSettings.spinAuto ?? 0), currentSettings.spinRpm ?? 6,
+              currentSettings.spinBeats ?? 16, tempo, way * (dishAngleRef.current[l] ?? 0));
+            const dish0 = dishSpinRef.current[l] ?? 0;
+            /*
+              A hand on the dish turns it: the dish takes the hand's speed
+              round its middle, times the tool's Amount, as fast as a hand
+              grips glass, and a hand held still stops it. What the hand
+              sets is the whole dish's speed, the look's turning included, so
+              the turntable takes up the difference; let go, it coasts back
+              to Auto Spin's speed on its drag. Tempo's lock lets go under a
+              hand, so it does not wind the dish back to the beat against it.
+            */
+            const hands = spinHandsRef.current[l];
+            hands?.forgetQuiet(showNow(), 250, 'gesture');
+            const held = hands?.rate(showNow()) ?? null;
+            let dishVel: number;
+            if (held !== null && Number.isFinite(held)) {
+              const want = held - (spinVelRef.current[l] ?? 0);
+              dishVel = dish0 + (want - dish0) * (1 - Math.exp(-realDt / GRIP_SECONDS));
+              auto.release();
+            } else {
+              dishVel = dishFollow(dish0, Number.isFinite(autoRate) ? autoRate : 0, dragRate, realDt);
+            }
+            if (Number.isFinite(dishVel)) dishSpinRef.current[l] = dishVel;
+            const dishNow = dishSpinRef.current[l] ?? 0;
+            if (Number.isFinite(dishNow * realDt)) dishAngleRef.current[l] = (dishAngleRef.current[l] ?? 0) + dishNow * realDt;
+            /*
+              And the liquid follows the turntable with the drag time of its
+              gap: seconds for water, a tenth of one for oil. The picture
+              turns with the liquid, because the liquid is what the lamp
+              shines through; the dish itself is never seen.
+            */
+            const tau = dragSeconds(carrierViscosity(currentSettings.viscosity));
+            const liq = liquidFollow(liquidSpinRef.current[l] ?? 0, dishNow, realDt, tau);
+            if (Number.isFinite(liq)) liquidSpinRef.current[l] = liq;
+            // The solver drags the liquid toward the dish by the difference (the swirl).
+            if (fluidsRef.current[l]) {
+              const liqNow = liquidSpinRef.current[l] ?? 0;
+              fluidsRef.current[l].dishSpin = dishNow;
+              fluidsRef.current[l].liquidSpin = liqNow;
+              fluidsRef.current[l].spinCentrifuge = dishNow !== 0 || liqNow !== 0 ? (spinVelRef.current[l] ?? 0) + liqNow : 0;
+            }
+            /*
               An angle that accumulates cannot be allowed to go non-finite —
               see the note above, which is why both of these are guarded and
-              not just the sum.
+              not just the sum. The turntable's turn is added only when there
+              is one, so a plate nobody spins sums exactly what it did.
             */
             const turn = (spinVelRef.current[l] ?? 0) * realDt;
             if (Number.isFinite(turn)) rotationAnglesRef.current[l] += turn;
+            const liquidTurn = (liquidSpinRef.current[l] ?? 0) * realDt;
+            if (liquidTurn !== 0 && Number.isFinite(liquidTurn)) rotationAnglesRef.current[l] += liquidTurn;
             const fl = fluidsRef.current[l];
             if (fl) {
               fl.plateAngle = rotationAnglesRef.current[l] ?? 0;
@@ -9442,7 +9589,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       return new DOMRect(box.left + (box.width - w) / 2, box.top + (box.height - h) / 2, w, h);
     };
     drawnRectRef.current = drawnRect;
-    const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
+    /*
+      Where a pointer is, in the plate's cells, not rounded: the Spin tool
+      reads a hand's angle round the middle from it, and a pointer rounded to
+      a cell is an angle rounded to a sixtieth of a radian at a third of the
+      plate out, which at sixty readings a second is a turn a second of noise.
+    */
+    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect) => {
       const cxp = clientX - rect.left - rect.width / 2;
       const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
       const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
@@ -9466,7 +9619,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const ca = Math.cos(-angle), sa = Math.sin(-angle);
         const px = ca * dx - sa * dy, py = sa * dx + ca * dy;
         dx = px; dy = py;
-        return { x: Math.floor((0.5 + dx * 0.5) * GRID_SIZE), y: Math.floor((0.5 + dy * 0.5) * GRID_SIZE) };
+        return { x: (0.5 + dx * 0.5) * GRID_SIZE, y: (0.5 + dy * 0.5) * GRID_SIZE };
       }
       let fx = rx / (scale * z) + shot.cx * GRID_SIZE;
       let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
@@ -9476,7 +9629,30 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
         fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
       }
-      return { x: Math.floor(fx), y: Math.floor(fy) };
+      return { x: fx, y: fy };
+    };
+    const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
+      const p = fluidPointAt(clientX, clientY, rect);
+      return { x: Math.floor(p.x), y: Math.floor(p.y) };
+    };
+    /*
+      A hand on the Spin tool (PLAN §22): where it is from the dish's middle
+      as the audience sees it, in plate widths. The plate's cells turn with
+      the liquid (`rotationAnglesRef`), so the point is turned back out by
+      that angle; the hand's angle is then the room's, and its speed round
+      the middle is what the dish is asked to turn at (lib/turntable.ts,
+      SpinHand).
+    */
+    const spinHand = (id: string, clientX: number, clientY: number, landing: boolean) => {
+      const p = fluidPointAt(clientX, clientY, drawnRect());
+      const fx = p.x / GRID_SIZE - 0.5, fy = p.y / GRID_SIZE - 0.5;
+      const a = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const dx = fx * Math.cos(a) - fy * Math.sin(a), dy = fx * Math.sin(a) + fy * Math.cos(a);
+      const hand = spinHandOf(activeLayerRef.current);
+      if (landing) hand.down(id, dx, dy, showNow(), toolAmountRef.current); else hand.move(id, dx, dy, showNow(), toolAmountRef.current);
+    };
+    const spinLetGo = (id?: string) => {
+      for (const h of spinHandsRef.current) { if (!h) continue; if (id === undefined) h.clear(); else h.up(id); }
     };
 
     /*
@@ -9524,6 +9700,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         hand's spot emptied (187 to 108) while a ring 0.15-0.2 out filled.
       */
       if (activeToolRef.current === 'magnet') return;
+      // The Spin tool turns the dish under the pointer and touches no liquid.
+      if (activeToolRef.current === 'spin') {
+        if (isMouseDownRef.current) spinHand('mouse', e.clientX, e.clientY, false);
+        return;
+      }
       /*
         And only while the button is down. This ran on every move, so moving
         the mouse across the plate to reach a control pressed and stirred the
@@ -9583,6 +9764,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // the last let go (the step loop's reset needs a step with no hand).
       dropClockRef.current = 0;
       dropLaidRef.current = freshLaid();
+      if (activeToolRef.current === 'spin') spinHand('mouse', e.clientX, e.clientY, true);
     };
     const handleMouseUp = (e: MouseEvent) => {
       const drag = aimDragRef.current;
@@ -9593,6 +9775,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       isMouseDownRef.current = false;
+      spinLetGo('mouse');
     };
 
     /*
@@ -9629,6 +9812,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       isMouseDownRef.current = false;
       primaryTouchRef.current = null;
       extraHandsRef.current.clear();
+      spinLetGo();
     };
     const applyPinch = (pinch: NonNullable<typeof pinchRef.current>, span: { d: number; mx: number; my: number }) => {
       onPinchZoomRef.current?.(Math.max(1, Math.min(16, pinch.zoom0 * span.d / pinch.d0)));
@@ -9668,6 +9852,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       for (const t of Array.from(e.changedTouches)) {
         const p = touchCell(t);
+        // Every finger on the Spin tool is a hand on the dish; two go round together.
+        if (activeToolRef.current === 'spin') spinHand(`touch${t.identifier}`, t.clientX, t.clientY, true);
         if (primaryTouchRef.current === null) {
           primaryTouchRef.current = t.identifier;
           isMouseDownRef.current = true;
@@ -9694,6 +9880,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         return;
       }
       for (const t of Array.from(e.changedTouches)) {
+        spinLetGo(`touch${t.identifier}`);
         if (t.identifier === primaryTouchRef.current) {
           const next = extraHandsRef.current.entries().next();
           if (next.done) {
@@ -9731,6 +9918,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const activeFluid = fluidsRef.current[activeLayerRef.current];
       for (const t of Array.from(e.changedTouches)) {
         const { x, y } = touchCell(t);
+        if (activeToolRef.current === 'spin') { spinHand(`touch${t.identifier}`, t.clientX, t.clientY, false); continue; }
         if (t.identifier === primaryTouchRef.current) {
           lastMousePosRef.current = { ...mousePosRef.current };
           mousePosRef.current = { x, y };

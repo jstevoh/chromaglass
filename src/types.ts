@@ -490,6 +490,23 @@ export interface VisualizerSettings {
   spinAudioDepth: number;
   /** How hard one flick hits, as a fraction of a turn a second. */
   spinImpulse: number;
+  /*
+    Auto Spin (PLAN.md §22, lib/turntable.ts): a motor of its own under the
+    dish, on top of the look's Rotation Speed.
+
+    `spinAuto` is 0 Off, 1 Rate, 2 Tempo. Off is the default and what every
+    look had: nothing added. Rate turns the dish at `spinRpm` revolutions a
+    minute, negative the other way round (Spin Direction still picks which
+    plate goes which way). Tempo turns it once every `spinBeats` beats of the
+    beat clock, locked to the beat, and at the Rate until a tempo is heard.
+
+    The dish is what turns; the liquid follows it with the drag of its gap
+    (seconds for water, a tenth of one for oil), and a spun dish is a
+    centrifuge. What the picture does is the liquid's (the solver's swirl).
+  */
+  spinAuto?: number;
+  spinRpm?: number;
+  spinBeats?: number;
   centerGravity: number;
   ledPlatform: boolean;
   ledMode: LedMode;
@@ -828,6 +845,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   spinWander: 0,            // a motor holds its speed until it is asked not to
   spinAudioDepth: 0,        // the nine looks that route a band keep exactly what they had
   spinImpulse: 0.5,
+  spinAuto: 0,              // off: no look turns its dish by itself unless it asks to
+  spinRpm: 6,               // a slow turntable: a turn every ten seconds when Auto Spin is on
+  spinBeats: 16,            // four bars of four a turn: 7.5 rpm at 120 bpm
   centerGravity: 0.0,
   ledPlatform: false,
   ledMode: 'rainbow',

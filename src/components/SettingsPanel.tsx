@@ -17,6 +17,7 @@ import { Segmented, Sheet } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
+import { SPIN_AUTO_NAMES } from '../lib/turntable';
 
 /**
  * Pinning a control onto a desk.
@@ -3239,6 +3240,56 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             </button>
           ))}
         </div>
+        {/*
+          Auto Spin (PLAN §22): the dish turned by a motor of its own, at a
+          rate or at the tempo. Stepped like Spin Direction, since it is three
+          answers. The Rate is signed: its sign is the way round, and Reverse
+          flips it (a pad can too, as Reverse Spin), so reversing a dish in
+          the middle of a song is one press and not a trip to a slider.
+        */}
+        <Slider
+          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
+          value={settings.spinAuto ?? 0}
+          min={0}
+          max={2}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinAuto: Math.round(v) })}
+          settingKey="spinAuto"
+        />
+        <Slider
+          label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
+          value={settings.spinRpm ?? 6}
+          min={-45}
+          max={45}
+          step={0.5}
+          onChange={(v: number) => onUpdate({ spinRpm: v })}
+          settingKey="spinRpm"
+        />
+        <Slider
+          label={`Beats a Turn — ${Math.round(settings.spinBeats ?? 16)}`}
+          value={settings.spinBeats ?? 16}
+          min={1}
+          max={64}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinBeats: Math.round(v) })}
+          settingKey="spinBeats"
+        />
+        <div className="flex gap-2 mt-1 mb-2">
+          <button
+            onClick={() => onUpdate({ spinRpm: -(settings.spinRpm ?? 6) })}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+                       hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all"
+            data-testid="spin-reverse"
+            title="Turn Auto Spin the other way round"
+          >
+            Reverse Spin
+          </button>
+        </div>
+        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+          The dish turns and the liquid follows it: water lags for a few seconds, oil goes at once,
+          and a fast dish flings the heavy colour outward. Tempo turns once every so many beats,
+          locked to the beat; with no beat heard yet it turns at the Rate.
+        </p>
         {/*
           Which way, how steadily, and what drives it.
 
