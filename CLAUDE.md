@@ -94,9 +94,12 @@ deploy:
   `scripts/deploygate.sh`). Otherwise the deploy runs them in full. So bring
   `main` into a PR and let it go green before merging, rather than merging a
   head that is behind.
-- Superseded PR runs are cancelled. `gallery.yml` (every preset photographed),
-  `controls.yml` (every control measured) and `film.yml` (every look filmed and
-  measured against real shows: swells, calm, black, sync by section) run by hand.
+- Superseded PR runs are cancelled, and so are a PR's runs still queued or going
+  when it merges or closes (`closed.yml`). `gallery.yml` (every preset
+  photographed), `controls.yml` (every control measured) and `film.yml` (every
+  look filmed and measured against real shows: swells, calm, black, sync by
+  section) run by hand; the first two also on a PR labelled `gallery` or
+  `controls`, which a session can add.
 
 When CI is red, use the `steward` skill.
 
