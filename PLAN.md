@@ -1094,33 +1094,34 @@ Open, from building 9i:
   (`src/gpu/wgsl/magnetDisc.ts`): its field is Derby and Olbert's closed form in
   Bulirsch's elliptic integral, four rounds of an AGM, handed to a dipole of its
   volume past six to eight half-sizes. At the tool's own size it is a rod 0.05 of
-  the plate in radius and half again as long (20 mm by 30 mm on the 20 cm dish),
-  its face 0.0575 above where the dipole stood (14 mm under the liquid held to the
-  glass), so at the default its spikes reach where they did (0.155 of the plate
-  out against 0.156, on its axis 0.953 of the hand's field against 0.954). A
-  flatter disc was tried first (32 by 16 mm, then 24 by 24): matched at the
-  spikes' patch, its field fell away faster past it, and `npm run fingers` lost
-  its reach (8 fingers to the 0.12 circle fell to 5, under the check's 7); the
-  rod keeps it. Magnet Size sets the radius, k = 0.5 to 2 times it, the gap and
+  the plate in radius and twice as long (20 mm by 40 mm on the 20 cm dish), its
+  face 0.06 above where the dipole stood (13.5 mm under the liquid held to the
+  glass), so at the default its spikes reach where they did (0.157 of the plate
+  out against 0.156, on its axis 0.952 of the hand's field against 0.954).
+  Flatter shapes were tried first (a 32 by 16 mm disc, 24 by 24, a 20 by 30 mm
+  rod): matched at the spikes' patch, their fields fell away faster past it,
+  and `npm run fingers` lost its reach (the discs 8 to 5 on the 0.12 circle, the
+  short rod 7 to 6 on the 0.09, under the check's 7; on Metal too). This rod's
+  fingers are 10/8/9/5 on the four circles in 7 sectors, main's 12/7/8/3 in 6. Magnet Size sets the radius, k = 0.5 to 2 times it, the gap and
   strength untouched: a bigger magnet is stronger at the glass (on its axis 0.26,
-  0.95, 2.31 at k 0.5, 1, 2, where the deepened dipole stayed at 0.95) and reaches
-  further (spikes out to 0.046, 0.155, 0.334; the dipole's 0.078, 0.156, 0.312).
+  0.95, 2.22 at k 0.5, 1, 2, where the deepened dipole stayed at 0.95) and reaches
+  further (spikes out to 0.050, 0.157, 0.339; the dipole's 0.078, 0.156, 0.312).
   The saturation is a field on the same scale (`MAGNET_BS`, spikes.ts):
   ψ = B²/(1 + B/Bs) with B the strength times the magnet's field, so a weaker
   magnet pulls the far liquid as its square; Ferro Maze's own magnet went 0.3 →
-  0.5 and Ferro Paint's 0.5 → 0.62 to gather as they did. Both constants carry
+  0.45 and Ferro Paint's 0.5 → 0.6 to gather as they did. Both constants carry
   the old ones over at the hand's magnet, so `MAGNET_GAIN` and phaseMu's χ keep
   their tuning. The radius rides `GpuStepParams.magnetRadius` (`Sim.magRadius`,
   `U.magnetRadius`); every shader including `SPIKES_WGSL` defines
   `magnetRadius()`. `npm run disc` (lab, Mac plate shard) runs the shader's own
-  text against a Biot–Savart sum over the side current: within 0.0072% on and
-  off the face and at the rim, 0.91% where it hands over to the dipole (the point
-  dipole there 1.8%), 0.87% past it; at Size 0.9 the pull at the edge of its
+  text against a Biot–Savart sum over the side current: within 0.0073% on and
+  off the face and at the rim, 1.24% where it hands over to the dipole (the point
+  dipole there 2.5%), 1.2% past it; at Size 0.9 the pull at the edge of its
   spikes is the real magnet's (1.000), where main's deepened dipole pulled 0.31
   of it; the plate's far shortcut (spikeAmp answers far points without the
   integrals) never drops a spike; every look's own magnet stays under the onset
-  (Magnet Garden 0.144, Ferro Paint 0.099, Ferro Maze 0.024 against 0.18). In the
-  lab on the rod: `spikes` 6/6 (outline 2.89, main 2.85). `npm run magnet` (Mac)
+  (Magnet Garden 0.148, Ferro Paint 0.099, Ferro Maze 0.023 against 0.18). In the
+  lab on the rod: `spikes` 6/6 (outline 2.83, main 2.85), `fingers` 4/4. `npm run magnet` (Mac)
   now asks that Size makes the held and the set-down magnet k times as wide with
   its height and strength as they were. On the phone, Size is the same setting on
   the Magnet panel and the other fingers' magnets are the same magnet. A saved
@@ -1139,7 +1140,7 @@ Open, from building 9i:
     A real set (ceramic against neodymium) differs in remanence by about three
     times; a Grade choice beside Size would be that, MIDI-learnable.
   - **9v-height.** Magnet Height is still where the old dipole stood, and the
-    face is a fixed 0.0575 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
+    face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
     Saying the setting as the gap itself would be plainer, but changes every
     saved look's magnet; worth doing with a look version bump.
 - **9w. Carry the ferrofluid across a new solver.** The dye is carried when the

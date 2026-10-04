@@ -54,22 +54,25 @@
  *
  * ## Its size and where it is held
  *
- * The magnet is a rod half again as long as it is wide, standing on end
+ * The magnet is a rod twice as long as it is wide, standing on end
  * under the glass (the dish is 20 cm across, lib/turntable.ts DISH_METRES):
- * at the tool's own size 0.05 of the plate in radius, a 20 mm by 30 mm rod.
- * A flatter disc was tried first (32 mm by 16 mm, then 24 by 24): held so
- * its spikes' patch matched today's, its field fell away faster past the
- * patch, and the lab's fingers reaching the 0.12 circle fell from 8 to 5,
- * under the check's 7 (npm run fingers). A rod's far field is a bigger share of its near one,
- * so it keeps the default look. Magnet Size sets its radius, k = 0.5 to 2
+ * at the tool's own size 0.05 of the plate in radius, a 20 mm by 40 mm rod.
+ * Flatter shapes were tried first (a 32 by 16 mm disc, 24 by 24, then a
+ * 20 by 30 mm rod): held so their spikes' patch matched today's, their
+ * fields fell away faster past the patch, and the lab's fingers lost
+ * their reach (on the 0.12 circle 8 fell to 5 for the discs; on the 0.09
+ * circle 7 fell to 6 for the 20 by 30 rod, under the check's 7, by
+ * npm run fingers). A longer rod's far field is a bigger share of its near one:
+ * this one's fingers are 10, 8, 9 and 5 on the four circles, main's 12, 7,
+ * 8 and 3, so it keeps the default look. Magnet Size sets its radius, k = 0.5 to 2
  * times that (10 mm to 40 mm across), and its length with it; nothing else.
  *
  * Where it is held is the app's Magnet Height, as it always was: m.z, the
  * depth at which the old dipole stood, which Ferrofluid Scale already
  * stretches (a bigger look is a magnet held further off). The rod's face is
  * MAGNET_FACE above that depth: at the tool's own size held to the glass
- * (Magnet Height 0.15 at Scale 0.35, m.z 0.1275) its face is 0.07 under the
- * liquid, 14 mm, and its spikes' patch (the onset, spikes.ts) reaches 0.155
+ * (Magnet Height 0.15 at Scale 0.35, m.z 0.1275) its face is 0.0675 under the
+ * liquid, 13.5 mm, and its spikes' patch (the onset, spikes.ts) reaches 0.157
  * of the plate out, as the dipole's 0.156 did: the default keeps today's
  * look. A bigger rod keeps the face where it is.
  *
@@ -82,11 +85,11 @@
 /** The magnet's radius at the tool's own size (Magnet Size 0.5), in plate widths. */
 export const MAGNET_RADIUS = 0.05;
 /** How far above the old dipole's depth (m.z) the magnet's face is held. */
-export const MAGNET_FACE = 0.0575;
+export const MAGNET_FACE = 0.06;
 /** The closest its face comes to the liquid: the glass and the dish's floor. */
 export const MAGNET_MIN_GAP = 0.01;
-/** Length over radius: a rod half again as long as it is wide. */
-export const MAGNET_THICKNESS = 3;
+/** Length over radius: a rod twice as long as it is wide. */
+export const MAGNET_THICKNESS = 4;
 
 /** The gap from the liquid to the magnet's face, for a magnet held at depth h (m.z). */
 export function discGap(h: number): number {

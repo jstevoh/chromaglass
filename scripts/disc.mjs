@@ -84,7 +84,7 @@ const pointDipole = (rho, z, a, t) => {
 };
 
 // The magnet's geometry, as magnetDisc.ts sets it.
-const FACE = 0.0575, MIN_GAP = 0.01, THICK = 3;
+const FACE = 0.06, MIN_GAP = 0.01, THICK = 4;
 const gapOf = (h) => Math.max(h - FACE, MIN_GAP);
 const centreOf = (h, a) => gapOf(h) + THICK * a / 2;
 /** The true field at ρ off the axis, on the plate, of a magnet of radius a held at depth h. */
@@ -229,7 +229,7 @@ fn magnetRadius() -> f32 { return R; }
       Every look's own magnet, held further off, still raises none: each
       gathers its pool flat, as a real one would, until a hand brings the
       magnet up. With the strength a field now (the pull far off goes as its
-      square), Ferro Maze's went 0.3 → 0.5 and Ferro Paint's 0.5 → 0.62 to
+      square), Ferro Maze's went 0.3 → 0.45 and Ferro Paint's 0.5 → 0.6 to
       gather as they did; this asks they stayed under the onset doing it,
       anywhere round the magnet, at the depth the app holds it (magnetDepth).
     */

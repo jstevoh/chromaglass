@@ -19,15 +19,15 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
  *
  * The solver's magnet is a cylinder (gpu/wgsl/magnetDisc.ts, PLAN.md 9v),
  * held with its face a gap under the liquid, and Size sets its radius: k
- * times the tool's own 0.05 of the plate (a 20 mm by 30 mm rod on the 20 cm
+ * times the tool's own 0.05 of the plate (a 20 mm by 40 mm rod on the 20 cm
  * dish), its length with it, the gap and the strength where they were. That
  * is what a bigger magnet in the same hand is: the glass between it and the
  * liquid does not get thicker. So a bigger one reaches further and is
  * stronger at the glass too (on its axis, the share of the hand's field the
- * spikes are measured on, spikes.ts: 0.26, 0.95 and 2.31 at k 0.5, 1 and 2,
+ * spikes are measured on, spikes.ts: 0.27, 0.95 and 2.22 at k 0.5, 1 and 2,
  * held to the glass at Ferrofluid Scale 0.35), not the same field reaching
  * further. Its spikes' patch, where the field is past the onset, reaches
- * 0.046, 0.155 and 0.334 of the plate out (the deepened dipole's: 0.078,
+ * 0.050, 0.157 and 0.339 of the plate out (the deepened dipole's: 0.078,
  * 0.156 and 0.312), so a small magnet's spikes are a cluster over the
  * fingertip and a big one's a hedgehog (npm run disc prints these).
  *
