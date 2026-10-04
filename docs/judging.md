@@ -775,6 +775,31 @@ has been seen at 60 fps like this:
 - a look you saved before this should open with Thin Gap on; one you save with it
   off should stay off.
 
+## 31. The plate's forces as forces (Thin Gap, PLAN 18a-2)
+
+On a thin gap (every look) four of a look's forces now act as the thing they stand
+for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap off.
+
+- **Rain Drip** (Settings → Squish Plate, eighteen looks set it): the colour is
+  heavier than the clear liquid and falls through it down the plate, in fingers that
+  grow by themselves, while the clear liquid rises between them. Before, the whole
+  plate slid downhill and drained out of the bottom of the dish. Say if the fall is
+  too slow or too fast against how those looks felt; it falls along Tilt Direction.
+- **Glass Smear**: the glass slides over the liquid and carries all of it at half its
+  speed, colour and clear alike. On an even gap that is a drift, not a shear; where
+  a press or a domed plate changes the gap the drift turns. It moves the colour as
+  fast as before. Say if a look misses its old smear.
+- **Updraft** (nine looks): a draught dragging the liquid's surface, now on all the
+  liquid, not only the colour, half as hard where the glass is pressed. It blows the
+  same way Rain Drip falls, as it always has; say if it should rise instead.
+- **Thickness** (Settings → Squish Plate; on the phone, the Settings tile): turn it
+  up from its default and the magnet's pull, the oil's surface tension, Rain Drip
+  and Updraft should all slow down as a thicker liquid would, while Turbulence (the
+  hand stir) keeps its pace. Turn it down to water and they speed up. At the default
+  nothing should look different.
+- Vibration does almost nothing on a thin gap (PLAN 18a-2's open item); that is
+  known, not this change.
+
 ---
 
 ## Reading the frame time while you do it
