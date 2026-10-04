@@ -168,8 +168,10 @@ const api = {
   */
   async step(n: number, over: Partial<GpuStepParams> = {}, flushed = false) {
     const l = lab!;
-    // The app runs the old solver until Thin Gap's pipelines are built
-    // (prepareThinGap); the lab measures the thin gap from its first step.
+    // The app builds Thin Gap's pipelines before its first step (every look
+    // opens on a thin gap); the lab builds them here, so it measures the
+    // thin gap from its first step too. BASE has no thinGap: a lab check
+    // runs the old plate unless it asks for the thin one (PLAN 18a).
     if ((over.thinGap ?? 0) > 0.5) await l.solver.prepareThinGap();
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;

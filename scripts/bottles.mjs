@@ -488,8 +488,29 @@ try {
     return { ...calls, holds, squeezed, readings: read1 - read0, before, after };
   };
   await bottle('oil');
-  const pOn = await hold(true);
-  const pOff = await hold(false);
+  /*
+    On the old plate, Thin Gap off. These measure the Press's own move of the
+    oil (squeezeOut and pressMix), which a thin gap retires: there the flow
+    carries the oil out and back with its colour (PLAN 18a, the Press's
+    carries retired), and squeezeOut returns before it moves anything. Every
+    look runs on a thin gap since PLAN 18a-every, so without this the calls
+    counted here never come and the lines below would read the thin flow,
+    not the move they are about. The old plate is still a switch away, and
+    this is still its Press. The oil's press on a thin gap has no app check
+    of its own yet (PLAN 18a).
+  */
+  await page.evaluate(() => window.chromaglassSettings({ thinGap: 0 }));
+  // Turned off in a show that opened thin, the plate stays thin until the old plate's pipelines are built.
+  for (let k = 0; k < 400 && (await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap)); k++) await settle(50);
+  const oldPlate = await page.evaluate(() => !window.chromaglassDebug().fluids?.[0]?.thinGap);
+  let pOn, pOff;
+  try {
+    pOn = await hold(true);
+    pOff = await hold(false);
+  } finally {
+    await page.evaluate(() => window.chromaglassSettings({ thinGap: 1 }));
+  }
+  check('the Press\'s oil checks below ran on the old plate they measure', oldPlate, oldPlate ? 'Thin Gap off and the plate stepping without it' : 'the plate was still on a thin gap after 20 s');
   const b = pOn.before, a = pOn.after;
   console.log(`     Press, Oil Bodies on: ${pOn.mouse} oil presses held over ${pOn.readings} readings and ${pOn.replay} of 8 replayed, ${pOn.placed} of ${pOn.n} under the palm, ${pOn.mirror} at its mirror; oil under the palm ${b?.palm.toFixed(1)} → ${a?.palm.toFixed(1)}, ring ${b?.ring.toFixed(1)} → ${a?.ring.toFixed(1)}, all ${b?.all.toFixed(1)} → ${a?.all.toFixed(1)}; off: ${pOff.n} oil presses in ${pOff.squeezed} presses`);
   check('the Press moves the oil with Oil Bodies on: out from under the palm onto the ring, and keeps it',

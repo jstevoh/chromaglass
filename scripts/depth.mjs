@@ -376,6 +376,26 @@ try {
     taken minutes apart differ for reasons that have nothing to do with the
     setting under test. Taken in pairs and averaged, the drift falls out.
   */
+  /*
+    On the old plate, Thin Gap off. Depth Drag is the old plate's stand-in
+    for the gap: a mobility laid on the flow that carries the dye. A thin gap
+    has the real thing in its own solve (the mobility h³/12μ, wgsl/thinGap.ts)
+    and takes no Depth Drag at all, so since every look went thin (PLAN
+    18a-every) the dial moved nothing and this read 0.156 → 0.158: the rim
+    was already six times slower than the centre with the dial at zero,
+    which is the physics this asks for, from the solver rather than the
+    dial. So the dial is asked on the plate it is for, here and on the flat
+    plate below, and the thin gap is asked the same question on its own
+    terms after them: is its rim slower on a domed plate than on a flat one.
+  */
+  const thinNow = () => page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap);
+  const thinTo = async (on) => {
+    await set({ thinGap: on ? 1 : 0 });
+    // Turned off in a show that opened thin, the plate stays thin until the old plate's pipelines are built.
+    for (let k = 0; k < 400 && (await thinNow()) !== on; k++) await page.waitForTimeout(50);
+    if ((await thinNow()) !== on) throw new Error(`the plate did not go ${on ? 'onto' : 'off'} a thin gap within 20 s`);
+  };
+  await thinTo(false);
   const off = [], on = [];
   for (let i = 0; i < 3; i++) {
     await set({ depthDrag: 0 });
@@ -393,7 +413,7 @@ try {
   console.log(`\n  drag off: rim/centre ${rOff.toFixed(3)}  (centre ${mean(off, 'inner').toFixed(4)}, rim ${mean(off, 'outer').toFixed(4)})`);
   console.log(`  drag on:  rim/centre ${rOn.toFixed(3)}  (centre ${mean(on, 'inner').toFixed(4)}, rim ${mean(on, 'outer').toFixed(4)})\n`);
 
-  check('the tight rim runs slower than the deep centre once depth is coupled',
+  check('on the old plate, the tight rim runs slower than the deep centre once depth is coupled',
     rOn < rOff * 0.9,
     `rim/centre ${rOff.toFixed(3)} → ${rOn.toFixed(3)}, ${((1 - rOn / rOff) * 100).toFixed(0)}% down`);
 
@@ -449,11 +469,37 @@ try {
   const pairRatios = flatOns.map((o, i) => o.inner / flatOffs[i].inner);
   const medianRatio = [...pairRatios].sort((a, b) => a - b)[Math.floor(pairRatios.length / 2)];
   const drift = Math.abs(medianRatio - 1);
-  check('a flat plate does not notice the drag at all',
+  check('and on the old plate a flat plate does not notice the drag at all',
     drift < 0.12,
     `centre on/off ${medianRatio.toFixed(3)} at the median of five pairs, ${(drift * 100).toFixed(1)}% apart`
     + ` (means ${mean(flatOffs, 'inner').toFixed(4)} → ${mean(flatOns, 'inner').toFixed(4)};`
     + ` each pair ${flatOffs.map((o, i) => `${o.inner.toFixed(3)}/${flatOns[i].inner.toFixed(3)}`).join(', ')})`);
+
+  /*
+    And the thin gap, as every look plays it: the same dome, against a flat
+    plate, alternated in pairs for the drift as above. The gap's mobility goes
+    as h³, so at the dome's rim (a quarter of the centre's gap) the same push
+    carries a sixty-fourth as much liquid; with the rim open the ratio is not
+    that simple, so the claim is the one the dial's line makes, a tenth or
+    more slower at the rim than the flat plate's rim, against its centre.
+  */
+  await thinTo(true);
+  const thinDome = [], thinFlat = [];
+  for (let i = 0; i < 3; i++) {
+    await set({ plateCurve: CURVE, depthDrag: 0 });
+    await page.waitForTimeout(5000);
+    thinDome.push(await speeds());
+    await set({ plateCurve: 0, depthDrag: 0 });
+    await page.waitForTimeout(5000);
+    thinFlat.push(await speeds());
+  }
+  const rDome = mean(thinDome, 'outer') / mean(thinDome, 'inner');
+  const rFlat = mean(thinFlat, 'outer') / mean(thinFlat, 'inner');
+  console.log(`\n  thin gap, flat:  rim/centre ${rFlat.toFixed(3)}  (centre ${mean(thinFlat, 'inner').toFixed(4)}, rim ${mean(thinFlat, 'outer').toFixed(4)})`);
+  console.log(`  thin gap, domed: rim/centre ${rDome.toFixed(3)}  (centre ${mean(thinDome, 'inner').toFixed(4)}, rim ${mean(thinDome, 'outer').toFixed(4)})\n`);
+  check('on a thin gap, as every look plays, the domed plate\'s tight rim runs slower than a flat plate\'s, with no dial',
+    rDome < rFlat * 0.9,
+    `rim/centre ${rFlat.toFixed(3)} flat → ${rDome.toFixed(3)} domed, ${((1 - rDome / rFlat) * 100).toFixed(0)}% down`);
 
   /*
     And a change of shape does not wipe a press.

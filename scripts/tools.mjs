@@ -386,6 +386,25 @@ try {
 
   // ── Blow and Press ──────────────────────────────────────────────
   for (const t of ['blow', 'press']) {
+    /*
+      The Press here on the old plate, Thin Gap off. What this asks is the
+      old plate's move: squeezeOut lays the colour under the palm out on a
+      ring from 0.05 to 0.25, and on a thin gap, which every look runs on
+      since PLAN 18a-every, squeezeOut moves nothing. There the flow moves
+      the colour as the film under the palm thins: the liquid between two
+      closing glasses spreads as r ∝ h^-½ (a disc keeps its volume, πr²h),
+      so a pool 0.011 from the palm's middle went to 0.028 with the gap at a
+      sixth (Mac, run 37187495749: √6 × 0.011 = 0.027), still inside this
+      line's 0.05 disc, and read 234 → 213 here. That is the physics, not a
+      Press that failed to push, and the let-go check below asks it of the
+      thin gap in its own terms (the colour's mean distance from the palm,
+      and that it comes back).
+    */
+    if (t === 'press') {
+      await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
+      // Turned off in a show that opened thin, the plate stays thin until the old plate's pipelines are built.
+      for (let k = 0; k < 400 && (await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap)); k++) await settle(50);
+    }
     await clear();
     await pool(A);
     const idle = await idleChange(A, 2500);
@@ -425,7 +444,7 @@ try {
       check('and pushes it out to the rim rather than making more', now - was - idle < 0.5 * was + 5 + 3 * Math.abs(idle),
         `${was.toFixed(0)} → ${now.toFixed(0)} under it and round it, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} left alone`);
     } else {
-      check('Press pushes the dye out from under the palm', b.disc < 0.8 * a.disc,
+      check('Press on the old plate (Thin Gap off) pushes the dye out from under the palm', b.disc < 0.8 * a.disc,
         `${a.disc.toFixed(0)} → ${b.disc.toFixed(0)} under it, ${a.ring.toFixed(0)} → ${b.ring.toFixed(0)} from 0.05 to 0.25`);
       /*
         Loses none, and makes no more than it had. Not 'keeps it exactly', as
@@ -452,6 +471,9 @@ try {
         `${a.total.toFixed(0)} → ${b.total.toFixed(0)}, against ${idle >= 0 ? '+' : ''}${idle.toFixed(0)} with the plate left alone as long`);
     }
   }
+
+  // Back on the thin gap every look plays.
+  await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 1 }));
 
   // ── Press, let go, on a thin gap ────────────────────────────────
   /*
@@ -611,11 +633,15 @@ try {
     let off, on, thin = false;
     try {
       await settle(3000);
-      // The Press as the owner has it, Thin Gap off.
+      // The Press on the old plate, Thin Gap off: what every look had before
+      // Thin Gap went on in all of them (PLAN 18a-every), and the bar the
+      // thin gap's return is read against.
       off = await readRun('off', await pressLift('off'));
 
       await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 1 }));
-      // The thin gap's pipelines are built when it is first asked for; the plate runs the old way until they are in.
+      // The thin gap's pipelines are built before the show opens now that every
+      // look opens on one, so this finds it at once; a show that opened with it
+      // off would run the old way until they were built.
       const thinBy = Date.now() + 20000;
       while (!thin && Date.now() < thinBy) {
         await settle(250);
@@ -624,7 +650,9 @@ try {
       await settle(3000);
       on = await readRun('lift', await pressLift('lift'));
     } finally {
-      await page.evaluate((b) => window.chromaglassSettings?.({ ...b, thinGap: 0 }), before);
+      // Back as it was, Thin Gap included: on, as every look has it, so the
+      // checks after this one run on the plate the show plays.
+      await page.evaluate((b) => window.chromaglassSettings?.({ ...b }), before);
       await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true));
     }
 
