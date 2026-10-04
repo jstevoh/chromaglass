@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Thin Gap on in every look (PLAN 18a-every)
+
+- **Every look runs on a thin gap**, so a press pushes the liquid out over the
+  dish's rim and draws it back as the glass lifts, rather than sending it down a
+  drain spread over the whole plate. The owner's pick; Thin Gap is still a switch
+  (Settings → Squish Plate, the phone's Press Amount, MIDI, the remote).
+- **Saved looks are version 2.** One saved before reads with Thin Gap on, since it
+  saved the old default rather than a choice; one saved since keeps what it says.
+- **The opening builds the thin gap's pipelines before the first frame moves**, so
+  the first step is a thin one.
+
 ### Added — a magnet you size and play (PLAN 9x)
 
 - **Picking the Magnet changes nothing on the plate.** It used to pour the

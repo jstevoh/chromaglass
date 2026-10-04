@@ -690,8 +690,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             The plate as a thin gap (PLAN §18a), a switch on the slider's two
             stops, and its liquid's Thickness only while it is on.
           */}
-          <Slider label="Thin Gap" field="thinGap" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={value('thinGap') as number | undefined} {...sliderProps} connected={connected} />
-          {(settings?.thinGap ?? 0) > 0.5 && (
+          <Slider label="Thin Gap" field="thinGap" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={(value('thinGap') ?? 1) as number} {...sliderProps} connected={connected} />
+          {(settings?.thinGap ?? 1) > 0.5 && (
             <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}

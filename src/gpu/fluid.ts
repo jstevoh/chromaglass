@@ -96,7 +96,7 @@ export const THIN_GAP_THICKNESS = 0.45;
  * water it is the thicker and fingers where the water pushes it (a lift).
  */
 export const FERRO_NU = 5e-6;
-/** The thin gap's kernels (wgsl/thinGap.ts), built when it is first turned on. */
+/** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
 const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
 /*
   The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
@@ -555,6 +555,9 @@ export class WebGPUFluid {
   /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
   private hsReady = false;
   private hsBuilding: Promise<void> | null = null;
+  /** And the old plate's (prepareOldPlate), which a show that opens on a thin gap builds only when Thin Gap is turned off. */
+  private oldReady = false;
+  private oldBuilding: Promise<void> | null = null;
   private hsMobC: GPUBuffer[] = [];
   private hsFaceC: GPUBuffer[] = [];
   /** The gap as the last thin step left it, a cell at a time: its change is the press (hsDivergence). */
@@ -689,9 +692,7 @@ export class WebGPUFluid {
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
-      ['divergence', [R32], true],
       ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye], true],
-      ['macCormack', [dye, VEL], true],
       ['forcesB', [VEL], true],
       ['currentForces', [VEL], true],
       ['curDivergence', [R32], true],
@@ -712,7 +713,9 @@ export class WebGPUFluid {
       // the dye as well as on itself.
       ['marangoniFlux', [dye, RGBA32], open.mix],
       ['mixSplat', [RGBA32], open.mix],
-      ['mixAdvect', [RGBA32], open.mix],
+      // The mix's carry on the old plate; on a thin gap it is carried in
+      // substeps (mixAdvectSub, below), so a look opening on one never asks.
+      ['mixAdvect', [RGBA32], open.mix && !open.thinGap],
       ['mixRelax', [RGBA32], open.mix],
       ['mixMu', [RGBA32], open.mix],
       ['mixUpdate', [RGBA32], open.mix],
@@ -754,15 +757,17 @@ export class WebGPUFluid {
       ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
       // The two volume forms (phaseGrid, phaseCHVolume) run only on a thin
-      // gap, which no look opens on: built behind the show, like phaseCarry,
-      // so a ferrofluid look does not wait on them (\`npm run startup\` fails a
-      // pipeline waited for and asked for by none).
-      ['phaseGrid', [R32], false],
+      // gap. Every look opens on one now (Thin Gap, on in every look), so a
+      // ferrofluid look carries its ferrofluid as a volume from its first
+      // steps and waits for them; a look opened with Thin Gap off builds them
+      // behind, as it did when no look opened on one (`npm run startup`
+      // fails a pipeline waited for and asked for by none).
+      ['phaseGrid', [R32], open.phase && open.thinGap],
       ['phaseRelax', [R32], open.phase],
       ['screenJacobi', [R32], open.phase],
       ['phaseMu', [RG32], open.phase],
       ['phaseCH', [R32], open.phase],
-      ['phaseCHVolume', [R32], false],
+      ['phaseCHVolume', [R32], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
@@ -779,20 +784,41 @@ export class WebGPUFluid {
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
-    // the pressure solve and the squeeze, which every step runs.
-    const byName: [string, GPUTextureFormat][] = [
-      ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
-      ['mgRestrict0', R32], ['mgZero', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32],
-      // The projection's right-hand side made zero-mean, every step (divTiles).
-      ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
-      ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
-    ];
+    // zeroing a pressure (the old plate's, between projections) and a
+    // coarse level, which both solvers do every step. The old plate's own
+    // solve is in oldPlateBuilds.
+    const byName: [string, GPUTextureFormat][] = [['mgZero', R32]];
     const keyed = new Map<string, [string, boolean]>();
     const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
     for (const [name, formats, now] of byFormat) for (const f of formats) add(`${name}:${f}`, kernel(name, f), now);
     for (const [name, f] of byName) add(name, kernel(name, f), true);
-    // The thin gap's kernels are not here: they are built when it is first
-    // turned on (prepareThinGap), so no show pays for them at its opening.
+    /*
+      The thin gap's kernels (PLAN §18a): waited for by a look that opens on a
+      thin gap, which since the owner's pick (2026-10-03) is every look, so
+      its first step is a thin one and asks for every one of them. Left off
+      the list for a look that opens with Thin Gap off: they are then built
+      when it is first turned on (prepareThinGap), as before, so a show that
+      never turns it on does not pay for them behind it either (see there).
+      The mix's carry in substeps waits only where the look opens with the
+      mix, as the mix's own carry does, and is built behind otherwise.
+    */
+    if (open.thinGap) {
+      for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
+      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
+    } else {
+      /*
+        And the other way: the old plate's projections, its velocity's
+        self-advection, its squeeze's own solve and its dye's backtrace,
+        which a thin step never asks for. Waited for only by a look that
+        opens with Thin Gap off; otherwise built when Thin Gap is first
+        turned off (prepareOldPlate), with the plate staying thin until they
+        are in. Every opening built both solvers otherwise, fourteen
+        pipelines for nothing: about 3.4 s of a cold opening at prepare.ts's
+        0.23 s each on CI's Mac, which `npm run startup`'s 1b counts as the
+        show's own wait, against its 1 s of slack, since nothing asks for them.
+      */
+      for (const [key, code] of WebGPUFluid.oldPlateBuilds(dye)) add(key, code, true);
+    }
     // The splats' deltas brought up to the grid, every step.
     for (const f of [RGBA32, R32] as GPUTextureFormat[]) add(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f), true);
     // A tool, a pour: the splats, always into the full-float deltas. And the
@@ -804,6 +830,48 @@ export class WebGPUFluid {
     for (const name of ['statsTiles', 'statsFold'] as const) add(name, STATS_KERNELS[name], false);
     return [...keyed].map(([key, [code, now]]) => cache.computePrep(key, code, !now));
   }
+
+  /**
+   * What a thin step needs built before it can run (prepare, prepareThinGap,
+   * thinGapOn): its kernels, the velocity's snapshot in the velocity's own
+   * format, and the dye's carry in substeps. Not the mix's carry, which only
+   * a look with the mix asks for.
+   */
+  private static thinBuilds(dye: GPUTextureFormat): [string, string][] {
+    return [
+      ...THIN_GAP_KERNELS.map((name): [string, string] => [`${name}:thin`, kernel(name, 'rgba16float')]),
+      [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
+      [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
+    ];
+  }
+
+  /** The old plate's own pipelines, which a thin step never asks for (prepare, prepareOldPlate). */
+  private static oldPlateBuilds(dye: GPUTextureFormat): [string, string][] {
+    const byName: [string, GPUTextureFormat][] = [
+      ['pressureRedBlack', R32], ['squeezeRedBlack', R32],
+      ['mgRestrict0', R32], ['mgSmooth', R32], ['mgRestrict', R32], ['mgProlong', R32],
+      // The projection's right-hand side made zero-mean, every step (divTiles).
+      ['divTiles', R32], ['divFold', R32], ['divCentre', R32],
+      ['squeezeVelBuf', VEL], ['gradientSubtractBuf', VEL],
+    ];
+    return [
+      ...byName.map(([name, f]): [string, string] => [name, kernel(name, f)]),
+      [`divergence:${R32}`, kernel('divergence', R32)],
+      // The dye's backtrace and the velocity's self-advection (one key when the dye is half float).
+      ...[...new Set([dye, VEL])].map((f): [string, string] => [`macCormack:${f}`, kernel('macCormack', f)]),
+    ];
+  }
+
+  /**
+   * Off only for `?prepare=0`, the show opened the old way, every pipeline
+   * built on the frame that first asks (`npm run startup`'s control). There
+   * the thin gap's are built on the frame too, at its first step, rather than
+   * behind it while the plate runs the old way: otherwise the control's first
+   * seconds would be the old plate's, and its pipelines the old plate's, and
+   * the startup check would price the show's wait for the thin gap's against
+   * a control that never waited for them.
+   */
+  static buildAhead = true;
 
   constructor(private readonly device: GPUDevice, physicalSize: number, logicalSize: number, opts: { float32Filterable: boolean; timestamps?: boolean }) {
     this.N = physicalSize;
@@ -2822,41 +2890,91 @@ export class WebGPUFluid {
    */
   private thinGapOn(p: GpuStepParams): boolean {
     const want = (p.thinGap ?? 0) > 0.5 && this.mg.length > 0;
-    if (want && !this.hsReady) { void this.prepareThinGap(); return false; }
+    if (want && !this.hsReady) {
+      /*
+        Built ahead at the opening (prepare), which is every look's now: the
+        first step is a thin one. Asking prepareThinGap here would find them
+        built but say so only after an await, and the first steps would run
+        the old way meanwhile, asking for the old plate's pipelines. Under
+        `?prepare=0` they are built on this frame, as everything there is.
+      */
+      if (!WebGPUFluid.buildAhead || this.thinBuilt()) { this.hsReady = true; return true; }
+      void this.prepareThinGap();
+      return false;
+    }
+    if (!want && !this.oldReady) {
+      /*
+        Turned off in a show that opened thin: the old plate's pipelines were
+        not built (prepare), so the plate stays thin while they build, as it
+        stays old while the thin gap's build in the other direction. Built
+        already when the look opened with it off; built on this frame under
+        `?prepare=0`, and when the plate cannot run thin either (a new
+        device's first steps before its thin gap is built: the stop the
+        opening's list exists to prevent, which the re-laid opening's own
+        list should have spared it).
+      */
+      if (!WebGPUFluid.buildAhead || this.oldBuilt()) { this.oldReady = true; return false; }
+      void this.prepareOldPlate();
+      if (this.hsReady && this.mg.length > 0) return true;
+      this.oldReady = true;
+    }
     return want;
   }
 
   /**
    * The thin gap's pipelines, built off the frame one at a time, the first
-   * time it is asked for; the plate runs the old way until they are in.
+   * time it is asked for in a show that opened with it off; the plate runs
+   * the old way until they are in. A look that opens on a thin gap, which is
+   * every look since the owner picked every look (2026-10-03), has them
+   * built before its first step instead (`prepare`, and thinGapOn).
    *
-   * Not in \`prepare\`'s list, not even behind the show. Behind the show a
+   * Not behind the show for one that opened with it off. Behind the show a
    * compile costs the frames it takes (gpu/prepare.ts): the page draws
    * between compiles, not during them, so every pipeline there is paid for
    * by every show's first seconds, and on a slow runner the WebGPU smoke's
    * "the stage starts" (thirty frames in thirty seconds) went red with these
    * twelve of them added (run 36367898896: 31 frames drawn by 37 s after load, where
    * another PR's green run that hour had drawn 852; that runner was slow
-   * all round, so how much was these twelve is not known). Thin Gap is off
-   * in every look, so a show that never turns it on should not pay for it;
-   * one that does runs the old way for as long as its compiles take
-   * (fifteen now with the carries' substeps and their plan: about three
-   * and a half seconds at prepare.ts's 0.23 s each on CI's Mac), rather
-   * than stopping on the frame to build them.
+   * all round, so how much was these twelve is not known). A show that
+   * opened with Thin Gap off and never turns it on should not pay for it;
+   * one that turns it on runs the old way for as long as its compiles take
+   * (fifteen with the carries' substeps and their plan: about three and a
+   * half seconds at prepare.ts's 0.23 s each on CI's Mac), rather than
+   * stopping on the frame to build them.
    */
   prepareThinGap(): Promise<void> {
     if (!this.hsBuilding) {
       this.hsBuilding = (async () => {
-        for (const name of THIN_GAP_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, kernel(name, 'rgba16float'));
-        // The snapshot before the forces, and the copy the dye rides, both into the velocity's format.
-        await this.pipelines.prepareCompute(`scaleDye:${VEL}`, kernel('scaleDye', VEL));
-        // The carries in substeps (carryPlan): the dye and the oil's share of it, and the oil.
-        await this.pipelines.prepareCompute(`bodyAdvectSub:${this.dyeFormat}`, kernel('bodyAdvectSub', this.dyeFormat));
+        // The kernels; the snapshot before the forces and the copy the dye
+        // rides, both into the velocity's format; the dye's carry in substeps.
+        for (const [key, code] of WebGPUFluid.thinBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        // And the oil's (carryPlan), which only a look with the mix asks for.
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
       })();
     }
     return this.hsBuilding;
+  }
+
+  /** The old plate's pipelines, built off the frame when Thin Gap is first turned off in a show that opened thin (thinGapOn). */
+  prepareOldPlate(): Promise<void> {
+    if (!this.oldBuilding) {
+      this.oldBuilding = (async () => {
+        for (const [key, code] of WebGPUFluid.oldPlateBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        await this.pipelines.prepareCompute('mixAdvect:rgba32float', kernel('mixAdvect', 'rgba32float'));
+        this.oldReady = true;
+      })();
+    }
+    return this.oldBuilding;
+  }
+
+  private oldBuilt(): boolean {
+    return WebGPUFluid.oldPlateBuilds(this.dyeFormat).every(([key, code]) => this.pipelines.hasCompute(key, code));
+  }
+
+  /** Whether every pipeline a thin step needs is already built (at the opening, by prepare). */
+  private thinBuilt(): boolean {
+    return WebGPUFluid.thinBuilds(this.dyeFormat).every(([key, code]) => this.pipelines.hasCompute(key, code));
   }
 
   /** The thin-gap solver's storage, made once; returns the velocity snapshot. */
@@ -2994,7 +3112,21 @@ export class WebGPUFluid {
       this.hsRun(pass, 'hsCoarsen', `hsCoarsen:${l}`, this.arg(`thin coarsen ${l}`, [fineN, l === 0 ? 1 : 0, 0, 0]),
         [cells, faces, this.hsMobC[l], this.hsFaceC[l]], this.mg[l].n * this.mg[l].n);
     }
-    this.clearBuffer(pass, this.hsP!, 'clear pressure');
+    /*
+      Warm-started: the solve begins from the last step's P, not from zero.
+      It looked as if it began from zero: hsP was cleared under the bind
+      group key 'clear pressure', which the old plate's clear of `press` had
+      already built on `press`, so it zeroed `press` (which hsGradient then
+      overwrites) and left hsP as the last step had it; after a groups.clear()
+      the first caller took the key, and the thin gap went cold. Every number
+      Thin Gap was measured and shipped on came from the warm start, and a
+      cold one does not reach them in hsCycles V-cycles: in `npm run thingap`
+      a press on a 130² grid moved its ring 63% of the way the displaced
+      volume puts it, against 100% warm (128² is 100% either way). A Hele-Shaw
+      cell's pressure changes smoothly from one step to the next, so the last
+      step's is the standard first guess; it is chosen here rather than left
+      to whichever clear ran first (PLAN 18a-12).
+    */
     for (let c = 0; c < this.hsCycles; c++) this.hsCycle(pass, 0);
     this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
       [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);

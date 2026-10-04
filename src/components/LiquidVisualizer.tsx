@@ -3498,7 +3498,7 @@ class FluidSimulation {
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
-      thinGap: (settings.thinGap ?? 0) > 0.5 ? 1 : 0,
+      thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
       /*
         The half-life the comment above means is in seconds, and `this.dt`
@@ -9023,7 +9023,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // `?prepare=0` opens the show the old way, every pipeline built on the
       // frame that first needs it: `npm run startup`'s control, so a run
       // measures the freeze it guards against as well as its absence.
-      if (PREPARE_OFF) return s;
+      // The thin gap's pipelines too, which otherwise wait for nothing but
+      // build behind the old plate (WebGPUFluid.buildAhead says why).
+      if (PREPARE_OFF) { WebGPUFluid.buildAhead = false; return s; }
       /*
         Never the reason the show does not open. The builds themselves cannot
         fail (a pipeline that will not build ahead is left to the frame), but

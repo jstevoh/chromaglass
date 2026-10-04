@@ -2921,14 +2921,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         */}
         <Slider
           label="Thin Gap"
-          value={settings.thinGap ?? 0}
+          value={settings.thinGap ?? 1}
           min={0}
           max={1}
           step={1}
           onChange={(v: number) => onUpdate({ thinGap: v })}
           settingKey="thinGap"
         />
-        {(settings.thinGap ?? 0) > 0.5 && (
+        {(settings.thinGap ?? 1) > 0.5 && (
           <Slider
             label="Thickness"
             value={settings.gapThickness ?? 0.45}

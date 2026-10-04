@@ -4639,7 +4639,7 @@ export default function App() {
             onBeatAccent={(v) => updateSettings({ beatAccent: v })}
             fingering={settings.fingering ?? 0}
             onFingering={(v) => updateSettings({ fingering: v })}
-            thinGap={settings.thinGap ?? 0}
+            thinGap={settings.thinGap ?? 1}
             onThinGap={(v) => updateSettings({ thinGap: v })}
             pressLift={settings.plateSpring ?? 0.35}
             onPressLift={(v) => updateSettings({ plateSpring: v })}

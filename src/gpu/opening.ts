@@ -25,7 +25,7 @@
  * steps, for a pipeline that was left for later.
  */
 
-import type { VisualizerSettings } from '../types';
+import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -53,6 +53,15 @@ export interface Opening {
   camera: boolean;
   /** The film stock (home-movie). */
   stock: boolean;
+  /**
+   * The plate as a Hele-Shaw cell (Thin Gap, PLAN §18a): its own solve, the
+   * carries' substeps and their plan, in place of the old projection. On in
+   * every look since the owner picked every look (2026-10-03), so every
+   * opening asks for them from its first step. Read as the step reads it (a
+   * switch at one half), and from the default when a look does not say,
+   * since no preset does.
+   */
+  thinGap: boolean;
 }
 
 export function openingOf(s: Partial<VisualizerSettings>): Opening {
@@ -68,5 +77,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     particles: on(s.particles),
     camera: on(s.camera),
     stock: on(s.stock),
+    thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
   };
 }
