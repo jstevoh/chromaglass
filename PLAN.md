@@ -4092,6 +4092,13 @@ ones report.
   Mac runner~~ **Fixed 2026-10-03 (§14b-2):** the floor was measured against a different
   two seconds than it judged, and the gate on a starved machine really did turn down the
   show's own next frame; both fixed, and `wall` now makes the busy machine itself.
+- `render-app`'s "the live loop draws again after every render" wants more than 5
+  frames in the half second after each render, and read 5 after render M (music
+  playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
+  dozen runs read M 10 to 26 and once A 11. A starved runner can stall the loop for
+  a moment after a render, so the line judges the runner as well as the loop. What it
+  means to ask is whether the loop resumes at all: count frames until a fixed number
+  have been drawn, with a long limit, rather than frames in a fixed half second.
 
 *Fix:* `CRASH_GPU=1`; `songs` into Measure; `shelf`, `sw` and `bubbles` on a Mac shard,
 or written into CLAUDE.md as by hand; `check.mjs` reading `scripts/*.mjs` paths as well
