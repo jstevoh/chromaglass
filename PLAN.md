@@ -4113,6 +4113,34 @@ ones report.
   a moment after a render, so the line judges the runner as well as the loop. What it
   means to ask is whether the loop resumes at all: count frames until a fixed number
   have been drawn, with a long limit, rather than frames in a fixed half second.
+- ~~`startup`'s "no stop in the opening" charges Chromium's hold at the GPU's start
+  to the page~~ **Fixed 2026-10-04 (this PR):** on main's 997c71f deploy (run
+  37162044666) the adapter took 0.47 to 4.18 s, the page drew nothing from 1.00 to
+  4.17 s, no long task, and a long animation frame over it named no script, exactly as
+  the hold reads on every green run (seven read: 1.6 to 2.4 s from about 1.0 s, 0
+  scripts, no blocking). 4b set it aside as the page's own code because a promise the
+  page fetched had settled within 50 ms of its start, and check 4 read 3.18 s against
+  2. The 50 ms was not the tell. What is (`scripts/pagehold.mjs`): the page's code
+  after an await runs before anything else the page does, so a stretch after a frame
+  or tick that followed the mark is not it; and for a fetch, a body read, an image or
+  an audio decode, Chromium's long animation frames name that code as a script for as
+  long as it runs (tried on each in a cloud session), while its hold names none. The
+  GPU's own promises are named by nothing, so a stretch right after one stays the
+  page's, as before. Frames are now placed by when their callback ran, not their
+  timestamp: a frame begun before a second of the page's code carries the earlier
+  time and made that code look already finished. The check-skeptic found the page's
+  code after a promise the check does not wrap (`enumerateDevices`, `caches.keys()`,
+  a Blob's body, all awaited by the app) read as held under both rules; any stretch
+  the page's scripts or a blocked frame lie in is now the page's. The rule's thirteen
+  cases (this red, the lab's recordings, and the ways it could tell wrong) are a check
+  line on every run (the old 50 ms rule tells four wrong), with a control in the run's
+  own Chromium: 0.7 s of a page's code after a fetch and after a Blob must read as its
+  own and be named as scripts, since that naming was tried on the cloud's Chromium
+  141, not CI's. The 2 s limit and the 4.5 s cap are unchanged. *Still open:* the
+  page's code after a GPU promise that ends exactly where Chromium's hold begins, with
+  nothing between, still goes to check 4; which promise settled at 1.0 s on that run
+  is not known (the opening line now names it); and the rule's cases could run in
+  Measure, being pure Node, if #239's owner of the workflows adds them.
 
 *Fix:* `CRASH_GPU=1`; `songs` into Measure; `shelf`, `sw` and `bubbles` on a Mac shard,
 or written into CLAUDE.md as by hand; `check.mjs` reading `scripts/*.mjs` paths as well
