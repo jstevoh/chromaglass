@@ -54,10 +54,13 @@
  * h, stepped, and written back. Nothing in the patch is kept between steps:
  * the plate holds the layer, the patch only steps it. Inside the patch the
  * plate's own keeping of the ferrofluid (separation, Cahn–Hilliard, the
- * maze's flow, the magnet's pull and the flow that carries it with the
- * water) steps aside by the same window the film's mobility is weighted
- * by, so one physics acts there and not two (fluid.ts, STAND_ASIDE). Only
- * the relax stays, its ceiling raised to the top glass (FILM_TOP).
+ * maze's flow, the magnet's pull) steps aside by the same window the
+ * film's mobility is weighted by, so one physics acts there and not two
+ * (fluid.ts, STAND_ASIDE). The relax stays, its ceiling raised to the top
+ * glass (FILM_TOP), and so does the flow that carries the layer with the
+ * water, at the domes' scale and over: it carries the layer's mean, the
+ * film its shape (fluid.ts, carried), so the pool's edge is still fed
+ * from its middle and goes out in fingers past the window.
  *
  * The time step is semi-implicit, the lab's: the flux explicit, then the
  * whole change smoothed by 1 / (1 + dt A k⁴), the stiff part of the tension

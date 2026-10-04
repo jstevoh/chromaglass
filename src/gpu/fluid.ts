@@ -211,8 +211,9 @@ const MAZE_UNIFORM = 0.45;
   only spread sideways and the domes stood shoulder to shoulder, the gaps
   between them 16% of the plate near the magnet (PLAN.md §9f, `npm run
   domes`). That layer is now there (PLAN §9t, src/gpu/standing.ts), and
-  both these act only past its window: under it the film moves the layer
-  and the plate's pull, maze flow and advection step aside (STAND_ASIDE).
+  both these act only past its window: under it the film shapes the layer
+  and the plate's pull and maze flow step aside (STAND_ASIDE), the flow
+  carrying only the layer's mean there (wgsl/fluid.ts, carried).
   What is left of them is the ring between the window (0.083 of the plate
   from the magnet on 384², fading out by 0.125) and the spikes' reach
   (0.155), where they still carry the pool's edge in and the fingers out

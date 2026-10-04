@@ -286,8 +286,10 @@ const W = '@compute @workgroup_size(8, 8)';
   exchange between two cells is weighted by how far neither is under the
   film (stand, its window): the same weight read from both sides, so what
   moves is still conserved. The cap at full is raised under it instead
-  (phaseRelax). stand is 0 wherever no film runs and the weight exactly 1,
-  so every other look is as it was, to the bit.
+  (phaseRelax). The advection is the one exception: it still carries the
+  layer's mean there, which the film does not move (phaseAdvect, carried).
+  stand is 0 wherever no film runs and the weight exactly 1, so every
+  other look is as it was, to the bit.
 */
 const STAND_ASIDE = /* wgsl */ `
 fn aside(p: vec2i, q: vec2i, n: f32) -> f32 {
@@ -626,6 +628,43 @@ fn upwind(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
   if (c >= 0.0) { return ph(a, n) + 0.5 * (1.0 - c) * minmod(ph(a, n) - ph(a - e, n), ph(b, n) - ph(a, n)); }
   return ph(b, n) - 0.5 * (1.0 + c) * minmod(ph(b, n) - ph(a, n), ph(b + e, n) - ph(b, n));
 }
+/*
+  Under a standing layer (STAND_ASIDE) the water carries the layer as a
+  whole, and the film shapes it: what crosses a face there is the flow
+  times the layer's mean round the face (a seven-cell box round each of
+  its two cells, about a dome's spacing: they stand 8 apart on 384²), not
+  times the cell's own. A real layer's domes ride the flow over the glass; the flow does
+  not pour each dome into the gap beside it.
+
+  What was reported: with the domes on, a pool held under the hand threw
+  half the fingers past its rim (npm run fingers: 6/4/5/2 on the Mac
+  against main's 12/9/9/3). Measured in the lab at the end of that run,
+  the film's window held 7212 of the pool's 13029 where the same run
+  with the film off held 5429: the window had stepped the plate's flow
+  aside altogether, so nothing carried the layer out of it, and the
+  pool's edge, fed from the middle by that flow, had less to finger with.
+  Letting the flow carry each cell as it does outside brought the fingers
+  back (7/12/8/5) and broke the domes: it poured them into one another
+  and they set as black slabs, which is why the flow was stepped aside in
+  the first place. Carrying the mean, the window holds 5622, the fingers
+  are 9/12/9/4 in 7 sectors, and the domes stand.
+
+  Blended in over the window's edge as the other passes are, so a cell
+  outside every window moves as it always has, to the bit. A gap the mean
+  takes more from than it holds goes under empty for a moment and
+  phaseRelax fills it from its neighbours, as it does everywhere the
+  limiter digs below empty.
+*/
+fn coarse(a: vec2i, b: vec2i, n: i32) -> f32 {
+  var t = 0.0;
+  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) { t += ph(a + vec2i(i, j), n) + ph(b + vec2i(i, j), n); } }
+  return t / 98.0;
+}
+fn carried(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
+  let s = 1.0 - aside(a, a + e, S.n);
+  if (s <= 0.0) { return upwind(a, e, c, n); }
+  return mix(upwind(a, e, c, n), coarse(a, a + e, n), s);
+}
 // The flux across the face between cell a and cell a + e, in the +e direction.
 fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
@@ -652,16 +691,9 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let pb = packedAt(b.x, b.y, n);
   let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
   let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
-  /*
-    Under a standing layer the film carries it (STAND_ASIDE): its own
-    pressure moves the liquid there. Left to the plate's flow as well, the
-    flow, which the magnet drives toward itself and the projection only
-    nearly keeps from converging, piled the layer round the magnet with
-    nothing in the film to answer it, and the domes ran together into worms
-    with stepped edges.
-  */
-  let c = aside(a, b, S.n) * clamp(ve * A.b.y * f32(n), -0.45, 0.45);
-  return c * upwind(a, e, c, n);
+  // Under a standing layer, the layer as a whole: see carried.
+  let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
+  return c * carried(a, e, c, n);
 }
 
 // Under Thin Gap: the gap at cell p in rest gaps, a share t of the way through the step.
@@ -695,8 +727,8 @@ fn volumeFlux(a: vec2i, e: vec2i, n: i32) -> f32 {
            + 0.25 * f32(n) * (thinFace(a - e, e, n) - 2.0 * thinFace(a, e, n) + thinFace(b, e, n));
   // As a Courant number, bounded as the flux form's is, then back to a volume.
   let h = 0.5 * (gapAt(a, n, A.a.y) + gapAt(b, n, A.a.y));
-  let c = aside(a, b, S.n) * clamp(face * A.b.y * f32(n) / h, -0.45, 0.45);
-  return h * c * upwind(a, e, c, n);
+  let c = clamp(face * A.b.y * f32(n) / h, -0.45, 0.45);
+  return h * c * carried(a, e, c, n);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }

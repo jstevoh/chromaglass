@@ -111,23 +111,20 @@ const FILM_SUBSTEPS = 8;
   0.125 of the plate; on 1024², where the patch is a quarter of it, 0.06 and
   0.09.
 
-  Why not wider, and what the window does not change. At 0.65 and 0.9
-  (0.11 and 0.15 of the plate) the pool held under the hand by `npm run
-  fingers` threw fewer fingers past its rim than without the film: 7/5/5/4
-  on the circles 0.06 to 0.15 past the poured edge, against 11/10/9/5 with
-  the window at nothing. A smaller window did not bring them back (at half
-  and three quarters 6/6/8/1, at 0.4 and 0.65 6/4/6/3), nor did raising the
-  plate's ceiling only where the film acts fully. What is left is the
-  film's own flow, and the likeliest part of it (inferred, not yet
-  isolated in a run) is the lift: it is stronger where the field is, so the
-  film's pressure is lower over the magnet and the layer drains from the
-  pool's rim into the domes. Measured at the end of that run, the ring 0.125 to 0.17 from the
-  magnet holds 0.30 of full where the pour put 0.48, and the middle 1.1 to
-  1.3. A real layer does the same (it is the magnetic normal traction's
-  gradient, a pull of its own), so the rim has less to finger with; PLAN
-  9t-8. Half and three quarters are kept because they leave the most of
-  the pool to the plate's own fingering for the domes they give (13 within
-  0.08 of the magnet, `npm run standing`).
+  Why not wider. At 0.65 and 0.9 (0.11 and 0.15 of the plate) and at
+  half and three quarters alike, the pool held under the hand by `npm run
+  fingers` threw fewer fingers past its rim than without the film (7/5/5/4
+  and 6/6/8/1 against 11/10/9/5), and a 256 patch with the window out to
+  0.21 kept the rim full and threw none: the plate's maze, which pushes a
+  pool's edge out into fingers, stands aside under the window, and the film
+  does not finger. The cause of the fewer fingers was the flow: stepped
+  aside under the window, it left the layer there to the film, which does
+  not move it as a whole, so the window kept what the flow would have
+  carried out to the edge (7212 of the pool's 13029 against 5429 with the
+  film off). The flow now carries the layer's mean under the window
+  (wgsl/fluid.ts, carried): 9/12/9/4 in 7 sectors. Half and three quarters
+  are kept because they leave the most of the pool to the plate's own
+  fingering for the domes they give.
 */
 function patchSize(n: number): number {
   let p = 32;
