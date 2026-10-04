@@ -973,6 +973,21 @@ or two) and about 0.9 (holds until you drop Alcohol on it). Please say:
 
 ---
 
+## 33. A click on the laptop is not a beat (PLAN 14x)
+
+On the laptop's own microphone, in a quiet room (no music), with any look:
+
+- Pick tools one after another, press the Speed ride and other rides, and type a
+  few keys. The plate should not pulse, squeeze or ring on any of them. Before
+  this, a click was heard as a kick and the plate took it as one.
+- Clap once, or knock on the table away from the trackpad, with no hand on the
+  laptop: the plate should still pulse. That is the microphone hearing the room.
+- Then with music playing through speakers and Follow Beat on: ride a fader and
+  pick tools through a chorus. The beat should carry on through the clicks.
+- On the phone, on its microphone: tap tools and the Amount slider. Same as above.
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real

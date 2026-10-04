@@ -1220,6 +1220,8 @@ export default function App() {
     isActive ? audioStream : null, isActive,
     settings.sensitivity, settings.bassBoost,
     settings.autoCalibrate !== false, calibrateNonce,
+    // The microphone hears the hand on the laptop: its clicks are not beats.
+    audioSource === 'microphone',
   );
   const liveAudio = ear.audioData;
   /*
