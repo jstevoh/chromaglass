@@ -66,7 +66,7 @@ Where each batch stands, as of 2026-09-27:
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
-| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; the deploy's second Mac run is the owner's call) |
+| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -4221,9 +4221,18 @@ like day (`npm run macqueue -- --hours 24` for the time).
 - **19h-2. The phone's second finger lays a third as much as the first, or nothing.** "A 23
   steps, B 11 steps" with both down; the same pixels land on different cells run to run.
   Reads as a multi-touch Drop bug. Handoff: `handoff/ci-overhaul/phone-two-finger-drop.md`.
-- **19h-3. The deploy's second Mac run.** Every merge behind main (the owner's rule since
-  2026-09-28) re-runs all four shards on the deploy: 14 of the last 20 merges, about 50
+- **19h-3. The deploy's second Mac run. Shipped in the same PR, the owner's choice
+  ("Skip if no overlap", 2026-10-04).** Every merge behind main (the owner's rule since
+  2026-09-28) re-ran all four shards on the deploy: 14 of the last 20 merges, about 50
   minutes from merge to live each, red 4 times in 9 on lines nothing in the merge touched.
-  A deploy could instead trust the PR's green run when the files the PR changed and the
-  files main changed since its run do not overlap. That would publish a combination no Mac
-  run measured, so it is the owner's call.
+  `deploygate.sh`'s rule 5 now answers `disjoint` when the PR's run passed the Mac on an
+  older main, the site files it changed (`reach.mjs --site`: src/, public/, index.html,
+  the build config, the lockfile, package.json beyond "scripts") are not ones main changed
+  since, everything else that differs is main's own change, and no deploy since the run's
+  base went red; the deploy then runs Measure on the exact tree and not the Mac. By file
+  alone it never held (every PR adds a step to checks.yml and a script to package.json);
+  by site file, `npm run deploygate -- --history 20` reads 6 exact and 9 disjoint of 20,
+  so 15 of 20 merges deploy without waiting for a Mac, against 6. The two it refuses share
+  `src/App.tsx` (#233) and the solver (#225). What no deploy measures now: two PRs in
+  different site files moving the same picture; the next PR's own run, on main with both,
+  measures that.

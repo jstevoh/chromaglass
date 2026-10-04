@@ -32,6 +32,13 @@ run-name: "${{ github.event.pull_request.title || 'Checks' }} (tests ${{ github.
 
 on:
   workflow_call:
+    inputs:
+      # The deploy turns the Mac off when its gate found the PR's site files
+      # apart from main's newer changes (deploygate.sh rule 5); anything else
+      # that calls this workflow gets the Mac.
+      mac:
+        type: boolean
+        default: true
   pull_request:
 
 # A second push to a branch makes the first push's run pointless, and these are
@@ -51,8 +58,8 @@ jobs:
   # nothing new there, and on 2026-10-03 each such push still waited twenty
   # to thirty minutes for a Mac and then held one for forty-five runner-minutes
   # in front of PRs that did change the plate. Measure always runs. A deploy
-  # (`workflow_call`) always reaches the Mac, and the deploy gate never trusts
-  # a run that skipped it.
+  # (`workflow_call`) reaches the Mac unless its gate passed `mac: false`
+  # (deploygate.sh rule 5), and the gate never trusts a run that skipped it.
   reach:
     name: What the change reaches
     runs-on: ubuntu-latest
@@ -69,6 +76,7 @@ jobs:
         id: reach
         env:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 
   # Measure, in three parts side by side. As one job it took a median 14.3

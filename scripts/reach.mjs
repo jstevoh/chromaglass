@@ -28,9 +28,8 @@
 // Measure, on ubuntu, runs in full on every push whatever this says: it is
 // what checks the scripts, the docs' JSON and the workflow wiring, and it is
 // not behind a queue. And a run that skipped the Mac is never the run a deploy
-// trusts (`scripts/deploygate.sh`): the deploy runs the Mac checks itself,
-// because main's code under a docs-only merge is whatever the last merge left,
-// which a red deploy may not have passed.
+// trusts (`scripts/deploygate.sh`): main's code under a docs-only merge is
+// whatever the last merge left, which a red deploy may not have passed.
 //
 // `--diff` compares the checked-out commit with its first parent, with rename
 // detection off: a `git mv` of a Mac-only script to `docs/x.md` lists both
@@ -43,7 +42,8 @@
 // pull_request run that commit is GitHub's merge of the head into the base, so
 // the first parent is the base and the diff is exactly what merging would
 // change, however many commits the PR has. Any other event (a deploy calling
-// the workflow, a push) reaches the Mac without asking.
+// the workflow, a push) reaches the Mac unless the deploy's gate passed
+// `mac: false` (its rule 5, CALL_MAC here).
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -65,6 +65,20 @@ const NOT_MAC = [
 ];
 
 export const reachesMac = (path) => !NOT_MAC.some((re) => re.test(path));
+
+// What the live site is built from: `vite build` over src/, public/ and
+// index.html, with the packages the lockfile pins and the hosting config.
+// Nothing under src/ imports from docs/, scripts/, server/, desktop/ or ios/
+// (grepped 2026-10-04). Tailwind's `@import "tailwindcss"` (src/index.css)
+// scans the whole repository for class names, so a PLAN.md edit can add an
+// unused utility to the stylesheet; nothing outside src/ and index.html puts
+// a class on the page, so it changes no picture. The deploy gate's rule 5
+// asks only about these: two
+// PRs that both added a step to checks.yml, a script to package.json or a
+// line to the same harness cannot have broken the site between them, and
+// they did on every merge of 2026-10-03.
+const SITE = [/^src\//, /^public\//, /^index\.html$/, /^vite\.config\.[cm]?[jt]s$/, /^tsconfig[^/]*\.json$/, /^package(-lock)?\.json$/, /^firebase\.json$/];
+export const shipsToSite = (path) => SITE.some((re) => re.test(path));
 
 function selftest() {
   const cases = [
@@ -106,6 +120,27 @@ function selftest() {
     ['a/desktop/b.ts', true],
   ];
   let bad = 0;
+  const site = [
+    ['src/gpu/fluid.ts', true],
+    ['public/presets/a.json', true],
+    ['index.html', true],
+    ['vite.config.ts', true],
+    ['package.json', true],
+    ['package-lock.json', true],
+    ['tsconfig.json', true],
+    ['firebase.json', true],
+    ['.github/workflows/checks.yml', false],
+    ['scripts/phone.mjs', false],
+    ['scripts/lab-entry.ts', false],
+    ['server/remote-server.js', false],
+    ['PLAN.md', false],
+    ['docs/sets/example.chromaglass-setlist.json', false],
+  ];
+  for (const [path, want] of site) {
+    const got = shipsToSite(path);
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} ${path} ${want ? 'is' : 'is not'} built into the live site`);
+  }
   for (const [path, want] of cases) {
     const got = reachesMac(path);
     if (got !== want) bad++;
@@ -166,6 +201,21 @@ function selftest() {
     [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'scripts/maconly.mjs'), '// more\n')), 'mac=true', '--diff: a changed script reaches'],
     [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'PLAN.md'), 'x\n'), 'f'.repeat(40)), 'refused', '--diff: a HEAD that is not the merge of PR_HEAD is refused'],
   ];
+  // The deploy's switch: only a call that is not a PR's run, with mac false.
+  const call = (env) => {
+    const out = path.join(os.tmpdir(), `reach-call-${process.pid}`);
+    fs.writeFileSync(out, '');
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: { ...process.env, ...env, GITHUB_OUTPUT: out } });
+    const r = fs.readFileSync(out, 'utf8').trim();
+    fs.rmSync(out);
+    return r;
+  };
+  diffs.push(
+    [call({ GITHUB_EVENT_NAME: 'push', CALL_MAC: 'false' }), 'mac=false', 'a deploy whose gate said disjoint skips the Mac'],
+    [call({ GITHUB_EVENT_NAME: 'push', CALL_MAC: 'true' }), 'mac=true', 'a deploy that did not runs it'],
+    [call({ GITHUB_EVENT_NAME: 'workflow_dispatch', CALL_MAC: '' }), 'mac=true', 'a run by hand runs it'],
+    [(() => { try { return call({ GITHUB_EVENT_NAME: 'pull_request', CALL_MAC: 'false', PR_HEAD: '' }); } catch { return 'refused'; } })(), 'refused', 'a PR run ignores the deploy\'s switch (and, outside a merge commit, is refused)'],
+  );
   for (const [got, want, what] of diffs) {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}${got === want ? '' : ` — got ${got}`}`);
@@ -173,11 +223,21 @@ function selftest() {
   if (bad) process.exit(1);
 }
 
-if (process.argv.includes('--diff')) {
+if (process.argv.includes('--reaching')) {
+  // Paths on stdin, one a line; prints those that can reach a Mac shard, or
+  // with `--site` those the live site is built from (the deploy gate's rule 5).
+  const lines = fs.readFileSync(0, 'utf8').split('\n').filter(Boolean);
+  for (const l of lines) if (process.argv.includes('--site') ? shipsToSite(l) : reachesMac(l)) console.log(l);
+} else if (process.argv.includes('--diff')) {
   const event = process.env.GITHUB_EVENT_NAME;
   let mac = true;
   let why = `a ${event || 'local'} run reaches the Mac without asking`;
-  if (event === 'pull_request') {
+  if (event !== 'pull_request' && process.env.CALL_MAC === 'false') {
+    // The deploy, when its gate's rule 5 held: the PR's run passed the Mac
+    // and the site files it changed are apart from main's newer ones.
+    mac = false;
+    why = 'the deploy gate found the PR\'s site files apart from main\'s newer changes; Measure runs, the Mac does not';
+  } else if (event === 'pull_request') {
     const git = (...a) => execFileSync('git', a).toString();
     const second = git('rev-parse', 'HEAD^2').trim();
     if (!process.env.PR_HEAD || second !== process.env.PR_HEAD) {

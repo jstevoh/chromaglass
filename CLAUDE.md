@@ -97,9 +97,11 @@ deploy:
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
 - A deploy skips the checks when main's new tree is the exact tree its PR's
   `Checks` run passed on (the PR's head contained main when it merged;
-  `scripts/deploygate.sh`). Otherwise the deploy runs them in full. So bring
-  `main` into a PR and let it go green before merging, rather than merging a
-  head that is behind.
+  `scripts/deploygate.sh`). Since 2026-10-04 (the owner's choice) it also skips
+  just the Mac shards, running Measure, when the PR's green run tested an older
+  main and the site files the PR changed (src/, public/, index.html, the build
+  config, package.json beyond its scripts) are not ones main changed since, and
+  no deploy since went red. Otherwise the deploy runs them in full.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured) and `film.yml` (every
