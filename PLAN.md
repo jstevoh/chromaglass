@@ -63,7 +63,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §23); steps 2 to 6 not started |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones) |
@@ -3200,12 +3200,97 @@ would carry every field alike. It changes how every tool feels, so it goes to th
 first. Blow and Finger on the ferrofluid are 9n, in the ferrofluid thread, which has
 these numbers.
 
-### 15c. Blow's wind erases colour rather than pushing it
+### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
-A moving Blow multiplies the dye under it by 0.8 every step, which clears it, and
-its push is the one-step push of 15b. `npm run tools` checks "Blow clears dye from
-under it", so the check asserts the eraser. Whether wind should push the colour
-aside instead is a question for the owner, taken with 15b.
+A moving Blow multiplied the dye under it by 0.8 every step, which cleared it, and
+its push is the one-step push of 15b. So did a second finger's Blow on the phone, a
+Blow on a plate that is not the lead, and every remote hand's (a directed blow
+thinned 15% a step at its middle). Now a hand's Blow that is not the straw is the
+wind (`blowWind`): it carries the colour the way the hand went, a take and a put as
+the Finger's carry, with the ferrofluid's numbers (`blowCarry`), so the colour and
+the ferrofluid go the same way. Held still (a puff that is not the straw) it blows
+the colour out from under it onto the Press's ring. With Oil Bodies the oil goes
+with its colour, along (`carryMix`) or onto the same ring (`pressOil`), cell for
+cell. Measured in the lab (`npm run wind`, 30 readings of a Blow drawn a sixth of
+the plate from a pool's middle): the old eraser kept 78.7% of the pool (a remote
+hand's directed one the same) and moved its middle 1.05% of the plate backwards; the
+wind keeps 100.0% and moves it 1.06% the wind's way (2.71% for a remote hand's wider
+one). `npm run tools` on the Mac now draws a Blow across a pool through the real
+pointer and asks that the stroke ran as the wind (the pointer's Blow counts its
+straw and wind steps and what the wind carried, `blowSteps` in `chromaglassDebug`),
+that the colour goes along and that it is kept.
+
+A held puff lands the oil on the Press's ring, and the ring's kernel worked out what
+each ring cell gets from the formula (1 / K), which a small palm's ring does not tile:
+a puff six cells across lost 3.3% of the oil it moved on the Mac (`npm run wind` went
+red on it). The kernel is now handed the share counted on its own grid, as the
+colour's is counted on the mirror's (`pressShare`), and the Press's own oil, which
+lost up to 1% of a press the same way, now keeps all of it (`npm run pressoil`:
+32768.0 → 32768.0 in the middle, off it and in a corner).
+
+The straw is now chosen by whether the hand has moved in the last 150 ms (the
+clock the ferrofluid's wind already used), not by whether it moved this step. Asked
+per step, a drag blew the straw on every step after a frame's first and on every
+frame the pointer did not report a move, so a drag left a string of straw bubbles
+and ran the wind a step a frame at best. The show's own puffs (a pour's burst, the
+automation's breath, a bubble's pop) still clear the dye under them, as their look.
+
+### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
+
+The owner's standing rule (2026-09-28): build from the chemistry and physics of the
+liquids, not from a picture of their result. 15c is a shortcut by that rule, and so
+are the carries it copied. The wind moves the colour, the oil and the ferrofluid
+directly, a take from under the hand and a put a hop ahead (`blowDye`, `blowOil`,
+`blowCarry`), because the flow cannot carry them: a tool's push is cut back to idle
+at the end of the step it was added in (15b). The Finger (`carryDye`, `carryMix`,
+`fingerCarry`) and the Press (`pressDye`, `pressMix`) do the same. It keeps the
+colour and moves it the right way, and it is not what air on a liquid does.
+
+What air blown on a thin layer does, and what the plate would need:
+
+- **Shear.** Air moving over the surface drags it with a tangential stress, about
+  tau = 1/2 rho_air C_f U^2 along the jet (C_f a few thousandths for a wall jet).
+  In a layer this thin the flow is viscous (lubrication), so the stress drives a
+  Couette profile: the surface moves at tau h / mu and the depth-mean at
+  tau h / (2 mu), in proportion to the depth. A deep pool moves more than a thin
+  film under the same breath, and a thick oil (glycerine) less than water. The
+  plate's depth-mean velocity should take tau h / (2 mu) as a force that lasts as
+  long as the breath does, not a disc of velocity that the clamp removes.
+- **Pressure.** Where the jet meets the surface it presses a dimple, about
+  1/2 rho_air U^2 at the stagnation point, which pushes liquid out from under the
+  nozzle (a Poiseuille flow, -h^2 grad p / (3 mu) depth-mean). That is a held
+  puff's ring, and it is the Press's physics at a smaller pressure: it belongs in
+  the gap field the Press already squeezes (`squeeze`, `applySquish`), not in a
+  ring map.
+- **The film.** The layer's thickness moves with its own flow,
+  dh/dt + div(h u) = 0: it thins where the air hits and piles up in a bow wave
+  where the wind stops. Colour, oil and ferrofluid are then carried by that one
+  flow, conserved by the advection, and the carries can go.
+
+Depends on 15b: the tool's force has to reach a flow that remembers it (the lasting
+current `cur`, or the clamp lifted for forced flow), which changes how every tool
+feels, so it goes to the owner first. When it lands, `npm run wind` is the check:
+with the carries deleted, the colour kept and moved along by the flow alone, and the
+oil with it, against the same bars. Then the same for the Finger (a solid dragged
+through the layer: no-slip on the finger, the wake behind it) and the Press
+(squeeze flow from the gap, which the solver half models already).
+
+### 15f. Found with 15c
+
+- The Finger carries the oil (`carryMix`) whenever the dye mirror is current, and
+  a carry with no colour under it never marks the mirror spent. So a Finger over a
+  body with no colour under it carries the oil every step at a share sized for one
+  carry a reading. The Press (15d) and now the Blow keep the oil on its own clock
+  (`oilPressAfter`); the Finger should too.
+- The Press's ring (`pressDye`) keeps 99.4% of a pool of colour a puff blows out over
+  30 readings, not all of it: a nearest-cell gather does not tile a small ring
+  exactly, and the counted stretch that makes a flat plate exact does not on an
+  uneven one. Small next to the 21% the eraser lost, but a ring that splits each
+  palm cell exactly among the cells that read it would keep all of it.
+- A remote hand's Blow (performGesture: the phone as the laptop's remote, a pen, OSC,
+  a replayed take) goes through the same `blowWind`, but no check drives it through
+  the app: `npm run wind` runs the functions it calls, and `npm run tools` only the
+  mouse. A gesture sent through the remote's link in `tools` would close it.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 

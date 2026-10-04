@@ -494,6 +494,11 @@ jobs:
       - name: The press moves the oil
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run pressoil
+      # A hand's Blow that is not the straw pushes the colour along and keeps
+      # it, the oil going with its colour; it erased it (PLAN §15c).
+      - name: The wind carries the colour
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run wind
       # A spun dish drags its liquid round through the gap, harder where the
       # gap is tight, flings the heavy dye out and draws the oil in; with
       # nothing spinning the flow is a still plate's to the bit (PLAN §22).
