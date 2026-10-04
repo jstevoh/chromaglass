@@ -97,7 +97,7 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-const THIN_GAP_KERNELS = ['hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
+const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
 /*
   The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
   substep may carry across a face, in cells, and the most substeps a step
@@ -318,6 +318,39 @@ const REST_GAP = 0.03;
   dishes inside it). Past it the liquid is open to the air.
 */
 const OPEN_RIM = 0.5;
+/*
+  The forces' own physics on a thin gap (PLAN 18a-2, wgsl/thinGap.ts's
+  hsBody, hsPrep and hsDivergence).
+
+  The reference liquid: the default Thickness, the one every look's forces
+  were tuned on. A body force is read as the speed it drives this liquid to
+  at the rest gap, so on the default Thickness nothing moves differently,
+  and on any other the liquid answers as its viscosity says (hsPrep).
+*/
+const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
+/*
+  Rain Drip's weight: the speed a unit of dye over the plate's mean drives
+  the reference liquid to at the rest gap, per unit of the slider, in the
+  flow's per-step speeds. Set so a pool of colour falls as fast as it did on
+  the thin gap before (lab, Rain Drip 0.5, a pool of 1: 0.079 against
+  0.083), where it fell because the whole plate slid downhill out of the
+  dish at 0.092 round it; now it falls through clear liquid that rises past
+  it (the plate's mean 0.001). Measured by hand in the lab against main;
+  `npm run forces` holds the physics, not this number. Linear in the dye, as
+  Boussinesq weight is (the mix's Dye Weight saturates with a tanh): a pool
+  poured thick, up to the dye's cap of 6, is that much heavier and falls
+  that much faster.
+*/
+const DRIP_WEIGHT = 0.5;
+/*
+  Updraft's shear, over the old push it is made from. The old push was only
+  on the colour, and a pool pushed while the clear liquid round it is not
+  goes at about half the push (Darcy's: the liquid round it has to get out
+  of its way); the draught's shear is on all of it, so it is halved to move
+  a pool as fast as it went (lab, by hand against main: a pool 0.0179 at
+  the full push against 0.0096 before).
+*/
+const AIR_SHEAR = 0.5;
 /*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
@@ -550,6 +583,10 @@ export class WebGPUFluid {
     on each coarse level of the multigrid.
   */
   private hsPrev: GPUTexture | null = null;
+  /** The velocity after the step's body forces (hsPrep reads them apart from the stirring), made with hsPrev. */
+  private hsMid: GPUTexture | null = null;
+  /** What the step's hsPrep reads as the velocity after the body forces: hsMid, or hsPrev when no body force ran. */
+  private hsMidNow: GPUTexture | null = null;
   private hsMob: GPUBuffer | null = null;
   private hsP: GPUBuffer | null = null;
   /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
@@ -1566,7 +1603,8 @@ export class WebGPUFluid {
       flow's own displacement is what makes the pull the same on a slow look
       as a fast one. Only with a magnet under a plate that has ferrofluid.
     */
-    if (this.phaseLive && p.magnetStrength > 0.0001 && (p.magnetSeconds ?? 0) > 0) {
+    const magnetOn = this.phaseLive && p.magnetStrength > 0.0001 && (p.magnetSeconds ?? 0) > 0;
+    if (magnetOn) {
       stage('magnet', (pass) => {
         const perStep = (p.magnetSeconds ?? 0) / Math.max(disp, 1e-7);
         // Under a maze field the magnet's pull gives way to the dipoles'
@@ -1648,6 +1686,34 @@ export class WebGPUFluid {
           gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]));
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
+    /*
+      On a thin gap, Rain Drip's heavy dye and Updraft's shear join the body
+      forces (hsBody), and the velocity is kept here, after all of them and
+      before the stirring, so hsPrep can read the two apart: a body force
+      moves a liquid as its viscosity says, a stir as the dial says (PLAN
+      18a-2, wgsl/thinGap.ts). With no body force this step there is nothing
+      to keep, and hsPrep reads the velocity from before the forces in its
+      place, which makes the body forces' share zero.
+    */
+    const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
+    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1);
+    if (thinBody) {
+      stage('thin body', (pass) => {
+        this.ensureThinGap();
+        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}`,
+          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, 0, 0, 0, 0, 0]),
+          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write]);
+        this.vel.swap();
+      });
+    }
+    if (thin) {
+      const body = magnetOn || mazeFlow || mixOn || thinBody;
+      const prev = this.ensureThinGap();
+      this.hsMidNow = body ? this.hsMid! : prev;
+      stage('thin gap mid', (pass) => {
+        this.run(pass, 'scaleDye', this.hsMid!, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+      }, body);
+    }
     // Vorticity confinement, a look option (see `curl` in wgsl/fluid.ts).
     stage('confine', (pass) => {
       const w = this.scratch();
@@ -1690,7 +1756,7 @@ export class WebGPUFluid {
     */
     if (thin) {
       stage('forces', (pass) => {
-        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
+        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], this.arg('forces thin', [1, 0, 0, 0]));
         this.vel.swap();
       });
       /*
@@ -2985,6 +3051,10 @@ export class WebGPUFluid {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       const buf = (label: string, n: number) => this.disposer.track(this.device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.hsMid = this.disposer.track(this.device.createTexture({
+        label: 'thin gap after body forces', size: [this.N, this.N], format: VEL,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
       this.hsMob = buf('thin gap mobility', this.N);
       // The thin solve's own P, packed as the old solver's pressure is. hsGradient
       // hands the advections c·P in that one (wgsl/thinGap.ts, hsGradient).
@@ -3093,9 +3163,21 @@ export class WebGPUFluid {
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     const phase = this.phaseLive ? this.phase.read : this.blankPhase();
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${this.squeeze.read.label}:${phase.label}`,
-      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1, 0, 0, 0]),
-      [this.vel.read, prev, this.squeeze.read, phase, this.vel.write, mob]);
+    const mid = this.hsMidNow ?? prev;
+    /*
+      Glass Smear is the glass sliding over the liquid (hsPrep): the liquid's
+      column goes at half the glass's speed. The old push gave the colour a
+      noise's 0 to 1 of smearX, half on average, and a pool pushed while the
+      clear liquid round it is not goes at about half its push (Darcy's), so
+      the colour went at about a quarter of smearX (lab: 0.27). The glass is
+      taken at half smearX, so the liquid, colour and all, goes at a quarter
+      (0.25): a look's smear moves its colour as fast as it did, and now
+      moves the liquid it is in with it.
+    */
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}`,
+      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
+        NU_REF / nu, 0.25 * p.smearX, 0.25 * p.smearY]),
+      [this.vel.read, prev, mid, this.squeeze.read, phase, this.vel.write, mob]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
