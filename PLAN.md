@@ -61,12 +61,12 @@ Where each batch stands, as of 2026-09-27:
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
-| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in; nothing built |
+| 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 6 not started |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15b, 15c, 15e open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); 18a-2 to 18a-11 left, each its own PR |
-| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
+| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); nothing built |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1930,6 +1930,26 @@ while this batch's plan was going in (#177), and no cause is known yet:
   watch, so it read as never moving and check 1b failed on the control; the opening
   is now read at least to when the plate was seen running, and 1b asks the control
   to have run steadily at all.
+- `npm run startup`, 1b, "moving for good no later than the old way" (with 3 s to
+  spare): red on three of seventy open-shard runs, 27 September to 3 October (16.72
+  against 13.71 s on 36371919138, 22.47 against 18.12 on 37095698733, 19.24 against
+  14.99 on #223's 37143242070), while the show less the control ran -4.95 to +4.35 s
+  across them. One opening against one, unpaired, measured the runner: each wait is
+  Chromium handing over the GPU (2.9 to 6.1 s after load), the GPU compiling the same
+  forty-five pipelines cold, and the page's own work, and the compile took the two
+  openings of one run 0.75 to 1.5 times as long a pipeline as each other (the three
+  reds 1.22 to 1.31, 12.9 to 16.8 s of compile in the show). **Fixed (this PR):** 1b
+  takes Chromium's handover and the compile of the old way's pipelines out of both
+  sides, and holds what is left, the page's own wait (beyond-the-list builds in it),
+  to the control's plus 1 s: replayed on all seventy, -0.89 to +0.27 s, the three reds
+  +0.01, +0.27 and +0.07. A second line holds the show's build of those pipelines to
+  1.75 times the control's stop for them, so a slower way of building still reads
+  red. *Still open:* the replay approximated each build from the run's total (the
+  logs printed only that); the first green Mac runs print the real split, and the
+  1.75 should be read against twenty of them. A build less than half again slower
+  than the runner's own spread cannot be told from it by one pair of openings; a
+  third opening, or a reference compile timed inside each, would cost another
+  half-minute of Mac time a run.
 - Still owed from that hunt: the solver's first submits cost a few tenths of a second
   more than later ones even with every compute pipeline dispatched once ahead on
   scraps (downsample 0.32 s, upsampleDelta 0.40 s, run 36306162647). Worth finding
@@ -2202,7 +2222,19 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    it (offline from the first launch), the show server started with it, the show
    window opened on the projector with no click needed, background throttling off,
    and a macOS build on the CI runner. A check loads the packaged app with the
-   network off and sees a lit plate. *Not started.*
+   network off and sees a lit plate. **Shipped** (2026-09-27): `desktop/` (its
+   README has the build, the signing secrets and the first launch), the check
+   `npm run desktop` run on the packed app by `.github/workflows/desktop.yml` on a
+   Mac, which also builds the `.dmg` (Actions → Mac app → Run workflow). The server
+   is `server/remote-server.js` unchanged, imported by the app; the app keeps its
+   show key between launches; `useProjector` sends the show to a projector with no
+   gesture when `isDesktopApp()`, and the app fills the projector's screen itself.
+   Measured in a cloud session before and after: with a stand-in second screen, no
+   projector window opened before, one opened in full screen after; without the
+   app's fill, the wall showed the click hint and the laptop the title-bar chip.
+   **Owed:** the Mac look (`docs/judging.md` §26), and signing it with the owner's
+   Developer ID (the secrets in `desktop/README.md`); until then macOS asks once in
+   Privacy & Security before it opens.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
@@ -2238,6 +2270,43 @@ network):
   records (File System Access).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
+
+**Found building step 1** (2026-09-27):
+
+- The app's storage is its own, like a second browser: presets, MIDI maps and
+  settings saved in Chrome are not in it, and moving them is one file at a time
+  (each preset's download button, the MIDI map). One "take everything with you"
+  file (every user preset, the MIDI and sound-learn maps, the set list, the room's
+  settings), written in Chrome and opened in the app, would make the move one step.
+  The same file is a backup before a gig.
+- The storage belongs to the origin, port included: if port 3000 is taken when the
+  app opens (a `npm run show` still running), the app moves to 3001 and opens with
+  none of its saved looks. It says so in Show → Show Server Details…, but a
+  performer would not look there. Either warn in the show window, or give the app
+  its own origin (a custom protocol for the show window, with the relay still on
+  the port), which needs `relayInfo()` to learn the relay's address another way.
+- Built for Apple silicon only. An Intel Mac needs an `x64` (or universal) target in
+  `desktop/electron-builder.config.cjs`, about doubling the build.
+- The icon is the website's (`public/icon-512.png`), a flat square in the Dock. A
+  Mac icon has its own shape and shadow (a 1024 px `.icns`).
+- No updates in the app: a new version is a new download from Actions. Once it is
+  signed, `electron-updater` from GitHub Releases on a `desktop-v*` tag (which
+  `desktop.yml` already builds on) would let the app offer the new show itself.
+- The hidden-window lines are judged only where a window in a bare Electron is seen
+  to slow down when minimised or covered: never under xvfb (no window manager), and
+  on CI's Mac runner only if its window server really hides a minimised window.
+  The first run's control, a window inside the app, stayed visible at 46 frames/s
+  minimised because the app's switches reach every window in its process. Where
+  it is not measured, it is `docs/judging.md` §26 on the owner's Mac.
+- In a cloud session `npm run desktop` can fail "the run finished" on a 30 s
+  `page.reload` timeout, after software WebGPU starves the page (its covered-window
+  reading shows 2 s of timers taking about 54 s, and once the GPU process exited).
+  Measured on 2026-10-03 in one container: 3 of 6 runs failed this way after main's
+  #231 and #233 came in, and 1 of 4 failed on the head before them. So it is the
+  container, not those PRs. The Mac runner has never shown it. Worth fixing: a
+  check that times out because its machine is slow says nothing about the app.
+  Wait for the reload on the page's own first frame rather than `load`, or say
+  "skip" when the covered reading shows the page was starved, as the lit plate does.
 
 ## 14. The show at the gig: hearing, timing, speed and the picture on the wall
 
@@ -2692,6 +2761,13 @@ and comes back; a stubbed `getScreenDetails` with a fake `screenschange` in
   unregisters every service worker and deletes every cache (`src/main.tsx`): offline,
   that turns one missing file into a site that cannot be reloaded at all.
 - The fonts come from Google (`src/index.css`), which the worker does not handle.
+  *Found building the Mac app (§13 step 1), 2026-09-27:* they do not, anywhere. The
+  `@import url(https://fonts.googleapis.com/…)` comes after `@custom-variant`, and
+  CSS ignores an `@import` after any other rule, so the build drops it (`dist/assets`
+  has no `googleapis`) and Geist and Geist Mono never load: every page shows the
+  fallback fonts. `npm run desktop` saw no request leave the app. Serving the two
+  fonts from the site fixes the look and the offline half at once; which one the
+  designs were judged in is for the owner's eyes.
 - Song ID and lyrics fetch with no timeout (`fingerprint.ts`, `lyrics.ts`), and one
   busy flag gates the local fingerprint match, the song-end detector and the remote
   ID together (`useMusicIntelligence.ts`), so a request that hangs on venue Wi-Fi
@@ -3973,6 +4049,35 @@ three green runs sampled, and one `Checks` run wants four Mac jobs at once.
 on the push that takes a PR out of draft. *Measure:* the Mac shards' queue time over
 the next 20 `Checks` runs, against these.
 
+**Shipped 2026-10-03** (the owner asked why ten open PRs were all waiting on CI).
+`npm run macqueue` measured the fifteen hours to 19:14 UTC: 2,747 Mac runner-minutes, of
+which `Checks`' PR shards 1,705 (62%, 341 of them on runs that failed), the gallery 812
+(30%, 28 runs, every one on a push nobody had asked pictures of), deploys 191 (7%) and
+the iPhone build 39. The PR shards waited 19 minutes on average for a runner, and the
+account held five to eight Mac jobs at once through every busy hour, so a gallery run
+was a shard not running. Two changes, neither of which runs less of `Checks`:
+
+- `gallery.yml` runs on `workflow_dispatch` or on a PR labelled `gallery`, once per
+  labelling, as `controls.yml` does. A session can add the label (it gets a 403 on a
+  dispatch); `preset-auditor` now does.
+- `closed.yml` cancels a PR's `Checks` and `iPhone app` runs that are still queued or
+  running when it merges or closes, by joining their concurrency groups. At 19:14, #204
+  had been merged an hour while three of its last push's shards were still queued and
+  running, ahead of the deploy its merge started; 38 runner-minutes in the window went
+  to PRs already merged. It is its own workflow, not a `closed` trigger on `checks.yml`,
+  so the deploy gate can never read a run of it as a green `Checks`.
+  `npm run closedruns` (in Measure) holds the three files' groups to one spelling.
+  As shipped in #234 it wrote the group with `github.ref`, which for a merged PR's
+  closed event is the base branch, not `refs/pull/<n>/merge`: on #234's own merge it
+  joined `checks-Checks-refs/heads/main` and stopped nothing. The follow-up builds the
+  ref from the PR's number, and `closedruns` now evaluates closed.yml's side as a
+  merged PR's closed event (red on #234's spelling, green on the fix).
+
+*Measure after:* `npm run macqueue` over a like window once a day's PRs have run: the
+gallery's share should be its labelled runs only, and the shards' mean wait below 19
+minutes for the same number of open PRs. Left for the owner, since only a setting or a
+bill changes it: more Mac runners at once (19g).
+
 ### 19b. Measure is near its timeout, and its first red hides the rest
 
 The ubuntu job averaged 746 s over 14 runs (837 s at most) against `timeout-minutes:
@@ -4108,3 +4213,19 @@ directly, as `checks.yml` already does for some; the strays deleted or wired;
 
 *Fix:* one pass over each in a docs-only PR, at a moment when no other session has these
 lines open (#209 has "What comes next" and the operating rules open today).
+
+### 19g. More Mac runners than the account's hosted ones
+
+Even without the gallery, ten open PRs ask for forty Mac shards of about eleven minutes
+each, about 440 runner-minutes, against a cap of five to eight Mac jobs at a time: an
+hour and a half of queue for the last PR in line. Three ways to add runners, each the
+owner's call: a self-hosted runner on the owner's own Mac (a real GPU and free; but on a
+public repository a fork's pull request could run code on that machine unless
+"Require approval for all outside collaborators" is set under Settings → Actions, and
+`runs-on` would need a label that only same-repository PRs use); GitHub's larger macOS
+runners (paid by the minute, on a Team or Enterprise plan); or fewer, longer shards,
+which costs each PR more wall time to save the setup overhead, under a minute a shard
+today, so not worth it. Also worth having: the deploy gate skipping more often, which
+the owner's "merge behind main" rule (2026-09-28) trades away; 191 deploy minutes in the
+window above.
+

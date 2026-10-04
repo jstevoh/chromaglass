@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isDesktopApp } from '../lib/platform';
 
 /**
  * The projector, noticed and used.
@@ -16,6 +17,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *
  * The permission itself needs a gesture the first time; the chip asks for
  * it. After that Chrome remembers, and the app sees the screens on load.
+ *
+ * In the Mac app (`desktop/`) none of that waits for a hand. The app grants
+ * the screens, opens popups with no gesture and fills the projector's screen
+ * itself (desktop/main.js), so auto is the mode it starts in and a projector
+ * that appears is used at once: the show is on the wall when the app opens,
+ * which is what PLAN.md §13 step 1 asked. A mode chosen in Settings → Wall
+ * still wins, `ask` and `off` included.
  */
 export type ProjectorMode = 'ask' | 'auto' | 'off';
 
@@ -37,7 +45,8 @@ interface ScreenDetailsLike {
 const MODE_KEY = 'chromaglass-projector-mode';
 
 export const loadProjectorMode = (): ProjectorMode => {
-  try { const v = localStorage.getItem(MODE_KEY); return v === 'auto' || v === 'off' ? v : 'ask'; } catch { return 'ask'; }
+  const fallback: ProjectorMode = isDesktopApp() ? 'auto' : 'ask';
+  try { const v = localStorage.getItem(MODE_KEY); return v === 'auto' || v === 'off' || v === 'ask' ? v : fallback; } catch { return fallback; }
 };
 
 /** The screen that is not built in and not this one; failing that, any other screen. */
@@ -118,15 +127,28 @@ export function useProjector(opts: {
   useEffect(() => {
     const key = projector ? `${projector.left},${projector.top},${projector.availWidth}x${projector.availHeight}` : null;
     if (mode !== 'auto' || !projector || opts.casting || sentRef.current === key) { setArmed(false); return; }
+    const go = () => {
+      if (modeRef.current !== 'auto' || castingRef.current) return;
+      sentRef.current = key;
+      setArmed(false);
+      sendRef.current(projector);
+    };
+    // No gesture to wait for in the app (see the top of this file), but only
+    // for a screen that is known not to be built in. `pickProjector` falls
+    // back to any other screen, and a laptop opened on an external monitor
+    // would otherwise send the show, full screen, to its own panel on every
+    // launch. That case keeps the gesture. A timer, not a call in the
+    // effect, so the send happens outside React's render.
+    if (isDesktopApp() && projector.isInternal === false) {
+      const t = setTimeout(go, 0);
+      return () => clearTimeout(t);
+    }
     setArmed(true);
     const fire = (e: Event) => {
       // Not from the projector window itself, and not while a text field has focus.
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
-      if (modeRef.current !== 'auto' || castingRef.current) return;
-      sentRef.current = key;
-      setArmed(false);
-      sendRef.current(projector);
+      go();
     };
     window.addEventListener('pointerdown', fire, { capture: true });
     window.addEventListener('keydown', fire, { capture: true });
