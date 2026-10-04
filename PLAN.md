@@ -2967,12 +2967,15 @@ read -0.08% to +0.00% on all five runs that reached the line, and the window aft
 +0.24% to +0.39%, toward B every time. And since Thin Gap is on in every look
 (18a-every) the stroke's own push is smaller (+0.70% to +2.31% on main's code, was +0.76% to +4.15%), so the
 drift is a larger share. Whether it is the wind's liquid still going is not settled:
-the thin gap lets go of a velocity in about a tenth of a second, and the window opens
-0.7 s after the stroke; a drift that starts with the stroke and runs on would also
-pass a wind that pushed nothing. So the window after is split in two: the plate's own
-drift is the faster of the window before and the second half after (never below
-zero), and the first half after is printed, not judged. What the two halves read on
-the Mac says which it is.
+split in halves on #254's first run it read +0.30% then +0.16% (no dying away within
+the thin gap's tenth of a second), and charged at the second half's rate the wind's
++0.64% met +0.69%. Charging it or not is a guess either way, and not charging it
+would pass a wind that pushed nothing on a plate that starts drifting with the
+stroke. So the wind is now drawn both ways, A to B on a pool at A and B to A on a
+pool at B, and each has to beat the window before it by 0.002: a drift the wind did
+not make helps one stroke as much as it holds back the other. The windows after are
+printed in halves for both; if they turn round with the wind, the drift is the
+wind's.
 
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
