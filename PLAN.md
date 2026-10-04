@@ -1893,7 +1893,14 @@ while this batch's plan was going in (#177), and no cause is known yet:
   within a second of the last, counted from the end of Chromium's requests to the
   frames' return); replayed on the seventy as a proxy, -0.90 to +0.31 s (sd 0.22),
   and that deploy's control about 2.0 s against the show's 1.14 s. Each run now
-  prints the stop it chose. A build less than half again slower
+  prints every stop its control's frames made, what was built in each and which it
+  priced. Its first Mac run (37171671783) showed why it sums the stops a build sat
+  in, each less Chromium's part, rather than taking the first: the control's frames
+  stopped through the device's handover with its first build in that stop, then
+  from 4.76 s for 12.10 s for the other 47, and the first, less Chromium's, read
+  0.01 s (917x). On that run's numbers it reads 12.10 s, the show's own 1.05 s
+  against 1.86 s and its build 1.03x. A stop with no build in it is never priced,
+  so a runner's stall among the builds cannot make the 1.75x bound lenient. A build less than half again slower
   than the runner's own spread cannot be told from it by one pair of openings; a
   third opening, or a reference compile timed inside each, would cost another
   half-minute of Mac time a run.

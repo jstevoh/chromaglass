@@ -1015,7 +1015,7 @@ const waitOf = (x, oldWay) => {
     .map(([, a, b]) => [a, Math.min(b ?? steady, steady)]).sort((p, q) => p[0] - q[0]);
   let chromium = 0, end = 0;
   for (const [a, b] of asks) { const from = Math.max(a, end); if (b > from) chromium += b - from; end = Math.max(end, b); }
-  let compile = 0, count = 0, at = null;
+  let compile = 0, count = 0, at = null, stops = null;
   if (x.prepared) {
     const seen = new Set();
     for (const [key, at, ms] of x.prepared.builds ?? []) {
@@ -1025,29 +1025,50 @@ const waitOf = (x, oldWay) => {
       count++;
     }
   } else {
-    // The first stop in its frames that the builds it made on its frames
-    // sat in (ending after the first of them; Chromium's hold before the
-    // device came ends before any), from its start to moving for good.
-    // Begun no more than a second after the last of them, so a runner's
-    // stall later on is not taken for a cold compile; counted from the end
-    // of Chromium's requests at the earliest, so a first step built inside
-    // the device's own hold is not counted twice; and only to the frames'
-    // return, the quarter second to the next counted step being the page's
-    // own on both sides.
+    // The stops in its frames that the builds it made on its frames sat in,
+    // summed, each as it reads once Chromium's part is taken off: from the
+    // end of Chromium's requests at the earliest, so a first step built
+    // inside the device's own hold is not counted twice, and only to the
+    // frames' return, the quarter second to the next counted step being the
+    // page's own on both sides. A build sits in the stop that holds it, or,
+    // held by none, in one begun within the second after it (the frame it
+    // was asked for in may close before the GPU stops the next); a stop no
+    // build sat in is not the compile, however long or near the builds, so
+    // a runner's stall is not priced as compile. What is left of a stop
+    // under a quarter second, the steps' own resolution, is not one.
+    //
+    // On this PR's own first Mac run (run 37171671783) the control's frames
+    // stopped through Chromium's handover of the device with its first
+    // build in that stop, then from 4.76 s for 12.10 s while it built the
+    // other 47. The first cut took the first stop alone, which less
+    // Chromium's hold read 0.01 s of compile, and the show's 12.48 s
+    // building the same 48 read as 917 times slower. Summed and not the
+    // longest, so a compile split over two stops is not read as half.
     const built = (x.ledger?.onFrame ?? []).map((e) => e.at / 1000).filter((t) => t <= steady);
-    const first = Math.min(...built), last = Math.max(...built);
-    const stop = built.length ? (x.frameStopsRaw ?? []).find(([from, len]) => from + len > first && from <= last + 1 && from < steady) : null;
-    if (stop) {
-      const from = Math.max(stop[0], end);
-      compile = Math.max(0, Math.min(stop[0] + stop[1], steady) - from);
-      count = 1;
-      at = [from - t0, compile];
+    const raw = (x.frameStopsRaw ?? []).filter(([from]) => from < steady);
+    const holds = raw.map(() => 0);
+    for (const t of built) {
+      let i = raw.findIndex(([from, len]) => t >= from && t <= from + len);
+      if (i < 0) i = raw.findIndex(([from]) => from > t && from <= t + 1);
+      if (i >= 0) holds[i]++;
+    }
+    stops = raw.map(([s, len], i) => {
+      const from = Math.max(s, end);
+      const n = Math.max(0, Math.min(s + len, steady) - from);
+      return { from: from - t0, len: n, builds: holds[i], taken: holds[i] > 0 && n >= 0.25 };
+    });
+    for (const st of stops.filter((st) => st.taken)) {
+      compile += st.len;
+      count++;
+      at ??= [st.from, st.len];
     }
   }
-  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : 'stop', own: steady - t0 - chromium - compile };
+  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', stops, own: steady - t0 - chromium - compile };
 };
 const sayWait = (w) => (w == null ? 'never moving for good'
-  : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`);
+  : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
+    // Every stop its frames made, so a pick that is wrong reads off the log.
+    + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it${st.taken ? ', priced' : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
 const timeline = (o, held = null) => {
   // Whether the page's own thread was busy through a gap (a long task
