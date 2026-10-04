@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   breaking into more pieces, white over the colour on the lamp and not on black, and
   the picture unchanged byte for byte with the film off.
 
+### Changed — the spun dish's swirl on a thin plate is one pass, not thirteen (PLAN 22k)
+
+- Since a look's own turning went onto the dish, the nine thin looks with music
+  routed to rotation run the swirl on nearly every step while they play. On a
+  thin plate it no longer projects itself before the thin solve, which projects
+  the whole flow with the gap in it anyway: measured on CI's Mac at about 45 µs
+  a step on the phone layout where it was 105 (`npm run swirlcost`), under a
+  fifth of a percent of the GPU either way. The flow is the same to 0.3%
+  (`npm run dish`).
+
 ### Changed — the Magnet moves only the ferrofluid that is there (PLAN 9y)
 
 - **The Magnet brings no ferrofluid.** Its first touch on a plate with none used

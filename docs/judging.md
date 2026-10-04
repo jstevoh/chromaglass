@@ -855,7 +855,36 @@ for, and the rest answer the liquid's thickness. Nothing changes with Thin Gap o
 
 ---
 
-## 33. A clear film that tears into lace (Clear Film, PLAN 20b)
+## 33. The Finger drags the liquid (PLAN 15b)
+
+The Finger used to move the colour by a hand-written carry, a little taken from behind
+it and put a hop ahead, while the push it gave the liquid itself did nothing. Now it is
+a solid in the liquid: what it touches moves at your hand's speed, the liquid round it
+parts to let it through, and the flow carries the colour, the oil and the ferrofluid
+together. It changes how the Finger feels. On Classic:
+
+- draw the Finger slowly across bands or blobs of colour: the colour on its path should
+  be pulled along it in chevrons, the way a stylus pulls marbling, and the colour a
+  little to either side should bend back the other way as the hand passes;
+- draw it fast, then stop: the liquid should stop with the hand within a fraction of a
+  second, not coast on;
+- draw it through a pool on a ferrofluid look (Magnet Garden, or any with ferrofluid):
+  the pool should be drawn out after the hand into a tongue and, once the hand lifts,
+  pull itself back into a rounder drop at the tongue's head;
+- on Oil & Water: an oil body should go with the hand, its colour inside it;
+- on a thick look (Thickness high) the drag should reach less far round the finger
+  than on a thin one;
+- on the phone, drag a finger across the plate with the Finger tool: the same;
+- the remote's pad Finger (the phone driving the laptop): say if it stutters;
+- the frame time while dragging over ferrofluid: its carry takes more substeps while a
+  fast hand is down.
+
+Say if the Finger now feels too strong, too sticky (a blob that rides along under the
+hand), or not enough like a finger in liquid.
+
+---
+
+## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
 
 Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
 the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
