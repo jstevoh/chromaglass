@@ -377,15 +377,47 @@ try {
     await sleep(100);
     cast = (await allWindows()).find((w) => /[?&]cast=/.test(w.url)) ?? null;
   }
+  /*
+    The wall is read twice: once the mirror is up, and again two seconds later.
+
+    It was read once, at a fixed 2.5 s after the window appeared, and went red
+    on two PRs that never touched it (2026-10-04, #255 and #262's Mac app job:
+    "the mirror's canvas missing", the window full screen with something in
+    its root). That something was `main.tsx`'s Suspense fallback: the
+    projector's page is one lazy import, and until it arrives the root holds
+    a black <div> and no canvas. When it arrives depends on the show window,
+    which had just reloaded and was starting the plate: the two windows share
+    one renderer's main thread, and a starved runner's opening can hold the
+    projector's import past any fixed time. So the time to the mirror is what
+    is printed, and the bar on it is the app's own: the 8 s after which
+    `Loading` stops being a black screen and says the page is stuck.
+
+    The second read is what the 2.5 s was for. `CastHint` puts the click hint
+    up 1.5 s after it mounts, which is when the mirror mounts, not when the
+    window opened: a mirror that came up at 2.4 s was read for the hint 0.1 s
+    later and passed whatever the hint would have done. Read 2 s after the
+    mirror was first seen, the hint has had its 1.5 s.
+  */
   let castState = null;
+  let mirrorAt = null;
   if (cast) {
-    await sleep(2500);   // CastHint shows itself after 1.5 s when not in full screen
-    castState = await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+    const readWall = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
       const w = BrowserWindow.fromId(id);
-      if (!w) return null;
-      const doc = await w.webContents.executeJavaScript("({ full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0 })");
+      if (!w || w.isDestroyed()) return null;
+      const doc = await w.webContents.executeJavaScript("({ age: performance.now(), full: !!document.fullscreenElement, hint: !!document.querySelector('[data-testid=cast-hint]'), mirror: !!document.querySelector('#stage-canvas'), canvas: !!document.querySelector('canvas'), root: document.getElementById('root')?.childElementCount ?? 0, scripts: performance.getEntriesByType('resource').filter((e) => /\\.js$/.test(e.name)).map((e) => `${e.name.split('/').pop().replace(/-[\\w-]{8}\\.js$/, '')} ${(e.responseEnd / 1000).toFixed(2)} s`) })");
       return { windowFull: w.isFullScreen(), ...doc };
-    }, cast.id);
+    }, cast.id).catch(() => null);
+    // `age` is the projector page's own clock: how long since its document started.
+    for (let i = 0; i < 400; i++) {
+      castState = await readWall();
+      if (castState?.mirror) { mirrorAt = castState.age; break; }
+      if ((castState?.age ?? 0) > 8000) break;
+      await sleep(50);
+    }
+    if (mirrorAt !== null) {
+      await sleep(Math.max(0, mirrorAt + 2000 - castState.age));
+      castState = (await readWall()) ?? castState;
+    }
   }
   // Where the page asked for the window: the stand-in's left edge, not the
   // laptop's. Which real display main.js then puts it on needs a real
@@ -395,9 +427,9 @@ try {
   const aimed = standIn === null || askedLeft === standIn;
   const chip = await page.locator('[data-testid=projector-fill]').count();
   check('projector: a second screen gets the show, with no click, filling its screen',
-    !!cast && aimed && !!castState?.full && !castState.hint && !!castState.mirror && castState.root > 0 && chip === 0,
+    !!cast && aimed && mirrorAt !== null && !!castState?.full && !castState.hint && !!castState.mirror && castState.root > 0 && chip === 0,
     cast
-      ? `opened ${cast.url.replace(/^http:\/\/localhost:\d+/, '')} at left=${askedLeft}${standIn === null ? '' : ` (the stand-in's edge is ${standIn})`}; page full screen ${castState?.full}, window full screen ${castState?.windowFull}, the mirror's canvas ${castState?.mirror ? 'there' : 'missing'}, click hint on the wall ${castState?.hint}, title-bar chip on the laptop ${chip > 0}`
+      ? `opened ${cast.url.replace(/^http:\/\/localhost:\d+/, '')} at left=${askedLeft}${standIn === null ? '' : ` (the stand-in's edge is ${standIn})`}; page full screen ${castState?.full}, window full screen ${castState?.windowFull}, the mirror's canvas ${mirrorAt !== null ? `up ${(mirrorAt / 1000).toFixed(2)} s after the page opened` : `missing at ${((castState?.age ?? 0) / 1000).toFixed(2)} s (${castState?.canvas ? 'a canvas, but not the mirror\'s' : `no canvas, ${castState?.root ?? 0} in the root`}; scripts in by ${castState?.scripts?.join(', ') || 'none'})`}, click hint on the wall ${castState?.hint}${mirrorAt !== null ? ` ${((castState.age - mirrorAt) / 1000).toFixed(1)} s after it` : ''}, title-bar chip on the laptop ${chip > 0}`
       : 'no projector window opened');
 
   // ── network off, the whole run ────────────────────────────────────
