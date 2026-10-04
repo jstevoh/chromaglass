@@ -410,6 +410,18 @@ jobs:
       - name: The load
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run loadtime
+      # The intro (scripts/intro.mjs, PLAN.md 14v): drawn by the page before
+      # the app has arrived, taken into the plate's frame on the desk and the
+      # phone, leaving on the frame the plate first steps, out of the way of
+      # every press, and never on the remote or a cast. The plate is
+      # SwiftShader's, so what is judged is frames and order, not seconds.
+      # The site "The load" just built, not built again (`npm run intro`
+      # builds first, for a run by hand).
+      - name: The intro
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        env:
+          PW_WEBGPU: '1'
+        run: node scripts/intro.mjs
       # The iPhone app as the laptop's remote (src/lib/appLink.ts): a real
       # relay, a stand-in laptop and the app's page from another origin. No
       # plate needed, so it runs here rather than on a Mac.

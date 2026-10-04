@@ -17,6 +17,47 @@
     <meta property="og:image" content="/og-card.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <!--
+      The intro (src/lib/intro.ts): up from the first paint until the plate's
+      first frame, over the black the opening's compiles leave. Styled here,
+      not in the app's CSS, because it has to paint before any of the app has
+      arrived. The remote and a cast are not shows: no intro, decided before
+      the first paint so it never flashes there.
+    -->
+    <script>if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');</script>
+    <style>
+      html, body { background: #000; }
+      .cg-no-intro #cg-intro { display: none; }
+      /* Fixed over the window until the plate's frame takes it in, then the
+         plate's box exactly. Never a target: the desk under it before the
+         plate takes it, and the plate's hands after, get every press. */
+      #cg-intro { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: #000; pointer-events: none; container-type: size; transition: opacity 0.9s ease-out; }
+      #cg-intro.cg-in-plate { position: absolute; z-index: auto; }
+      #cg-intro.cg-out { opacity: 0; }
+      /* Only transform and opacity move, so the compositor runs them on its
+         own thread: the page's thread is held for seconds while Chromium
+         starts the GPU (npm run startup's "held" line), and anything the page
+         had to step would stop with it. */
+      .cg-oil { position: absolute; left: 50%; top: 50%; width: 78cqmax; height: 78cqmax; margin: -39cqmax 0 0 -39cqmax; border-radius: 50%; mix-blend-mode: screen; opacity: 0.55; will-change: transform; }
+      .cg-oil-a { background: radial-gradient(closest-side, #2a7dff 0%, rgba(20,51,201,0.45) 45%, transparent 100%); animation: cg-orbit 23s linear infinite; }
+      .cg-oil-b { background: radial-gradient(closest-side, #15c9b4 0%, rgba(10,111,134,0.45) 45%, transparent 100%); animation: cg-orbit 29s linear infinite reverse; animation-delay: -9s; }
+      .cg-oil-c { background: radial-gradient(closest-side, #2fd67e 0%, rgba(11,125,79,0.4) 45%, transparent 100%); animation: cg-orbit 37s linear infinite; animation-delay: -21s; opacity: 0.4; }
+      @keyframes cg-orbit {
+        0%   { transform: rotate(0deg)   translateX(17cqmin) rotate(0deg)    scale(1); }
+        50%  { transform: rotate(180deg) translateX(17cqmin) rotate(-180deg) scale(1.18); }
+        100% { transform: rotate(360deg) translateX(17cqmin) rotate(-360deg) scale(1); }
+      }
+      .cg-mark { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: max(10px, 3cqmin); }
+      .cg-dish { position: relative; width: max(72px, 26cqmin); height: max(72px, 26cqmin); }
+      .cg-burst { position: absolute; inset: 0; width: 100%; height: 100%; animation: cg-turn 48s linear infinite; will-change: transform; }
+      /* The hub is the burst's middle 208 of its 560: drawn to that share of the dish. */
+      .cg-hub { position: absolute; left: 31.43%; top: 31.43%; width: 37.14%; height: 37.14%; }
+      .cg-name { height: max(22px, 7cqmin); width: auto; }
+      .cg-sub { font: 400 max(10px, 1.9cqmin)/1 "Geist Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); animation: cg-breathe 2.8s ease-in-out infinite; }
+      @keyframes cg-turn { to { transform: rotate(360deg); } }
+      @keyframes cg-breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { #cg-intro *, #cg-intro { animation: none !important; transition: none !important; } }
+    </style>
+    <!--
       A show screen (?cast=: the projector window, a cast receiver) never shows
       the pointer, from its first paint: set here rather than in main.tsx,
       whose stylesheet and script arrive later, and in the waiting black
@@ -28,6 +69,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="cg-intro" aria-hidden="true">
+      <div class="cg-oil cg-oil-a"></div>
+      <div class="cg-oil cg-oil-b"></div>
+      <div class="cg-oil cg-oil-c"></div>
+      <div class="cg-mark">
+        <div class="cg-dish"><img class="cg-burst" src="/intro-burst.svg" alt="" /><img class="cg-hub" src="/intro-hub.svg" alt="" /></div>
+        <img class="cg-name" src="/intro-name.svg" alt="ChromaGlass" />
+        <div class="cg-sub">Warming the lamp</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
