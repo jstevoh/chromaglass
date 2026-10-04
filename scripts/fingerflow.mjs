@@ -157,6 +157,52 @@ try {
     return { t0, t1, t2, under, beside, still, speed, a: r - lab.handEdge(L) / 2, d: L / 6, tau, half: 30 / 60 };
   }, { hand, liquid, speed });
 
+  /*
+    A full pool drawn as the pointer draws it, for check 7. The pool is as
+    full as the plate lets a pool be (5.5 at its middle; the plate cuts any
+    cell past 6, capDye), and the hand goes from its middle 0.16 of the
+    plate as tools.mjs's stroke goes: thirty moves in a second and a half,
+    so at sixty steps a second the hand jumps a cell on one step in three
+    and is still on the other two. Returns the colour before, after the
+    stroke and a second on, the pool's fullest cell and its middle (x)
+    before and after, and how many of the moves laid no hand; with `hand`
+    false, the same pool left alone as long.
+  */
+  const poolRun = (hand) => page.evaluate(async (hand) => {
+    const N = 384, L = 192;
+    const look = lab.look('classic').settings;
+    const DT = look.globalSpeed * 0.2;
+    const over = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, advection: look.advection };
+    await lab.create(N, L);
+    const lay = new Array(L * L * 4).fill(0);
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+      const d = Math.hypot((i + 0.5) / L - 0.42, (j + 0.5) / L - 0.5);
+      if (d > 0.05) continue;
+      const k = (i + j * L) * 4, v = 5.5 * (1 - (d / 0.05) ** 2);
+      lay[k] = v; lay[k + 3] = v;
+    }
+    lab.addDye(lay); lab.flush(DT);
+    await lab.step(60, over);
+    const colour = async () => {
+      const d = await lab.field('dye');
+      let t = 0, top = 0, mx = 0;
+      for (let k = 3; k < d.length; k += 4) { t += d[k]; top = Math.max(top, d[k]); mx += d[k] * ((((k - 3) / 4) % L) + 0.5) / L; }
+      return { t, top, cx: t > 0 ? mx / t : 0 };
+    };
+    const c0 = await colour();
+    const r = Math.round(7 * (L / 128)), hy = 0.5 * L;
+    let hx = 0.42 * L, missed = 0;
+    for (let k = 0; k < 90; k++) {
+      if (hand && k % 3 === 0) { hx += 0.16 * L / 30; if (lab.finger(hx, hy, r, 0.16 * L / 30, 0) === 0) missed++; }
+      lab.flush(DT);
+      await lab.step(1, over, true);
+    }
+    const c1 = await colour();
+    await lab.step(60, over);
+    const c2 = await colour();
+    return { t0: c0.t, t1: c1.t, t2: c2.t, top: c0.top, cx0: c0.cx, cx1: c1.cx, missed };
+  }, hand);
+
   const got = {};
   const only = process.env.FF_RUNS ? process.env.FF_RUNS.split(',') : null;
   for (const [name, hand, liquid, speed] of [['solid', 'solid', 'none', 2], ['solid fast', 'solid', 'none', 5], ['solid ferro', 'solid', 'ferro', 2], ['solid ferro fast', 'solid', 'ferro', 5], ['solid oil', 'solid', 'oil', 2], ['solid maze fast', 'solid', 'maze', 5], ['push ferro', 'push', 'ferro', 2], ['alone', 'none', 'ferro', 2]]) {
@@ -164,6 +210,13 @@ try {
     const t = Date.now();
     const m = got[name] = await run(hand, liquid, speed);
     console.log(`  ${name}: bands ${((m.t1.band - m.t0.band) * 100).toFixed(2)}%, ${liquid} ${((m.t1.cx - m.t0.cx) * 100).toFixed(2)}% then ${((m.t2.cx - m.t1.cx) * 100).toFixed(2)}% in the second after; under the hand ${m.under.toFixed(2)} cells a step, beside ${m.beside.toFixed(2)}, half a second after it stopped ${m.still.toFixed(3)}, for ${speed}; colour kept ${(m.t2.dye / m.t0.dye * 100).toFixed(2)}%, ${liquid} ${(m.t2.mass / Math.max(m.t0.mass, 1e-9) * 100).toFixed(2)}% (${((Date.now() - t) / 1000).toFixed(0)} s)`);
+  }
+  if (!only || only.includes('pool')) {
+    for (const [name, hand] of [['pool', true], ['pool alone', false]]) {
+      const t = Date.now();
+      const m = got[name] = await poolRun(hand);
+      console.log(`  ${name}: colour ${m.t0.toFixed(1)} → ${m.t1.toFixed(1)} after the stroke → ${m.t2.toFixed(1)} a second on; fullest cell ${m.top.toFixed(2)}, its middle moved ${((m.cx1 - m.cx0) * 100).toFixed(2)}% of the plate${hand ? `, ${m.missed} of 30 moves laid no hand` : ''} (${((Date.now() - t) / 1000).toFixed(0)} s)`);
+    }
   }
   console.log('');
   const band = (m) => m.t1.band - m.t0.band;
@@ -247,6 +300,33 @@ try {
     check('and it stops when the hand stops: half a second later the liquid where it stopped has slowed as the gap\'s drag says',
       need(...ks) && ks.every((k) => Math.abs(got[k].still) < 2 * decay(got[k]) * got[k].speed),
       ks.filter((k) => got[k]).map((k) => `${got[k].still.toFixed(3)} cells a step half a second after a hand at ${got[k].speed}, against e^(−0.5/τ) of it, ${(decay(got[k]) * got[k].speed).toFixed(3)} (τ ${got[k].tau.toFixed(3)} s)`).join('; '));
+  }
+  // 7.
+  {
+    /*
+      And a full pool keeps its colour under a hand drawn as the pointer
+      draws one. Found by the Mac's \`npm run tools\`: its Finger, drawn
+      through a pool the Drop had laid, took 222 of the plate's colour to 161
+      where the plate left alone gained 17. The carries crossed faces rebuilt
+      from the cells' velocities with the pressure as if the drag were even
+      (PLAN 18a-8), and a solid is where it is not: at the hand's rim those
+      faces gathered liquid, a full pool's cells went past the plate's cap
+      of 6, and the cap cut them. Here, before the carries took the solve's
+      own faces (THIN_FACE in wgsl/fluid.ts), this stroke took the pool's
+      795.9 to 473.8 on this check's step, 40% of it gone (lab, software);
+      bands at 1 never came near the cap, which is why checks 1 to 6 passed.
+
+      Kept colour is only a reading if the hand moved the pool and the pool
+      was near the cap (check-skeptic): a hand that laid nothing keeps it
+      too. So every move has to lay a hand, the pool's middle has to go at
+      least a quarter of the stroke (0.04 of the plate), and its fullest
+      cell has to start at 5 or more. And the same pool left alone keeps
+      its colour to 0.1%, so a loss is the hand's and not the plate's.
+    */
+    const m = got.pool, a = got['pool alone'];
+    check('a full pool keeps its colour under a hand drawn as the pointer draws one',
+      !!m && !!a && m.missed === 0 && m.top >= 5 && m.cx1 - m.cx0 >= 0.04 && Math.abs(m.t2 / m.t0 - 1) < 0.005 && Math.abs(a.t2 / a.t0 - 1) < 0.001,
+      m && a ? `${m.t0.toFixed(1)} → ${m.t2.toFixed(1)}, ${pc(m.t2 / m.t0 - 1)}, the pool's middle carried ${pc(m.cx1 - m.cx0)} of the plate from a fullest cell of ${m.top.toFixed(2)}; left alone ${pc(a.t2 / a.t0 - 1)}` : 'not run');
   }
 } finally {
   await close();

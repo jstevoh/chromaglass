@@ -753,7 +753,8 @@ export class WebGPUFluid {
         flows (the advect dye stage), from the maze's first step, so a look
         that opens with it waits for it as it waits for mazeForce.
       */
-      ['bodyAdvect', [dye], open.maze],
+      ['bodyAdvect', [dye], open.maze && !open.thinGap],
+      ['bodyAdvectThin', [dye], open.maze && open.thinGap],
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
@@ -1024,6 +1025,25 @@ export class WebGPUFluid {
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst, this.press]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  /**
+   * A carry on a thin gap through the solve's own faces (THIN_FACE in
+   * wgsl/fluid.ts), in one pass: runPressed's bindings with the solve's P in
+   * place of the pressure, then the gap and the mobility.
+   */
+  private runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
+    const pipe = this.pipeline(name, dst.format);
+    const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -1870,15 +1890,16 @@ export class WebGPUFluid {
       if (thin) this.planCarry(pass, disp);
       if (!bodiesOn && mazeFlow) {
         // The maze's sixths, or as many as a hand in the liquid needs (handSubs), as the ferrofluid takes.
-        const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, 0]);
+        const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, thin ? REST_GAP : 0]);
         for (let k = 0; k < handSubs; k++) {
-          this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
+          if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, flux);
+          else this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
         }
         return;
       }
       if (!bodiesOn && thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
@@ -1890,12 +1911,13 @@ export class WebGPUFluid {
       */
       const od = this.oilDye!;
       if (bodiesFresh) for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-      const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
       if (thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, adv);
-        this.carrySubsteps(pass, 'bodyAdvect', od, adv);
+        const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
         return;
       }
+      const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
       this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], adv);
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
@@ -2095,7 +2117,7 @@ export class WebGPUFluid {
       const m = mix!;
       if (this.mixLive) {
         // The oil with its colour: in the dye's substeps on a thin gap (carryPlan).
-        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
+        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         else {
           this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
           m.swap();
@@ -3055,8 +3077,8 @@ export class WebGPUFluid {
    */
   private planCarry(pass: GPUComputePassEncoder, disp: number): void {
     this.ensureThinGap();
-    this.hsRun(pass, 'carryCourant', `carryCourant:${this.velForced.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, 0]),
-      [this.velForced, this.press, this.carryMost!]);
+    this.hsRun(pass, 'carryCourant', `carryCourant:${this.velForced.label}:${this.squeeze.read.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
+      [this.velForced, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!]);
     this.hsRun(pass, 'carryPlan', 'carryPlan', this.arg('carry plan', [CARRY_COURANT, CARRY_SUBSTEPS, Math.ceil(this.N / 8), CARRY_PAIRS]),
       [this.carryMost!, this.carryInd!, this.carrySub!], 1);
   }
@@ -3072,10 +3094,10 @@ export class WebGPUFluid {
     const kernelName = `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
     const group = (src: GPUTexture, dst: GPUTexture) => {
-      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}`;
+      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}:${this.squeeze.read.label}`;
       let g = this.groups.get(key);
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.press, this.carrySub!]);
+        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!]);
         this.groups.set(key, g);
       }
       return g;

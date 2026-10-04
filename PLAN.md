@@ -2932,6 +2932,18 @@ hand needs. The show's own Finger stroke (the automation's) keeps its colour car
 plate with ferrofluid on it, as it did, so it does not pull tongues out of the pools. The numbers are in the PR and
 in `scripts/fingerflow.mjs`.
 
+Found by the Mac's `npm run tools` on the way: its Finger, drawn through a pool the Drop
+had laid, took the plate's colour from 222 to 161 where the plate left alone gained 17.
+The colour's and the oil's carries crossed faces rebuilt from the cells' velocities,
+with the pressure put back as if the drag were even (18a-8), and a solid is exactly
+where it is not: at the hand's rim those faces gathered liquid, a full pool's cells
+went past the plate's cap of 6, and the cap cut them. Bands at 1 never reached the cap,
+so the lab's first checks passed. The colour's and the oil's carries and the substeps'
+Courant number now cross the faces the thin solve made conserve liquid, as the
+ferrofluid's has since 15d (`THIN_FACE`, `wgsl/fluid.ts`): a full pool drawn as the
+pointer draws one (a cell every third step) kept 59.5% of its colour before and all of
+it after (`npm run fingerflow`, check 7).
+
 Left, each its own plan item:
 
 - **15b-blow.** Blow's push on a thin gap is still a disc of velocity (moved nothing
@@ -2949,12 +2961,15 @@ Left, each its own plan item:
   `handEdge`) as a trail. Measure against a stylus through marbling (Jaffer's tine
   displacement, falling with distance from the path) and, if it shows, exclude the
   hand's cells from what the carries move.
-- **15b-remote.** A remote hand's Finger (the phone as the laptop's remote, a pen, OSC)
-  sends its stroke at message rate, not once a step, so the solid it lays moves as far
-  as the hand moved since its last message, in the one step after the message. A
-  stroke whose messages come slower than the steps reads as a hand that stops and
-  starts. Not measured through the app; `npm run fingerflow` lays the hand as the
-  pointer does.
+- **15b-remote.** A hand's Finger moves at the rate its events come, not once a step:
+  the solid it lays moves as far as the hand moved since its last event, in the one
+  step after it, and is not laid on the steps between. A remote (the phone as the
+  laptop's remote, a pen, OSC) sends at message rate, and the pointer itself is no
+  smoother when its events come slower than the steps (tools.mjs's stroke is a cell
+  every third step), so such a stroke is a hand that stops and starts. It no longer
+  loses colour (fingerflow's check 7 draws it that way); whether it reads as a jerky
+  stroke on the Mac is judging §31's, and if it does, carry the hand's last speed
+  across the steps until its next event.
 
 ### 15c. Blow's wind erases colour rather than pushing it (shipped)
 
@@ -3705,9 +3720,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     cells outside it count as open too.
   - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
     which leaves a small checkerboard at a floored dent's edge; the advections'
-    Rhie–Chow faces are given c·P, exact only where the drag is even; and the face
-    fluxes' upwinding squares off a ring under a fast radial flow (the pressed rings in
-    the picture). A staggered grid takes all three, and `dampGrid`'s job.
+    Rhie–Chow faces were given c·P, exact only where the drag is even (on a thin gap
+    the colour's and the oil's carries and carryCourant now cross the solve's own
+    faces, `THIN_FACE`, as the ferrofluid's did: a Finger's solid is where the drag is
+    least even, 15b; off a thin gap the carries keep their Rhie–Chow faces, exact on
+    the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
+    radial flow (the pressed rings in the picture). A staggered grid takes all three,
+    and `dampGrid`'s job.
   - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²

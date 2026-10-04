@@ -227,6 +227,60 @@ fn packedAt(x: i32, y: i32, n: i32) -> f32 {
 `;
 
 /** The same, sampled between cells, matching `bilerpN` exactly. */
+/*
+  A face's velocity on a thin gap, as the thin solve made it conserve liquid
+  (wgsl/thinGap.ts), for the carries that move what the liquid holds across
+  faces: the colour, the oil, and the step's count of substeps (carryCourant).
+  The ferrofluid's volume carry has used it since PLAN 15d (phaseAdvect, which
+  has the derivation): the solve's face flux is the mean of the two cells'
+  M·u* less n·M_f·ΔP, and hsGradient left each cell's h·u as the mean of its
+  two faces' M_f·ΔP, so the face is the mean of the two cells' h·u plus n/4
+  times the second difference of M_f·ΔP along the axis, over the face's gap.
+
+  What the carries had instead: the two cells' velocities filtered [1 2 1]
+  along the face, swapped back to the compact gradient with c·P (Rhie–Chow
+  on the old solve's pressure). That is exact where the drag c is even, and
+  a Finger is a solid in the solve, c forty times smaller inside the hand
+  than outside it (hsPrep): across its rim those faces gathered liquid that
+  was not there to gather. Measured in the lab on the app's Classic step,
+  a pool near the plate's cap (5.5 at its middle) and a Finger drawn through
+  it as the pointer drags one, a cell every third step: the colour
+  piled past the plate's cap of 6 a cell at the hand's rim, the cap cut it
+  (capDye), and the pool lost 43% of itself in a stroke 0.16 of the plate
+  long (Mac CI's \`tools\` check: 222 → 161). The same flow through these
+  faces gathers nothing a converged solve did not.
+
+  Needs \`vel\` (the flow the carries ride, hsGradient's), \`pr\` bound to the
+  solve's own P, \`sq\` (the gap), \`mob\` (the mobility, negative past the
+  open rim, where P is held at zero) and the rest gap in A.b.w.
+*/
+const THIN_FACE = /* wgsl */ `
+fn tfIn(q: vec2i, n: i32) -> bool { return q.x >= 0 && q.y >= 0 && q.x < n && q.y < n; }
+fn tfP(q: vec2i, n: i32) -> f32 {
+  if (mob[q.x + q.y * n] < 0.0) { return 0.0; }
+  let half = n / 2;
+  return pr[((q.x + q.y) & 1) * n * half + q.y * half + (q.x >> 1)];
+}
+// The solve's M_f·ΔP through the face q → q + e; nothing through the grid's wall.
+fn tfFace(q: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = q + e;
+  if (!tfIn(q, n) || !tfIn(b, n)) { return 0.0; }
+  let ma = abs(mob[q.x + q.y * n]);
+  let mb = abs(mob[b.x + b.y * n]);
+  return 2.0 * ma * mb / max(ma + mb, 1e-20) * (tfP(b, n) - tfP(q, n));
+}
+fn tfGap(q: vec2i) -> f32 { return max(textureLoad(sq, q, 0).r, 0.004) / A.b.w; }
+// The velocity through the face a → a + e, both cells inside the grid.
+fn thinFaceVel(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  let ha = tfGap(a);
+  let hb = tfGap(b);
+  let face = 0.5 * (dot(textureLoad(vel, a, 0).xy, vec2f(e)) * ha + dot(textureLoad(vel, b, 0).xy, vec2f(e)) * hb)
+           + 0.25 * f32(n) * (tfFace(a - e, e, n) - 2.0 * tfFace(a, e, n) + tfFace(b, e, n));
+  return face / (0.5 * (ha + hb));
+}
+`;
+
 const PACKED_BILERP = /* wgsl */ `
 fn packedBilerp(uv: vec2f, n: f32) -> f32 {
   let p = uv * n - 0.5;
@@ -3497,31 +3551,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     How far the step's flow carries anything across a face, at the most,
     in cells: for the carries' substeps in a thin gap (carryPlan, and why).
 
-    The face velocity is bodyAdvect's own (the same smoothing along the face
-    and the same Rhie–Chow correction from the pressure), so the number is
-    the Courant number the flux step itself would clamp, not an estimate of
-    it. Each cell reads its east and north faces; a workgroup keeps its
+    The face velocity is the thin carries' own (THIN_FACE, the faces the
+    thin solve made conserve liquid), so the number is the Courant number
+    the flux step itself would clamp, not an estimate of it. Each cell reads its east and north faces; a workgroup keeps its
     largest and hands one atomicMax to the buffer. A positive float's bits
     order as the float does, so the maximum of the bits is the bits of the
-    maximum. A.b.y is the step's displacement and A.b.z the Rhie–Chow
-    scale, as the carries take them.
+    maximum. A.b.y is the step's displacement and A.b.w the rest gap, as
+    the carries take them.
   */
   carryCourant: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var<storage, read> pr: array<f32>;
 @group(0) @binding(4) var<storage, read_write> most: array<atomic<u32>>;
-${PACKED}
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var<storage, read> mob: array<f32>;
+${THIN_FACE}
 var<workgroup> wgMost: atomic<u32>;
 fn faceCourant(a: vec2i, e: vec2i, n: i32) -> f32 {
-  let b = a + e;
-  let t = vec2i(e.y, e.x);
-  let va = textureLoad(vel, clamp(a - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, a, 0).xy + textureLoad(vel, clamp(a + t, vec2i(0), vec2i(n - 1)), 0).xy;
-  let vb = textureLoad(vel, clamp(b - t, vec2i(0), vec2i(n - 1)), 0).xy + 2.0 * textureLoad(vel, b, 0).xy + textureLoad(vel, clamp(b + t, vec2i(0), vec2i(n - 1)), 0).xy;
-  let pa = packedAt(a.x, a.y, n);
-  let pb = packedAt(b.x, b.y, n);
-  let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
-  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
-  return abs(ve * A.b.y * f32(n));
+  return abs(thinFaceVel(a, e, n) * A.b.y * f32(n));
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32) {
   // No early return: the barriers below have to be reached by the whole workgroup.
@@ -3616,8 +3663,29 @@ function substepped(name: string): string {
     .replace(bound, `${bound}\n@group(0) @binding(6) var<storage, read> sub: array<f32>;`)
     .replace(moved, 'A.b.y * sub[0] * f32(n)');
 }
-KERNELS.bodyAdvectSub = substepped('bodyAdvect');
-KERNELS.mixAdvectSub = substepped('mixAdvect');
+
+/*
+  The same carries on a thin gap, through the faces the thin solve made
+  conserve liquid (THIN_FACE) in place of faces rebuilt from the cells'
+  velocities: \`pr\` is bound to the solve's own P, and the gap and the
+  mobility follow everything the kernel already takes. A.b.w is the rest gap.
+*/
+function thinFaced(src: string, name: string): string {
+  const block = /  let t = vec2i\(e\.y, e\.x\);\n[^]*?  let ve = [^\n]*\n/;
+  const last = Math.max(...[...src.matchAll(/@binding\((\d+)\)/g)].map((m) => Number(m[1])));
+  const at = src.indexOf('fn flux(');
+  if (!block.test(src) || at < 0 || !src.includes('var vel: texture_2d<f32>;') || !src.includes('var<storage, read> pr: array<f32>;')) {
+    throw new Error(`${name} cannot take the thin solve's faces: its face velocity, its flux or its bindings moved`);
+  }
+  const bindings = `@group(0) @binding(${last + 1}) var sq: texture_2d<f32>;\n@group(0) @binding(${last + 2}) var<storage, read> mob: array<f32>;\n`;
+  const withFace = src.slice(0, at) + `${THIN_FACE}\n` + src.slice(at);
+  return withFace
+    .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
+    .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
+}
+KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
+KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
+KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
 
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {
