@@ -37,10 +37,11 @@
  * So this asks the thin gap, held, with the band playing and its bubbles
  * certainly on the plate: the band's dice drop bubbles on some runs and not
  * others, and a run with none would pass whatever the bubbles do. Four are
- * set down within the band's range (just outside the disc that is read)
- * and kept at four. Against silence on the same plate, held the same way, which has
- * to be silent and still itself. And the old plate the same, which has to
- * gather by more than the bar: the instrument shown to see the drift it was
+ * set down within the band's range (just outside the disc 0.12 round the
+ * middle) and kept at four. Against silence on the same plate, held the
+ * same way, which has to be still itself, read as the ring's mean distance
+ * from the middle (the bar, below, says why not the disc). And the old
+ * plate the same, which has to be pulled in by more than the bar: the instrument shown to see the drift it was
  * built for, until the old plate's bubbles stop pressing and that line turns
  * round to ask the old plate to stay too.
  *
@@ -207,37 +208,50 @@ try {
 }
 
 /*
-  How far the disc's mean rose: the mean of the last two readings less the
-  mean of the first two, on a page that poured the ring once (round the
-  middle, where Classic pours it: most of it 0.28 to 0.34 out, the disc
-  nearly clear, about a fifth of the plate), never laid it again, kept its
-  grid, its plate and its held settings.
+  How far the ferrofluid moved in toward the middle: its mean distance from
+  the middle, the mean of the first two readings less the mean of the last
+  two (so a positive number is a pull inward), on a page that poured the
+  ring once (round the middle, where Classic pours it: most of it 0.28 to
+  0.34 out, the disc nearly clear, about a fifth of the plate), never laid
+  it again, kept its grid, its plate and its held settings.
+
+  The mean distance, not the disc 0.12 round the middle that #238 read. The
+  disc is a small window on a few drops at the ring's inner edge, and a
+  pour settling in its first seconds moves it either way: two runs of
+  silence on the same build read the disc +0.004 and −0.022 (first two
+  readings to last two), rising 0.119 → 0.135 in the first 1.5 s and
+  falling to 0.104, while the mean distance read 0.308 → 0.307 and 0.308 →
+  0.308. The disc is still printed. A drift in is the ring's mean distance
+  falling: the old plate with its bubbles 0.315 → 0.306 and 0.311 → 0.301,
+  and #238's run, 0.310 → 0.298 on the old plate.
 */
 const poured = (r) => r?.first && r.first.total > 0.15 && r.first.r > 0.28 && r.first.r < 0.34 && r.first.disc > 0.03 && r.first.disc < 0.2;
-const gain = (r) => {
+const pull = (r) => {
   if (!r?.first || !r?.last || r.poured !== 1 || r.first.n !== r.last.n || !r.plateOk || !r.steady || !poured(r)) return null;
   const S = r.series;
-  return (S[S.length - 1].disc + S[S.length - 2].disc) / 2 - (S[0].disc + S[1].disc) / 2;
+  return (S[0].r + S[1].r) / 2 - (S[S.length - 1].r + S[S.length - 2].r) / 2;
 };
-const said = (r) => r?.first && r?.last ? `${r.first.disc.toFixed(3)} → ${r.last.disc.toFixed(3)} (mean distance ${r.first.r.toFixed(3)} → ${r.last.r.toFixed(3)})` : 'unread';
+const signed = (v, d = 4) => v === null ? 'unread' : `${v >= 0 ? '+' : ''}${v.toFixed(d)}`;
+const said = (r) => r?.first && r?.last ? `mean distance ${r.first.r.toFixed(4)} → ${r.last.r.toFixed(4)}, pulled in ${signed(pull(r))} (the disc 0.12 round the middle ${r.first.disc.toFixed(3)} → ${r.last.disc.toFixed(3)})` : 'unread';
 const kicksIn = (r) => r?.first && r?.last ? r.last.kicks - r.first.kicks : -1;
 const [quiet, band, old] = PAGES.map((p) => results.find((r) => r.pg === p));
-const gq = gain(quiet), gb = gain(band), go = gain(old);
+const pq = pull(quiet), pb = pull(band), po = pull(old);
 /*
-  The bar, 0.02 above silence: held on the thin gap the band read −0.015
-  and −0.026 against silence's +0.003 and +0.004, and the old plate with
-  the band's bubbles +0.051 (+0.047 over its silence). Silence itself has
-  to be still (under 0.02 either way), or the difference could hide a
-  drift both pages share: with the look's own currents let go both spread
-  about +0.15.
+  The bar, 0.004 of the plate's width more pull than silence: a third of
+  #238's 0.012 and under half of the old plate's 0.009 and 0.010 now, where
+  the thin gap with the band and its bubbles read 0.001 and 0.001 against
+  silence's 0.001 and 0.000. Silence itself has to be still (under 0.004
+  either way), or the difference could hide a drift both pages share: with
+  the look's own currents let go both spread, the mean distance growing
+  about 0.005 in twelve seconds.
 */
-const BAR = 0.02;
+const BAR = 0.004;
 check('the ring was poured round the middle on every page, once, and stayed the ring the pages watched',
   [quiet, band, old].every((r) => r && poured(r) && r.poured === 1 && r.steady && r.plateOk),
   [quiet, band, old].map((r, i) => `${PAGES[i].name}: ${r?.first ? `${(r.first.total * 100).toFixed(1)}% of the plate, ${r.first.r.toFixed(3)} out, the disc ${r.first.disc.toFixed(3)}; poured ${r.poured}, ${r.steady ? 'held' : 'not held'}, ${r.plateOk ? 'on its plate' : 'on the wrong plate'}` : 'unread'}`).join('; '));
-check('silence was silent and still: no band, no kicks, no bubbles, the disc steady',
-  !!quiet?.last && !quiet.last.band && kicksIn(quiet) === 0 && quiet.series.every((s) => s && s.bubbles === 0) && gq !== null && Math.abs(gq) < BAR,
-  `${quiet?.last?.band ? 'a band playing' : 'no band'}, ${kicksIn(quiet)} kicks while watched, the disc ${gq === null ? 'unread' : `${gq >= 0 ? '+' : ''}${gq.toFixed(3)}`}`);
+check('silence was silent and still: no band, no kicks, no bubbles, the ring where it was poured',
+  !!quiet?.last && !quiet.last.band && kicksIn(quiet) === 0 && quiet.series.every((s) => s && s.bubbles === 0) && pq !== null && Math.abs(pq) < BAR,
+  `${quiet?.last?.band ? 'a band playing' : 'no band'}, ${kicksIn(quiet)} kicks while watched; ${said(quiet)}`);
 check('the band played, and its bubbles lasted on the plate and were drawn, while it was watched',
   [band, old].every((r) => !!r?.last?.band && kicksIn(r) > 0 && r.bubbles >= 3 && r.drawn >= 3),
   [band, old].map((r, i) => `${PAGES[i + 1].name}: ${r?.last?.band ? `band playing, ${kicksIn(r)} kicks` : 'no band'}, ${r ? `${r.bubbles.toFixed(1)} bubbles lasting 1.5 s, ${r.drawn.toFixed(1)} drawn` : 'unread'}`).join('; '));
@@ -247,13 +261,12 @@ check('the band played, and its bubbles lasted on the plate and were drawn, whil
   still bubble presses the glass"). When that item lands this line turns
   round and asks the old plate to stay as the thin gap does.
 */
-check('and it can see a drift: the old plate, whose bubbles still press the glass, gathers more than the bar above silence',
-  gq !== null && go !== null && go > gq + BAR,
-  `the old plate with the band and its bubbles ${said(old)}, ${go === null ? 'unread' : `${go >= 0 ? '+' : ''}${go.toFixed(3)}`}`);
-check('with the band playing, the ferrofluid poured round the middle gathers into it no more than in silence',
-  gq !== null && gb !== null && gb < gq + BAR,
-  `the disc 0.12 round the middle ${said(band)} with the band and its bubbles (${gb === null ? 'unread' : `${gb >= 0 ? '+' : ''}${gb.toFixed(3)}`}), ` +
-  `${said(quiet)} in silence, over twelve seconds on the thin gap`);
+check('and it can see a drift: the old plate, whose bubbles still press the glass, pulls the ring in by more than the bar over silence',
+  pq !== null && po !== null && po > pq + BAR,
+  `the old plate with the band and its bubbles: ${said(old)}`);
+check('with the band playing, the ferrofluid poured round the middle is pulled in no more than in silence',
+  pq !== null && pb !== null && pb < pq + BAR,
+  `on the thin gap, with the band and its bubbles: ${said(band)}; in silence: ${said(quiet)}; over twelve seconds`);
 
 const failed = checks.filter(c => !c.ok);
 console.log(failed.length ? `\n${failed.length} of ${checks.length} failed` : `\nall ${checks.length} passed`);
