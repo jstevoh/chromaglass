@@ -1822,7 +1822,8 @@ export class WebGPUFluid {
         to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
         not stop. The oil's colour does mix inside a body, slowly
         (bodyPartition's inside rate), as two dyed oils do. (A share begun
-        this step is empty, and the transport below clears it first.)
+        this step is skipped here: the transport below starts it from the
+        plate as it is.)
       */
       if (bodiesOn && !bodiesFresh) {
         const od = this.oilDye!;

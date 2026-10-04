@@ -47,3 +47,32 @@ export function clockGlassBodies(float: () => number, dyes: number): OilBody[] {
   }
   return out;
 }
+
+/*
+  How much dye each liquid is laid with: the water's wash at its middle, a
+  Gaussian WASH_SIGMA of the plate (splatBlob's 34 in 128-grid units, which
+  the look laid its water with before), and each body's colour, flat through
+  its oil.
+*/
+export const WASH_AMOUNT = 1.3;
+export const WASH_SIGMA = 34 / 128;
+export const BODY_DYE = 2.6;
+
+/**
+ * What one cell of a plate `n` cells across is laid with: how much of it is
+ * oil (`oil`, as addMix lays a body, flat to its edge, here with a cell of
+ * antialiasing), which body that is (`body`, −1 for none), and the water's
+ * and the body's dye in it. The water's dye is not in the oil, so the wash
+ * is laid round the bodies and not under them: under them, every body was its
+ * own colour mixed with the water's. And a body's colour only in its oil:
+ * laid as a Gaussian it ran out past the oil into a ring in the water.
+ */
+export function clockGlassCell(x: number, y: number, n: number, bodies: readonly OilBody[]): { oil: number; body: number; water: number; dye: number } {
+  let oil = 0, body = -1;
+  bodies.forEach((b, q) => {
+    const c = Math.max(0, Math.min(1, (b.r - Math.hypot(x - b.x, y - b.y)) * n + 0.5));
+    if (c > oil) { oil = c; body = q; }
+  });
+  const w = Math.exp(-((x - 0.5) ** 2 + (y - 0.5) ** 2) / (2 * WASH_SIGMA * WASH_SIGMA));
+  return { oil, body, water: w >= 0.01 ? WASH_AMOUNT * w * (1 - oil) : 0, dye: body >= 0 ? BODY_DYE * oil : 0 };
+}

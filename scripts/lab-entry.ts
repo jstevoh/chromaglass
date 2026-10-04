@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS } from '../src/presetPlate';
 import { PALETTE_RGB } from '../src/constants';
@@ -201,6 +201,8 @@ const api = {
     let s = seed;
     return clockGlassBodies(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
   },
+  /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
+  clockGlassCell,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */

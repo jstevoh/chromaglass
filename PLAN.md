@@ -737,6 +737,13 @@ of that morning (`/mnt/project-files/lamp-ground/gallery/`, 12 s and 30 s):
   plate, nearly the patches' spacing, so all sixteen lay over each other. Now 0.09.
 - Open from this: **4a-units**. Roy, 1963 lays its shapes the same way (`S × fr` in
   128-grid units, 1.5 times the size meant); its panel may want them halved, by eye.
+  **4a-clock-fade**: on a fade (the set list, the desk's Go) the seed is laid in shares
+  over the fade (addSeedShare) while every body's oil lands at once, so on a long fade
+  the bodies move before their colour arrives and some of it lands in the water: the
+  halo this fixed for a hard lay. Lay the oil in the same shares, and give `npm run
+  clockglass` a case that lays through the handover. Also unmeasured: the look's own
+  doses (`['oil', 'water', 'oil', 'syrup']`, about seven small clear bodies at the
+  lay) and the app's finer GPU grid (the check lays at 192², the app runs 384² and up).
   And the automation's drops still land any of a look's dyes anywhere, so over a minute
   the regions blur: where each dye lands belongs to the "more going on in every look"
   work (several areas of interest across the plate), not to these two looks.

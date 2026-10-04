@@ -6,7 +6,7 @@ import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
-import { clockGlassBodies } from '../lib/oilLay';
+import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
 import { phasePour } from '../lib/phasePour';
 import { sizedMagnet } from '../lib/magnetSize';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
@@ -2376,7 +2376,7 @@ class FluidSimulation {
         // the ferrofluid fingers through colour everywhere and amber meets
         // teal (the references' green) along the seams.
         //
-        // Each patch a Gaussian a tenth of the plate wide (0.09 S), on a
+        // Each patch a Gaussian of sigma 0.09 of the plate, on a
         // grid a quarter of the plate apart. The radius was S × 0.15 in
         // splatBlob's 128-grid units, which it scales by GRID_SCALE again:
         // 0.225 of the plate, nearly the spacing, so the sixteen patches lay
@@ -2420,34 +2420,17 @@ class FluidSimulation {
         const water = col(0);
         const bodies = clockGlassBodies(this.rng.float, harmony.length);
         /*
-          Each cell is oil as far as a body covers it (addMix lays a body
-          flat to its edge; here with a cell of antialiasing), and the dye
-          is laid to match: a
-          body's colour in its oil and nowhere else, the water's in what is
-          left. Laid as Gaussians (splatBlob) the colours did not keep to
-          their liquids: a body's ran out past its oil into a ring in the
-          water, and the water's under it turned each body a mix with the
-          purple (in the lab, amber read as itself over 0.3% of the dish;
-          npm run clockglass). The water is the old wash, a quarter of the
-          plate wide and deepest in the middle.
+          Each cell as clockGlassCell lays it (and why): a body's colour in
+          its oil and nowhere else, the water's wash in what is left.
         */
-        const sigma = 34 * k, reach = Math.ceil(sigma * 2.6);
         const g = this.gpu;
         for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
-        for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
-          const x = Math.floor(cx) + dx, y = Math.floor(cy) + dy;
-          if (x < 1 || x >= S - 1 || y < 1 || y >= S - 1) continue;
-          let oil = 0, mine = -1;
-          bodies.forEach((b, q) => {
-            const d = Math.hypot((x + 0.5) / S - b.x, (y + 0.5) / S - b.y);
-            const c = Math.max(0, Math.min(1, (b.r - d) * S + 0.5));
-            if (c > oil) { oil = c; mine = q; }
-          });
-          const w = Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma));
-          if (w >= 0.01 && oil < 1) this.addDensity(x, y, 1.3 * w * (1 - oil), water.r, water.g, water.b);
-          if (mine >= 0) {
-            const c = col(bodies[mine].dye);
-            this.addDensity(x, y, 2.6 * oil, c.r, c.g, c.b);
+        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+          const cell = clockGlassCell((x + 0.5) / S, (y + 0.5) / S, S, bodies);
+          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
+          if (cell.dye > 0) {
+            const c = col(bodies[cell.body].dye);
+            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
           }
         }
         break;

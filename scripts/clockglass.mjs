@@ -16,7 +16,7 @@
  * 'clock-glass').
  *
  * What this asks is the feature, several colours side by side in their own
- * parts of the dish, not that a pass ran. Three plates, laid as the app lays
+ * parts of the dish, not that a pass ran. Two plates, laid as the app lays
  * them and stepped five seconds with the look's own plate settings (its oil,
  * its curved glasses, Thin Gap):
  *
@@ -32,7 +32,9 @@
  *   2. the look's colours spread at least twice as far as the old lay's: the
  *      mean angle of each dyed cell's colour from the dish's mean colour,
  *      near 0 for one colour or a blend of several
- *   3. in at least four separate regions off the water: cells, side by side
+ *   3. in at least four separate regions off the water, of at least two
+ *      colours (regions APART radians apart): cells, side by side, and not
+ *      all the same oil
  *   4. and the oil holds the colour laid in it as its own: of the dye laid
  *      in the bodies, the share the oil carries (Oil Bodies) after the five
  *      seconds. The share used to start empty when a plate first had bodies,
@@ -68,8 +70,9 @@ try {
     await lab.create(N, N);
     const { settings: s, dyes: now } = lab.look('clock-glass');
     const dyes = which === 'before' ? OLD : now;
-    const bodiesOn = which === 'now' ? 1 : 0;
-    const oil = which === 'before' ? 0 : 0.9;
+    // The look's own oil, read from the look: a look that lost it would fail here.
+    const bodiesOn = which === 'now' ? s.oilBodies : 0;
+    const oil = which === 'before' ? 0 : s.oilTension;
     const over = { thinGap: 1, advection: s.advection, plateCurve: s.plateCurve, depthDrag: s.depthDrag,
       platePressure: s.platePressure, oilTension: oil, oilBodies: bodiesOn };
     // Absorbance per unit of dye, as the app's addDensity stores it.
@@ -95,18 +98,12 @@ try {
       const bodies = lab.clockGlassBodies(11, dyes.length);
       const sv = lab.solver();
       for (const b of bodies) sv.addMix(b.x, b.y, b.r, { oil: 1 });
-      // As seedPreset's 'clock-glass': each body's dye in its oil, the
-      // water's wash (splatBlob's 34 in 128-grid units at GRID_SCALE 1.5 on
-      // the app's 192 grid) in what is left.
-      const sigma = (34 * 1.5) / 192, aw = ab(dyes[0]);
+      // Each cell as seedPreset's 'clock-glass' lays it (lab.clockGlassCell is the app's own).
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-        const x = (i + 0.5) / N, y = (j + 0.5) / N, k = (i + j * N) * 4;
-        let oil = 0, mine = -1;
-        bodies.forEach((b, q) => { const c = Math.max(0, Math.min(1, (b.r - Math.hypot(x - b.x, y - b.y)) * N + 0.5)); if (c > oil) { oil = c; mine = q; } });
-        const w = Math.exp(-((x - 0.5) ** 2 + (y - 0.5) ** 2) / (2 * sigma * sigma));
+        const cell = lab.clockGlassCell((i + 0.5) / N, (j + 0.5) / N, N, bodies), k = (i + j * N) * 4;
         const put = (amt, a) => { for (let ch = 0; ch < 3; ch++) d[k + ch] += amt * a[ch]; d[k + 3] += amt; };
-        if (w >= 0.01 && oil < 1) put(1.3 * w * (1 - oil), aw);
-        if (mine >= 0) { put(2.6 * oil, ab(dyes[bodies[mine].dye])); laidInOil += 2.6 * oil; }
+        if (cell.water > 0) put(cell.water, ab(dyes[0]));
+        if (cell.dye > 0) { put(cell.dye, ab(dyes[bodies[cell.body].dye])); laidInOil += cell.dye; }
       }
     }
     lab.addDye(d); lab.flush();
@@ -178,7 +175,7 @@ try {
     `dyed ${(now.dyed * 100).toFixed(0)}% and ${(before.dyed * 100).toFixed(0)}% of the dish`);
   check('the look\'s colours spread at least twice as far as the old lay\'s', now.spread > 2 * before.spread,
     `${now.spread.toFixed(3)} rad against ${before.spread.toFixed(3)}`);
-  check('in at least four separate regions of colour off the water', now.regions >= 4, fmt(now));
+  check('in at least four separate regions off the water, of more than one colour', now.regions >= 4 && now.colours >= 2, fmt(now));
   check('and the oil holds the colour laid in it as its own', now.held > 0.6,
     `${(now.held * 100).toFixed(0)}% of the bodies' dye is the oil's after five seconds`);
 } finally {
