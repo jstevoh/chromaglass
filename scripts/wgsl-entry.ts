@@ -2,6 +2,8 @@
 // display shader, compiled on whatever WebGPU the browser has.
 import { KERNELS, kernel } from '../src/gpu/wgsl/fluid';
 import { plateWgsl, DISPLAY_MAIN, DERIVE_WGSL } from '../src/gpu/wgsl/plate';
+import { SPIKES_WGSL } from '../src/gpu/wgsl/spikes';
+import { STAND_WINDOW, standingKernels } from '../src/gpu/wgsl/standing';
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -19,6 +21,10 @@ const FORMATS: Record<string, string> = {};
   for (const name of Object.keys(KERNELS)) await check(`fluid.${name}`, kernel(name, FORMATS[name] ?? 'rgba16float'));
   await check('plate.display', plateWgsl(DISPLAY_MAIN));
   await check('plate.derive', DERIVE_WGSL);
-  out.push(`checked ${Object.keys(KERNELS).length + 2} shaders`);
+  // The standing layer's film (PLAN §9t), built behind the show.
+  const film = standingKernels(SPIKES_WGSL);
+  for (const [name, code] of Object.entries(film)) await check(`standing.${name}`, code);
+  await check('standing.window', STAND_WINDOW);
+  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1} shaders`);
   return out;
 };
