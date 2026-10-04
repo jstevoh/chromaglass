@@ -283,7 +283,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // see NOT_A_TARGET in sceneMap.ts.
 // Nor the Mixer rows' fade times: see the same list there.
 // Nor Thin Gap, which switches the solver: see the same list there.
-const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap',
+// Nor Clear Film, which pours over the whole dish: the same list again.
+const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
