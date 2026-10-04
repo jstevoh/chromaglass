@@ -341,6 +341,10 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-13** Fillmore East's dish fills only a small part of the canvas; it should be
   framed so the whole plate fills it. Wall, desk. Thread "More going on in every look".
 
+- **QA-14** The looks carry too few colours: the owner wants many, with subtle gradients
+  between them, across the presets in general. Wall, desk. Thread "More colour in the
+  looks".
+
 **Tier 4. Polish.**
 
 - **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
