@@ -907,6 +907,21 @@ together. It changes how the Finger feels. On Classic:
 Say if the Finger now feels too strong, too sticky (a blob that rides along under the
 hand), or not enough like a finger in liquid.
 
+## 35. Picking a bottle pours nothing (PLAN 15i)
+
+Picking a liquid, on the desk's shelf, the Design desk or the phone's Dye sheet, puts it
+in your hand and nothing on the plate.
+
+- On a look with no ferrofluid (Classic), pick Ferrofluid: nothing lands, and the plate
+  stays as it was for as long as you leave it. Pour with the Dropper: only what you
+  poured shows, where you poured it.
+- Pick Oil, Soap, Milk, then a dye, each without touching the plate: nothing lands.
+- With Ferrofluid in your hand, open Magnet Garden: its own ferrofluid is there as
+  before. Open Classic from it, then pour one drop of Ferrofluid: only the drop shows,
+  not Magnet Garden's ring coming back with it.
+- After pouring some, Go to another look with a fade: no ring of ferrofluid lands half
+  way through.
+
 ---
 
 ## 34. A clear film that tears into lace (Clear Film, PLAN 20b)

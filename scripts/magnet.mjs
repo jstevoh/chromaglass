@@ -31,8 +31,8 @@
  *   7. a new grid (the quality governor stepping down) with the Magnet in
  *      hand lays nothing on a bare plate, picked and untouched or held:
  *      never the look's ring, and no pool of the magnet's own
- *   8. and a new grid under ferrofluid poured from the bottle on Classic
- *      keeps it, the same amount where it was, and lays no ring over it
+ *   8. and a new grid under ferrofluid poured by hand on Classic, with
+ *      Ferrofluid up, keeps it, the same amount where it was, and lays no ring over it
  *      (PLAN 9w; the solver's side is `npm run regrid`)
  *
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
@@ -614,12 +614,15 @@ try {
     about 22% of the plate in the ring. Now the old solver hands its
     ferrofluid over and nothing is laid.
 
-    The Ferrofluid bottle picked (chromaglassLiquid, as the shelf picks
-    it), which turns Ferrofluid up to 0.6 on a look with none: that is what
-    made the old lay fire. Then two pools, a big one and a small one off the
-    middle, poured as the bottle pours (the solver's addPhase, as check 3),
-    so the shape is one no look pours and a lay of any look's would show in
-    where the ferrofluid is, not only in how much. Its own page on the same
+    Two pools, a big one and a small one off the middle, poured as the
+    bottle pours (the solver's addPhase, as check 3), so the shape is one no
+    look pours and a lay of any look's would show in where the ferrofluid
+    is, not only in how much. Then Ferrofluid turned up to 0.6
+    (chromaglassSettings), as a hand's first pour of the bottle turns it up
+    (PLAN 15i): Ferrofluid up is what made the old lay fire. The solver's
+    addPhase called directly does not mark the pour as a hand's
+    (phaseByHand, 15i's own guard against the same lay), so what keeps the
+    pools here is the carry alone. Its own page on the same
     rung as check 7 (512²), stepped down once to 384².
   */
   await page2.close();
@@ -646,10 +649,10 @@ try {
     }
     return { total: total / (n * n), near: near.map(v => (total ? v / total : 0)), n };
   }, POOLS);
-  await page3.evaluate(() => window.chromaglassLiquid('ferrofluid'));
-  await page3.waitForTimeout(1800);
   await page3.evaluate((POOLS) => { const g = window.chromaglassDebug().fluids[0].gpu; for (const p of POOLS) g.addPhase(p.x, p.y, p.r, 0.9); }, POOLS);
-  await page3.waitForTimeout(1000);
+  await page3.waitForTimeout(500);
+  await page3.evaluate(() => window.chromaglassSettings({ phaseAmount: 0.6 }));
+  await page3.waitForTimeout(1500);
   const before3 = await counts3(), poured3 = await pools3();
   let grids3 = { seen: [before3.grid], moved: false };
   for (let i = 0; i < 4 && !grids3.moved; i++) {

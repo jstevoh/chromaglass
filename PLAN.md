@@ -384,7 +384,7 @@ Where each batch stands, as of 2026-09-27:
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 8 not started (7, a DAW bridge plugin, and 8, a native renderer core for later, added 2026-10-04); Windows (13-win-smoke, -app, -sign) planned 2026-10-04, never run on a PC |
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
-| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15e, 15f, 15g open |
+| 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15i, picking a bottle lays nothing, **shipped** (`npm run bottles`, Mac); 15e, 15f, 15g, 15j open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16f, add and take off the back plate on every look, **shipped** (#273, `layout`, `phone`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (0 in every look, the owner picks which go on the lamp; `npm run lamp`), 18b-1 to 18b-6 left |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
@@ -3217,6 +3217,62 @@ performer would notice first:
 ### 15a. Only the Dropper lays the bottle's liquid (shipped)
 
 **Shipped** (#201): every laying tool lays the bottle's liquid (`npm run bottles`); the Splat line's "following the hand" was fixed in #214. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+### 15i. Picking a bottle pours nothing (shipped)
+
+**Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a
+huge chunk on the canvas. It shouldn't do that. I want to pour it on myself. Same with
+all of the other liquids."
+
+- **Cause.** Picking the Ferrofluid bottle turned Ferrofluid (`phaseAmount`) up to 0.6 so
+  the drops would show (the plate draws the second phase only with it up). Only the
+  frame's "turned up on a bare plate" pour knew that rise was for the bottle. Everything
+  else that lays a look's ferrofluid read it as the look asking for some and poured the
+  look's ring (a fifth of the plate in black drops round the middle): a new solver under
+  the lead plate (the governor moving the grid, a lost device), every look cued after
+  the pick (`layPlate` ran a render before the new look's settings arrived, by the 0.6
+  still in them, and the pick's effect set 0.6 again on every look), and a cast display
+  on a plate of its own, which gets the settings but not the bottle.
+- **Fix.** Picking any bottle sets the bottle in the hand and nothing else, on every path
+  that picks one: the desk's shelf, the Design desk's bottles, the phone's Dye sheet, the
+  remote's `liquid` message, the Liquid Designer. MIDI and the set list pick no bottle.
+  Ferrofluid is turned up when a hand has poured from the bottle and the ferrofluid is in
+  the solver (`onFerrofluidPoured`, asked from the frame as the Magnet's hold asks), so it
+  never rises over a bare plate. A look is laid by the Ferrofluid (and Scale) it asks for,
+  passed with the cue, a Go and a Back, not by the settings the last look left or the
+  half-way blend of a fade. A new solver lays the look's ferrofluid again only over the
+  look's own, not over a hand's pour. And a pour that starts while Ferrofluid is at 0
+  first clears what is in the solver unseen (a cut to a look with none leaves the last
+  look's ring there), or turning the amount up for one drop brought the whole ring back.
+- **What the other bottles did.** In the code, picking Oil, Soap or a dye changed nothing
+  on the plate before this either; what landed with them was the ferrofluid ring, laid
+  by a regrid or a look change while the amount the Ferrofluid pick had set was still up.
+- **Measured** by `npm run bottles` (Mac): every bottle on the bench picked on an
+  untouched plate lays no ferrofluid, no oil and no look's ring, and leaves Ferrofluid at
+  0; a look cued with the Ferrofluid bottle in the hand lays none; Magnet Garden, which
+  has its own, still lays it; the hand's first pour, over Magnet Garden's ring left unseen
+  by a cut to Classic, turns Ferrofluid up and reads back as only the stroke's ferrofluid.
+- **No look relied on the pick.** The three looks with ferrofluid (Magnet Garden, Ferro
+  Maze, Ferro Paint) carry their own amount and lay their own pour when they load.
+
+### 15j. Found with 15i
+
+- A cast display that cannot mirror the show's canvas runs a plate of its own and is
+  sent the settings, never the hands. So nothing poured by hand reaches it, and when a
+  hand's first Ferrofluid pour turns the amount up there, it lays the look's ring over a
+  plate the hand never touched. Sending the hands' gestures to it (as the remote's are
+  applied with `applyGesture`) would close both.
+- Ferrofluid poured by hand and a look change: a cut leaves it in the solver, hidden by
+  the new look's Ferrofluid at 0 (the next pour clears it); a look that fades in clears
+  it at the half-way point when the incoming look asks for none. One rule for both, and
+  whether hand-poured ferrofluid should stay visible through a look change, is the
+  owner's call.
+- A Back fades to the previous settings as they were, so after a hand's pour turned
+  Ferrofluid up they carry its 0.6, and the Back lays the previous look's ring half way.
+  The previous look's own amount would need keeping beside its settings.
+- A new solver after a hand's pour lays nothing now, so the pour (and, on a look with
+  ferrofluid of its own, the look's) is gone from the new grid until 9w carries the phase
+  across (#266).
 
 ### 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 
