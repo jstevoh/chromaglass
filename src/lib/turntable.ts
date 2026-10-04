@@ -160,6 +160,58 @@ export function dishFrame(look: number, turntable: number, liquid: number, dt: n
   return { dish, liquid: next, turn: Number.isFinite(turn) ? turn : 0 };
 }
 
+/**
+ * The look's motor dial (`rotationSpeed`, 0 to 1) as the dish's speed, rad/s.
+ * Moved here from the frame unchanged, so a check can read it.
+ *
+ * The top of this dial used to be one turn every thirteen minutes.
+ * `rotationSpeed` ran `v * 0.01`, so the whole slider reached 0.01 rad/s —
+ * measured at 0.011 rad over 1.4 s with the dial at 0.8, against 1.885 rad/s
+ * for a flick. It was a motor that kept a plate alive and could not be seen
+ * doing it, and asking for a plate that visibly turns was asking for travel
+ * this dial did not have.
+ *
+ * Every shipped look sat at 0.1 or below then (most under 0.012), so the
+ * bottom tenth was kept exactly as it was — `v * 0.01`, the same arithmetic,
+ * the same numbers — and the ninety per cent above it is where the speed
+ * lives. The two halves meet at 0.001 rad/s, so there is no step at the join,
+ * and the square keeps fine control at the slow end of what is a visible
+ * range: about a turn every fifteen seconds at half, and a flick's worth at
+ * the top.
+ *
+ * The bottom tenth looked alive for another reason: the same dial stirred
+ * the current round the middle, at thirty times the dial in the solver's
+ * units, and on most looks that stir turned the liquid in view twenty to a
+ * thousand times faster than this motor turned the dish. The stir went in
+ * PLAN 22j (the dish drags the liquid through the gap, so a steady motor
+ * leaves nothing to stir once the liquid has caught up), and the looks that
+ * leaned on it were moved up the dial to turn their dish as fast as the stir
+ * moved the liquid they show (presets.ts, Rotation Speed). Most now sit
+ * between 0.02 and 0.2.
+ */
+export function lookMotorRate(asked: number): number {
+  const v = Math.max(0, Number.isFinite(asked) ? asked : 0);
+  return v <= 0.1 ? v * 0.01 : 0.001 + Math.pow((v - 0.1) / 0.9, 2) * 2.4;
+}
+
+/**
+ * The look's motor, one frame's ask, rad/s: the dial's speed `rate` the
+ * plate's way round (`way`, ±1 and the wander), and the music routed to
+ * rotation, `music`, with its sway `sway` (which crosses zero: a quiet band
+ * pushes the plate back).
+ *
+ * The sway used to multiply the dial's speed as well. While that speed was a
+ * thousandth of a radian a second it changed nothing anyone could see; once
+ * the dial carried what the stir did (22j) it would have turned acid-trip's
+ * whole dish backwards at 0.24 rad/s in every quiet bar. A motor holds its
+ * way round whatever the band does, so only the band's share sways, exactly
+ * as it always has (`npm run turntable`, check 15).
+ */
+export function lookMotor(rate: number, way: number, music: number, sway: number): number {
+  const m = rate * way + music * sway;
+  return Number.isFinite(m) ? m : 0;
+}
+
 /** Wrap an angle difference to (−π, π]. */
 export function wrapPi(a: number): number {
   const t = a - 2 * Math.PI * Math.round(a / (2 * Math.PI));

@@ -152,7 +152,6 @@ export interface GpuStepParams {
   rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
   rockY: number;
   currentGrav: number;      // a concave dish, × (density − mean): heavy dye pools in the middle
-  twist: number;            // the top glass turning: a differential rotation, fastest inside
   meanDensity: number;
   maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
   /**
