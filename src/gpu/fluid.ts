@@ -273,11 +273,12 @@ const CURRENT_ITERS = 10;
   liquid: at 1e-3 rad/s the swirl at the rim is under 5e-4 plate widths a
   second, a cell of 768 in three seconds, for as long as the lag lasts. The
   centrifuge: at 0.05 rad/s water's drift outward is 3e-4 plate widths a
-  second at the rim with the heaviest dye. Both speeds are the turntable's
-  alone (Auto Spin and the Spin tool): a look's own turning, its motor, the
-  music routed to rotation and a flick, turns the picture rigidly as it
-  always has and never reaches here, so every shipped look leaves both at
-  exactly zero.
+  second at the rim with the heaviest dye. Since 22h (#252) the look's own
+  turning is on the same dish, so a look with music routed to rotation sways
+  its dish under its liquid and runs the swirl on most steps while it plays
+  (PLAN 22k: what that costs, `npm run swirlcost`), and since 22j (#261)
+  a look whose motor turns its liquid past the centrifuge's floor runs it on
+  every step; a look nobody turns leaves both at exactly zero.
 */
 const SWIRL_DISH_MIN = 1e-3;
 const SWIRL_SPIN_MIN = 0.05;
@@ -488,6 +489,14 @@ export class WebGPUFluid {
   private swirlLive = false;
   /** Seconds the swirl runs on after its forcing stops, so what it made can die away. */
   private swirlTail = 0;
+  /**
+   * For `npm run swirlcost` (PLAN 22k): the same plate with the swirl held
+   * off, to read what it costs, and how many steps ran it of how many were
+   * taken. Never set by the app. On the class, so a solver the ladder builds
+   * mid-measurement is held off too.
+   */
+  static swirlHeldOff = false;
+  readonly swirlCount = { steps: 0, ran: 0 };
   private readonly grain: PingPong | null;
   private readonly div: GPUTexture;
   /*
@@ -1740,7 +1749,9 @@ export class WebGPUFluid {
       plate it is laid over the flow after both projections, as the current
       is, and it is divergence-free already (stepSwirl projects it).
     */
-    const swirlOn = this.swirlWanted(p);
+    const swirlOn = this.swirlWanted(p) && !WebGPUFluid.swirlHeldOff;
+    this.swirlCount.steps++;
+    if (swirlOn) this.swirlCount.ran++;
     stage('swirl', (pass) => {
       if (swirlOn) { this.stepSwirl(pass, p, thin); return; }
       for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
@@ -2632,6 +2643,39 @@ export class WebGPUFluid {
   }
 
   /**
+   * What the swirl stage costs the GPU, for `npm run swirlcost` (PLAN 22k):
+   * `reps` swirl stages, as a thin plate runs it (`thin`) or as the old
+   * plate does, encoded back to back in one pass and timed from submit to
+   * the queue's done, in milliseconds.
+   *
+   * Timed this way because CI's Mac grants no timestamp queries (the
+   * profiler reads nothing there, measured on #258), and the frame rate
+   * alone could not see it: two runs of the nine looks read the swirl at
+   * 2 fps of 41 and at nothing of 30, each look's own pair scattered by
+   * five frames either way. It waits for the queue to empty first, so the
+   * frame's own work is not timed with it, and the caller times two counts
+   * of reps and takes the slope, which leaves out the submit's fixed cost.
+   *
+   * On the plate's own swirl textures, with a made-up drive: on the thin
+   * plate what it writes is overwritten by the next step that runs the
+   * swirl, and the next step that does not empties it (swirlLive).
+   */
+  async benchSwirl(reps: number, thin: boolean): Promise<number> {
+    const p = { spinDish: 0.01, spinLiquid: 0.02, spinTau: 3, spinNu: 1e-6, magnetSeconds: 1 / 60, spinDyeWeight: 0.5 } as GpuStepParams;
+    const enc = this.device.createCommandEncoder({ label: 'bench swirl' });
+    const pass = enc.beginComputePass({ label: 'bench swirl' });
+    for (let k = 0; k < reps; k++) this.stepSwirl(pass, p, thin);
+    pass.end();
+    this.swirlLive = true;
+    // Behind whatever the frame has already queued, so it is not timed with it.
+    await this.device.queue.onSubmittedWorkDone();
+    const t0 = performance.now();
+    this.device.queue.submit([enc.finish()]);
+    await this.device.queue.onSubmittedWorkDone();
+    return performance.now() - t0;
+  }
+
+  /**
    * The spun dish's swirl (spinSwirl), read back whole on its own grid: m × m
    * velocities (x, y), plate widths a second, in the frame turning with the
    * liquid. For `npm run dish`, not for a frame.
@@ -2931,6 +2975,25 @@ export class WebGPUFluid {
     ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
       Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT]), this.M);
     this.swirl.swap();
+    /*
+      A thin gap stops here, at one dispatch where it was thirteen (PLAN 22k).
+
+      There the swirl field is the dish's drive, a speed at the rest gap
+      (spinSwirl's thin branch, which keeps no state), and it goes into the
+      flow before the thin solve, which makes the whole flow conserve liquid
+      with the gap in it: ∇·(h u) = 0, by its own multigrid. Projecting the
+      drive first, by ten Jacobi sweeps of ∇·u = 0 on the current's grid, did
+      a weaker version of the same job with the wrong operator. Where the gap
+      is even the solve takes away exactly what it took away; where a press
+      or a dome makes it uneven what it took away is a gradient of u, not of
+      hu, and handing the solve the drive as it is lets the right projection
+      decide. Since #252 the nine thin music looks run the swirl on most of
+      their steps while the band plays; this is the part of it that did
+      nothing the solve after it does not do. The old plate has no solve
+      after it that sees the swirl (it is laid over the projected flow), so
+      it keeps its own projection.
+    */
+    if (thin) return;
     const m = this.arg('current grid', [0, this.M, 0, 0]);
     this.run(pass, 'curDivergence', this.swirlDiv, [this.swirl.read], m, this.M);
     for (let k = 0; k < CURRENT_ITERS; k++) {

@@ -81,9 +81,9 @@ try {
 
   const has = await page.evaluate(() => {
     const d = window.chromaglassDebug?.();
-    return typeof d?.flick === 'function' && !!d.liquidSpin && !!d.spin;
+    return typeof d?.flick === 'function' && !!d.liquidSpin && !!d.spin && typeof d.frameAt === 'number';
   });
-  check('the page is running the build that was just made', has, has ? 'flick() and liquidSpin present' : 'stale bundle');
+  check('the page is running the build that was just made', has, has ? 'flick(), liquidSpin and frameAt present' : 'stale bundle');
   if (!has) process.exit(1);
 
   // One plate, no motor, no music, no Auto Spin:
@@ -98,21 +98,35 @@ try {
     d.turntable.current.fill(0);
     d.liquidSpin.current.fill(0);
   }, { viscosity, drag: DRAG });
-  const read = () => page.evaluate(() => {
+  /*
+    Timed by the plate's own clock, not the page's. `at` is the time the
+    last frame stepped the plate to (`chromaglassDebug().frameAt`), which is
+    what the speeds and angles read are the state at; a flick lands on the
+    next frame, which steps the dish from that same time. The check used to
+    take `performance.now()` at the read, against the last frame's speeds,
+    and a frame loop that paused before the read put the liquid behind its
+    clock: a run on #258 read the water at 0.117 rad/s "after 0.30 s"
+    against 0.179, the picture's angle at 0.41 of the liquid's, both what
+    the drag time gives at 0.19 s, on a commit whose app the same check had
+    passed on an hour before (0.176 against 0.186). Reading inside an
+    animation frame alone did not cure it: a frame that stalls after
+    stamping its clock still leaves the page's clock ahead of it.
+  */
+  const read = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {
     const d = window.chromaglassDebug();
     const st = d.fluids[0]?.lastStep ?? null;
-    return {
-      at: performance.now(), frames: d.frames ?? 0, dish: (d.spin.current[0] ?? 0) + (d.turntable.current[0] ?? 0),
+    resolve({
+      at: d.frameAt, frames: d.frames ?? 0, dish: (d.spin.current[0] ?? 0) + (d.turntable.current[0] ?? 0),
       liquid: d.liquidSpin.current[0] ?? 0, angle: d.rotation.current[0] ?? 0,
-      handed: st ? (st.spinDish ?? 0) : null, stir: st ? 'twist' in st : null,
-    };
-  });
-  const flick = () => page.evaluate(() => {
+      handed: typeof st?.spinDish === 'number' ? st.spinDish : null, stir: st ? 'twist' in st : null,
+    });
+  })));
+  const flick = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => {
     const d = window.chromaglassDebug();
     const a0 = d.rotation.current[0] ?? 0;
     d.flick(0);
-    return { at: performance.now(), frames: d.frames ?? 0, angle: a0, dish: d.spin.current[0] ?? 0 };
-  });
+    resolve({ at: d.frameAt, frames: d.frames ?? 0, angle: a0, dish: d.spin.current[0] ?? 0 });
+  })));
 
   /*
     Measured on a plate that draws, not one still building. The first run on
@@ -184,11 +198,11 @@ try {
   // ── 5b: the turntable's share, no flick ──
   await quiet('thin');
   await page.waitForTimeout(1000);
-  const g = await page.evaluate((O0) => {
+  const g = await page.evaluate((O0) => new Promise((resolve) => requestAnimationFrame(() => {
     const d = window.chromaglassDebug();
     d.turntable.current[0] = O0;
-    return { at: performance.now(), frames: d.frames ?? 0, dish: O0 };
-  }, f.dish);
+    resolve({ at: d.frameAt, frames: d.frames ?? 0, dish: O0 });
+  })), f.dish);
   await settle(300, g.frames);
   const u = await read();
   const tu = (u.at - g.at) / 1000;

@@ -8635,6 +8635,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         engine: engineStatusRef.current?.label ?? '',
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /**
+         * The clock the last frame stepped the plate to, in milliseconds on
+         * the page's own clock (Date.now, or the render's): what its dish,
+         * its liquid and its picture's angle are the state at. `npm run
+         * flick` times its flick and its readings by this, not by when it
+         * happened to ask.
+         */
+        frameAt: lastTimeRef.current * 1000,
         /** The draw gate (PLAN.md §14b): offers drawn and turned down by window, and the refresh it is working to. */
         drawGate: { drawn: { ...drawGate.drawn }, skipped: { ...drawGate.skipped }, refreshMs: drawGate.refreshMs(performance.now()), twoClocks: drawGate.twoClocks(performance.now()), stampFallbacks, stampMisses: { ...stampMisses } },
         /** The beat clock's period (ms, 0 unknown) and how sure it is: a lock right after a render is one carried over from it. */
@@ -9639,6 +9647,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (f.gpu instanceof WebGPUFluid) { f.gpu.profiler.ms.clear(); f.gpu.stageTimings = on; }
               }
               return on;
+            },
+            /**
+             * The spun dish's swirl held off (`on` false) or let run, for
+             * `npm run swirlcost` (PLAN 22k), and every layer's count of the
+             * steps taken and the steps that ran it since the page opened.
+             */
+            swirl: (on?: boolean) => {
+              if (on !== undefined) WebGPUFluid.swirlHeldOff = !on;
+              return fluidsRef.current.map((f) => (f.gpu instanceof WebGPUFluid ? { ...f.gpu.swirlCount, heldOff: WebGPUFluid.swirlHeldOff } : null));
+            },
+            /** The lead plate's swirl stage timed on the GPU (WebGPUFluid.benchSwirl). */
+            benchSwirl: async (reps: number, thin: boolean) => {
+              const g = fluidsRef.current[0]?.gpu;
+              return g instanceof WebGPUFluid ? await g.benchSwirl(reps, thin) : null;
             },
           },
           /** The picture as RGBA rows, drawn and copied in one task (a presented WebGPU canvas reads black). */
