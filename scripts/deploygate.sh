@@ -39,6 +39,42 @@
 #      rule cannot see: a stacked PR moved onto main after its only run, which
 #      tested the head merged into another branch.
 #
+#   6. (PLAN.md 19j, 2026-10-04) Before any of that: if no file the live site
+#      is built from differs between the pushed tree and the commit that is
+#      live, the verdict is `nothing`, and the deploy neither checks nor
+#      publishes. Eight of the thirty merges to 2026-10-04 changed no site file
+#      (PLAN.md, the docs, check scripts, workflows), and their deploys still
+#      ran the checks: 84bb112 (#245, docs only) went live 79 minutes after its
+#      merge, behind the whole Mac; 3586ead and e199bd3 (check scripts) spent 8
+#      minutes each on Measure. Those three answer `nothing` now. The tree that
+#      is live already passed every check before it was published, and a build
+#      of the same site files is the same site: `vite build` of each of the
+#      three and of the commit live before it gave the same 25 files byte for
+#      byte, where a merge that changed six site files (87b06a6) differed in 8.
+#      So there is nothing to measure and nothing to put up. A changed check
+#      script still ran on its own PR, and the next merge that changes the site
+#      is measured as before.
+#
+#      The other five did not qualify, rightly. Two were deploy runs GitHub
+#      cancelled before they started, a newer merge taking their place in the
+#      concurrency group. Three (d027626, 872b44d, d9302e5) came straight after
+#      a site change whose own run had been cancelled or gone red, so that
+#      change was not yet live and their run was the one to check and publish
+#      it: d027626's 111 minutes were three PRs' site changes going out.
+#
+#      "The commit that is live" is the head of main's newest deploy run that
+#      succeeded before this push's own run. A successful run that published
+#      nothing (this rule) had the live commit's site files, so the chain
+#      holds through it. It is compared with the commit live then, not with the
+#      push's parent: a docs-only merge on top of a site change whose deploy went
+#      red differs from what is live, and is deployed (and checked) in full.
+#      "Built from" is `reach.mjs --site` (src/, public/, index.html, the build
+#      config, the lockfile, package.json, firebase.json), plus this workflow
+#      and .firebaserc, which decide how it is built and where it goes;
+#      package.json counts unless only scripts the build never runs changed.
+#      A rollback or a deploy from outside this workflow would make the newest
+#      green run not the live one: anything that publishes must do it here.
+#
 # Runs from before the title carried the tested SHA (before 2026-09-27) fall
 # back to inferring it: the head has the pushed tree, and main as it stood
 # before the push ($2 in CI, `github.event.before`; the commit's parent in a
@@ -54,7 +90,7 @@
 #
 # Usage:
 #   scripts/deploygate.sh <sha> [<main before the push>]
-#                                        prints tested=true|disjoint|false and why;
+#                                        prints tested=nothing|true|disjoint|false and why;
 #                                        appends tested=… to $GITHUB_OUTPUT if set
 #   scripts/deploygate.sh --history <n>  replays the last n merges on main and
 #                                        counts how many would have skipped
@@ -190,8 +226,34 @@ apart() {
   echo "disjoint the PR's $(printf '%s\n' "$pr" | grep -c . || true) files and main's $(printf '%s\n' "$moved" | grep -c . || true) newer ones are apart, and every commit since went live green or would have passed"
 }
 
-# Echoes "true <why>", "disjoint <why>" or "false <why>" for one commit on
-# main; $2 is main before it (defaults to the commit's first parent, which for
+# Rule 6: echoes "nothing <why>" when no file the site is built from differs
+# between the pushed commit and the one that is live, and nothing at all
+# otherwise (including when anything cannot be read: the other rules decide).
+#   $1 the pushed commit   $2 its tree
+unchanged() {
+  local sha="$1" tree="$2" runs mine live ltree diff deployable
+  runs=$(api "actions/workflows/deploy.yml/runs?branch=main&per_page=100") || return 0
+  # This push's own deploy run, if it has one (a re-run keeps its number), and
+  # the newest success before it; a replay of an older merge (--history) reads
+  # what was live when that merge's own deploy started.
+  mine=$(jq -r --arg h "$sha" '[.workflow_runs[] | select(.head_sha == $h) | .run_number] | min // empty' <<<"$runs") || return 0
+  live=$(jq -r --argjson n "${mine:-1000000000}" '[.workflow_runs[] | select(.conclusion == "success" and .run_number < $n)]
+    | max_by(.run_number) | .head_sha // empty' <<<"$runs") || return 0
+  [ -n "$live" ] || return 0
+  ltree=$(treeof "$live") || return 0
+  [ -n "$ltree" ] || return 0
+  diff=$(treediff "$ltree" "$tree") || return 0
+  deployable=$( { printf '%s\n' "$diff" | grep -v '^$' | node "$(dirname "$0")/reach.mjs" --reaching --site || true
+                  printf '%s\n' "$diff" | grep -xE '\.github/workflows/deploy\.yml|\.firebaserc' || true; } | sort -u | grep -v '^$' || true)
+  if grep -qx package.json <<<"$deployable" && scriptsonly "$live" "$sha"; then
+    deployable=$(grep -vx package.json <<<"$deployable" || true)
+  fi
+  [ -z "$deployable" ] || return 0
+  echo "nothing no file the site is built from differs from ${live:0:7}, which is live ($(printf '%s\n' "$diff" | grep -c . || true) other files do): nothing to check or publish"
+}
+
+# Echoes "nothing <why>", "true <why>", "disjoint <why>" or "false <why>" for
+# one commit on main; $2 is main before it (defaults to the commit's first parent, which for
 # a squash merge is the same commit).
 judge() {
   local sha="$1" before="${2:-}" commit tree heads entry pr head runs run url tested ttree htree status verdict shards newest
@@ -199,6 +261,8 @@ judge() {
   sha=$(jq -r .sha <<<"$commit")
   tree=$(jq -r '.commit.tree.sha // empty' <<<"$commit")
   [ -n "$tree" ] || { echo "false could not read the pushed commit's tree"; return; }
+  verdict=$(unchanged "$sha" "$tree")
+  [ -z "$verdict" ] || { echo "$verdict"; return; }
   [ -n "$before" ] || before=$(jq -r '.parents[0].sha // empty' <<<"$commit")
   heads=$(api "commits/$sha/pulls" | jq -r '.[] | select(.merged_at != null) | "\(.number):\(.head.sha)"')
   [ -n "$heads" ] || { echo "false not the merge of a PR"; return; }
@@ -255,7 +319,7 @@ judge() {
 }
 
 if [ "${1:-}" = --history ]; then
-  n="${2:-20}"; yes=0; apartn=0; total=0
+  n="${2:-20}"; yes=0; apartn=0; nothingn=0; total=0
   # Read first, so a failed call stops the script instead of replaying nothing.
   list=$(api "commits?sha=main&per_page=$n" | jq -r '.[] | "\(.sha) \(.commit.message | split("\n")[0])"')
   [ -n "$list" ] || { echo "no commits on main to replay" >&2; exit 1; }
@@ -263,10 +327,12 @@ if [ "${1:-}" = --history ]; then
     verdict=$(judge "$sha" | tail -1)
     total=$((total + 1)); [ "${verdict%% *}" = true ] && yes=$((yes + 1))
     [ "${verdict%% *}" = disjoint ] && apartn=$((apartn + 1))
+    [ "${verdict%% *}" = nothing ] && nothingn=$((nothingn + 1))
     printf '%s %-60.60s %s\n' "${sha:0:7}" "$subject" "$verdict"
   done <<<"$list"
   echo "$yes of $total merges would have deployed on their PR's green run without re-running the checks,"
-  echo "and $apartn more with Measure alone, their files apart from main's newer changes (rule 5)"
+  echo "and $apartn more with Measure alone, their files apart from main's newer changes (rule 5);"
+  echo "$nothingn needed no deploy at all, no file the site is built from differing from what was live (rule 6)"
   exit 0
 fi
 
@@ -280,4 +346,6 @@ if [ "$tested" = true ]; then
   echo "::notice title=Checks already passed::${last#true }"
 elif [ "$tested" = disjoint ]; then
   echo "::notice title=Mac checks passed on the PR, files apart from main's newer changes::${last#disjoint }"
+elif [ "$tested" = nothing ]; then
+  echo "::notice title=Nothing to deploy::${last#nothing }"
 fi

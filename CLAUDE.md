@@ -103,7 +103,10 @@ deploy:
   just the Mac shards, running Measure, when the PR's green run tested an older
   main and the site files the PR changed (src/, public/, index.html, the build
   config, package.json beyond its scripts) are not ones main changed since, and
-  no deploy since went red. Otherwise the deploy runs them in full.
+  no deploy since went red. Otherwise the deploy runs them in full. And when no
+  file the site is built from differs from the commit that is live (a docs, check
+  or workflow merge; PLAN.md 19j), the deploy checks and publishes nothing, green in
+  seconds. A run started by hand always checks and deploys.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured) and `film.yml` (every

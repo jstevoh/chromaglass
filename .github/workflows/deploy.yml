@@ -50,6 +50,13 @@ jobs:
   # --history 20` replays it over recent merges (16 of 20 would have skipped).
   # A run started by hand always checks: that is what someone reaching for the
   # button usually wants.
+  #
+  # Since PLAN.md 19j a fourth answer comes first: `nothing`, when no file the
+  # site is built from differs from the commit that is live (a docs-only or
+  # check-only merge). Then nothing is checked or published, and the run is
+  # green in seconds. Over the 30 merges to 2026-10-04 three would have
+  # answered it, and one of them (#245, docs only) waited 79 minutes for the
+  # Mac. A run by hand still checks and deploys.
   verified:
     name: Already checked on its PR
     runs-on: ubuntu-latest
@@ -85,7 +92,7 @@ jobs:
   checks:
     name: Checks
     needs: verified
-    if: ${{ needs.verified.outputs.tested != 'true' }}
+    if: ${{ needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' }}
     uses: ./.github/workflows/checks.yml
     with:
       mac: ${{ needs.verified.outputs.tested != 'disjoint' }}
@@ -95,8 +102,10 @@ jobs:
     needs: [verified, checks]
     # `checks` is skipped only when `verified` said the tree had passed; a
     # skipped `checks` for any other reason (a failed `verified`) never deploys.
+    # `nothing` publishes nothing: the live site is already this build's.
     if: >-
       ${{ !cancelled() && needs.verified.result == 'success' &&
+          needs.verified.outputs.tested != 'nothing' &&
           (needs.checks.result == 'success' ||
            (needs.checks.result == 'skipped' && needs.verified.outputs.tested == 'true')) }}
     runs-on: ubuntu-latest
