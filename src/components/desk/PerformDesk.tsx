@@ -153,6 +153,9 @@ interface PerformDeskProps {
   /** How much the tool in hand does (ToolAmount). */
   toolAmount?: number;
   onToolAmount?: (v: number) => void;
+  /** How big the Magnet is (Magnet Size), in the Magnet's options. */
+  magnetSize?: number;
+  onMagnetSize?: (v: number) => void;
   dyes: string[];
   dye: string | null;
   onDye: (hex: string) => void;
@@ -506,6 +509,8 @@ export function PerformDesk(p: PerformDeskProps) {
               onChange={(v) => p.onAmountFor!(toolMenu.tool, v)}
               at={toolMenu.at}
               onClose={() => setToolMenu(null)}
+              magnetSize={p.magnetSize}
+              onMagnetSize={p.onMagnetSize}
             />
           )}
           <div className="ml-auto flex items-center gap-3">

@@ -82,6 +82,8 @@ const NOT_THE_LOOK = new Set([
     owner asked to be rid of. How far it walks when nobody has it still drifts.
   */
   'magnetX', 'magnetY',
+  // And how big that hand's magnet is (Magnet Size): the performer's choice.
+  'magnetSize',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),
