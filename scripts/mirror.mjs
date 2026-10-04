@@ -90,14 +90,18 @@ try {
       page's first pointerdown, and on a browser that has never chosen a
       sound source that gesture starts the simulated band (App.tsx, the
       first visit's wake). CALM holds the music's own reactions still, but
-      the band's kicks release bubbles into the densest dye near the middle
-      of the plate whatever Audio Impact says, and from the second drop on
+      the band's kicks released bubbles into the densest dye near the middle
+      of the plate whatever Audio Impact said, and from the second drop on
       the middle of the preview moved by itself. On the Mac, with the band
       let start: 29 kicks over the four drops, four bubbles near the middle
       from the second, and the middle cells' drift 1.7 1.6 16.3 12.8, against
-      cells that sat at their drift with the band off. "None" written here
-      is a choice made, so the wake leaves it alone. The printed-only plates
-      are photographed silent too, the reported one included.
+      cells that sat at their drift with the band off. Audio Impact 0 holds
+      the bubbles back now too (`npm run kickbubbles`), but a plate judged
+      for what the hand alone did is judged in silence all the same: the
+      band's tempo still paces the look, and a kick still breathes a maze.
+      "None" written here is a choice made, so the wake leaves it alone. The
+      printed-only plates are photographed silent too, the reported one
+      included.
     */
     await page.addInitScript(() => {
       try {
