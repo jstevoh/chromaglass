@@ -327,7 +327,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-8** Sensual Laboratory is washed out by the lamp. Wall. Draft #262 (18b-1).
 - **QA-9** Clock Glass and the ferrofluid looks fall short of their references. Wall.
   Thread "Clock glass and ferro looks", no PR yet.
-- **QA-10** Velvet Underground and Lumia are underwhelming: one area of interest, not
+- **QA-10** Velvet Underground, Lumia and Cell Bloom are underwhelming: one area of interest, not
   several. Wall. Thread "More going on in every look", no PR yet.
 
 **Tier 4. Polish.**
