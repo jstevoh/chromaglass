@@ -59,10 +59,12 @@
  *   4b. and the page's thread held from outside it, in stretches
  *      beginning in the first HELD_BY_S and ending before the first step,
  *      no more than COLD_CAP_S all told: no frame, no tick of its own
- *      timer, no long task of its own, and not begun where a promise the
- *      page awaits had just settled. That is how Chromium starting Metal
- *      on a cold runner looks from the page, on every opening read, and not
- *      how any stop of the show's own has (see frameGaps in open()). The
+ *      timer, no long task of its own, and not the page's own code picking
+ *      up after a promise it awaits settled (`pagehold.mjs`, whose own
+ *      cases are checked on every run, on the line before). That is how
+ *      Chromium starting Metal on a cold runner looks from the page, on
+ *      every opening read, and not how any stop of the show's own has (see
+ *      openingGaps). The
  *      instruments have to be able to tell: long tasks observable, and the
  *      page's timer ticking as asked before the first step.
  *   5. every look, opened on its own, asks in its first OPENING_STEPS
@@ -95,6 +97,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { engineQuery } from './frame.mjs';
+import { heldStretches, selfCheck } from './pagehold.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -226,15 +229,6 @@ const TICK_OK_MS = 150;
  * against check 4.
  */
 const HELD_BY_S = 3;
-/**
- * How soon after a promise the page awaits settled a silent stretch may
- * begin and still be the page's own code, not a held thread (4b). The
- * continuation runs in the same task as the moment is marked, so it is
- * microseconds apart; fifty milliseconds is room for a few such in a row.
- * Chromium's hold did not begin at one on any opening read: it began with
- * the adapter or device still pending, and ended at their handover.
- */
-const SETTLED_MS = 50;
 
 /**
  * The page's frame gaps, each with what is left of it once the time the
@@ -256,6 +250,32 @@ const frameStops = (x) => {
       first: longest ? 0 : null,
       seen: x.heldSeen,
     },
+  };
+};
+
+/**
+ * The page's frame gaps, each [began, whole, less the held time] with the
+ * largest of what is left first, the held stretches, and the silent ones
+ * kept as the page's own code after an await with what settled before each
+ * (seconds). Nothing is taken out unless long tasks could be seen and the
+ * page's timer ticked as asked before the first step: then the page's own
+ * work would look held.
+ */
+const openingGaps = (x, heldByMs = HELD_BY_S * 1000) => {
+  const { frames, frameRan, ...rest } = x.raw;
+  const seenOk = x.heldSeen.longOk && x.heldSeen.tickMedian != null && x.heldSeen.tickMedian <= TICK_OK_MS;
+  const { held, own } = seenOk
+    ? heldStretches({ frames: frameRan, ...rest }, { stepRaw: x.stepRaw, t0: x.t0, heldMinMs: HELD_MIN_S * 1000, heldByMs })
+    : { held: [], own: [] };
+  const heldIn = (a, b) => held.reduce((n, [st, en]) => n + Math.max(0, Math.min(b, en) - Math.max(a, st)), 0);
+  const ts = [...frames, x.now];
+  const gaps = [];
+  for (let i = 1; i < ts.length; i++) gaps.push([ts[i - 1] / 1000, (ts[i] - ts[i - 1]) / 1000, (ts[i] - ts[i - 1] - heldIn(ts[i - 1], ts[i])) / 1000]);
+  gaps.sort((p, q) => q[2] - p[2]);
+  return {
+    frameGaps: gaps.slice(0, 12),
+    held: held.map(([a, b]) => [a / 1000, (b - a) / 1000]),
+    settledStarts: own.map(([a, b, what]) => [a / 1000, (b - a) / 1000, what]),
   };
 };
 
@@ -302,6 +322,261 @@ await new Promise((r) => setTimeout(r, 2500));
 if (!up) process.exit(2);
 
 /**
+ * What every page the check opens is watched with, from its first moment
+ * (added as an init script; see open() and instrumentsControl()).
+ */
+const instruments = () => {
+  const t0 = performance.now();
+  window.__startupT0 = t0;
+  const frames = [];
+  window.__startupFrames = frames;
+  /*
+    And when each frame's callback ran, which is not its timestamp: that
+    is when the frame began, and a frame begun just before a second of
+    the page's own code runs after it, carrying the earlier time (a
+    cloud session: 835.9 ms on a frame whose callback ran at 1832 ms,
+    behind code that began at 832.2). What ran after what (4b,
+    `pagehold.mjs`) is read from these; the gaps from the timestamps.
+  */
+  const frameRan = [];
+  window.__startupFrameRan = frameRan;
+  const tick = (t) => { if (frames.length < 20000) { frames.push(t); frameRan.push(performance.now()); } requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+  const long = [];
+  window.__startupLong = long;
+  // Whether long tasks can be seen at all: without them a stretch of the
+  // page's own work would look like a thread held from outside (4b).
+  window.__startupLongOk = false;
+  try {
+    new PerformanceObserver((l) => { for (const e of l.getEntries()) long.push([e.startTime, e.duration]); })
+      .observe({ type: 'longtask', buffered: true });
+    window.__startupLongOk = PerformanceObserver.supportedEntryTypes?.includes('longtask') ?? false;
+  } catch { /* no long tasks here; the frames still say it */ }
+  /*
+    And long animation frames, printed and not judged. The page's own
+    JavaScript run as a promise's continuation, after an `await` on
+    requestAdapter, requestDevice, createComputePipelineAsync,
+    onSubmittedWorkDone or fetch, is not reported as a long task: a
+    second of it in a cloud session left no long task and no tick, so it
+    looked exactly like a thread held from outside. That second is a
+    long animation frame (1.00 s), and a renderer stopped from outside
+    for two seconds (SIGSTOP) left none, so these were tried as the tell.
+    On the Mac they are not one: Chromium's own hold at the GPU's start
+    was a long animation frame too (2.94 s from 1.01 s, over a frame gap
+    of 2.80 s from 1.17 s, run 36353565837). What does tell is where the
+    page's code after an await begins (__startupSettled below). The
+    frame's scripts do tell for one kind of promise: the continuation of
+    a fetch, a body read, an image or an audio decode is named as a
+    script for as long as it runs, the GPU's promises' never are, and
+    Chromium's hold names none (`pagehold.mjs`). So each frame's scripts
+    are kept, [start, duration], for that; the frames stay printed.
+  */
+  const loaf = [];
+  window.__startupLoaf = loaf;
+  try {
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries()) loaf.push([e.startTime, e.duration, e.renderStart ?? null, e.blockingDuration ?? null, (e.scripts ?? []).length, (e.scripts ?? []).map((x) => [x.startTime, x.duration])]);
+    }).observe({ type: 'long-animation-frame', buffered: true });
+  } catch { /* none here; they are only printed */ }
+  /*
+    The page's own thread, every tenth of a second: a timer that does
+    nothing but note when it ran. It runs whenever the thread is free,
+    so a stretch with no tick and no long task, not begun where a
+    promise settled (below), is one in which the page
+    ran nothing at all (4b; frameGaps below).
+  */
+  const ticks = [];
+  window.__startupTicks = ticks;
+  const beat = () => { ticks.push(performance.now()); if (ticks.length < 20000) setTimeout(beat, 100); };
+  setTimeout(beat, 100);
+  // Every synchronous build, whoever asked: the ledger's own count is
+  // only as good as every caller going through the cache.
+  const direct = [];
+  window.__startupDirect = direct;
+  for (const name of ['createComputePipeline', 'createRenderPipeline']) {
+    const f = GPUDevice.prototype[name];
+    GPUDevice.prototype[name] = function (d) { direct.push([performance.now(), d?.label ?? '']); return f.call(this, d); };
+  }
+  /*
+    The first time the page asked WebGPU for each thing it can do, and
+    how often. A stop that no build of ours was under way for (run
+    36298506575: 2.07 s from 17.17 s, a tenth of a second after the
+    first step) is something else the first frames asked the GPU
+    process for the first time; this is how the next one is named.
+  */
+  const firsts = new Map();
+  window.__startupFirsts = firsts;
+  /*
+    And when the GPU finished each piece of work the page handed it, with
+    what was in it. Through the stop after the first step the page's own
+    timers kept firing (the timeline's rows every quarter second) while
+    frames, heartbeats and steps all waited: the page's thread is free,
+    so the wait is on the GPU. Writing every texel of the show's 75.8 MB
+    of fields on a bare page stopped nothing (0.08 s, run 36304683847),
+    nor did clearing them, nor a first dispatch of every kernel on
+    scraps. So this records each submit's time handed over, its time
+    done (onSubmittedWorkDone after it), and the pipelines it ran with
+    their workgroup counts. It named the stop on its first run (run
+    36305436208): 1.42 s of GPU time on the plate's first draw, 0.03 s
+    on the same draw a few frames later. The render pipelines built
+    ahead now draw once before the show opens (`gpu/kit.ts`, firstDraw),
+    and the same submit took 0.14 s (run 36306162647).
+  */
+  const subs = [];
+  window.__startupSubs = subs;
+  const passOf = new WeakMap(), workOf = new WeakMap(), bufOf = new WeakMap();
+  const note = (enc, label, n) => {
+    let w = workOf.get(enc);
+    if (!w) { w = new Map(); workOf.set(enc, w); }
+    w.set(label, (w.get(label) ?? 0) + n);
+  };
+  for (const [begin, Pass] of [['beginComputePass', globalThis.GPUComputePassEncoder], ['beginRenderPass', globalThis.GPURenderPassEncoder]]) {
+    const b = GPUCommandEncoder.prototype[begin];
+    GPUCommandEncoder.prototype[begin] = function (...a) { const pass = b.apply(this, a); passOf.set(pass, { enc: this, label: '' }); return pass; };
+    const sp = Pass?.prototype?.setPipeline;
+    if (sp) Pass.prototype.setPipeline = function (pl) { const r = passOf.get(this); if (r) r.label = pl?.label || '?'; return sp.call(this, pl); };
+  }
+  const dw = globalThis.GPUComputePassEncoder?.prototype?.dispatchWorkgroups;
+  if (dw) GPUComputePassEncoder.prototype.dispatchWorkgroups = function (x, y = 1, z = 1) { const r = passOf.get(this); if (r) note(r.enc, r.label, x * y * z); return dw.call(this, x, y, z); };
+  const dr = globalThis.GPURenderPassEncoder?.prototype?.draw;
+  if (dr) GPURenderPassEncoder.prototype.draw = function (...a) { const r = passOf.get(this); if (r) note(r.enc, `draw ${r.label}`, 1); return dr.apply(this, a); };
+  const fin = GPUCommandEncoder.prototype.finish;
+  GPUCommandEncoder.prototype.finish = function (...a) { const cb = fin.apply(this, a); bufOf.set(cb, workOf.get(this)); return cb; };
+  const sub = GPUQueue.prototype.submit;
+  GPUQueue.prototype.submit = function (cbs) {
+    const r = sub.call(this, cbs);
+    if (subs.length < 6000) {
+      const work = new Map();
+      for (const cb of cbs ?? []) for (const [k, n] of bufOf.get(cb) ?? []) work.set(k, (work.get(k) ?? 0) + n);
+      const row = [performance.now(), null, [...work]];
+      subs.push(row);
+      this.onSubmittedWorkDone().then(() => { row[1] = performance.now(); }, () => {});
+    }
+    return r;
+  };
+  /*
+    And how much memory the page asked for, and wrote, when. The stop
+    after the first step kept on a warm cache (median 1.15 s over the
+    forty looks' openings, run 36300733762), so it is not a compile:
+    what the first frames make and fill is the next thing to see.
+  */
+  const bytes = [];
+  window.__startupBytes = bytes;
+  const bpp = { rgba32float: 16, rgba32uint: 16, rgba16float: 8, rg32float: 8, r32float: 4, rg16float: 4, r16float: 2, r8unorm: 1 };
+  const texBytes = (d) => {
+    const [w, h = 1, z = 1] = Array.isArray(d.size) ? d.size : [d.size.width, d.size.height ?? 1, d.size.depthOrArrayLayers ?? 1];
+    return w * h * z * (bpp[d.format] ?? 4);
+  };
+  const log = (proto, key, kind, size) => {
+    const f = proto?.[key];
+    if (!f) return;
+    proto[key] = function (...a) { try { bytes.push([performance.now(), kind, size(...a)]); } catch { /* measure only */ } return f.apply(this, a); };
+  };
+  log(GPUDevice.prototype, 'createTexture', 'texture', (d) => texBytes(d));
+  log(GPUDevice.prototype, 'createBuffer', 'buffer', (d) => d.size);
+  log(GPUQueue.prototype, 'writeTexture', 'written', (_, data) => data.byteLength ?? 0);
+  log(GPUQueue.prototype, 'writeBuffer', 'written', (_, __, data, ___, size) => size ?? data.byteLength ?? 0);
+  for (const name of ['GPUDevice', 'GPUQueue', 'GPUCommandEncoder', 'GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPUBuffer', 'GPUCanvasContext', 'GPUTexture']) {
+    const proto = globalThis[name]?.prototype;
+    if (!proto) continue;
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      const d = Object.getOwnPropertyDescriptor(proto, key);
+      if (key === 'constructor' || typeof d?.value !== 'function') continue;
+      const f = d.value, what = `${name.slice(3)}.${key}`;
+      proto[key] = function (...a) {
+        const row = firsts.get(what);
+        if (row) row[1]++; else firsts.set(what, [performance.now(), 1]);
+        return f.apply(this, a);
+      };
+    }
+  }
+  /*
+    When the page asked for the GPU and when it had it. The first stop
+    seen with the pipelines built ahead (2.08 s from 1.01 s, run
+    36255595521) came before any step and before the prepare, with no
+    long task on the page's thread: these say whether it sits inside
+    the device request, which no ordering of pipelines can move.
+  */
+  const gpuAt = [];
+  window.__startupGpu = gpuAt;
+  const timed = (what, owner, name) => {
+    const f = owner?.[name];
+    if (!f) return;
+    owner[name] = function (...a) {
+      const row = [what, performance.now(), null];
+      gpuAt.push(row);
+      return f.apply(this, a).finally(() => { row[2] = performance.now(); });
+    };
+  };
+  timed('adapter', navigator.gpu, 'requestAdapter');
+  timed('device', globalThis.GPUAdapter?.prototype, 'requestDevice');
+  /*
+    When each promise the page's code awaits on its way to the first
+    step settled: the moment its continuation begins. The page's own
+    JavaScript after an `await` is no long task (above), so a stall of
+    the show's there leaves no frame, no tick and no long task, as
+    Chromium's hold does; but it begins where one of these settled,
+    and Chromium's hold does not (it began 0.98 to 1.42 s after load
+    on every opening read, with the adapter or device still pending,
+    and ended at their handover). So a silent stretch that begins
+    where a promise settled is the page's own (4b). The adapter's and
+    the device's are gpuAt's; these are the rest the show awaits: its
+    pipelines, its GPU's work done, mapped buffers, errors, and what
+    it fetches. A continuation of anything not here (an import(), a
+    decoded image) would still look held; COLD_CAP_S is the backstop.
+  */
+  const settled = [];
+  window.__startupSettled = settled;
+  const settles = (owner, name, what = name) => {
+    const f = owner?.[name];
+    if (!f) return;
+    owner[name] = function (...a) {
+      const p = f.apply(this, a);
+      if (!p || typeof p.then !== 'function') return p;
+      const at = () => { if (settled.length < 50000) settled.push([performance.now(), what]); };
+      return p.then((v) => { at(); return v; }, (e) => { at(); throw e; });
+    };
+  };
+  settles(globalThis.GPUDevice?.prototype, 'createComputePipelineAsync');
+  settles(globalThis.GPUDevice?.prototype, 'createRenderPipelineAsync');
+  settles(globalThis.GPUDevice?.prototype, 'popErrorScope');
+  settles(globalThis.GPUQueue?.prototype, 'onSubmittedWorkDone');
+  settles(globalThis.GPUBuffer?.prototype, 'mapAsync');
+  settles(globalThis.GPUShaderModule?.prototype, 'getCompilationInfo');
+  settles(globalThis, 'fetch');
+  for (const k of ['json', 'text', 'arrayBuffer', 'blob']) settles(globalThis.Response?.prototype, k, `Response.${k}`);
+  settles(globalThis, 'createImageBitmap');
+  settles(globalThis.BaseAudioContext?.prototype, 'decodeAudioData');
+  const rows = [];
+  window.__startupRows = rows;
+  const sample = () => {
+    const d = window.chromaglassDebug?.();
+    const f = d?.fluids?.[0];
+    const made = window.__startupBytes ?? [];
+    rows.push([performance.now() - t0, frames.length, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0,
+      made.filter(([, k]) => k === 'texture').length, made.filter(([, k]) => k === 'written').length, window.__startupFirsts?.get('Queue.submit')?.[1] ?? 0]);
+    if (rows.length < 2000) setTimeout(sample, 250);
+  };
+  setTimeout(sample, 250);
+  /*
+    What the page ran, for telling held stretches from its own
+    (`pagehold.mjs`): frames by when their callback ran, the timer's ticks,
+    long tasks, each promise it awaits settling, named (the adapter's and
+    the device's too), and the long animation frames with their scripts.
+    One function for the opening and the instruments' control, so the two
+    read the same things.
+  */
+  window.__startupRaw = (now, stepRaw) => ({
+    frames: window.__startupFrames.filter((t) => t <= now),
+    frameRan: window.__startupFrameRan.filter((t) => t <= now),
+    ticks: window.__startupTicks.filter((t) => t <= now),
+    long: window.__startupLong.filter(([st]) => st <= now),
+    marks: [...window.__startupSettled, ...window.__startupGpu.filter((r) => r[2] != null).map((r) => [r[2], r[0]])].filter(([t]) => t <= now),
+    loaf: window.__startupLoaf.filter(([st]) => st <= Math.min(now, stepRaw)),
+  });
+};
+
+/**
  * One opening, in a browser of its own (a fresh profile, so Chromium's own
  * GPU cache is empty too). From the moment the page starts: the time of every
  * animation frame, the main thread's long tasks, every pipeline WebGPU was
@@ -314,227 +589,7 @@ async function open(query, looks) {
   const browser = await launchChromium(chromium);
   try {
     const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-    await page.addInitScript(() => {
-      const t0 = performance.now();
-      window.__startupT0 = t0;
-      const frames = [];
-      window.__startupFrames = frames;
-      const tick = (t) => { if (frames.length < 20000) frames.push(t); requestAnimationFrame(tick); };
-      requestAnimationFrame(tick);
-      const long = [];
-      window.__startupLong = long;
-      // Whether long tasks can be seen at all: without them a stretch of the
-      // page's own work would look like a thread held from outside (4b).
-      window.__startupLongOk = false;
-      try {
-        new PerformanceObserver((l) => { for (const e of l.getEntries()) long.push([e.startTime, e.duration]); })
-          .observe({ type: 'longtask', buffered: true });
-        window.__startupLongOk = PerformanceObserver.supportedEntryTypes?.includes('longtask') ?? false;
-      } catch { /* no long tasks here; the frames still say it */ }
-      /*
-        And long animation frames, printed and not judged. The page's own
-        JavaScript run as a promise's continuation, after an `await` on
-        requestAdapter, requestDevice, createComputePipelineAsync,
-        onSubmittedWorkDone or fetch, is not reported as a long task: a
-        second of it in a cloud session left no long task and no tick, so it
-        looked exactly like a thread held from outside. That second is a
-        long animation frame (1.00 s), and a renderer stopped from outside
-        for two seconds (SIGSTOP) left none, so these were tried as the tell.
-        On the Mac they are not one: Chromium's own hold at the GPU's start
-        was a long animation frame too (2.94 s from 1.01 s, over a frame gap
-        of 2.80 s from 1.17 s, run 36353565837). What does tell is where the
-        page's code after an await begins (__startupSettled below). These
-        stay printed, with where the frame's rendering began, so whether the
-        two differ inside the frame can be read later.
-      */
-      const loaf = [];
-      window.__startupLoaf = loaf;
-      try {
-        new PerformanceObserver((l) => {
-          for (const e of l.getEntries()) loaf.push([e.startTime, e.duration, e.renderStart ?? null, e.blockingDuration ?? null, (e.scripts ?? []).length]);
-        }).observe({ type: 'long-animation-frame', buffered: true });
-      } catch { /* none here; they are only printed */ }
-      /*
-        The page's own thread, every tenth of a second: a timer that does
-        nothing but note when it ran. It runs whenever the thread is free,
-        so a stretch with no tick and no long task, not begun where a
-        promise settled (below), is one in which the page
-        ran nothing at all (4b; frameGaps below).
-      */
-      const ticks = [];
-      window.__startupTicks = ticks;
-      const beat = () => { ticks.push(performance.now()); if (ticks.length < 20000) setTimeout(beat, 100); };
-      setTimeout(beat, 100);
-      // Every synchronous build, whoever asked: the ledger's own count is
-      // only as good as every caller going through the cache.
-      const direct = [];
-      window.__startupDirect = direct;
-      for (const name of ['createComputePipeline', 'createRenderPipeline']) {
-        const f = GPUDevice.prototype[name];
-        GPUDevice.prototype[name] = function (d) { direct.push([performance.now(), d?.label ?? '']); return f.call(this, d); };
-      }
-      /*
-        The first time the page asked WebGPU for each thing it can do, and
-        how often. A stop that no build of ours was under way for (run
-        36298506575: 2.07 s from 17.17 s, a tenth of a second after the
-        first step) is something else the first frames asked the GPU
-        process for the first time; this is how the next one is named.
-      */
-      const firsts = new Map();
-      window.__startupFirsts = firsts;
-      /*
-        And when the GPU finished each piece of work the page handed it, with
-        what was in it. Through the stop after the first step the page's own
-        timers kept firing (the timeline's rows every quarter second) while
-        frames, heartbeats and steps all waited: the page's thread is free,
-        so the wait is on the GPU. Writing every texel of the show's 75.8 MB
-        of fields on a bare page stopped nothing (0.08 s, run 36304683847),
-        nor did clearing them, nor a first dispatch of every kernel on
-        scraps. So this records each submit's time handed over, its time
-        done (onSubmittedWorkDone after it), and the pipelines it ran with
-        their workgroup counts. It named the stop on its first run (run
-        36305436208): 1.42 s of GPU time on the plate's first draw, 0.03 s
-        on the same draw a few frames later. The render pipelines built
-        ahead now draw once before the show opens (`gpu/kit.ts`, firstDraw),
-        and the same submit took 0.14 s (run 36306162647).
-      */
-      const subs = [];
-      window.__startupSubs = subs;
-      const passOf = new WeakMap(), workOf = new WeakMap(), bufOf = new WeakMap();
-      const note = (enc, label, n) => {
-        let w = workOf.get(enc);
-        if (!w) { w = new Map(); workOf.set(enc, w); }
-        w.set(label, (w.get(label) ?? 0) + n);
-      };
-      for (const [begin, Pass] of [['beginComputePass', globalThis.GPUComputePassEncoder], ['beginRenderPass', globalThis.GPURenderPassEncoder]]) {
-        const b = GPUCommandEncoder.prototype[begin];
-        GPUCommandEncoder.prototype[begin] = function (...a) { const pass = b.apply(this, a); passOf.set(pass, { enc: this, label: '' }); return pass; };
-        const sp = Pass?.prototype?.setPipeline;
-        if (sp) Pass.prototype.setPipeline = function (pl) { const r = passOf.get(this); if (r) r.label = pl?.label || '?'; return sp.call(this, pl); };
-      }
-      const dw = globalThis.GPUComputePassEncoder?.prototype?.dispatchWorkgroups;
-      if (dw) GPUComputePassEncoder.prototype.dispatchWorkgroups = function (x, y = 1, z = 1) { const r = passOf.get(this); if (r) note(r.enc, r.label, x * y * z); return dw.call(this, x, y, z); };
-      const dr = globalThis.GPURenderPassEncoder?.prototype?.draw;
-      if (dr) GPURenderPassEncoder.prototype.draw = function (...a) { const r = passOf.get(this); if (r) note(r.enc, `draw ${r.label}`, 1); return dr.apply(this, a); };
-      const fin = GPUCommandEncoder.prototype.finish;
-      GPUCommandEncoder.prototype.finish = function (...a) { const cb = fin.apply(this, a); bufOf.set(cb, workOf.get(this)); return cb; };
-      const sub = GPUQueue.prototype.submit;
-      GPUQueue.prototype.submit = function (cbs) {
-        const r = sub.call(this, cbs);
-        if (subs.length < 6000) {
-          const work = new Map();
-          for (const cb of cbs ?? []) for (const [k, n] of bufOf.get(cb) ?? []) work.set(k, (work.get(k) ?? 0) + n);
-          const row = [performance.now(), null, [...work]];
-          subs.push(row);
-          this.onSubmittedWorkDone().then(() => { row[1] = performance.now(); }, () => {});
-        }
-        return r;
-      };
-      /*
-        And how much memory the page asked for, and wrote, when. The stop
-        after the first step kept on a warm cache (median 1.15 s over the
-        forty looks' openings, run 36300733762), so it is not a compile:
-        what the first frames make and fill is the next thing to see.
-      */
-      const bytes = [];
-      window.__startupBytes = bytes;
-      const bpp = { rgba32float: 16, rgba32uint: 16, rgba16float: 8, rg32float: 8, r32float: 4, rg16float: 4, r16float: 2, r8unorm: 1 };
-      const texBytes = (d) => {
-        const [w, h = 1, z = 1] = Array.isArray(d.size) ? d.size : [d.size.width, d.size.height ?? 1, d.size.depthOrArrayLayers ?? 1];
-        return w * h * z * (bpp[d.format] ?? 4);
-      };
-      const log = (proto, key, kind, size) => {
-        const f = proto?.[key];
-        if (!f) return;
-        proto[key] = function (...a) { try { bytes.push([performance.now(), kind, size(...a)]); } catch { /* measure only */ } return f.apply(this, a); };
-      };
-      log(GPUDevice.prototype, 'createTexture', 'texture', (d) => texBytes(d));
-      log(GPUDevice.prototype, 'createBuffer', 'buffer', (d) => d.size);
-      log(GPUQueue.prototype, 'writeTexture', 'written', (_, data) => data.byteLength ?? 0);
-      log(GPUQueue.prototype, 'writeBuffer', 'written', (_, __, data, ___, size) => size ?? data.byteLength ?? 0);
-      for (const name of ['GPUDevice', 'GPUQueue', 'GPUCommandEncoder', 'GPUComputePassEncoder', 'GPURenderPassEncoder', 'GPUBuffer', 'GPUCanvasContext', 'GPUTexture']) {
-        const proto = globalThis[name]?.prototype;
-        if (!proto) continue;
-        for (const key of Object.getOwnPropertyNames(proto)) {
-          const d = Object.getOwnPropertyDescriptor(proto, key);
-          if (key === 'constructor' || typeof d?.value !== 'function') continue;
-          const f = d.value, what = `${name.slice(3)}.${key}`;
-          proto[key] = function (...a) {
-            const row = firsts.get(what);
-            if (row) row[1]++; else firsts.set(what, [performance.now(), 1]);
-            return f.apply(this, a);
-          };
-        }
-      }
-      /*
-        When the page asked for the GPU and when it had it. The first stop
-        seen with the pipelines built ahead (2.08 s from 1.01 s, run
-        36255595521) came before any step and before the prepare, with no
-        long task on the page's thread: these say whether it sits inside
-        the device request, which no ordering of pipelines can move.
-      */
-      const gpuAt = [];
-      window.__startupGpu = gpuAt;
-      const timed = (what, owner, name) => {
-        const f = owner?.[name];
-        if (!f) return;
-        owner[name] = function (...a) {
-          const row = [what, performance.now(), null];
-          gpuAt.push(row);
-          return f.apply(this, a).finally(() => { row[2] = performance.now(); });
-        };
-      };
-      timed('adapter', navigator.gpu, 'requestAdapter');
-      timed('device', globalThis.GPUAdapter?.prototype, 'requestDevice');
-      /*
-        When each promise the page's code awaits on its way to the first
-        step settled: the moment its continuation begins. The page's own
-        JavaScript after an `await` is no long task (above), so a stall of
-        the show's there leaves no frame, no tick and no long task, as
-        Chromium's hold does; but it begins where one of these settled,
-        and Chromium's hold does not (it began 0.98 to 1.42 s after load
-        on every opening read, with the adapter or device still pending,
-        and ended at their handover). So a silent stretch that begins
-        where a promise settled is the page's own (4b). The adapter's and
-        the device's are gpuAt's; these are the rest the show awaits: its
-        pipelines, its GPU's work done, mapped buffers, errors, and what
-        it fetches. A continuation of anything not here (an import(), a
-        decoded image) would still look held; COLD_CAP_S is the backstop.
-      */
-      const settled = [];
-      window.__startupSettled = settled;
-      const settles = (owner, name) => {
-        const f = owner?.[name];
-        if (!f) return;
-        owner[name] = function (...a) {
-          const p = f.apply(this, a);
-          if (!p || typeof p.then !== 'function') return p;
-          const at = () => { if (settled.length < 50000) settled.push(performance.now()); };
-          return p.then((v) => { at(); return v; }, (e) => { at(); throw e; });
-        };
-      };
-      settles(globalThis.GPUDevice?.prototype, 'createComputePipelineAsync');
-      settles(globalThis.GPUDevice?.prototype, 'createRenderPipelineAsync');
-      settles(globalThis.GPUDevice?.prototype, 'popErrorScope');
-      settles(globalThis.GPUQueue?.prototype, 'onSubmittedWorkDone');
-      settles(globalThis.GPUBuffer?.prototype, 'mapAsync');
-      settles(globalThis.GPUShaderModule?.prototype, 'getCompilationInfo');
-      settles(globalThis, 'fetch');
-      for (const k of ['json', 'text', 'arrayBuffer', 'blob']) settles(globalThis.Response?.prototype, k);
-      settles(globalThis, 'createImageBitmap');
-      settles(globalThis.BaseAudioContext?.prototype, 'decodeAudioData');
-      const rows = [];
-      window.__startupRows = rows;
-      const sample = () => {
-        const d = window.chromaglassDebug?.();
-        const f = d?.fluids?.[0];
-        const made = window.__startupBytes ?? [];
-        rows.push([performance.now() - t0, frames.length, d?.crash?.beats?.() ?? -1, f?.stepIndex ?? -1, f?.gpu?.N ?? 0,
-          made.filter(([, k]) => k === 'texture').length, made.filter(([, k]) => k === 'written').length, window.__startupFirsts?.get('Queue.submit')?.[1] ?? 0]);
-        if (rows.length < 2000) setTimeout(sample, 250);
-      };
-      setTimeout(sample, 250);
-    });
+    await page.addInitScript(instruments);
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${query}${engineQuery()}`, { waitUntil: 'load' });
 
     // Running: the plate stepped in each of the last nine quarter seconds
@@ -596,7 +651,7 @@ async function open(query, looks) {
       their count went up, so they are good to a quarter second, which is
       plenty against a bound of two.
     */
-    const opening = await page.evaluate(([watch, maxGap, heldMin, tickOk, heldBy, settledMs]) => {
+    const opening = await page.evaluate(([watch, maxGap, heldBy]) => {
       const now = Math.min(performance.now(), watch);
       const longest = (times) => {
         let gap = 0, at = null;
@@ -660,8 +715,9 @@ async function open(query, looks) {
         page's thread was held: no frame callback, no tick of the page's
         own tenth-of-a-second timer and no long task, for HELD_MIN_S or
         more, beginning in the first HELD_BY_S after load and not where a
-        promise the page awaits had just settled (within SETTLED_MS), and
-        ending before the first step. If the show's builds held the
+        promise the page awaits had just settled with nothing of the page's
+        after it (`pagehold.mjs` has that rule and the cases it was tried
+        on), and ending before the first step. If the show's builds held the
         frames past Chromium's start, the page's timer comes back while the
         frames still wait, and that part is counted in full for check 4.
         The held time is 4b's, held to COLD_CAP_S all told. None of it is
@@ -690,38 +746,20 @@ async function open(query, looks) {
       const spacing = early.slice(1).map((t, i) => t - early[i]).sort((x, y) => x - y);
       const tickMedian = spacing.length ? spacing[spacing.length >> 1] : null;
       const heldSeen = { longOk: !!window.__startupLongOk, tickMedian };
-      const held = [];
-      // Stretches not taken out because they began where a promise settled.
-      const settledStarts = [];
-      if (heldSeen.longOk && tickMedian != null && tickMedian <= tickOk) {
-        // The page's thread running: each frame's callback, each tick, each
-        // long task whole, and each moment a promise it awaits settled
-        // (marked). So a held stretch lies inside a frame gap.
-        const marks = [...window.__startupSettled, ...window.__startupGpu.map((r) => r[2]).filter((t) => t != null)];
-        const ran = [...window.__startupFrames.map((t) => [t, t, false]), ...ticks.map((t) => [t, t, false]),
-          ...window.__startupLong.map(([st, dur]) => [st, st + dur, false]), ...marks.map((t) => [t, t, true])]
-          .filter(([st]) => st <= now).sort((x, y) => x[0] - y[0]);
-        let end = null, lastMark = null;
-        for (const [st, en, mark] of ran) {
-          if (end != null && st - end >= heldMin * 1000 && st <= stepRaw && end - t0 <= heldBy * 1000) {
-            if (lastMark != null && end - lastMark <= settledMs) settledStarts.push([end / 1000, (st - end) / 1000]);
-            else held.push([end, st]);
-          }
-          if (mark) lastMark = st;
-          end = end == null ? en : Math.max(end, en);
-        }
-      }
-      const heldIn = (a, b) => held.reduce((n, [st, en]) => n + Math.max(0, Math.min(b, en) - Math.max(a, st)), 0);
-      const seen = window.__startupFrames.filter((t) => t <= now);
-      const ts = [...seen, now];
-      const gaps = [];
-      for (let i = 1; i < ts.length; i++) gaps.push([ts[i - 1] / 1000, (ts[i] - ts[i - 1]) / 1000, (ts[i] - ts[i - 1] - heldIn(ts[i - 1], ts[i])) / 1000]);
-      gaps.sort((x, y) => y[2] - x[2]);
+      /*
+        What the page ran, handed back whole: which silent stretches were its
+        thread held from outside and which its own is told in Node, by
+        `pagehold.mjs`, whose own cases the check runs first (the long
+        comment there says why the fifty milliseconds this used to allow
+        after a promise settled were not the tell). Only when the
+        instruments can see the page's work at all (heldSeen).
+      */
+      const raw = window.__startupRaw(now, stepRaw);
       return {
-        // [began, whole, less the held time], the largest of what is left first.
-        frameGaps: gaps.slice(0, 12),
-        framesSeen: seen.length,
-        held: held.map(([a, b]) => [a / 1000, (b - a) / 1000]),
+        raw,
+        stepRaw,
+        now,
+        framesSeen: window.__startupFrames.filter((t) => t <= now).length,
         heldSeen,
         beats: longest(changes(2)),
         steps: longest(changes(3)),
@@ -753,7 +791,6 @@ async function open(query, looks) {
         // run says whether one lay across Chromium's hold (4b).
         loaf: window.__startupLoaf.filter(([st]) => st <= Math.min(now, (heldBy + 3) * 1000))
           .map(([st, d, rs, bl, n]) => [st / 1000, d / 1000, rs == null ? null : rs / 1000, bl == null ? null : bl / 1000, n]),
-        settledStarts,
         t0: window.__startupT0,
         rows: rows.map((r) => [+(r[0] / 1000).toFixed(2), ...r.slice(1)]),
         prepared: d?.pipelines?.()?.prepares?.find((p) => p.stage === 'opening') ?? null,
@@ -773,7 +810,9 @@ async function open(query, looks) {
         subs: window.__startupSubs.filter(([t]) => t <= now).map(([t, d, w]) => [t / 1000, d == null ? null : d / 1000, w]),
         box: (d?.crash?.thisLoad?.() ?? []).map((e) => `${e.up.toFixed(1)}s ${e.level} ${e.source}: ${String(e.msg).slice(0, 140)}`),
       };
-    }, [watch, MAX_GAP_S, HELD_MIN_S, TICK_OK_MS, HELD_BY_S, SETTLED_MS]);
+    }, [watch, MAX_GAP_S, HELD_BY_S]);
+    Object.assign(opening, openingGaps(opening));
+    delete opening.raw;
 
     /*
       Then every look, through the app's own `applyPreset`, each until the
@@ -1039,6 +1078,72 @@ const timeline = (o, held = null) => {
   for (const line of o.box) console.log(`       ${line}`);
 };
 
+/**
+ * The instruments' own control, in a browser like the openings' with the
+ * same init script: a page that runs 0.7 s of its own code after awaiting a
+ * fetch's body (a promise the check wraps) and 0.7 s after awaiting a Blob's
+ * (one it does not), read through openingGaps as an opening is. Each must
+ * read as the page's own, and a long animation frame must name each as a
+ * script: the rule leans on Chromium naming that code, which was tried on
+ * the cloud's Chromium (141), not on the one CI installs, so a Chromium that
+ * stops naming it is red here rather than a stall of the page's passing as
+ * held. The thread is never held from outside on this page, so a held
+ * stretch in it is the rule telling the page's own code wrong.
+ */
+async function instrumentsControl() {
+  const browser = await launchChromium(chromium);
+  try {
+    const page = await browser.newPage();
+    await page.route('**/__pagehold', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><body>pagehold</body>' }));
+    await page.addInitScript(instruments);
+    await page.goto(`http://localhost:${PORT}/__pagehold`, { waitUntil: 'load' });
+    await page.waitForTimeout(800);
+    // A script of the page's own, so Chromium gives it to the page as it
+    // does the app's (an evaluate's code is not).
+    const run = (code) => page.evaluate((c) => { const el = document.createElement('script'); el.textContent = c; document.body.append(el); }, code);
+    const busy = 'const t = performance.now(); (window.__busy ??= []).push(t); while (performance.now() - t < 700);';
+    await run(`(async () => { await (await fetch('data:,x')).text(); ${busy} })()`);
+    await page.waitForTimeout(1500);
+    await run(`(async () => { await new Blob(['x']).arrayBuffer(); ${busy} })()`);
+    await page.waitForTimeout(1500);
+    const x = await page.evaluate(() => {
+      const now = performance.now();
+      const ticks = window.__startupTicks;
+      const spacing = ticks.slice(1).map((t, i) => t - ticks[i]).sort((p, q) => p - q);
+      return {
+        raw: window.__startupRaw(now, now), stepRaw: now, now, t0: window.__startupT0,
+        heldSeen: { longOk: !!window.__startupLongOk, tickMedian: spacing.length ? spacing[spacing.length >> 1] : null },
+        busy: window.__busy ?? [], loaf: window.__startupLoaf,
+      };
+    });
+    const read = openingGaps(x, Infinity);
+    const each = ['after a fetch', 'after a Blob'].map((what, i) => {
+      const t = x.busy[i];
+      if (t == null) return { what, ok: false, say: `${what}: never ran` };
+      /*
+        The page's own either way it can be seen: a silent stretch kept as
+        its code after an await, or a long task. Chromium on CI's Mac
+        reported this page's code after each await as a long task, so its
+        first run read neither (run 37170402977, "the page's own 0.00 s,
+        held 0.00 s, named as a script 0.70 s"); the cloud's reported none.
+      */
+      const over = (a, b) => Math.max(0, Math.min(t + 700, b) - Math.max(t, a));
+      const longMs = x.raw.long.reduce((n, [a, d]) => n + over(a, a + d), 0);
+      const ownMs = read.settledStarts.filter(([a]) => Math.abs(a * 1000 - t) < 100).reduce((n, [, len]) => n + len * 1000, 0) + longMs;
+      const heldMs = read.held.reduce((n, [a, len]) => n + Math.max(0, Math.min(t + 700, (a + len) * 1000) - Math.max(t, a * 1000)), 0);
+      const named = Math.max(0, ...x.loaf.flatMap((f) => f[5] ?? []).filter(([a]) => Math.abs(a - t) < 50).map(([, d]) => d));
+      return { what, ok: ownMs >= 650 && heldMs < 50 && named >= 650,
+        say: `${what}: the page's own ${(ownMs / 1000).toFixed(2)} s (${(longMs / 1000).toFixed(2)} s of it a long task), held ${(heldMs / 1000).toFixed(2)} s, named as a script ${(named / 1000).toFixed(2)} s` };
+    });
+    const seen = `long tasks ${x.heldSeen.longOk ? 'seen' : 'not seen'}, the timer every ${x.heldSeen.tickMedian == null ? 'never' : `${x.heldSeen.tickMedian.toFixed(0)} ms`}`;
+    return { ok: each.every((e) => e.ok), say: `${each.map((e) => e.say).join('; ')} (${seen})` };
+  } catch (e) {
+    return { ok: false, say: `the control did not run: ${String(e?.message ?? e).split('\n')[0]}` };
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
 try {
   // ── The control: the old way, on a cold cache ─────────────────────
   const c = await open('&prepare=0', []);
@@ -1123,8 +1228,19 @@ try {
     whether a fetch settling just before Chromium's hold can hide it is now
     read on every run.
   */
-  const setAside = (x) => (x.settledStarts?.length ? x.settledStarts.map(([a, n]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s`).join(', ') : 'none');
+  const setAside = (x) => (x.settledStarts?.length ? x.settledStarts.map(([a, n, what]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s (after ${what})`).join(', ') : 'none');
   const fmtLoaf = ([a, d, rs, bl, n]) => `${d.toFixed(2)} s from ${a.toFixed(2)} s (rendering from ${rs == null ? '?' : `${rs.toFixed(2)} s`}, blocking ${bl == null ? '?' : `${bl.toFixed(2)} s`}, ${n} script${n === 1 ? '' : 's'})`;
+  /*
+    The rule that says which silent stretches were the page's own code, on
+    the cases it was made from, before its reading of this run is believed:
+    a change to it that calls a second of the page's code after an await
+    held, or Chromium's hold the page's, is red here whatever the run did.
+  */
+  const rule = selfCheck();
+  const ctl = await instrumentsControl();
+  check(`and what tells Chromium's hold from the page's own code after an await tells each of its ${rule.cases} cases as seen, and 0.7 s of a page's own code after an await as its own in this Chromium`,
+    rule.cases >= 13 && rule.wrong.length === 0 && ctl.ok,
+    `${rule.wrong.length ? `told wrong: ${rule.wrong.join('; ')}` : `${rule.cases} of ${rule.cases} (scripts/pagehold.mjs)`}; ${ctl.say}`);
   const heldOk = seenOk && held.total <= COLD_CAP_S;
   check(`and the page's thread was held from outside it, in the first ${HELD_BY_S} s and before the first step, no more than ${COLD_CAP_S} s all told (Chromium starting its GPU)`,
     heldOk,

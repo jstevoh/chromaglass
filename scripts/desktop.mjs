@@ -389,7 +389,7 @@ try {
   }
   // Where the page asked for the window: the stand-in's left edge, not the
   // laptop's. Which real display main.js then puts it on needs a real
-  // projector (docs/judging.md §23).
+  // projector (docs/judging.md §26).
   const asked = await electronApp.evaluate(() => globalThis.__chromaglassOpened?.at(-1) ?? null);
   const askedLeft = Number(/(?:^|,)left=(-?\d+)/.exec(asked ?? '')?.[1]);
   const aimed = standIn === null || askedLeft === standIn;

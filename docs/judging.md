@@ -576,7 +576,7 @@ Magnet pressed under a pool:
 
 ---
 
-## 22. The Press on the ferrofluid (PLAN 15d)
+## 23. The Press on the ferrofluid (PLAN 15d)
 
 A press on a pool of ferrofluid used to turn it a brownish grey under the palm and
 leave it the size it was. Now, with Thin Gap on (Settings → Squish Plate → Thin Gap),
@@ -604,7 +604,7 @@ On Ferro Paint, then Magnet Garden, with Thin Gap on:
   where it ran fewer before, plus one small pass. Say if the governor steps down;
 - the same on the phone: Thin Gap on the settings sheet, a finger on the Press.
 
-## 23. Beams, and tiles with no seam
+## 24. Beams, and tiles with no seam
 
 PLAN.md §16c. In Settings, Mapping, two rectangles overlapping by a fifth,
 both with Light on **Add**:
@@ -620,7 +620,24 @@ both with Light on **Add**:
 
 ---
 
-## 23. The Mac app, on the Mac and on a projector
+## 25. The Magnet: nothing on pick, a pool under the hand, and its Size (PLAN 9x)
+
+On Classic (a look with no ferrofluid), desk and phone:
+
+- pick the Magnet (M, or its button): the plate should not change at all;
+- touch and hold: a small black pool should appear under the hand and stand up
+  into spikes; drag it, and it should come with you. Say whether it is the right
+  amount of ferrofluid to start with;
+- right-click the Magnet on the desk (or tap it twice on the phone) and move
+  Size: a small magnet raises a few spikes under the fingertip, a big one a wide
+  hedgehog and pulls more gently from further off. Say whether the range is right
+  at both ends;
+- the pool still reads as a black disc with domes round its rim, not domes with
+  colour between them. That is the standing-domes work (PLAN 9t), not this.
+
+---
+
+## 26. The Mac app, on the Mac and on a projector
 
 The app (`desktop/`, PLAN.md §13 step 1) is the website's build and the show
 server in one Electron app. CI opens the packed app on its Mac runner and
@@ -650,6 +667,70 @@ or `npm run mac-app`; `desktop/README.md` has the first-launch steps.
   every display, so the laptop's screen may go black too. Say which it is on
   your Mac; if it does, the app should use a borderless window over the
   projector's screen instead.
+
+## 27. Roy, 1963: the plate printed as a comic (PLAN 21)
+
+Pick Roy, 1963 (a Light show look). The picture should read as a Lichtenstein
+panel: flat red, yellow and blue on white, a black line round every solid shape
+and where two colours meet, and the pale washes round the shapes as even dots.
+
+- are the dots the right size on the wall (32 rows down the picture), and the line
+  heavy enough? Say if either wants to be bigger or smaller;
+- does it hold up moving: do the dots sit still while the colour slides under them,
+  and does the line stay a line, not a flicker, as the shapes move and merge;
+- Ben-Day Dots (Settings → Look) from 0 to 100 % on Roy, and on Classic: is there a
+  point between where it looks better than either end;
+- zoom in to 2.8x: the dots stay the size they were (PLAN 21c). Say if you want
+  them to grow with the zoom, as the accidental ones did.
+
+## 28. Spinning the dish (PLAN 22)
+
+Nothing on the laptop has seen the dish spun with the liquid lagging behind it: the
+lab measured the swirl (`npm run dish`), not the picture. On the Mac:
+
+- the Spin tool (N): drag round the middle. The glass should go round with the
+  pointer, coast when you let go and stop when you hold still. On Classic (thick)
+  the picture should follow almost at once; on a thin look (Viscosity thin) the
+  liquid should visibly trail the glass for a couple of seconds, then catch up;
+- press (P) and hold with a spinning dish: the liquid under the palm should go round
+  with the glass while the rest lags, a whirl round the palm;
+- on Oil & Water, spun: the oil bodies should go round with the glass and the water
+  between them lag, and after a while of spinning hard (Spin Rate 30 or more), the
+  heavy dye should creep outward and the oil in;
+- Auto Spin at Rate 6: a slow, even turn; Reverse Spin turns it back through a stop,
+  not a jump;
+- Auto Spin at Tempo, 16 beats a turn, with music: the dish should turn once every
+  four bars and stay with the music; a flick with the Spin tool knocks it off and
+  it should come back to the beat within a bar or two, not settle somewhere new;
+- the phone: the Spin tool with one finger round the middle, and Auto Spin on the
+  Play sheet; the remote: the Spin pad, and the Auto Spin and Spin Rate sliders.
+
+Say if the lag is too long or too short to read as a liquid, and whether the swirl a
+press makes is visible or wants more.
+
+```
+?set=spinAuto=1;spinRpm=12     a dish turning at 12 rev/min, anticlockwise
+?set=spinAuto=2;spinBeats=8    a turn every 8 beats of the music
+```
+
+---
+
+---
+
+## 26. Blow's wind (PLAN 15c)
+
+The Blow drawn across the plate used to wipe a trail out of the colour. Now it
+pushes the colour along and keeps it. On Classic, with a pool laid:
+
+- draw the Blow slowly through the pool: a tongue of colour should be pushed ahead
+  of the hand and pile up where it stopped, with no dark trail behind it;
+- stop and hold: the straw's bubble should start within a tenth of a second, and a
+  drag should no longer leave a string of small straw bubbles behind it;
+- on the phone, hold one finger (the straw) and drag a second across the colour: the
+  second pushes it; hold the second still and it should blow a small clear ring;
+- on Oil & Water, blow across a body: the oil and its colour should go together.
+
+Say if the wind now reads as too strong or too weak next to the Finger.
 
 ---
 

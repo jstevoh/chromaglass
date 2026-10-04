@@ -50,6 +50,9 @@ import { stream } from './rng';
 const LIGHT_STACK = new Set([
   'saturationBoost', 'bloom', 'lumia', 'gelWheel', 'secondLamp', 'dimmer',
   'exposure', 'transmission', 'iridescence', 'thicknessOptics', 'spectralOptics',
+  // The comic print (the Roy look): half a print is neither, so it moves
+  // only by hand.
+  'benDay',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',
@@ -79,6 +82,8 @@ const NOT_THE_LOOK = new Set([
     owner asked to be rid of. How far it walks when nobody has it still drifts.
   */
   'magnetX', 'magnetY',
+  // And how big that hand's magnet is (Magnet Size): the performer's choice.
+  'magnetSize',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

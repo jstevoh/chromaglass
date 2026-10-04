@@ -7,8 +7,8 @@ description: Merge a green ChromaGlass PR, confirm the Firebase deploy, report i
 
 ## Before merging
 
-- CI green on the PR's **current head** (every shard of `WebGPU (macOS)`, and
-  `Measure`), no merge conflict, no open review thread waiting on us.
+- CI green on the PR's **current head** (every shard of `WebGPU (macOS)`, or
+  none when the `reach` job skipped them for a docs-only change, and `Measure`), no merge conflict, no open review thread waiting on us.
 - The head **contains main's latest commit**. If main moved, merge it in and
   wait for green again. Then the squash is the tree the PR run measured, and
   the deploy publishes on that run instead of running the Mac checks a second
