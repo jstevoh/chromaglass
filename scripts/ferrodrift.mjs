@@ -42,17 +42,29 @@ await new Promise(r => setTimeout(r, 2500));
 
 /*
   The pages. Each is Classic with its ring poured and watched for twelve
-  seconds; all but the first with the band let start, and each of the rest
-  with one of the things the band reaches taken away.
+  seconds, with the band let start or not, and some with the plate's own
+  currents held still 2.5 s after the pour the way `npm run magnet` held
+  them when #238 read the drift (turbulence, Audio Impact, the rock, Beat
+  Squeeze, the heat's lift and the turning off, and an ordinary plate
+  clock), so that the band is all that moves the plate. #238 read it before
+  #248 turned Thin Gap on in every look, so the old plate is asked too (Thin Gap turned off and waited for
+  before the click, as bottles.mjs does).
+
+  The first run (all looks as they are) read the same gathering with the
+  band and without it: the disc 0.099 → 0.196 in nine seconds in silence,
+  0.088 → 0.184 with the band, 0.104 → 0.255 with no centre gravity, and the
+  ferrofluid's mean distance from the middle growing in every one, which is
+  the ring spreading both ways, not drifting in.
 */
+const HELD = {
+  rotationSpeed: 0, turbulenceScale: 0, audioImpact: 0, plateRock: 0, beatSqueeze: 0, buoyancy: 0, globalSpeed: 0.025,
+};
 const VARIANTS = [
-  { name: 'silence', band: false, set: {} },
-  { name: 'band', band: true, set: {} },
-  { name: 'band, no bubbles', band: true, set: { bubbles: 0 } },
-  { name: 'band, no centre gravity', band: true, set: { centerGravity: 0 } },
-  { name: 'band, Audio Impact 0', band: true, set: { audioImpact: 0 } },
-  { name: 'band, Tempo Sync 0', band: true, set: { tempoSync: 0 } },
-  { name: 'band, no vibration', band: true, set: { vibrationFrequency: 0 } },
+  { name: 'held, silence', band: false, held: true, set: {} },
+  { name: 'held, band', band: true, held: true, set: {} },
+  { name: 'held, band, no bubbles', band: true, held: true, set: { bubbles: 0 } },
+  { name: 'held, silence, old plate', band: false, held: true, set: {}, oldPlate: true },
+  { name: 'held, band, old plate', band: true, held: true, set: {}, oldPlate: true },
 ];
 const only = process.env.DRIFT_ONLY ? process.env.DRIFT_ONLY.split(',') : null;
 
@@ -77,7 +89,7 @@ try {
       continue;
     }
 
-    /** The ferrofluid: the disc 0.12 round the middle (its mean), the whole plate's share, its mean distance from the middle, and the flow it sits in, toward the middle. */
+    /** The ferrofluid: the disc 0.12 round the middle (its mean), the whole plate's share and its mean distance from the middle. */
     const read = () => page.evaluate(async () => {
       const d = window.chromaglassDebug();
       const f = await d.readPhase();
@@ -90,31 +102,22 @@ try {
         total += v; rsum += v * r;
         if (r < 0.12) { disc += v; discCells++; }
       }
-      // The flow under the ferrofluid, on the plate's CPU copy (grid G):
-      // its speed toward the middle, weighted by the ferrofluid there.
       const fl = d.fluids?.[0];
-      const vx = fl?.readVx, vy = fl?.readVy;
-      let inward = 0, speed = 0, w = 0;
-      if (vx && vy) {
-        const G = Math.round(Math.sqrt(vx.length));
-        for (let y = 0; y < n; y += 2) for (let x = 0; x < n; x += 2) {
-          const p = data[x + y * n];
-          if (p < 0.05) continue;
-          const gx = Math.min(G - 1, Math.floor((x + 0.5) / n * G)), gy = Math.min(G - 1, Math.floor((y + 0.5) / n * G));
-          const ux = vx[gx + gy * G], uy = vy[gx + gy * G];
-          const dx = (x + 0.5) / n - 0.5, dy = (y + 0.5) / n - 0.5, r = Math.hypot(dx, dy) || 1;
-          inward += p * -(ux * dx + uy * dy) / r; speed += p * Math.hypot(ux, uy); w += p;
-        }
-      }
       const st = fl?.lastStep;
       return {
         n, disc: disc / Math.max(1, discCells), total: total / (n * n), r: total ? rsum / total : 0,
-        inward: w ? inward / w : 0, speed: w ? speed / w : 0,
         dt: st ? +st.dt : 0, tempo: fl?.tempoMul ?? 1,
         bubbles: d.bubbles?.bubbles?.length ?? -1, kicks: d.kicks?.() ?? -1,
         band: typeof window.__band === 'function',
       };
     });
+
+    if (v.oldPlate) {
+      await page.evaluate(() => window.chromaglassSettings?.({ thinGap: 0 }));
+      for (let k = 0; k < 400 && (await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.thinGap)); k++) await page.waitForTimeout(50);
+      const old = await page.evaluate(() => !window.chromaglassDebug().fluids?.[0]?.thinGap);
+      if (!old) console.log(`  ${v.name}: the plate was still on a thin gap after 20 s`);
+    }
 
     // The first click (in the corner, off the plate's middle) starts the band where it is let.
     await page.mouse.click(5, 5);
@@ -124,6 +127,13 @@ try {
     await page.evaluate(() => { window.chromaglassDebug().settings.phaseAmount = 0.6; });
     await page.waitForTimeout(600);
     const laysAfter = await page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
+    if (v.held) {
+      await page.waitForTimeout(1900);
+      await page.evaluate((held) => {
+        const d = window.chromaglassDebug();
+        Object.assign(d.settings, held, { audioMappings: { ...(d.settings.audioMappings ?? {}), rotation: 'none' } });
+      }, HELD);
+    }
     const series = [];
     for (let t = 0; t <= 12; t += 1.5) {
       const s = await read();
@@ -134,8 +144,7 @@ try {
     console.log(`  ${v.name}: poured ${laysAfter - laysBefore} time(s); grid ${first?.n} → ${last?.n}; band ${last?.band ? 'playing' : 'off'}, ${last?.kicks} kicks`);
     for (const s of series) {
       if (!s) { console.log('     (no phase read)'); continue; }
-      console.log(`     t=${s.t.toFixed(1).padStart(4)} s  disc ${s.disc.toFixed(3)}  plate ${(s.total * 100).toFixed(2)}%  r ${s.r.toFixed(3)}  ` +
-        `inward ${(s.inward * 1e3).toFixed(3)}  speed ${(s.speed * 1e3).toFixed(3)} (thousandths)  dt ${s.dt.toFixed(5)}  tempo ${s.tempo.toFixed(2)}  bubbles ${s.bubbles}`);
+      console.log(`     t=${s.t.toFixed(1).padStart(4)} s  disc ${s.disc.toFixed(3)}  plate ${(s.total * 100).toFixed(2)}%  r ${s.r.toFixed(3)}  dt ${s.dt.toFixed(5)}  tempo ${s.tempo.toFixed(2)}  bubbles ${s.bubbles}`);
     }
     results.push({ v, first, last, poured: laysAfter - laysBefore });
     await page.close();
@@ -145,13 +154,14 @@ try {
 }
 
 const by = (name) => results.find(r => r.v.name === name);
-const band = by('band');
-if (band?.first && band?.last) {
-  check('with the band playing, the ferrofluid poured round the middle does not gather into it',
-    band.poured === 1 && band.first.n === band.last.n && band.last.disc < Math.max(0.2, band.first.disc * 1.5),
-    `the disc 0.12 round the middle ${band.first.disc.toFixed(3)} → ${band.last.disc.toFixed(3)} in twelve seconds, mean distance ${band.first.r.toFixed(3)} → ${band.last.r.toFixed(3)}`);
-} else if (!only) {
-  check('with the band playing, the ferrofluid poured round the middle does not gather into it', false, 'no reading');
+const gain = (r) => r?.first && r?.last && r.poured === 1 && r.first.n === r.last.n ? r.last.disc - r.first.disc : null;
+const band = by('held, band'), quiet = by('held, silence');
+if (!only || (band && quiet)) {
+  const gb = gain(band), gq = gain(quiet);
+  check('with the band playing, the ferrofluid poured round the middle gathers into it no more than in silence',
+    gb !== null && gq !== null && gb < gq + 0.05,
+    `the disc 0.12 round the middle ${gb === null ? 'unread' : `${band.first.disc.toFixed(3)} → ${band.last.disc.toFixed(3)}`} with the band, ` +
+    `${gq === null ? 'unread' : `${quiet.first.disc.toFixed(3)} → ${quiet.last.disc.toFixed(3)}`} in silence, over twelve seconds`);
 }
 const failed = checks.filter(c => !c.ok);
 console.log(failed.length ? `\n${failed.length} of ${checks.length} failed` : `\nall ${checks.length} passed`);
