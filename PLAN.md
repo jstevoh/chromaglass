@@ -338,6 +338,9 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-10** Velvet Underground, Lumia and Cell Bloom are underwhelming: one area of interest, not
   several. Wall. Thread "More going on in every look", no PR yet.
 
+- **QA-13** Fillmore East's dish fills only a small part of the canvas; it should be
+  framed so the whole plate fills it. Wall, desk. Thread "More going on in every look".
+
 **Tier 4. Polish.**
 
 - **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
