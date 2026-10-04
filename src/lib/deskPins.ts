@@ -101,6 +101,7 @@ const SECTION_OF: Record<string, string> = {
   lampMotion: 'lamp',
   lampHotspot: 'lamp',
   secondLamp: 'lamp',
+  lampGround: 'lamp',
   iridescence: 'lamp',
   camera: 'camera',
   focus: 'camera',

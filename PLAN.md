@@ -223,7 +223,8 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.1** ~~**18a-every** Thin Gap in every look~~ #248 (the owner's pick came before 2.1's
   reading; 2.1 still reads it), then **15b**, **15g**,
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
-- **6.2** **18b** the lamp through the dye, then **18f** heat from the lamp (which unblocks 10.6
+- **6.2** ~~**18b** the lamp through the dye~~ #PR (behind Lamp Ground, 0 in every look;
+  the owner picks the looks, judging §31), then **18f** heat from the lamp (which unblocks 10.6
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
 - **6.3** **18c** a pour adds liquid, then **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
@@ -304,9 +305,9 @@ Where each batch stands, as of 2026-09-27:
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, 15e, 15f, 15g open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16d–16e not started |
-| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); 18a-2 to 18a-11 left, each its own PR |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); 18a-2 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (0 in every look, the owner picks which go on the lamp; `npm run lamp`), 18b-1 to 18b-6 left |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
-| 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes; nothing built in the plate. 20a–20f open |
+| 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #PR: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28); 22b–22i open |
 
@@ -3392,7 +3393,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | # | Item | Gain | GPU cost | Needs |
 |---|---|---|---|---|
 | 18a | The plate is a Hele-Shaw cell | Large: tools move every liquid, thick liquids stop, fingering becomes possible | About −2 ms a step (a saving) | Retuning every look; the owner's feel call (15b) |
-| 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground |
+| 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground. **Shipped** (#PR), behind Lamp Ground |
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
@@ -3728,6 +3729,58 @@ its frame rate live. "Free" means no new passes or texture reads.
   physical way, with a dense base dye in the dish or the lamp dimmed, so a look can keep
   its darkness for a real reason. Relates to physics-plan "Layer depth" and bubbles-plan
   F (the wet carrier).
+- **Shipped (#PR, 2026-10-04): Lamp Ground** (`lampGround`, Settings → Lamp & Light;
+  MIDI, the desks, the remote, the phone's Looks sheet), 0 in every look, so nothing
+  changed until the owner turns a look up (judging §31). At 1 the ground under the
+  dish is the lamp (through whatever the mixer has under the glass: the LED ring, the
+  gel, the lumia), and the dye is a filter on it: `ground · exp(−a · amount)`, with
+  `spectralThrough`'s six bands where Spectral Optics is up. The amount is the one the
+  opacity was always made from, without the ×1.7 darkness fudge and the 0.95 cap, so
+  the same pool is the same depth of dye on either ground. The back plate is a second
+  filter (the product), and the pH, BZ and Liesegang colours are absorbers in the
+  light, not paint. Between 0 and 1 the two pictures fade into each other, so a fader
+  can play it. Not in the photograph, which has its paper. `npm run lamp` (CI, open
+  shard, 8 checks) measures it: all 41 looks at 0 draw byte for byte what the plate
+  drew before (against a lab built with the lamp's lines taken out); a clear pool
+  throws 100% of the lamp (§20a asks 90%), 0% on black; twice the dye lets through
+  the square of once to 0.00 in every channel of three dyes (blue 0.21/0.41/0.78 →
+  0.04/0.17/0.61), in the ratio of the absorbances laid down; a dense blue passes
+  0.00/0.02 of red and green; a pool over a gel is the gel times the dye's
+  transmission to 0.49 of a byte (164 on black, the old fault); two plates multiply
+  to 0.61 of a byte, pixel by pixel; the photograph does not change. Found on the way:
+  the hot-spot lifted the middle to 1.28 times the lamp, which burnt a white ground
+  out (the doubling read 0.89 where the law says 0.96); on the lamp ground its peak
+  is now the lamp. The gooey edge's contrast is left out of the amount (18b-4)
+- **18b-1. The owner picks the looks** (judging §31). Each look's dyes and Dye Budget
+  were set for black; one moved to the lamp may want less dye.
+- **18b-2. The dark ground the physical way.** A look that stays dark should get there
+  with a dense base dye in the dish or a dimmed lamp, not with the black ground, once
+  the owner has picked; then the black ground can go.
+- **18b-3. The painted edges on the lamp (shortcut, until 18e).** The meniscus, the
+  boundary line, lacing, cells, gloss and the closeup's detail are drawn on the dye's
+  tint; on the lamp ground what they did is carried over as the ratio of the tint's
+  brightness after them to before (`reliefOf`). Real edges are refraction: 18e.
+- **18b-4. The gooey edge's contrast is not in the amount.** It is an opacity curve
+  made for paint on black; as an amount it bent the law (a plate twice as deep let
+  through 0.16 of the green where Beer–Lambert says 0.09). On the lamp only its blur
+  counts. A look on the lamp that wants crisp blobs needs them from the liquid (18a's
+  surface tension, 18d), not from a curve.
+- **18b-5. The back plate's mixer blends on the lamp.** With its own blend (the look's
+  Blend Mode) the back plate filters the lamp; a mixer row set to screen, add, multiply
+  or key still lays its dye as it did. Decide whether a row blend means anything under
+  the lamp, or the lamp overrides it.
+- **18b-6. Light through a film, not the whole gap (for 20b).** The path is the dye's
+  amount times the gap (Layer Depth). Once a film of clear liquid sits in the gap
+  (20b), the water's path is the gap less the film, which is where the reference's
+  faint pink and lavender in the white come from. A drop's or bubble's "through"
+  colour (the lamp through the clear gap, `through` in the bubbles) is still the old
+  tint-towards-white estimate, read off the ring round it (which is on the lamp
+  ground now).
+- **18b-7. What `npm run lamp` does not read yet.** The closeup's and the particles'
+  decode (`decodeFluidRaw`, which has no Colour Body factor where `decodeFluid` has
+  one), the spectral branch, the chemistry as filters, the bubbles' rim and lens on
+  the lamp, values between 0 and 1, and the second lamp's divide. Each wants a case
+  in the check, or a reason it does not need one.
 
 ### 18c. A pour adds liquid, not only colour
 
@@ -4619,7 +4672,7 @@ Pictures in `/mnt/project-files/lace/`: `reference-vs-prototype.png`,
 
 | Feature | What the plate has | What is missing |
 |---|---|---|
-| White where there is no dye | Dye stored as absorbance; the gap bound in the plate pass | The lamp ground: 18b. Today, clear liquid shows black |
+| White where there is no dye | Dye stored as absorbance; the gap bound in the plate pass | The lamp ground: 18b, shipped (#PR) behind Lamp Ground; a look must turn it up (20a) |
 | A film that tears | A Cahn–Hilliard phase (Oil Bodies, §10 step 5; the ferrofluid) with flux-form transport, Rayleigh–Plateau for free; `marangoniFlux` moving what rides the surface away from soap | A film **thickness** field with a disjoining pressure; nucleation from solvent and dust |
 | Rimless holes, slits | Flow shear; 18a's thin-gap flow (Thin Gap, on in every look since #248) | A viscous film (20c) on 18a's per-liquid mobility (18d) |
 | Hairline edges | The projector's aperture law for drops and bubbles (`dropLens`, u*) | The same law applied to every edge: 18e |
@@ -4633,6 +4686,8 @@ plans the lamp as a per-look choice. This look is the first that must have it, s
 is a good first customer. **Check:** the prototype's white fraction measured in the
 lab: a clear pool on the lamp ground throws at least 90% of the lamp, and the same
 pool on the black ground stays the control.
+**The ground shipped (18b, #PR):** `npm run lamp` reads the clear pool at 100% of the
+lamp and 0% on black. What is left of 20a is the look itself, on Lamp Ground 1.
 
 ### 20b. A clear film that tears (the thin-film equation)
 

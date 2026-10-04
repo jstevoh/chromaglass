@@ -204,6 +204,13 @@ export interface PhoneStageProps {
    */
   benDay: number;
   onBenDay: (v: number) => void;
+  /**
+   * Lamp Ground (PLAN 18b): what the dye is seen on, black or the lamp
+   * shining up through it. On the Looks sheet, always: it turns a look
+   * over, and a thumb on the phone picks the ground as it picks the look.
+   */
+  lampGround: number;
+  onLampGround: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -630,6 +637,11 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className={`grid gap-1.5 ${p.onRevert ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
+          </div>
+          <div className="mt-3">
+            <Slider label="Lamp Ground" value={p.lampGround} min={0} max={1} step={0.05} onChange={p.onLampGround}
+              display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">

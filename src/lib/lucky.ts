@@ -98,6 +98,8 @@ export function luckyLook(
     // The comic print is the Roy look's and its own control's, and a roll
     // is a new look: rolled from Roy it would still be printed.
     benDay: 0,
+    // Lamp Ground (PLAN 18b) is kept: it is the light table the roll is
+    // shown on, set by the performer, not a part of the look being rolled.
     sensitivity: rand() * 0.8 + 0.2,
     /*
       1 to 2, not 0.5 to 2. No preset sets this — it is an ear setting, so
