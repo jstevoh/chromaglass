@@ -2165,7 +2165,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     thick the liquid is, and it cycles every few hundredths of opacity: read
     after the grain, every grain was a jump round the rainbow, and Sunny Side
     Up and Soap Film threw single pixels of another colour along every thin
-    edge (npm run grainedge: 7.1% and 3.0% of the edges' pixels flecks).
+    edge (7.1% and 3.0% of the edges' pixels flecks, as grainedge reads them).
     Pigment settling deeper in a place does not make the liquid thicker there.
   */
   let film0 = fluid0.a;
