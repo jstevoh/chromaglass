@@ -884,6 +884,14 @@ Open, from building 9e (in the order to do them):
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
 
+- **9ab. Fingers thinner than the grid are drawn** (**shipped**). The plate drew the
+  ferrofluid only past its half-full line, so a finger pulled out narrower than the
+  solver's interface was not drawn at all. `npm run fingers` then passed or failed on the
+  dye's shade under it, and went red on the deploy after #267 (4 at 0.12 against 7). With
+  no line within four cells up the slope, the strand is now drawn by Beer–Lambert through
+  the thickness its phase gives. Lab: 13/16/13/8 drawn against the field's 15/19/13/8
+  (2 at 0.12 by the line before). Judging §41. Open: the maze's haze (9aa) is under half
+  full too and is drawn by the same rule, so it reads browner until 9aa takes the leak out.
 - **9aa. The maze is two to three times coarser than its period, and leaves a haze**
   (measured 2026-10-04, building 4a-clock). Ferro Maze, Ferro Paint and Magnet Garden
   in the Mac gallery are fat black blobs with a brown haze round them, where the
