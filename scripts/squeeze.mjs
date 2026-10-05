@@ -27,6 +27,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
+import { kickDepth } from '../src/lib/squish.ts';
 
 const PORT = Number(process.env.SQUEEZE_PORT ?? 4371);
 const NEED_GPU = process.env.SQUEEZE_GPU === '1';
@@ -203,14 +204,19 @@ try {
     check('and the show kicks on it', on.kicks >= 0.75 * beats(on) && off.kicks >= 0.75 * beats(off),
       `${on.kicks} and ${off.kicks} kicks in ${on.seconds.toFixed(0)} and ${off.seconds.toFixed(0)} s, of ${beats(on).toFixed(0)} and ${beats(off).toFixed(0)} tapped beats`);
     /*
-      And pressed as deep as a kick at this look's squeeze: each cell 0.0024
-      × 0.9 × the bass (/70, capped at 1) × the accent (1 at Accent 0), so
-      the mean depth a cell is at least 0.0024 × 0.9 × 0.1, a tenth of the
-      bass; a cell counted at a depth of nothing would not count as pressed
-      at all (only cells that close the gap are counted).
+      And pressed as deep as a kick at this look's squeeze: each disc
+      kickDepth(0.9, the bass /70 capped at 1, the accent 1 at Accent 0),
+      0.005 × 0.9 × (0.6 + 0.4 × the bass) since PLAN 26b, so the softest
+      kick presses 0.0027 at the middle. On a thin gap a disc is a bowl
+      (3 × depth × (1 − r²/R²)², squishDisc), whose mean over its own cells
+      is the depth itself, and the three nested discs count each cell once
+      a disc, so the mean depth a cell is at least half the softest kick's:
+      a kick pressing at a tenth of its depth fails. A cell counted at a
+      depth of nothing would not count as pressed at all (only cells that
+      close the gap are counted).
     */
     const meanDepth = on.depth / Math.max(1, on.cells);
-    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.0024 * 0.9 * 0.1,
+    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.9, 0, 1),
       `${on.cells} cells laid by kicks, ${perKick.toFixed(0)} a kick, ${meanDepth.toFixed(5)} deep a cell`);
     check('while at 0 the kicks go on and press nothing', off.kicks >= 0.75 * beats(off) && off.cells === 0, `${off.kicks} kicks, ${off.cells} cells`);
     /*

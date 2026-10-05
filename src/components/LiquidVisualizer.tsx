@@ -38,6 +38,8 @@ import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
+import { stirOf } from '../lib/stir';
+import { CUR_ROCK, kickRock, stepRock, rockSwing, swayAt } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -54,7 +56,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, type Presser, type Stroke } from '../lib/squish';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -277,7 +279,6 @@ function particleFlowScale(fluid: { dt: number } | undefined, s: VisualizerSetti
   without sweeping the plate clear.
 */
 const CUR_BUOY = 0.3;    // × buoyancy × tanh(20 × temperature): the heat field is small, ~0.03 on average
-const CUR_ROCK = 0.2;    // × the rock spring's displacement (±1–2) × (density − mean)
 const CUR_GRAV = 0.25;   // × centre gravity × (density − mean)
 /*
   How much of a blow is swirl rather than push.
@@ -2771,18 +2772,16 @@ class FluidSimulation {
   }
 
   /**
-   * Beat Squeeze's kick: the top glass pressed over three nested discs (a
-   * rough dome, so the dye spreads from the middle instead of only at one
-   * hard ring), remembered for the lift like a hand's press, and let go a
+   * Beat Squeeze's kick: the top glass pressed over three nested discs
+   * across most of the dish (KICK_RADII: a rough dome, so the dye spreads
+   * from the middle instead of only at one hard ring), remembered for the lift like a hand's press, and let go a
    * moment later (`kickRelease`). `amount` is each disc's press.
    */
   pressKick(x: number, y: number, amount: number, fingering: number): void {
     x = Math.round(x);
     y = Math.round(y);
-    this.applySquish(x, y, 40, amount, fingering, true, 'press', 'kick');
-    this.applySquish(x, y, 27, amount, fingering, false, 'press', 'kick');
-    this.applySquish(x, y, 15, amount, fingering, false, 'press', 'kick');
-    this.kickRelease.kick(x, y, [40, 27, 15].map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+    KICK_RADII.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
+    this.kickRelease.kick(x, y, KICK_RADII.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
   }
 
   /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
@@ -3515,17 +3514,34 @@ class FluidSimulation {
     const nu = visc * 0.0001;
 
     const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
-    let turbScale = settings.turbulenceScale ?? 0;
+    /*
+      Turbulence, the hand stirring the layer (PLAN 26c). Measured on the
+      Mac with the band playing (`npm run controls`, 2026-10-05): turned
+      from a look's own value to full it changed nothing a person could see
+      on five looks of six. Two reasons, both fixed here.
+
+      Its top was the bottom's speed doubled: the dial was the stir's speed
+      itself, and a look's 0.3 and the slider's 1 differ by three, which on
+      a plate already moving with the music reads as the same drift. A hand
+      stirring a dish goes from a slow trail to a stick dragged round at a
+      quarter of the dish a second, so the dial runs as t(1 + 3t³): the
+      looks' own values (most are 0.3 or under) within 8% of where they were
+      and full four times what it was.
+
+      And the music took the difference back. A loud track multiplied the
+      stir by up to three and then held it to the larger of the dial and
+      1.2, so with the band playing 0.5 already ran at 0.9 and full could
+      only reach 1.2: a third more, for twice the dial. Now the music
+      multiplies whatever the dial says, by at most two: audio energy still
+      breathes extra stir into the field so the liquid churns with the
+      music, and a loud track still cannot triple a calm look's (lib/stir.ts).
+    */
+    let turbScale = stirOf(settings.turbulenceScale ?? 0, audioData ? audioData.energy : null, settings.audioImpact ?? 0.45);
     if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
     let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
     if (audioData) {
       const impact = settings.audioImpact ?? 0.45;
-      // Audio energy breathes extra turbulence into the field so the liquid
-      // visibly churns with the music instead of drifting at constant pace.
-      // Capped, now that turbulence is a real current: tripled on a loud
-      // track it would tear a calm look apart rather than make it breathe.
-      turbScale = Math.min(Math.max(turbScale, 1.2), turbScale * (1 + Math.min(1, audioData.energy) * impact * 2.0));
       const mid01 = Math.min(1, audioData.mid / 70);
       const treble01 = Math.min(1, audioData.treble / 70);
       const s = (mid01 * 0.6 + treble01 * 0.4) * impact;
@@ -7946,14 +7962,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
-            if (R > 0 && kickStep) {
-              // Twice what it was: at full, with the band playing, the rock
-              // showed on 7 looks of 24 (npm run controls). A ride at full
-              // should be unmistakable.
-              rock.vx += Math.cos(rock.phase) * bass01 * 14 * R * accent;
-              rock.vy += Math.sin(rock.phase) * bass01 * 14 * R * accent;
-              rock.phase += 2.4;   // successive kicks go different ways
-            }
+            // The hand's spring and sway, the slider applied once (lib/plateRock.ts, PLAN 26a).
+            if (R > 0 && kickStep) kickRock(rock, bass01, accent);
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
             const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
@@ -7971,29 +7981,43 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // (Whatever showed then was not the press, which never landed
                 // until the centre was rounded, PLAN §10 step 4.) Pressed and
                 // let go: `pressKick`.
-                const a = 0.0024 * squeezeAmt * bass01 * accent;
+                /*
+                  And across the dish (KICK_RADII), deeper, and less at the
+                  mercy of the bass reading (PLAN 26b). Measured in the lab on
+                  a thin gap (`npm run rides`), a ring of colour 30 cells out
+                  from a kick's centre: the old kick at the default squeeze and
+                  the bass a kick usually reads (0.5, about 0.7) went out 1.7
+                  cells and back, a hundredth of the plate, which nobody sees.
+                  Now 5.7, and 11 at full. The glass closes as the film's own
+                  resistance lets it (0.0192 at the middle for 0.0024 a disc,
+                  0.0140 for 0.006), so deeper is not linear and never reaches
+                  the floor. The bass reading is already in the kick that
+                  fired this, and on top of it a soft kick pressed a third as
+                  deep as a hard one; now two thirds (kickDepth).
+                */
+                const a = kickDepth(squeezeAmt, bass01, accent);
                 leadPlate.pressKick(cx, cy, a, currentSettings.fingering ?? 0);
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
-            const w = 2 * Math.PI * 0.9, z = 0.22;
-            const ax = -w * w * rock.x - 2 * z * w * rock.vx;
-            const ay = -w * w * rock.y - 2 * z * w * rock.vy;
-            rock.vx += ax * simStepS; rock.vy += ay * simStepS;
-            rock.x += rock.vx * simStepS; rock.y += rock.vy * simStepS;
-            const swayX = noise2D(time * 0.11, 3.7) * 0.35 * R;
-            const swayY = noise2D(7.1, time * 0.09) * 0.35 * R;
+            stepRock(rock, simStepS);
+            const [swingX, swingY] = rockSwing(rock, R, ...swayAt(noise2D, time));
             // A phone held by the projectionist: its tilt is the plate's, fading
             // out a couple of seconds after the last reading if the link drops.
             const ext = externalTiltRef.current;
             const extAge = showNow() * 0.001 - ext.at;
             const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
-            const tiltX = (rock.x + swayX) * 0.004 * R + ext.x * 0.0045 * extK;
-            const tiltY = (rock.y + swayY) * 0.004 * R + ext.y * 0.0045 * extK;
-            // The current takes the rock itself (its spring's displacement and the
-            // sway, ±1–2), scaled by the slider; the phone's tilt joins it.
-            const rockX = (rock.x + swayX) * R + ext.x * 1.1 * extK;
-            const rockY = (rock.y + swayY) * R + ext.y * 1.1 * extK;
+            const tiltX = swingX * 0.004 + ext.x * 0.0045 * extK;
+            const tiltY = swingY * 0.004 + ext.y * 0.0045 * extK;
+            /*
+              The plate takes the swing itself (±1–2 at full), scaled by the
+              slider; the phone's tilt joins it. On a thin gap that is the
+              plate tipped (× CUR_ROCK, sinθ), and a phone held tipped slides
+              the colour downhill for as long as it is held, as a dish tipped
+              in the hand does (PLAN 26a).
+            */
+            const rockX = swingX + ext.x * 1.1 * extK;
+            const rockY = swingY + ext.y * 1.1 * extK;
             for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; }
 
             // ── Oil beads ───────────────────────────────────────

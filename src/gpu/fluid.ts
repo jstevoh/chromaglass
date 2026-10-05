@@ -399,6 +399,43 @@ const DRIP_WEIGHT = 0.5;
 */
 const AIR_SHEAR = 0.5;
 /*
+  Plate Rock's tilt, as the dye's weight down the tilted plate (PLAN 26a).
+
+  A hand rocking the clock glass tips the plate a few degrees. Flat on the
+  projector gravity is straight through the glass and moves nothing; tipped
+  by θ it has g·sinθ in the plate, and between two glasses a liquid denser
+  than the one round it slides downhill at Darcy's speed h²Δρ g sinθ / 12μ
+  while the lighter one rises past it. A plate of one liquid evenly coloured
+  does not move at all (no weight is heavier than its neighbour): what moves
+  is the colour, where it is thicker than the plate's mean.
+
+  It went through the half-resolution current as a stir, × 0.2 of the
+  spring's swing and × tanh of the dye over the mean, and was capped there
+  with everything else the current carries. Measured in the lab on a thin
+  gap at the default Speed (dt 0.003), forty pools of colour rocked at
+  0.9 Hz at the most the app ever handed it: the picture differed from the
+  same plate left still by 0.024 at most over two seconds (the dye's L1
+  change against its total), where Turbulence at 0.5 moves it 0.72. Plate
+  Rock was a dial that did nothing a person could see.
+
+  So on a thin gap it is a body force in `hsBody`, with Rain Drip's
+  heavy colour: `rock` is the plate's tilt (sinθ: the app's spring at
+  full Plate Rock swings to about 0.2 on a strong kick, twelve degrees,
+  which a hand on a clock glass does), and ROCK_FALL is how fast a unit of
+  dye over the mean falls on a plate stood straight up, in the flow's
+  per-step speeds, read against the reference liquid as every body force
+  is. Its size: dyed water in a light mineral oil (Δρ about 150 kg/m³) in
+  the plate's 6 mm middle, tipped fifteen degrees, would slide at about a
+  quarter of the plate a second; colour in the same liquid (Δρ of ten or
+  so) at a fiftieth. ROCK_FALL puts a pool at 0.73 in the flow's speeds at
+  twelve degrees (`npm run rides`), about 6% of the plate a second at the
+  default Speed, between the two, so a kick at full Plate Rock swings a pool
+  a few percent of the plate and the spring brings it back. With forty
+  pools rocked as the app rocks them the colour moved 0.43 against 0.028
+  before, where a look's own stir moves it 0.79.
+*/
+export const ROCK_FALL = 12;
+/*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
   at 1, on a log scale, which is how viscosities are spread: a light mineral
@@ -1280,7 +1317,8 @@ export class WebGPUFluid {
     i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
     f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
-    f[28] = p.rockX; f[29] = p.rockY;
+    // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
+    f[28] = thin ? 0 : p.rockX; f[29] = thin ? 0 : p.rockY;
     f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
     const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
     f[34] = -(p.gravityX ?? 0) / gl; f[35] = -(p.gravityY ?? -1) / gl;
@@ -1876,8 +1914,9 @@ export class WebGPUFluid {
         room. The dish is drawn turned (Rotation, and a flick), and gravity
         does not turn with it: reported, Lava Lamp's wax poured off toward
         whichever corner the dish had started turned to and the plate was
-        empty in twenty seconds. (Its rock and tilt move the dye already,
-        through the lasting current.)
+        empty in twenty seconds. (Its rock moves the dye already: on a thin
+        gap as the dye's weight down the tipped plate, in hsBody, and on the
+        old plate through the lasting current.)
 
         And a lamp under it, just where the plate goes out of view: what
         sinks there is warmed, rises, cools as it goes and sinks again,
@@ -1894,8 +1933,8 @@ export class WebGPUFluid {
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
-      On a thin gap, Rain Drip's heavy dye and Updraft's shear join the body
-      forces (hsBody), and the velocity is kept here, after all of them and
+      On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt and Updraft's
+      shear join the body forces (hsBody), and the velocity is kept here, after all of them and
       before the stirring, so hsPrep can read the two apart: a body force
       moves a liquid as its viscosity says, a stir as the dial says (PLAN
       18a-2, wgsl/thinGap.ts). With no body force this step there is nothing
@@ -1903,12 +1942,14 @@ export class WebGPUFluid {
       place, which makes the body forces' share zero.
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
-    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1);
+    const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
+    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || rockOn);
     if (thinBody) {
       stage('thin body', (pass) => {
         this.ensureThinGap();
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}`,
-          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, 0, 0, 0, 0, 0]),
+          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, 0,
+            rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, 0, 0]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write]);
         this.vel.swap();
       });

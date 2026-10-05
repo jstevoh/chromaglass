@@ -191,8 +191,15 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       the liquid, not only the colour: the old push was only where there
       was dye, and air does not know what colour it is blowing on.
 
+      **Plate Rock is the same weight down a tipped plate.** A hand
+      rocking the glass tips it a few degrees, which puts g·sinθ in the
+      plate, and the colour where it is thicker than the mean slides
+      downhill as Rain Drip's does, the clear liquid rising past it (PLAN
+      26a). A.b.xy is that tilt's in-plane gravity times the weight of a
+      unit of dye (fluid.ts, ROCK_FALL), signed downhill.
+
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
-      AIR_SHEAR), the rest gap h0, 0).
+      AIR_SHEAR), the rest gap h0, 0); A.b = (Plate Rock's pull, x and y, 0, 0).
     */
     hsBody: `${HEAD}${NOISE}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -203,9 +210,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
   var v = textureLoad(vel, q, 0);
-  if (A.a.x > 0.0) {
-    let d = textureLoad(dye, q, 0).a;
-    v = vec4f(v.xy - S.up * (A.a.x * (d - S.meanD)), v.z, v.w);
+  // Rain Drip's heavy colour down a standing plate, and Plate Rock's tilt (A.b.xy, fluid.ts ROCK_FALL):
+  // both the dye's weight over the plate's mean, the second down whichever way the hand tips the glass.
+  if (A.a.x > 0.0 || any(A.b.xy != vec2f(0.0))) {
+    let w = textureLoad(dye, q, 0).a - S.meanD;
+    v = vec4f(v.xy - S.up * (A.a.x * w) + A.b.xy * w, v.z, v.w);
   }
   if (S.air > 0.1) {
     let p = uvOf(id) * S.l;

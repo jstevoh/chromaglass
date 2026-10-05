@@ -207,6 +207,9 @@ merge conflicts are the shared documents', which 0.6 ends.
 
 ### Wave 5. Playing it: the instrument
 
+**§26, every control does something you can see** (the owner, 2026-10-05): ~~26a-c Plate
+Rock, Beat Squeeze, Turbulence~~ (this PR); **26d** the rest of the sweep (M, lanes B and G).
+
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
 (S) then **10.3-4otf, 10.3-sure, 10.3-half, 10.3-newsong, 10.3-fill** (S each);
@@ -5215,3 +5218,73 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   about 0.06 of the bass area (turned by the plate's angle), and on classic at the
   middle (the check-skeptic's design).
 
+
+## 26. Every control does something you can see
+
+The owner, 2026-10-05: "I feel like beat squeeze doesn't do too much (if anything). Also
+turbulence and plate rock don't appear to do too much either. Many of the controls aren't
+meaningful. Go through them all and fix them or remove them if they don't do anything or
+are covered by a new control."
+
+**The measure.** `controls.yml` on main (run 37379345453, the band playing, about forty
+kicks heard a look): each ride turned from the look's own value to the far end, judged
+against the look's own drift. On 20 of 24 looks: Turbulence visible on 5, Beat Squeeze 6,
+Plate Rock 9, Swirl 3, Evolve Speed 5, Fingering 5, Lacing 4, Tempo Sync 4. On the `all`
+shard's three looks about twenty more read nothing on all three (26d has the list).
+
+- **26a. Plate Rock is the plate tipped (shipped, this PR).** It went through the
+  half-resolution current as a stir, 0.2 × the spring's swing × tanh of the dye over the
+  mean, and its dial went as its square (the kick's shove × R, then the swing × R). Now
+  the dial is applied once and, on a thin gap, the tilt is the dye's weight down the
+  tipped plate in `hsBody`, with Rain Drip's: a pool slides downhill through the clear
+  liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
+  forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
+  own stir moves them 0.79).
+- **26b. Beat Squeeze presses the glass, not a palm (shipped, this PR).** The kick
+  pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
+  an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
+  span the dish (`KICK_RADII`) and the depth is `kickDepth` (0.005 × squeeze × (0.6 +
+  0.4 bass)): 5.7 cells at the default, 11 at full. `npm run lift`'s "does not add up"
+  floor is now a lone kick's own dip rather than 0.020.
+  - **26b-1, open.** Let go, the ring comes back 87% of the way at the default and 79%
+    at full; a squeeze film with nothing fingering should come all the way. The rest is
+    the colour's first-order carry (18a-8).
+- **26c. Turbulence reaches (shipped, this PR).** The dial was the stir's speed, so
+  full was a look's 0.3 tripled, and with the band playing the music multiplied it and
+  then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
+  dial runs as t(1 + 3t³) (`lib/stir.ts`; a look's 0.3 within 8% of before, full four
+  times) and the music multiplies it by at most two: full is 5.8 times half way. The
+  eddies still change on the clock, not on the stir's own speed (an eddy of size l
+  stirred at U turns over in l/U): **26c-1, open**, wants a third dimension in the
+  noise (3D simplex with the turnover as z), not a slide of the 2D one.
+- **26d. The rest of the sweep (open, its own PR).** From the run above and a read of
+  the code (handoff `meaningful-controls.md` in the project's files):
+  - Dead on a thin gap (every look since #248): Depth Drag (18a's open item), Vibration
+    (18a-2's), Damping (only the lasting current now), Plate Pressure (only the clock
+    and the dish's bed drag).
+  - Two dials that are one number: Gooey × Post Blur (`U.gooey * U.postBlur`), Blob
+    Surface Tension × Polarity (`immiscibility`); Rain Drip against Dye Weight with
+    Gravity (both the dye's weight down the plate); Buoyancy against Dye Weight's heat
+    lift.
+  - Read nothing on any look measured: Swirl, Evolve Speed, Tempo Sync (Random Evolve
+    overrides it), Surge (lib/phrasing.ts measured it inert), and on the `all` shard
+    Accent the One, Bead Drops, Macro Chase, Kaleido Zoom, Maze Detail, Pushes Dye,
+    Follow the Song, the Back Plate's and Gel Wheel's hue and level dials, Lumia
+    Saturation, Deadzone, Grain Size, Macro Lacing, Relief, Domain Size, pH Indicator,
+    Glass Smear, Evaporation, Diffusion, LED Rotation Speed. Many need another setting
+    on (a gel wheel, a second plate, a camera, the ferrofluid); the sweep sorts gated
+    from dead, then fixes, folds or retires each with saved looks, set lists, MIDI and
+    the remote migrated.
+  - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
+    rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
+    dials say.
+- **26e. The music should move the picture more (open, its own thread).** The owner,
+  2026-10-05: "Generally I don't feel like music is having as much impact on the visuals
+  as I would like." 26a-c make the kick's two rides and the stir answer harder; what the
+  rest of the plate takes from the music (Sound Drive's pours and swells, the bands'
+  routes, the beat clock's accents, the song's shape) has not been measured as a whole.
+  First measure: on `film.yml`'s real songs, how much the picture's motion and colour
+  follow loudness and the kick at beat scale and over 20 s (light-show plan targets r
+  about 0.4 over 20 s), against the same take with the sound off; then pick the routes
+  that read weakest and make each the thing it stands for.
+- **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
