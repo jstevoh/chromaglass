@@ -314,7 +314,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 - **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
   phone. Draft #269 (PLAN 15i).
-- ~~**QA-4**~~ **Fixed (this PR)**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).
+- ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).
   Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
   top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
   The chip is `fixed top-3 … translate-y-9` in `src/App.tsx` (the `macroZoom > 1.05`
@@ -337,7 +337,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   centre lives in `LiquidVisualizer`'s `MacroCamera` (private `camX/Y`) and App
   cannot read it yet, so it needs a getter plumbed to the chip and the phone.
 
-- ~~**QA-16**~~ **Fixed (this PR)**: a hue past 40° from every ink prints as two inks overprinted, green (cyan over yellow) and violet (magenta, half cyan); `npm run benday` 7 (main: green printed yellow, violet blue). Violet is laid flat, 21f.
+- ~~**QA-16**~~ **Fixed, #293**: a hue past 40° from every ink prints as two inks overprinted, green (cyan over yellow) and violet (magenta, half cyan); `npm run benday` 7 (main: green printed yellow, violet blue). Violet is laid flat, 21f.
   On Roy, 1963 a green dye cannot be added: it prints as another colour.
   Desk (the owner's report from the corner dot, plate `roy`). Likely cause, read in
   the code but not yet run: the Ben-Day print snaps every pixel's hue to the nearest of
@@ -362,7 +362,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   between them, across the presets in general. Wall, desk. Thread "More colour in the
   looks".
 
-- ~~**QA-15**~~ **Fixed (this PR)**: the seed is a laid-out panel, Dye Budget 0.45; `npm run royopen` 6/6 (main 1/6). Story in §21 of `docs/plan-shipped.md`.
+- ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run royopen` 6/6 (main 1/6). Story in §21 of `docs/plan-shipped.md`.
   Roy, 1963 always opens on a giant black stain over flat red, filling most of
   the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
   Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
@@ -4484,7 +4484,7 @@ Open:
   cloud session). Dye Budget went from 0.9 to 0.45 on the reasoning that a fuller plate
   runs the inks over each other into black; if it reads too empty or still muddies, the
   budget and Roy's injection styles are the two knobs.
-- **21f. Violet is laid flat** (QA-16's fix). A comic's violet is solid magenta
+- **21f. Violet is laid flat** (QA-16, #293). A comic's violet is solid magenta
   with a second screen of cyan dots over it; the print lays it as the flat colour
   that reads from a step back (`BENDAY_VIOLET`), since Roy has one screen. Green
   is a true overprint and needs nothing. Lay the cyan as dots over the magenta if
