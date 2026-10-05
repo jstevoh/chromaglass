@@ -216,6 +216,43 @@ try {
       `at the panel's middle from the Amount chip: ${viaChip}; at the Magnet's Size from a right-click: ${sizeOnTop}`);
   }
   /*
+    Zoomed in, the zoom chip leaves Record alone (QA-4). The owner found the
+    chip (− 4.7× +, Hold / Follow / Auto) on top of Record performance as
+    soon as the plate was zoomed past 1.05×: it was pinned to the window's
+    top, which on a desk is the top strip Record sits in. Asked on both desks
+    at the three desk widths: the chip and Record do not overlap, what is on
+    top at Record's middle is Record, and the chip lies inside the plate's
+    box. On main the chip sat 48 px down the window, 3,856 px² of it over
+    Record at 1440, and what was on top at Record's middle was the chip.
+  */
+  for (const width of [1440, 1280, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const mode of ['design', 'perform']) {
+      await clickOn(`mode-segmented-${mode}`);
+      await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 3 }));
+      await settle(800);
+      const where = await page.evaluate(() => {
+        const box = (id) => { const el = document.querySelector(`[data-testid="${id}"]`); return el ? el.getBoundingClientRect() : null; };
+        const chip = box('macro-zoom'), rec = box('performance-button'), plate = box('desk-preview');
+        if (!chip || !rec) return { chip: !!chip, rec: !!rec };
+        const hit = document.elementFromPoint(rec.left + rec.width / 2, rec.top + rec.height / 2);
+        const overlap = Math.max(0, Math.min(chip.right, rec.right) - Math.max(chip.left, rec.left))
+          * Math.max(0, Math.min(chip.bottom, rec.bottom) - Math.max(chip.top, rec.top));
+        const inPlate = !!plate && chip.left >= plate.left - 0.5 && chip.right <= plate.right + 0.5
+          && chip.top >= plate.top - 0.5 && chip.bottom <= plate.bottom + 0.5;
+        return { chip: true, rec: true, overlap, onRecord: !!hit?.closest('[data-testid="performance-button"]'), inPlate, top: Math.round(chip.top) };
+      });
+      check(`zoomed in on ${mode} at ${width}, the zoom chip sits on the plate and Record stays clear`,
+        where.chip && where.rec && where.overlap === 0 && where.onRecord && where.inPlate,
+        where.chip && where.rec
+          ? `${where.overlap} px² over Record; Record on top at its middle: ${where.onRecord}; chip ${where.inPlate ? 'inside' : 'outside'} the plate, ${where.top} px down`
+          : `chip ${where.chip ? 'shown' : 'missing'}, Record ${where.rec ? 'shown' : 'missing'}`);
+      await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 1 }));
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await settle(800);
+  /*
     A layer added and taken off from the Design desk, on every look.
 
     Reported by the owner: layers could be added on some presets and not
