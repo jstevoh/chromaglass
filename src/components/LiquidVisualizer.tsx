@@ -60,7 +60,7 @@ import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, ty
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
-import { adoptIntro, introOut, introPlateFrame } from '../lib/intro';
+import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 const HAND_SETTLE = 0.25;
@@ -9433,7 +9433,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       try {
         // What the look now up turns on: the opening's, or the one on when a
         // lost device is replaced mid-show (`gpu/opening.ts`).
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable }, openingOf(settingsRef.current));
+        // The intro held still while the render pipelines compile (`Quiet`
+        // in gpu/prepare.ts says why).
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }

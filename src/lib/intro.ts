@@ -40,6 +40,8 @@ interface IntroRecord {
   reason?: IntroOut;
   /** When it was gone from the page. */
   gone?: number;
+  /** The stretches it was held still while the opening's render pipelines compiled, [from, to] (`introStill`). */
+  still?: [number, number | null][];
 }
 
 /**
@@ -142,6 +144,38 @@ export function introOut(reason: IntroOut): void {
  */
 export function introPlateFrame(stepped: boolean): void {
   if (!out && stepped) introOut('plate');
+}
+
+/**
+ * Held still while the opening's render pipelines compile (`Quiet` in
+ * `gpu/prepare.ts` says why: a moving intro there stopped the page's frames
+ * for as long as the display compiled). Paused, not hidden: the picture
+ * stays exactly where it was and moves on from there.
+ *
+ * The promise resolves once the page has drawn two frames with it paused,
+ * so the last moving frame is presented before the compile is asked for,
+ * and never later than a fifth of a second: a hidden tab draws no frames,
+ * and the opening must not wait on one. Nothing to hold (gone, leaving, or
+ * never shown) resolves at once.
+ */
+export function introStill(): Promise<void> {
+  const el = node();
+  if (out || !el || el.classList.contains('cg-still')) return Promise.resolve();
+  el.classList.add('cg-still');
+  (record.still ??= []).push([performance.now(), null]);
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 200);
+    requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(timer); resolve(); }));
+  });
+}
+
+/** And moving again. */
+export function introMove(): void {
+  const el = node();
+  if (!el?.classList.contains('cg-still')) return;
+  el.classList.remove('cg-still');
+  const last = record.still?.[record.still.length - 1];
+  if (last && last[1] === null) last[1] = performance.now();
 }
 
 /** Whether the intro is still up (not yet leaving). */
