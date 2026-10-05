@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Mic, Monitor, FileAudio, Music, Sparkles, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
+import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
 import { Sheet } from './ui';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
@@ -33,7 +33,7 @@ const SOURCES: ReadonlyArray<{
     blurb: 'Play a track from this machine. It plays out of this tab, so a shared tab carries the music too.' },
   { id: 'drone', label: 'The plate', icon: Waves,
     blurb: 'The glass plays itself: a pad keyed by its colour, a bass paced by its flow, bells where dye arrives and air as it stirs. It sounds out of this tab, so a shared tab carries it.' },
-  { id: 'simulated', label: 'A band in a box', icon: Sparkles,
+  { id: 'simulated', label: 'A band in a box', icon: Drum,
     blurb: 'A synthesised band — kick, snare, hats, bass and a pad, in verses and choruses. No device, no permission, nothing to be asked for.' },
 ];
 
