@@ -2159,6 +2159,13 @@ The plan as written before it was built:
   neighbouring hues and an accent, and five are on the plate at once (`WORKING_DYES`,
   `dyesOnPlate`); the grade pushes
   along the line from grey and eases in before the gamut's edge, so it keeps the hue.
+  What that push cannot give, a second push about the brightest channel gives (the
+  others spread from it as far as the old clamped push spread them, easing in before
+  the dimmest reaches 0; spread by the whole push, a faintly tinted white paper went
+  pink and `npm run benday` read 20% white where it asks 60%), so a colour already at
+  the edge is still deepened and the hue still kept: without it the glints at the feet
+  of Magnet Garden's domes stayed bright and `npm run spikes` failed on the Mac (16 tops
+  lit against 4.0 places off them in the lab, 0.5 on main and with the second push).
   Ink lays 0.3 a drop where it laid 0.25: with a red that is no longer a perfect filter,
   a drop of Cherry Red into a yellow plate read 1.48 times as red as green against
   `npm run plate`'s bar of 1.5 (that check now uses the app's conversion, not its own copy).

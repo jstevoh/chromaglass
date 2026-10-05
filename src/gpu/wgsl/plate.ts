@@ -231,17 +231,32 @@ fn throughScaled(through: vec3f, k: f32) -> vec3f {
   own), so the hue and the brightness stay and two colours that were
   different stay different. Where the push fits with room to spare it is
   the push asked for, to a fraction of a percent (at twice the room it is
-  0.3% short). Light already at or past the edge before the grade (a
-  highlight lifted above 1) gets no push, and its channels clamp as they
-  always did; a gradient crossing the edge stays a gradient (an early
+  0.3% short). A gradient crossing the edge stays a gradient (an early
   return to the old push there made a step of 48 bytes in the blue between
   a red of 0.999 and one of 1.0, the pre-push review).
+
+  What the push about grey could not give, a second push gives about the
+  colour's brightest channel: that channel stays where it is and the
+  others spread away from it, as far as the old clamped push spread them
+  and no further, easing in before the dimmest reaches 0. Both pushes move
+  every channel by the same scale about the same point, so neither turns
+  the hue. (Spread by the whole of the push asked, a near-white paper with
+  a faint tint went pink: in npm run benday the white of a wash's paper
+  fell from over 60% of it to 20%.) Without it a colour already touching the edge
+  (a warm glint at full red, a bright yellow) got no push at all, where
+  the old clamp had deepened it, and on Magnet Garden the glints at the
+  feet of the ferrofluid's domes stayed bright enough to rival the white
+  point on their tops: in npm run spikes 4.0 places half a pitch off the
+  tops lit against 16 tops, where the old clamp read 0.5. With the second
+  push it reads 0.5 again (the hue still kept).
 */
 fn saturate3(c: vec3f, s: f32) -> vec3f {
-  let l = clamp(dot(c, vec3f(0.299, 0.587, 0.114)), 0.0, 1.0);
-  let d = c - vec3f(l);
-  let asked = clamp(vec3f(l) + d * s, vec3f(0.0), vec3f(1.0));
+  // The old push, clamped: what the grade gave before, and still gives at 1 or under.
+  let lu = dot(c, vec3f(0.299, 0.587, 0.114));
+  let asked = clamp(vec3f(lu) + (c - vec3f(lu)) * s, vec3f(0.0), vec3f(1.0));
   if (s <= 1.0) { return asked; }
+  let l = clamp(lu, 0.0, 1.0);
+  let d = c - vec3f(l);
   // The largest push that keeps every channel inside 0..1.
   var room = 1e6;
   for (var i = 0; i < 3; i++) {
@@ -250,7 +265,18 @@ fn saturate3(c: vec3f, s: f32) -> vec3f {
   }
   // A smooth minimum of the push asked and the room, never under no push.
   let k = max(1.0, s / pow(1.0 + pow(s / room, 6.0), 1.0 / 6.0));
-  return clamp(vec3f(l) + d * k, vec3f(0.0), vec3f(1.0));
+  // On the screen's range: a highlight lifted past 1 is white there already.
+  let g = clamp(vec3f(l) + d * k, vec3f(0.0), vec3f(1.0));
+  // The rest of the push, about the brightest channel, as far as the dimmest
+  // allows: to the spread the old clamped push gave (asked), no further.
+  let hi = max(g.r, max(g.g, g.b));
+  let spread = hi - min(g.r, min(g.g, g.b));
+  if (spread < 1e-5 || hi <= 1e-5) { return g; }
+  let want = max(asked.r, max(asked.g, asked.b)) - min(asked.r, min(asked.g, asked.b));
+  let rest = max(1.0, want / spread);
+  let room2 = hi / spread;
+  let k2 = max(1.0, rest / pow(1.0 + pow(rest / room2, 6.0), 1.0 / 6.0));
+  return clamp(vec3f(hi) + (g - vec3f(hi)) * k2, vec3f(0.0), vec3f(1.0));
 }
 
 /*
