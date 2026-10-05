@@ -3833,8 +3833,17 @@ its frame rate live. "Free" means no new passes or texture reads.
   rim's dispatch, only while anything poured is on the plate, and now that nothing fades
   it that is until it is flushed to a millionth. `npm run thick` times the stage alone
   (benchSpecies) at 768² in the Mac plate shard, beside the colour's own carry timed the
-  same way. CI's Mac read 12.2 ms a step for the stage on #298, which cannot be set
-  against an M4's 6.6 ms step; the ratio to the colour's carry is the reading to take.
+  same way. **Read on CI's Mac (#299, 768², 15 substeps): the stage 12.36 ms a step, the
+  colour's own carry 12.28 ms, 1.01 of it.** So pouring a liquid of its own costs one more
+  colour carry for as long as any of it is on the plate, which now that nothing fades is
+  until it is flushed. CI's runner is slow in absolute terms (its whole step is not an
+  M4's 6.6 ms), but against the colour's carry on the same GPU this is over 18d's budget
+  of 0.5 to 0.7 ms unless the owner's Mac carries the colour in under that. The two
+  carries cost the same though the species is rgba32f and the colour half floats, so the
+  cost is the substeps' dispatches and the face velocities, not the bytes. Next
+  (**18d-11a**): move the species in the colour's own carry kernel, one pass reading the
+  velocity once and writing both, and time it with the same bench; or carry it at half
+  the grid. Read the owner's Mac with `?debug` (judging §43) before choosing.
 - **Found:** at the plate's 6 mm rest gap, a liquid as thin as water has a drag time of
   about 3 s, so for a second or so it moves as a free liquid, not a Hele-Shaw one. Alcohol
   in a thick look read 14 times a pool of colour, where Darcy's bound is 2. That is right
