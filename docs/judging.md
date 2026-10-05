@@ -1081,6 +1081,24 @@ the show is not:
 - Ferro Maze, Magnet Garden and Ferro Paint's maze are unchanged: still coarser than
   the references, with a brown haze. That is PLAN 9aa, its own change.
 
+## 40. The dye's edges, on the laptop (PLAN 1a–1d)
+
+The looks were reported as "very pixelated ... very digital" on the laptop's web app. The
+largest cause was the pigment's grain thresholding every dye edge into a fringe of single
+lit and dark flecks; the grain now sits inside the colour and the edges are smooth lines.
+On the laptop, in the browser, full screen:
+
+- Classic, Velvet Underground, Jellyfish Bloom, Oil & Water and Colorful Cosmos: look
+  closely at where one colour meets another or the dark. The edge should be a soft line
+  the way a liquid's is, with no crawling dots along it, and the colour inside should
+  still have a fine pigment texture (the Granulation control turns it up and down);
+- say whether any look still reads as "digital", and where: a regular grid of dots
+  (Agate's rings are one, PLAN 1b), blocky steps along an edge, or the picture soft and
+  upscaled overall (PLAN 1c);
+- with `?debug`, run `chromaglassDebug().engine` in the console after half a minute on
+  each: it says which grid the laptop settled on (`WebGPU · 512² · 1.5x` is the top).
+  On CI's Mac every look settled on 256² (PLAN 1d); if yours does too, say which looks.
+
 ---
 
 ## Reading the frame time while you do it

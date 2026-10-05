@@ -809,6 +809,16 @@ jobs:
       - name: The show opens without stopping
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run startup
+      # The pigment's grain inside the dye, not at its edge: in every look the
+      # grain moves almost no pixel of a dye edge by a fleck's worth (it made
+      # the edges a dithered fringe, "very digital"), and the bodies keep it.
+      # In the open shard (the plate shard is near its timeout), and after the
+      # opening's check, so a timing check never follows four minutes of
+      # renders: with this one before it, startup's first frame waited 2.27 s
+      # on two of the PR's runs, against 1.65-2.00 s on other PRs' runs.
+      - name: The grain inside the dye, not at its edge
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run grainedge
       # The show keeps hearing while its window is hidden behind the wall's
       # (scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second
       # window asking for frames as the projector window does, and the level

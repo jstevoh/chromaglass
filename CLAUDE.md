@@ -65,7 +65,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 |---|---|
 | anything | `npm run lint` (typecheck) |
 | `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
-| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), and a `look` render |
+| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
@@ -112,10 +112,11 @@ deploy:
   seconds. A run started by hand always checks and deploys.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
-  photographed), `controls.yml` (every control measured) and `film.yml` (every
-  look filmed and measured against real shows: swells, calm, black, sync by
-  section) run by hand; the first two also on a PR labelled `gallery` or
-  `controls`, which a session can add.
+  photographed), `controls.yml` (every control measured), `pixels.yml` (every
+  look at a laptop's size, one to one, with the cell's lattice measured) and
+  `film.yml` (every look filmed and measured against real shows: swells, calm,
+  black, sync by section) run by hand; the first three also on a PR labelled
+  `gallery`, `controls` or `pixels`, which a session can add.
 
 When CI is red, use the `steward` skill.
 
