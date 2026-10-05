@@ -3099,6 +3099,27 @@ is a rake, and OSC gets `/comb`. *Measure:* a lab check in the manner of
 `npm run ferrohands` (N parallel bands moved a stroke, mass exact), and
 `npm run detail`'s hard-edge share after a two-way comb against the Marbling column.
 
+### 15k. Inked balls rolled across the plate (proposed 2026-10-05)
+
+The owner's idea, in their words: "Imagine we covered some Balls in ink and we rolled
+them around the canvas by tilting the mouse or with the mouse. It would leave behind a
+messy trail that eventually runs out of ink and then can push other ink around as it
+roles." Not built.
+
+The physics to model, rather than a painted trail: a ball rolling on the glass touches
+it along a small contact patch, and each turn lays down part of the ink on its surface
+there, more where it presses or slows and in a broken, uneven line where the coat is
+patchy, so the trail starts dense and thins as the ball's ink load runs out (deposition
+proportional to what is left, so it fades rather than stops). A ball also picks up some
+of the wet colour it rolls through, so it can carry one colour into another. Tilting
+the plate gives the balls a downhill pull and they roll on with their own momentum;
+with the mouse the hand pushes them. A dry ball is still a solid moving through the
+thin layer, so it pushes the other liquid aside and drags a wake behind it: the same
+moving obstacle 15b builds for the Finger, which this should share. *Measure:* a lab
+check that a ball's deposited dye falls off with distance as its load depletes, that
+total dye is conserved (laid plus left on the ball), and that a dry ball moves dye
+already on the plate. Ships with the phone (tilt is the phone's own motion sensor).
+
 ## 16. Many plates: each projector its own source (rig-plan R1)
 **Partly shipped**: 16a, 16b, 16c and 16f are shipped (#231, #226, #232, #273). What 16a, 16b and 16c each left undone is listed below in that order, then 16d and 16e, which are open. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
