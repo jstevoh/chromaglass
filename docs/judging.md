@@ -1158,6 +1158,24 @@ stays thick until clear liquid poured after it has pushed it out. On the desk an
   glycerine at 0.3 of the dish, and only its water and soap pours flush it, PLAN 18d-2a);
 - say whether the push from a held bottle is too weak, too strong, or right (PLAN 18c-5).
 
+## 44. Each liquid in its own colour, and a dye in it (PLAN 18d-12)
+
+Each bottle now pours what the liquid itself looks like until you pick a dye for it: Syrup
+amber, Oil a pale gold, Ferrofluid black, Milk white, and Glycerine, Alcohol, Silicone,
+Soap, Acid and Base clear. Water still comes with a blue dye in it. A dye picked for a
+bottle goes into the liquid rather than replacing it, and **Natural**, at the head of the
+dye swatches (the shelf, the Design desk, the phone's Dye sheet, the remote), takes it back
+out. On the desk and the phone:
+- pick Glycerine and pour into a colourful plate (Deep Ocean): no colour should land, only
+  the clear hole it opens; on a look with Lamp Ground up the hole should be lamp-white;
+- pick Cherry Red with Glycerine: it should pour red. Pick Natural: clear again;
+- pour Syrup on a dark look: amber, darkening where it pools deep. Pick a blue for it: a
+  dark green-blue, the amber still in it;
+- pour Milk: a white body on a black-ground look. On a Lamp Ground look it reads as clear,
+  where real milk would throw a grey shadow (PLAN 18d-12c, 18j);
+- say if any liquid's own colour looks wrong to you, or if Oil's pale gold is too faint to
+  be worth it.
+
 ---
 
 ## Reading the frame time while you do it

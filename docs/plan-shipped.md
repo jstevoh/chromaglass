@@ -2199,7 +2199,23 @@ headroom for a thick bottle reads the GPU's share of the dish (`speciesShare`, a
 a second) instead of the CPU's body, which still fades. `npm run thick`'s kept share now
 asserts no fade (1.0000, where the fade took 0.0225); the glycerine pool, no longer
 thinning as it fades, reads 0.045 of colour and syrup 2.06.
-The open items are 18d-3 to 18d-11 in PLAN.md.
+**18d-12** (2026-10-05): each liquid pours its own colour, and a dye picked for it tints it
+(`npm run natural`, `npm run bottles`). The owner: "Some of the liquids don't carry color.
+Let's make them by default the correct color, but allow them to have color as well." Each
+bottle had one colour and it was all dye (Syrup red-orange, Alcohol mint, Oil orange,
+Glycerine, Silicone, Soap and Milk pale swatches), and a dye picked replaced it. Now every
+bottle that is a liquid of its own carries `own`, what 6 mm of it passes of the lamp's light:
+Syrup amber (maple syrup's numbers, so its Amber grade: 75% at 560 nm through 6 mm, 27% in
+the blue), sunflower Oil a pale gold, Ferrofluid black, Milk white (it scatters, `scatter`
+2/mm, laid as a white body until 18j), and Water, Glycerine, Alcohol, Silicone, Soap,
+vinegar and washing soda clear. A clear liquid with no dye lays no colour at all: what shows
+is the colour its volume pushes aside, and the lamp through it on a lamp ground. A dye
+picked goes into the liquid (`pourTint`, `src/lib/liquidColour.ts`): transmissions multiply,
+so absorbances add, and every hand's pour (the mouse, other fingers, a take, the phone's
+Drop, the remote) reads it. A Natural swatch on the shelf, the Design desk, the phone's Dye
+sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by default
+(the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
+The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 
