@@ -1584,6 +1584,14 @@ Measured (`npm run airblow`, lab, software WebGPU, Classic's step on the app's g
 - a pool of ferrofluid went +2.89% and a drop of oil +0.83% by the flow alone, none of
   either made or lost.
 
+Found by the Mac's `npm run tools` on the PR: with the carries gone, the stroke out to the
+left moved its pool −0.26% (+0.20% to beat) and the one to the right +0.51%. On that
+runner the pointer's moves came about 120 ms apart, and in the gap between the direction's
+150 ms hold and the straw's hold the wind was a puff, whose ring carry moved 80 to 106 of a
+pool of 210 to 244 out round the hand, backwards near the pool's leading edge (inferred
+from the counts the check prints: 3 to 4 puff carries a stroke, no directed one). The wind
+now blows along the hand's last way until the hand is held (BLOW_STRAW_FRAMES).
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the

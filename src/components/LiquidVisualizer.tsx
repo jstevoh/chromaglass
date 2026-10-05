@@ -7194,7 +7194,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // ferrofluid the way the hand last went (PLAN.md §15g);
                   // held still, or off a thin gap, it carries them (§15c).
                   // It used to erase them.
-                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  /*
+                    Along the way the hand last went until the hand is held,
+                    not only for the 150 ms the ferrofluid's push keeps it
+                    (BLOW_DIR_HOLD_MS). Between the two the wind was a puff,
+                    and a puff carries the colour under the hand out onto a
+                    ring a palm and more across: on a runner whose moves came
+                    120 ms apart, a stroke's three or four puffs moved 80 to
+                    106 of a pool of 210 to 244 out round the hand, which
+                    near the pool's leading edge is backwards, and the
+                    stroke out to the left moved the pool -0.26% against the
+                    air's push (`npm run tools` on #300). A pointer that is
+                    late is not a hand that stopped; a hand that stopped is
+                    held within BLOW_STRAW_FRAMES and blows the straw, or on
+                    a plate that is not the lead, the puff.
+                  */
+                  const aim = going ?? (hand.blowDir.moved && hand.blowDir.still < BLOW_STRAW_FRAMES ? hand.blowDir : null);
+                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, aim ? aim.x : 0, aim ? aim.y : 0);
                   blowStepsRef.current.carried += carried;
                   blowStepsRef.current.wind++;
                   if (going) blowStepsRef.current.directed++;
