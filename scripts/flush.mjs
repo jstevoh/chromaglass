@@ -23,36 +23,61 @@
  *   1. A ring of colour at 0.15 of the plate round a held pour of water
  *      at the middle: the ring's mean r² grows by V/π, to 5%. The mean of
  *      r², not of r, because r² is what the flow moves by a constant, so
- *      the carry's spreading of the ring's width does not move it. The
- *      same pours laid with no volume (the plate before 18c) move it by
- *      less than a hundredth of that.
+ *      the carry's spreading of the ring's width does not move it. With
+ *      no volume a pour of water lays nothing at all (the plate before
+ *      18c), and the ring drifts by less than a hundredth of that.
  *   2. Glycerine poured as volume is all accounted for: the species' total
- *      is the sum of the pours' shares (f·πr²/2 a dome), to 1%, after the
- *      flow each made has carried it off its disc. Its first version mixed
+ *      is the sum of the pours' shares (f·πr²/2 a dome), to 1%, and the
+ *      flow each made has carried it off its disc: no cell is fuller than
+ *      a whole column (1.02), and its mean r² is a full disc of that
+ *      area's, πR² = V and R²/2, within 0.9 to 1.3 for the carry's
+ *      spreading of its edge. A pour whose flow never ran would keep the
+ *      total and fail both. Its first version mixed
  *      the pour into the column, (was + f)/(1 + f), and then let the pour's
  *      own flow carry f of it out, counting that outflow twice: it read
  *      0.495, half of every pour gone, glycerine into glycerine adding
  *      nothing at all.
  *   3. A dish of glycerine flushed with clear liquid: a quarter of the
  *      dish's volume of water poured at the middle pushes a quarter of the
- *      glycerine over the rim and leaves the rest, 0.75 of the dish, to 3%
+ *      glycerine over the rim and leaves the rest, 0.75 of the dish, to 1%
  *      (the front stays well inside the rim, so what left was all
- *      glycerine). Before 18d-2 nothing could leave and the fade took it
- *      anyway; before 18c water poured into it pushed nothing out.
+ *      glycerine). 18d-1's fade over the run would read 4% low. The dish is
+ *      full to the rim and no further first, to 2%: a rim that never took
+ *      the corners off would read 1.27.
  *   4. And the water is where it was poured: the middle of the dish is
  *      clear liquid again, its share under 0.05.
+ *   5. And the app's held stream, on the CPU: a second of a held Dropper
+ *      pours 2 mL (HELD_POUR), no step of it clipped at a whole column.
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
  * Linux box's software WebGPU anywhere else (PW_WEBGPU=1).
  */
 import { openLab } from './lab.mjs';
+import { HELD_POUR, pourShare } from '../src/lib/liquidProps.ts';
+import { DISH_METRES, DISH_REST_GAP } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
+
+/*
+  5. The held stream the app pours with (pourShare, LiquidVisualizer's
+  onDeposit), which the lab's pours do not go through: a second of a held
+  Dropper at its default width (3 cells of the 128 its geometry was tuned
+  at), a step at a time at 60 a second, puts down 2 mL, and no step of it
+  is clipped at a whole column, so the rate is the rate.
+*/
+{
+  const r = 3 / 128, steps = 60;
+  const dome = Math.PI * (r * DISH_METRES) ** 2 / 2 * DISH_REST_GAP * DISH_METRES;
+  const one = pourShare(r, 1, 1 / steps);
+  const mL = one * dome * steps * 1e6;
+  check('a held bottle pours 2 mL a second, unclipped', Math.abs(mL - HELD_POUR * 1e6) < 1e-9 && one < 1 && pourShare(r, 0.35) === 0.35,
+    `${mL.toFixed(3)} mL in a second of a Dropper ${(r * DISH_METRES * 1000).toFixed(1)} mm wide, ${one.toFixed(3)} of the column a step; a dropped dose of 0.35 is 0.35`);
+}
 
 const { page, close } = await openLab();
 const gpuErrors = [];
@@ -81,13 +106,14 @@ try {
     };
     const shares = async () => {
       const s = await lab.field('species');
-      let total = 0, mid = 0, midCells = 0;
+      let total = 0, mid = 0, midCells = 0, most = 0, r2 = 0;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const v = s[(i + j * N) * 4];
-        total += v;
+        const x = (i + 0.5) / N - 0.5, y = (j + 0.5) / N - 0.5;
+        total += v; most = Math.max(most, v); r2 += v * (x * x + y * y);
         if (Math.hypot((i + 0.5) / N - 0.5, (j + 0.5) / N - 0.5) < 0.04) { mid += v; midCells++; }
       }
-      return { total: total / (N * N), mid: mid / Math.max(1, midCells) };
+      return { total: total / (N * N), mid: mid / Math.max(1, midCells), most, r2: r2 / Math.max(total, 1e-9) };
     };
     // 1. The ring, pushed by water poured at the middle, and the same pours with no volume.
     const RP = 0.04, TAKE = 1, POURS = 40;
@@ -142,15 +168,15 @@ try {
   const grew = ring.after - ring.before, want = ring.V / Math.PI, flatGrew = flat.after - flat.before;
   check('water poured at the middle pushes a ring of colour out by the volume poured',
     Math.abs(grew / want - 1) < 0.05 && Math.abs(flatGrew) < 0.01 * want,
-    `mean r² ${f(ring.before, 5)} → ${f(ring.after, 5)}, grew ${f(grew, 5)} against V/π ${f(want, 5)} (${f(grew / want)}); the same pours with no volume, as before 18c: ${f(flatGrew, 5)}`);
-  const p = r.poured;
-  check('glycerine poured as volume is all accounted for once its flow has carried it off',
-    Math.abs(p.total / p.want - 1) < 0.01,
-    `species ${f(p.total, 5)} of the dish against ${f(p.want, 5)} poured (${f(p.total / p.want, 4)})`);
+    `mean r² ${f(ring.before, 5)} → ${f(ring.after, 5)}, grew ${f(grew, 5)} against V/π ${f(want, 5)} (${f(grew / want)}); with no volume a pour of water lays nothing, as before 18c, and the ring drifts ${f(flatGrew, 5)}`);
+  const p = r.poured, discR2 = p.want / (2 * Math.PI);
+  check('glycerine poured as volume is all accounted for, and its flow has carried it off its disc',
+    Math.abs(p.total / p.want - 1) < 0.01 && p.most <= 1.02 && p.r2 > 0.9 * discR2 && p.r2 < 1.3 * discR2,
+    `species ${f(p.total, 5)} of the dish against ${f(p.want, 5)} poured (${f(p.total / p.want, 4)}); fullest cell ${f(p.most)}; its mean r² ${f(p.r2, 5)} against a full disc of that area's ${f(discR2, 5)}`);
   const fl = r.flush;
   const insideFull = fl.full.total / fl.dish, left = fl.after.total / fl.full.total, wantLeft = 1 - fl.V / fl.dish;
   check('a quarter of the dish of water pushes a quarter of the glycerine over the rim',
-    insideFull > 0.98 && Math.abs(left / wantLeft - 1) < 0.03,
+    Math.abs(insideFull - 1) < 0.02 && Math.abs(left / wantLeft - 1) < 0.01,
     `the dish ${f(insideFull)} glycerine; ${fl.pours} pours of water, ${f(fl.V / fl.dish)} of its volume, leave ${f(left)} of it (the volume says ${f(wantLeft)}; with 18d-1's fade it would have been less, with no rim more)`);
   check('the middle of the flushed dish is clear liquid again', fl.after.mid < 0.05,
     `glycerine's share at the middle ${f(fl.after.mid)} (it was ${f(fl.full.mid)})`);

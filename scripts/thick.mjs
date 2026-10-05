@@ -52,6 +52,8 @@
  *      poured, to 0.3%. Nothing fades it (PLAN 18d-2): a liquid leaves only
  *      over the rim, and this pool is far from it. 18d-1's fade, 22 s to a
  *      third, took 2.2% over the 30 steps, so a fade left in is far out.
+ *      A species stage that never ran would also read exactly 1: check 5,
+ *      the alcohol's species moving with its colour, is what catches that.
  *   5. And carried with its colour: on the alcohol run, whose pool moves
  *      some three cells, the species' middle moves with the colour's to a
  *      tenth of a cell (the glycerine pool moves a fourteenth of a cell,
