@@ -1122,9 +1122,17 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
   no magnet until the hand holds it, that the disc's mean ferrofluid stays under 0.3
   nine seconds on (in the lab 0.10 as poured and after, 0.54 a second into the old
   magnet and 0.97 by four), measured again if the ferrofluid was laid afresh in the
-  window, and that the magnet let go of has strength. Left: a hold while the show is stopped
-  or draining gives no magnet, because the hand is read in the solver's step; a
-  hold after Start does.
+  window, and that the magnet let go of has strength. Left then: a hold while the show
+  was frozen or draining gave no magnet, because the hand is read in magnetFor, which
+  only the solver's step asked; a hold after Start did. Shipped 2026-10-05: frozen
+  or draining, magnetFor is asked for its bookkeeping alone whenever a hand has the
+  magnet (the step's settings thrown away, so a frozen plate still does not move),
+  and the drain, which skips every hand, still notes where the magnet's hand is.
+  `npm run magnet`'s check 9 freezes Classic (F), holds the Magnet in a corner,
+  lets go, and asks that the solver was not stepped through the hold, that the look
+  was given Magnet Strength 0.8, and that thawed the solver has it where the hand
+  left it The drain's path has no check of its own: a drain is under a
+  second, and a hold timed into it from a harness would be a check of the timing.
 
 - **9y. The Magnet brings no ferrofluid** (**shipped**). Asked by the owner
   (2026-10-04), on the build with 9x live: "Why does the magnet add ferrofluid? It
@@ -1418,6 +1426,23 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   opening), no frame gap over 0.62 s. The lanes now spend 27.4 of their 29 s
   compiling, so what is left is the compiles themselves: 48 of them, the first three
   under Chromium's 2.9 s GPU start.
+
+### 14s. The ear: the input picker (shipped)
+
+**Shipped 2026-10-05.** `chooseAudioInput` (`App.tsx`) was memoised on `[audioSource]`
+alone and called the `handleSourceChange` of the render in which the source last
+changed, when `audioStream` was still `null` and `audioInputId` the old one. Measured
+2026-09-28 with Chromium's fake devices, and again by `npm run inputpick` on main
+before the fix: picking Input 1 and then Input 2 made three `getUserMedia` calls, none
+with a `deviceId`, and all three tracks stayed live ("3 live tracks: default, default,
+default", 2/5). The interface picked at soundcheck was not the one the show heard until
+a reload, and each pick left another microphone open. Now the stream and the input are
+refs beside their state, the picker calls this render's handler through a ref with the
+id it was given, and a device that answers after a newer pick is closed rather than
+heard. `npm run inputpick` goes through the desk's Mic dot and the settings' list: each
+pick asks for its own input by id, one track is live at the end, Input 2's (5/5). It
+runs in Measure's browser part. Safari's second song and song ID's latch stay open in
+PLAN.md 14s.
 
 ### 14x. The microphone hears the hand on the laptop (shipped)
 

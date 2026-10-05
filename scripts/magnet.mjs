@@ -676,6 +676,50 @@ try {
     `grid ${grids3.seen.join(' → ')}²; Ferrofluid ${before3.amount}; laid as a look's ${before3.lays} → ${after3.lays} times; `
     + `ferrofluid ${(poured3.total * 100).toFixed(2)}% of the plate poured, ${(kept3.total * 100).toFixed(2)}% on the new grid (${kept3.n}²); `
     + `in the two pools' reach ${shares(poured3)} before, ${shares(kept3)} after`);
+
+  /*
+    9. A hold on a frozen plate gives the look its magnet (PLAN 9s).
+
+    magnetFor, where a hold is read (onMagnetInHand: the look given Magnet
+    Strength 0.8; a let-go noted as set down), was asked only from the
+    solver's step, and a frozen or draining plate is not stepped. So the
+    Magnet held with the show frozen (F) gave the look no magnet: let go and
+    thawed, the plate had none, where the same hold after Start did. Its own
+    page, so nothing above has given Classic a magnet yet. Asked first that
+    the show really is frozen and the solver not stepped through the hold
+    (else this is check 4 again), then that the hold gave the look 0.8,
+    and, thawed, that the solver is given a magnet with strength where the
+    hand left it.
+  */
+  await page3.close();
+  const page4 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page4.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
+  await page4.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
+  await page4.waitForTimeout(9000);
+  const box4 = await page4.evaluate(() => { const r = document.getElementById('liquid-canvas').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const frozen4 = () => page4.evaluate(() => { const d = window.chromaglassDebug(); return { active: d.active?.() ?? null, steps: d.fluids?.[0]?.stepCount ?? -1, strength: d.settings?.magnetStrength ?? null }; });
+  await page4.mouse.click(5, 5);
+  await page4.keyboard.press('m');
+  await page4.keyboard.press('f');
+  await page4.waitForTimeout(500);
+  const f0 = await frozen4();
+  await page4.mouse.move(box4.x + box4.w * 0.25, box4.y + box4.h * 0.3);
+  await page4.mouse.down();
+  await page4.waitForTimeout(1000);
+  const hand4 = await page4.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  await page4.mouse.up();
+  await page4.waitForTimeout(1000);
+  const f1 = await frozen4();
+  await page4.keyboard.press('f');
+  await page4.waitForTimeout(2000);
+  const thawed = await page4.evaluate(() => { const st = window.chromaglassDebug().fluids?.[0]?.lastStep; return st ? { x: +st.magnetX, y: +st.magnetY, strength: +st.magnetStrength } : null; });
+  const off4 = hand4 && thawed ? Math.hypot(thawed.x - clamp(hand4.x), thawed.y - clamp(hand4.y)) : Infinity;
+  check('held with the show frozen, the Magnet gives the look its magnet, set down where the hand left it',
+    f0.active === false && f0.strength === 0 && f1.active === false && f1.steps === f0.steps && !!hand4
+      && f1.strength === 0.8 && !!thawed && thawed.strength > 0 && off4 < 0.02,
+    `frozen ${f0.active === false && f1.active === false} (solver steps ${f0.steps} → ${f1.steps} through the hold); `
+    + `Magnet Strength ${f0.strength} → ${f1.strength}; the hand at ${hand4 ? `${hand4.x.toFixed(2)},${hand4.y.toFixed(2)}` : 'nowhere'}; `
+    + `thawed, the solver was given ${thawed ? `${thawed.x.toFixed(2)},${thawed.y.toFixed(2)} strength ${thawed.strength.toFixed(2)}` : 'nothing'}, ${off4.toFixed(3)} from the hand`);
 } finally {
   await browser.close();
 }

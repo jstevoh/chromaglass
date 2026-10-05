@@ -749,9 +749,31 @@ export default function App() {
 
   const userPresetsRef = useRef<UserPreset[]>([]);
 
-  const handleSourceChange = useCallback(async (source: AudioSource) => {
-    if (audioStream) {
-      audioStream.getTracks().forEach(track => track.stop());
+  /*
+    The stream the show hears and the input it was opened on, as refs beside
+    the state, for handleSourceChange to read (PLAN.md 14s). Read from its
+    closure, a call made through a handler from an earlier render saw the
+    stream and the input of that render: the input picker's (chooseAudioInput,
+    memoised on the source alone) was the handler from when the source last
+    changed, with no stream yet and the old input. Measured with fake devices:
+    picking Input 1 and then Input 2 made three `getUserMedia` calls, none with
+    a `deviceId`, and all three tracks stayed live, so the interface picked at
+    soundcheck was not the one the show heard until a reload, and each pick
+    left another microphone open. `scripts/inputpick.mjs`.
+  */
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  audioStreamRef.current = audioStream;
+  const audioInputIdRef = useRef(audioInputId);
+  audioInputIdRef.current = audioInputId;
+  /** Counts the calls, so a device that answers after a newer pick is closed, not heard. */
+  const sourceAskRef = useRef(0);
+
+  const handleSourceChange = useCallback(async (source: AudioSource, inputId?: string) => {
+    const ask = ++sourceAskRef.current;
+    const was = audioStreamRef.current ?? audioStream;
+    if (was) {
+      was.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
       setAudioStream(null);
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
@@ -801,6 +823,7 @@ export default function App() {
       return;
     }
 
+    const deviceId = inputId ?? audioInputIdRef.current;
     try {
       let stream: MediaStream;
       if (source === 'system') {
@@ -834,16 +857,20 @@ export default function App() {
             noiseSuppression: false,
             autoGainControl: false,
             channelCount: 1,
-            ...(audioInputId ? { deviceId: { exact: audioInputId } } : {}),
+            ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
           },
         };
         try {
           stream = await navigator.mediaDevices.getUserMedia(raw);
         } catch {
-          stream = await navigator.mediaDevices.getUserMedia(audioInputId ? { audio: { deviceId: { exact: audioInputId } } } : { audio: true });
+          stream = await navigator.mediaDevices.getUserMedia(deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true });
         }
         void refreshAudioInputs();   // with permission, the inputs have names now
       }
+      // Two picks in quick succession: the first device can answer after the
+      // second was asked for. It is closed, not handed to the show over it.
+      if (ask !== sourceAskRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
+      audioStreamRef.current = stream;
       setAudioStream(stream);
       stream.getTracks().forEach(track => {
         track.onended = () => {
@@ -852,6 +879,9 @@ export default function App() {
         };
       });
     } catch (error: any) {
+      // Refused after a newer pick (the prompt dismissed once the band was
+      // chosen): the newer source stands.
+      if (ask !== sourceAskRef.current) return;
       if (error.name === 'NotAllowedError' || error.name === 'AbortError' || error.message?.includes('Permission denied')) {
         console.warn('Audio permission denied or cancelled by user.');
       } else {
@@ -859,7 +889,9 @@ export default function App() {
       }
       setAudioSource('none');
     }
-  }, [audioStream, audioInputId, refreshAudioInputs]);
+  }, [audioStream, refreshAudioInputs]);
+  const handleSourceChangeRef = useRef(handleSourceChange);
+  handleSourceChangeRef.current = handleSourceChange;
   /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
   const toggleDrone = useCallback(() => {
     if (droneRef.current) {
@@ -878,11 +910,13 @@ export default function App() {
   }, []);
   const chooseAudioInput = useCallback((id: string) => {
     setAudioInputId(id);
+    audioInputIdRef.current = id;
     try { localStorage.setItem(AUDIO_INPUT_KEY, id); } catch { /* private */ }
-    // Reopen the microphone on the new input if it is the live source.
-    if (audioSource === 'microphone') setTimeout(() => { void handleSourceChange('microphone'); }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioSource]);
+    // Reopen the microphone on the new input if it is the live source: this
+    // render's handler, told the id, so it closes the stream that is live now
+    // and opens the one just picked (see audioStreamRef).
+    if (audioSourceRef.current === 'microphone') void handleSourceChangeRef.current('microphone', id);
+  }, []);
 
   /** What the show hears of the music element. */
   const musicStream = useCallback((el: HTMLAudioElement): MediaStream | null => {
@@ -922,6 +956,7 @@ export default function App() {
     // Music takes over: the plate's instrument and the band in a box stop.
     stopDrone();
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+    sourceAskRef.current++;   // a microphone still being asked for is not heard over the music
     if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
     el.src = url;
     el.onloadedmetadata = () => setMusicTime({ t: 0, d: el.duration || 0 });
@@ -943,6 +978,7 @@ export default function App() {
     if (!el) return;
     if (!el.paused) { el.pause(); return; }
     if (audioSource !== 'file') {
+      sourceAskRef.current++;   // as startMusic
       stopDrone();
       if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
       if (audioStream) audioStream.getTracks().forEach(t => t.stop());
@@ -3908,8 +3944,17 @@ export default function App() {
         }}
       />
 
-      {/* A game controller's cursor: a ring over the plate, shown while the sticks move */}
-      {gamepadCursorStyle && (
+      {/*
+        A game controller's cursor: a ring over the plate, shown while the
+        sticks move. Not in clean screen, which is the show (PLAN.md 14w): the
+        owner asked for nothing to be drawn at the pointer on the show, and
+        when the laptop's own screen is the one on the wall (one screen, or a
+        mirrored projector) this ring was on the wall the moment a stick
+        moved. Without it the stick is aimed by what it does to the plate,
+        which is how a hand on a dish aims anyway; the design screen keeps it
+        for finding where the cursor is. `npm run showcursor` asks both.
+      */}
+      {gamepadCursorStyle && overlaysVisible && (
         <div
           className="pointer-events-none fixed z-30 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(255,255,255,0.6)] transition-transform"
           style={{ left: gamepadCursorStyle.left, top: gamepadCursorStyle.top, width: gamepad.cursor.pressing ? 44 : 28, height: gamepad.cursor.pressing ? 44 : 28, backgroundColor: gamepad.cursor.pressing ? `${selectedLiquid?.color ?? '#fff'}55` : 'transparent' }}
