@@ -7,6 +7,7 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { songShapeLine } from './lib/songShape';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
+import { holdWhereItIs } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
@@ -1453,7 +1454,14 @@ export default function App() {
     rowFades.forget(['gel', 'lumia']);
   };
 
-  const updateSettings = (newSettings: Partial<VisualizerSettings>) => {
+  const updateSettings = (patch: Partial<VisualizerSettings>) => {
+    /*
+      Hold stays where the closeup is (QA-12, reported by the owner as the
+      picture jumping when Hold was pressed): see holdWhereItIs. Here rather
+      than at the chip, so the desk's chip, the phone's Hold, the Camera menu
+      and anything else that sets the mode all get it.
+    */
+    const newSettings = holdWhereItIs(patch, settingsRef.current.macroCamera, () => visualizerRef.current?.macroCentre() ?? null);
     setSettings(prev => ({ ...prev, ...newSettings }));
     setDocDirty(true);
     handOnLevels(Object.keys(newSettings));

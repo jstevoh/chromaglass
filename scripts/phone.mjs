@@ -1473,6 +1473,65 @@ try {
       await touch('touchEnd', [{ x: 110, y: 420, id: 1 }, { x: 280, y: 420, id: 2 }]);
       await settle(150);
       check('and when they lift, nothing is left painting', (await hands()).hands.length === 0 && !(await hands()).pinch);
+
+      /*
+        Hold stays where the closeup is (QA-12). The owner pressed Hold and
+        the picture jumped: Hold sat on the stored aim, and on Auto the camera
+        had gone somewhere else, so Hold went back to the aim (from Auto, in
+        one frame). The aim is put far from the camera first, so a Hold that
+        still went to the stored aim would cross a third of the plate here.
+
+        Measured against what Hold wrote, not against a reading taken before
+        the tap: Auto keeps riding its drop in the moment between that reading
+        and Hold landing, so "the frame did not move from there" counted Auto's
+        own motion against Hold. So: the aim Hold wrote is where the camera was
+        (loosely, for that moment) and not the stale far aim, and from a beat
+        after the tap the frame stays on it. Shot Length 60 keeps Auto from
+        cutting to another drop on its timer during all this. Then the same
+        far aim given on purpose must move the camera, or a camera that was
+        not stepping would have passed; each window counts the plate's own
+        steps, since a frame drawn is not a frame the camera ran on.
+      */
+      const shotNow = () => page.evaluate(() => { const d = window.chromaglassDebug(); return { x: d.shot.cx, y: d.shot.cy, steps: d.fluids[0].stepCount }; });
+      const far = (v) => (v < 0.5 ? 0.85 : 0.15);
+      const onAuto = await shotNow();
+      const farAim = { x: far(onAuto.x), y: far(onAuto.y) };
+      await page.evaluate((a) => window.chromaglassSettings({ macroAimX: a.x, macroAimY: a.y, macroHold: 60 }), farAim);
+      await settle(300);
+      const held0 = await shotNow();
+      await tap(page, 'phone-camera-hold');
+      await settle(300);
+      const heldAim = await page.evaluate(() => { const s = window.chromaglassSettings(); return { x: s.macroAimX, y: s.macroAimY, mode: s.macroCamera }; });
+      const wrote = Number.isFinite(heldAim.x) && Number.isFinite(heldAim.y);
+      const off = (s, t) => Math.hypot(s.x - t.x, s.y - t.y);
+      const heldFrom = await shotNow();
+      let heldMove = off(heldFrom, wrote ? heldAim : held0);
+      for (let i = 0; i < 12; i++) {
+        await settle(100);
+        heldMove = Math.max(heldMove, off(await shotNow(), wrote ? heldAim : held0));
+      }
+      const holdSteps = (await shotNow()).steps - heldFrom.steps;
+      const aimFrom = await shotNow();
+      await page.evaluate((a) => window.chromaglassSettings({ macroAimX: a.x, macroAimY: a.y }), farAim);
+      let aimedMove = 0;
+      for (let i = 0; i < 15; i++) {
+        await settle(100);
+        aimedMove = Math.max(aimedMove, off(await shotNow(), aimFrom));
+      }
+      const aimSteps = (await shotNow()).steps - aimFrom.steps;
+      // Software WebGPU steps the app's plate slowly or not at all (it stood
+      // still through all of this in a cloud session), and a camera that is
+      // not stepping cannot be asked. The Mac shard asks it; `npm run
+      // holdjump` asks the camera itself everywhere.
+      if ((holdSteps >= 5 && aimSteps >= 5) || NEED_GPU) {
+        check('pressing Hold on the closeup keeps the picture where it is, and an aim moves it',
+          heldAim.mode === 'hold' && wrote && off(heldAim, held0) < 0.03 && off(heldAim, farAim) > 0.3
+            && heldMove < 0.01 && aimedMove > 0.1 && holdSteps >= 5 && aimSteps >= 5,
+          `Hold wrote the aim ${heldAim.x?.toFixed(3)}, ${heldAim.y?.toFixed(3)} (the frame was at ${held0.x.toFixed(3)}, ${held0.y.toFixed(3)}, the old aim ${farAim.x}, ${farAim.y}); `
+          + `the frame then strayed ${heldMove.toFixed(3)} from it (under 0.010 wanted) over ${holdSteps} steps; the old aim given again moved it ${aimedMove.toFixed(3)} (over 0.100 wanted) over ${aimSteps} steps`);
+      } else {
+        console.log(` --   the plate stepped ${holdSteps} and ${aimSteps} times over the Hold and the aim: Hold keeping the closeup where it is is not asked here (the Mac shard asks it)`);
+      }
     }
     await ctx.close();
   }

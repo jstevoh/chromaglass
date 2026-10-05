@@ -120,6 +120,8 @@ export class MacroCamera {
   /** The aim last acted on (grid cells), so follow locks on again only when it moves. */
   private lastAimX = NaN;
   private lastAimY = NaN;
+  /** The grid the camera last ran on, so `centre` can answer in plate uv. */
+  private lastSize = 0;
 
   /**
    * The jitter on which drop wins a cut and how long the shot holds. Seeded
@@ -167,8 +169,24 @@ export class MacroCamera {
     return this.clock;
   }
 
+  /**
+   * Where the camera is pointed now, in plate uv (0..1): its own eased centre,
+   * without the treble's tremor, or null before it has run.
+   *
+   * What Hold aims at as it is pressed (`holdWhereItIs`, QA-12). The centre
+   * before the frame clamp, as the aim is: `aimed()` clamps the same way, so
+   * the shot it draws from this aim is the one already on screen.
+   */
+  get centre(): { x: number; y: number } | null {
+    if (!this.initialized || !(this.lastSize > 0)) return null;
+    const x = this.camX / this.lastSize, y = this.camY / this.lastSize;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x: clamp(x, 0, 1), y: clamp(y, 0, 1) };
+  }
+
   update(field: MacroField, dt: number, opts: MacroCameraOptions): MacroShot {
     const { size } = field;
+    this.lastSize = size;
     const step = clamp(Number.isFinite(dt) ? dt : 0, 0, 0.25);
     /*
       Not-a-number is sticky here, and it was black.
@@ -528,4 +546,32 @@ export class MacroCamera {
     if (half >= 0.5) return 0.5;
     return clamp(c, half, 1 - half);
   }
+}
+
+type CameraMode = 'hold' | 'follow' | 'auto';
+
+/**
+ * The settings patch that switches the closeup to Hold, with the aim set to
+ * where the camera is looking now (QA-12).
+ *
+ * The owner pressed Hold on the zoom chip and the picture jumped. Hold sits on
+ * the stored aim (`aimed()` above), and under Follow or Auto the camera had
+ * ridden away from that aim, so Hold eased the frame back to it at Hold's
+ * quick rate: across the plate, at 3x, in a second. Hold is the mode for "stay
+ * there", so it takes the camera's own centre as its aim, and there is
+ * nowhere to go. The aim is a setting, not a private place inside the camera,
+ * so the Aim sliders say where it is and the drift wanders round the new aim
+ * rather than pulling the frame back to the old one.
+ *
+ * Left alone: a patch that is not a switch to Hold, a Hold that was already
+ * on, a patch carrying its own aim (a click on the plate means that place),
+ * and no closeup running (`centre` null: the camera is not looking anywhere).
+ */
+export function holdWhereItIs<T extends { macroCamera?: CameraMode; macroAimX?: number; macroAimY?: number }>(
+  patch: T, mode: CameraMode | undefined, centre: () => { x: number; y: number } | null,
+): T {
+  if (patch.macroCamera !== 'hold' || (mode ?? 'hold') === 'hold') return patch;
+  if (patch.macroAimX !== undefined || patch.macroAimY !== undefined) return patch;
+  const here = centre();
+  return here ? { ...patch, macroAimX: here.x, macroAimY: here.y } : patch;
 }
