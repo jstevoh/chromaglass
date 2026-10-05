@@ -823,6 +823,11 @@ Found with it, open:
   pixels at every tint's threshold: 8.2% of Roy's edge pixels on the Mac against 0.02%
   for the plate under the print. A print should read the dye's coverage before the grain
   (or Roy ship without one); the owner's eye decides which (judging §34).
+- **1g. On the lamp the grain mottles a thin edge** (18b's looks: Poster 1969, Fillmore,
+  Microscopic Chaos and the rest on the lamp). This fix does not change them (the same
+  numbers before and after it): the grain's soft blotches, about ten pixels across,
+  move a thin edge's pixels 9–10.6 levels on average (`npm run grainedge` prints it), with
+  no flecks. Watercolour-like, not dithered; whether it is too strong is the owner's call.
 
 ### 2. Lacing
 
