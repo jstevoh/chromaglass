@@ -7,9 +7,12 @@ driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 Before starting anything that is not a bug fix, read `PLAN.md`'s **Order of work**
 (its first section: which step is next, in which lane) and then only the section your
 step names: `grep -n '^##' PLAN.md` for the map, then `sed -n` the section. Not the
-whole file: `PLAN.md` is about 75k tokens, and see "Keeping a session small" for why
-that matters. Shipped batches are in `docs/plan-shipped.md`; the engine's own order is
-in `docs/roadmap.md`.
+whole file: `PLAN.md` is about 60k tokens, and see "Keeping a session small" for why
+that matters. What shipped is in `docs/plan-shipped.md`, under the same section numbers:
+`PLAN.md` keeps a one-line stub per shipped item and only the open work, so read the
+archive only when an open item needs the history behind it. When an item ships, move its
+story there in the same PR and leave the stub. The engine's own order is in
+`docs/roadmap.md`.
 `docs/judging.md` lists what needs the owner's eyes on a real GPU.
 
 ## How work is done here
