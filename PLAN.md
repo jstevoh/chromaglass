@@ -4041,6 +4041,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   (`npm run spikes`: 16 tops lit against 7.8 places half a pitch off, where the check
   asks for three times as many; 4.0 off at 0.5). The ferrofluid looks' own pass should
   decide whether its water should be deeper or its points brighter at 1.
+- **18l-6. The mixer's grades are measured at Transmission 0.5.** At 1 the lab plate in
+  `npm run mixer` brightens (its brightest tenth 146 to 198 of 255) and contrast at 1.8
+  carries that tenth into white, so the spread reads 1.30 times against the bar's 1.3
+  (1.50 at 0.5). The grade shots pin 0.5; re-derive the contrast line on a plate whose
+  bright end has headroom at 1 (a dimmer lamp or a lower frontBright), then drop the pin.
 - **18l-1. Real dye spectra (the shortcut kept).** Still three bands: a dye's colour is
   three transmissions, and the 4%/96% limits stand in for the tails of a real absorption
   band. Spectral Optics' six bands cannot reproduce the palette's saturated colours (its

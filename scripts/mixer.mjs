@@ -247,6 +247,17 @@ const shots = await page.evaluate(async (controls) => {
   const base = { layerCount: 2, filmMix: 0.9, markMix: 1, markX: 0.5, markY: 0.5, markScale: 0.6, beads: 0, lampHotspot: 0, secondLamp: 0, microDroplets: 0, lampWarmth: 0, dishVignette: 0 };
   const all = { film, mark, backPlate: true, backRotation: Math.PI };
   const shot = (set, cam = all) => lab.render(S, { ...base, ...set }, cam);
+  /*
+    The front plate alone, for the grades (section 3), at Transmission 0.5:
+    the picture their bars were measured on. With the dye's depth drawn
+    (Transmission 1, the default since PLAN 18l) the thin dye on this plate
+    goes pale and the picture brightens (its brightest tenth 146 -> 198 of
+    255), and contrast at 1.8 about mid-grey then carries that tenth into
+    white, where the screen and not the control caps the spread: 1.30 times
+    against 1.50 at 0.5, measured. The grades are the mixer's; how deep a
+    dye draws is not theirs to answer for (PLAN 18l-6).
+  */
+  const GRADED = { layerCount: 1, filmMix: 0, markMix: 0, transmission: 0.5 };
   const out = {
     S,
     def: await shot({}),
@@ -258,14 +269,14 @@ const shots = await page.evaluate(async (controls) => {
     markUnderFilm: await shot({ mixOrder: 'led gel lumia front back mark film' }),
     onePlate: await shot({ layerCount: 1 }, { film, mark, backRotation: Math.PI }),
     oneBackOff: await shot({ backLevel: 0 }),
-    frontOff: await shot({ frontLevel: 0, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    bare: await shot({ layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    frontOff: await shot({ frontLevel: 0, ...GRADED }, {}),
+    bare: await shot({ ...GRADED }, {}),
     filmDark: await shot({ filmBright: 0 }),
-    frontHalf: await shot({ frontBright: 0.5, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontContrast: await shot({ frontContrast: 1.8, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontGrey: await shot({ frontSat: 0, saturationBoost: 1, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontFlat: await shot({ saturationBoost: 1, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontHue: await shot({ frontHue: 120, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    frontHalf: await shot({ frontBright: 0.5, ...GRADED }, {}),
+    frontContrast: await shot({ frontContrast: 1.8, ...GRADED }, {}),
+    frontGrey: await shot({ frontSat: 0, saturationBoost: 1, ...GRADED }, {}),
+    frontFlat: await shot({ saturationBoost: 1, ...GRADED }, {}),
+    frontHue: await shot({ frontHue: 120, ...GRADED }, {}),
     markDark: await shot({ markBright: 0 }),
     led: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0 }, {}),
     ledBeam: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'gel lumia front back led film mark' }, {}),
