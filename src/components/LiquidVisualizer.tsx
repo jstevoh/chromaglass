@@ -2529,10 +2529,22 @@ class FluidSimulation {
           and solid by 0.15. One wide Gaussian crosses that band in a thin
           ring, so a field is a lattice of small ones, 1.3 sigma apart, which
           sums to the even wash (TINT) in the band's middle.
+
+          Those were the strengths until the pigment's grain moved after the
+          gooey curve (#267, PLAN 1a): the grain the lab reads (a blank field,
+          about 0.75) had thinned every wash by a quarter in front of the
+          curve, and behind it thins the depth instead, so the same wash
+          printed solid. The deploy that took both read 47 dots on Roy's
+          opening against the 150 royopen asks. Swept as a whole (the seed's
+          TINT times 0.6 to 0.9, `npm run royopen`): 0.6 printed 29 dots, 0.7
+          256, 0.75 272, 0.8 240 and 0.9 102, every ink's fields dotting
+          across 0.7 to 0.8, so TINT is the old strengths times 0.75, the
+          band's middle. It is the same scaling the print's own check took
+          (benday's washes 0.14 → 0.10).
         */
         const u = S / GRID_SCALE;
         const M = (v: number) => 0.5 + (v - 0.5) * 0.7;
-        const TINT = [0.13, 0.12, 0.095];
+        const TINT = [0.098, 0.09, 0.071];
         const ink = (x: number, y: number, r: number, amount: number, i: number) => {
           const c = col(i);
           this.splatBlob(M(x) * S, M(y) * S, r * 0.7 * 0.5 * u, amount, c.r, c.g, c.b);
