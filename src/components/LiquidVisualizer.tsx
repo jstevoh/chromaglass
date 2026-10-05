@@ -2486,15 +2486,85 @@ class FluidSimulation {
       }
 
       case 'roy': {
-        // A panel's shapes: a few big flat pools of the three inks, each in a
-        // thin wash of itself twice as wide, so the print (benDay) has solid
-        // ink to outline and a tint round it to lay as dots from the start.
-        const shapes: [number, number, number][] = [[0.3, 0.32, 0.16], [0.68, 0.4, 0.18], [0.42, 0.7, 0.14], [0.75, 0.75, 0.1]];
-        shapes.forEach(([fx, fy, fr], i) => {
+        /*
+          A panel, laid out: flat shapes and two brushstrokes of the three
+          inks, apart on white paper, and three fields of pale wash for the
+          print (benDay) to lay as Ben-Day dots.
+
+          The owner, 2026-10-04: Roy "always starts with this giant black
+          stain". It was this seed. splatBlob takes its radius in the 128
+          grid's units and scales it by GRID_SCALE itself, and the old seed
+          handed it plate fractions times S, already in cells: each of the
+          four pools came out a Gaussian 0.24 of the plate wide in its core
+          and 0.43 in its wash, so all four lay over each other across the
+          whole glass. Red over blue over yellow absorbs every channel, and
+          the print draws dark as black: the lab, rendering the dye the app
+          had laid, printed 57% of the view black and 37% red, with no white,
+          no yellow and no blue (the owner's screenshot, nine seconds in).
+
+          Here every size is a plate fraction turned into splatBlob's units
+          (u). A solid shape is a Gaussian of half its radius: at 1.2 it is
+          solid ink out to about two sigma, and gone a little past that, so
+          shapes laid apart stay apart and the paper between them is paper.
+          The composition sits in the middle 0.7 of the plate, which is what
+          the plate's view shows at 1x.
+
+          A field of dots has to be an even wash at the strength the print
+          reads as a tint, and that strength is narrow and not the same for
+          each ink. Measured in the lab on flat squares through the real plate
+          shader with Roy's settings: blue prints dots from 0.09 to 0.11 and
+          is solid by 0.13, yellow from 0.11 to 0.13, red from 0.11 to 0.13
+          and solid by 0.15. One wide Gaussian crosses that band in a thin
+          ring, so a field is a lattice of small ones, 1.3 sigma apart, which
+          sums to the even wash (TINT) in the band's middle.
+        */
+        const u = S / GRID_SCALE;
+        const M = (v: number) => 0.5 + (v - 0.5) * 0.7;
+        const TINT = [0.13, 0.12, 0.095];
+        const ink = (x: number, y: number, r: number, amount: number, i: number) => {
           const c = col(i);
-          this.splatBlob(fx * S, fy * S, S * fr * 1.8, 0.5, c.r, c.g, c.b);
-          this.splatBlob(fx * S, fy * S, S * fr, 2.6, c.r, c.g, c.b);
-        });
+          this.splatBlob(M(x) * S, M(y) * S, r * 0.7 * 0.5 * u, amount, c.r, c.g, c.b);
+        };
+        const field = (x: number, y: number, R: number, i: number) => {
+          const sg = 0.02, dx = sg * 1.3, dy = dx * Math.sqrt(3) / 2;
+          const per = TINT[i % TINT.length] * dx * dy / (2 * Math.PI * sg * sg);
+          const c = col(i);
+          R *= 0.7;
+          for (let j = -Math.floor(R / dy); j * dy <= R; j++) {
+            for (let k = -Math.ceil(R / dx); k * dx <= R; k++) {
+              const ox = (k + (j & 1 ? 0.5 : 0)) * dx, oy = j * dy;
+              if (ox * ox + oy * oy > R * R) continue;
+              this.splatBlob((M(x) + ox) * S, (M(y) + oy) * S, sg * u, per, c.r, c.g, c.b);
+            }
+          }
+        };
+        const shape = (x: number, y: number, r: number, i: number, lobes: [number, number][]) => {
+          ink(x, y, r, 1.2, i);
+          for (const [a, f] of lobes) ink(x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.85, r * f, 1.0, i);
+        };
+        // A brushstroke: a chain of shapes along a bend from (x0, y0) through
+        // (xm, ym) to (x1, y1), fattest in the middle.
+        const stroke = (x0: number, y0: number, xm: number, ym: number, x1: number, y1: number, r: number, i: number) => {
+          for (let t = 0; t <= 1.0001; t += 0.05) {
+            const v = 1 - t;
+            ink(v * v * x0 + 2 * v * t * xm + t * t * x1, v * v * y0 + 2 * v * t * ym + t * t * y1,
+              r * (0.6 + 0.4 * Math.sin(Math.PI * t)), 0.9, i);
+          }
+        };
+        field(0.74, 0.27, 0.21, 2);
+        field(0.25, 0.74, 0.2, 0);
+        field(0.18, 0.2, 0.17, 1);
+        field(0.9, 0.86, 0.12, 1);
+        shape(0.3, 0.36, 0.09, 0, [[2.6, 0.6], [4.2, 0.5]]);
+        shape(0.5, 0.14, 0.05, 2, [[0.3, 0.6]]);
+        shape(0.86, 0.46, 0.05, 1, []);
+        shape(0.68, 0.74, 0.1, 2, [[5.6, 0.55], [1.9, 0.5]]);
+        shape(0.16, 0.86, 0.055, 2, [[0, 0.6]]);
+        shape(0.46, 0.86, 0.05, 1, [[3.4, 0.7]]);
+        shape(0.6, 0.3, 0.045, 1, []);
+        stroke(0.36, 0.58, 0.52, 0.42, 0.7, 0.54, 0.05, 0);
+        stroke(0.86, 0.88, 0.95, 0.74, 0.84, 0.62, 0.035, 0);
+        stroke(0.08, 0.56, 0.16, 0.44, 0.06, 0.3, 0.04, 1);
         break;
       }
 

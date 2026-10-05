@@ -1026,6 +1026,20 @@ On the laptop's own microphone, in a quiet room (no music), with any look:
 
 ---
 
+## 37. Roy, 1963 opens as a panel (PLAN 21e)
+
+Pick Roy, 1963. It should open as a Lichtenstein panel: flat red, yellow and blue
+shapes and brushstrokes apart on white, outlined in black, with fields of Ben-Day
+dots, and no black stain. The opening is measured (`npm run royopen`); a minute of
+the show is not:
+
+- watch it for a minute with music: do the pours and drops keep it a print, or do
+  the inks run together into dark patches again? Its Dye Budget is now 0.45 (was
+  0.9): say if it reads too empty, or still muddies;
+- are the dot fields big enough, and is there enough colour? Say which way.
+- add a green, then a purple, with the bottles: they should print as a bright
+  comic green and a violet, flat and outlined, not as yellow or blue (QA-16).
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real

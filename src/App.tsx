@@ -4033,8 +4033,21 @@ export default function App() {
           <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
         </div>
       )}
+      {/*
+        The zoom chip. Without a desk it hangs at the window's top, under the
+        projector's hint. With a desk up it sits at the top of the desk's
+        plate instead (QA-4): pinned to the window's top it landed on the
+        desk's top strip, square on Record performance, which the owner found
+        covered as soon as the plate was zoomed in, on Perform and Design
+        alike. The plate's box is the one place on a desk nothing else is
+        drawn, and the chip is about the plate, so it goes there.
+      */}
       {(settings.macroZoom ?? 1) > 1.05 && overlaysVisible && !phone && (
-        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 translate-y-9 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="macro-zoom">
+        <div
+          style={preview.frame ? { top: preview.frame.top + 8, left: preview.frame.left + preview.frame.width / 2 } : undefined}
+          className={`fixed ${preview.frame ? '' : 'top-3 left-1/2 translate-y-9 '}z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl`}
+          data-testid="macro-zoom"
+        >
           <Microscope size={12} className="ml-1" />
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
           <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>

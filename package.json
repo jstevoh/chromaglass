@@ -133,6 +133,7 @@
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "benday": "node scripts/benday.mjs",
+    "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
     "lace": "node scripts/lace.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
