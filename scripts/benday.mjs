@@ -332,8 +332,9 @@ try {
     its middle: the share of pixels within 45 of the overprint's colour, and
     the square's mean against every ink and overprint (the film grain
     averages out of a mean). At 0 the same pools must be green and violet to
-    begin with (their hue past 40 degrees from every ink), so the check is of
-    the print and not of a dye that was already yellow.
+    begin with (their hue past 40 degrees from every ink), and the print must
+    move the middle more than 30 levels from them, so the check is of the
+    print and not of a dye that was already the overprint's colour.
   */
   const over = [[0.32, 0.5, 0.12, GREEN, 2.5], [0.68, 0.5, 0.12, VIOLET, 2.5]];
   const overOn = await render(over);
@@ -356,8 +357,8 @@ try {
     const on = square(overOn, fx), off = square(overOff, fx);
     const h = hueOf(off.mean);
     check(`a ${name} pool prints flat in the ${name} overprint, not the nearest ink`,
-      h > from[0] && h < from[1] && on.ink === name && (on.share[name] ?? 0) > 0.9,
-      `at 0 ${off.mean.join(',')} (hue ${h.toFixed(0)}°); printed ${on.mean.join(',')} (${on.ink}), ${pct(on.share[name] ?? 0)} of its middle the ${name}`);
+      h > from[0] && h < from[1] && on.ink === name && (on.share[name] ?? 0) > 0.9 && dist(on.mean, off.mean) > 30,
+      `at 0 ${off.mean.join(',')} (hue ${h.toFixed(0)}°); printed ${on.mean.join(',')} (${on.ink}, ${dist(on.mean, off.mean).toFixed(0)} from the unprinted), ${pct(on.share[name] ?? 0)} of its middle the ${name}`);
   }
 } finally {
   await close();

@@ -1867,6 +1867,10 @@ const BENDAY_MAGENTA = vec3f(0.89, 0.116, 1.0);
 const BENDAY_CYAN = vec3f(0.09, 1.0, 0.78);
 const BENDAY_GREEN = BENDAY_CYAN * BENDAY_YELLOW;
 const BENDAY_VIOLET = BENDAY_MAGENTA * mix(vec3f(1.0), BENDAY_CYAN, 0.5);
+/* The inks' own hues, as benDayHue reads them, folded when the shader compiles. */
+const BENDAY_RED_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_RED.g - BENDAY_RED.b), BENDAY_RED.r - 0.5 * (BENDAY_RED.g + BENDAY_RED.b)));
+const BENDAY_YELLOW_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_YELLOW.g - BENDAY_YELLOW.b), BENDAY_YELLOW.r - 0.5 * (BENDAY_YELLOW.g + BENDAY_YELLOW.b)));
+const BENDAY_BLUE_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_BLUE.g - BENDAY_BLUE.b), BENDAY_BLUE.r - 0.5 * (BENDAY_BLUE.g + BENDAY_BLUE.b)));
 /** How near an ink's hue (in degrees) a colour prints in that ink alone. */
 const BENDAY_OWN: f32 = 40.0;
 /** A colour's hue round the colour wheel, in degrees from red toward green. */
@@ -1884,9 +1888,9 @@ fn benDayApart(a: f32, b: f32) -> f32 {
  */
 fn benDayInkIndex(hue: vec3f) -> f32 {
   let h = benDayHue(hue);
-  let r = benDayApart(h, benDayHue(BENDAY_RED));
-  let y = benDayApart(h, benDayHue(BENDAY_YELLOW));
-  let b = benDayApart(h, benDayHue(BENDAY_BLUE));
+  let r = benDayApart(h, BENDAY_RED_HUE);
+  let y = benDayApart(h, BENDAY_YELLOW_HUE);
+  let b = benDayApart(h, BENDAY_BLUE_HUE);
   let near = min(r, min(y, b));
   if (near > BENDAY_OWN) {
     // Past every ink's own reach: the two inks either side of it. The red

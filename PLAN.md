@@ -4489,6 +4489,10 @@ Open:
   that reads from a step back (`BENDAY_VIOLET`), since Roy has one screen. Green
   is a true overprint and needs nothing. Lay the cyan as dots over the magenta if
   violet reads too smooth beside the dotted washes.
+  Found with it: the seam line is drawn wherever two inks meet, and there are five
+  now, so a player's pool shading from yellow to teal gets two pen lines inside it
+  (yellow, green, blue) where it had one. A comic outlines each colour area, so
+  this is inferred to be right; judge it on the Mac (judging.md §37).
 - **21d. More painters.** The same print with other inks is the start of more looks
   after painters (a Warhol screen print's off-register blocks, Riley's black and
   white, Rothko's soft fields); none is planned yet.
