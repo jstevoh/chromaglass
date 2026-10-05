@@ -6,6 +6,7 @@
  */
 import { Disposer, PipelineCache, bindGroup } from './kit';
 import { SPIKES_WGSL, SPIKE_ONSET, SPIKE_PITCH } from './wgsl/spikes';
+import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { FILM_H0, STAND_WINDOW, standingKernels } from './wgsl/standing';
 
 /*
@@ -159,7 +160,7 @@ const WIN_NONE_PLATE = 1 / 8;
 */
 export const FILM_FROM = 0.5;
 
-export interface FilmMagnet { x: number; y: number; height: number; strength: number }
+export interface FilmMagnet { x: number; y: number; height: number; strength: number; radius?: number }
 
 export class StandingFilm {
   readonly P: number;
@@ -190,7 +191,7 @@ export class StandingFilm {
     this.sh = buf('film short', P2 * 16);
     this.tot = buf('film total', 16);
     for (let k = 0; k < 4; k++) {
-      this.films.push(disposer.track(device.createBuffer({ label: `film ${k}`, size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })));
+      this.films.push(disposer.track(device.createBuffer({ label: `film ${k}`, size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })));
     }
     const fft = (label: string, axis: number, sign: number, mode: number) => {
       const b = disposer.track(device.createBuffer({ label: `fft ${label}`, size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
@@ -273,6 +274,7 @@ export class StandingFilm {
       this.N, dx, dt, H0,
       EPS, kappa, HS, LANGEVIN,
       ...this.win(), PULL, this.count++ % 16777216,
+      m.radius ?? MAGNET_RADIUS, 0, 0, 0,
     ]));
     const k = `${slot}`;
     const patch = Math.ceil(this.P / 8);

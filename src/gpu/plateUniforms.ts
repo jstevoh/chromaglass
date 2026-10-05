@@ -19,6 +19,7 @@ import type { VisualizerSettings } from '../types';
 import type { UniformPack } from './uniforms';
 import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
+import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 
 /** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
@@ -56,10 +57,10 @@ export interface PlateView {
   lamp: { x: number; y: number; x2: number; y2: number };
   /**
    * The magnets under the glass, as the lead plate was last stepped with them
-   * (fluid uv, and the solver's own height and strength): what raises the
-   * ferrofluid's spikes. Up to four; none when absent.
+   * (fluid uv, and the solver's own height, strength and magnet radius): what
+   * raises the ferrofluid's spikes. Up to four; none when absent.
    */
-  magnets?: readonly { x: number; y: number; height: number; strength: number }[];
+  magnets?: readonly { x: number; y: number; height: number; strength: number; radius?: number }[];
   gelAngle: number;
   /** Where the mirror rig has turned to, accumulated on the CPU. */
   kaleidoPhase: number;
@@ -427,15 +428,15 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
 /**
  * The magnets under the lead plate as its last step had them: the one in
- * the step and the other fingers', at its height and strength. None with the
+ * the step and the other fingers', at its height, strength and size. None with the
  * magnet off. The plate drew the spikes they raised from these, on a lattice
  * round each (plate.ts, spikeAt); it draws the domes from the layer's own
  * height now (PLAN 9t). The app and the harnesses still compute and upload
  * them every frame (LiquidVisualizer, lab-entry.ts) and the shader no longer
  * reads them; taking them out of the uniforms is a plan item (PLAN 9t-9).
  */
-export function magnetsOnPlate(p: GpuStepParams | null): { x: number; y: number; height: number; strength: number }[] {
+export function magnetsOnPlate(p: GpuStepParams | null): { x: number; y: number; height: number; strength: number; radius: number }[] {
   if (!p || p.magnetStrength <= 0.0001) return [];
-  const one = { x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength };
+  const one = { x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength, radius: p.magnetRadius ?? MAGNET_RADIUS };
   return [one, ...(p.extraMagnets ?? []).slice(0, 3).map((m) => ({ ...one, x: m.x, y: m.y }))];
 }

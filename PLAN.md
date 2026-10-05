@@ -238,7 +238,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
-- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, **9v**, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
+- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
@@ -399,7 +399,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a disc 9v, open; carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9aa (the maze too coarse, and its haze; measured) open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9aa (the maze too coarse, and its haze; measured) open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -994,7 +994,7 @@ Open, from building 9i:
   held and set down: k = 0.5 to 2 times the size, the dipole k times deeper with k³
   the strength, which is a real magnet scaled (magnetostatics has no length of its
   own): the same field share over it, reaching k times as far (the pull is weaker
-  than a scaled magnet's at a big Size, see 9v), so the spikes' patch and
+  than a scaled magnet's at a big Size; since 9v a magnet k times as wide at the same gap), so the spikes' patch and
   the pool it brings are k times as wide (lab: 0.3%, 1.1% and 4.6% of the plate at k
   0.5, 1 and 2). It is the performer's, kept across looks (`RIG_KEYS`) and never
   drifted, on the Settings sheet, the desks' Magnet options (right-click the Magnet)
@@ -1026,19 +1026,64 @@ Open, from building 9i:
   gather into it" (the ring pour this item takes away) and `scripts/ferro.mjs`'s
   "not at its mirror", whose two arms ran on two grids when the governor moved the
   solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
-- **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
-  solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
-  its face than a dipole, and a bigger one at the same gap is somewhat stronger at
-  the glass, not equal; the dipole's saturation (`MAGNET_BSAT`) stands in for the
-  flat face today. Replace `magnetEnergy` (and `spikeAmp`, which must agree) with a
-  finite disc's field (a disc of radius a at depth g: the on-axis field
-  Br/2 · (1 − g/√(g² + a²)) and its off-axis form), with Size setting a.
-  And put the saturation in field units: `MAGNET_BSAT` is a number in the
-  dipole's geometric units, so the k-deeper dipole sits lower on the curve than
-  the magnet it stands for and pulls less than the 1/k a scaled magnet does
-  (lib/magnetSize.ts: at Size 0.9, 0.47 of it one height out and 0.33 at one and
-  a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
-  weakly at the edge of its reach than a real one.
+- **9v. The magnet as a real magnet, not a deepened dipole (shipped).** The
+  solver's magnet was a point dipole, and Magnet Size (9x) sank it k times deeper
+  with k³ the strength: a magnet scaled gap and all, its axis field the same at
+  every Size, and with the liquid's saturation (`MAGNET_BSAT`) a number in the
+  dipole's own units, a big one pulled less at the edge of its reach than the
+  magnet it stood for. Now the magnet is a uniformly magnetised cylinder
+  (`src/gpu/wgsl/magnetDisc.ts`): its field is Derby and Olbert's closed form in
+  Bulirsch's elliptic integral, four rounds of an AGM, handed to a dipole of its
+  volume past six to eight half-sizes. At the tool's own size it is a rod 0.05 of
+  the plate in radius and twice as long (20 mm by 40 mm on the 20 cm dish), its
+  face 0.06 above where the dipole stood (13.5 mm under the liquid held to the
+  glass), so at the default its spikes reach where they did (0.157 of the plate
+  out against 0.156, on its axis 0.952 of the hand's field against 0.954).
+  Flatter shapes were tried first (a 32 by 16 mm disc, 24 by 24, a 20 by 30 mm
+  rod): matched at the spikes' patch, their fields fell away faster past it,
+  and `npm run fingers` lost its reach (the discs 8 to 5 on the 0.12 circle, the
+  short rod 7 to 6 on the 0.09, under the check's 7; on Metal too). This rod's
+  fingers are 10/8/9/5 on the four circles in 7 sectors, main's 12/7/8/3 in 6. Magnet Size sets the radius, k = 0.5 to 2 times it, the gap and
+  strength untouched: a bigger magnet is stronger at the glass (on its axis 0.26,
+  0.95, 2.22 at k 0.5, 1, 2, where the deepened dipole stayed at 0.95) and reaches
+  further (spikes out to 0.050, 0.157, 0.339; the dipole's 0.078, 0.156, 0.312).
+  The saturation is a field on the same scale (`MAGNET_BS`, spikes.ts):
+  ψ = B²/(1 + B/Bs) with B the strength times the magnet's field, so a weaker
+  magnet pulls the far liquid as its square; Ferro Maze's own magnet went 0.3 →
+  0.45 and Ferro Paint's 0.5 → 0.6 to gather as they did. Both constants carry
+  the old ones over at the hand's magnet, so `MAGNET_GAIN` and phaseMu's χ keep
+  their tuning. The radius rides `GpuStepParams.magnetRadius` (`Sim.magRadius`,
+  and the standing layer's `Film.size`); every shader including `SPIKES_WGSL` defines
+  `magnetRadius()`. `npm run disc` (lab, Mac plate shard) runs the shader's own
+  text against a Biot–Savart sum over the side current: within 0.0073% on and
+  off the face and at the rim, 1.24% where it hands over to the dipole (the point
+  dipole there 2.5%), 1.2% past it; at Size 0.9 the pull at the edge of its
+  spikes is the real magnet's (1.000), where main's deepened dipole pulled 0.31
+  of it; the plate's far shortcut (spikeAmp answers far points without the
+  integrals) never drops a spike; every look's own magnet stays under the onset
+  (Magnet Garden 0.148, Ferro Paint 0.099, Ferro Maze 0.023 against 0.18). In the
+  lab on the rod: `spikes` 6/6 (outline 2.83, main 2.85), `fingers` 4/4. `npm run magnet` (Mac)
+  now asks that Size makes the held and the set-down magnet k times as wide with
+  its height and strength as they were. On the phone, Size is the same setting on
+  the Magnet panel and the other fingers' magnets are the same magnet. A saved
+  look with its own magnet at a low Strength pulls as its square now (0.3 pulls
+  about a third as hard as it did). Judging §37.
+  Open, found here:
+  - **9v-cost.** The field is elliptic integrals wherever the magnet reaches (in
+    the solver five evaluations a cell a magnet, and per pixel on the plate inside
+    twice the rim and gap). Measure it with `npm run stages` on the Mac with the
+    Magnet held; if it shows, tabulate the magnet's field once per radius and gap
+    (it is a function of ρ/a and z/a only) and sample it.
+  - **9v-tilt.** The magnet is held upright under the glass here. A hand tilts
+    it, and a tilted magnet's field leans: its spikes lean and its pool slides toward the
+    lower rim. Needs the magnet's direction in the step.
+  - **9v-grade.** Every magnet is one grade, its strength a share of the hand's.
+    A real set (ceramic against neodymium) differs in remanence by about three
+    times; a Grade choice beside Size would be that, MIDI-learnable.
+  - **9v-height.** Magnet Height is still where the old dipole stood, and the
+    face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
+    Saying the setting as the gap itself would be plainer, but changes every
+    saved look's magnet; worth doing with a look version bump.
 - **9w. Carry the ferrofluid across a new solver** (**shipped**). The dye was
   carried when the governor moved the grid; the phase was not, so the frame loop
   poured the look's ring onto every new solver while Ferrofluid was up: a pool
@@ -2812,6 +2857,16 @@ for, and the GPU was asked for only after they had arrived and drawn.
   pipeline is asked for? Its animations are the compositor's, but the compositor
   presents through the same GPU process that is starting; a screen recording of a
   cold load on the owner's Mac would say. A still picture is still not a black plate.
+- *The intro and the GPU device (14v-5, in progress).* Held still, the intro did not
+  end the startup red: #280's run (37252349929) stopped frames 2.50 s from 2.87 s with
+  the intro already still, on the opening's first compile (`fluid/fill:rgba32float`),
+  outside Chromium's hold. What changed with the intro is when the GPU device comes:
+  given 0.04 s after it was asked before the intro (#272's run), 1.7 to 2.6 s after
+  with it, so the first compile, which stops frames on a cold Metal cache in every
+  run (the `?prepare=0` control too), no longer falls inside the hold. Taken out:
+  the pools' `mix-blend-mode: screen`, a blended group the GPU process must build
+  a surface and compositing for as the page first paints. Whether that was it is the
+  Mac's "device asked, given" line.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -3160,6 +3215,27 @@ Tool Amount; a second pass at right angles makes the chevron. On the phone each 
 is a rake, and OSC gets `/comb`. *Measure:* a lab check in the manner of
 `npm run ferrohands` (N parallel bands moved a stroke, mass exact), and
 `npm run detail`'s hard-edge share after a two-way comb against the Marbling column.
+
+### 15k. Inked balls rolled across the plate (proposed 2026-10-05)
+
+The owner's idea, in their words: "Imagine we covered some Balls in ink and we rolled
+them around the canvas by tilting the mouse or with the mouse. It would leave behind a
+messy trail that eventually runs out of ink and then can push other ink around as it
+roles." Not built.
+
+The physics to model, rather than a painted trail: a ball rolling on the glass touches
+it along a small contact patch, and each turn lays down part of the ink on its surface
+there, more where it presses or slows and in a broken, uneven line where the coat is
+patchy, so the trail starts dense and thins as the ball's ink load runs out (deposition
+proportional to what is left, so it fades rather than stops). A ball also picks up some
+of the wet colour it rolls through, so it can carry one colour into another. Tilting
+the plate gives the balls a downhill pull and they roll on with their own momentum;
+with the mouse the hand pushes them. A dry ball is still a solid moving through the
+thin layer, so it pushes the other liquid aside and drags a wake behind it: the same
+moving obstacle 15b builds for the Finger, which this should share. *Measure:* a lab
+check that a ball's deposited dye falls off with distance as its load depletes, that
+total dye is conserved (laid plus left on the ball), and that a dry ball moves dye
+already on the plate. Ships with the phone (tilt is the phone's own motion sensor).
 
 ## 16. Many plates: each projector its own source (rig-plan R1)
 **Partly shipped**: 16a, 16b, 16c and 16f are shipped (#231, #226, #232, #273). What 16a, 16b and 16c each left undone is listed below in that order, then 16d and 16e, which are open. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

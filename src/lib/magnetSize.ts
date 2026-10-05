@@ -1,3 +1,5 @@
+import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
+
 /**
  * How big the magnet in the hand is (Magnet Size).
  *
@@ -15,37 +17,28 @@
  * falls away within its own width, and the block's carries k times as far
  * across the plate before it does.
  *
- * The solver's magnet is a dipole a height h under the plate (fluid.ts,
- * magnetEnergy), whose field at the glass spreads over about h and is, on
- * its axis, the strength over h³. A magnet k times the size is that dipole k
- * times deeper with k³ the strength: the field's share over it is the same
- * (but see the saturation, below), and its
- * footprint, the spikes' patch with it (spikes.ts: the onset is a share of
- * the field, strength over height cubed, so k³ over k³ leaves it where it
- * was), is k times as wide. The step's other inputs see a magnet: the pull
- * is the field's gradient, so a big magnet pulls more gently over more of
- * the plate, which is what a big magnet under a dish does.
+ * The solver's magnet is a cylinder (gpu/wgsl/magnetDisc.ts, PLAN.md 9v),
+ * held with its face a gap under the liquid, and Size sets its radius: k
+ * times the tool's own 0.05 of the plate (a 20 mm by 40 mm rod on the 20 cm
+ * dish), its length with it, the gap and the strength where they were. That
+ * is what a bigger magnet in the same hand is: the glass between it and the
+ * liquid does not get thicker. So a bigger one reaches further and is
+ * stronger at the glass too (on its axis, the share of the hand's field the
+ * spikes are measured on, spikes.ts: 0.27, 0.95 and 2.22 at k 0.5, 1 and 2,
+ * held to the glass at Ferrofluid Scale 0.35), not the same field reaching
+ * further. Its spikes' patch, where the field is past the onset, reaches
+ * 0.050, 0.157 and 0.339 of the plate out (the deepened dipole's: 0.078,
+ * 0.156 and 0.312), so a small magnet's spikes are a cluster over the
+ * fingertip and a big one's a hedgehog (npm run disc prints these).
  *
- * The shortcuts, named. A real disc held at a fixed gap is not exactly a
- * deeper dipole. Near its face the field is flatter than a dipole's (a disc's
- * own width spreads it), and a bigger disc at the same gap is somewhat
- * stronger at the glass, not equal.
- *
- * And the scaling is exact only where the liquid is far from saturation. The
- * solver's saturation (MAGNET_BSAT in fluid.ts) is a fixed number in the
- * field's geometric units, not in tesla, so a dipole k times deeper sits
- * lower on that curve than the magnet it stands for. Below the spikes the
- * field share is the same, as above, but the pull, the energy's gradient, is
- * not the 1/k a scaled magnet gives. Against an exactly scaled magnet, at
- * Size 0.9 (k 1.74) the solver's pull is 0.68 of it half a height out from
- * the axis, 0.47 at one height and 0.33 at one and a half. At Size 1 (k 2)
- * it is 0.55, 0.35 and 0.23. At Size 0 (k 0.5) it is 1.05 to 2.2, stronger.
- * So a big magnet holds its pool more weakly at the edge of its reach than a
- * real one would. In the lab it still carried the pool 90% of a drag at
- * Size 0.9 (scripts/magnet.mjs, check 3).
- *
- * Both are PLAN.md 9v: a finite disc's field, with the saturation in field
- * units, so that Size sets the disc's radius and nothing else.
+ * Until 9v it was a dipole, made bigger by sinking it k times deeper with k³
+ * the strength: a magnet scaled gap and all, the same field over it reaching
+ * k times as far. That held the axis field the same at every Size, and,
+ * with the liquid's saturation a number in the dipole's own units, the
+ * deeper dipole sat lower on that curve and pulled less at the edge of its
+ * reach than the magnet it stood for (at Size 0.9, 0.47 of a scaled magnet's
+ * pull one height out). The saturation is a field now (spikes.ts, MAGNET_BS),
+ * so a bigger magnet's pull is the real one's, wherever it reaches.
  *
  * ## The range
  *
@@ -62,12 +55,21 @@ export function magnetReach(size: number | undefined): number {
 }
 
 /**
- * The magnet as the solver gets it, at this size: k times deeper and k³
- * the strength (above).
+ * How deep the solver holds a magnet set at Magnet Height h on a look of
+ * Ferrofluid Scale `scale`: further off for a bigger look, which is what
+ * spreads the pull. The depth the old dipole stood at; the magnet's face is
+ * MAGNET_FACE above it (gpu/wgsl/magnetDisc.ts).
  */
-export function sizedMagnet(strength: number, height: number, size: number | undefined): { strength: number; height: number } {
-  const k = magnetReach(size);
-  return { strength: strength * k * k * k, height: height * k };
+export function magnetDepth(height: number | undefined, scale: number | undefined): number {
+  return Math.max(0.02, (height ?? 0.25) * (0.5 + (scale ?? 0.4)));
+}
+
+/**
+ * The magnet's radius as the solver gets it, at this size (above), in plate
+ * widths: k times the tool's own.
+ */
+export function magnetRadiusAt(size: number | undefined): number {
+  return MAGNET_RADIUS * magnetReach(size);
 }
 
 /*

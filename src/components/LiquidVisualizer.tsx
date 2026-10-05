@@ -10,7 +10,8 @@ import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape,
 import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
 import { plateAreas, areaForBand, areaCentre, areaDye, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
-import { sizedMagnet } from '../lib/magnetSize';
+import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
+import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -969,6 +970,8 @@ class FluidSimulation {
    * solver with the first finger's magnet (GpuStepParams.extraMagnets).
    */
   extraMagnets: readonly { x: number; y: number }[] = [];
+  /** The magnet's radius, Magnet Size's (magnetFor; gpu/wgsl/magnetDisc.ts). */
+  magnetRadius = MAGNET_RADIUS;
   /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
   viewHalfW = 0.33;
   viewHalfH = 0.21;
@@ -3621,9 +3624,10 @@ class FluidSimulation {
       */
       magnetY: Math.max(0, Math.min(1, settings.magnetY ?? 0.5)),
       // Held further away for a bigger look, which is what spreads the pull.
-      magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
+      magnetHeight: magnetDepth(settings.magnetHeight, settings.phaseScale),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
       extraMagnets: this.extraMagnets,
+      magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
@@ -4205,7 +4209,7 @@ interface FrameView {
   /** Where the lamp and its second have wandered to, under the plate. */
   lamp: { x: number; y: number; x2: number; y2: number };
   /** The magnets the lead plate was last stepped with: what stands the ferrofluid up into spikes. */
-  magnets: readonly { x: number; y: number; height: number; strength: number }[];
+  magnets: readonly { x: number; y: number; height: number; strength: number; radius: number }[];
   gelAngle: number;
   kaleidoPhase: number;
   /** The second plate's throw: how magnified, and how far it has drifted. */
@@ -5176,7 +5180,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The settings handed to the lead plate's step, with the magnet where it is now. */
   const magnetStepRef = useRef<Record<string, unknown>>({});
   /** What the lead plate's magnet was last given, for the harness: where, how strong, and whether a hand held it. */
-  const lastMagnetRef = useRef<{ x: number; y: number; strength: number; height: number; held: boolean; field: number } | null>(null);
+  const lastMagnetRef = useRef<{ x: number; y: number; strength: number; height: number; radius: number; held: boolean; field: number } | null>(null);
   /** The maze field's kick envelope: 1 on a kick, falling over about a second (see magnetFor). */
   const mazeKickRef = useRef({ env: 0, at: 0 });
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
@@ -6127,7 +6131,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
         const now = showNow();
         const lead = fluidsRef.current[0];
-        if (lead) lead.extraMagnets = [];
+        if (lead) { lead.extraMagnets = []; lead.magnetRadius = MAGNET_RADIUS; }
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
         const lookX = look.magnetX ?? 0.5, lookY = look.magnetY ?? 0.5;
@@ -6205,7 +6209,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
           // as still held once the hand has gone stale.
-          lastMagnetRef.current = { x: lookX, y: lookY, strength, height: look.magnetHeight ?? 0.25, held: false, field };
+          lastMagnetRef.current = { x: lookX, y: lookY, strength, height: look.magnetHeight ?? 0.25, radius: MAGNET_RADIUS, held: false, field };
           return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
         }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
@@ -6227,14 +6231,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
         /*
           The magnet's size (Magnet Size, lib/magnetSize.ts): held or set
-          down it is the same magnet, k times deeper with k³ the strength,
-          so the same field over it reaching k times as far. Not the walk's:
-          that is the look's own magnet, which nobody's hand chose. Read
-          from the folded look, so a patch (a fader's LFO, the room, the
-          sound) aimed at Magnet Size moves it as it moves any other setting.
+          down it is the same magnet, k times as wide with its face
+          where it was, its height and strength as they were (PLAN.md 9v).
+          Not the walk's: that is the look's own magnet, which nobody's hand
+          chose. Read from the folded look, so a patch (a fader's LFO, the
+          room, the sound) aimed at Magnet Size moves it as it moves any
+          other setting.
         */
-        if (held || placed) ({ strength: ms, height: mh } = sizedMagnet(ms, mh, look.magnetSize ?? settingsRef.current.magnetSize));
-        lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
+        const radius = held || placed ? magnetRadiusAt(look.magnetSize ?? settingsRef.current.magnetSize) : MAGNET_RADIUS;
+        if (lead) lead.magnetRadius = radius;
+        lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, radius, held, field };
         // The other fingers' magnets, while the first is held (see the hands
         // loop): each finger that held one within the same quarter second.
         if (lead) {
