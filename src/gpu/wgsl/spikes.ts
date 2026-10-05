@@ -1,10 +1,13 @@
 /**
- * The ferrofluid's spikes: where a magnet stands them up, and where each one is.
+ * The ferrofluid's spikes: where a magnet's field is strong enough to stand
+ * them up.
  *
- * Shared by the solver (fluid.ts, phaseMu: the liquid gathers into them) and
- * the plate (plate.ts, spikeAt: each is drawn as a peak with a light on it),
- * because the two have to agree on where every spike is or the plate draws a
- * point of light on a dome the solver put somewhere else.
+ * The field and its onset, shared by the solver (fluid.ts: whether a
+ * magnet's film runs, and the maze's push past the domes) and the film that
+ * stands the layer up (standing.ts: the lift, from the same field). Where
+ * each dome is, is the layer's own now (PLAN 9t): until then it was a
+ * lattice here, rings a pitch apart round each magnet, that the solver
+ * gathered the liquid into and the plate drew a point of light on.
  *
  * Reported by the owner: "The ferrofluid magnet still sucks and doesn't make
  * spikes or fingers. It's just a big blob that gets pulled around by the
@@ -18,10 +21,8 @@
  * showing between them, joined by thin channels: every ferrofluid macro the
  * owner sent (Chemical Bouillon's) is that.
  *
- * Where they are: on rings a pitch apart round each magnet with six more on
- * each ring out (a hexagonal packing wrapped round a point, which is how
- * peaks settle round a small magnet rather than on a flat lattice), each
- * ring turned a little against the last so they do not line up in spokes.
+ * How far apart: SPIKE_PITCH, the onset's wavelength 2π l_c, which is what
+ * sets the capillary length l_c the film is measured in.
  *
  * How strong the field has to be: a dipole's |B| at the glass, which on its
  * axis goes as strength over height cubed, taken as a share of a magnet in
@@ -51,9 +52,14 @@ export const SPIKE_FULL = 0.35;
  * they arrive with the spikes the plate draws and not in one step.
  */
 export function spikesOnAxis(strength: number, height: number): number {
-  const rel = Math.max(height, 0.02) / SPIKE_H_REF;
-  const t = Math.max(0, Math.min(1, (strength / (rel * rel * rel) - SPIKE_ONSET) / (SPIKE_FULL - SPIKE_ONSET)));
+  const t = Math.max(0, Math.min(1, (fieldOnAxis(strength, height) - SPIKE_ONSET) / (SPIKE_FULL - SPIKE_ONSET)));
   return t * t * (3 - 2 * t);
+}
+
+/** A magnet's field on its own axis, on spikeField's scale (the onset is SPIKE_ONSET). */
+export function fieldOnAxis(strength: number, height: number): number {
+  const rel = Math.max(height, 0.02) / SPIKE_H_REF;
+  return strength / (rel * rel * rel);
 }
 
 export const SPIKES_WGSL = /* wgsl */ `
@@ -61,9 +67,9 @@ const SPIKE_PITCH = ${SPIKE_PITCH};
 const SPIKE_H_REF = ${SPIKE_H_REF};
 const SPIKE_ONSET = ${SPIKE_ONSET};
 const SPIKE_FULL = ${SPIKE_FULL};
-// How far into spikes the field of magnet m = (x, y, height, strength) is at
-// p: 0 flat, 1 full.
-fn spikeAmp(p: vec2f, m: vec4f) -> f32 {
+// The field of magnet m = (x, y, height, strength) at p, as a share of the
+// hand's magnet pressed to the glass (the scale SPIKE_ONSET is on).
+fn spikeField(p: vec2f, m: vec4f) -> f32 {
   if (m.w <= 0.001) { return 0.0; }
   let h = max(m.z, 0.02);
   let to = p - m.xy;
@@ -72,27 +78,10 @@ fn spikeAmp(p: vec2f, m: vec4f) -> f32 {
   // |B| off the axis over |B| on it: sqrt((r² + 4h²)/(r² + h²)⁴) / (2/h³).
   let off = sqrt((r2 + 4.0 * h * h) / (q * q * q * q)) * h * h * h * 0.5;
   let rel = h / SPIKE_H_REF;
-  return smoothstep(SPIKE_ONSET, SPIKE_FULL, m.w * off / (rel * rel * rel));
+  return m.w * off / (rel * rel * rel);
 }
-// The spike of magnet m nearest p: (its tip, the distance to it).
-fn spikeTip(p: vec2f, m: vec4f) -> vec3f {
-  let to = p - m.xy;
-  let rho = length(to) / SPIKE_PITCH;
-  let th = atan2(to.y, to.x);
-  var best = vec3f(m.xy, 1e9);
-  let k0 = i32(round(rho));
-  for (var ring = max(k0 - 1, 0); ring <= k0 + 1; ring++) {
-    var c = m.xy;
-    if (ring > 0) {
-      let nr = f32(6 * ring);
-      let turn = f32(ring) * 0.37;
-      let j = round((th - turn) * nr / 6.2831853);
-      let a = turn + j * 6.2831853 / nr;
-      c = m.xy + vec2f(cos(a), sin(a)) * f32(ring) * SPIKE_PITCH;
-    }
-    let dd = distance(p, c);
-    if (dd < best.z) { best = vec3f(c, dd); }
-  }
-  return best;
+// How far into spikes the field of magnet m is at p: 0 flat, 1 full.
+fn spikeAmp(p: vec2f, m: vec4f) -> f32 {
+  return smoothstep(SPIKE_ONSET, SPIKE_FULL, spikeField(p, m));
 }
 `;
