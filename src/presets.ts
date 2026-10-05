@@ -2012,7 +2012,15 @@ export const PRESETS: Preset[] = [
       phaseAmount: 1,
       phaseScale: 0.4,
       phaseSharp: 0.75,
-      magnetStrength: 0.3,
+      /*
+        The strength is the magnet's field (gpu/wgsl/magnetDisc.ts, PLAN.md
+        9v), and far off, where this look's magnet works, the pull goes as
+        its square: 0.45 gathers the maze as 0.3 did when the strength was
+        the pull's own scale (0.96 of the old pull from 0.1 to 0.2
+        of the plate out). Still far under the spikes' onset: 0.02 of the
+        hand's field (\`npm run disc\`).
+      */
+      magnetStrength: 0.45,
       magnetHeight: 0.4,
       magnetWalk: 0.3,
       beatSqueeze: 0.3,
@@ -2062,7 +2070,9 @@ export const PRESETS: Preset[] = [
       phaseAmount: 0.8,
       phaseScale: 0.3,
       phaseSharp: 0.75,
-      magnetStrength: 0.5,
+      // The magnet's field, not its pull (see Ferro Maze): 0.6 gathers
+      // as 0.5 did, and stays under the spikes (0.10 of the hand's field).
+      magnetStrength: 0.6,
       magnetHeight: 0.3,
       magnetWalk: 0.5,
       // The black pushes the colour aside and packs it along its edges, as in

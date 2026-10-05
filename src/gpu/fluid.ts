@@ -25,6 +25,7 @@ import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup
 import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
 import { SPIKE_ONSET, fieldOnAxis, spikesOnAxis } from './wgsl/spikes';
+import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
@@ -488,7 +489,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 48;      // 36 scalars (33 is the vec2's alignment), then the fingers' three magnets at 36..47
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48
 
 export class WebGPUFluid {
   readonly N: number;
@@ -1255,6 +1256,7 @@ export class WebGPUFluid {
       f[36 + k * 4] = m?.x ?? 0; f[37 + k * 4] = m?.y ?? 0;
       f[38 + k * 4] = p.magnetHeight; f[39 + k * 4] = m ? p.magnetStrength : 0;
     }
+    f[48] = p.magnetRadius ?? MAGNET_RADIUS;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1548,7 +1550,7 @@ export class WebGPUFluid {
       And the magnet's own field is a maze field as strong as its spikes, on
       a look with a Labyrinth (see HAND_SCREEN).
     */
-    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight, p.magnetRadius) : 0;
     const spikes = spikeAmt > 0;
     /*
       And whether the layer stands up under them (standing.ts): each magnet
@@ -1561,13 +1563,14 @@ export class WebGPUFluid {
       look's own magnet (Magnet Garden's is at 0.14, the onset 0.18) keeps
       its maze, which the film does not model.
     */
-    const onAxis = this.phaseLive && p.magnetStrength > 0.0001 ? fieldOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    const onAxis = this.phaseLive && p.magnetStrength > 0.0001 ? fieldOnAxis(p.magnetStrength, p.magnetHeight, p.magnetRadius) : 0;
     if (spikes) this.filmHeld = true;
     else if (onAxis < FILM_FROM * SPIKE_ONSET) this.filmHeld = false;
     const filmMags: FilmMagnet[] = [];
     if (this.filmHeld) {
-      filmMags.push({ x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength });
-      for (const m of (p.extraMagnets ?? []).slice(0, 3)) filmMags.push({ x: m.x, y: m.y, height: p.magnetHeight, strength: p.magnetStrength });
+      const radius = p.magnetRadius ?? MAGNET_RADIUS;
+      filmMags.push({ x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength, radius });
+      for (const m of (p.extraMagnets ?? []).slice(0, 3)) filmMags.push({ x: m.x, y: m.y, height: p.magnetHeight, strength: p.magnetStrength, radius });
     }
     if (filmMags.length && !this.layer) this.layer = new StandingFilm(this.device, this.pipelines, this.disposer, this.N);
     const filmOn = filmMags.length > 0 && !!this.layer?.isReady();

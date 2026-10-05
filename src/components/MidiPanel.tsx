@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Sheet } from './ui';
-import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Wand2, Music } from 'lucide-react';
+import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
 import {
   ACTION_LABELS, FACTORY_MAPS, factoryFor, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
   MAPPABLE_SOURCES, MUSIC_SOURCES, MUSIC_SOURCE_LABELS, isMapping, triggerable, soundMappable,
@@ -321,7 +321,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
                 : 'Watch what this controller sends and build a map from it'}
               data-testid="midi-auto-start"
             >
-              <Wand2 size={11} className="inline -mt-0.5 mr-1" />
+              <Ear size={11} className="inline -mt-0.5 mr-1" />
               Auto-map this controller
             </button>
           )

@@ -39,8 +39,17 @@
       /* Only transform and opacity move, so the compositor runs them on its
          own thread: the page's thread is held for seconds while Chromium
          starts the GPU (npm run startup's "held" line), and anything the page
-         had to step would stop with it. */
-      .cg-oil { position: absolute; left: 50%; top: 50%; width: 78cqmax; height: 78cqmax; margin: -39cqmax 0 0 -39cqmax; border-radius: 50%; mix-blend-mode: screen; opacity: 0.55; will-change: transform; }
+         had to step would stop with it. No blend mode on the pools (they
+         were mix-blend-mode: screen): on CI's Mac, with the intro in the
+         page, the GPU device took 1.7 to 2.6 s to be given against 0.04 s
+         before it, and the opening's first compile then stopped the frames
+         outside Chromium's hold (startup's "no stop in the opening", 2.15 to
+         2.82 s). A blended group is drawn through a surface of its own, with
+         the GPU process compiling what composites it as the page first
+         paints; over black, screen and plain alpha differ only where two
+         pools overlap. Inferred from the timings: the Mac's "device asked,
+         given" line says whether this was it. */
+      .cg-oil { position: absolute; left: 50%; top: 50%; width: 78cqmax; height: 78cqmax; margin: -39cqmax 0 0 -39cqmax; border-radius: 50%; opacity: 0.55; will-change: transform; }
       .cg-oil-a { background: radial-gradient(closest-side, #2a7dff 0%, rgba(20,51,201,0.45) 45%, transparent 100%); animation: cg-orbit 23s linear infinite; }
       .cg-oil-b { background: radial-gradient(closest-side, #15c9b4 0%, rgba(10,111,134,0.45) 45%, transparent 100%); animation: cg-orbit 29s linear infinite reverse; animation-delay: -9s; }
       .cg-oil-c { background: radial-gradient(closest-side, #2fd67e 0%, rgba(11,125,79,0.4) 45%, transparent 100%); animation: cg-orbit 37s linear infinite; animation-delay: -21s; opacity: 0.4; }

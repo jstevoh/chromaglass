@@ -25,9 +25,9 @@
  *   4. let go of, it stays where the hand left it, rather than going back
  *      to the middle and taking the ferrofluid with it
  *   5. and Magnet Across still moves it once the hand has set it down
- *   6. Magnet Size reaches the solver: a bigger magnet is the same field
- *      reaching further (lib/magnetSize.ts), k times deeper with k³ the
- *      strength, so the spikes over it start where they did
+ *   6. Magnet Size reaches the solver: a bigger magnet is a wider one held
+ *      at the same gap (lib/magnetSize.ts, PLAN 9v), its radius k times the
+ *      tool's own, its height and strength as they were
  *   7. a new grid (the quality governor stepping down) with the Magnet in
  *      hand lays nothing on a bare plate, picked and untouched or held:
  *      never the look's ring, and no pool of the magnet's own
@@ -386,24 +386,25 @@ try {
     const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep, s = d.settings, m = d.magnetNow?.();
     if (!st) return null;
     return {
-      x: st.magnetX, y: st.magnetY, strength: st.magnetStrength, height: st.magnetHeight, held: !!m?.held,
+      x: st.magnetX, y: st.magnetY, strength: st.magnetStrength, height: st.magnetHeight, radius: st.magnetRadius ?? null, held: !!m?.held,
       lookStrength: Math.max(0, s.magnetStrength ?? 0),
       lookHeight: Math.max(0.02, (s.magnetHeight ?? 0.25) * (0.5 + (s.phaseScale ?? 0.4))),
       // Magnet Size's factor (lib/magnetSize.ts): what the hand set down is sized by it, the look's own magnet is not.
       k: 2 ** (2 * Math.max(0, Math.min(1, s.magnetSize ?? 0.5)) - 1),
-      heightAsked: (s.magnetHeight ?? 0.25) * (0.5 + (s.phaseScale ?? 0.4)),
     };
   });
-  const fmt = (m) => m ? `${m.x.toFixed(2)},${m.y.toFixed(2)} strength ${m.strength.toFixed(2)} height ${m.height.toFixed(3)}${m.held ? ' (held)' : ''}` : 'unknown';
+  const fmt = (m) => m ? `${m.x.toFixed(2)},${m.y.toFixed(2)} strength ${m.strength.toFixed(2)} height ${m.height.toFixed(3)} radius ${m.radius?.toFixed(3) ?? 'none'}${m.held ? ' (held)' : ''}` : 'unknown';
   /*
     The look's magnet, as the look alone gives it, or (sized) as the hand
-    set it down at Magnet Size: k³ the strength and k times the height. The
-    check runs at Size 0.9 (k = 1.74), so a set-down magnet that ignored the
-    size, or a look's own that took it, fails here.
+    set it down at Magnet Size: the look's strength and height, a magnet k
+    times the tool's own radius (MAGNET_RADIUS, 0.05; PLAN 9v). The check
+    runs at Size 0.9 (k = 1.74), so a set-down magnet that ignored the size,
+    or a look's own that took it, fails here.
   */
   const asLook = (m, sized = false) => !!m && !m.held
-    && Math.abs(m.strength - m.lookStrength * (sized ? m.k ** 3 : 1)) < 1e-3
-    && Math.abs(m.height - (sized ? Math.max(0.02, m.heightAsked * m.k) : m.lookHeight)) < 1e-3;
+    && Math.abs(m.strength - m.lookStrength) < 1e-3
+    && Math.abs(m.height - m.lookHeight) < 1e-3
+    && m.radius !== null && Math.abs(m.radius - 0.05 * (sized ? m.k : 1)) < 1e-4;
   await page.mouse.move(...at(0.85));
   const probe = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   const corner = { x: (probe?.x ?? 0.5) > 0.5 ? 0.1 : 0.9, y: (probe?.y ?? 0.5) > 0.5 ? 0.1 : 0.9 };
@@ -431,7 +432,7 @@ try {
   check('let go of, the magnet stays where the hand left it',
     away > 0.3 && asLook(letGo, true) && off < 0.02 && letGo.strength > 0 && letGo.k > 1.5,
     `the hand left it at ${left ? `${left.x.toFixed(2)},${left.y.toFixed(2)}` : 'nowhere'}, ${away.toFixed(2)} from the look's; ` +
-    `two seconds after letting go the solver was given ${fmt(letGo)} (the look alone: strength ${letGo?.lookStrength.toFixed(2)} height ${letGo?.lookHeight.toFixed(3)}; at Magnet Size ×${letGo?.k.toFixed(2)}: strength ${(letGo ? letGo.lookStrength * letGo.k ** 3 : 0).toFixed(2)} height ${(letGo ? letGo.heightAsked * letGo.k : 0).toFixed(3)})`);
+    `two seconds after letting go the solver was given ${fmt(letGo)} (the look alone: strength ${letGo?.lookStrength.toFixed(2)} height ${letGo?.lookHeight.toFixed(3)}; at Magnet Size ×${letGo?.k.toFixed(2)}: radius ${(letGo ? 0.05 * letGo.k : 0).toFixed(3)})`);
 
   /*
     4. And the look can still place it. Magnet Across moved (the slider, a
@@ -453,12 +454,14 @@ try {
   /*
     6. Magnet Size, asked for by the owner: "I just want a magnet that I can
     control the size of that I can interact with." A magnet k times the size
-    is the same field over it reaching k times as far: k times deeper with k³
-    the strength (lib/magnetSize.ts, where the physics is). Asked of the
-    step the solver was given while the hand holds the magnet, at Size 0.1
-    and 0.9 (k = 0.574 and 1.741): the height's ratio k, the strength's k³,
-    and the spikes over it (spikesOnAxis: strength over height cubed) where
-    they were. A Size that never reached the solver gives ratios of 1.
+    is a magnet k times as wide held at the same gap, with the same strength
+    (lib/magnetSize.ts and gpu/wgsl/magnetDisc.ts, where the physics is;
+    PLAN 9v: until then a dipole k times deeper with k³ the strength). Asked
+    of the step the solver was given while the hand holds the magnet, at
+    Size 0.1 and 0.9 (k = 0.574 and 1.741): the radius's ratio k, the
+    height's and the strength's 1. A Size that never reached the solver
+    gives a radius ratio of 1; one that still sank the magnet, a height's
+    of k.
 
     Set the way a hand sets it on the desk: right-click the Magnet for its
     options and move Size there (ToolAmount.tsx), then read back what the
@@ -486,10 +489,11 @@ try {
   };
   const small = await heldAt(0.1), big = await heldAt(0.9);
   const k = 2 ** (2 * 0.9 - 1) / 2 ** (2 * 0.1 - 1);
-  const hRatio = small && big ? big.height / small.height : 0, sRatio = small && big ? big.strength / small.strength : 0;
-  check('Magnet Size makes the held magnet reach further with the same field over it',
-    sizes[0] === 0.1 && sizes[1] === 0.9 && !!small?.held && !!big?.held && Math.abs(hRatio / k - 1) < 0.01 && Math.abs(sRatio / (k ** 3) - 1) < 0.01,
-    `set from the desk's Magnet options: ${sizes.join(', then ')}; held at Size 0.1: ${fmt(small)}; at 0.9: ${fmt(big)}; height ×${hRatio.toFixed(3)} (asked ×${k.toFixed(3)}), strength ×${sRatio.toFixed(3)} (asked ×${(k ** 3).toFixed(3)})`);
+  const ratio = (key) => small && big && small[key] ? big[key] / small[key] : 0;
+  const rRatio = ratio('radius'), hRatio = ratio('height'), sRatio = ratio('strength');
+  check('Magnet Size makes the held magnet a wider one at the same gap and strength',
+    sizes[0] === 0.1 && sizes[1] === 0.9 && !!small?.held && !!big?.held && Math.abs(rRatio / k - 1) < 0.01 && Math.abs(hRatio - 1) < 0.01 && Math.abs(sRatio - 1) < 0.01,
+    `set from the desk's Magnet options: ${sizes.join(', then ')}; held at Size 0.1: ${fmt(small)}; at 0.9: ${fmt(big)}; radius ×${rRatio.toFixed(3)} (asked ×${k.toFixed(3)}), height ×${hRatio.toFixed(3)} and strength ×${sRatio.toFixed(3)} (asked ×1)`);
 
   /*
     7. A new grid while the Magnet is in hand lays nothing on a bare plate.

@@ -36,14 +36,17 @@
  *
  * So this asks the thin gap, held, with the band playing and its bubbles
  * certainly on the plate: the band's dice drop bubbles on some runs and not
- * others, and a run with none would pass whatever the bubbles do. Four are
- * set down within the band's range (just outside the disc 0.12 round the
- * middle) and kept at four. Against silence on the same plate, held the
- * same way, which has to be still itself, read as the ring's mean distance
- * from the middle (the bar, below, says why not the disc). And the old
- * plate the same, which has to be pulled in by more than the bar: the instrument shown to see the drift it was
- * built for, until the old plate's bubbles stop pressing and that line turns
- * round to ask the old plate to stay too.
+ * others, and a run with none would pass whatever the bubbles do. So the
+ * music releases none (Audio Impact 0 from before the band starts), and
+ * eight asked at the band's largest size are set down where it drops its own (just
+ * outside the disc 0.12 round the middle) from the pour on, and kept at
+ * eight. Against silence on the same plate, held the same way, which has to
+ * be still itself, read as the ring's mean distance from the middle (the
+ * bar, below, says why not the disc). And the old plate the same, which has
+ * to be pulled in by more than the bar: the instrument shown to see the
+ * drift it was built for, until the old plate's bubbles stop pressing and
+ * that line turns round to ask the old plate to stay too. (Why eight, the
+ * largest, from the pour, and none of the music's: SPOTS, below.)
  *
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
@@ -82,15 +85,37 @@ const PAGES = [
   { name: 'the band and its bubbles, old plate', band: true, bubbles: true, oldPlate: true },
 ];
 /*
-  Where the bubbles are set down: 0.15 out from the middle, four ways round,
-  just outside the disc that is read, inside the band's own range (6 to 46
-  steps of 128 from the middle, 0.05 to 0.36). At 0.2 the old plate's
-  drift read +0.020 against the bar's +0.012 on its first run: the press
-  pulls the ring toward the bubbles, and a bubble halfway to the ring pulls
-  little of it into the disc. Nearer, the same pull lands in the disc, and
-  the thin gap is asked under the same bubbles.
+  Where the bubbles are set down: 0.15 out from the middle, eight ways round,
+  just outside the disc that is read, where Classic's ring of dye blobs sits
+  (0.15 to 0.19 out) and so where the band drops its own (the densest dye of
+  six tries 0.05 to 0.36 out, LiquidVisualizer "Air lives in the oil"). At
+  0.2 the old plate's drift read +0.020 against the bar's +0.012 on #250's
+  first run: the press pulls the ring toward the bubbles, and a bubble
+  halfway to the ring pulls little of it into the disc. Nearer, the same pull
+  lands in the disc, and the thin gap is asked under the same bubbles.
+
+  Eight asked at the band's largest size (spawn draws each one's size from
+  that, as it does the band's), set down from the pour on. Four of its
+  middling ones set down 2.5 s after the pour were what this check first
+  laid, and they were never what made the old plate drift: the band's dice
+  were. Eleven Mac runs, 2026-10-04 and 05 (the old plate's pull, the mean of
+  the first two readings less the last two): on the six where the band had
+  dropped no bubble of its own before Audio Impact was held, 0.0029, 0.0037,
+  0.0038, 0.0040, 0.0053 and 0.0091; on the five where it had dropped three
+  to seven, onto the dye ring in the 3 s between the first click and the
+  hold, 0.0062, 0.0076, 0.0120, 0.0224 and 0.0260. The bar asks more than
+  0.004 over silence, so a run with no air of the band's own sat on the bar
+  and failed about one time in three (#267 and #281's reds). The band's
+  bubbles are larger (0.9 to 2.1 grid steps at 128, by the bass), come in
+  twos to fours, and had pressed since before the first reading. So the
+  music releases none here (Audio Impact 0 from before the first click, read
+  back from the plate's own count), and this sets down what it did on its
+  heavy runs, every time: as many as its clusters, at its largest size, from
+  the moment the ring is poured.
 */
-const SPOTS = [0, 1, 2, 3].map((k) => ({ x: 0.5 + 0.15 * Math.cos(k * Math.PI / 2 + 0.4), y: 0.5 + 0.15 * Math.sin(k * Math.PI / 2 + 0.4) }));
+const SPOTS = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => ({ x: 0.5 + 0.15 * Math.cos(k * Math.PI / 4 + 0.4), y: 0.5 + 0.15 * Math.sin(k * Math.PI / 4 + 0.4) }));
+/** The band's largest bubble, in grid steps of 128 (LiquidVisualizer: (0.9 + bass × 1.2) × GRID_SCALE). */
+const BUBBLE = 2.1;
 
 const browser = await launchChromium(chromium);
 const results = [];
@@ -142,20 +167,29 @@ try {
       };
     });
     /*
-      Four bubbles where the band drops its own, kept at four: one set down
-      at each spot that has none of the plate's bubbles within 0.05 of it.
-      The band's size (LiquidVisualizer, "A few bubbles at a time": 0.9 to
-      2.1 grid steps at 128, here 1.5), one at a time with no spread.
+      The bubbles, kept at eight: one set down at each spot that has none of
+      the plate's bubbles within 0.05 of it, one at a time with no spread.
     */
-    const keepBubbles = () => page.evaluate((spots) => {
+    const keepBubbles = () => page.evaluate(({ spots, size }) => {
       const d = window.chromaglassDebug(), b = d.bubbles, G = d.pointer().grid;
       if (!b?.spawn) return -1;
       for (const s of spots) {
         const near = b.bubbles.some((q) => Math.hypot(q.x / G - s.x, q.y / G - s.y) < 0.05);
-        if (!near) b.spawn(s.x * G, s.y * G, 1.5 * G / 128, 1, 0);
+        if (!near) b.spawn(s.x * G, s.y * G, size * G / 128, 1, 0);
       }
       return b.bubbles.length;
-    }, SPOTS);
+    }, { spots: SPOTS, size: BUBBLE });
+
+    /*
+      No air of the music's own: Audio Impact held at 0 before the first
+      click starts the band, through the app's settings so a rebuild keeps
+      it, and read back from the plate. The rest of the plate's currents are
+      held 2.5 s after the pour, below, as #238 held them.
+    */
+    await page.evaluate(() => window.chromaglassSettings({ audioImpact: 0 }));
+    for (let k = 0; k < 40 && (await page.evaluate(() => window.chromaglassDebug().settings.audioImpact !== 0)); k++) await page.waitForTimeout(50);
+    const music = () => page.evaluate(() => window.chromaglassDebug().musicBubbles?.() ?? null);
+    const airBefore = await music();
 
     // The first click (in the corner, off the plate) starts the band where it is let.
     await page.mouse.click(5, 5);
@@ -163,7 +197,11 @@ try {
     const laysBefore = await page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
     // Ferrofluid turned up on a bare plate pours the look's own shape: Classic's ring.
     await page.evaluate(() => { window.chromaglassDebug().settings.phaseAmount = 0.6; });
-    await page.waitForTimeout(2500);
+    // The bubbles press from the pour on, as the band's own did on the runs where it dropped them.
+    for (let k = 0; k < 5; k++) {
+      if (pg.bubbles) await keepBubbles();
+      await page.waitForTimeout(500);
+    }
     const laysAfter = await page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
     await page.evaluate((held) => {
       const d = window.chromaglassDebug();
@@ -200,7 +238,8 @@ try {
       console.log(`     t=${s.t.toFixed(1).padStart(4)} s  disc ${s.disc.toFixed(3)}  plate ${(s.total * 100).toFixed(2)}%  r ${s.r.toFixed(3)}  bubbles ${s.bubbles} (drawn ${s.drawn})`);
     }
     const n = series.length - 1;
-    results.push({ pg, series, first, last, poured: laysAfter - laysBefore, plateOk, steady, bubbles: bubbleSum / n, drawn: drawnSum / n });
+    const airAfter = await music();
+    results.push({ pg, series, first, last, poured: laysAfter - laysBefore, plateOk, steady, bubbles: bubbleSum / n, drawn: drawnSum / n, air: airBefore && airAfter ? airAfter.kicks + airAfter.held - airBefore.kicks - airBefore.held : -1, chances: airBefore && airAfter ? airAfter.chances - airBefore.chances : -1, impact: airAfter ? airAfter.impact : NaN });
     await page.close();
   }
 } finally {
@@ -253,8 +292,20 @@ check('silence was silent and still: no band, no kicks, no bubbles, the ring whe
   !!quiet?.last && !quiet.last.band && kicksIn(quiet) === 0 && quiet.series.every((s) => s && s.bubbles === 0) && pq !== null && Math.abs(pq) < BAR,
   `${quiet?.last?.band ? 'a band playing' : 'no band'}, ${kicksIn(quiet)} kicks while watched; ${said(quiet)}`);
 check('the band played, and its bubbles lasted on the plate and were drawn, while it was watched',
-  [band, old].every((r) => !!r?.last?.band && kicksIn(r) > 0 && r.bubbles >= 3 && r.drawn >= 3),
+  [band, old].every((r) => !!r?.last?.band && kicksIn(r) > 0 && r.bubbles >= 6 && r.drawn >= 6),
   [band, old].map((r, i) => `${PAGES[i + 1].name}: ${r?.last?.band ? `band playing, ${kicksIn(r)} kicks` : 'no band'}, ${r ? `${r.bubbles.toFixed(1)} bubbles lasting 1.5 s, ${r.drawn.toFixed(1)} drawn` : 'unread'}`).join('; '));
+/*
+  And every bubble was one this set down: the music released none of its own
+  (the plate's count, musicBubbles), so the pages are the same plate whatever
+  the band's dice said. Its own air was the old plate's drift on some runs and
+  not others, above. The count alone could pass on a full plate (the music
+  asks only while the plate carries fewer than 3 + 14 × Bubbles, six on
+  Classic, and this keeps eight), so the impact the frame itself used is asked
+  too: 0 there is the reason no air came, not the room.
+*/
+check('the music released no air of its own on any page: every bubble was one set down here',
+  [quiet, band, old].every((r) => r && r.air === 0 && r.impact === 0),
+  [quiet, band, old].map((r, i) => `${PAGES[i].name}: ${r ? (r.air < 0 ? 'unread' : `${r.air} released of ${r.chances} chances, the frame's impact ${r.impact}`) : 'unread'}`).join('; '));
 /*
   The instrument, shown to see the drift it was built for: the old plate's
   bubbles still press the glass and pull the poured ring in (PLAN.md, "a

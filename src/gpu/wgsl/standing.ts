@@ -151,8 +151,12 @@ struct Film {
   grid: vec4f,   // the plate's grid N, l_c a cell, the film's time a substep, H0
   film: vec4f,   // EPS, the wetting's κ, hs, the magnetisation's Langevin scale
   win: vec4f,    // the window: full inside win.x cells of the patch's middle, none past win.y; the pull's scale (z); the step's count, for the noise (w)
+  size: vec4f,   // the magnet's radius in plate widths (x; PLAN 9v, Magnet Size)
 };
 @group(0) @binding(0) var<uniform> F: Film;
+// The field's shape is the magnet's own (spikes.ts, magnetShare), and every
+// shader that asks for it says how big the magnet is.
+fn magnetRadius() -> f32 { return F.size.x; }
 `;
 
 /*

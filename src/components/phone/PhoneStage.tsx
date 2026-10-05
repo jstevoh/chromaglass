@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import type { MixTakes } from '../../lib/mixFade';
 import {
   Droplet, SprayCan, Paintbrush, FlaskConical, Slash, Wind, Hand, Fingerprint, Magnet,
-  Play, Pause, Microscope, EyeOff, X, Music, Sparkles, MoreHorizontal, ChevronDown,
+  Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop,
@@ -539,7 +539,7 @@ export function PhoneStage(p: PhoneStageProps) {
         </div>
         <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:pt-1 wide-land:w-[264px] wide-land:border-l wide-land:border-t-0 wide-land:pl-1.5 wide-land:pt-0">
           {([
-            ['looks', 'Looks', Sparkles],
+            ['looks', 'Looks', Palette],
             ['sound', 'Sound', Music],
             ['play', 'Play', Waves],
             ['mix', 'Mix', SlidersVertical],
@@ -809,7 +809,7 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'play' && (
         <PhoneSheet title="Play" onClose={close} testId="phone-sheet-play">
           <div className="grid grid-cols-2 gap-1.5">
-            <Tile icon={Sparkles} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
+            <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
             <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
