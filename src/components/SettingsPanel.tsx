@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Sparkles, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MAPPABLE_SOURCES, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
@@ -3154,7 +3154,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {/* Automation Section */}
       <section id="settings-automation" className={`${SECTION_CARD} ${shown('automation') ? SECTION_GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
         <h3 className={SECTION_TITLE}>
-          <Sparkles size={12} /> Automation
+          <Hourglass size={12} /> Automation
         </h3>
         <Slider
           label="Evolve Speed"

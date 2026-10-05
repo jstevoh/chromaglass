@@ -372,6 +372,13 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 4. Polish.**
 
+- ~~**QA-17** The phone's **Looks** tab wore a sparkle, the icon apps use for AI, and the
+  owner wants nothing in the app to read as AI.~~ Shipped: Looks is a palette; the
+  other sparkles (Random on the desk and the remote, Evolve, Automation, the track's
+  Evolution, "A band in a box") are a shuffle, an hourglass or a drum, and the MIDI
+  auto-map's magic wand is an ear, since it builds the map by listening. Desk, phone,
+  remote. No user-facing text said "AI", "magic" or "smart".
+
 - **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
   `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
   without ever cutting away; Auto picks its own subject, rides it for Shot Length (5 s

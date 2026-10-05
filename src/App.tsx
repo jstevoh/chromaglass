@@ -28,7 +28,7 @@ import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Sparkles, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
@@ -4501,7 +4501,7 @@ export default function App() {
                     ? 'Click again to replace every setting with a random one. Revert brings this look back.'
                     : 'Randomize all settings — the look it replaces is kept, so Revert brings it back'}
                 >
-                  <Sparkles size={16} className={luckyArmed ? '' : 'text-yellow-400 group-hover:scale-110 transition-transform'} />
+                  <Shuffle size={16} className={luckyArmed ? '' : 'text-yellow-400 group-hover:scale-110 transition-transform'} />
                   <span className="text-[7px] font-bold uppercase tracking-widest">{luckyArmed ? 'Sure?' : 'Random'}</span>
                 </button>
 
