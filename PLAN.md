@@ -527,6 +527,19 @@ has to be still itself, and asks the old plate to drift by more than the same ba
 the instrument is shown to see what it was built for; that line turns round to ask
 the old plate to stay once its bubbles stop pressing.
 
+*Found 2026-10-05 (#267, #281 and #287 red on it), **fixed in the ferrodrift control's
+PR:*** **the old-plate line sat on its bar.** Its four bubbles at 0.15, set down 2.5 s
+after the pour, were never what pulled the ring: the band's own were. Over eleven Mac
+runs the old plate pulled 0.0029–0.0091 on the six where the band had dropped no air
+before Audio Impact was held, and 0.0062–0.0260 on the five where its dice had dropped
+three to seven onto the dye ring, against a bar of 0.004 over silence. The check now
+holds Audio Impact at 0 from before the band starts, asks that the music released no
+air on any page, and sets down eight of the band's largest bubbles where it drops them,
+from the pour on, on both plates. Still open: with the same four bubbles the old
+plate's pull varied threefold (0.0029 → 0.0091), with its readings sometimes
+accelerating (0.310 → 0.281 in twelve seconds) and sometimes linear; what makes one
+press pull three times another is not measured, and belongs with the press item above.
+
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
 the One, default 0, which leaves every kick's weight at exactly 1) read 0.040 → 0.046
