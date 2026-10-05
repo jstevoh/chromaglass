@@ -4797,6 +4797,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   (146 → 138; its exclusion blend inverts where dyes overlap), Fractal Dream (42 → 38)
   and Sunny Side Up (92 → 79). Look at them on the Mac (judging §37) and reorder or
   trim their families if they read muddier.
+- **18l-5. Magnet Garden keeps Transmission 0.5.** With depth drawn the thin gold
+  between its ferrofluid domes goes pale and rivals the white points on their tops
+  (`npm run spikes`: 16 tops lit against 7.8 places half a pitch off, where the check
+  asks for three times as many; 4.0 off at 0.5). The ferrofluid looks' own pass should
+  decide whether its water should be deeper or its points brighter at 1.
 - **18l-1. Real dye spectra (the shortcut kept).** Still three bands: a dye's colour is
   three transmissions, and the 4%/96% limits stand in for the tails of a real absorption
   band. Spectral Optics' six bands cannot reproduce the palette's saturated colours (its

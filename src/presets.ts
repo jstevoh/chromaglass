@@ -1845,6 +1845,17 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.5,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
+      /*
+        The plate's domes read by the white point on each top against the
+        gold water round them. With the dye's depth drawn (Transmission 1,
+        the default since PLAN 18l) the thin gold between the domes goes
+        pale, as a thin wash of a dye does, and on this plate bright enough
+        to rival the points: in npm run spikes 7.8 of the places half a
+        pitch off the tops lit against 16 tops, where at 0.5 it is 4.0
+        against 16. The ferrofluid looks have their own pass (PLAN 18l-5);
+        until then this one keeps the half it had.
+      */
+      transmission: 0.5,
       saturationBoost: 1.4,
       dyeBudget: 1.0,
       glossiness: 0.2,
