@@ -28,6 +28,8 @@
  *   6. a browser with no WebGPU sees the failure screen, not the intro
  *   7. the remote and a cast never show it, not even before the app has run
  *   8. an app that never arrives: it leaves when the way out appears
+ *   9. it holds still while each of the opening's render pipelines
+ *      compiles, and moves again once they are done
  *
  * And it prints how much of the wait it covered: from the first paint to
  * the plate's first step, the share of that time the intro was up.
@@ -69,7 +71,24 @@ const browser = await launchChromium(chromium);
 */
 const instruments = () => {
   const w = window;
-  const at = w.__introAt = { frames: 0, shown: 0, hidden: 0 };
+  const at = w.__introAt = { frames: 0, shown: 0, hidden: 0, renders: [], moving: [] };
+  /*
+    Every render pipeline asked of the GPU, from its ask to its settle, seen
+    from outside the app: check 9 holds the intro's frames against the
+    opening's. Its own record (`__cgIntro.still`) says only when it meant to
+    hold still; this is when the compiles really were under way.
+  */
+  const make = w.GPUDevice?.prototype?.createRenderPipelineAsync;
+  if (make) {
+    w.GPUDevice.prototype.createRenderPipelineAsync = function (desc) {
+      const r = [performance.now(), null, desc?.label ?? ''];
+      at.renders.push(r);
+      const p = make.call(this, desc);
+      const end = () => { r[1] = performance.now(); };
+      p.then(end, end);
+      return p;
+    };
+  }
   /*
     When it left the page, from the removal itself: the frames that read
     everything else can stall a second and a half on a software plate just
@@ -84,6 +103,11 @@ const instruments = () => {
     const el = document.getElementById('cg-intro');
     const on = !!el && el.isConnected;
     const style = on ? getComputedStyle(el) : null;
+    // Up and not leaving: when it was, and whether anything in it was
+    // turning on this frame (a paused animation is not).
+    if (on && style.display !== 'none' && !el.classList.contains('cg-out')) {
+      at.moving.push([performance.now(), el.getAnimations({ subtree: true }).some((a) => a.playState === 'running')]);
+    }
     // Seen and showing, or there and hidden by the page itself: the remote
     // and a cast must have the second and never the first, on every frame,
     // not only on one that might come after the app has removed it.
@@ -124,6 +148,10 @@ async function open(query, { viewport = { width: 1440, height: 900 }, phone = fa
   const context = await browser.newContext({ viewport, ...(phone ? { isMobile: true, hasTouch: true, deviceScaleFactor: 3 } : {}) });
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log(`   page error: ${e.message}`));
+  // What the app says of its own opening ("ChromaGlass: …", a warning when
+  // the pipelines were not all built ahead), kept to print beside a failure.
+  page.cgSaid = [];
+  page.on('console', (m) => { if (/ChromaGlass/.test(m.text())) page.cgSaid.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   if (slow) {
     const cdp = await context.newCDPSession(page);
     await cdp.send('Network.enable');
@@ -175,7 +203,8 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     const props = new Set();
     let n = 0;
     for (const a of el.getAnimations({ subtree: true })) {
-      if (a.playState !== 'running') continue;
+      // Held still is still its animation: the opening may be compiling.
+      if (a.playState !== 'running' && a.playState !== 'paused') continue;
       n++;
       for (const k of a.effect.getKeyframes()) for (const p of Object.keys(k)) if (!['offset', 'computedOffset', 'easing', 'composite'].includes(p)) props.add(p);
     }
@@ -218,6 +247,45 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   check('4. it leaves on the frame the plate first steps, fades, and is gone from the page',
     leftOnStep && faded && goneIn && !after.there,
     `${at.noCount ? 'no stepCount on the lead plate to read; ' : ''}${stepped ? `plate stepped on frame ${at.stepped} (${s(at.steppedAt)}), intro leaving on frame ${at.leaving} (${s(at.leavingAt)}) for "${rec.reason}"` : 'the plate never stepped, or the intro never went'}; ${at.fade ? `a ${at.fade.ms} ms fade on opacity` : 'no fade started'}; gone ${at.removedAt !== undefined ? `${Math.round(at.removedAt - at.leavingAt)} ms after (seen on a frame ${at.goneAt !== undefined ? `${Math.round(at.goneAt - at.leavingAt)} ms after` : 'never'})` : 'never'}`);
+  /*
+    Still through the opening's render compiles. What it guards (run
+    37233245217): with the intro turning, a frame needs the GPU process, and
+    on CI's Mac it waited there behind the display's compile, 2.82 s with
+    no frame at all. Software WebGPU does not stall so, so what is held
+    here is the cause and not the stall: no frame in which anything of the
+    intro was running while one of the opening's render pipelines was
+    compiling, and some such frame seen (a check that saw none measured
+    nothing). The opening's are those asked from its start until it was
+    done (`prepareLog`); what is built later, behind a plate already
+    drawing, is not the intro's to wait for. And it moved again: every
+    stretch it held still was let go, and once the compiles were done it
+    turned on some frame before it left (or left within two frames of the
+    last of them).
+  */
+  await waitFor(page, () => !!window.chromaglassDebug?.()?.pipelines?.()?.prepares?.some((x) => x.stage === 'opening'), null, 10000);
+  const log = await page.evaluate(() => {
+    const d = window.chromaglassDebug?.();
+    const all = d?.pipelines?.()?.prepares;
+    const p = all?.find((x) => x.stage === 'opening');
+    return { opening: p ? { at: p.at, end: p.at + p.ms } : null, stages: all ? all.map((x) => x.stage) : null, debug: d ? Object.keys(d).length : null, pipelines: typeof d?.pipelines };
+  });
+  const opening = log.opening;
+  if (!opening) console.log(`     no opening to read: ${log.debug ?? 'no'} debug keys, pipelines ${log.pipelines}, prepares ${JSON.stringify(log.stages)}; ${at.renders?.length ?? 0} render compiles seen in all; the app said ${JSON.stringify(page.cgSaid)}`);
+  const renders = opening ? (at.renders ?? []).filter(([a]) => a >= opening.at && a <= opening.end) : [];
+  const inCompile = (t) => renders.some(([a, e]) => t > a && (e === null || t < e));
+  const during = (at.moving ?? []).filter(([t]) => inCompile(t));
+  const lastEnd = renders.length && renders.every(([, e]) => e !== null) ? Math.max(...renders.map(([, e]) => e)) : null;
+  const afterward = lastEnd === null ? [] : (at.moving ?? []).filter(([t]) => t > lastEnd);
+  const stills = rec.still ?? [];
+  const letGo = stills.length > 0 && stills.every(([, e]) => e !== null);
+  // One at a time, as the opening has always asked for them (`renderBusy` in
+  // gpu/prepare.ts): the hold must not let the lanes ask for several at once.
+  const sorted = [...renders].sort((a, b) => a[0] - b[0]);
+  const overlaps = sorted.filter((r, i) => i > 0 && (sorted[i - 1][1] === null || sorted[i - 1][1] > r[0])).length;
+  check('9. it holds still while the opening\'s render pipelines compile, one at a time, and moves again after',
+    overlaps === 0 && renders.length > 0 && during.length > 0 && during.every(([, m]) => !m) && letGo && lastEnd !== null
+      && (afterward.some(([, m]) => m) || afterward.length <= 2),
+    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${during.length} frames up during them, ${during.filter(([, m]) => m).length} of them moving; held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the last`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {

@@ -182,7 +182,7 @@ const OPENING_LANES = (() => {
  * otherwise have every remaining build refused one after another, each
  * counted as a try.
  */
-async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[], lanes = 1): Promise<Prepared> {
+async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: Prep[], lanes = 1, quiet?: Quiet): Promise<Prepared> {
   const t0 = performance.now();
   let gone = false;
   void device.lost.then(() => { gone = true; });
@@ -221,6 +221,9 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     while the other lanes stood idle.
   */
   let renderBusy: Promise<void> | null = null;
+  // The page held still across the render compiles (`Quiet`, below): asked
+  // once, before the first of them, and let go when the last has settled.
+  let renderLeft = quiet ? builds.filter((b) => b.kind === 'render').length : 0;
   const take = (): Prep | undefined => {
     const i = renderBusy ? queue.findIndex((b) => b.kind !== 'render') : 0;
     return i < 0 ? undefined : queue.splice(i, 1)[0];
@@ -269,7 +272,12 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       const stamps: BuildTimes = {};
       const built = prep.build(stamps);
       const waited = within(built.then(() => undefined), left);
-      if (prep.kind === 'render') renderBusy = waited.then(() => { renderBusy = null; });
+      if (prep.kind === 'render') {
+        renderBusy = waited.then(() => {
+          renderBusy = null;
+          if (quiet && --renderLeft === 0) quiet.go();
+        });
+      }
       const settled = await waited;
       const now = performance.now();
       const from = Math.max(b0, lastSettled);
@@ -281,7 +289,17 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       if (await built) ready++;
     }
   };
+  /*
+    Held still before any lane starts, not as a lane takes its first render
+    pipeline: an await between \`take\` and \`renderBusy\` let all three lanes
+    take a render pipeline while the first waited, and the opening asked for
+    three at once (#283's first Mac run: \`air/air splat\` 3.32 s, under way
+    through a 2.15 s frame gap). The render pipelines are asked first anyway.
+  */
+  if (renderLeft > 0) await quiet?.still().catch(() => undefined);
   await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
+  // Gone, timed out or a build that never settled: never left held still.
+  if (quiet && renderLeft > 0) quiet.go();
   /*
     The first uses, handed over as each compile came in and not waited for
     there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
@@ -304,10 +322,40 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
 }
 
 /**
+ * What the page holds still while the opening's render pipelines compile.
+ *
+ * What was reported: the first deploy with the intro over the opening
+ * (`lib/intro.ts`, run 37233245217) went red on `npm run startup`'s "no
+ * stop in the opening": no animation frame for 2.82 s from 3.15 s, the page
+ * neither busy nor held. Its frames stopped exactly while `plate/display`
+ * compiled (4.30 s from 2.71 s), and again for about 1.9 s while
+ * `plate/derive` did (2.18 s from 7.03 s); through the compute kernels after
+ * them they ran on. On every run before the intro the display's compile
+ * stopped nothing (no frame gap over 0.62 s on #254's, the display 3.46 s):
+ * the page drew nothing new then, and a frame with nothing new in it needs
+ * nothing of the GPU process. The intro's turning burst is a new picture on
+ * every frame, and on CI's Mac a frame that needs the GPU process waits
+ * behind a render pipeline compiling there (inferred from the timings; a
+ * compute kernel's compile does not hold it), and the next frame waits for
+ * that one.
+ *
+ * So the intro holds still for those seconds: it would have frozen anyway,
+ * and still, the page keeps its frames, and with them the desk answering a
+ * press. `still` resolves once the page has drawn the still picture (a
+ * frame or two), so the last moving frame is not left queued behind the
+ * first compile; `go` lets it move again. Asked only in the opening, and
+ * only while the intro is up (`introStill`).
+ */
+export interface Quiet {
+  still(): Promise<void>;
+  go(): void;
+}
+
+/**
  * Builds what the show opens with and returns when it is done; then goes on
  * building the rest behind the show, which is under way by then.
  */
-export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, opts: { float32Filterable: boolean }, open: Opening): Promise<Prepared> {
+export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, opts: { float32Filterable: boolean; quiet?: Quiet }, open: Opening): Promise<Prepared> {
   const builds = [
     ...WebGPUFluid.prepare(device, opts, open),
     ...WebGPUPlate.prepare(device, format, PICTURE_FORMAT, open),
@@ -344,7 +392,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     it one by one while the kernels run beside them.
   */
   const ahead = builds.filter((b) => !b.later).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'render' ? -1 : 1));
-  const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES);
+  const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES, opts.quiet);
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
   void buildInTurn(device, 'later', builds.filter((b) => b.later))
