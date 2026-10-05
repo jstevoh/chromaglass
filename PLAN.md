@@ -710,6 +710,33 @@ Found with it, open:
   numbers before and after it): the grain's soft blotches, about ten pixels across,
   move a thin edge's pixels 9–10.6 levels on average (`npm run grainedge` prints it), with
   no flecks. Watercolour-like, not dithered; whether it is too strong is the owner's call.
+- **1h. A screen-space anti-aliasing pass (FXAA and its kind): not for the plate; the
+  projector's warp is the one place the picture itself aliases** (asked 2026-10-05, from
+  an After Effects FXAA plugin). FXAA finds pixels whose brightness jumps against their
+  neighbours and blurs along the edge it guesses, which repairs one-pixel stair steps on
+  rasterised triangles. The plate has none to repair: it is one full-screen shader whose
+  edges are already drawn as coverage over a pixel and a half (`fwidth` in wgsl/plate.ts:
+  the rims, the drops, the ferrofluid's line), and the dye is read through a Catmull-Rom
+  filter (`textureBicubic`), not nearest texels. What reads as blocky comes from the
+  **simulation grid**, not the final image: at 256² on a 1440-wide panel one cell is
+  about 5.6 pixels, so a step along a dye edge is five pixels tall, far wider than FXAA's
+  one-pixel blend, and the fixes for that are the grid's own (1b, 1c, 1d). Run over the
+  finished frame, FXAA would also take things that are meant to be there: the pigment's
+  grain (1a), Roy's Ben-Day dots (a regular high-contrast pattern is exactly what it
+  smears), and the razor edge of a thick ferrofluid domain (judging §41). A temporal
+  pass (TAA) is worse on a liquid: everything moves every frame, so its history ghosts.
+  Where the **final image** does alias is the projector's pass (`src/gpu/wgsl/output.ts`):
+  each wall pixel takes one bilinear tap of the plate (`textureSampleLevel(..., 0.0)`, no
+  mip levels), so a surface whose corner pins shrink the picture (a keystoned far side,
+  a small mapped shape) skips texels and the grain, the dots and thin fingers shimmer
+  there as the liquid moves; and a surface's `feather` is in its own space, so on a
+  shrunk side a 0.01 feather can fall under a pixel and its outline stair-steps. The real
+  fix is to filter by the pixel's footprint: take as many taps as the warp shrinks the
+  picture (its derivatives give the count), or build mip levels of the plate's picture
+  when a surface needs them, and give the feather a floor of a wall pixel and a half.
+  Measure with `npm run map` (the lab, `PW_WEBGPU=1`): a pinned surface at a half and a
+  quarter of its size, a fixed picture panned a fraction of a texel a frame, and how
+  much each wall pixel flickers beyond the pan itself (shimmer) before and after, and the outline's width in wall pixels. Unbuilt; nothing to judge yet.
 
 ### 2. Lacing
 
