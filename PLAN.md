@@ -338,6 +338,21 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   green lands on yellow or blue. A real comic printed green as yellow and blue dots
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
+- ~~**QA-18**~~ **Fixed, this PR** (`npm run saves`, 28 lines, in Measure's browser part; main fails "Save asks
+  for a name again with a saved look open"). Save did not let the owner name a new
+  preset from the current settings. Desk. It asked for a name once; after that the look
+  just saved (or any saved look opened) was the document and Save wrote over it, a toast
+  the only sign. Saved presets were in no list on either desk (⌘K found them by name),
+  ⌘S on the Perform desk reached the browser's Save Page, and the save sheet's fields
+  were 200 px wide in a 480 px sheet. Now Save always asks for a name (button, ⌘S on
+  both desks, ⌘K) and makes a new preset; writing over the open one is the sheet's
+  "Replace “name”" button and the look menu's "Save over"; the look menu lists your
+  presets to open or take out. The phone's Looks sheet has the same Save, landing under
+  Yours. The narrow window's preset menu said "Save as file" and promised a download
+  that saving stopped doing; it says Save. Open: QA-18a.
+- **QA-18a** The Perform desk has no list of your saved presets of its own (⌘K and the
+  set list's Add both find them). Its header has no look menu to hang one off; decide
+  whether the cue list's Add or a header menu is the place. Desk.
 
 **Tier 3. On the wall, it looks wrong.**
 
@@ -2873,10 +2888,9 @@ read in the code.**
   dial it had off (stardust-collapse to poster-1969: nine switched on, ten pulled);
   re-anchored at the Go, none. A fader is also fought by a glide in flight. Re-anchor at
   the end of a look fade, and treat a ride as a hand's write.
-- *⌘S never saves over the open look.* The keyboard's ⌘S opens the save sheet
-  (`setShowSave(true)`) where the desk's button calls `saveLook()`, and it matches before
-  the shifted branch, so ⇧⌘S never runs (`App.tsx`). Measured: the button wrote over
-  "Mine"; ⌘S offered "Mine copy".
+- ~~*⌘S never saves over the open look.*~~ Settled by QA-18: the button, ⌘S and ⌘K all
+  ask for a name now, and writing over is the sheet's Replace. Do not make ⌘S write over
+  again: a Save that silently wrote over the open look is what the owner reported.
 - *A sequence in the set list reads "missing" on every load.* The `cues` memo reads
   `sequencerRef.current`, which is assigned further down the same render, and its
   dependencies do not change on load. Go still plays it; the list says `slow-build · seq

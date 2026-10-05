@@ -86,8 +86,16 @@ export interface DesignDeskProps {
   plateRef: Ref<HTMLDivElement>;
   lookName: string | null;
   edited: boolean;
+  /** Save as a new preset: always asks for a name. */
   onSave: () => void;
-  onSaveAs: () => void;
+  /** Write over the saved look that is open; absent when none is. */
+  onSaveOver?: () => void;
+  /** Your saved presets, listed under the look menu to open or take out. */
+  savedLooks: { id: string; name: string; swatch: string }[];
+  /** Which of them is open, if one is. */
+  openLookId: string | null;
+  onOpenSaved: (id: string) => void;
+  onDeleteSaved: (id: string) => void;
   onNew: () => void;
   /** Whether the look has unsaved changes, for the dot on Save. */
   dirty: boolean;
@@ -147,7 +155,7 @@ export function DesignDesk(p: DesignDeskProps) {
                 ref={docButton}
                 onClick={toggleDocMenu}
                 className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
-                title="New, Save, Save as…"
+                title="New, Save, and your saved presets"
                 data-testid="doc-menu-button"
               >
                 <span className="truncate">{p.lookName ?? 'Untitled'}</span>
@@ -162,21 +170,58 @@ export function DesignDesk(p: DesignDeskProps) {
                     style={{ top: docMenu.top, left: docMenu.left }}
                     data-testid="doc-menu"
                   >
-                    {[
+                    {([
                       ['New — an empty plate', '', p.onNew, 'doc-new'],
-                      ['Save', '⌘S', p.onSave, 'doc-save'],
-                      ['Save as…', '⇧⌘S', p.onSaveAs, 'doc-save-as'],
-                    ].map(([label, kbd, run, id]) => (
+                      ['Save as a new preset…', '⌘S', p.onSave, 'doc-save'],
+                      ...(p.onSaveOver ? [[`Save over “${p.lookName ?? 'Untitled'}”`, '', p.onSaveOver, 'doc-save-over']] : []),
+                    ] as [string, string, () => void, string][]).map(([label, kbd, run, id]) => (
                       <button
-                        key={String(id)}
-                        onClick={() => { setDocMenu(null); (run as () => void)(); }}
+                        key={id}
+                        onClick={() => { setDocMenu(null); run(); }}
                         className="flex w-full items-center justify-between gap-4 px-3 py-2 text-left text-[13px] text-text-2 transition-colors hover:bg-hover hover:text-text"
-                        data-testid={String(id)}
+                        data-testid={id}
                       >
-                        <span>{String(label)}</span>
-                        {kbd ? <span className="font-mono text-[11px] text-faint">{String(kbd)}</span> : null}
+                        <span className="truncate">{label}</span>
+                        {kbd ? <span className="font-mono text-[11px] text-faint">{kbd}</span> : null}
                       </button>
                     ))}
+                    {/*
+                      Your presets, under the look they become.
+
+                      A saved preset was in no list anywhere on this desk:
+                      ⌘K would find it by name, and nothing said so, so a look
+                      saved here seemed to have gone nowhere. This is the menu
+                      already hung off the look's name, so it is where they are.
+                    */}
+                    {p.savedLooks.length > 0 && (
+                      <div className="border-t border-border py-1" data-testid="doc-saved">
+                        <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your presets</div>
+                        <div className="max-h-[50vh] overflow-y-auto">
+                          {p.savedLooks.map(l => (
+                            <div key={l.id} className={`group flex items-center ${l.id === p.openLookId ? 'bg-active' : 'hover:bg-hover'}`}>
+                              <button
+                                onClick={() => { setDocMenu(null); p.onOpenSaved(l.id); }}
+                                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-[13px] text-text-2 hover:text-text"
+                                title={`Open ${l.name}`}
+                                data-testid={`doc-saved-${l.id}`}
+                              >
+                                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: l.swatch }} />
+                                <span className="truncate">{l.name}</span>
+                              </button>
+                              <button
+                                onClick={() => p.onDeleteSaved(l.id)}
+                                className="mr-1 rounded p-1.5 text-faint opacity-60 hover:bg-hover hover:text-text group-hover:opacity-100"
+                                title={`Remove ${l.name} from your presets`}
+                                aria-label={`Remove ${l.name}`}
+                                data-testid={`doc-saved-remove-${l.id}`}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               ), document.body)}

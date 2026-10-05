@@ -1548,8 +1548,8 @@ export default function App() {
     lookTakesLevels();
     setSettings(prev => targetLook(prev, p.settings));
     setPinnedPresetId(p.id);
-    // Your own look, opened: ⌘S from here writes over it rather than making
-    // a second copy.
+    // Your own look, opened: the save sheet's Replace, and the look menu's
+    // Save over, write over it from here (Save itself always makes a new one).
     setDocId(p.id);
     setDocDirty(false);
     setPresetSeq(n => n + 1);
@@ -1568,8 +1568,9 @@ export default function App() {
 
     So: `docId` is the saved look these settings belong to, or null for one
     that has never been saved. `docDirty` is whether they have been touched
-    since. Save writes over the document when there is one and asks for a name
-    when there is not, Save as always asks, and New is an empty plate.
+    since. Save asks for a name and makes a new preset, every time (see
+    saveLook for why); Replace writes over the document when there is one; and
+    New is an empty plate.
   */
   /**
    * A line that fades, for the moves whose whole result is invisible.
@@ -1621,28 +1622,52 @@ export default function App() {
 
   const [docId, setDocId] = useState<string | null>(null);
   const [docDirty, setDocDirty] = useState(false);
-  /** Whether Save should ask for a name (no document yet) or just write. */
-  const [saveMode, setSaveMode] = useState<'as' | 'over'>('as');
 
   const saveCurrentPreset = (name: string, description: string, forSong = false) => {
     const plate = visualizerRef.current?.describePlate();
-    const p = userPresets.saveCurrent(name, description, settings, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null, forSong ? currentSong : null);
+    // From the ref: ⌘K's list is memoised and would otherwise hand this the
+    // settings as they stood when the list was last built.
+    const p = userPresets.saveCurrent(name, description, settingsRef.current, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null, forSong ? currentSong : null);
     setPinnedPresetId(p.id);
     setDocId(p.id);
     setDocDirty(false);
+    setToast(`Saved “${p.name}”`);
   };
 
-  /** ⌘S: over the document when there is one, otherwise ask for a name. */
-  const saveLook = () => {
-    if (!docId) { setSaveMode('as'); setShowSave(true); return; }
+  /*
+    Save asks for a name, every time: a new preset made from what is on the
+    plate now.
+
+    Reported by the owner (2026-10-05) as Save not working on the desk, when
+    what they wanted was to name a new preset from the current settings. It
+    did work, once: the first Save of a session asked for a name. From then
+    on the look just saved, or any saved look opened, was "the document", and
+    Save wrote over it without a word bar a toast for two seconds at the
+    bottom of the plate. Naming a second preset meant finding Save as… in a
+    menu hung off the look's name in the breadcrumb, which nothing pointed
+    to. Measured in `npm run saves`: the second Save on the Design desk
+    opened no sheet. So Save names a new one now, on both desks, ⌘S and the
+    phone alike, and writing over the look you opened is the sheet's second
+    button, named for the look it would replace, and the look menu's.
+  */
+  const saveLook = () => setShowSave(true);
+  /** Write over the saved look that is open, keeping its name and song. */
+  const replaceLook = () => {
+    if (!docId) { setShowSave(true); return; }
     const plate = visualizerRef.current?.describePlate();
-    const saved = userPresets.saveOver(docId, settings, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null);
-    if (!saved) { setSaveMode('as'); setShowSave(true); return; }   // deleted underneath us
+    const saved = userPresets.saveOver(docId, settingsRef.current, plate?.contract ?? null, plate?.injectStyles ?? null, plate?.liquids ?? null);
+    // Taken out underneath us (another tab, say): the sheet stays up to save
+    // it as a new one, and says why the Replace did nothing.
+    if (!saved) { setDocId(null); setShowSave(true); setToast('That preset is gone; save it under a name'); return; }
+    setShowSave(false);
     setDocDirty(false);
-    setToast(`Saved “${saved.name}”`);
+    setToast(`Saved over “${saved.name}”`);
   };
-  /** ⇧⌘S: always a new one. */
-  const saveLookAs = () => { setSaveMode('as'); setShowSave(true); };
+  /** A saved look taken out of the library; the plate keeps what is on it. */
+  const deleteSavedLook = (id: string) => {
+    userPresets.remove(id);
+    if (docId === id) setDocId(null);
+  };
 
   /**
    * An empty plate.
@@ -3699,8 +3724,8 @@ export default function App() {
       { id: 'back',      name: 'Back — undo the last look', kind: 'Actions', kbd: '⌫',    run: () => revertLook() },
       { id: 'blackout',  name: blackout ? 'Lights up' : 'Blackout', kind: 'Actions', kbd: 'B', run: toggleBlackout },
       { id: 'new',       name: 'New — an empty plate',      kind: 'Actions', run: newLook },
-      { id: 'save',      name: 'Save this look',            kind: 'Actions', kbd: '⌘S',  run: saveLook },
-      { id: 'save-as',   name: 'Save as a new look…',       kind: 'Actions', kbd: '⇧⌘S', run: saveLookAs },
+      { id: 'save',      name: 'Save as a new preset…',     kind: 'Actions', kbd: '⌘S',  run: saveLook },
+      ...(docId ? [{ id: 'save-over', name: `Save over “${docName}”`, kind: 'Actions' as const, run: replaceLook }] : []),
       { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
       { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
       { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
@@ -3750,7 +3775,7 @@ export default function App() {
 
     return [...looks, ...doing, ...opening, ...sections];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode,
+  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode, docId, docName,
       cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
 
   useEffect(() => {
@@ -3766,17 +3791,17 @@ export default function App() {
         setShowPalette(v => !v);
         return;
       }
-      // The bench's two: save what you have made, send it to the wall.
-      if (designing && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+      /*
+        ⌘S on either desk, shifted or not. It was the Design desk's alone,
+        though the Perform desk's Save button wears the same ⌘S: pressed in
+        Perform it reached the browser, which offered to save the web page.
+        Measured in `npm run saves`. The shifted one, Save as, had a branch of
+        its own after this one that it never reached (this one took any S
+        with ⌘ held); with Save always asking for a name the two are one.
+      */
+      if (deskUp && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        setShowSave(true);
-        return;
-      }
-      // Save as, the shifted Save. Before Save could write over anything there
-      // was nothing for it to be the other half of.
-      if (designing && (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault();
-        saveLookAs();
+        saveLook();
         return;
       }
       if (designing && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -4698,6 +4723,8 @@ export default function App() {
               if (pool.length) goLookNow(stream('phone.look').pick(pool).id);
             }}
             onRevert={previousLook.current ? revertLook : null}
+            onSaveLook={(name) => saveCurrentPreset(name, '', false)}
+            saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
             onBackLook={(id) => backLookNow(id)}
             backLook={backLookName}
             onBackFollowsFront={backFollowsFront}
@@ -5097,7 +5124,7 @@ export default function App() {
             </span>
           </button>
           {presetMenu === 'title' && (
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={userPresets.remove} currentSong={currentSong} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
           )}
         </div>
 
@@ -5404,7 +5431,11 @@ export default function App() {
           lookName={docName}
           edited={docDirty}
           onSave={saveLook}
-          onSaveAs={saveLookAs}
+          onSaveOver={docId ? replaceLook : undefined}
+          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
+          openLookId={docId}
+          onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
+          onDeleteSaved={deleteSavedLook}
           onNew={newLook}
           dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
@@ -5456,7 +5487,9 @@ export default function App() {
 
       {showSave && (
         <SaveLookSheet
-          suggested={saveMode === 'as' && docId ? `${docName} copy` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          suggested={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          replaceName={docId ? docName : null}
+          onReplace={replaceLook}
           songName={musicIntel.state.track?.title ?? null}
           onSave={saveCurrentPreset}
           onClose={() => setShowSave(false)}
