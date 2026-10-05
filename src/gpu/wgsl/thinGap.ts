@@ -399,6 +399,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       A.a = (air push, 1/dt, air cover, h0),
       A.b = (air rate mean, 1/disp, 1 to take the gap as it is without a rate).
     */
+    pourVolume: `${HEAD}${COMMON}
+@group(0) @binding(2) var<storage, read_write> poured: array<f32>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let d = length(uvOf(id) - A.a.xy) / max(A.a.z, 1e-6);
+  if (d >= 1.0) { return; }
+  let k = i32(id.x) + i32(id.y) * i32(S.n);
+  poured[k] = poured[k] + clamp((1.0 - d * d) * A.a.w, 0.0, 1.0);
+}`,
+
     hsDivergence: `${HEAD}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var sq: texture_2d<f32>;
@@ -407,6 +417,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(6) var dst: texture_storage_2d<r32float, write>;
 @group(0) @binding(7) var<storage, read> mob: array<f32>;
 @group(0) @binding(8) var<storage, read_write> gapBefore: array<f32>;
+@group(0) @binding(9) var<storage, read_write> poured: array<f32>;
 fn flux(p: vec2i, n: i32) -> vec2f {
   let c = clamp(p, vec2i(0), vec2i(n - 1));
   var w = textureLoad(vel, c, 0).xy * abs(mob[c.x + c.y * n]);
@@ -428,7 +439,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let k = p.x + p.y * n;
   let dh = select((g - gapBefore[k]) / A.a.w * A.b.y, 0.0, A.b.z > 0.5);
   gapBefore[k] = g;
-  let q = rate * A.a.x - dh;
+  /*
+    Liquid poured onto the plate since the last step (PLAN 18c, pourVolume):
+    a share of the column, so h·share of liquid in rest-gap units, which
+    has to go somewhere, so it is a source, as a gap opening is a sink, in
+    the same units (per displacement, A.b.y). It pushes the liquid round it
+    outward, u_r = Q/(2πrh), and what reaches the open rim leaves. Taken and
+    emptied here, as gapBefore is kept here.
+  */
+  let pour = poured[k] * hsGap(g, A.a.w) * A.b.y;
+  poured[k] = 0.0;
+  let q = rate * A.a.x - dh + pour;
   var b = -div / S.n + q / (S.n * S.n);
   if (!(abs(b) < 1e30)) { b = 0.0; }
   textureStore(dst, p, vec4f(b, 0.0, 0.0, 0.0));

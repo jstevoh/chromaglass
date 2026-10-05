@@ -232,9 +232,10 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
   it), then **18f** heat from the lamp (which unblocks 10.6
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
-- **6.3** **18c** a pour adds liquid, then **18g** colour leaves by flushing and **18k-spray**.
+- **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
+  **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
-- **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, then **18d-2** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
+- **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
@@ -411,7 +412,7 @@ Where each batch stands, as of 2026-09-27:
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v); 14x, the microphone taking the hand's own clicks for kicks, **shipped** (`npm run clicks`); 14v-3, the intro over the opening's black plate, **shipped** (`npm run intro`); 14v-4, the intro held still while the opening's render pipelines compile, **shipped** (`npm run intro` line 9; the Mac's `startup` frame gap) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15i, picking a bottle lays nothing, **shipped** (`npm run bottles`, Mac); 15e, 15f, 15g, 15j open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16f, add and take off the back plate on every look, **shipped** (#273, `layout`, `phone`); 16d–16e not started |
-| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (`npm run lamp`); **18b-1 which looks go on it, shipped** (#262: eleven looks on the lamp, ten picked by a written rule from Mac pictures, `npm run lampjudge`, one by the owner); 18b-2 to 18b-9 left; **18d-1 each poured liquid's viscosity, shipped** (glycerine crawls, syrup runs ahead in a thick look; `npm run thick`), 18d-2 to 18d-11 left |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (`npm run lamp`); **18b-1 which looks go on it, shipped** (#262: eleven looks on the lamp, ten picked by a written rule from Mac pictures, `npm run lampjudge`, one by the owner); 18b-2 to 18b-9 left; **18d-1 each poured liquid's viscosity, shipped** (glycerine crawls, syrup runs ahead in a thick look; `npm run thick`); **18c-1 a pour adds liquid and 18d-2 flushing, shipped** (a held bottle pushes the plate out into rings, a poured liquid stays until it is pushed over the rim; `npm run flush`); 18c-2 to 18c-5 and 18d-3 to 18d-11 left |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
@@ -3781,34 +3782,38 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18c. A pour adds liquid, not only colour
 
-- **Where:** the Dropper stamps dye with no volume. The Pour, the splash crown and
-  the Splatter push with a radial velocity kick, which is curl-free, so the projection
-  deletes it (bubbles-plan H's own rule). The splash fires at any energy above 0.02,
-  with a random count of satellites.
-- **The real phenomenon:** a landing drop is a volume source Q. Between glasses it
-  drives a radial flow, u_r = Q/(2πrh), that shoves the colour already there outward
-  into concentric rings (drop into drop). A crown splash needs K = We·Oh^−0.4 above
-  about 2100, which for a 3 mm water drop means falling from about 20 cm or more. Below
-  that a drop only merges and spreads. Whether an oil drop stays a lens or spreads to a
-  film is set by the spreading coefficient S = γ_w − γ_o − γ_ow, which is negative for
-  most oils.
-- **What it takes:** a volume channel on the splat record, fed into `divergence`
-  exactly as a growing bubble's rate already is. The splash is gated on K from
-  `dropHeight`.
-- **Cost:** free (one term in an existing pass).
-- **Gain:** drops push the plate's colour into rings, and bubbles and beads get pushed
-  by that real flow rather than by `disturb()` kicks. Works today against the uniform
-  sink. It is better with 18a's open rim, and with 18d it gives radial fingering when a
-  thin liquid is poured into a thick one.
+**18c-1 shipped** (a bottle's pour is volume on a thin gap; `npm run flush`, judging §43; story in
+`docs/plan-shipped.md` §18c). Left, each its own PR:
+
+- **18c-2** The colour's own drops as volume. A bottle's deposit is volume now, but the
+  colour each tool lays with it (`autoInject`, `addDensity`) is still stamped with none,
+  and so is the automation's colour. A water or dye bottle pours both, so the push is
+  there wherever a bottle is held, but a look that only drops colour pushes nothing and
+  flushes nothing. Give the dye's splat a volume as the species' has (one more
+  `pourVolume` per drop); a look change in every look, so judge it on the Mac.
+- **18c-3** Retire the Pour's, the splash crown's and the Splatter's radial velocity kicks
+  for their volume: a kick is curl-free and the solve deletes it. Gate the splash on
+  K = We·Oh^−0.4 above about 2100 from `dropHeight`, not on any energy above 0.02.
+- **18c-4** An oil drop as a lens or a film by the spreading coefficient
+  S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
+- **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,
+  `src/lib/liquidProps.ts`), whatever the tool and the Amount. A Pour should let go more
+  than a Dropper, and the Amount should be the rate.
 
 ### 18d. Each liquid has its real properties (replaces the property scalars)
 
 **18d-1 shipped** (each poured liquid's own viscosity on a thin gap; `npm run thick`, judging §42; story in
 `docs/plan-shipped.md` §18d). The rest of 18d is these items, each its own PR:
 
-- **18d-2** Flushing, not fading. The species fades on the body's 22 s clock
-  (`SPECIES_SECONDS`), a named shortcut, so the automation's headroom matches what the
-  flow feels. Replace it with 18g's flush, and read the headroom from the GPU.
+- ~~**18d-2**~~ Flushing, not fading: shipped with 18c-1 (`npm run flush`). Nothing fades
+  the species; it leaves over the open rim when pours push it there, and the
+  automation's headroom for a thick bottle reads the GPU's share (`speciesShare`, once a
+  second). The colour still fades (18g), and the CPU's body still fades on the old plate.
+- **18d-2a** An automated look that pours glycerine keeps it until something pushes it
+  out: its headroom stops it at 0.3 of the dish, and only a bottle held or the
+  automation's own pours of water and soap flush it (Velvet Underground pours no water),
+  until 18c-2 makes the colour's drops volume. Judge Glycerine Drift, Deep Ocean, Aurora
+  Borealis, Velvet Underground and Lumia over ten minutes on the Mac (judging §43).
 - **18d-3** The oil's and silicone's own viscosity. Their phase (mix.r, Oil Tension) is
   as thick as the clear liquid round it. Take its share into hsPrep as the ferrofluid's is.
 - **18d-4** Density into the tilt's buoyancy. The species carries Σ share·ρ, and nothing
@@ -3821,11 +3826,24 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **18d-8** Retire the CPU fields (soap, body, repel at 192²) and their pass once 18d-2 to
   18d-7 have moved each to the GPU.
 - **18d-9** The index into 18e's refraction. The species carries Σ share·n.
-- **18d-10** The species is not in FieldCarry, so a rebuilt solver loses it (it would fade
-  in 22 s anyway). On the old plate (Thin Gap off), the CPU body drag is still the thickness.
-- **18d-11** The cost on the Mac: one rgba32f carry in the colour's substeps, plus a
-  fade dispatch, only while anything poured is on the plate. `npm run thick` now times
-  the stage alone (benchSpecies) at 768² in the Mac plate shard. The number is not read yet.
+- **18d-10** The species is not in FieldCarry, so a rebuilt solver loses it, and now that
+  nothing fades it the loss shows: a governor's move drops every poured liquid. Carry it.
+  On the old plate (Thin Gap off), the CPU body drag is still the thickness.
+- **18d-11** The cost on the Mac: one rgba32f carry in the colour's substeps, plus the
+  rim's dispatch, only while anything poured is on the plate, and now that nothing fades
+  it that is until it is flushed to a millionth. `npm run thick` times the stage alone
+  (benchSpecies) at 768² in the Mac plate shard, beside the colour's own carry timed the
+  same way. **Read on CI's Mac (#299, 768², 15 substeps): the stage 12.36 ms a step, the
+  colour's own carry 12.28 ms, 1.01 of it.** So pouring a liquid of its own costs one more
+  colour carry for as long as any of it is on the plate, which now that nothing fades is
+  until it is flushed. CI's runner is slow in absolute terms (its whole step is not an
+  M4's 6.6 ms), but against the colour's carry on the same GPU this is over 18d's budget
+  of 0.5 to 0.7 ms unless the owner's Mac carries the colour in under that. The two
+  carries cost the same though the species is rgba32f and the colour half floats, so the
+  cost is the substeps' dispatches and the face velocities, not the bytes. Next
+  (**18d-11a**): move the species in the colour's own carry kernel, one pass reading the
+  velocity once and writing both, and time it with the same bench; or carry it at half
+  the grid. Read the owner's Mac with `?debug` (judging §43) before choosing.
 - **Found:** at the plate's 6 mm rest gap, a liquid as thin as water has a drag time of
   about 3 s, so for a second or so it moves as a free liquid, not a Hele-Shaw one. Alcohol
   in a thick look read 14 times a pool of colour, where Darcy's bound is 2. That is right

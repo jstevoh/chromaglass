@@ -1141,6 +1141,23 @@ and drop them with the Dropper (desk and phone) on Glycerine Drift, Deep Ocean, 
 - milk (Galaxy, Jellyfish Bloom, Poster 1969, Milk Marble, Roy) is now as thin as milk really is.
   Its edge still holds, through its own "repel". Say if those looks lost a slowness you liked.
 
+## 43. A pour is liquid, and glycerine stays until it is flushed (PLAN 18c-1, 18d-2)
+
+Every bottle you pour now adds liquid to the plate: on a thin gap (every look) it pushes
+what is already there out of its way, and what reaches the rim leaves the dish. A held
+bottle lets go as a squeezed dropper does, half a millilitre a second. And a poured liquid no longer fades: glycerine
+stays thick until clear liquid poured after it has pushed it out. On the desk and the phone:
+- hold the Dropper of Water in the middle of a colourful plate (Deep Ocean, Aurora Borealis):
+  the colour round it should be pushed outward into rings, slowly, as water dropped into a
+  real dish pushes it (`npm run flush`: a ring moves out by 1.006 of the volume poured);
+- drop Glycerine on Glycerine Drift, wait a minute: the pool should still be thick (before,
+  it had thinned to a third in 22 s). Then hold Water in its middle: the glycerine should be
+  pushed out into a ring and the middle run free again;
+- leave Glycerine Drift, Deep Ocean, Aurora Borealis, Velvet Underground and Lumia running
+  ten minutes each: say if any goes stiff and stays stiff (the automation stops pouring
+  glycerine at 0.3 of the dish, and only its water and soap pours flush it, PLAN 18d-2a);
+- say whether the push from a held bottle is too weak, too strong, or right (PLAN 18c-5).
+
 ---
 
 ## Reading the frame time while you do it
