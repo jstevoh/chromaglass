@@ -2384,6 +2384,32 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The poured liquids' species (PLAN 18d, src/lib/liquidProps.ts): a pour
+    and the fade, in one kernel.
+
+    A pour replaces a share f of the column, a dome of A.a.w at its middle,
+    with the liquid poured: (1, ln(ν/ν_water), ρ, n) in the four channels,
+    each the share-weighted sum the carry conserves. Replaces, so the share
+    never passes the whole column and a second liquid poured onto the first
+    displaces it. Then the fade, A.b.w of what was there kept (1 for a
+    pour); a fade is a pour of radius 0, so f is 0 everywhere.
+
+    A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
+    density, index, kept).
+  */
+  speciesSplat: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let d = length(uvOf(id) - A.a.xy) / max(A.a.z, 1e-6);
+  let f = select(0.0, clamp((1.0 - d * d) * A.a.w, 0.0, 1.0), d < 1.0 && A.a.z > 0.0);
+  let was = textureLoad(src, p, 0) * A.b.w;
+  textureStore(dst, p, mix(was, vec4f(1.0, A.b.x, A.b.y, A.b.z), f));
+}`,
+
+  /*
     The mix rides the flow in flux form, as the ferrofluid does (see
     phaseAdvect): each face's flux computed the same way from both sides, so
     none of it is made or lost. μ (a) is derived and is not carried.

@@ -80,6 +80,8 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
+import { DISH_METRES } from '../../lib/turntable';
+import { WATER_NU } from '../../lib/liquidProps';
 
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
@@ -279,6 +281,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(7) var hand: texture_2d<f32>;
 @group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(9) var<storage, read_write> mob: array<f32>;
+@group(0) @binding(10) var species: texture_2d<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -299,7 +302,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     runs further. \`phase\` is 1×1 and empty with none poured.
   */
   let share = clamp(textureLoad(phase, min(q, vec2i(textureDimensions(phase)) - 1), 0).r, 0.0, 1.0);
-  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share);
+  /*
+    And a poured liquid's own (PLAN 18d, src/lib/liquidProps.ts): the
+    species field carries, for the share r of the column that is glycerine,
+    syrup, milk or alcohol, Σ share·ln(ν/ν_water) in g. The rest of the
+    column is the clear liquid, whose ν is in A.a.x (12ν/W², W the plate's
+    width), so the column's viscosity against the clear liquid's is
+    exp(g − r·ln(ν_clear/ν_water)), the same geometric mixing by share as
+    the ferrofluid's above. Glycerine in the default clear liquid is fifty
+    times its drag, so where it lies the flow has to go round it (the
+    mobility below carries it into the pressure) and it crawls; alcohol in
+    a thick look is a thin patch that the clear liquid's push runs into.
+    \`species\` is 1×1 and empty with nothing poured.
+  */
+  let sp = textureLoad(species, min(q, vec2i(textureDimensions(species)) - 1), 0);
+  let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
+  let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
+  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured;
   var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the

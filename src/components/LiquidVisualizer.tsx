@@ -45,6 +45,7 @@ import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
+import { speciesOf } from '../lib/liquidProps';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
 import { BackLook } from '../lib/backLook';
@@ -1299,6 +1300,19 @@ class FluidSimulation {
         const L = this.size;
         if (solvent > 0 || clearOil > 0) g.addFilm!(cx / L, cy / L, Math.max(1.5, radius) / L, { film: FILM_POUR * Math.min(1, clearOil), solvent });
       }
+      /*
+        A liquid of its own that mixes with the clear one (glycerine, syrup,
+        milk, alcohol) replaces a share of the column where it lands, and the
+        thin gap's drag takes its own viscosity from there (PLAN 18d,
+        lib/liquidProps.ts). The share is the dose, as the body's is, so the
+        automation's headroom, read from the body, means the same liquid.
+        Only on a thin gap: the old plate has no viscosity a cell to give it.
+      */
+      const sp = this.thinGap && g.addSpecies ? speciesOf(what) : null;
+      if (sp) {
+        const L = this.size;
+        g.addSpecies!(cx / L, cy / L, Math.max(1.5, radius) / L, Math.min(1, amount), sp.lnNu, sp.density, sp.index);
+      }
       if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
       let oil = oilOn && !filmOn ? clearOil : 0;
@@ -1899,6 +1913,7 @@ class FluidSimulation {
       dish separates by standing still.
     */
     this.liquid.setTilt(this.tiltX + this.rockX * 0.02, this.tiltY + this.rockY * 0.02);
+    this.liquid.thickOnGpu = this.thinGap && !!this.gpu?.addSpecies;
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
     // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
     // the deltas and nothing else reads it. The CPU solver has no such step —

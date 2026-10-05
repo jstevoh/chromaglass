@@ -59,6 +59,29 @@ export interface LiquidBehaviour {
    * gesture for it. Soap does the same through its own `soap`.
    */
   solvent?: number;
+  /*
+    What the liquid *is*, in real units at room temperature (PLAN 18d), for
+    the bottles that are a liquid of their own rather than something
+    dissolved in the plate's. Water, the dyes, ink, soap, vinegar and washing
+    soda carry none: each is a few percent of something in the plate's own
+    clear liquid, and a dilute solution is as thick, as heavy and as bright
+    as what it is dissolved in. The clear liquid itself is the look's
+    Thickness (thinGapViscosity in src/gpu/fluid.ts).
+
+    Only the viscosity is read so far: a miscible bottle carries it into
+    the GPU's species field (src/lib/liquidProps.ts), and the thin gap's
+    drag takes it from there. The density, tension and index ride along in
+    the same field for 18d's next pieces (the tilt's buoyancy, alcohol's
+    Marangoni burst, edges from refraction) and nothing reads them yet.
+  */
+  /** Dynamic viscosity, mPa·s (water 1.0). */
+  viscosity?: number;
+  /** Density, g/cm³ (water 1.00). */
+  density?: number;
+  /** Surface tension against air, mN/m (water 72.8). */
+  tension?: number;
+  /** Refractive index (water 1.333). */
+  index?: number;
 }
 
 export interface LiquidType {
@@ -90,16 +113,21 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // Lighter than water and about as unlike it as a kitchen gets: it rides up
   // over water and will not mix with it.
   { id: 'oil',     name: 'Oil',     color: '#ffaa22', description: 'Lighter than water and will not mix with it — rides up and beads',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0,
-    behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3 } },
+    // Sunflower oil: 49 mPa·s, 0.92 g/cm³, 33 mN/m, n 1.47 (an immiscible
+    // bottle: its own phase, the oil, and not the species field).
+    behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3, viscosity: 49, density: 0.92, tension: 33, index: 1.47 } },
   // Lighter still, and polar enough to go into water rather than sit on it.
   { id: 'alcohol', name: 'Alcohol', color: '#aaffcc', description: 'Light and thin: it rises through water and disperses with heat, and opens holes in a clear film',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
-    behaviour: { weight: -0.2, polarity: -0.15, solvent: 1 } },
+    // Ethanol: 1.2 mPa·s at 0.79 g/cm³, so a little thinner than water by
+    // the kinematic measure that sets a thin gap's drag; 22 mN/m; n 1.361.
+    behaviour: { weight: -0.2, polarity: -0.15, solvent: 1, viscosity: 1.2, density: 0.79, tension: 22, index: 1.361 } },
   { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.3, heatAmount: 0.0,
     behaviour: { weight: 0.02, polarity: 0.2 } },
   // The heavy one, and it is sugar in water, so it is polar: it sinks through
   // water without refusing to mix with it.
   { id: 'syrup',   name: 'Syrup',   color: '#ff6644', description: 'Heavy and polar: it sinks through water and drags where it settles', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0,
-    behaviour: { weight: 0.35, polarity: 0.6, body: 0.5 } },
+    // A 65% sucrose syrup: 147 mPa·s, 1.32 g/cm³, 76 mN/m, n 1.452.
+    behaviour: { weight: 0.35, polarity: 0.6, body: 0.5, viscosity: 147, density: 1.32, tension: 76, index: 1.452 } },
 
   // The four that change what the plate does rather than only what colour it
   // is. Each writes into the liquid field, and the field goes on acting for as
@@ -120,7 +148,9 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'milk',      name: 'Milk',      color: '#f4efe4',
     description: 'A pale ground that holds its own edge instead of blending away',
     injectRadius: 4, injectAmount: 2.0,  heatAmount: 0.0,
-    behaviour: { repel: 1, body: 0.35, weight: 0.03, polarity: 0.45 } },
+    // Whole milk: 2.0 mPa·s, 1.03 g/cm³, 46 mN/m, n 1.345. Thin: what holds
+    // its edge is `repel`, not a body (18d keeps that as a named stand-in).
+    behaviour: { repel: 1, body: 0.35, weight: 0.03, polarity: 0.45, viscosity: 2.0, density: 1.03, tension: 46, index: 1.345 } },
   { id: 'silicone',  name: 'Silicone',  color: '#dfe7ee',
     description: 'Shoulders colour aside into a ring — the cell maker',
     // 0.05 before — forty times less than syrup, which made every colour
@@ -128,7 +158,9 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     injectRadius: 3, injectAmount: 0.35, heatAmount: 0.0,
     // The least polar thing on the shelf, which is why it shoulders colour
     // aside instead of tinting it.
-    behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95 } },
+    // A 50 cSt silicone oil (PDMS): 48 mPa·s, 0.96 g/cm³, 21 mN/m, n 1.402;
+    // immiscible, so the oil's phase, not the species field.
+    behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95, viscosity: 48, density: 0.96, tension: 21, index: 1.402 } },
   /*
     Acid and base, for a pH indicator in the dye (docs/physics-plan.md): they
     do nothing to the flow, and with pH Indicator up the dye they land in
@@ -145,7 +177,8 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'glycerine', name: 'Glycerine', color: '#e6f2ff',
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
     injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
-    behaviour: { body: 1, repel: 0.25, weight: 0.26, polarity: 0.8 } },
+    // Glycerol: 1412 mPa·s, 1.261 g/cm³, 63.4 mN/m, n 1.4746.
+    behaviour: { body: 1, repel: 0.25, weight: 0.26, polarity: 0.8, viscosity: 1412, density: 1.261, tension: 63.4, index: 1.4746 } },
   /*
     Ferrofluid was the plate's, not a bottle: a look laid it, or picking the
     Magnet poured some over the whole plate. As a bottle it goes where it is
@@ -156,7 +189,9 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   { id: 'ferrofluid', name: 'Ferrofluid', color: '#1b1c22',
     description: 'Black and magnetic: it will not mix, and the Magnet pulls it into spikes and mazes',
     injectRadius: 3, injectAmount: 0.05, heatAmount: 0.0,
-    behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6 } },
+    // Ferrotec's EFH1: 6 mPa·s, 1.21 g/cm³, about 29 mN/m; opaque, so no index.
+    // Its viscosity reaches the thin gap through the phase (FERRO_NU).
+    behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6, viscosity: 6, density: 1.21, tension: 29 } },
 ];
 export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
 /**

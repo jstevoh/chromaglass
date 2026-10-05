@@ -10,6 +10,8 @@ import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
+import { speciesOf, SPECIES_SECONDS } from '../src/lib/liquidProps';
+import { DEFAULT_LIQUID_TYPES } from '../src/types';
 import { normalizeOutput } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
@@ -68,6 +70,16 @@ const api = {
     solver.clear();
     lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null };
     return { N, L };
+  },
+  /** A disc of colour flat to its edge, for a force the same everywhere in a pool (`npm run thick`). */
+  dyeDisc(x: number, y: number, r: number, rgb: [number, number, number], d = 1) {
+    const { L, dyeAdd } = lab!;
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+      const dx = (i + 0.5) / L - x, dy = (j + 0.5) / L - y;
+      if (dx * dx + dy * dy > r * r) continue;
+      const k = (i + j * L) * 4;
+      dyeAdd[k] += rgb[0] * d; dyeAdd[k + 1] += rgb[1] * d; dyeAdd[k + 2] += rgb[2] * d; dyeAdd[k + 3] += d;
+    }
   },
   /** A soft disc of dye (absorbances r, g, b; density d) at (x, y) in plate units, radius r. */
   dye(x: number, y: number, r: number, rgb: [number, number, number], d = 1) {
@@ -206,11 +218,20 @@ const api = {
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /** A pour of a shelf bottle into the species field (PLAN 18d), as the app's onDeposit makes it: null if the bottle lays none. */
+  addSpecies(x: number, y: number, r: number, take: number, bottle: string) {
+    const sp = speciesOf(DEFAULT_LIQUID_TYPES.find((l) => l.id === bottle)?.behaviour);
+    if (sp) lab!.solver.addSpecies(x, y, r, take, sp.lnNu, sp.density, sp.index);
+    return sp;
+  },
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
   /** Thin Gap's viscosity for a Thickness, and the ferrofluid's (src/gpu/fluid.ts), so a check never copies either. */
   thinGapViscosity,
+  /** The species' fade (PLAN 18d), and the real seconds a lab step takes, for `npm run thick`'s kept share. */
+  speciesSeconds: SPECIES_SECONDS,
+  stepSeconds: BASE.magnetSeconds ?? 1 / 60,
   ferroViscosity: FERRO_NU,
   /** A shipped look's settings and the shape it pours its ferrofluid in, as the app reads them. */
   look(id: string) {
@@ -268,7 +289,7 @@ const api = {
     s.device.queue.submit([enc.finish()]);
     await s.device.queue.onSubmittedWorkDone();
   },
-  async field(which: 'dye' | 'vel' | 'oilDye') { return Array.from(await lab!.solver.readField(which)); },
+  async field(which: 'dye' | 'vel' | 'oilDye' | 'species') { return Array.from(await lab!.solver.readField(which)); },
   /**
    * The clear film (PLAN §20b), read back: its grid, and its thickness and
    * solvent cell by cell (n × n each), or null with no film on the plate.
