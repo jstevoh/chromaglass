@@ -3823,8 +3823,9 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **18d-9** The index into 18e's refraction. The species carries Σ share·n.
 - **18d-10** The species is not in FieldCarry, so a rebuilt solver loses it (it would fade
   in 22 s anyway). On the old plate (Thin Gap off), the CPU body drag is still the thickness.
-- **18d-11** The cost on the Mac has not been read: one rgba32f carry in the colour's
-  substeps, plus a fade dispatch, only while anything poured is on the plate.
+- **18d-11** The cost on the Mac: one rgba32f carry in the colour's substeps, plus a
+  fade dispatch, only while anything poured is on the plate. `npm run thick` now times
+  the stage alone (benchSpecies) at 768² in the Mac plate shard. The number is not read yet.
 - **Found:** at the plate's 6 mm rest gap, a liquid as thin as water has a drag time of
   about 3 s, so for a second or so it moves as a free liquid, not a Hele-Shaw one. Alcohol
   in a thick look read 14 times a pool of colour, where Darcy's bound is 2. That is right

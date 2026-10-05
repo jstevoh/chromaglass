@@ -705,6 +705,8 @@ export class WebGPUFluid {
   private speciesLive = false;
   /** Seconds since the last pour into the species field, so it can go quiet once faded to nothing. */
   private speciesQuiet = 0;
+  /** The last thin step's displacement scale, which the species' carry was given (benchSpecies repeats it). */
+  private speciesDisp = 0;
   /**
    * Whether the thin gap's drag reads the species (PLAN 18d). Only `npm run
    * thick` turns it off, to measure the plate as it was before 18d with the
@@ -2378,11 +2380,9 @@ export class WebGPUFluid {
       a show that poured glycerine once does not carry it for good.
     */
     stage('species', (pass) => {
-      const sp = this.species!;
       const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
-      this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
-      this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species fade', [0, 0, 0, 0, 0, 0, 0, Math.exp(-seconds / SPECIES_SECONDS)]));
-      sp.swap();
+      this.speciesDisp = disp;
+      this.stepSpecies(pass, seconds);
       this.speciesQuiet += seconds;
       if (this.speciesQuiet > SPECIES_SECONDS * Math.log(1e4)) this.speciesLive = false;
     }, thin && !!this.species && this.speciesLive);
@@ -2654,6 +2654,34 @@ export class WebGPUFluid {
     this.device.queue.submit([enc.finish()]);
     this.speciesLive = true;
     this.speciesQuiet = 0;
+  }
+
+  /** The species' stage (PLAN 18d): its carry in the colour's substeps, then its fade. */
+  private stepSpecies(pass: GPUComputePassEncoder, seconds: number): void {
+    const sp = this.species!;
+    this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
+    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species fade', [0, 0, 0, 0, 0, 0, 0, Math.exp(-seconds / SPECIES_SECONDS)]));
+    sp.swap();
+  }
+
+  /**
+   * What the species' stage costs the GPU (PLAN 18d-11), as benchSwirl times
+   * the swirl's: `reps` of it back to back on the plate's own textures, after
+   * a thin step has planned the carry's substeps, submit to done, in ms. Two
+   * counts and the slope between them leave out the submit's fixed cost. For
+   * `npm run thick`; CI's Mac grants no timestamp queries.
+   */
+  async benchSpecies(reps: number): Promise<number> {
+    if (!this.species || !this.speciesLive || !this.carryInd) return NaN;
+    const enc = this.device.createCommandEncoder({ label: 'bench species' });
+    const pass = enc.beginComputePass({ label: 'bench species' });
+    for (let k = 0; k < reps; k++) this.stepSpecies(pass, 0);
+    pass.end();
+    await this.device.queue.onSubmittedWorkDone();
+    const t0 = performance.now();
+    this.device.queue.submit([enc.finish()]);
+    await this.device.queue.onSubmittedWorkDone();
+    return performance.now() - t0;
   }
 
   /** The clear film's fields (PLAN §20b), made the first time a plate asks for a film. */

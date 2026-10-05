@@ -56,6 +56,16 @@
  *      tenth of a cell (the glycerine pool moves a fourteenth of a cell,
  *      too little to tell a carry from none); and the glycerine's colour
  *      moved less than colour alone.
+ *   6. What it costs (PLAN 18d-11): the species' stage (its carry in the
+ *      colour's substeps and its fade) timed alone on the plate's own
+ *      textures, submit to done, at two counts back to back and the slope
+ *      between them, the quickest of three (benchSpecies; CI's Mac grants
+ *      no timestamp queries, swirlcost's way). After thirty stirred steps
+ *      on glycerine, so the carry runs the substeps a moving plate asks for.
+ *      At the app's top rung on a Mac (768²), on software at 256² only to
+ *      show it runs. It asserts only that it measured something; the
+ *      number is the finding, against PLAN 18d's budget of 0.5 to 0.7 ms
+ *      for the whole of 18d and a 768² step's 6.6 ms on an M4.
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -73,7 +83,7 @@ const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 try {
-  const r = await page.evaluate(async () => {
+  const r = await page.evaluate(async (mac) => {
     const N = 128, STEPS = 30, out = {};
     /*
       The pool's colour-weighted velocity, its colour's middle and the
@@ -121,8 +131,24 @@ try {
       out[name] = await run(t, bottle, ignored);
     }
     out.kept = Math.exp(-STEPS * lab.stepSeconds / lab.speciesSeconds);
+    // 6. The stage's cost, on a stirred plate of glycerine.
+    {
+      const G = mac ? 768 : 256, [few, many] = mac ? [20, 220] : [2, 12];
+      await lab.create(G, G);
+      lab.solver().readsSpecies = true;
+      lab.dyeDisc(0.5, 0.5, 0.2, [1, 0, 0], 1);
+      lab.addSpecies(0.5, 0.5, 0.2, 2, 'glycerine');
+      lab.flush();
+      await lab.step(STEPS, { thinGap: 1, gapThickness: 0.45, gapSpring: 0, turbScale: 1 });
+      const slopes = [];
+      for (let k = 0; k < 3; k++) {
+        const a = await lab.solver().benchSpecies(few), b = await lab.solver().benchSpecies(many);
+        slopes.push((b - a) / (many - few));
+      }
+      out.cost = { grid: G, ms: Math.min(...slopes), all: slopes };
+    }
     return out;
-  });
+  }, process.platform === 'darwin');
 
   const ratio = (a, b) => r[a].after.speed / Math.max(r[b].after.speed, 1e-12);
   const lam = (name) => r[name].nuClear / (Math.exp(r[name].sp.lnNu) * 1e-6);
@@ -153,6 +179,10 @@ try {
   check('the poured liquid is carried with its colour, and glycerine\'s colour moved less than colour alone',
     colourMoved(al) > 1 && sep < 0.1 && colourMoved(gl) < colourMoved(r['colour 0.45']),
     `alcohol's species ${f(moved(al))} cells, its colour ${f(colourMoved(al))}, apart ${f(sep)}; glycerine's colour ${f(colourMoved(gl))} against ${f(colourMoved(r['colour 0.45']))} alone`);
+  const c = r.cost;
+  check(`the species' stage was timed (${process.platform === 'darwin' ? 'Metal' : 'software, not the finding'})`,
+    Number.isFinite(c.ms) && c.ms > 0,
+    `${f(c.ms, 3)} ms a step at ${c.grid}² (the three: ${c.all.map((x) => f(x, 3)).join(', ')})`);
   check('no GPU pass failed validation (a stage that never ran would read as an unchanged pool)', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the lab ran', false, e.message.slice(0, 300));
