@@ -1377,6 +1377,25 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   step; the page's first contentful paint is now the intro's, 0.70 s. `npm run
   startup` prints its times on the Mac ("the intro: …") for the cold opening.
 
+- **Shipped, 14v-4: the intro held still while the opening's render pipelines
+  compile.** The first deploy carrying the intro (run 37233245217) went red on
+  `npm run startup`'s "no stop in the opening": no animation frame for 2.82 s from
+  3.15 s with the page neither busy nor held, exactly while `plate/display` compiled
+  (4.30 s from 2.71 s), and again for about 1.9 s while `plate/derive` did; through
+  the compute kernels after them the frames ran on. Before the intro the display's
+  compile stopped nothing (no gap over 0.62 s on #254's run, display 3.46 s): a page
+  with nothing new to draw needs nothing of the GPU process, a turning burst needs it
+  every frame, and on the Mac such a frame waits there behind a render pipeline's
+  compile (inferred from the timings; a compute kernel's compile does not hold it).
+  So `prepareShow` pauses the intro's animations (`.cg-still`, `introStill`) two
+  frames before the first of the opening's render pipelines is asked for and lets it
+  turn again when the last has settled (`Quiet` in `gpu/prepare.ts`). `npm run intro`
+  line 9 holds every frame against the opening's render compiles, read from outside
+  the app: 242 frames up during them, none moving, held 2.02–6.18 s on SwiftShader,
+  then turning on all 354 frames after; with the hold taken out, 178 of 178 moving
+  and the line red. Its first version held still as each lane took its first render pipeline, which let three lanes ask for three at once (PR #283's first Mac run: a 2.15 s frame gap with `air/air splat` compiling 3.32 s); it now holds still before the lanes start, and line 9 also holds the opening to one render compile at a time (2 of 4 asked while another compiled with the first version). The Mac's `npm run startup` is what says the stop has gone; its intro line prints the stretches held still. This
+  answers the open question of whether the swirl freezes: around the display's and
+  the derive's compiles it does, and now it does so on purpose, still and not stalled.
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry

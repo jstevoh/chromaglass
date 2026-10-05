@@ -33,6 +33,9 @@
       #cg-intro { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: #000; pointer-events: none; container-type: size; transition: opacity 0.9s ease-out; }
       #cg-intro.cg-in-plate { position: absolute; z-index: auto; }
       #cg-intro.cg-out { opacity: 0; }
+      /* Held still while the opening's render pipelines compile (gpu/prepare.ts,
+         Quiet): a moving picture there stopped the page's frames. */
+      #cg-intro.cg-still, #cg-intro.cg-still * { animation-play-state: paused !important; }
       /* Only transform and opacity move, so the compositor runs them on its
          own thread: the page's thread is held for seconds while Chromium
          starts the GPU (npm run startup's "held" line), and anything the page
