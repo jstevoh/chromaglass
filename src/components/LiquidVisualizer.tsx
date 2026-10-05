@@ -12,6 +12,7 @@ import { plateAreas, areaForBand, areaCentre, areaDye, pointInArea, pickArea, ty
 import { phasePour } from '../lib/phasePour';
 import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
+import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -145,7 +146,7 @@ interface LiquidVisualizerProps {
    */
   filmSenseRef?: React.MutableRefObject<SceneReading | null>;
   /** Called (throttled) while the user paints — feeds performance recording. */
-  onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string }) => void;
+  onManualGesture?: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean }) => void;
   /**
    * A hand on the closeup camera: Alt-drag on the plate pans it, Alt-click
    * fixes it on the spot under the pointer. Plate uv (0-1), where the camera
@@ -833,7 +834,7 @@ export interface LiquidVisualizerHandle {
    * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => void;
+  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => void;
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -3093,7 +3094,13 @@ class FluidSimulation {
     this.gpu.carryPhase(c.x, c.y, c.r, c.ux, c.uy, c.take, c.hop, c.outward);
   }
 
-  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false) {
+  /*
+    `dye`, the share of `amount` that is colour: 0 for a clear liquid poured
+    with no dye in it (lib/liquidColour.ts). A drop's impact is its size, not
+    its colour, so a clear drop from a height still splashes; only what it
+    lays is scaled.
+  */
+  autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1) {
     const S = this.size;
     const k = GRID_SCALE;
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -3183,9 +3190,9 @@ class FluidSimulation {
             const dd = Math.sqrt(ddx * ddx + ddy * ddy);
             if (dd > dropR) continue;
             const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
-            this.addDensity(nx, ny, amount * thin * Math.pow(1 - dd / dropR, 2), r, g, b);
+            this.addDensity(nx, ny, amount * dye * thin * Math.pow(1 - dd / dropR, 2), r, g, b);
           }
-        if (e > 0.02) this.splash(x, y, dropR, h, e, amount, r, g, b);
+        if (e > 0.02) this.splash(x, y, dropR, h, e, amount * dye, r, g, b);
         break;
       }
     }
@@ -5122,7 +5129,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * of hand be added without teaching it about bubbles, beads or the squeeze
    * film all over again.
    */
-  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; layer?: number; amount?: number; id?: number }) => {
+  const performGesture = (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => {
     // The magnet moves no fluid itself: it is held where the gesture is, and
     // the next solver step pulls the ferrofluid toward it. Ahead of the drain
     // gate, since holding it over an emptying plate is harmless.
@@ -5159,7 +5166,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const S = GRID_SIZE;
     const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
+    /*
+      A colour the gesture carries is the colour that was laid, the bottle's
+      own through its dye (laidColour, lib/liquidColour.ts: a take records
+      it, the phone's and the remote's Drop send it), so it lands as it
+      comes; `clear` is a clear liquid that laid none. With neither it is
+      the harmony's.
+    */
+    const poured = { dose: g.clear ? 0 : 1 };
     const rgb = g.color ? hexToRgb(g.color) : harmonyColor(harmonyOf(layer));
+    const dyeOf = (liq: LiquidType | undefined) => bottleDye(liq) * poured.dose;
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
     // And the amount set for this tool, on top of how hard this hand pressed.
     const kTool = toolAmountRef.current;
@@ -5185,7 +5201,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       case 'drop': {
         const liq = selectedLiquidRef.current;
         if (liq?.behaviour) af.liquid.deposit(x, y, Math.max(2, (liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, amt);
-        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt);
+        af.autoInject('drop', x, y, 5 * amt * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5 * amt, false, poured.dose);
         af.addTemp(x, y, 0.6 * amt);
         break;
       }
@@ -5194,7 +5210,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const dx = g.dx ?? 1, dy = g.dy ?? 0;
         const len = 8 * GRID_SCALE;
         const liq = selectedLiquidRef.current;
-        const tint = bottleDye(liq);
+        const tint = dyeOf(liq);
         for (let t = -len; t <= len; t += 0.8) {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
           if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
@@ -5248,26 +5264,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       case 'spray': {
         const liq = selectedLiquidRef.current;
-        const tint = bottleDye(liq);
+        const tint = dyeOf(liq);
         af.autoInject('spray', x, y, 5 * kTool * tint, rgb.r, rgb.g, rgb.b, 0.5);
         layBottle(af, x, y, 6 * GRID_SCALE, liq, kTool * 0.5);
         break;
       }
       case 'splatter': {
         const liq = selectedLiquidRef.current;
-        af.autoInject('splatter', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5);
+        af.autoInject('splatter', x, y, 4 * kTool * dyeOf(liq), rgb.r, rgb.g, rgb.b, 0.5);
         layBottle(af, x, y, 3 * GRID_SCALE, liq, kTool);
         break;
       }
       case 'pour': {
         const liq = selectedLiquidRef.current;
-        af.autoInject('pour', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, true);
+        af.autoInject('pour', x, y, 4 * kTool * dyeOf(liq), rgb.r, rgb.g, rgb.b, 0.5, true);
         layBottle(af, x, y, 4 * GRID_SCALE, liq, kTool);
         break;
       }
       default: { // dropper
         const liq = selectedLiquidRef.current;
-        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5);
+        af.autoInject('drop', x, y, 4 * kTool * bottleDye(liq), rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
         layBottle(af, x, y, Math.max(2, (liq?.injectRadius ?? 3) * GRID_SCALE), liq, kTool);
       }
     }
@@ -7052,7 +7068,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const strokeFrom = hand.stroke ?? { x, y };
               const strokeDx = x - strokeFrom.x, strokeDy = y - strokeFrom.y;
               hand.stroke = { x, y };
-              const rgb = hexToRgb(liq?.color ?? '#ffffff');
+              // The liquid's own colour through any dye in it; a clear liquid with none lays no colour (lib/liquidColour.ts).
+              const poured = pourTint(liq);
+              const rgb = poured.rgb;
               const heat = liq?.heatAmount ?? 0.05;
               // The Amount set for this tool (1 is what it always did).
               const k = toolAmountRef.current;
@@ -7076,7 +7094,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   y: y / GRID_SIZE,
                   dx: gmx / gLen,
                   dy: gmy / gLen,
-                  color: tool === 'blow' || tool === 'press' ? undefined : (liq?.color ?? '#ffffff'),
+                  // What was laid, not the bottle's dye (laidColour), so a take plays back as performed.
+                  ...(tool === 'blow' || tool === 'press' ? {} : laidColour(liq)),
                 });
               }
 
@@ -7176,7 +7195,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               } else if (tool === 'spray') {
                 // Wide cone of fine mist — many small random particles in a radius
                 const sprayR = 10 * GRID_SCALE * kSoft;
-                const tint = bottleDye(liq);
+                const tint = bottleDye(liq) * poured.dose;
                 for (let p = 0; p < 12; p++) {
                   const angle = DICE.hands.angle();
                   const dist = DICE.hands.float() * sprayR;
@@ -7195,7 +7214,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Fling droplets outward from cursor — random sizes, random directions
                 // More droplets, not bigger ones, for a heavier hand.
                 const flings = Math.max(1, Math.round(5 * k));
-                const tint = bottleDye(liq);
+                const tint = bottleDye(liq) * poured.dose;
                 for (let p = 0; p < flings; p++) {
                   const angle = DICE.hands.angle();
                   const flingDist = (3 + DICE.hands.float() * 15) * GRID_SCALE;
@@ -7223,7 +7242,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               } else if (tool === 'pour') {
                 // Heavy thick stream — wide, dense, with downward velocity
                 const pourR = Math.max(1, Math.round(4 * GRID_SCALE * kSoft));
-                const amt = 2.0 * k * bottleDye(liq);
+                const amt = 2.0 * k * bottleDye(liq) * poured.dose;
                 for (let ddy = -pourR; ddy <= pourR; ddy++) {
                   for (let ddx = -pourR; ddx <= pourR; ddx++) {
                     const dd = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -7252,7 +7271,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const mvLen = Math.sqrt(mvx * mvx + mvy * mvy) || 1;
                 const streakLen = Math.min(12 * GRID_SCALE, Math.max(3, mvLen * 2));
                 const nx_dir = mvx / mvLen, ny_dir = mvy / mvLen;
-                const tint = bottleDye(liq);
+                const tint = bottleDye(liq) * poured.dose;
                 for (let t = -streakLen; t <= streakLen; t += 0.8) {
                   const sx = Math.floor(x + nx_dir * t);
                   const sy = Math.floor(y + ny_dir * t);
@@ -7275,8 +7294,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (hand.clock % DROP_EVERY === 0) {
                   const amt = (liq?.injectAmount ?? 0.8) * DROP_EVERY * k;
                   hand.laid.drops++;
-                  hand.laid.dye += amt;
-                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
+                  hand.laid.dye += amt * poured.dose;
+                  af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5, false, poured.dose);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
                   if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
@@ -7286,7 +7305,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // density ceiling in its middle, so more dye there alone would
                 // not show; a drop with more in it spreads further.
                 const r = Math.max(1, Math.round((liq?.injectRadius ?? 3) * GRID_SCALE * kSoft));
-                const amt = (liq?.injectAmount ?? 0.8) * k;
+                const amt = (liq?.injectAmount ?? 0.8) * k * poured.dose;
                 hand.laid.steps++;
                 for (let dy = -r; dy <= r; dy++) {
                   for (let dx = -r; dx <= r; dx++) {

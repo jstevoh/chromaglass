@@ -282,6 +282,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run liquids
 
+      # Each liquid pours its own colour (syrup amber, glycerine clear, milk
+      # white), and a dye picked for it tints it by Beer and Lambert.
+      - name: Each liquid's own colour
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run natural
+
       # A liquid someone made: the file reads back as what they meant, a bad
       # one says why, and "how it meets the others" agrees with the shelf.
       - name: The liquids file

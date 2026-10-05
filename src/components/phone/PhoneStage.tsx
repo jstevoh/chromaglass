@@ -14,6 +14,7 @@ import { MixerPanel } from '../MixerPanel';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
+import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 
 /**
  * ChromaGlass on a phone.
@@ -533,7 +534,7 @@ export function PhoneStage(p: PhoneStageProps) {
             data-testid="phone-open-dye"
             className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-border-strong bg-active text-text' : 'border-transparent text-text-2 active:bg-active'}`}
           >
-            <span className="h-5 w-5 rounded-full border-2 border-white/40" style={{ backgroundColor: liquid?.color ?? '#fff' }} />
+            <span className="h-5 w-5 rounded-full border-2 border-white/40" style={liquid ? bottleSwatch(liquid) : { backgroundColor: '#fff' }} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
@@ -583,7 +584,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       className={`flex h-12 items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${on ? 'text-text' : 'border-border bg-elevated text-text-2'}`}
                       style={on ? { borderColor: l.color, backgroundColor: `${l.color}26` } : undefined}
                     >
-                      <span className="h-5 w-5 shrink-0 rounded-full border-2 border-white/30" style={{ backgroundColor: l.color }} />
+                      <span className="h-5 w-5 shrink-0 rounded-full border-2 border-white/30" style={bottleSwatch(l)} />
                       <span className="truncate">{l.name}</span>
                     </button>
                   );
@@ -600,9 +601,27 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
 
           <SectionLabel>{liquid ? `${liquid.name}'s colour` : 'Colour'}</SectionLabel>
+          {/*
+            The bottle's own colour with no dye in it (lib/liquidColour.ts),
+            as on the desk: what it pours until a dye is picked.
+          */}
+          {liquid?.own && (
+            <button
+              onClick={() => p.onDyeColor(liquid.own!)}
+              aria-pressed={isNatural(liquid)}
+              data-testid="phone-dye-natural"
+              className={`mb-2 flex h-12 w-full items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${isNatural(liquid) ? 'border-white text-text' : 'border-border bg-elevated text-text-2'}`}
+            >
+              <span
+                className="h-5 w-5 shrink-0 rounded-full border-2 border-dashed border-white/40"
+                style={isClearLiquid(liquid) ? { backgroundColor: 'transparent' } : { backgroundColor: liquid.own }}
+              />
+              Natural · {isClearLiquid(liquid) ? 'clear, no dye' : 'its own colour, no dye'}
+            </button>
+          )}
           <div className="grid grid-cols-6 gap-2">
             {p.dyeColors.map(hex => {
-              const on = liquid?.color.toLowerCase() === hex.toLowerCase();
+              const on = !isNatural(liquid) && liquid?.color.toLowerCase() === hex.toLowerCase();
               return (
                 <button
                   key={hex}

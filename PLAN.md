@@ -3844,6 +3844,21 @@ its frame rate live. "Free" means no new passes or texture reads.
   (**18d-11a**): move the species in the colour's own carry kernel, one pass reading the
   velocity once and writing both, and time it with the same bench; or carry it at half
   the grid. Read the owner's Mac with `?debug` (judging §43) before choosing.
+- **18d-12 shipped** (each liquid pours its own colour, a dye picked tints it;
+  `npm run natural`, judging §44; story in `docs/plan-shipped.md` §18d). Found with it:
+  - **18d-12a** The automation's pours of a bottle (`pourLiquid`, the look's own liquids
+    and an area's) lay the liquid and no colour, so a look that doses syrup doses clear
+    syrup. Give them the bottle's own colour (amber syrup, white milk, gold oil) as the
+    hand's pours have; a look change in every look that doses a coloured bottle, so judge
+    it on the Mac.
+  - **18d-12b** Soap and Silicone still clear any colour where they land, a dye picked for
+    them included: the CPU's dye multiply (18d-5) thins whatever dye is under the soap,
+    and cannot tell the soap's own dye from the plate's. On a thin gap their pour is
+    volume and pushes the colour aside, which is the real clear disc; deleting the
+    multiply there (18d-5) is what lets a dyed soap show its dye.
+  - **18d-12c** Milk is laid as a white body (its `scatter`), which is milk seen by
+    reflected light on the black ground. On the lamp's ground real milk throws a warm grey
+    shadow, and a dye in milk is a pastel, not the dye: both are 18j's scattering.
 - **Found:** at the plate's 6 mm rest gap, a liquid as thin as water has a drag time of
   about 3 s, so for a second or so it moves as a free liquid, not a Hele-Shaw one. Alcohol
   in a thick look read 14 times a pool of colour, where Darcy's bound is 2. That is right
