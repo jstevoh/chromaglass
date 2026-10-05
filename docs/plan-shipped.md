@@ -2056,6 +2056,16 @@ up (d027626's 111 minutes, which this section first counted as a docs-only wait,
 PRs' site changes going out). The gain grows with 19i and 0.3: fewer red or superseded
 deploys leave more docs merges directly on top of a live commit.
 
+### 19r. Smaller, for the same pass: the open shard evened
+
+**Shipped** (the open shard's half). The open shard had gathered eight checks since #239
+evened the shards and ran 17.4 to 18.7 minutes green on 2026-10-04 against its 20-minute
+timeout (startup 393 s, the phone's fingers 268 s, the lamp 124 s), while show ran 8.9 to
+10.7. #280's third attempt was killed by the timeout inside the phone's fingers, and three
+open PRs (#267, #280, #281) each add a check to open. The phone's fingers moved to show:
+open about 14 minutes, show about 15, both from the step times of the intro PR's green run.
+Nothing on show needs a cold shader cache, which is why the fingers ran after `startup`.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**

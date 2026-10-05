@@ -104,8 +104,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
   (11-blowbubble), and `tools`' "Pour lays more than Drop", which passes at 0 against 0.
-- **0.4** **19r** (E, S): the open shard is back near its 15-minute timeout (median 12.6, green
-  maximum 14.1, one cancelled at 15.3); even it again.
+- **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
+  docs/plan-shipped.md 19r).
 - **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
   only their shards, a new check edits no shared file, and `npm run quick` runs what
   the diff needs, in parallel.
@@ -4351,9 +4351,12 @@ user. *Size:* S.
 
 ### 19r. Smaller, for the same pass
 
-- The open shard is back near its timeout after #239's rebalance: median 12.6 minutes, green
-  maximum 14.1, one cancelled at 15.3 (#240). `startup` (349 s) and the phone's fingers
-  (224 s) dominate it; move one, as #239 did.
+- The open shard evened again: **shipped** (docs/plan-shipped.md 19r). New checks go on the
+  shortest shard, not open, which holds `startup` (393 s alone).
+- Re-running an older deploy cancels main's newest one: `deploy.yml`'s group keeps one run
+  waiting, and the re-run takes that place. On 2026-10-05 re-running be02853's deploy
+  cancelled e978aca's (#286) and 6bcbf8f's. Harmless while those were docs merges; a re-run
+  should be of main's newest deploy, or the deploy should refuse a tree older than main.
 - `npm run lint` takes 18 to 24 s; `tsc --incremental` with a kept `tsbuildinfo` takes 3.5 s
   warm. A Playwright cache on ubuntu saves 23 s a Measure part.
 - `tools`' "Pour lays more than Drop" passes at 0 against 0: a check that cannot fail on the
