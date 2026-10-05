@@ -63,6 +63,8 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BarGrid, Accent, accentGain, barLine, OFF_THE_BEAT, STRONG_BEAT, WEAK_BEAT } from '../src/lib/barGrid.ts';
 import { arrange, rng, SR } from './arrangement.mjs';
+import { kickRock } from '../src/lib/plateRock.ts';
+import { kickDepth } from '../src/lib/squish.ts';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => {
@@ -656,9 +658,22 @@ console.log('\nWiring');
     && /songShapeRef\.current\.reset\(\);[\s\S]{0,200}barGridRef\.current\.reset\(\);\s*accentRef\.current\.reset\(\);/.test(vis));
   check('each kick is weighed by the accent, at the beat the clock means, with the setting',
     /const accentAt = songClockRef\.current \+ \(kickRef\.current\.predicted \? Math\.max\(0, currentSettings\.beatLead \?\? 0\) \/ 1000 : 0\);\s*const accent = kickStep \? accentRef\.current\.kick\(barGridRef\.current, accentAt, currentSettings\.beatAccent \?\? 0\) : 1;/.test(vis));
+  /*
+    The rock's shove and the squeeze's depth moved into src/lib/plateRock.ts
+    and src/lib/squish.ts (PLAN 26a, 26b), so the lab's `npm run rides` could
+    measure the same numbers the app uses. The grep now reads that the frame
+    loop hands them the accent, and the helpers are called to show the accent
+    scales what they give: a grep of a helper's body would pass on a helper
+    that took the accent and dropped it.
+  */
+  const shove = accent => { const r = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 }; kickRock(r, 0.8, accent); return Math.hypot(r.vx, r.vy); };
+  const shoveScales = shove(1) > 0 && Math.abs(shove(1.5) / shove(1) - 1.5) < 1e-9;
+  const depthScales = kickDepth(0.9, 0.8, 1) > 0 && Math.abs(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1) - 1.5) < 1e-9;
   check('and the weight reaches the rock, the squeeze and the beads',
-    /rock\.vx \+= Math\.cos\(rock\.phase\) \* bass01 \* 14 \* R \* accent;/.test(vis) && /rock\.vy \+= Math\.sin\(rock\.phase\) \* bass01 \* 14 \* R \* accent;/.test(vis)
-    && /const a = 0\.0024 \* squeezeAmt \* bass01 \* accent;/.test(vis) && /0\.4 \* squeezeAmt \* bass01 \* accent\)/.test(vis));
+    /if \(R > 0 && kickStep\) kickRock\(rock, bass01, accent\);/.test(vis)
+    && /const a = kickDepth\(squeezeAmt, bass01, accent\);/.test(vis) && /0\.4 \* squeezeAmt \* bass01 \* accent\)/.test(vis)
+    && shoveScales && depthScales,
+    `the rock's shove ×${(shove(1.5) / shove(1)).toFixed(3)} and the squeeze's depth ×${(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1)).toFixed(3)} at an accent of 1.5`);
   check('the app reads what the grid knows for the phone', /const bar = report \? barLine\(report\.bar\) : '';/.test(app)
     && /bar: \{ \.\.\.barGridRef\.current\.now \}/.test(vis));
 }
