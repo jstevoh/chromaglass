@@ -3948,6 +3948,20 @@ as `npm run` names. Each new check held red by the `check-skeptic`.
 
 ### 19d. The build and what it ships
 
+- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05 (this PR).**
+  On #287's merged head (37252828490) the control built its 47 on its first step at
+  3.23 s, its frames kept coming, then stopped 9.98 s from 5.59 s with no build in it
+  and more than a second after them: nothing priced, its own wait 13.80 s, and both 1b
+  lines red. When the frames stop after the builds is the GPU process's business, so
+  no window of time is right. A stop is now also the compile when the first submit to
+  run one of the pipelines built on the frames was handed over before it began and was
+  done as the frames came back (within a quarter second), with the page's own timer
+  running through it: a pipeline cannot run before it is built, the page's thread is
+  free while the GPU compiles, and a runner's stall later has no first use out through
+  it. Line 2 now also needs a one-device control, as line 1 did. Each stop prints its
+  first uses and the page's longest silence in it. *Still open:* read the first Mac runs' prints to
+  see the follow stop (#283's run: 11.27 s from 5.20 s) carries first uses too; if it
+  does, the one-second window is that same compile and could go.
 - The main route loads about 527 KB of script gzipped (1.68 MB raw): the App's chunk
   236 KB, the engine's 186, React's 66. Only the routes are lazy (`main.tsx`: the App,
   the remote, the cast). `motion` is 42 KB of it, for 53 simple uses in six components;
