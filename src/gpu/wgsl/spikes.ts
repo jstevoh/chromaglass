@@ -24,11 +24,12 @@
  * How far apart: SPIKE_PITCH, the onset's wavelength 2π l_c, which is what
  * sets the capillary length l_c the film is measured in.
  *
- * How strong the field has to be: a dipole's |B| at the glass, which on its
- * axis goes as strength over height cubed, taken as a share of a magnet in
- * the hand pressed to the glass (the Magnet tool: strength 0.9, the solver's
- * height 0.12 to 0.14 by Ferrofluid Scale), and falling off the axis as the
- * dipole's does. The peaks start at 0.18 of that and are full by half
+ * How strong the field has to be: the magnet's |B| at the glass (a cylinder,
+ * magnetDisc.ts; until PLAN 9v a dipole, whose field on its axis went as
+ * strength over height cubed), taken as a share of a magnet in the hand
+ * pressed to the glass at the tool's own size (the Magnet tool: strength
+ * 0.9, the solver's height 0.12 to 0.14 by Ferrofluid Scale), and falling
+ * off the axis as the magnet's does. The peaks start at 0.18 of that and are full by half
  * (SPIKE_ONSET, SPIKE_FULL; fluid.ts gates the solver's side on the same
  * onset). At 0.25 the hand's spikes reached only 0.1 of the plate out and
  * the pool barely parted (2 pieces, by `npm run spikes`); at 0.1 Magnet Garden's
@@ -41,6 +42,8 @@
  * about 0.9 the hand's magnet raises none, as a magnet held a hand's width
  * under a deep pool would not.
  */
+import { MAGNET_DISC_WGSL, MAGNET_RADIUS, discGap, discOnAxis } from './magnetDisc';
+
 export const SPIKE_PITCH = 0.04;
 export const SPIKE_H_REF = 0.13;
 export const SPIKE_ONSET = 0.18;
@@ -51,37 +54,78 @@ export const SPIKE_FULL = 0.35;
  * strongest (spikeAmp there): what the solver ramps its own changes on, so
  * they arrive with the spikes the plate draws and not in one step.
  */
-export function spikesOnAxis(strength: number, height: number): number {
-  const t = Math.max(0, Math.min(1, (fieldOnAxis(strength, height) - SPIKE_ONSET) / (SPIKE_FULL - SPIKE_ONSET)));
+export function spikesOnAxis(strength: number, height: number, radius = MAGNET_RADIUS): number {
+  const t = Math.max(0, Math.min(1, (fieldOnAxis(strength, height, radius) - SPIKE_ONSET) / (SPIKE_FULL - SPIKE_ONSET)));
   return t * t * (3 - 2 * t);
 }
 
-/** A magnet's field on its own axis, on spikeField's scale (the onset is SPIKE_ONSET). */
-export function fieldOnAxis(strength: number, height: number): number {
-  const rel = Math.max(height, 0.02) / SPIKE_H_REF;
-  return strength / (rel * rel * rel);
+/**
+ * The field the spikes are measured against: the tool's own magnet on its
+ * axis, held at SPIKE_H_REF, at strength 1. So a share of 0.9 is the hand's
+ * magnet pressed to the glass, as it was with the dipole.
+ */
+export const SPIKE_B_REF = discOnAxis(discGap(SPIKE_H_REF), MAGNET_RADIUS);
+
+/** A magnet's field on its own axis, on spikeAmp's scale (the onset is SPIKE_ONSET). */
+export function fieldOnAxis(strength: number, height: number, radius = MAGNET_RADIUS): number {
+  return strength * discOnAxis(discGap(height), radius) / SPIKE_B_REF;
 }
 
+/*
+  The energy a field B sets up in the liquid (fluid.ts, magnetEnergy, whose
+  gradient is the pull), B on magnetShare's scale.
+
+  Bs is a field, on the same scale as B (PLAN.md 9v): the liquid saturates at
+  a field whatever magnet makes it. It was a number in the old dipole's own
+  units (150, of a field that was 2/h³ on its axis), so the magnet that
+  Magnet Size sank deeper sat lower on the curve than the one it stood for.
+  Both numbers are the old ones carried over at the hand's magnet: Bs is
+  where 150 was against the hand's field (0.9 × 150 / (2/0.13³) = 0.148),
+  and MAGNET_E makes ψ there what it was, so MAGNET_GAIN and the χ that reads
+  ψ (phaseMu) keep their tuning. What changes is everything else: the
+  field's shape (a cylinder's), a bigger magnet's (stronger at the glass at the
+  same gap), and the strength, which is now a field and so goes into ψ
+  squared far from the magnet and once close to it, where it went in once
+  everywhere: a weaker magnet pulls the far liquid less than in proportion.
+*/
+export const MAGNET_BS = 0.9 * 150 / (2 / SPIKE_H_REF ** 3);
+export const MAGNET_E = (2 / SPIKE_H_REF ** 3) ** 2 / 0.9;
+
 export const SPIKES_WGSL = /* wgsl */ `
+${MAGNET_DISC_WGSL}
 const SPIKE_PITCH = ${SPIKE_PITCH};
 const SPIKE_H_REF = ${SPIKE_H_REF};
 const SPIKE_ONSET = ${SPIKE_ONSET};
 const SPIKE_FULL = ${SPIKE_FULL};
-// The field of magnet m = (x, y, height, strength) at p, as a share of the
-// hand's magnet pressed to the glass (the scale SPIKE_ONSET is on).
-fn spikeField(p: vec2f, m: vec4f) -> f32 {
-  if (m.w <= 0.001) { return 0.0; }
-  let h = max(m.z, 0.02);
-  let to = p - m.xy;
-  let r2 = dot(to, to);
-  let q = r2 + h * h;
-  // |B| off the axis over |B| on it: sqrt((r² + 4h²)/(r² + h²)⁴) / (2/h³).
-  let off = sqrt((r2 + 4.0 * h * h) / (q * q * q * q)) * h * h * h * 0.5;
-  let rel = h / SPIKE_H_REF;
-  return m.w * off / (rel * rel * rel);
+const SPIKE_B_REF = ${SPIKE_B_REF};
+const MAGNET_BS = ${MAGNET_BS};
+const MAGNET_E = ${MAGNET_E};
+// ψ = B² / (1 + B/Bs): quadratic far from the magnet, linear close in (fluid.ts, magnetEnergy).
+fn magnetFieldEnergy(b: f32) -> f32 {
+  return MAGNET_E * b * b / (1.0 + b / MAGNET_BS);
 }
-// How far into spikes the field of magnet m is at p: 0 flat, 1 full.
+// The field of magnet m = (x, y, height, strength) at p, as a share of the
+// hand's magnet pressed to the glass: its strength times the magnet's field
+// (magnetDisc.ts; magnetRadius() is the including shader's).
+fn magnetShare(p: vec2f, m: vec4f) -> f32 {
+  if (m.w <= 0.001) { return 0.0; }
+  return m.w * magnetDiscField(p, m, magnetRadius()) / SPIKE_B_REF;
+}
+// How far into spikes the field of magnet m is at p: 0 flat, 1 full. The
+// plate asks this of every pixel, so past twice the rim and the gap, where
+// the magnet's field is under 1.25 times its dipole's (\`npm run disc\`
+// measures the most it is), a field too weak for spikes even so is answered
+// without the elliptic integrals.
 fn spikeAmp(p: vec2f, m: vec4f) -> f32 {
-  return smoothstep(SPIKE_ONSET, SPIKE_FULL, spikeField(p, m));
+  if (m.w <= 0.001) { return 0.0; }
+  let a = magnetRadius();
+  let g = max(m.z - MAGNET_FACE, MAGNET_MIN_GAP);
+  let rho = length(p - m.xy);
+  if (rho > 2.0 * (a + g) && 1.25 * m.w * magnetDiscFar(rho, g + 0.5 * MAGNET_THICKNESS * a, a) < SPIKE_ONSET * SPIKE_B_REF) { return 0.0; }
+  return smoothstep(SPIKE_ONSET, SPIKE_FULL, magnetShare(p, m));
+}
+// The standing layer's name for the same share (standing.ts, PLAN 9t).
+fn spikeField(p: vec2f, m: vec4f) -> f32 {
+  return magnetShare(p, m);
 }
 `;

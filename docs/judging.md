@@ -1026,7 +1026,33 @@ On the laptop's own microphone, in a quiet room (no music), with any look:
 
 ---
 
-## 37. Roy, 1963 opens as a panel (PLAN 21e)
+## 37. The Magnet is a real magnet (PLAN 9v)
+
+The magnet under the glass was a point; it is a cylinder magnet now, a rod 20 mm
+across and 40 mm long at the tool's own size on the 20 cm dish, and Magnet Size
+makes it a wider rod held at the same gap (10 mm to 40 mm across), not the same
+magnet scaled away. On Classic, desk and phone:
+
+- at the tool's own Size the spikes should stand as far out and as tall as before
+  (`npm run disc`: out to 0.157 of the plate against 0.156);
+- Size all the way up: the hedgehog should be wider and the spikes taller than
+  before at the same Size (on its axis 2.2 times the tool's own field, where the
+  deepened point stayed at 0.95), and a pool dragged with it should stay with it
+  from further out;
+- Size all the way down: a few spikes under the fingertip, now weaker than the
+  tool's own size (a quarter of its field), where before they were as strong;
+- Ferro Maze and Ferro Paint: their own magnets were turned up (0.3 to 0.45, 0.5
+  to 0.6) because a magnet's strength is now its field, whose pull far off goes as
+  its square. Say whether each still gathers its ferrofluid as it did. A look you
+  saved with a low Magnet Strength was not turned up: at 0.3 its far pull is now
+  about a third of what it was. Say if Strength should read the old way (it would
+  need a saved-look version, PLAN 9v-height);
+- the frame time with the Magnet held (below): the field is now worked out from
+  elliptic integrals wherever the magnet reaches, on the plate and in the solver.
+
+---
+
+## 38. Roy, 1963 opens as a panel (PLAN 21e)
 
 Pick Roy, 1963. It should open as a Lichtenstein panel: flat red, yellow and blue
 shapes and brushstrokes apart on white, outlined in black, with fields of Ben-Day
