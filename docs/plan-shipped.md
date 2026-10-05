@@ -2199,6 +2199,21 @@ headroom for a thick bottle reads the GPU's share of the dish (`speciesShare`, a
 a second) instead of the CPU's body, which still fades. `npm run thick`'s kept share now
 asserts no fade (1.0000, where the fade took 0.0225); the glycerine pool, no longer
 thinning as it fades, reads 0.045 of colour and syrup 2.06.
+**18d-11a** (2026-10-05): the poured liquid rides the colour's carry. Carried in a stage
+of its own, the species cost as much as the colour's whole carry for as long as anything
+poured was on the plate (CI's Mac, 768², 15 substeps: 12.36 ms a step against 12.28).
+The two cost the same though the species is rgba32f and the colour half floats, so what
+a carry pays for is the face, not the field: thinFaceVel reads the velocity, the gap and
+the mobility either side and the solve's P across three faces for each of a cell's four
+faces, every substep. The species follows exactly the colour's flow, so one kernel
+(`bodyAdvectPairSub`) now finds each face's Courant number once and moves both fields,
+with the same expression, limiter and floor; the species' stage keeps only the rim.
+`npm run thick` times all three on one plate (the stage alone, the colour's carry, the
+two together) and asks that the species now add under half of what it cost alone, and
+carries the alcohol run both ways and asks for the same fields. Software, 256²: alone
+1.00 of the colour's carry, riding it 0.34; the fields the same to the bit.
+Under the maze's flow the colour moves in sixths, so the species there still has its own
+stage (18d-11b).
 The open items are 18d-3 to 18d-11 in PLAN.md.
 
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)

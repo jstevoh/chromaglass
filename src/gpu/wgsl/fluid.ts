@@ -3875,6 +3875,72 @@ function thinFaced(src: string, name: string): string {
     .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
 }
 KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
+
+/*
+  The colour and the poured liquids' species carried together (PLAN 18d-11a):
+  bodyAdvectSub, the same fluxes through the same faces, for two fields in one
+  pass. The species rides exactly the flow the colour rides (fluid.ts, the
+  species' stage), and carried on its own it cost as much as the colour's own
+  carry: read on CI's Mac at 768² in fifteen substeps, 12.36 ms a step against
+  12.28 (`npm run thick`). Twice the bytes (it is rgba32f, the colour half
+  floats) and the same time, so what each carry pays for is not its field but
+  the face: thinFaceVel reads the velocity, the gap and the mobility on both
+  sides and the solve's P across three faces, a dozen loads for every one of
+  the four faces of every cell, in every substep, before a single amount
+  moves. Here each face's Courant number is found once and moves both fields.
+
+  Nothing about either carry changes: the same expression in the same order
+  for the Courant number, the same limiter, the same floor, each field into
+  its own format (the colour's DYE_FORMAT, the species' rgba32float). `npm
+  run thick` carries a stirred plate both ways and asks for the same fields.
+*/
+KERNELS.bodyAdvectPairSub = `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var<storage, read> pr: array<f32>;
+@group(0) @binding(6) var<storage, read> sub: array<f32>;
+@group(0) @binding(7) var sq: texture_2d<f32>;
+@group(0) @binding(8) var<storage, read> mob: array<f32>;
+@group(0) @binding(9) var src2: texture_2d<f32>;
+@group(0) @binding(10) var dst2: texture_storage_2d<rgba32float, write>;
+${THIN_FACE}
+fn mm(a: vec4f, b: vec4f) -> vec4f {
+  return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
+}
+// The share of a cell crossing the face a → a + e this substep; nothing through the grid's wall.
+fn courant(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return 0.0; }
+  let ve = thinFaceVel(a, e, n);
+  return clamp(ve * A.b.y * sub[0] * f32(n), -0.45, 0.45);
+}
+fn mx(t: texture_2d<f32>, p: vec2i, n: i32) -> vec4f { return textureLoad(t, clamp(p, vec2i(0), vec2i(n - 1)), 0); }
+// bodyAdvect's flux, upwind and limited, for a face whose Courant number is c.
+fn flux(t: texture_2d<f32>, a: vec2i, e: vec2i, c: f32, n: i32) -> vec4f {
+  let b = a + e;
+  if (c >= 0.0) {
+    let s = mm(mx(t, a, n) - mx(t, a - e, n), mx(t, b, n) - mx(t, a, n));
+    return c * (mx(t, a, n) + 0.5 * (1.0 - c) * s);
+  }
+  let s = mm(mx(t, b, n) - mx(t, a, n), mx(t, b + e, n) - mx(t, b, n));
+  return c * (mx(t, b, n) - 0.5 * (1.0 + c) * s);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let x = vec2i(1, 0);
+  let y = vec2i(0, 1);
+  let ce = courant(p, x, n);
+  let cw = courant(p - x, x, n);
+  let cn = courant(p, y, n);
+  let cs = courant(p - y, y, n);
+  let d = flux(src, p, x, ce, n) - flux(src, p - x, x, cw, n) + flux(src, p, y, cn, n) - flux(src, p - y, y, cs, n);
+  textureStore(dst, p, max(textureLoad(src, p, 0) - d, vec4f(0.0)));
+  let d2 = flux(src2, p, x, ce, n) - flux(src2, p - x, x, cw, n) + flux(src2, p, y, cn, n) - flux(src2, p - y, y, cs, n);
+  textureStore(dst2, p, max(textureLoad(src2, p, 0) - d2, vec4f(0.0)));
+}`;
 KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
 KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
 

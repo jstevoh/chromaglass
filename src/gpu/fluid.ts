@@ -714,6 +714,14 @@ export class WebGPUFluid {
    * same pour on it: a "before" that is read, not remembered.
    */
   readsSpecies = true;
+  /**
+   * Whether the species rides the colour's carry (PLAN 18d-11a). Only `npm
+   * run thick` turns it off, to carry the same plate the way 18d-1 did, in a
+   * stage of its own, and ask that both ways give the same fields.
+   */
+  fuseSpecies = true;
+  /** How the last step carried the species: with the colour ('pair'), in its own stage ('alone'), or not at all (null). For `npm run thick`. */
+  lastSpeciesCarry: 'pair' | 'alone' | null = null;
   /*
     How much of the plate the oil poured since it was last cleared covers,
     as a share of its area. Cahn–Hilliard and the flux transport both keep
@@ -969,6 +977,8 @@ export class WebGPUFluid {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
       add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
+      // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
+      add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
     } else {
@@ -2043,6 +2053,15 @@ export class WebGPUFluid {
         od.swap();
       }
     }, a > 0);
+    /*
+      The poured liquids' species rides the colour's carry when it can (PLAN
+      18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found
+      once for both. Where the colour is carried some other way (the maze's
+      sixths), the species' stage carries it alone, as it always did.
+    */
+    const speciesOn = thin && !!this.species && this.speciesLive;
+    const rider = speciesOn && this.fuseSpecies ? this.species! : undefined;
+    let speciesCarried = false;
     stage('advect dye', (pass) => {
       /*
         Under the maze's flow the dye crosses faces, as the ferrofluid does
@@ -2109,7 +2128,8 @@ export class WebGPUFluid {
         return;
       }
       if (!bodiesOn && thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
+        speciesCarried = !!rider;
         return;
       }
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
@@ -2136,7 +2156,8 @@ export class WebGPUFluid {
       }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
+        speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
         return;
       }
@@ -2387,8 +2408,9 @@ export class WebGPUFluid {
     */
     stage('species', (pass) => {
       this.speciesDisp = disp;
-      this.stepSpecies(pass);
-    }, thin && !!this.species && this.speciesLive);
+      this.stepSpecies(pass, !speciesCarried);
+    }, speciesOn);
+    this.lastSpeciesCarry = !speciesOn ? null : speciesCarried ? 'pair' : 'alone';
 
     /*
       The clear film (PLAN §20b, wgsl/film.ts).
@@ -2699,37 +2721,45 @@ export class WebGPUFluid {
   }
 
   /**
-   * The species' stage (PLAN 18d): its carry in the colour's substeps, then
-   * the rim. What the flow has carried past the rim has left the dish over
+   * The species' stage (PLAN 18d): its carry in the colour's substeps, unless
+   * the colour's carry has taken it along already (`carry` false, PLAN 18d-11a:
+   * bodyAdvectPairSub), then the rim. What the flow has carried past the rim has left the dish over
    * it (the open rim, OPEN_RIM, where the thin solve holds the pressure at
    * the air's), so it is taken off the plate there; nothing else takes any
    * away (18d-2: a liquid leaves by being flushed, it does not fade).
    */
-  private stepSpecies(pass: GPUComputePassEncoder): void {
+  private stepSpecies(pass: GPUComputePassEncoder, carry = true): void {
     const sp = this.species!;
-    this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
+    if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
     this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
   }
 
   /**
-   * What the species' stage costs the GPU (PLAN 18d-11), as benchSwirl times
-   * the swirl's: `reps` of it back to back on the plate's own textures, after
-   * a thin step has planned the carry's substeps, submit to done, in ms. Two
+   * What the species costs the GPU (PLAN 18d-11), as benchSwirl times the
+   * swirl's: `reps` of it back to back on the plate's own textures, after a
+   * thin step has planned the carry's substeps, submit to done, in ms. Two
    * counts and the slope between them leave out the submit's fixed cost. For
-   * `npm run thick`; CI's Mac grants no timestamp queries. `dye` times the
-   * colour's own carry instead, the same kernel in the same substeps on the
-   * dye's texture: the work every thin step already does, so the species'
-   * cost can be read as a share of it on whatever GPU runs the bench.
+   * `npm run thick`; CI's Mac grants no timestamp queries. `what`:
+   *   'alone', the species' stage as 18d-1 ran it, its own carry and the rim;
+   *   'dye', the colour's own carry alone, the work every thin step does
+   *     whether anything is poured or not;
+   *   'pair', the two together as a thin step now runs them (18d-11a): the
+   *     colour's carry taking the species along, then the rim.
+   * So the species costs a step 'alone' as it was and 'pair' less 'dye' as
+   * it is, each readable as a share of 'dye' on whatever GPU runs the bench.
    */
-  async benchSpecies(reps: number, dye = false): Promise<number> {
+  async benchSpecies(reps: number, what: 'alone' | 'dye' | 'pair' = 'alone'): Promise<number> {
     if (!this.species || !this.speciesLive || !this.carryInd) return NaN;
     const enc = this.device.createCommandEncoder({ label: 'bench species' });
     const pass = enc.beginComputePass({ label: 'bench species' });
     const args = this.arg('bench dye carry', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]);
     for (let k = 0; k < reps; k++) {
-      if (dye) this.carrySubsteps(pass, 'bodyAdvect', this.dye, args);
-      else this.stepSpecies(pass);
+      if (what === 'alone') this.stepSpecies(pass);
+      else {
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, args, what === 'pair' ? this.species : undefined);
+        if (what === 'pair') this.stepSpecies(pass, false);
+      }
     }
     pass.end();
     await this.device.queue.onSubmittedWorkDone();
@@ -3749,24 +3779,26 @@ export class WebGPUFluid {
    * indirectly so one this step does not need runs no workgroups. The field
    * ends swapped once, as a single carry leaves it.
    */
-  private carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer): void {
-    const kernelName = `${name}Sub`;
+  private carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong): void {
+    // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
+    const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
-    const group = (src: GPUTexture, dst: GPUTexture) => {
-      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}:${this.squeeze.read.label}`;
+    const group = (src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
+      const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}`;
       let g = this.groups.get(key);
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!]);
+        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : [])]);
         this.groups.set(key, g);
       }
       return g;
     };
     const w = Math.ceil(this.N / 8);
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, group(field.read, field.write));
+    pass.setBindGroup(0, group(field.read, field.write, also?.read, also?.write));
     pass.dispatchWorkgroups(w, w);
     field.swap();
-    const there = group(field.read, field.write), back = group(field.write, field.read);
+    also?.swap();
+    const there = group(field.read, field.write, also?.read, also?.write), back = group(field.write, field.read, also?.write, also?.read);
     for (let k = 0; k < CARRY_PAIRS; k++) {
       pass.setBindGroup(0, there);
       pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
