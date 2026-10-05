@@ -90,6 +90,8 @@ struct Sim {
     ride the Sim because every magnet pass reads them the same way.
   */
   mags: array<vec4f, 3>,
+  // The magnet's radius, every one of them (magnetDisc.ts): Magnet Size's.
+  magRadius: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -326,16 +328,19 @@ const W = '@compute @workgroup_size(8, 8)';
   *gradient*: a soft magnetic fluid is pulled toward where the field is
   stronger, with a force density that goes as ∇|B|² (the linear, unsaturated
   case, which is where a hand-held magnet at a few centimetres sits). The
-  magnet is a dipole a height h below the plate, pointing up, so in the plate
-  |B|² ∝ (r² + 4h²) / (r² + h²)⁴, and its radial gradient is
+  magnet is a cylinder under the plate, pointing up (magnetDisc.ts, PLAN.md 9v;
+  until then a dipole a height h below). Seen from a few of its widths off
+  it is a dipole, so there |B|² ∝ (r² + 4h²) / (r² + h²)⁴, and its radial
+  gradient is
 
       F(r) ∝ r (r² + 5h²) / (r² + h²)⁵
 
   toward the magnet. Three things follow, and all three are how a real one
   behaves: the pull is zero directly over the magnet (the liquid pools there
-  rather than being yanked through a point), it peaks just off-axis, and it
+  rather than being yanked through a point), it peaks off-axis, and it
   falls away as the seventh power of distance, so lifting the magnet weakens
-  it everywhere and fast.
+  it everywhere and fast. Closer in, within a few of its own widths, the
+  field is the magnet's own shape, worked out exactly, not a point's.
 
   And it does not care which way up the magnet is. A ferrofluid is
   magnetised *by* the field, so its moment always lines up with it and both
@@ -368,8 +373,9 @@ fn aside(p: vec2i, q: vec2i, n: f32) -> f32 {
 }`;
 const MAGNET_WGSL = /* wgsl */ `
 // The magnetic energy density a magnet under the glass sets up in the plate,
-// up to its constant. The field is a dipole's a height h below, pointing up:
-// |B|² ∝ (r² + 4h²) / (r² + h²)⁴. m = (x, y, height, strength).
+// up to its constant. m = (x, y, height, strength); its field B is the
+// magnet's (magnetDisc.ts) times the strength, on the scale where the hand's
+// magnet pressed to the glass is 0.9 (magnetShare, spikes.ts).
 //
 // And the liquid saturates. A ferrofluid's magnetisation follows a Langevin
 // curve: in a weak field it grows with the field, so the energy goes as B²;
@@ -378,7 +384,9 @@ const MAGNET_WGSL = /* wgsl */ `
 // second, which is why ψ = B² / (1 + B/Bs): quadratic far away, linear close
 // in. Without it the pull right over the magnet was a spike hundreds of times
 // the pull a little way off, which no real ferrofluid feels.
-const MAGNET_BSAT = 150.0;
+//
+// Bs is a field, on the same scale as B (PLAN.md 9v): see magnetFieldEnergy
+// in spikes.ts, which the solver and npm run disc share.
 /*
   The hand's magnet in the solver (spikesClose below; phaseMu). Under it the
   layer stands up into domes, which the film does (wgsl/standing.ts, PLAN
@@ -402,15 +410,9 @@ const MAGNET_BSAT = 150.0;
 */
 const STRIPE_CURVE = 0.52;
 const FINGER_REPEL = 1.0;
+fn magnetRadius() -> f32 { return S.magRadius; }
 fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
-  let toM = m.xy - uv;
-  let r2 = dot(toM, toM);
-  let h = max(m.z, 0.02);
-  let h2 = h * h;
-  let q = r2 + h2;
-  let q2 = q * q;
-  let b2 = (r2 + 4.0 * h2) / (q2 * q2);
-  return m.w * b2 / (1.0 + sqrt(b2) / MAGNET_BSAT);
+  return magnetFieldEnergy(magnetShare(uv, m));
 }
 // All the magnets: the one in Args and the fingers' (S.mags). Their energies
 // add, which is only exact for magnets far enough apart that each one's field
