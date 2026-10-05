@@ -109,6 +109,7 @@
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",
     "spikes": "node scripts/spikes.mjs",
+    "standing": "node scripts/standing.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferropour": "node scripts/ferropour.mjs",
     "regrid": "node scripts/regrid.mjs",

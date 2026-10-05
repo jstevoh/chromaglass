@@ -618,6 +618,39 @@ both with Light on **Add**:
 - whether the overlap of two plates is a light show's overlap is the
   judgement this is for.
 
+## 24. The ferrofluid stands up in domes (PLAN 9t)
+
+Under the hand's Magnet the ferrofluid used to pack into a black disc studded with
+drawn-on spikes. Now the pool stands up into separate black domes with the colour
+showing between them, because the plate keeps the ferrofluid's volume under the
+magnet rather than its area: a dome rising takes its liquid from round it.
+
+On Magnet Garden, then Ferro Paint:
+
+- hold the Magnet still under a pool for four seconds: the pool should part into
+  round black domes, about a fingertip apart on the projection, the dish's colour
+  between them, a white point on the top of each. Say if they come out as bars or
+  worms instead, or in a cross along the screen's axes;
+- the domes start about a second and a half after the magnet arrives. A real pool
+  stands up faster: say if the wait reads as wrong (PLAN 9t-4);
+- let go, or turn the Magnet's strength down: the domes should sink back over a
+  second or two. Held long enough to part the layer to the glass, they leave puddles
+  that join slowly rather than one pool at once; say if that reads as wrong;
+- move the Magnet slowly: the domes ahead of it rise as it arrives, those it leaves
+  sink back. They do not slide along with it (the magnet's pull is not in the film
+  yet, 9t-2);
+- a big pool (Magnet Garden's pour) under the Magnet: domes in the middle, the
+  fingers past them at its edge (9i), as many as before the domes (in the lab
+  9/12/9/5 on the fingers check's circles, against 12/9/9/3 before). Say if the
+  pool's middle reads as a patch cut out of it, a ring round the domes where the
+  fingering starts;
+- the Magnet no longer draws the fixed ring lattice of stars over the pool (the grid
+  the owner saw during shows): the domes are the liquid's own, wherever it stands;
+- the frame time with the Magnet held (`?debug`, `status.frameMs`), and on the
+  phone with three fingers on the Magnet: each finger runs its own patch of the
+  film (9t-6). Say if the governor steps down;
+- the same on the phone: each finger on the Magnet raises its own domes.
+
 ---
 
 ## 25. The Magnet: it moves only the ferrofluid that is there, and its Size (PLAN 9x, 9y)

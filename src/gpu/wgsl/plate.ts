@@ -22,7 +22,8 @@
  */
 
 import { PLATE_STRUCT } from './plateFields';
-import { SPIKES_WGSL } from './spikes';
+import { SPIKE_PITCH } from './spikes';
+import { FILM_H0, PHASE_VIEW_TOP } from './standing';
 import { filmTableWgsl } from '../../lib/filmTable';
 
 /** Bindings every plate shader shares. */
@@ -829,47 +830,6 @@ fn dishToPlate(uvScreen: vec2f, layer: i32, aspect: f32, c: f32, s: f32) -> vec2
 }
 
 // Blend mode functions
-${SPIKES_WGSL}
-/*
-  The ferrofluid's spikes drawn (spikes.ts says where they are and why): the
-  solver gathers the pool into a dome under each (phaseMu), which is a plan
-  view of how much of the gap is filled and has no height; the peak on the
-  dome is drawn here, as the glint and the rim are. Returns (height 0–1, the
-  direction down its side, the field's share of full spikes here).
-*/
-fn spikeAt(p: vec2f) -> vec4f {
-  var best = vec4f(0.0);
-  for (var k = 0; k < 4; k++) {
-    let m = U.magnets[k];
-    let amp = spikeAmp(p, m);
-    if (amp <= 0.001) { continue; }
-    let h = max(m.z, 0.02);
-    let to = p - m.xy;
-    let r2 = dot(to, to);
-    let t = spikeTip(p, m);
-    let tip = t.xy;
-    let dmin = t.z;
-    /*
-      A cone with a sharp point, concave, as a peak's sides are, meeting the
-      next at half a pitch. And leaning out: a peak stands along the field,
-      and off the magnet's axis the field fans outward, so seen from above
-      every peak off the middle is drawn out along the line from the magnet,
-      a point aimed away from it. At the pool's rim that is the star.
-    */
-    let rel2 = p - tip;
-    let outward = select(vec2f(1.0, 0.0), to / sqrt(r2), r2 > 1e-10);
-    let along = dot(rel2, outward);
-    let across = rel2 - along * outward;
-    let lean = clamp(sqrt(r2) / (sqrt(r2) + h), 0.0, 1.0);
-    let dAniso = length(vec2f(along * (1.0 - 0.55 * lean), length(across) * (1.0 + 0.9 * lean)));
-    let s = clamp(dAniso / (0.5 * SPIKE_PITCH), 0.0, 1.0);
-    let height = amp * pow(1.0 - s, 3.0);
-    let down = select(vec2f(0.0), rel2 / max(dmin, 1e-6), dmin > 1e-6);
-    if (height > best.x || amp > best.w) { best = vec4f(max(height, best.x), down, max(amp, best.w)); }
-  }
-  return best;
-}
-
 fn blendScreen(a: vec3f, b: vec3f) -> vec3f    { return 1.0 - (1.0 - a) * (1.0 - b); }
 fn blendLighter(a: vec3f, b: vec3f) -> vec3f   { return max(a, b); }
 fn blendExclusion(a: vec3f, b: vec3f) -> vec3f { return a + b - 2.0 * a * b; }
@@ -1348,7 +1308,7 @@ fn viewAt(uv: vec2f) -> View {
   let t01 = viewTexel(i + vec2i(0, 1)); let t11 = viewTexel(i + vec2i(1, 1));
   var o = array<f32, 9>();
   for (var k = 0; k < 9; k++) { o[k] = mix(mix(t00[k], t10[k], f.x), mix(t01[k], t11[k], f.x), f.y); }
-  return View(o[0], o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7], o[8]);
+  return View(o[0] * ${PHASE_VIEW_TOP}.0, o[1], o[2] * 2.0 - 1.0, o[3], o[4], o[5] * 4.0, o[6] * 0.06, o[7], o[8]);
 }
 
 /*
@@ -2262,11 +2222,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     */
     if (U.phaseAmount > 0.002) {
       let ph = clamp(view.phase, 0.0, 1.0);
-      // The spikes (spikeAt), where a magnet is close under it: read before
-      // the test for ferrofluid here, since a peak on a pool's rim stands out
-      // past the line, over water the solver has no ferrofluid in.
-      let sp = spikeAt(fuvBase);
-      if (ph > 0.004 || sp.x > 0.001) {
+      if (ph > 0.004) {
         /*
           Where the ferrofluid ends, as a line rather than a ramp.
 
@@ -2293,22 +2249,24 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           antialiasing.
         */
         let cell = 1.0 / f32(textureDimensions(view0).x);
-        let gx = viewAt(fuvBase + vec2f(cell, 0.0)).phase - viewAt(fuvBase - vec2f(cell, 0.0)).phase;
-        let gy = viewAt(fuvBase + vec2f(0.0, cell)).phase - viewAt(fuvBase - vec2f(0.0, cell)).phase;
-        let grad = vec2f(gx, gy) / (2.0 * cell);
+        let pE = viewAt(fuvBase + vec2f(cell, 0.0)).phase; let pW = viewAt(fuvBase - vec2f(cell, 0.0)).phase;
+        let pN = viewAt(fuvBase + vec2f(0.0, cell)).phase; let pS = viewAt(fuvBase - vec2f(0.0, cell)).phase;
+        /*
+          The line's slope from the phase clamped to full, as ph is: under a
+          magnet's film a cell past full is a dome (PLAN §9t), and a full
+          cell beside a dome's flank read the flank's steep rise as the
+          line's slope, put the line under a cell away and drew the edge's
+          amber and glint as a ring at the foot of every dome standing out
+          of a covered pool. The dome's own slope (heightGrad) is for its
+          light.
+        */
+        let grad = vec2f(clamp(pE, 0.0, 1.0) - clamp(pW, 0.0, 1.0), clamp(pN, 0.0, 1.0) - clamp(pS, 0.0, 1.0)) / (2.0 * cell);
+        let heightGrad = vec2f(pE - pW, pN - pS) / (2.0 * cell);
         let slope = length(grad);
         // Signed distance to the half-full line in plate units, inside positive.
         // Where the field is flat there is no line near, and the sign alone
         // says which side: capped at eight cells either way.
-        var d = clamp((ph - 0.5) / max(slope, 1e-4), -8.0 * cell, 8.0 * cell);
-        /*
-          At the pool's edge a peak stands its side out past the line, so the
-          outline is a star of points rather than a round rim. By no more
-          than six cells: past eight the distance to the line is not known
-          (the clamp above), and a peak whose point is over open water would
-          draw there as a black spot with no pool under it.
-        */
-        d += min(sp.x * 0.9 * SPIKE_PITCH, 6.0 * cell);
+        let d = clamp((ph - 0.5) / max(slope, 1e-4), -8.0 * cell, 8.0 * cell);
         let dc = d / cell;
         // A floor under the pixel, for where the screen's coordinates stop
         // changing (the kaleidoscope clamps them at its corners) and there is
@@ -2358,18 +2316,25 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let glint = pow(max(dot(Nd, H), 0.0), 220.0);
         pc += vec3f(1.0, 0.97, 0.92) * glint * 0.9 * amt;
         /*
-          And each peak lit by the same key: its side is steep, so only the
-          sliver of it facing the light catches it, a white point on every
-          peak on the same side; and a dull sheen down that side, which is
-          what shows a black peak against a black pool at all.
+          And each dome lit by the same key (PLAN §9t). Where a magnet stands
+          the layer up, a cell past full is a dome that much taller than the
+          pool (the layer FILM_H0 l_c deep at full), so its surface is the
+          layer's own: the normal from the slope of the thickness, in l_c
+          over l_c (a plate unit is 1 / LC of them), and the light lands
+          where the real top faces it. It used to be drawn on spikes.ts's
+          ring lattice round each magnet, a cone at each point the lattice
+          put there, whatever the liquid under it was doing. Only the
+          part above full: below it, the edge and its meniscus above draw
+          the pool's rim. The side facing the light catches it, a white
+          point on every dome on the same side, and a dull sheen down that
+          side, which is what shows a black dome against a black pool.
         */
-        if (sp.x > 0.001) {
-          // The side's slope: a cone's, steepening toward the point (the
-          // height goes as the cube of the distance from the valley).
-          let steep = 6.0 * pow(sp.x * sp.w, 0.67);
-          let Ns = normalize(vec3f(sp.yz * steep, 1.0));
+        let rise = max(view.phase - 1.0, 0.0);
+        if (rise > 0.01) {
+          let lean = heightGrad * ${FILM_H0 * SPIKE_PITCH / (2 * Math.PI)} * smoothstep(1.0, 1.4, view.phase);
+          let Ns = normalize(vec3f(-lean, 1.0));
           let face = max(dot(Ns, H), 0.0);
-          let body = smoothstep(0.0, 0.06, sp.x);
+          let body = smoothstep(0.0, 0.5, rise);
           // A black gloss reflects the room, more of it the steeper it is
           // seen (Fresnel), warmer on the side facing the key: the peaks'
           // outlines in grey, which is how a black peak on a black pool shows.
@@ -2384,15 +2349,33 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
             dome of Colored I. Nine a turn, turned a little per peak so
             neighbours do not match.
           */
-          let ang = atan2(sp.z, sp.y);
-          let rays = 0.5 + 0.5 * cos(ang * 9.0 + sp.w * 3.0);
+          let ang = atan2(Ns.y, Ns.x);
+          let rays = 0.5 + 0.5 * cos(ang * 9.0 + rise * 3.0);
           pc += room * fres * body * amt * (0.25 + 0.95 * rays);
           pc += vec3f(1.0, 0.97, 0.92) * pow(face, 70.0) * 1.2 * body * amt;
-          // And the point itself, where every direction meets: a white dot,
-          // a fifth of the way to the valley across. At a tenth (the first
-          // try) it was under a pixel at 1x and the references' dots are
-          // the brightest thing on each dome.
-          pc += vec3f(1.0, 0.98, 0.95) * smoothstep(0.5, 0.8, sp.x / max(sp.w, 1e-3)) * 0.9 * amt;
+          /*
+            And the top itself, where the slope runs out on a tall dome: a
+            white dot, the brightest thing on each dome in the references.
+            Only on a curved top: the dot is the key's reflection in a cap,
+            a spot as wide as the cap is round, and on the flat top of a
+            mound the magnet gathers (or a pool deeper than full) the slope
+            runs out everywhere, and the whole top drew white. The curvature
+            is the layer's, in l_c: the Laplacian of the four samples the
+            slope was taken from, a plate unit being 1 / LC of l_c. A dome
+            1.5 l_c high and 2.5 across the base is about 0.5.
+
+            Lit from a half of full above the pool, fully by 1.2: the film's
+            domes stand 1.5 to 3.2 times full under the hand's Magnet (the
+            spikes check's pool), and drawn from 1 to 2.5 above it, as for
+            the lab's taller domes, the dot reached a third of its light on
+            the tallest and none on half of them. On the spikes check's
+            picture 8 of its 28 domes had a pixel past 200 within 0.006 of
+            the top.
+          */
+          let lapView = (viewAt(fuvBase + vec2f(cell, 0.0)).phase + viewAt(fuvBase - vec2f(cell, 0.0)).phase
+                       + viewAt(fuvBase + vec2f(0.0, cell)).phase + viewAt(fuvBase - vec2f(0.0, cell)).phase - 4.0 * view.phase) / (cell * cell);
+          let curv = -lapView * ${FILM_H0 * (SPIKE_PITCH / (2 * Math.PI)) ** 2};
+          pc += vec3f(1.0, 0.98, 0.95) * smoothstep(0.35, 0.1, length(lean)) * smoothstep(0.5, 1.2, rise) * smoothstep(0.05, 0.2, curv) * 0.9 * amt;
         }
 
         /*
@@ -2417,7 +2400,29 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           wherever the maze left a trace of phase in the water.
         */
         let lens = exp(-pow(max(-dc, 0.0) / 0.55, 2.0)) * (1.0 - cover);
-        let phFar = select(ph, viewAt(fuvBase + outward * (4.5 + dc) * cell).phase, slope > 1e-4 && dc > -4.5);
+        /*
+          And the least of what lies on the way out, not only what is four
+          and a half cells off. Where another domain is nearer than that, the
+          read landed inside it and drew it as film just outside this one's
+          line. A maze's domains are rarely that close; the domes a magnet
+          stands up are (PLAN §9t: a capillary wavelength apart, eight cells
+          on 384², with the bare glass between them a few cells wide), and
+          every dome wore dark brown dashes on the sides facing its
+          neighbours. Emulating this read on the plate's phase under the
+          hand's magnet, 29% of the pixels within three cells outside a line
+          were drawn as dark film, all of them where the read had crossed the
+          gap into the next dome; taking the least of the reads at 1.5, 2.5,
+          3.5 and 4.5 cells, 0.3%. Where the phase only falls away from the
+          line, as round a lone domain, the least is the furthest read, so
+          nothing else changes.
+        */
+        var phFar = ph;
+        if (slope > 1e-4 && dc > -4.5) {
+          phFar = viewAt(fuvBase + outward * (4.5 + dc) * cell).phase;
+          for (var k = 1.5; k < 4.0; k += 1.0) {
+            phFar = min(phFar, viewAt(fuvBase + outward * (k + dc) * cell).phase);
+          }
+        }
         /*
           Less a trace. A maze leaves a fifth of the plate between a tenth and
           half full (measured in the lab after eight seconds of Labyrinth:

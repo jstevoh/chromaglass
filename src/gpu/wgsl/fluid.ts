@@ -26,6 +26,7 @@
 import { SPIKES_WGSL } from './spikes';
 import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
+import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
 import { filmKernels } from './film';
 
 /**
@@ -345,6 +346,26 @@ const W = '@compute @workgroup_size(8, 8)';
   susceptibility), and it acts on the liquid: the ferrofluid can only go
   where the water it displaces goes. See phaseForce.
 */
+/*
+  Where a magnet stands the ferrofluid up into domes (wgsl/standing.ts, PLAN
+  §9t), the layer's own film moves it there: tension, gravity, the field's
+  lift and the glass's wetting, on its thickness, with a cell past full a
+  dome. The plate's own keeping of the ferrofluid (the separation's
+  sharpening and grid filter, Cahn–Hilliard, the maze's flow, the magnet's
+  pull and the advection) would pull every dome back down to full and pack
+  the pool, which is the area-keeping layer the film replaces. So each
+  exchange between two cells is weighted by how far neither is under the
+  film (stand, its window): the same weight read from both sides, so what
+  moves is still conserved. The cap at full is raised under it instead
+  (phaseRelax). The advection is the one exception: it still carries the
+  layer's mean there, which the film does not move (phaseAdvect, carried).
+  stand is 0 wherever no film runs and the weight exactly 1, so every
+  other look is as it was, to the bit.
+*/
+const STAND_ASIDE = /* wgsl */ `
+fn aside(p: vec2i, q: vec2i, n: f32) -> f32 {
+  return 1.0 - max(textureLoad(stand, clampP(p, n), 0).r, textureLoad(stand, clampP(q, n), 0).r);
+}`;
 const MAGNET_WGSL = /* wgsl */ `
 // The magnetic energy density a magnet under the glass sets up in the plate,
 // up to its constant. The field is a dipole's a height h below, pointing up:
@@ -359,43 +380,26 @@ const MAGNET_WGSL = /* wgsl */ `
 // the pull a little way off, which no real ferrofluid feels.
 const MAGNET_BSAT = 150.0;
 /*
-  The spikes in the solver (spikeWell, spikesClose below; phaseMu).
+  The hand's magnet in the solver (spikesClose below; phaseMu). Under it the
+  layer stands up into domes, which the film does (wgsl/standing.ts, PLAN
+  §9t); this is what the hand's field does past them, where its fingers grow.
 
-  SPIKE_WELL: how deep the spikes' wells are, against the double well's
-  barrier of about 0.19: deep enough to empty the valleys of a pool. At 0.8
-  the domes only dimpled the pool; at 3 they packed further past full than
-  at 2 (1.27 against 1.17, before the relax passes that now hold 2 to 1.01)
-  and parted the pool no more.
-
-  SPIKE_REPEL: how many times more the dipoles repel among the spikes
-  (where spikeWell's share is), with a magnet that close: it is what parts
-  a small pool between its domes ("npm run spikes": the outline 2.62 times
-  a disc's at 1, 2.85 at 5). Only among them (PLAN.md §9i): across the whole
-  reach of the magnet it drove the pool's edge out as a grey haze past the
-  spikes, the fingers' liquid spread to a tenth or a fifth full, which the
-  plate (drawing the half-full line) does not draw at all.
-
-  FINGER_REPEL: the same past the spikes, where the fingers grow. Rendered
-  in the lab (a pool poured past the spikes' reach, 384², six seconds, on
-  Classic's settings while the hand's push still ran there too; it runs
-  only under a Labyrinth now, fluid.ts HAND_SCREEN): at 1 the fingers are
-  black with round tips; at 0 they stopped as stubs a finger's width long,
-  and at 5 went out as haze.
+  FINGER_REPEL: how many times more the dipoles repel under a magnet close
+  enough to raise domes. Rendered in the lab (a pool poured past the domes'
+  reach, 384², six seconds, on Classic's settings while the hand's push
+  still ran there too; it runs only under a Labyrinth now, fluid.ts
+  HAND_SCREEN): at 1 the fingers are black with round tips; at 0 they
+  stopped as stubs a finger's width long, and at 5 went out as haze.
 
   STRIPE_CURVE: see phaseMu, where the double well is steepened for the
   push.
 
-  SPIKE_SHARP: the double well steepened by up to 1 + this under the
-  spikes, so a dome's side is a line and not a slope of grey: the wells set
-  the liquid anywhere between empty and full, and with the double well as
-  it is more than half the cells round the magnet sat between 0.2 and 0.6.
-  Its stiffness is explicit: with M dt at Phase Edge's most (0.018), the
-  update's largest factor is (64 + 16 (1 + 1.5)) × 0.018 = 1.87, under the
-  2 it must stay below; 2 would be 2.02.
+  What was here before the film: wells in μ on spikes.ts's ring lattice
+  (SPIKE_WELL 2), the dipoles' repulsion five times over among them
+  (SPIKE_REPEL) and the double well steepened 2.5 times (SPIKE_SHARP), so a
+  plan view that cannot stand up would pack the pool into domes where the
+  lattice put them. The film raises them where the layer does instead.
 */
-const SPIKE_WELL = 2.0;
-const SPIKE_REPEL = 5.0;
-const SPIKE_SHARP = 1.5;
 const STRIPE_CURVE = 0.52;
 const FINGER_REPEL = 1.0;
 fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
@@ -421,24 +425,6 @@ fn magnetsEnergy(uv: vec2f, m: vec4f) -> f32 {
 }
 ${SPIKES_WGSL}
 /*
-  The spikes' hold on the liquid, as a chemical potential: lowest on each
-  spike (spikes.ts) and highest in the valleys between them, as deep as the
-  field there is into spikes; where two magnets' spikes overlap, the stronger
-  field's. What it stands in for is the peak's own height, which a plan view
-  of the gap does not have: a peak's surface is pulled up along the field,
-  and in a thin layer the liquid under it comes from the valleys round it,
-  so the valleys run dry and the pool, seen from above, parts into a field of
-  domes. Zero at 0.45 of the way to the valley, so about a third of each
-  spike's patch stays in liquid: the domes the references show, a little
-  less than half a pitch across, with water between them.
-*/
-fn spikeWell(uv: vec2f, m: vec4f) -> vec2f {
-  let a = spikeAmp(uv, m);
-  if (a <= 0.001) { return vec2f(0.0); }
-  let s = clamp(spikeTip(uv, m).z / (0.5 * SPIKE_PITCH), 0.0, 1.0);
-  return vec2f(a * (2.0 * smoothstep(0.2, 0.7, s) - 1.0), a);
-}
-/*
   How far into spikes the closest magnet is on its own axis: 0 for every
   look's own magnet, 1 for the Magnet tool pressed up under the glass. What
   turns the magnet's own push on (phaseMu), and how much of it moves the
@@ -448,15 +434,6 @@ fn spikesClose(m: vec4f) -> f32 {
   var a = spikeAmp(m.xy, m);
   for (var k = 0; k < 3; k++) { a = max(a, spikeAmp(S.mags[k].xy, S.mags[k])); }
   return a;
-}
-// (the well, the field's share of full spikes), of whichever magnet is strongest here.
-fn spikesWell(uv: vec2f, m: vec4f) -> vec2f {
-  var best = spikeWell(uv, m);
-  for (var k = 0; k < 3; k++) {
-    let w = spikeWell(uv, S.mags[k]);
-    if (w.y > best.y) { best = w; }
-  }
-  return best;
 }
 `;
 
@@ -710,7 +687,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(7) var<storage, read> gapSeen: array<f32>;
 @group(0) @binding(8) var<storage, read> thinP: array<f32>;
 @group(0) @binding(9) var<storage, read> mob: array<f32>;
+@group(0) @binding(10) var stand: texture_2d<f32>;
 ${PACKED}
+${STAND_ASIDE}
 fn ph(p: vec2i, n: i32) -> f32 { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
 fn minmod(a: f32, b: f32) -> f32 { return select(0.0, select(max(a, b), min(a, b), a > 0.0), a * b > 0.0); }
 fn inside(a: vec2i, n: i32) -> bool { return a.x >= 0 && a.y >= 0 && a.x < n && a.y < n; }
@@ -719,6 +698,43 @@ fn upwind(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
   let b = a + e;
   if (c >= 0.0) { return ph(a, n) + 0.5 * (1.0 - c) * minmod(ph(a, n) - ph(a - e, n), ph(b, n) - ph(a, n)); }
   return ph(b, n) - 0.5 * (1.0 + c) * minmod(ph(b, n) - ph(a, n), ph(b + e, n) - ph(b, n));
+}
+/*
+  Under a standing layer (STAND_ASIDE) the water carries the layer as a
+  whole, and the film shapes it: what crosses a face there is the flow
+  times the layer's mean round the face (a seven-cell box round each of
+  its two cells, about a dome's spacing: they stand 8 apart on 384²), not
+  times the cell's own. A real layer's domes ride the flow over the glass; the flow does
+  not pour each dome into the gap beside it.
+
+  What was reported: with the domes on, a pool held under the hand threw
+  half the fingers past its rim (6/4/5/2 on the Mac in npm run fingers,
+  against main's 12/9/9/3). Measured in the lab at the end of that run,
+  the film's window held 7212 of the pool's 13029 where the same run
+  with the film off held 5429: the window had stepped the plate's flow
+  aside altogether, so nothing carried the layer out of it, and the
+  pool's edge, fed from the middle by that flow, had less to finger with.
+  Letting the flow carry each cell as it does outside brought the fingers
+  back (7/12/8/5) and broke the domes: it poured them into one another
+  and they set as black slabs, which is why the flow was stepped aside in
+  the first place. Carrying the mean, the window holds 5622, the fingers
+  are 9/12/9/4 in 7 sectors, and the domes stand.
+
+  Blended in over the window's edge as the other passes are, so a cell
+  outside every window moves as it always has, to the bit. A gap the mean
+  takes more from than it holds goes under empty for a moment and
+  phaseRelax fills it from its neighbours, as it does everywhere the
+  limiter digs below empty.
+*/
+fn coarse(a: vec2i, b: vec2i, n: i32) -> f32 {
+  var t = 0.0;
+  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) { t += ph(a + vec2i(i, j), n) + ph(b + vec2i(i, j), n); } }
+  return t / 98.0;
+}
+fn carried(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
+  let s = 1.0 - aside(a, a + e, S.n);
+  if (s <= 0.0) { return upwind(a, e, c, n); }
+  return mix(upwind(a, e, c, n), coarse(a, a + e, n), s);
 }
 // The flux across the face between cell a and cell a + e, in the +e direction.
 fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
@@ -746,8 +762,9 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let pb = packedAt(b.x, b.y, n);
   let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
   let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
+  // Under a standing layer, the layer as a whole: see carried.
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
-  return c * upwind(a, e, c, n);
+  return c * carried(a, e, c, n);
 }
 
 // Under Thin Gap: the gap at cell p in rest gaps, a share t of the way through the step.
@@ -782,7 +799,7 @@ fn volumeFlux(a: vec2i, e: vec2i, n: i32) -> f32 {
   // As a Courant number, bounded as the flux form's is, then back to a volume.
   let h = 0.5 * (gapAt(a, n, A.a.y) + gapAt(b, n, A.a.y));
   let c = clamp(face * A.b.y * f32(n) / h, -0.45, 0.45);
-  return h * c * upwind(a, e, c, n);
+  return h * c * carried(a, e, c, n);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -835,7 +852,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   phaseForce: `${HEAD}${MAGNET_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var phase: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var stand: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
 fn ph(p: vec2i, n: f32) -> f32 { return clamp(textureLoad(phase, clampP(p, n), 0).r, 0.0, 1.0); }
 fn phs(p: vec2i, n: f32) -> f32 {
   var t = 0.0;
@@ -851,7 +869,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let h = 1.0 / n;
   let gpsi = vec2f(magnetsEnergy(uv + vec2f(h, 0.0), A.a) - magnetsEnergy(uv - vec2f(h, 0.0), A.a),
                    magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
-  var f = phs(p, n) * gpsi * A.b.x;
+  // None under a standing layer: the film has the magnet's pull in its own
+  // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
+  var f = (1.0 - textureLoad(stand, p, 0).r) * phs(p, n) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
@@ -873,30 +893,51 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   phaseRelax: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
-// What a cell holds outside 0..1: above full (positive) or below empty
-// (negative), and whether the neighbour exists at all.
+@group(0) @binding(3) var stand: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+/*
+  Under a standing layer (STAND_ASIDE) a cell past full is a dome, so the
+  ceiling there is the top glass (standing.ts, FILM_TOP), where the film's
+  window is full. Not the pair weight the other passes step aside by:
+  with the relax set aside, nothing refilled the dips the flux step's
+  limiter digs below empty round a dome, nor stopped the plate's flow
+  piling the layer where it converges, and the plate went to NaN in 140
+  steps under the Magnet. Each cell's excess is its own, and each pair's
+  exchange still the same from both sides, so it conserves as before.
+*/
+/*
+  Raised only where the film acts fully, not blended in over the window's
+  edge: there the plate's own flows still run in part, and the magnet's
+  pull piled the pool against the full window into a ring of black arcs
+  past full, each cut sharp along a circle where the plate's flows stop
+  (rendered under the hand's Magnet, the spikes check's pool). Capped at
+  full there, the plate's flows pack the edge no deeper than they ever
+  did, and the arcs go.
+*/
+fn top(p: vec2i) -> f32 { return select(1.0, ${FILM_TOP.toFixed(3)}, textureLoad(stand, p, 0).r > 0.99); }
+// What a cell holds outside 0..its ceiling: above it (positive) or below
+// empty (negative), and whether the neighbour exists at all.
 fn bad(p: vec2i, n: i32) -> vec2f {
   if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) { return vec2f(0.0, 0.0); }
   let c = textureLoad(src, p, 0).r;
-  return vec2f(max(c - 1.0, 0.0) + min(c, 0.0), 1.0);
+  return vec2f(max(c - top(p), 0.0) + min(c, 0.0), 1.0);
 }
 fn pair(a: f32, b: vec2f) -> f32 { return select(0.0, 0.24 * (a - b.x), b.y > 0.5); }
-fn over(p: vec2i, n: i32) -> vec2f { return bad(p, n); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
-  let c = textureLoad(src, p, 0).r;
-  let e = max(c - 1.0, 0.0) + min(c, 0.0);
-  let out = pair(e, over(p + vec2i(1, 0), n)) + pair(e, over(p - vec2i(1, 0), n))
-          + pair(e, over(p + vec2i(0, 1), n)) + pair(e, over(p - vec2i(0, 1), n));
-  textureStore(dst, p, vec4f(c - out, 0.0, 0.0, 0.0));
+  let e = bad(p, n).x;
+  let out = pair(e, bad(p + vec2i(1, 0), n)) + pair(e, bad(p - vec2i(1, 0), n))
+          + pair(e, bad(p + vec2i(0, 1), n)) + pair(e, bad(p - vec2i(0, 1), n));
+  textureStore(dst, p, vec4f(textureLoad(src, p, 0).r - out, 0.0, 0.0, 0.0));
 }`,
 
   phaseSeparate: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(3) var stand: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+${STAND_ASIDE}
 /*
   Tension smooths the edge by its curvature; sharpening pushes back against
   what the advection blurred; the balance sets the edge. Both are written as
@@ -929,7 +970,7 @@ ${PHASE_MEAN3}fn exchange(p: vec2i, q: vec2i, sp: f32, n: i32) -> f32 {
   // checkerboard into it, which the old clamp hid and this removes: at an
   // eighth a pair, exactly one step's worth of a checkerboard.
   let grid = 0.125 * ((b - a) - (sq - sp));
-  return toFuller + 0.125 * clamp(A.a.y, 0.0, 1.0) * (b - a) + grid;
+  return aside(p, q, S.n) * (toFuller + 0.125 * clamp(A.a.y, 0.0, 1.0) * (b - a) + grid);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -968,6 +1009,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
 @group(0) @binding(4) var gapNow: texture_2d<f32>;
 @group(0) @binding(5) var<storage, read> gapSeen: array<f32>;
+@group(0) @binding(6) var stand: texture_2d<f32>;
+${STAND_ASIDE}
 fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
 ${PHASE_MEAN3}
 fn gapAt(q: vec2i, n: i32) -> f32 {
@@ -985,7 +1028,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let e = select(vec2i(0, 1 - 2 * (k & 1)), vec2i(1 - 2 * (k & 1), 0), k < 2);
     let q = p + e;
     if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
-    d += 0.125 * ((raw(q) - c) - (mean3(q, n) - sp)) * min(hp, gapAt(q, n));
+    d += aside(p, q, S.n) * 0.125 * ((raw(q) - c) - (mean3(q, n) - sp)) * min(hp, gapAt(q, n));
   }
   textureStore(dst, p, vec4f(c + d / hp, 0.0, 0.0, 0.0));
 }`,
@@ -3084,8 +3127,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let uv = uvOf(id);
   let e = magnetsEnergy(uv, A.a);
   let sat = e / (e + 800.0);
-  let sw = spikesWell(uv, A.a);
-  let chi = (A.b.z + (1.0 - A.b.z) * sat * (1.0 + max(SPIKE_REPEL * sw.y, FINGER_REPEL * spikesClose(A.a)))) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
+  let chi = (A.b.z + (1.0 - A.b.z) * sat * (1.0 + FINGER_REPEL * spikesClose(A.a))) * (1.0 + 0.25 * snoise(uv * 9.0 + vec2f(A.b.w * 0.05, -A.b.w * 0.03)));
   let w = textureLoad(psi, p, 0).r;
   /*
     Under the hand's magnet the push moves the liquid by flow and not by
@@ -3118,8 +3160,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let close = spikesClose(A.a);
   let wellNeed = mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close);
-  let well = min(max(1.0 + SPIKE_SHARP * sw.y, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
-  let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap + SPIKE_WELL * sw.x;
+  let well = min(max(1.0, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
+  let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap;
   let repel = A.b.y * chi * w;
   textureStore(dst, p, vec4f(local + repel, local + repel * (1.0 - close) * step(1e-6, A.b.z), 0.0, 0.0));
 }`,
@@ -3138,7 +3180,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var phase: texture_2d<f32>;
 @group(0) @binding(4) var mu: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var stand: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
 // Both blurred [1 2 1]²: μ carries −∇²c, which is grid-scale, and a
 // grid-scale force is the part a collocated projection cannot remove (see
 // phaseForce); unblurred, it printed a mesh into the black.
@@ -3163,7 +3206,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, p, 0);
   let c = cb(p, n);
   let g = vec2f(uu(p + vec2i(1, 0), n) - uu(p - vec2i(1, 0), n), uu(p + vec2i(0, 1), n) - uu(p - vec2i(0, 1), n)) * 0.5;
-  var f = -c * g * A.a.x;
+  // None under a standing layer: the film moves the liquid there (STAND_ASIDE).
+  var f = -c * g * A.a.x * (1.0 - textureLoad(stand, p, 0).r);
   let fl = length(f);
   if (fl > A.a.y) { f = f * (A.a.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
@@ -3172,13 +3216,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   phaseCH: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var mu: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(4) var stand: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<r32float, write>;
 fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).g; }
+${STAND_ASIDE}
+// The flux from q into p, less where a standing layer's film steps it (see STAND_ASIDE).
+fn face(p: vec2i, q: vec2i, n: f32) -> f32 { return aside(p, q, n) * (uu(q, n) - uu(p, n)); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
-  let lap = uu(p + vec2i(1, 0), n) + uu(p - vec2i(1, 0), n) + uu(p + vec2i(0, 1), n) + uu(p - vec2i(0, 1), n) - 4.0 * uu(p, n);
+  var lap = uu(p + vec2i(1, 0), n) + uu(p - vec2i(1, 0), n) + uu(p + vec2i(0, 1), n) + uu(p - vec2i(0, 1), n) - 4.0 * uu(p, n);
+  // Face by face only near a film, so everywhere else sums as it always did.
+  let st = max(max(textureLoad(stand, clampP(p + vec2i(1, 0), n), 0).r, textureLoad(stand, clampP(p - vec2i(1, 0), n), 0).r),
+               max(max(textureLoad(stand, clampP(p + vec2i(0, 1), n), 0).r, textureLoad(stand, clampP(p - vec2i(0, 1), n), 0).r), textureLoad(stand, p, 0).r));
+  if (st > 0.0) {
+    lap = face(p, p + vec2i(1, 0), n) + face(p, p - vec2i(1, 0), n) + face(p, p + vec2i(0, 1), n) + face(p, p - vec2i(0, 1), n);
+  }
   // Not clamped: Cahn–Hilliard dips a little either side of an edge and
   // brings itself back, and a clamp there makes or loses ferrofluid.
   textureStore(dst, p, vec4f(textureLoad(src, p, 0).r + A.b.x * lap, 0.0, 0.0, 0.0));
@@ -3201,7 +3255,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var mu: texture_2d<f32>;
 @group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(5) var stand: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<r32float, write>;
+${STAND_ASIDE}
 fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).g; }
 fn hh(p: vec2i, n: f32) -> f32 { return max(textureLoad(sq, clampP(p, n), 0).r, 0.004); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -3213,7 +3269,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var flow = 0.0;
   for (var k = 0; k < 4; k++) {
     let q = p + select(vec2i(0, 1 - 2 * (k & 1)), vec2i(1 - 2 * (k & 1), 0), k < 2);
-    flow += (uu(q, n) - up) * min(hp, hh(q, n));
+    flow += aside(p, q, n) * (uu(q, n) - up) * min(hp, hh(q, n));
   }
   textureStore(dst, p, vec4f(textureLoad(src, p, 0).r + A.b.x * flow / hp, 0.0, 0.0, 0.0));
 }`,
@@ -3390,7 +3446,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
         | (bzu << 16u)
         | (u32(0.5 + 255.0 * clamp(film, 0.0, 1.0)) << 24u);
   textureStore(dst, p, vec4u(
-    pack2x16unorm(clamp(vec2f(ph, m.r), vec2f(0.0), vec2f(1.0))),
+    // The ferrofluid as a share of PHASE_VIEW_TOP, so a dome past full reaches the plate.
+    pack2x16unorm(clamp(vec2f(ph / ${PHASE_VIEW_TOP}.0, m.r), vec2f(0.0), vec2f(1.0))),
     pack2x16unorm(clamp(vec2f(m.b * 0.5 + 0.5, m.g), vec2f(0.0), vec2f(1.0))),
     pack2x16unorm(clamp(vec2f(r.g, l.a * 0.25), vec2f(0.0), vec2f(1.0))),
     w));
