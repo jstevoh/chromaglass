@@ -471,6 +471,13 @@ jobs:
       - name: No pointer on the show
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/showcursor.mjs
+      # Picking an input changes what the show hears at once (scripts/
+      # inputpick.mjs, PLAN.md 14s): Chromium's fake devices, Input 1 and then
+      # Input 2 picked in the settings, each opened by its id and the earlier
+      # ones closed. Media, not the plate, so no GPU; on the same dist/.
+      - name: The input picker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run inputpick
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU

@@ -134,12 +134,41 @@ async function askShow(page, label) {
     hint ? summary(still) : 'the full-screen hint never came up');
 }
 
+/**
+ * Push the pad's left stick for half a second, and say whether the ring was
+ * on the page while it moved. Asked during the push, not after: the ring
+ * stays up for two and a half seconds after the last movement, so a ring left
+ * over from an earlier push must not be what is measured, and one that is
+ * hidden must be hidden while the stick moves.
+ */
+async function ringWhilePushed(page) {
+  await page.evaluate(() => { window.__pad.axes = [0.8, 0.4, 0, 0]; });
+  await page.waitForTimeout(500);
+  const ring = await page.evaluate(() => !!document.querySelector('[data-testid="gamepad-cursor"]'));
+  await page.evaluate(() => { window.__pad.axes = [0, 0, 0, 0]; });
+  return ring;
+}
+
 const server = await serve();
 const browser = await launchChromium(chromium);
 try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const show = await context.newPage();
   show.setDefaultTimeout(60_000);
+  /*
+    A game controller, stood in for: `navigator.getGamepads` hands back one
+    standard pad whose sticks are `window.__pad.axes`, which the checks below
+    push. useGamepad polls it every 16 ms, so a pushed left stick is the
+    hand moving the ring as a real pad does (headless Chromium has no pad).
+  */
+  await show.addInitScript(() => {
+    window.__pad = { axes: [0, 0, 0, 0] };
+    const pad = () => ({
+      id: 'Stand-in pad', index: 0, connected: true, mapping: 'standard', timestamp: performance.now(),
+      axes: window.__pad.axes.slice(), buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    });
+    Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value() { return [pad()]; } });
+  });
   await show.goto(`${ORIGIN}/?debug&look=classic&dpr=0.35`, { waitUntil: 'networkidle' });
   await show.waitForSelector('#liquid-canvas', { timeout: 30_000 });
 
@@ -150,6 +179,12 @@ try {
   check('the design screen keeps its pointer: the plate is a crosshair and the desk can be aimed at',
     plate === 'crosshair' && design.shown.length > 0 && design.any.length > 0,
     `plate ${plate}; ${design.shown.length} of ${design.points} points and ${design.any.length} elements show one`);
+  // And the game controller's ring, which the design screen keeps: the
+  // control for the clean-screen line below, so a stand-in pad the app never
+  // read cannot pass that line by drawing no ring anywhere.
+  const designRing = await ringWhilePushed(show);
+  check('the design screen shows the game controller\'s ring while the stick moves', designRing,
+    designRing ? 'drawn' : 'no ring: the stand-in pad was not read');
 
   // ── The projector window ──────────────────────────────────────
   // As useCastSession opens it: a popup from the show, then onto the cast
@@ -200,6 +235,11 @@ try {
   const hidden = await show.evaluate(() => !!document.querySelector('.overlays-hidden'));
   check('clean screen: no pointer anywhere in the window', hidden && clean(cleanScreen),
     hidden ? summary(cleanScreen) : "the palette's Clean screen did not hide the overlays");
+  // PLAN.md 14w: the ring was the one thing still drawn at a pointer on
+  // the show; on one screen, or a mirrored projector, it was on the wall.
+  const cleanRing = await ringWhilePushed(show);
+  check('clean screen: no game controller ring while the stick moves', hidden && !cleanRing,
+    cleanRing ? 'the ring is drawn over the show' : 'none');
   await show.keyboard.press('Escape');
   await show.waitForTimeout(400);
   const back = await show.evaluate(() => getComputedStyle(document.getElementById('liquid-canvas')).cursor);

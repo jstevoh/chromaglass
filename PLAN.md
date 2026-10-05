@@ -136,7 +136,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   carried fields. **S20** after them (C+G, M).
 - **1.4** **S14** (B, S): an error boundary per panel, desk and phone component, the plate
   outside them all.
-- **1.5** **14s** (B+D, M): the input picker, Safari's second song, song ID's latch.
+- **1.5** **14s** (B+D, M): Safari's second song, song ID's latch (the input picker **shipped**, `npm run inputpick`).
 - **1.6** **14g** (B, M): a knocked cable brings the input and the projector back.
 - **1.7** **14h** (B+E, M): precache the build, never `startOver()` offline, fonts from the site
   (#207's note), timeouts on song ID and lyrics.
@@ -403,7 +403,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9aa (the maze too coarse, and its haze; measured) open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and a hold with the show frozen or draining gives the look its magnet, **shipped** (2026-10-05, `npm run magnet`'s check 9 on the Mac), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9aa (the maze too coarse, and its haze; measured) open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -2784,14 +2784,9 @@ full-wall red flash (counted by the red rule) and a 1.5× to 1× rung change (no
 **Measured in headless Chromium on 2026-09-28 where it says so; the rest read in the
 code.**
 
-- *The input picker never changes the input.* `chooseAudioInput` (`App.tsx`) is
-  memoised on `[audioSource]` alone, and calls the `handleSourceChange` of the render in
-  which the source last changed, when `audioStream` was still `null` and `audioInputId`
-  the old one. Measured with fake devices: picking Input 1 and then Input 2 made three
-  `getUserMedia` calls, none with a `deviceId`, and all three tracks stayed live. The
-  interface picked at soundcheck is not the one the show hears until a reload, and each
-  pick leaves another microphone open. Hold the handler and the stream in refs, and pass
-  the id.
+- *The input picker never changed the input* (**shipped**, 2026-10-05): a pick opens the
+  input picked, by its id, and closes the one before (`npm run inputpick`, 2/5 → 5/5).
+  The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) under 14s.
 - *On Safari and iOS, every song after the first is silence to the ear.* Without
   `captureStream`, `musicStream` hands back the one `MediaStreamDestination`'s stream;
   `startMusic`, `handleSourceChange` and `toggleMusic` stop `audioStream`'s tracks, and
@@ -2807,8 +2802,7 @@ code.**
   (`fingerprint.ts`) each leave an `AudioContext` open. (14h's shared busy flag is the
   same flag, hung by a request rather than a throw.)
 
-*Measure:* a browser check with Chromium's fake devices (the second input is opened by
-its id, the first one's track ends); the same with `captureStream` removed (the source
+*Measure:* the same as `npm run inputpick` with `captureStream` removed (the source
 is live after the third track); `npm run music` with a `finalizeListen` that throws once
 (identification runs again).
 
@@ -2997,10 +2991,11 @@ opens, with the mouse sweeping it and later, at a grid of points and on every el
 and that the design screen keeps its crosshair (12 lines; 9 of them red before the
 change); `npm run desktop` adds "projector: no pointer on the wall". Nothing else is
 drawn at the pointer: the projector copies the plate's canvas only, and no shader marks
-where the mouse is. Left as it is: the gamepad's ring (`App.tsx`) still shows on the
-laptop in clean screen while the sticks move, since without it the stick is aimed blind;
-on one screen that ring is on the show. A setting to hide it, if the owner wants one, is
-the next step. The phone needs nothing: a touch screen draws no pointer, and a phone or
+where the mouse is. The gamepad's ring (`App.tsx`), the last thing drawn at a pointer,
+showed on the laptop in clean screen while the sticks moved, so on one screen (or a
+mirrored projector) it was on the show; since 2026-10-05 clean screen hides it and the
+design screen keeps it (`npm run showcursor`, the ring's two lines, 13/14 → 14/14 with
+the fix taken out and put back). The phone needs nothing: a touch screen draws no pointer, and a phone or
 tablet showing `?cast=` gets the same page.
 
 ### 14x. The microphone hears the hand on the laptop (shipped)
@@ -4330,6 +4325,18 @@ like day (`npm run macqueue -- --hours 24` for the time).
   laid; `grating`'s §6 holds two Drops at ten moments and reads the old push 0.40 apart,
   today's 1.00. The rarer case of both fingers low at once is still open (batch 11's
   two-finger entry), and `phone` now prints what the plate gained of what it was handed.
+  **Read 2026-10-05, both-low twice in 350 runs since 10-03** (deploy 37233245217
+  attempt 2, fc7dcc3, 10-04 22:35Z, the open shard; #230's PR run 37134515660, 10-03
+  16:16Z, tools): A 0 and B 0 under the fingers and at their mirrors, yet "each lay it on
+  every step" passed both times (A 28 steps, 222 dye, B 27, 214, 7.9 a step), and the
+  plate gained −10 of the 435 it was handed. So the hands laid and the plate kept none of
+  it: not the touch path. Two leads. The fingers sit at one height (110 px) but land on
+  cells of different heights ((93, 43) and (53, 64); (138, 64) and (97, 43)), so the plate
+  was turned under the view when they were picked; and the 435 went somewhere between the
+  lay and the readback (a clear, a drain or a look's fade landing in the window, or the
+  readback taken off a plate that was rebuilt). The next red should print the plate's
+  turn and the solver's step and clear counts across the window. Too big for the
+  2026-10-05 bundle of small fixes; left open here.
 
 ### 19i. A green Mac result carries across a merge of main
 

@@ -50,6 +50,7 @@
     "qa": "npm run build && node scripts/qa.mjs",
     "layout": "npm run build && node scripts/layout.mjs",
     "showcursor": "npm run build && node scripts/showcursor.mjs",
+    "inputpick": "node scripts/inputpick.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
     "ios": "npm run build && npx cap sync ios && npx cap open ios",

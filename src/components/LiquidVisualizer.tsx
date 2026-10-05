@@ -6983,7 +6983,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, laid: dropLaidRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
           for (const { hand, primary } of hands) {
-            if (drainFrameRef.current !== 0) break;
+            /*
+              Nothing is laid while the plate drains. But a magnet lays
+              nothing: it is where the hand holds it, and the drain does not
+              take it out of the hand. Breaking before it, a hold during the
+              drain never reached magnetFor (below), so the look was never
+              given its magnet and let go of there was none (PLAN.md 9s, left
+              open by #227).
+            */
+            if (drainFrameRef.current !== 0) {
+              // On the plate only, as below, and each finger as below too.
+              const on = hand.x > 0 && hand.x < GRID_SIZE - 1 && hand.y > 0 && hand.y < GRID_SIZE - 1;
+              if (!on || activeToolRef.current !== 'magnet' || !fluidsRef.current[activeLayerRef.current]) continue;
+              if (primary) magnetHandRef.current = { x: hand.x / GRID_SIZE, y: hand.y / GRID_SIZE, at: showNow() };
+              else hand.magnetAt = showNow();
+              continue;
+            }
             const { x, y } = hand;
             const af = fluidsRef.current[activeLayerRef.current];
             if (af && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
@@ -8085,6 +8100,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
             const ms = performance.now() - t0;
             simMsRef.current += (ms - simMsRef.current) * 0.3;
+          } else {
+            /*
+              Frozen or draining, the solver is not stepped, and magnetFor was
+              only ever asked from the step. But it is also where a hold is
+              read: where it tells the app the hand brought a magnet
+              (onMagnetInHand) and where a let-go is noted as set down. So a
+              hold while the show was frozen or draining gave the look no
+              magnet, and a hold after Start did (PLAN.md 9s). Asked here for
+              that alone, with the step's settings thrown away: a frozen plate
+              does not move, so a magnet under it pulls nothing until it is
+              thawed, as a real dish set down would not flow either, and then
+              the magnet is where the hand left it with the strength it was
+              given. Only with a hand on it, so a look's own magnet is left as it
+              was through a drain (but for the one call that finds the look
+              has moved its magnet since the hand let go, which forgets the
+              hand and walks one step, as the solver's step would).
+            */
+            if (magnetHandRef.current) magnetFor(patch.layer(0));
           }
         }
 
