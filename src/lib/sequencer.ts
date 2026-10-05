@@ -168,20 +168,23 @@ export function builtInSequences(): ShowSequence[] {
           presetId: 'classic', paletteSize: 1, paletteLead: 0, transition: 4,
           settings: { dyeBudget: 0.35, turbulenceScale: 0.15, audioImpact: 0.3, bubbles: 0.15, plateRock: 0.2, beatSqueeze: 0.2 },
         }),
+        // Classic carries six dyes (PLAN 18l): one, then three, then five of
+        // them, so the blue arrives with the full set and the wheel turns
+        // through all six.
         s('Second dye in', 60, {
-          paletteSize: 2, paletteLead: 0, transition: 20,
+          paletteSize: 3, paletteLead: 0, transition: 20,
           settings: { dyeBudget: 0.6, turbulenceScale: 0.3, audioImpact: 0.45, bubbles: 0.35, plateRock: 0.35, beatSqueeze: 0.4 },
         }),
         s('Full set', 90, {
-          paletteSize: 3, paletteLead: 0, transition: 25,
+          paletteSize: 5, paletteLead: 0, transition: 25,
           settings: { dyeBudget: 0.85, turbulenceScale: 0.5, audioImpact: 0.6, bubbles: 0.5, plateRock: 0.45, beatSqueeze: 0.55 },
         }),
         s('Turn the wheel', 90, {
-          paletteSize: 3, paletteLead: 1, transition: 30,
+          paletteSize: 5, paletteLead: 1, transition: 30,
           settings: { dyeBudget: 0.9, turbulenceScale: 0.55, audioImpact: 0.65, beatSqueeze: 0.6 },
         }),
         s('Settle', 60, {
-          paletteSize: 2, paletteLead: 2, transition: 30,
+          paletteSize: 3, paletteLead: 3, transition: 30,
           settings: { dyeBudget: 0.55, turbulenceScale: 0.25, audioImpact: 0.4, bubbles: 0.25, plateRock: 0.25, beatSqueeze: 0.3 },
         }),
       ],

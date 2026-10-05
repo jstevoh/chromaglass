@@ -2134,6 +2134,76 @@ The plan as written before it was built:
   punches a hole where it lands. Both are in the phone's bottle picker and on MIDI,
   like every other bottle.
 
+### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
+
+- **What was reported** (the owner, 2026-10-04): "in general there just aren't enough
+  colors in the presets. I want a lot of color subtlety between color gradients."
+- **What was measured** (the lab, each look's own dyes on one seeded, sheared plate,
+  rendered through the plate shader; distinct colours are 5° of hue by four steps of
+  saturation and of value, each holding 0.1% of the lit pixels): three causes.
+  - *Two dyes on the plate.* Most looks carried two or three dyes, from §10's "2–3 hues
+    a frame", and the hue walk shows one fewer than the set (`harmonyFromContract`), so
+    most looks had two dyes on the plate at once; a look without the walk drew three.
+  - *Perfect filters.* `addDensity`, the splat records and the picture pour read a
+    palette colour as the dye's transmission with a floor of 0.002, and half the
+    palette sits on the gamut's corners, a channel at 0 and one at 1. That is a filter
+    that passes all or nothing of each band, which has one colour at every depth
+    (1ⁿ = 1, 0ⁿ = 0): each pool was one flat colour from rim to core, Transmission
+    could only change its opacity (on Classic's plate, Transmission at 1 alone: 68
+    distinct colours to 66), and a sixth of a blocking dye in a mixture killed a
+    channel (the hue change bunched 43–51% into the outer fifth of a mix of yellow and
+    hot pink, amber and hot pink, purple and blue, orange and red).
+  - *A grade that clips.* The saturation grade (1.45 on most looks) clamped each channel
+    on its own: with it at 1, Classic's plate showed 75 colours against 62, Velvet
+    Underground's 79 against 57.
+  - Not the cause: the gooey edge (no consistent change), and the mixing law itself
+    (geometric mean of transmissions, which is the physics).
+- **Shipped** (#281): the dye's absorbance is a real dye's, held between 4% and 96%
+  transmission per band at one unit (`src/lib/dye.ts`, every place a poured colour becomes
+  dye: drops, strokes, the picture pour, the CPU engine; a colour clear in every band,
+  white, stays clear liquid; the bead drops' own lens colour in `plate.ts` already had a
+  4% floor and keeps its own conversion);
+  Transmission's default is 1, so the colour follows the dye's depth (Beer–Lambert:
+  thin washes pale, deep pools saturate and their hue shifts, a deep yellow amber, a
+  deep pink crimson); 27 of the 41 looks carry five to seven dyes as a family of
+  neighbouring hues and an accent, and five are on the plate at once (`WORKING_DYES`,
+  `dyesOnPlate`); the grade pushes
+  along the line from grey and eases in before the gamut's edge, so it keeps the hue.
+  What that push cannot give, a second push about the brightest channel gives (the
+  others spread from it as far as the old clamped push spread them, easing in before
+  the dimmest reaches 0; spread by the whole push, a faintly tinted white paper went
+  pink and `npm run benday` read 20% white where it asks 60%), so a colour already at
+  the edge is still deepened and the hue still kept: without it the glints at the feet
+  of Magnet Garden's domes stayed bright and `npm run spikes` failed on the Mac (16 tops
+  lit against 4.0 places off them in the lab, 0.5 on main and with the second push).
+  Ink lays 0.3 a drop where it laid 0.25: with a red that is no longer a perfect filter,
+  a drop of Cherry Red into a yellow plate read 1.48 times as red as green against
+  `npm run plate`'s bar of 1.5 (that check now uses the app's conversion, not its own copy).
+  The Slow Build sequence opens on one of Classic's dyes, then three, then five. The phone
+  draws the same plate and palettes. `npm run colours` (CI, open shard) holds
+  it (9 checks; 2 of them pass on the old plate, the presence ones): most looks five dyes
+  or more and five on every six-dye plate, six dyes strictly paler thin and more
+  saturated deep (old: 0.95/0.99/0.98 for yellow, now 0.69/0.96/1.00), a pure blue
+  letting 4.2% of red and green through (old 0.2%), a deep yellow toward orange from the
+  depth, four neighbouring pairs walking (net hue change in the outer tenth at each end
+  39–48% of the whole on the old dyes, 25–28% now, at most a third asked), the grade
+  within 3° of hue at the 95th percentile (old clamp 6.2°, now 0.3°).
+  Left as they were: Velvet Underground, Lumia, Cell Bloom and the Fillmores (areas of
+  their own, "More going on in every look"), Sensual Laboratory (on the lamp, #262),
+  Clock Glass and the ferrofluid looks (their own pass), Roy's three inks, and the looks
+  whose liquids or chemistry make the colour. Judging: docs/judging.md §37 (the owner's eyes
+  on every look, on the Mac).
+  `npm run mixer` read the back plate's dye as the pixels adding it at full level moved;
+  a deep pool of a dark dye now draws near black and adding it moves nothing, so 150
+  covered pixels read as bare glass and Multiply darkening them (77 steps) failed the
+  check. The footprint is now also read from the plate drawn flat (Transmission 0, same
+  coverage): worst 0 off the dye, 68/68, bounds unchanged.
+- **Across the looks** (the survey above, every look before and after, its own dyes,
+  as many as its plate shows at once): the 27 widened looks went from a median of 65
+  distinct colours and 19 hue bins to 101 and 25 (Classic 65 → 100, Galaxy 27 → 72,
+  Stardust Collapse 21 → 127, Soap Film 63 → 136); the 14 left alone from 54.5 to 62.5,
+  from the dye and the grade alone.
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,

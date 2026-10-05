@@ -895,6 +895,15 @@ export const PRESETS: Preset[] = [
     name: 'Poster, 1969',
     description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: orange against ultramarine, the colours that vibrate.',
     settings: {
+      /*
+        Its print's grain stays a texture, not flecks, at the half it had:
+        with the dye's depth drawn (Transmission 1, PLAN 18l) the pigment's
+        grain varies the depth of this poster's strong, saturated inks on the
+        lamp, and each ±40% of depth swings their colour far enough to fleck
+        the edges (in npm run grainedge, 4.1% of the edges' pixels flecks, the
+        line asks under 2%; 0.6% at 0.5). PLAN 18l-7.
+      */
+      transmission: 0.5,
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
       globalSpeed: 0.0126,
@@ -1845,6 +1854,17 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.5,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
+      /*
+        The plate's domes read by the white point on each top against the
+        gold water round them. With the dye's depth drawn (Transmission 1,
+        the default since PLAN 18l) the thin gold between the domes goes
+        pale, as a thin wash of a dye does, and on this plate bright enough
+        to rival the points: in npm run spikes 7.8 of the places half a
+        pitch off the tops lit against 16 tops, where at 0.5 it is 4.0
+        against 16. The ferrofluid looks have their own pass (PLAN 18l-5);
+        until then this one keeps the half it had.
+      */
+      transmission: 0.5,
       saturationBoost: 1.4,
       dyeBudget: 1.0,
       glossiness: 0.2,
@@ -2110,6 +2130,11 @@ export const PRESETS: Preset[] = [
         Nothing that shades: no gloss, no hot-spot, no second lamp, no
         bubbles or beads, because a print has no light in it.
       */
+      // Flat inks: a comic is printed in solid colour, so the depth ramp
+      // every other look now draws (Transmission 1, PLAN 18l) is held at the
+      // old half, and the print's dots stay the screen's (in npm run benday,
+      // 88% of the dots held under a turn at 1, against its 90%).
+      transmission: 0.5,
       benDay: 1,
       globalSpeed: 0.0105,
       surge: 0.45,

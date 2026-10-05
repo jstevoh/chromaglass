@@ -247,6 +247,17 @@ const shots = await page.evaluate(async (controls) => {
   const base = { layerCount: 2, filmMix: 0.9, markMix: 1, markX: 0.5, markY: 0.5, markScale: 0.6, beads: 0, lampHotspot: 0, secondLamp: 0, microDroplets: 0, lampWarmth: 0, dishVignette: 0 };
   const all = { film, mark, backPlate: true, backRotation: Math.PI };
   const shot = (set, cam = all) => lab.render(S, { ...base, ...set }, cam);
+  /*
+    The front plate alone, for the grades (section 3), at Transmission 0.5:
+    the picture their bars were measured on. With the dye's depth drawn
+    (Transmission 1, the default since PLAN 18l) the thin dye on this plate
+    goes pale and the picture brightens (its brightest tenth 146 -> 198 of
+    255), and contrast at 1.8 about mid-grey then carries that tenth into
+    white, where the screen and not the control caps the spread: 1.30 times
+    against 1.50 at 0.5, measured. The grades are the mixer's; how deep a
+    dye draws is not theirs to answer for (PLAN 18l-6).
+  */
+  const GRADED = { layerCount: 1, filmMix: 0, markMix: 0, transmission: 0.5 };
   const out = {
     S,
     def: await shot({}),
@@ -258,14 +269,14 @@ const shots = await page.evaluate(async (controls) => {
     markUnderFilm: await shot({ mixOrder: 'led gel lumia front back mark film' }),
     onePlate: await shot({ layerCount: 1 }, { film, mark, backRotation: Math.PI }),
     oneBackOff: await shot({ backLevel: 0 }),
-    frontOff: await shot({ frontLevel: 0, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    bare: await shot({ layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    frontOff: await shot({ frontLevel: 0, ...GRADED }, {}),
+    bare: await shot({ ...GRADED }, {}),
     filmDark: await shot({ filmBright: 0 }),
-    frontHalf: await shot({ frontBright: 0.5, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontContrast: await shot({ frontContrast: 1.8, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontGrey: await shot({ frontSat: 0, saturationBoost: 1, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontFlat: await shot({ saturationBoost: 1, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    frontHue: await shot({ frontHue: 120, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    frontHalf: await shot({ frontBright: 0.5, ...GRADED }, {}),
+    frontContrast: await shot({ frontContrast: 1.8, ...GRADED }, {}),
+    frontGrey: await shot({ frontSat: 0, saturationBoost: 1, ...GRADED }, {}),
+    frontFlat: await shot({ saturationBoost: 1, ...GRADED }, {}),
+    frontHue: await shot({ frontHue: 120, ...GRADED }, {}),
     markDark: await shot({ markBright: 0 }),
     led: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0 }, {}),
     ledBeam: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'gel lumia front back led film mark' }, {}),
@@ -354,6 +365,21 @@ const shots = await page.evaluate(async (controls) => {
   out.blend.back.photoOwn = await shot({ ...ROWS.back.set, ...ROWS.back.on(0.6), renderStyle: 'photo' }, ROWS.back.cam);
   out.blend.back.photoAdd = await shot({ ...ROWS.back.set, ...ROWS.back.on(0.6), renderStyle: 'photo', backBlend: 'add' }, ROWS.back.cam);
   out.blend.back.photoNone = await shot({ ...ROWS.back.set, ...ROWS.back.off, renderStyle: 'photo' }, ROWS.back.cam);
+  /*
+    Where the back plate has dye at all, for the two checks of what its blend
+    leaves alone. They read it as the pixels that adding the plate at full
+    level moved (\`full\`), which held while a dye drew as its own colour at
+    any depth. Since the dye's depth is drawn (Transmission at 1, PLAN 18l) a
+    deep pool of a dark dye is near black, as a deep dish of it is, and adding
+    near black moves nothing: those pixels read as bare glass while the plate
+    covers them, and Multiply, which darkens by the plate's coverage, darkened
+    them by up to 77 steps, measured, and paper's Own and Add parted by 88.
+    That is the blends doing what they should where there is dye. So the dye's
+    footprint is read from the same plate drawn flat (Transmission 0: every
+    pool its one unit's colour, as it was always drawn), whose coverage, the
+    alpha, is the same; the checks' bounds are as they were.
+  */
+  out.blend.back.fullFlat = await shot({ ...ROWS.back.set, ...ROWS.back.on(1), backBlend: 'add', transmission: 0 }, ROWS.back.cam);
 
   // Every control, moved off its rest, in a scene where its source is on the wall.
   const lit = { ledPlatform: true, ledMode: 'rainbow', gelWheel: 0.6, lumia: 0.6 };
@@ -727,7 +753,7 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
       if (d < -15) darker++; else if (d > 6) lighter++;
     }
     // And where it has none, nothing: a multiply by its level alone would darken the bare glass too.
-    const bare = diff(b.multiply, b.c, (x, y) => px(b.full, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1));
+    const bare = diff(b.multiply, b.c, (x, y) => [b.full, b.fullFlat].every(s => px(s, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1)));
     check('and multiply darkens what is under it where it has dye, and lightens nothing, and leaves the rest',
       n > 200 && darker > 0.8 * n && lighter === 0 && bare.n > 1000 && bare.max <= 1,
       `${darker} of ${n} px darker, ${lighter} lighter; worst ${bare.max} over ${bare.n} px without its dye`);
@@ -741,7 +767,7 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
   {
     const b = shots.blend.back;
     const dyed = (x, y) => px(b.full, x, y).some((v, i) => v - px(b.c, x, y)[i] > 20);
-    const bare = (x, y) => px(b.full, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1);
+    const bare = (x, y) => [b.full, b.fullFlat].every(s => px(s, x, y).every((v, i) => Math.abs(v - px(b.c, x, y)[i]) <= 1));
     const onDye = diff(b.photoAdd, b.photoOwn, dyed), offDye = diff(b.photoAdd, b.photoOwn, bare), lit = diff(b.photoOwn, b.photoNone, dyed);
     // Off the dye is where adding the plate at full level moved no channel a
     // step, which still leaves a sliver of coverage: there Add (c + a·s) and

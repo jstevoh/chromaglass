@@ -139,6 +139,7 @@
     "grainedge": "node scripts/grainedge.mjs",
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
+    "colours": "node scripts/colours.mjs",
     "lace": "node scripts/lace.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
     "beams": "node scripts/beams.mjs",

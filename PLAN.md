@@ -18,7 +18,7 @@ screen capture.
 **The show.** Twenty-odd filmed liquid light shows, from the Joshua Light Show's 1969
 *Liquid Loops* to a band's show in 2023, were measured with the watch tool
 (`npm run watch`) on 2026-09-26. Real shows move in swells and scenes, spend a third
-or more of the time near black, hold two or three hues a frame, and do not follow the
+or more of the time near black, hold two or three hues a frame (the owner wants more, 18l), and do not follow the
 kick. Ours is equally busy all the time, which `src/lib/phrasing.ts` measured and
 stopped short of fixing. Batch 10 is that thread; its yardstick is the table there.
 
@@ -1222,7 +1222,7 @@ The yardstick, measured on the footage at four samples a second:
 | Scene change | every 15–30 s |
 | Share of time calm | 20–40 % |
 | Near-black | 30–60 % on average, ranging from 3 % to 90 % over a set |
-| Hues in a frame | 2–3, one family leading, the family changing by scene |
+| Hues in a frame | 2–3, one family leading, the family changing by scene (the owner, 2026-10-04, wants more: five dyes of a family on the plate, 18l) |
 | Motion against loudness | r ≈ 0 at the beat; about 0.4 over 20 s windows |
 | Edges | two regimes: soft washes under 1 %, sharp drop and cell fields about 15 % |
 | Hard cuts | none |
@@ -3499,6 +3499,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
 | 18k | Smaller ones | Small | Free to small | See each |
+| 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
 
 ### 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 **Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -4027,6 +4028,49 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **The ferrofluid's spikes are placed** on a fixed hexagonal lattice
   (`src/gpu/wgsl/spikes.ts`) rather than emerging from the Rosensweig instability.
   Noted for the ferrofluid thread (9f onward), not audited further here.
+
+### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
+**Partly shipped**: finite dyes, depth drawn, the hue-keeping grade and five dyes on the plate (#281). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+- **18l-4. Three widened looks read fewer colours on the survey's plate:** Acid Trip
+  (146 → 138; its exclusion blend inverts where dyes overlap), Fractal Dream (42 → 38)
+  and Sunny Side Up (92 → 79). Look at them on the Mac (judging §37) and reorder or
+  trim their families if they read muddier.
+- **18l-5. Magnet Garden keeps Transmission 0.5.** With depth drawn the thin gold
+  between its ferrofluid domes goes pale and rivals the white points on their tops
+  (`npm run spikes`: 16 tops lit against 7.8 places half a pitch off, where the check
+  asks for three times as many; 4.0 off at 0.5). The ferrofluid looks' own pass should
+  decide whether its water should be deeper or its points brighter at 1.
+- **18l-6. The mixer's grades are measured at Transmission 0.5.** At 1 the lab plate in
+  `npm run mixer` brightens (its brightest tenth 146 to 198 of 255) and contrast at 1.8
+  carries that tenth into white, so the spread reads 1.30 times against the bar's 1.3
+  (1.50 at 0.5). The grade shots pin 0.5; re-derive the contrast line on a plate whose
+  bright end has headroom at 1 (a dimmer lamp or a lower frontBright), then drop the pin.
+- **18l-7. Poster 1969 keeps Transmission 0.5.** At 1 the pigment's grain (#267) varies
+  the depth of its strong inks on the lamp enough to fleck the edges (`npm run grainedge`
+  4.1% of edge pixels, the line asks under 2%; 0.6% at 0.5). Decide with the grain's
+  owner whether a deep ink's grain should swing its colour less, then drop the pin.
+  (`npm run royopen`'s black control is now scaled to an opaque ink, since a dye's
+  strongest band passes 4% a unit: at that strength the control printed dark grey.)
+- **18l-1. Real dye spectra (the shortcut kept).** Still three bands: a dye's colour is
+  three transmissions, and the 4%/96% limits stand in for the tails of a real absorption
+  band. Spectral Optics' six bands cannot reproduce the palette's saturated colours (its
+  bands are too wide: hot pink comes out 0.66/0.32/0.41), so it is no replacement as
+  it stands. The real thing is each dye's absorption spectrum (smooth bands, fitted so
+  the dye at one unit is its palette colour) mixed wavelength by wavelength and summed
+  through the CIE matching functions, which turns yellow over blue green as paint does;
+  it needs either more dye channels in the solver or a smooth three-coefficient basis
+  for the absorbance that stays closed under mixing.
+- **18l-2. The packed dye caps absorbance at 8.** `packDye` stores each channel
+  √(d/8) in 8 bits and clamps at 8, so a dense pool of a dye that blocks a band
+  (absorbance 3.2 per unit now, 6.2 before) saturates that channel's store at a density
+  of 2.5 and the decode's per-unit colour lets the band back in. Belongs with 14i's
+  float dye for the plate (and the pixelation work, #267).
+- **18l-3. The thin floor.** The decode still clamps the depth it draws at 0.35 to 4,
+  so the thinnest wash is not paler than a third of a unit and the deepest core not
+  deeper than four; inside that range the colour is the stored absorbance exactly. A
+  thinner floor reads as a milky halo on the black ground; on the lamp ground (18b) the
+  depth is not clamped.
 
 ### Kept, named as dials or looks
 

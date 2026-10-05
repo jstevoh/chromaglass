@@ -6,10 +6,11 @@
  * solver turns the list into full-resolution deltas in one dispatch
  * (`wgsl/splat.ts`).
  *
- * Colour is stored the way `addDensity` stores it — Scott Burns absorption,
- * −log(channel) weighted by how much dye lands — so the mixing is the mixing
+ * Colour is stored the way `addDensity` stores it — the dye's absorbance
+ * (`lib/dye.ts`) weighted by how much dye lands — so the mixing is the mixing
  * the plate has always done.
  */
+import { dyeAbsorbances } from '../lib/dye';
 
 /** Floats per record; four vec4s (see `Splat` in wgsl/splat.ts). */
 export const SPLAT_FLOATS = 16;
@@ -70,11 +71,11 @@ export class SplatList {
     const i = this.n * SPLAT_FLOATS;
     const amount = o.amount ?? 0;
     const [r, g, b] = o.colour ?? [1, 1, 1];
-    const eps = 0.002;
     d[i] = x; d[i + 1] = y; d[i + 2] = radius; d[i + 3] = kind;
-    d[i + 4] = amount * -Math.log(Math.max(eps, r));
-    d[i + 5] = amount * -Math.log(Math.max(eps, g));
-    d[i + 6] = amount * -Math.log(Math.max(eps, b));
+    const [ar, ag, ab] = dyeAbsorbances(r, g, b);
+    d[i + 4] = amount * ar;
+    d[i + 5] = amount * ag;
+    d[i + 6] = amount * ab;
     d[i + 7] = amount;
     d[i + 8] = o.vx ?? 0; d[i + 9] = o.vy ?? 0; d[i + 10] = o.temp ?? 0; d[i + 11] = o.gap ?? 0;
     d[i + 12] = o.mul ?? 1; d[i + 13] = FALLOFF[o.falloff ?? 'flat']; d[i + 14] = ex; d[i + 15] = ey;

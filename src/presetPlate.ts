@@ -13,32 +13,68 @@ import { DEFAULT_LIQUID_TYPES } from './types';
 import type { PhasePourShape } from './lib/phasePour';
 
 // ─── Palette contracts ───────────────────────────────────────────────
-// A projected clock face carries two or three dyes, and the richness of a
-// show comes from stacking plates, not from rainbow dye. Each preset names the
-// palette indices it may use; seeding, automation, beat injection and the
-// slow harmony rotation all pick from inside that set. A user's palette lock
-// still wins outright.
+// Each preset names the palette indices it may use; seeding, automation,
+// beat injection and the slow harmony rotation all pick from inside that
+// set. A user's palette lock still wins outright.
+//
+// Most looks carry five or six dyes, as a family of neighbouring hues and an
+// accent, in the order the hue walk visits them (PLAN 18l). They carried two
+// or three, from the rule that a projected clock face shows two or three hues
+// a frame (the show research of 2026-09-26, PLAN §10), and the hue walk shows
+// one fewer than the set, so most looks had two dyes on the plate at once;
+// the owner (2026-10-04): "there just aren't enough colours in the presets. I
+// want a lot of colour subtlety between colour gradients." Neighbours, not a
+// rainbow, because the dye mixes like filters: two neighbours meeting make
+// the hues between them, two opposites meeting make mud, so a family gives a
+// meeting of colours many in-between hues and the accent one dark seam.
+// Left as they were: the looks other work owns (Velvet Underground, Lumia,
+// Cell Bloom and the Fillmores get areas of their own; Sensual Laboratory is
+// on the lamp; Clock Glass and the ferrofluid looks have their own pass),
+// Roy's three printing inks, and the looks whose liquids or chemistry make
+// the colour (Oil & Water, Red Cabbage, Chemical Clock).
+/*
+  How many of a look's dyes are on the plate at once, when nothing narrower
+  is asked for (the sequencer's window, or the hue walk's one fewer than the
+  set): `harmonyWithin` and `windowOf` in the visualizer. It was three, from
+  the same two-or-three-hues rule; with five or six dyes to a family, three
+  would hide half of each, and the in-between hues come from neighbours
+  meeting on the plate.
+*/
+export const WORKING_DYES = 5;
+
+/**
+ * How many of a contract's n dyes are on the plate at once with nothing
+ * narrower asked for: with the hue walk on, one fewer than the set (so the
+ * walk shows), at least two and at most WORKING_DYES; with it off, the set,
+ * at most WORKING_DYES. `harmonyFromContract` in the visualizer draws this
+ * many, and `npm run colours` reads it per look.
+ */
+export function dyesOnPlate(n: number, journeyOn: boolean): number {
+  if (journeyOn && n >= 3) return Math.min(WORKING_DYES, Math.max(2, n - 1));
+  return Math.min(n, WORKING_DYES);
+}
+
 export const PRESET_CONTRACTS: Record<string, number[]> = {
-  'classic':            [0, 2, 8],           // yellow, pink, blue: also the picture npm run fx measures, so it stays put
-  'galaxy':             [18, 23, 16],
-  'deep-ocean':         [16, 22, 7, 19],
-  'cyberpunk':          [20, 16, 6],
-  'acid-trip':          [18, 21, 6, 20],
-  'bass-drop':          [4, 18, 7],
-  'timbre-shifter':     [23, 16, 17],
-  'boiling-point':      [6, 19, 17],
-  'microscopic-chaos':  [20, 10, 18],
-  'aurora-borealis':    [19, 6, 23, 16],   // jade, lime and lavender: greens and a violet, as the sky has
-  'solar-flare':        [17, 21, 4],
-  'jellyfish-bloom':    [20, 23, 16],
-  'fractal-dream':      [17, 20, 16],
+  'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
+  'galaxy':             [18, 23, 10, 8, 16, 7],
+  'deep-ocean':         [16, 19, 7, 9, 22, 18],
+  'cyberpunk':          [20, 2, 10, 18, 16, 6],
+  'acid-trip':          [18, 20, 2, 21, 17, 6],
+  'bass-drop':          [4, 11, 20, 18, 9, 7],
+  'timbre-shifter':     [23, 10, 16, 7, 17, 21],
+  'boiling-point':      [6, 5, 19, 16, 17, 0],
+  'microscopic-chaos':  [20, 2, 10, 23, 18, 8],
+  'aurora-borealis':    [19, 5, 6, 16, 7, 23, 10], // greens through ice to a violet, as the sky has
+  'solar-flare':        [17, 0, 1, 21, 3, 4],
+  'jellyfish-bloom':    [20, 2, 23, 10, 16, 7],
+  'fractal-dream':      [17, 21, 20, 10, 16, 19],
   'velvet-underground': [18, 20, 11],
-  'neon-coral-reef':    [21, 16, 17],
-  'stardust-collapse':  [15, 23, 17],
+  'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
+  'stardust-collapse':  [15, 23, 10, 17, 21, 7],
   'lumia':              [10, 7, 1],
   'sensual-laboratory': [14, 12],
-  'oil-wheel':          [17, 6, 18],
-  'poster-1969':        [1, 18],
+  'oil-wheel':          [17, 1, 6, 5, 18, 10],
+  'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-1969':      [1, 0, 3, 7, 5, 10],
   'fillmore-wash':      [5, 10, 9],
   // The dye mixes like filters, so a set is chosen for what its overlaps make:
@@ -48,32 +84,32 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'oil-and-water':      [17, 16],             // amber oil, teal water
   'red-cabbage':        [23, 10],             // the indicator itself: violet, and its deep purple
   'chemical-clock':     [7, 15],              // a pale dish for the reaction's own red and blue
-  'agate':              [12, 13],             // sienna and coffee, an agate's browns
+  'agate':              [12, 13, 17, 4],      // an agate's browns, its amber and its red bands
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
-  'home-movie':         [1, 21, 16, 17],       // the colours a Super 8 cartridge loved
+  'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
-  'oil-on-water':       [0, 1],
-  'colorful-cosmos':    [18, 20, 17],
-  'sunny-side-up':      [7, 10, 2],
+  'oil-on-water':       [0, 17, 1, 21],
+  'colorful-cosmos':    [18, 10, 20, 2, 17, 21],
+  'sunny-side-up':      [7, 23, 10, 20, 2],
   // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye. The three
   // used to share one warm set on three dark reds; each now has its own
   // ground and its own family, so the three read as three.
-  'macro-bead':         [16, 17, 21, 19],
+  'macro-bead':         [16, 19, 17, 21, 1, 7],
   'cell-bloom':         [20, 23, 18, 17],
-  'lace-run':           [17, 21, 4, 3],
-  // Six dyes rather than the usual two or three: the point of this one is that
-  // a person gets a colour of their own, and a crowd wants more than three.
+  'lace-run':           [17, 1, 21, 3, 4, 11],
+  // Six dyes of six families rather than one: the point of this one is that
+  // a person gets a colour of their own.
   'crowd-plate':        [17, 20, 16, 21, 18, 6],
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
-  'milk-marble':        [0, 2, 8, 6],
-  'soap-film':          [23, 20, 7],
-  'glycerine-drift':    [18, 20, 23, 21],
+  'milk-marble':        [0, 17, 2, 20, 8, 16, 6],
+  'soap-film':          [23, 20, 10, 7, 16, 17],
+  'glycerine-drift':    [18, 10, 20, 23, 21, 11],
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {

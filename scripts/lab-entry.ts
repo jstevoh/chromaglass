@@ -17,7 +17,8 @@ import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/deta
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
 import { clockGlassBodies, clockGlassCell } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
-import { phasePourShape, PRESET_CONTRACTS } from '../src/presetPlate';
+import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
+import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
 import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
@@ -228,6 +229,19 @@ const api = {
   clockGlassCell,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
+  /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */
+  dyeOf(rgb: [number, number, number]) { return dyeAbsorbances(...rgb); },
+  /** The palette, and each look's dyes with how many of them are on its plate at once (presetPlate.ts). */
+  palette() {
+    return {
+      colours: PALETTE_RGB.map(c => [c.r, c.g, c.b]),
+      looks: PRESETS.map(p => {
+        const c = PRESET_CONTRACTS[p.id];
+        const journey = ((p.settings.hueJourney ?? DEFAULT_SETTINGS.hueJourney) ?? 0) > 0;
+        return { id: p.id, dyes: c ? c.length : 0, onPlate: c ? dyesOnPlate(c.length, journey) : 0 };
+      }),
+    };
+  },
   /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */
   pour(shape: PhasePourShape, scale: number) {
     const drops = phasePour(shape, scale);

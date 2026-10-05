@@ -23,6 +23,7 @@
  */
 
 import { PRESETS } from '../src/presets.ts';
+import { dyeAbsorbance } from '../src/lib/dye.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR } from '../src/presetPlate.ts';
 import { PRESET_AREAS, plateAreas, areaForBand, areaDye, pointInArea, pickArea } from '../src/lib/plateAreas.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
@@ -240,7 +241,8 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // what is already there, so picking Cherry Red with Silicone selected painted
 // the plate's own colour back at you. It read as "red is broken".
 {
-  const ab = (v) => -Math.log(Math.max(0.002, v));
+  // The app's own conversion (lib/dye.ts), not a copy of it.
+  const ab = dyeAbsorbance;
   const YELLOW = [1, 0.92, 0], RED = [1, 0, 0];
   /** Cherry Red dropped into a plate of yellow at this density: does it read red? */
   const showsUp = (amount, plate = 2.0) => {

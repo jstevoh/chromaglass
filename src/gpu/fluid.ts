@@ -36,6 +36,7 @@ import { pressShare } from '../lib/pressRing';
 import { DISH_GAP_RANGE, OIL_NU, dragSeconds } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
+import { dyeAbsorbances } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 
 /*
@@ -1511,8 +1512,7 @@ export class WebGPUFluid {
    */
   depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
     if (amount <= 0) return;
-    const eps = 0.002;
-    const log = colour.map((c) => -Math.log(Math.max(eps, c)));
+    const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });
     this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, 0, 0, ...log, 0]));

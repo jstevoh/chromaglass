@@ -1023,6 +1023,23 @@ On the laptop's own microphone, in a quiet room (no music), with any look:
 - Then with music playing through speakers and Follow Beat on: ride a fader and
   pick tools through a chorus. The beat should carry on through the clicks.
 - On the phone, on its microphone: tap tools and the Amount slider. Same as above.
+## 37. More colours, and the hues between them (PLAN 18l)
+
+Every look except Velvet Underground, Lumia, Cell Bloom, the Fillmores, Sensual
+Laboratory, Clock Glass, the ferrofluid looks, Roy and the three chemistry and liquid
+looks now carries five or six dyes of one family (Classic: yellow, amber, hot pink,
+magenta, ultramarine, blue), and five are on the plate at once. Each dye now changes
+with depth: a thin wash is a pale tint of it, a deep pool saturates, and a deep yellow
+goes amber, a deep pink crimson. Where two colours meet, the mixture should walk
+through the hues between them rather than switching.
+
+- Play Classic, Galaxy, Acid Trip, Solar Flare and Oil Wheel for a minute each. Count
+  the colours on the plate at once; it was two in most looks.
+- Look inside a pool, rim to core: a ramp of one colour, not a flat disc.
+- Where two neighbouring colours meet: a band of in-between hues, not a seam.
+- If a look now reads muddy (opposite colours meeting go dark), or too pale at its thin
+  edges, say which; each look's dyes are a line in `src/presetPlate.ts`.
+- On the phone: the same looks show the same colours.
 
 ---
 

@@ -227,12 +227,12 @@ const SECTIONS: Section[] = [
         </P>
         <H>Palette contracts</H>
         <P>
-          A projected clock face carries two or three dyes. The richness of a real show
-          comes from stacking plates, not from rainbow dye — so each preset names the
-          handful of colours it may use, and everything that adds colour stays inside that
-          set: seeding, automation, beat hits, the slow harmony rotation, a song's
-          identity. <Em>Crowd Plate</Em> is the exception at six, because a crowd wants more
-          colours to hand out than a clock face does.
+          Each preset names the colours it may use, and everything that adds colour stays
+          inside that set: seeding, automation, beat hits, the slow harmony rotation, a
+          song's identity. Most carry five or six dyes of one family of neighbouring hues
+          and an accent, with five on the plate at once: neighbours meeting make the hues
+          between them, where opposites meeting make mud. A few looks keep two or three,
+          where their liquids, their chemistry or their print make the colour.
         </P>
         <Rows items={[
           ['Hue Journey', <>Settings → Show. Minutes per step. The set drifts its colours over the length of a set, one dye draining as the next arrives, never a jump. At zero the old behaviour stays: a re-pick every forty-five seconds or so.</>],

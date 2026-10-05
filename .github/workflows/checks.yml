@@ -707,6 +707,12 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # More colours (PLAN 18l): most looks carry five dyes and five are on the
+      # plate; a dye is paler thin than deep and a deep yellow turns orange; two
+      # neighbouring dyes meeting walk between their hues; the grade keeps hue.
+      - name: Enough colours, and the hues between them
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run colours
       # A clear film that tears (PLAN 20b): the film's volume kept, a thick film
       # whole and a thin dusty one torn into holes of every size by the physics
       # alone, a drop of solvent opening a growing hole, white over the colour
