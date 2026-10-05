@@ -1803,11 +1803,13 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
 
   - its key: dark is black ink, and anything lit is paper with ink on it.
     Lichtenstein has no shading, so the key is a step, not a ramp;
-  - its ink: whichever of the three process inks (BENDAY_RED, _YELLOW,
-    _BLUE) its hue is nearest, at full strength. Taking the pixel's own hue
-    instead was the first try, and it printed the plate's gradients as
-    gradients (red running through orange into yellow across one pool) and
-    the tints as rainbow dots, which is a photograph, not a print;
+  - its ink: whichever of the look's inks (BENDAY_RED, _YELLOW, _BLUE) its
+    hue is nearest, at full strength, or, where the hue is far from all three,
+    two of them printed over each other (benDayInkIndex): green and violet.
+    Taking the pixel's own hue instead was the first try, and it printed the
+    plate's gradients as gradients (red running through orange into yellow
+    across one pool) and the tints as rainbow dots, which is a photograph,
+    not a print;
   - its coverage: how much of the pixel is that ink rather than paper,
     (max - min) / max. Little is bare paper, some is the tint (the dots) and
     most is the solid ink.
@@ -1837,22 +1839,91 @@ const BENDAY_SOLID: f32 = 0.62;
 const BENDAY_RED = vec3f(0.89, 0.1, 0.12);
 const BENDAY_YELLOW = vec3f(1.0, 0.86, 0.06);
 const BENDAY_BLUE = vec3f(0.08, 0.33, 0.78);
-fn chromaDir(c: vec3f) -> vec3f { return normalize(c - vec3f((c.r + c.g + c.b) / 3.0)); }
-/** Which of the three inks a colour's hue is nearest: 0 red, 1 yellow, 2 blue. */
+/*
+  Green and violet, as a printer made them (QA-16).
+
+  The owner, 2026-10-04, from the corner dot on Roy: a green dye "cannot be
+  added", it prints as another colour. Snapping every hue to the nearest of
+  three inks put a green (120 degrees, the yellow ink is at 52 and the blue
+  at 219) on the yellow, and a teal or a violet on the blue: there was no
+  green on the press at all.
+
+  A comic had no green ink either. It was printed in transparent process
+  inks over white paper, and a colour the press had no ink for was two inks
+  laid over each other, each a filter on the light the paper sends back, so
+  the overprint is their product. The look's three inks are themselves such
+  overprints: its red is magenta over yellow and its blue is cyan with
+  magenta over it. So the two missing inks are divided out of them: the
+  magenta is RED / YELLOW, (0.89, 0.116, 2.0) clipped to what a filter can
+  pass, and the cyan is BLUE / magenta, (0.09, 2.8, 0.78) clipped the same
+  way (the look's blue lets through more green than a full magenta would,
+  which is the half-strength magenta a comic's blue was). Green is then that
+  cyan over the yellow, a clean bright green (0.09, 0.86, 0.05), and not the
+  look's blue over its yellow, (0.08, 0.28, 0.05), which is olive going on
+  black: the blue already carries the magenta that kills a green, and that
+  is why the obvious overprint was not taken. Violet is the magenta with
+  the cyan at half, the colourist's chart's 100 % magenta and 50 % cyan,
+  laid flat at the colour it reads as from a step back rather than as a
+  second screen of dots over the magenta (PLAN 21f).
+
+  Which hues take an overprint is how far they are from the inks: within
+  BENDAY_OWN of an ink, the ink alone, as before; past it from both inks
+  either side, the two together. The red and yellow inks are 53 degrees
+  apart, so no hue between them is past 40 degrees from both: an orange
+  still prints red or yellow, Roy's red-against-yellow seams are what they
+  were, and red over yellow would only have printed red again (the red ink
+  passes almost no green for the yellow to keep). Between yellow and blue
+  (167 degrees) everything from a lime to a turquoise prints green; between
+  blue and red (139) a purple or a magenta prints violet. A cyan, 39 degrees
+  from the blue, stays blue, and a pink stays red.
+*/
+const BENDAY_MAGENTA = vec3f(0.89, 0.116, 1.0);
+const BENDAY_CYAN = vec3f(0.09, 1.0, 0.78);
+const BENDAY_GREEN = BENDAY_CYAN * BENDAY_YELLOW;
+const BENDAY_VIOLET = BENDAY_MAGENTA * mix(vec3f(1.0), BENDAY_CYAN, 0.5);
+/* The inks' own hues, as benDayHue reads them, folded when the shader compiles. */
+const BENDAY_RED_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_RED.g - BENDAY_RED.b), BENDAY_RED.r - 0.5 * (BENDAY_RED.g + BENDAY_RED.b)));
+const BENDAY_YELLOW_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_YELLOW.g - BENDAY_YELLOW.b), BENDAY_YELLOW.r - 0.5 * (BENDAY_YELLOW.g + BENDAY_YELLOW.b)));
+const BENDAY_BLUE_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_BLUE.g - BENDAY_BLUE.b), BENDAY_BLUE.r - 0.5 * (BENDAY_BLUE.g + BENDAY_BLUE.b)));
+/** How near an ink's hue (in degrees) a colour prints in that ink alone. */
+const BENDAY_OWN: f32 = 40.0;
+/** A colour's hue round the colour wheel, in degrees from red toward green. */
+fn benDayHue(c: vec3f) -> f32 {
+  return degrees(atan2(0.8660254 * (c.g - c.b), c.r - 0.5 * (c.g + c.b)));
+}
+/** How far apart two hues are round the wheel, in degrees, 0 to 180. */
+fn benDayApart(a: f32, b: f32) -> f32 {
+  let d = abs(a - b) % 360.0;
+  return min(d, 360.0 - d);
+}
+/**
+ * Which ink a colour prints in: 0 red, 1 yellow, 2 blue, and the overprints
+ * 3 green (between yellow and blue) and 4 violet (between blue and red).
+ */
 fn benDayInkIndex(hue: vec3f) -> f32 {
-  let a = hue - vec3f((hue.r + hue.g + hue.b) / 3.0);
-  let r = dot(a, chromaDir(BENDAY_RED));
-  let y = dot(a, chromaDir(BENDAY_YELLOW));
-  let b = dot(a, chromaDir(BENDAY_BLUE));
-  if (r >= y && r >= b) { return 0.0; }
-  if (y >= b) { return 1.0; }
+  let h = benDayHue(hue);
+  let r = benDayApart(h, BENDAY_RED_HUE);
+  let y = benDayApart(h, BENDAY_YELLOW_HUE);
+  let b = benDayApart(h, BENDAY_BLUE_HUE);
+  let near = min(r, min(y, b));
+  if (near > BENDAY_OWN) {
+    // Past every ink's own reach: the two inks either side of it. The red
+    // and yellow are too close for a hue between them to get here, so it
+    // is green beside the yellow and violet beside the red.
+    if (y < r) { return 3.0; }
+    return 4.0;
+  }
+  if (r <= y && r <= b) { return 0.0; }
+  if (y <= b) { return 1.0; }
   return 2.0;
 }
 fn benDayInk(hue: vec3f) -> vec3f {
   let i = benDayInkIndex(hue);
   if (i < 0.5) { return BENDAY_RED; }
   if (i < 1.5) { return BENDAY_YELLOW; }
-  return BENDAY_BLUE;
+  if (i < 2.5) { return BENDAY_BLUE; }
+  if (i < 3.5) { return BENDAY_GREEN; }
+  return BENDAY_VIOLET;
 }
 /*
   The outline of the front plate's shapes, as thick as a pen's line.

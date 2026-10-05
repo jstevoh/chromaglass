@@ -488,7 +488,8 @@ jobs:
   # waited a mean 21 to 31 minutes for one (`npm run macqueue`). So the
   # shards are kept even, the longest about eleven and a half minutes by the
   # medians then (tools 13.2 → about 9.8 without the phone's fingers, open
-  # 7.8 → about 11.2 with them, plate 11.2 → about 10.2 without the mixer
+  # 7.8 → about 11.2 with them, which grew to 18.7 by 2026-10-04 and sent
+  # the fingers on to show, PLAN.md 19r; plate 11.2 → about 10.2 without the mixer
   # and 11.3 with #218's Ben-Day print (63 s on its PR's runs), show 8.8 →
   # about 9.8 with the mixer), and they do not run at all for a change
   # that reaches none of them (the `reach` job above).
@@ -708,11 +709,24 @@ jobs:
       - name: A clear film that tears
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lace
+      # Clock Glass (PLAN 4a-clock): its dish holds several colours apart, in
+      # bodies of oil that keep the colour laid in them, where the old lay was
+      # one blended disc. Two 192² plates of 300 steps; in the open shard, as
+      # the plate shard is near its timeout.
+      - name: Clock Glass keeps its colours apart
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run clockglass
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run benday
+      # Roy opens as a panel: the app's own seed for the look, printed by the
+      # lab, is paper and three inks with fields of dots, not a black stain.
+      # In the open shard: the plate shard is near its timeout.
+      - name: Roy opens as a panel
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run royopen
       # The mixer: each source moved lands only where that source is (the
       # film under the back plate, the logo under the film), the LED ring
       # passes the front plate from lamp to beam, every grade does what its
@@ -880,12 +894,16 @@ jobs:
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.
-      # On the open shard, after the startup check has had its cold cache:
-      # about three and a half minutes, which put the tools shard at a median
-      # 13.2 and at most 15.6 against its 15-minute timeout on 2026-10-03,
-      # where open finished in 7.8 (PLAN.md 19h).
+      # On the show shard: about four and a half minutes. It left the tools
+      # shard on 2026-10-03 (a median 13.2 and at most 15.6 against its then
+      # 15-minute timeout, PLAN.md 19h) for open, where open finished in 7.8.
+      # Open has gathered eight checks since and on 2026-10-04 ran 17.4 to
+      # 18.7 minutes green against its 20, with one run killed by the
+      # timeout inside this step (#280); show ran 8.9 to 10.7. Here open is
+      # about 14 and show about 15 (PLAN.md 19r). Nothing on show needs a
+      # cold shader cache, so the fingers warming it costs no check.
       - name: The phone's fingers
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: PHONE_GPU=1 node --experimental-strip-types scripts/phone.mjs
 
       # A drop lands where it is dropped: on the Design desk, on either layer,
