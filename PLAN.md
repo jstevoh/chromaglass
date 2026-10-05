@@ -2750,6 +2750,16 @@ for, and the GPU was asked for only after they had arrived and drawn.
   pipeline is asked for? Its animations are the compositor's, but the compositor
   presents through the same GPU process that is starting; a screen recording of a
   cold load on the owner's Mac would say. A still picture is still not a black plate.
+- *The intro and the GPU device (14v-5, in progress).* Held still, the intro did not
+  end the startup red: #280's run (37252349929) stopped frames 2.50 s from 2.87 s with
+  the intro already still, on the opening's first compile (`fluid/fill:rgba32float`),
+  outside Chromium's hold. What changed with the intro is when the GPU device comes:
+  given 0.04 s after it was asked before the intro (#272's run), 1.7 to 2.6 s after
+  with it, so the first compile, which stops frames on a cold Metal cache in every
+  run (the `?prepare=0` control too), no longer falls inside the hold. Taken out:
+  the pools' `mix-blend-mode: screen`, a blended group the GPU process must build
+  a surface and compositing for as the page first paints. Whether that was it is the
+  Mac's "device asked, given" line.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
