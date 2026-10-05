@@ -318,6 +318,12 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # Hold stays where the closeup is (PLAN.md QA-12): the real closeup
+      # camera on a made-up plate, switched to Hold from Auto and from Follow,
+      # moves the frame on main's Hold and not on this one.
+      - name: Hold keeps the closeup
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run holdjump
       # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
       # src draws from Math.random outside a short allowlist of ids, and the
       # beads, bubbles, closeup camera, chemistry, palette and automation run

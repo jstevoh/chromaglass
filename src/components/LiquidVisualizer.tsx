@@ -768,6 +768,11 @@ export interface LiquidVisualizerHandle {
    * polls can take only the ones it has not seen.
    */
   songShape: () => SongShapeReport;
+  /**
+   * Where the closeup camera is pointed, in plate uv, or null while there is
+   * no closeup (MacroCamera.centre): what Hold aims at, so it stays put (QA-12).
+   */
+  macroCentre: () => { x: number; y: number } | null;
   /** Move the look's working dyes on by one, the way the hue journey would. */
   stepDyes: () => void;
   /** Where a paced scene is (`lib/scenePacing.ts`); the plate follows it at its own rate. 1 and 1 is no pacing. */
@@ -5540,6 +5545,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     },
     kicks: () => kickCountRef.current,
     songShape: () => ({ now: { ...songShapeRef.current.now }, bar: { ...barGridRef.current.now }, events: songEventsRef.current.slice() }),
+    // Off the closeup the camera is not running, and the centre it last had is
+    // from some earlier closeup: an aim written from it would move the aim the
+    // owner set to a place nobody is looking at.
+    macroCentre: () => (lastMacroOnRef.current ? macroCamRef.current.centre : null),
     pace: (sample) => { paceTargetRef.current = { activity: sample.activity, dim: sample.dim }; },
     pour: (gust = 0.8) => {
       const energy = Math.min(1, audioDataRef.current?.energy ?? 0);
