@@ -36,6 +36,8 @@
  * show it.
  */
 
+import { SPECIES_SECONDS } from './liquidProps.ts';
+
 /** How the four liquids write themselves into the field. */
 export interface LiquidDeposit {
   soap?: number;
@@ -58,6 +60,11 @@ export interface LiquidDeposit {
     it goes to the GPU's film, through `onDeposit`.
   */
   solvent?: number;
+  /** What the liquid is, in real units (LiquidBehaviour in src/types.ts, PLAN 18d): into the GPU's species field through `onDeposit`. */
+  viscosity?: number;
+  density?: number;
+  tension?: number;
+  index?: number;
 }
 
 /**
@@ -68,7 +75,7 @@ export interface LiquidDeposit {
  * are properties of a liquid that is still sitting there, so they last as long
  * as a plate of it plausibly would.
  */
-const DECAY_SECONDS = { soap: 6, body: 22, repel: 26, weight: 30, polarity: 30 };
+const DECAY_SECONDS = { soap: 6, body: SPECIES_SECONDS, repel: 26, weight: 30, polarity: 30 };
 
 /*
   The two forces the *kind* channels drive.
@@ -109,7 +116,10 @@ const FLOOR = 0.004;
  * gradient lasts until the soap has spread out.
  */
 const MARANGONI = 1.1;
-/** Drag added per unit of body, as a share of the local velocity per second. */
+/**
+ * Drag added per unit of body, as a share of the local velocity per second.
+ * Only where the GPU does not hold the liquid's own viscosity (`thickOnGpu`).
+ */
 const BODY_DRAG = 2.6;
 /** How much of the escaping flow a repelling liquid takes back, per unit of repel per second. */
 const EDGE_HOLD = 0.9;
@@ -294,6 +304,16 @@ export class LiquidPhase {
    * the same liquid on the same disc. Set by the plate.
    */
   onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number) => void;
+
+  /*
+    Set by the plate when the GPU carries each poured liquid's own viscosity
+    (a thin gap, PLAN 18d): its drag is then the real one, in the solve, and
+    the body's drag here, a drag against last frame's velocity added as a
+    delta, would be the same liquid made thick twice. The body itself is
+    still kept and faded, for the automation's headroom and for the old
+    plate, which has no viscosity a cell to give it.
+  */
+  thickOnGpu = false;
 
   deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1): void {
     this.onDeposit?.(cx, cy, radius, what, amount);
@@ -601,7 +621,7 @@ export class LiquidPhase {
         // ── Body: it crawls while the rest of the plate flows ──────
         // Drag against the velocity that is actually there, which is the one
         // thing a delta cannot express without being told what to oppose.
-        if (body > 0) {
+        if (body > 0 && !this.thickOnGpu) {
           const k = Math.min(0.9, body * BODY_DRAG * dt);
           fx -= plateVx[idx] * k;
           fy -= plateVy[idx] * k;

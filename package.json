@@ -134,6 +134,7 @@
     "presslift": "node scripts/presslift.mjs",
     "fingerflow": "node scripts/fingerflow.mjs",
     "forces": "node scripts/forces.mjs",
+    "thick": "node scripts/thick.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
     "benday": "node scripts/benday.mjs",

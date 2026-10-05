@@ -607,6 +607,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 4
         run: npm run forces
+      # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
+      # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
+      # colour, syrup in a thick look runs ahead of it, a liquid as thin as
+      # the plate's moves as colour alone, and the poured liquid is carried
+      # with its colour and kept.
+      - name: Each liquid is as thick as it is
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 4
+        run: npm run thick
       # And the GPU half of the same seed: seeded dye and bubbles through the
       # solver and the plate shader twice, the same bytes; another seed, not.
       # Then the built app: ?seed= reaches it, and it says which seed it is on.

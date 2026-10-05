@@ -33,7 +33,8 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, OIL_NU, dragSeconds } from '../lib/turntable';
+import { SPECIES_SECONDS } from '../lib/liquidProps';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { dyeAbsorbances } from '../lib/dye';
@@ -354,8 +355,10 @@ const MAX_SPEED = 0.002;
   about eight inches, 0.2 m, which puts the rest gap at 6 mm in the middle
   and the tightest the squeeze allows (0.004) at 0.8 mm. The same 0.03 is
   the unit the mobility is written in, so M is about c on an open plate.
+  The turntable's dish, because hsPrep reads the clear liquid's viscosity
+  back out of 12ν/W² with that width (PLAN 18d) and the two must agree.
 */
-const PLATE_METRES = 0.2;
+const PLATE_METRES = DISH_METRES;
 const REST_GAP = 0.03;
 /*
   The dish's rim, in plate widths from the middle: the plate's inscribed
@@ -692,6 +695,23 @@ export class WebGPUFluid {
   private liesLive = false;
   private mixLive = false;
   /*
+    The poured liquids that mix with the clear one (PLAN 18d,
+    src/lib/liquidProps.ts): share, Σ share·ln(ν/ν_water), Σ share·ρ,
+    Σ share·n, carried with the colour on a thin gap and read by hsPrep as
+    each column's own viscosity. Made at the first such pour; live until
+    the last has faded (speciesQuiet).
+  */
+  private species: PingPong | null = null;
+  private speciesLive = false;
+  /** Seconds since the last pour into the species field, so it can go quiet once faded to nothing. */
+  private speciesQuiet = 0;
+  /**
+   * Whether the thin gap's drag reads the species (PLAN 18d). Only `npm run
+   * thick` turns it off, to measure the plate as it was before 18d with the
+   * same pour on it: a "before" that is read, not remembered.
+   */
+  readsSpecies = true;
+  /*
     How much of the plate the oil poured since it was last cleared covers,
     as a share of its area. Cahn–Hilliard and the flux transport both keep
     the oil exactly (npm run physics), so what went in is what is there,
@@ -855,6 +875,13 @@ export class WebGPUFluid {
       */
       ['mixSmooth', [R32], false],
       /*
+        The poured liquids' species (PLAN 18d): its pour and fade, and its
+        carry in substeps, below. Built behind the show: nothing runs them
+        until glycerine, syrup, milk or alcohol is poured, which no look's
+        opening steps do.
+      */
+      ['speciesSplat', [RGBA32], false],
+      /*
         The dye across faces is also how the dye moves wherever the maze
         flows (the advect dye stage), from the maze's first step, so a look
         that opens with it waits for it as it waits for mazeForce.
@@ -938,6 +965,7 @@ export class WebGPUFluid {
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
       add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
+      add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
     } else {
       /*
         And the other way: the old plate's projections, its velocity's
@@ -1297,6 +1325,8 @@ export class WebGPUFluid {
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.speciesLive = false;
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
@@ -2337,6 +2367,27 @@ export class WebGPUFluid {
     }, !!mix && this.mixLive);
 
     /*
+      The poured liquids' species (PLAN 18d): carried with the colour, in
+      its substeps and through the thin solve's own faces, so a pool of
+      glycerine and its colour move as one and none of either is made or
+      lost; then faded, on the clock the CPU's body fades on
+      (SPECIES_SECONDS), as the colour still fades until 18g flushes it. Only
+      on a thin gap, the one plate whose drag a viscosity means anything to:
+      off it, the CPU's body drag (lib/liquidPhase.ts) is the thickness, as
+      before. Once a field has faded to a ten-thousandth it is dropped, so
+      a show that poured glycerine once does not carry it for good.
+    */
+    stage('species', (pass) => {
+      const sp = this.species!;
+      const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+      this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+      this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species fade', [0, 0, 0, 0, 0, 0, 0, Math.exp(-seconds / SPECIES_SECONDS)]));
+      sp.swap();
+      this.speciesQuiet += seconds;
+      if (this.speciesQuiet > SPECIES_SECONDS * Math.log(1e4)) this.speciesLive = false;
+    }, thin && !!this.species && this.speciesLive);
+
+    /*
       The clear film (PLAN §20b, wgsl/film.ts).
 
       Laid the first step Clear Film is up, over the whole plate at its
@@ -2574,6 +2625,35 @@ export class WebGPUFluid {
       this.device.queue.submit([enc.finish()]);
     }
     return this.mix;
+  }
+
+  /**
+   * A pour of a liquid that mixes with the clear one (PLAN 18d): glycerine,
+   * syrup, milk, alcohol. It replaces `take` of the column at its middle,
+   * less toward its rim (a dome, as the soap lands), so a held drop fills
+   * its disc over a few steps and a second liquid poured onto the first
+   * displaces it rather than piling on it: what is in a column is a share
+   * of each, and the shares add to at most the whole. In plate units;
+   * `lnNu` is ln(ν/ν_water), `density` g/cm³, `index` the refractive index
+   * (lib/liquidProps.ts, speciesOf).
+   */
+  addSpecies(x: number, y: number, radius: number, take: number, lnNu: number, density: number, index: number): void {
+    if (!(radius > 0) || !(take > 0)) return;
+    if (!this.species) {
+      this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
+    }
+    const sp = this.species;
+    const enc = this.device.createCommandEncoder({ label: 'add species' });
+    const pass = enc.beginComputePass({ label: 'add species' });
+    if (!this.speciesLive) for (const t of [sp.a, sp.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species splat', [x, y, radius, take, lnNu, density, index, 1]));
+    sp.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.speciesLive = true;
+    this.speciesQuiet = 0;
   }
 
   /** The clear film's fields (PLAN §20b), made the first time a plate asks for a film. */
@@ -2833,6 +2913,8 @@ export class WebGPUFluid {
     const enc = this.device.createCommandEncoder({ label: 'clear chemistry' });
     const pass = enc.beginComputePass();
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.speciesLive = false;
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
@@ -3668,10 +3750,12 @@ export class WebGPUFluid {
       moves the liquid it is in with it.
     */
     const hand = hands ?? this.blankPhase();
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}`,
+    // The poured liquids' viscosities (PLAN 18d), or nothing poured.
+    const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}`,
       this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, 0.25 * p.smearX, 0.25 * p.smearY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
@@ -3945,8 +4029,9 @@ export class WebGPUFluid {
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye'): Promise<Float32Array> {
-    const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read : this.grain?.read;
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species'): Promise<Float32Array> {
+    const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
+      : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba')) : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);

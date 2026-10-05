@@ -1128,6 +1128,19 @@ Ferro Maze, desk and phone, hold the Magnet close to a pool's edge:
 - say whether Ferro Maze's haze between its domains (PLAN 9aa) reads browner than before.
   The haze is the same ferrofluid under half full, so it is drawn by the same rule.
 
+## 42. Each poured liquid as thick as it is (PLAN 18d-1)
+
+Glycerine, syrup, milk and alcohol now carry their real viscosity into the flow. Glycerine is
+fifty times the default clear liquid, syrup five, and milk and alcohol are thinner than it.
+Before, all four were one "body" number that dragged a little. Pick Glycerine, then Syrup,
+and drop them with the Dropper (desk and phone) on Glycerine Drift, Deep Ocean, Aurora Borealis, Velvet Underground and Lumia:
+- a drop of glycerine should sit and crawl while the plate's flow goes round it, not ride
+  along with it (`npm run thick`: a pool of it falls at 0.049 of a pool of colour);
+- syrup should do the same, less strongly;
+- on a thick look, a drop of syrup should run ahead into the liquid round it;
+- milk (Galaxy, Jellyfish Bloom, Poster 1969, Milk Marble, Roy) is now as thin as milk really is.
+  Its edge still holds, through its own "repel". Say if those looks lost a slowness you liked.
+
 ---
 
 ## Reading the frame time while you do it

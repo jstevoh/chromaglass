@@ -2159,6 +2159,20 @@ The plan as written before it was built:
   punches a hole where it lands. Both are in the phone's bottle picker and on MIDI,
   like every other bottle.
 
+### 18d. Each liquid has its real properties
+
+**18d-1** (2026-10-05): each poured liquid's own viscosity, on a thin gap (`npm run thick`,
+judging §42). Every bottle that is a liquid of its own carries its real viscosity, density,
+surface tension and index (`src/types.ts`). The ones that mix with the clear liquid
+(glycerine, syrup, milk, alcohol) go into a GPU species field (`src/lib/liquidProps.ts`):
+the share, plus Σ share·ln ν, Σ share·ρ and Σ share·n. It is carried with the colour in
+flux form, and hsPrep takes each column's drag from it by the log mixing rule. The CPU's
+body drag is off on a thin gap. A glycerine pool falls under Rain Drip at 0.049 of a pool of
+colour (Darcy's inclusion says 0.039; it was 1.0), and syrup in the thickest look runs at 2.05
+(Darcy 1.8). Water, the dyes, ink, soap, vinegar and soda are solutions in the clear liquid,
+so they carry none.
+The open items are 18d-2 to 18d-11 in PLAN.md.
+
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 
 - **What was reported** (the owner, 2026-10-04): "in general there just aren't enough
