@@ -2159,6 +2159,26 @@ The plan as written before it was built:
   punches a hole where it lands. Both are in the phone's bottle picker and on MIDI,
   like every other bottle.
 
+### 18c. A pour adds liquid, not only colour
+
+**18c-1** (2026-10-05): a bottle's pour is volume, on a thin gap (`npm run flush`, judging
+§43). What was there: a pour changed what was in the column where it landed and added
+nothing, so a held dropper of water moved nothing, and glycerine once poured could only
+fade. Now every bottle's deposit is a volume source in the thin solve: `pourVolume` lays
+its dome in a buffer and hsDivergence takes it as a source, the flow u_r = Q/(2πrh)
+pushes what was there outward, and what crosses the open rim leaves. A liquid that mixes
+with the clear one is added to the species field as its share; the flux-form carry
+removes the pour's own outflow from the column, so every poured share is accounted for.
+A held bottle is a 2 mL/s stream (`HELD_POUR`), its share a step that stream over the
+dome it lands as; a dropped dose (a drop that falls, the automation's) is its amount.
+The first version mixed the pour into the column, (was + f)/(1 + f), and then let its own
+flow carry f out, counting the outflow twice: half of every pour vanished.
+Measured on SwiftShader: a ring of colour round a held pour of water moves out by
+1.006 of the volume poured (as before 18c, 0.002); glycerine poured as volume is 0.9991
+accounted for; a dish of glycerine flushed with a quarter of its volume of water keeps
+0.748 of it (the volume says 0.750), its middle clear. The colour's own drops, the Pour's
+kicks and the splash crown are still not volume (18c-2, 18c-3).
+
 ### 18d. Each liquid has its real properties
 
 **18d-1** (2026-10-05): each poured liquid's own viscosity, on a thin gap (`npm run thick`,
@@ -2171,7 +2191,14 @@ body drag is off on a thin gap. A glycerine pool falls under Rain Drip at 0.049 
 colour (Darcy's inclusion says 0.039; it was 1.0), and syrup in the thickest look runs at 2.05
 (Darcy 1.8). Water, the dyes, ink, soap, vinegar and soda are solutions in the clear liquid,
 so they carry none.
-The open items are 18d-2 to 18d-11 in PLAN.md.
+**18d-2** (2026-10-05, with 18c-1): flushing, not fading. The species' 22 s fade, which
+stood in for a dish being flushed, is gone: a poured liquid leaves only over the open rim,
+taken off there each step, when the pours after it push it out. The automation's
+headroom for a thick bottle reads the GPU's share of the dish (`speciesShare`, about once
+a second) instead of the CPU's body, which still fades. `npm run thick`'s kept share now
+asserts no fade (1.0000, where the fade took 0.0225); the glycerine pool, no longer
+thinning as it fades, reads 0.045 of colour and syrup 2.06.
+The open items are 18d-3 to 18d-11 in PLAN.md.
 
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 

@@ -21,7 +21,7 @@
  * of the surrounding liquid would: the liquid round it has to get out of
  * its way, and the pressure that makes it shares the push. On the grid both
  * ways read about an eighth further from 1 than the formula (0.044 for
- * glycerine and 2.04 for syrup on a pool 19 cells across, 0.049 and 2.05 on
+ * glycerine and 2.04 for syrup on a pool 19 cells across, 0.045 and 2.06 on
  * this one of 10): the face between a poured cell and a clear one takes
  * the harmonic mean of the two, twice the lesser, so the pool's edge is a
  * little more open to the flow than a sharp one. The bands allow it and
@@ -49,23 +49,27 @@
  *      read 14 times colour alone. Real, and a reason the bands here are Darcy's only where
  *      both liquids' drag times are a few steps or less: syrup's is 27 ms.
  *   4. The species is kept: its total share after the steps is what was
- *      poured less only the fade (22 s to a third, exp(−t/22)), to 0.3%. The
- *      fade over the 30 steps is 2.2%, so no fade, or twice it, is far out.
+ *      poured, to 0.3%. Nothing fades it (PLAN 18d-2): a liquid leaves only
+ *      over the rim, and this pool is far from it. 18d-1's fade, 22 s to a
+ *      third, took 2.2% over the 30 steps, so a fade left in is far out.
  *   5. And carried with its colour: on the alcohol run, whose pool moves
  *      some three cells, the species' middle moves with the colour's to a
  *      tenth of a cell (the glycerine pool moves a fourteenth of a cell,
  *      too little to tell a carry from none); and the glycerine's colour
  *      moved less than colour alone.
  *   6. What it costs (PLAN 18d-11): the species' stage (its carry in the
- *      colour's substeps and its fade) timed alone on the plate's own
+ *      colour's substeps and the rim) timed alone on the plate's own
  *      textures, submit to done, at two counts back to back and the slope
  *      between them, the quickest of three (benchSpecies; CI's Mac grants
  *      no timestamp queries, swirlcost's way). After thirty stirred steps
  *      on glycerine, so the carry runs the substeps a moving plate asks for.
  *      At the app's top rung on a Mac (768²), on software at 256² only to
- *      show it runs. It asserts only that it measured something; the
- *      number is the finding, against PLAN 18d's budget of 0.5 to 0.7 ms
- *      for the whole of 18d and a 768² step's 6.6 ms on an M4.
+ *      show it runs. Beside it, the colour's own carry timed the same way on
+ *      the same plate: CI's Mac is not the owner's, and its first reading,
+ *      12 ms a step, could not be set against an M4's 6.6 ms step, but the
+ *      ratio of two carries in the same substeps carries over. It asserts
+ *      only that it measured something; the numbers are the finding,
+ *      against PLAN 18d's budget of 0.5 to 0.7 ms for the whole of 18d.
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -130,7 +134,7 @@ try {
       ['alcohol', 0.06, 'alcohol'], ['colour 0.06', 0.06, null], ['syrup thick', 1, 'syrup'], ['syrup unread', 1, 'syrup', true], ['colour 1', 1, null]]) {
       out[name] = await run(t, bottle, ignored);
     }
-    out.kept = Math.exp(-STEPS * lab.stepSeconds / lab.speciesSeconds);
+    out.steps = STEPS; out.stepSeconds = lab.stepSeconds;
     // 6. The stage's cost, on a stirred plate of glycerine.
     {
       const G = mac ? 768 : 256, [few, many] = mac ? [20, 220] : [2, 12];
@@ -140,12 +144,16 @@ try {
       lab.addSpecies(0.5, 0.5, 0.2, 2, 'glycerine');
       lab.flush();
       await lab.step(STEPS, { thinGap: 1, gapThickness: 0.45, gapSpring: 0, turbScale: 1 });
-      const slopes = [];
-      for (let k = 0; k < 3; k++) {
-        const a = await lab.solver().benchSpecies(few), b = await lab.solver().benchSpecies(many);
-        slopes.push((b - a) / (many - few));
-      }
-      out.cost = { grid: G, ms: Math.min(...slopes), all: slopes };
+      const slope = async (dye) => {
+        const all = [];
+        for (let k = 0; k < 3; k++) {
+          const a = await lab.solver().benchSpecies(few, dye), b = await lab.solver().benchSpecies(many, dye);
+          all.push((b - a) / (many - few));
+        }
+        return all;
+      };
+      const all = await slope(false), dyeAll = await slope(true);
+      out.cost = { grid: G, ms: Math.min(...all), all, dye: Math.min(...dyeAll), carry: await lab.solver().readCarry() };
     }
     return out;
   }, process.platform === 'darwin');
@@ -167,11 +175,12 @@ try {
     at > 1.5 && at < 2.3 && Math.abs(at0 - 1) < 0.02,
     `${f(at)} (λ ${f(lam('syrup thick'), 2)}, Darcy ${f(darcy(lam('syrup thick')))}; species unread, as before 18d: ${f(at0)})`);
 
-  const gl = r.glycerine, kept = r.kept;
-  const shareRatio = gl.after.share / Math.max(gl.before.share * kept, 1e-9);
-  check('the poured glycerine is kept, less only its fade',
+  const gl = r.glycerine;
+  const shareRatio = gl.after.share / Math.max(gl.before.share, 1e-9);
+  const fade18d1 = 1 - Math.exp(-r.steps * r.stepSeconds / 22);
+  check('the poured glycerine is all kept: nothing fades it',
     Math.abs(shareRatio - 1) < 0.003 && gl.before.share > 1,
-    `total ${f(gl.after.share, 1)} cells against ${f(gl.before.share * kept, 1)} (${f(shareRatio, 4)}; the fade alone is ${f(1 - kept, 4)})`);
+    `total ${f(gl.after.share, 1)} cells against ${f(gl.before.share, 1)} poured (${f(shareRatio, 4)}; 18d-1's fade would have taken ${f(fade18d1, 4)})`);
   const moved = (x) => Math.hypot(x.after.sx - x.before.sx, x.after.sy - x.before.sy);
   const colourMoved = (x) => Math.hypot(x.after.cx - x.before.cx, x.after.cy - x.before.cy);
   const al = r.alcohol;
@@ -182,7 +191,7 @@ try {
   const c = r.cost;
   check(`the species' stage was timed (${process.platform === 'darwin' ? 'Metal' : 'software, not the finding'})`,
     Number.isFinite(c.ms) && c.ms > 0,
-    `${f(c.ms, 3)} ms a step at ${c.grid}² (the three: ${c.all.map((x) => f(x, 3)).join(', ')})`);
+    `${f(c.ms, 3)} ms a step at ${c.grid}² (the three: ${c.all.map((x) => f(x, 3)).join(', ')}), against ${f(c.dye, 3)} ms for the colour's own carry on the same GPU (${f(c.ms / c.dye, 2)} of it), in ${c.carry?.n ?? '?'} substeps`);
   check('no GPU pass failed validation (a stage that never ran would read as an unchanged pool)', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the lab ran', false, e.message.slice(0, 300));

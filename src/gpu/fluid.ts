@@ -33,7 +33,6 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { SPECIES_SECONDS } from '../lib/liquidProps';
 import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
@@ -699,12 +698,14 @@ export class WebGPUFluid {
     src/lib/liquidProps.ts): share, Σ share·ln(ν/ν_water), Σ share·ρ,
     Σ share·n, carried with the colour on a thin gap and read by hsPrep as
     each column's own viscosity. Made at the first such pour; live until
-    the last has faded (speciesQuiet).
+    the last has been flushed out (speciesShare).
   */
   private species: PingPong | null = null;
   private speciesLive = false;
-  /** Seconds since the last pour into the species field, so it can go quiet once faded to nothing. */
+  /** Pours since the last read of the plate's poured share, so a read made before a pour cannot drop the field it landed in. */
   private speciesQuiet = 0;
+  /** The thin solve's volume source (PLAN 18c): the share of each column poured since the last step, which hsDivergence takes and empties. */
+  private hsPour: GPUBuffer | null = null;
   /** The last thin step's displacement scale, which the species' carry was given (benchSpecies repeats it). */
   private speciesDisp = 0;
   /**
@@ -968,6 +969,8 @@ export class WebGPUFluid {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
       add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
+      // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
+      add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
     } else {
       /*
         And the other way: the old plate's projections, its velocity's
@@ -1329,6 +1332,8 @@ export class WebGPUFluid {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
+    if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
@@ -2372,19 +2377,17 @@ export class WebGPUFluid {
       The poured liquids' species (PLAN 18d): carried with the colour, in
       its substeps and through the thin solve's own faces, so a pool of
       glycerine and its colour move as one and none of either is made or
-      lost; then faded, on the clock the CPU's body fades on
-      (SPECIES_SECONDS), as the colour still fades until 18g flushes it. Only
-      on a thin gap, the one plate whose drag a viscosity means anything to:
-      off it, the CPU's body drag (lib/liquidPhase.ts) is the thickness, as
-      before. Once a field has faded to a ten-thousandth it is dropped, so
-      a show that poured glycerine once does not carry it for good.
+      lost; and taken off where it has gone over the rim (stepSpecies). It
+      does not fade (18d-2): a poured liquid leaves a dish by being flushed
+      out of it as more liquid is poured in (pour, 18c). Only on a thin gap,
+      the one plate whose drag a viscosity means anything to: off it, the
+      CPU's body drag (lib/liquidPhase.ts) is the thickness, as before. Once
+      the plate's poured share has been flushed to a millionth (speciesShare)
+      the field is dropped and its stage stops running.
     */
     stage('species', (pass) => {
-      const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
       this.speciesDisp = disp;
-      this.stepSpecies(pass, seconds);
-      this.speciesQuiet += seconds;
-      if (this.speciesQuiet > SPECIES_SECONDS * Math.log(1e4)) this.speciesLive = false;
+      this.stepSpecies(pass);
     }, thin && !!this.species && this.speciesLive);
 
     /*
@@ -2628,39 +2631,84 @@ export class WebGPUFluid {
   }
 
   /**
-   * A pour of a liquid that mixes with the clear one (PLAN 18d): glycerine,
-   * syrup, milk, alcohol. It replaces `take` of the column at its middle,
-   * less toward its rim (a dome, as the soap lands), so a held drop fills
-   * its disc over a few steps and a second liquid poured onto the first
-   * displaces it rather than piling on it: what is in a column is a share
-   * of each, and the shares add to at most the whole. In plate units;
-   * `lnNu` is ln(ν/ν_water), `density` g/cm³, `index` the refractive index
-   * (lib/liquidProps.ts, speciesOf).
+   * A pour (PLAN 18c, 18d): `take` of the column at the middle of a disc,
+   * less toward its rim (a dome, as the soap lands), comes in as new liquid.
+   *
+   * Its volume goes into the thin solve as a source (hsDivergence), so the
+   * liquid already there is pushed out of the way, radially, and what
+   * reaches the rim leaves the dish over it. Its liquid, when it is one
+   * that mixes with the clear one (glycerine, syrup, milk, alcohol: `sp`),
+   * is added to the species field as that share of the column, with its
+   * ln(ν/ν_water), density and index (lib/liquidProps.ts, speciesOf);
+   * a clear-liquid pour (water, a dye, soap) adds the volume and nothing
+   * to the field, and so dilutes what it lands in by pushing it aside.
+   * Added, not replaced: the liquid that was in the column is not deleted
+   * but carried out of it by the flow its volume makes, which is what
+   * keeps every poured share accounted for until it leaves over the rim.
+   *
+   * `volume` false lays the liquid as though poured long ago, with no push:
+   * for a check that needs a pool in place (`npm run thick`). Only on a thin
+   * gap; in plate units.
    */
-  addSpecies(x: number, y: number, radius: number, take: number, lnNu: number, density: number, index: number): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number } | null, volume = true): void {
     if (!(radius > 0) || !(take > 0)) return;
-    if (!this.species) {
-      this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
-    }
-    const sp = this.species;
-    const enc = this.device.createCommandEncoder({ label: 'add species' });
-    const pass = enc.beginComputePass({ label: 'add species' });
-    if (!this.speciesLive) for (const t of [sp.a, sp.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    const enc = this.device.createCommandEncoder({ label: 'pour' });
+    const pass = enc.beginComputePass({ label: 'pour' });
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species splat', [x, y, radius, take, lnNu, density, index, 1]));
-    sp.swap();
+    const push = volume && !!this.hsPour;
+    if (sp) {
+      if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
+      const s = this.species;
+      if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      this.run(pass, 'speciesSplat', s.write, [s.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.density, sp.index, push ? 1 : 0]));
+      s.swap();
+      this.speciesLive = true;
+      this.speciesQuiet++;
+    }
+    if (push) {
+      this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
+    }
     pass.end();
     this.device.queue.submit([enc.finish()]);
-    this.speciesLive = true;
-    this.speciesQuiet = 0;
   }
 
-  /** The species' stage (PLAN 18d): its carry in the colour's substeps, then its fade. */
-  private stepSpecies(pass: GPUComputePassEncoder, seconds: number): void {
+  /**
+   * The share of the dish that is poured liquid (PLAN 18d-2), the mean of the
+   * species' first channel inside the rim, read back from the GPU: what the
+   * automation's headroom asks before it doses glycerine, now that nothing
+   * fades it (lib/liquidPhase.ts, headroom). A few hundred kilobytes, read
+   * once a second or so (LiquidVisualizer). When the dish has been flushed
+   * to a millionth and nothing was poured while it was read, the field is
+   * dropped and its stage stops running.
+   */
+  async speciesShare(): Promise<number> {
+    if (!this.species || !this.speciesLive) return 0;
+    const pours = this.speciesQuiet;
+    const f = await this.readField('species');
+    const L = this.L;
+    let sum = 0, cells = 0;
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+      if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) >= OPEN_RIM) continue;
+      sum += f[(i + j * L) * 4];
+      cells++;
+    }
+    const share = sum / Math.max(1, cells);
+    if (share < 1e-6 && pours === this.speciesQuiet) this.speciesLive = false;
+    return share;
+  }
+
+  /**
+   * The species' stage (PLAN 18d): its carry in the colour's substeps, then
+   * the rim. What the flow has carried past the rim has left the dish over
+   * it (the open rim, OPEN_RIM, where the thin solve holds the pressure at
+   * the air's), so it is taken off the plate there; nothing else takes any
+   * away (18d-2: a liquid leaves by being flushed, it does not fade).
+   */
+  private stepSpecies(pass: GPUComputePassEncoder): void {
     const sp = this.species!;
     this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
-    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species fade', [0, 0, 0, 0, 0, 0, 0, Math.exp(-seconds / SPECIES_SECONDS)]));
+    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
   }
 
@@ -2669,13 +2717,20 @@ export class WebGPUFluid {
    * the swirl's: `reps` of it back to back on the plate's own textures, after
    * a thin step has planned the carry's substeps, submit to done, in ms. Two
    * counts and the slope between them leave out the submit's fixed cost. For
-   * `npm run thick`; CI's Mac grants no timestamp queries.
+   * `npm run thick`; CI's Mac grants no timestamp queries. `dye` times the
+   * colour's own carry instead, the same kernel in the same substeps on the
+   * dye's texture: the work every thin step already does, so the species'
+   * cost can be read as a share of it on whatever GPU runs the bench.
    */
-  async benchSpecies(reps: number): Promise<number> {
+  async benchSpecies(reps: number, dye = false): Promise<number> {
     if (!this.species || !this.speciesLive || !this.carryInd) return NaN;
     const enc = this.device.createCommandEncoder({ label: 'bench species' });
     const pass = enc.beginComputePass({ label: 'bench species' });
-    for (let k = 0; k < reps; k++) this.stepSpecies(pass, 0);
+    const args = this.arg('bench dye carry', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]);
+    for (let k = 0; k < reps; k++) {
+      if (dye) this.carrySubsteps(pass, 'bodyAdvect', this.dye, args);
+      else this.stepSpecies(pass);
+    }
     pass.end();
     await this.device.queue.onSubmittedWorkDone();
     const t0 = performance.now();
@@ -3663,6 +3718,7 @@ export class WebGPUFluid {
       // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
       this.hsGap = buf('thin gap before', this.N);
+      this.hsPour = this.disposer.track(this.device.createBuffer({ label: 'thin pour', size: Math.max(16, this.N * this.N * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
       this.hsMobC = this.mg.map((lv) => buf(`thin gap rim ${lv.n}`, lv.n));
       // Each coarse level's faces: every cell's east face, then every cell's north.
       this.hsFaceC = this.mg.map((lv) => this.disposer.track(this.device.createBuffer({ label: `thin gap faces ${lv.n}`, size: Math.max(16, 2 * lv.n * lv.n * 4), usage: GPUBufferUsage.STORAGE })));
@@ -3788,7 +3844,7 @@ export class WebGPUFluid {
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
       this.arg('thin divergence', [this.airPush, invDt, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) * invDt, 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
-      [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!]);
+      [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!, this.hsPour!]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.
     for (let l = 0; l < this.mg.length; l++) {

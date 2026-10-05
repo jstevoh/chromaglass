@@ -10,7 +10,7 @@ import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
-import { speciesOf, SPECIES_SECONDS } from '../src/lib/liquidProps';
+import { speciesOf } from '../src/lib/liquidProps';
 import { DEFAULT_LIQUID_TYPES } from '../src/types';
 import { normalizeOutput } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
@@ -218,19 +218,24 @@ const api = {
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
-  /** A pour of a shelf bottle into the species field (PLAN 18d), as the app's onDeposit makes it: null if the bottle lays none. */
-  addSpecies(x: number, y: number, r: number, take: number, bottle: string) {
+  /**
+   * A pour of a shelf bottle (PLAN 18c, 18d), as the app's onDeposit makes it:
+   * its liquid into the species field (null if the bottle lays none, the
+   * clear liquid's own), and with `volume` its volume into the thin solve.
+   * Without it the pool is laid as though poured long ago (`npm run thick`).
+   */
+  addSpecies(x: number, y: number, r: number, take: number, bottle: string, volume = false) {
     const sp = speciesOf(DEFAULT_LIQUID_TYPES.find((l) => l.id === bottle)?.behaviour);
-    if (sp) lab!.solver.addSpecies(x, y, r, take, sp.lnNu, sp.density, sp.index);
+    lab!.solver.pour(x, y, r, take, sp, volume);
     return sp;
   },
+  async speciesShare() { return lab!.solver.speciesShare(); },
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
   /** Thin Gap's viscosity for a Thickness, and the ferrofluid's (src/gpu/fluid.ts), so a check never copies either. */
   thinGapViscosity,
-  /** The species' fade (PLAN 18d), and the real seconds a lab step takes, for `npm run thick`'s kept share. */
-  speciesSeconds: SPECIES_SECONDS,
+  /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */
   stepSeconds: BASE.magnetSeconds ?? 1 / 60,
   ferroViscosity: FERRO_NU,
   /** A shipped look's settings and the shape it pours its ferrofluid in, as the app reads them. */

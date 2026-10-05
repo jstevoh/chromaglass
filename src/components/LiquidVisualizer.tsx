@@ -45,7 +45,7 @@ import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
 import { ChemistryField } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
-import { speciesOf } from '../lib/liquidProps';
+import { pourShare, speciesOf } from '../lib/liquidProps';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay } from '../lib/sceneMap';
 import { BackLook } from '../lib/backLook';
@@ -385,7 +385,7 @@ const freshLaid = (): DropLaid => ({ steps: 0, drops: 0, dye: 0 });
 */
 function layBottle(af: FluidSimulation, x: number, y: number, r: number, liq: LiquidType | undefined, dose: number): void {
   if (!liq?.behaviour || !(dose > 0)) return;
-  af.liquid.deposit(x, y, Math.max(1, r), liq.behaviour, dose);
+  af.liquid.deposit(x, y, Math.max(1, r), liq.behaviour, dose, af.dtSeconds);
 }
 
 /*
@@ -657,8 +657,10 @@ const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
  * Pour one dose of whatever the preset keeps in the dish.
  *
  * Picks uniformly from the list, so the inert entries are the dilution: most
- * of the time this lands on `water` and returns having done nothing, which is
- * what makes `['water', 'water', 'soap']` a different plate from `['soap']`.
+ * of the time this lands on `water`, which carries no property, which is what
+ * makes `['water', 'water', 'soap']` a different plate from `['soap']`. On a
+ * thin gap the water is still liquid (PLAN 18c): its volume pushes what is
+ * there aside, and is what flushes the glycerine these looks pour (18d-2).
  *
  * The dose is scaled by the plate's remaining headroom for that liquid, so a
  * show left running overnight cannot end as a dish of solid glycerine. See
@@ -1247,6 +1249,25 @@ class FluidSimulation {
   get clockLeanNow(): number { return this.clockLean; }
   /** Wall-clock seconds this step covers, for smoothing that means the same thing at any frame rate. */
   dtSeconds = 1 / 60;
+  /*
+    The automation's headroom for a thick bottle (lib/liquidPhase.ts,
+    gpuShare) reads the GPU's poured share, since on a thin gap nothing
+    fades it (PLAN 18d-2). Read about once a second, never two at once: the
+    share moves only as fast as pours and the rim change it, and a read is
+    the species field downsampled to the CPU's grid, about 600 KB.
+  */
+  private shareSteps = 0;
+  private shareReading = false;
+  private readPouredShare(): void {
+    const g = this.gpu;
+    if (!this.liquid.thickOnGpu || !g?.speciesShare) { this.liquid.gpuShare = null; return; }
+    if (this.shareReading || ++this.shareSteps < 60) return;
+    this.shareSteps = 0;
+    this.shareReading = true;
+    g.speciesShare()
+      .then((share) => { this.liquid.gpuShare = share; }, () => { /* a lost device: the next read tries again */ })
+      .finally(() => { this.shareReading = false; });
+  }
   /** How much faster or slower the music wants this plate than its look (see `lib/tempoPace.ts`); set by the frame. */
   tempoMul = 1;
   /** A paced scene's activity (`lib/scenePacing.ts`): under 1 a rest, over it a swell; set by the frame. */
@@ -1274,7 +1295,7 @@ class FluidSimulation {
       soap for what it already does pays nothing for the passes that would
       move it.
     */
-    this.liquid.onDeposit = (cx, cy, radius, what, amount) => {
+    this.liquid.onDeposit = (cx, cy, radius, what, amount, seconds) => {
       const g = this.gpu;
       const s = this.lastSettings;
       if (!g || !s || amount <= 0) return;
@@ -1301,17 +1322,21 @@ class FluidSimulation {
         if (solvent > 0 || clearOil > 0) g.addFilm!(cx / L, cy / L, Math.max(1.5, radius) / L, { film: FILM_POUR * Math.min(1, clearOil), solvent });
       }
       /*
-        A liquid of its own that mixes with the clear one (glycerine, syrup,
-        milk, alcohol) replaces a share of the column where it lands, and the
-        thin gap's drag takes its own viscosity from there (PLAN 18d,
-        lib/liquidProps.ts). The share is the dose, as the body's is, so the
-        automation's headroom, read from the body, means the same liquid.
-        Only on a thin gap: the old plate has no viscosity a cell to give it.
+        On a thin gap every bottle's pour is volume (PLAN 18c): it pushes the
+        liquid already there out of its way, radially, and what reaches the
+        rim leaves the dish. A liquid of its own that mixes with the clear
+        one (glycerine, syrup, milk, alcohol) also lands in the species field
+        as its share of the column, and the thin gap's drag takes its own
+        viscosity from there (PLAN 18d, lib/liquidProps.ts); a clear-liquid
+        pour dilutes what it lands in. A held bottle puts down what its
+        stream lets go in the step, a one-shot dose its amount (pourShare).
+        Only on a thin gap: the old plate has no volume to push and no
+        viscosity a cell to give it.
       */
-      const sp = this.thinGap && g.addSpecies ? speciesOf(what) : null;
-      if (sp) {
+      if (this.thinGap && g.pour) {
         const L = this.size;
-        g.addSpecies!(cx / L, cy / L, Math.max(1.5, radius) / L, Math.min(1, amount), sp.lnNu, sp.density, sp.index);
+        const r = Math.max(1.5, radius) / L;
+        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
       }
       if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
@@ -1913,7 +1938,8 @@ class FluidSimulation {
       dish separates by standing still.
     */
     this.liquid.setTilt(this.tiltX + this.rockX * 0.02, this.tiltY + this.rockY * 0.02);
-    this.liquid.thickOnGpu = this.thinGap && !!this.gpu?.addSpecies;
+    this.liquid.thickOnGpu = this.thinGap && !!this.gpu?.pour;
+    this.readPouredShare();
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
     // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
     // the deltas and nothing else reads it. The CPU solver has no such step —
@@ -7252,7 +7278,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   hand.laid.dye += amt;
                   af.autoInject('drop', x, y, amt, rgb.r, rgb.g, rgb.b, 0.5);
                   if (heat > 0) af.addTemp(x, y, heat * 2);
-                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k);
+                  if (liq?.behaviour) af.liquid.deposit(x, y, Math.round((liq.injectRadius ?? 3) * GRID_SCALE), liq.behaviour, k, DROP_EVERY * af.dtSeconds);
                 }
               } else {
                 // dropper (default)
@@ -7277,7 +7303,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // Soap, milk, silicone and glycerine put their properties into
                 // the plate on the same disc as their colour, and the plate
                 // keeps acting on them long after the drop.
-                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k);
+                if (liq?.behaviour) af.liquid.deposit(x, y, r, liq.behaviour, k, af.dtSeconds);
               }
             }
             // Counted after the step it was read on (see the clock above).
