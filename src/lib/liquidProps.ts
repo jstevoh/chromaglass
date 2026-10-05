@@ -30,6 +30,7 @@
  * a little faster than water, not a little slower.
  */
 import type { LiquidBehaviour } from '../types';
+import { DISH_METRES, DISH_REST_GAP } from './turntable.ts';
 
 /** What speciesOf reads of a bottle: its behaviour, or the deposit made from it (lib/liquidPhase.ts). */
 type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index'>;
@@ -38,12 +39,12 @@ type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' 
 export const WATER_NU = 1e-6;
 
 /*
-  How long a poured liquid lasts on the plate, in seconds to a third of
-  itself: the CPU's body fades on it (lib/liquidPhase.ts) and the GPU's
-  species on the same, so the automation's headroom, which reads the CPU's,
-  agrees with what the flow feels. A liquid does not evaporate as a
-  property: this stands in for the dish being flushed, as the colour's
-  fade does, until 18g makes both leave by flushing (PLAN 18d-2).
+  How long the CPU's body lasts, in seconds to a third of itself
+  (lib/liquidPhase.ts): only where the GPU does not hold the liquid itself,
+  the old plate and a plate with no thin gap. On a thin gap nothing fades
+  the poured liquid any more: it stays until clear liquid poured after it
+  has pushed it out over the rim, as a real dish is flushed (PLAN 18d-2),
+  and the automation's headroom reads the GPU's share instead.
 */
 export const SPECIES_SECONDS = 22;
 
@@ -91,4 +92,39 @@ export function speciesOf(what: Poured | undefined): Species | null {
     plate whose clear liquid is water is no contrast at all.
   */
   return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333 };
+}
+
+/*
+  How fast a held bottle pours, m³ a second: 0.5 mL/s, a dropper's bulb
+  squeezed steadily, about ten drops of 0.05 mL a second. On a thin gap a
+  pour is volume (PLAN 18c): it pushes the liquid already there out of its
+  way, and what reaches the rim leaves. So a held tool cannot put a whole
+  column of its disc down every step, as the body's dose did (a disc a
+  dropper wide holds a fifth of a millilitre, which a step would fill three
+  times a second at this rate); it puts down what the dropper lets go in
+  the step.
+
+  It was 2 mL/s first, a bottle tipped to a thin stream, and on the Mac
+  (`node scripts/mirror.mjs`) four held drops of the Dropper on Classic's
+  second plate pushed the colour of the drops before them two cells of a
+  6×6 grid out from the hand (74.7 past the plate's drift, 27 allowed,
+  twice). A dropper is not a stream; a Pour should let go more (PLAN 18c-5).
+*/
+export const HELD_POUR = 0.5e-6;
+
+/**
+ * The share of the column a pour adds at the middle of its disc: what the
+ * GPU's `pour` takes (src/gpu/fluid.ts).
+ *
+ * `radius` is in plate widths. With `seconds`, a held bottle's stream for
+ * that long: HELD_POUR·seconds over the dome the pour lands as, half the
+ * disc's area times the 6 mm rest gap. Without, a one-shot dose (a drop
+ * that falls, the automation's): `amount` is the share, as the body's is.
+ */
+export function pourShare(radius: number, amount: number, seconds?: number): number {
+  if (!(amount > 0)) return 0;
+  if (seconds === undefined) return Math.min(1, amount);
+  const r = radius * DISH_METRES;
+  const dome = (Math.PI * r * r) / 2 * DISH_REST_GAP * DISH_METRES;
+  return Math.min(1, (amount * HELD_POUR * Math.max(0, seconds)) / dome);
 }

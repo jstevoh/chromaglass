@@ -246,11 +246,14 @@ export interface PlateSolver {
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
   /**
-   * A pour of a liquid that mixes with the clear one into the species field
-   * (PLAN 18d): `take` of the column at the middle replaced by a liquid of
-   * ln(ν/ν_water) `lnNu`, `density` g/cm³ and refractive `index`. Plate units.
+   * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
+   * comes in as new liquid, its volume pushing the plate's aside and out
+   * over the rim, and, for a liquid that mixes with the clear one (`sp`),
+   * its share into the species field. Plate units.
    */
-  addSpecies?(x: number, y: number, radius: number, take: number, lnNu: number, density: number, index: number): void;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number } | null, volume?: boolean): void;
+  /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
+  speciesShare?(): Promise<number>;
   /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
   addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */

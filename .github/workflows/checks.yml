@@ -619,7 +619,7 @@ jobs:
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as
       # the plate's moves as colour alone, and the poured liquid is carried
-      # with its colour and kept.
+      # with its colour and kept: nothing fades it (PLAN 18d-2).
       - name: Each liquid is as thick as it is
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 4
@@ -737,6 +737,15 @@ jobs:
       - name: Enough colours, and the hues between them
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run colours
+      # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
+      # ring of colour out by its volume, glycerine poured is all accounted
+      # for, and a dish of glycerine flushed with a quarter of its volume of
+      # water keeps three quarters of it. In the open shard: the plate shard
+      # is near its timeout.
+      - name: A pour pushes the liquid out over the rim
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 4
+        run: npm run flush
       # A clear film that tears (PLAN 20b): the film's volume kept, a thick film
       # whole and a thin dusty one torn into holes of every size by the physics
       # alone, a drop of solvent opening a growing hole, white over the colour

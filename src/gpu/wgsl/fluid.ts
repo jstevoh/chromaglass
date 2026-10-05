@@ -2384,18 +2384,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    The poured liquids' species (PLAN 18d, src/lib/liquidProps.ts): a pour
-    and the fade, in one kernel.
+    The poured liquids' species (PLAN 18d, src/lib/liquidProps.ts): a pour,
+    and the rim, in one kernel.
 
-    A pour replaces a share f of the column, a dome of A.a.w at its middle,
-    with the liquid poured: (1, ln(ν/ν_water), ρ, n) in the four channels,
-    each the share-weighted sum the carry conserves. Replaces, so the share
-    never passes the whole column and a second liquid poured onto the first
-    displaces it. Then the fade, A.b.w of what was there kept (1 for a
-    pour); a fade is a pour of radius 0, so f is 0 everywhere.
+    A pour of volume (A.b.w 1, PLAN 18c) adds a share f of the column, a
+    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water), ρ,
+    n) in the four channels, each the share-weighted sum the carry
+    conserves. Added, not mixed in: the pour's volume goes into the thin
+    solve as a source (pourVolume), and in that step the flow it makes
+    carries f of the column out of the cell, which the flux-form carry
+    takes from what the cell then holds. So what was poured is all in the
+    field, the carry moves it without making or losing any, and what was in
+    the column is pushed out of it, not deleted. Mixing it in instead, the
+    column's (was + f)/(1 + f), and letting the flow then carry f out,
+    would count the poured volume's outflow twice: glycerine poured into
+    glycerine would add nothing and lose f, and \`npm run flush\` read half
+    of every pour gone. A clear-liquid pour (water, a dye) adds nothing
+    here, and its flow dilutes what it lands in by pushing it aside. A.b.w
+    0 lays the liquid as though poured long ago, with no volume: f of the
+    column replaced (a check's pool in place, \`npm run thick\`). A.a.z of 0
+    is the rim instead: what the flow has carried past A.b.w from the
+    middle has gone over the dish's open rim and is taken off.
 
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
-    density, index, kept).
+    density, index, the mode; the rim's radius for the rim).
   */
   speciesSplat: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -2403,10 +2415,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let d = length(uvOf(id) - A.a.xy) / max(A.a.z, 1e-6);
-  let f = select(0.0, clamp((1.0 - d * d) * A.a.w, 0.0, 1.0), d < 1.0 && A.a.z > 0.0);
-  let was = textureLoad(src, p, 0) * A.b.w;
-  textureStore(dst, p, mix(was, vec4f(1.0, A.b.x, A.b.y, A.b.z), f));
+  let was = textureLoad(src, p, 0);
+  if (A.a.z <= 0.0) {
+    textureStore(dst, p, select(was, vec4f(0.0), length(uvOf(id) - vec2f(0.5)) >= A.b.w));
+    return;
+  }
+  let d = length(uvOf(id) - A.a.xy) / A.a.z;
+  let f = select(0.0, clamp((1.0 - d * d) * A.a.w, 0.0, 1.0), d < 1.0);
+  let poured = vec4f(1.0, A.b.xyz);
+  textureStore(dst, p, select(mix(was, poured, f), was + f * poured, A.b.w > 0.5));
 }`,
 
   /*

@@ -224,7 +224,7 @@ export class LiquidPhase {
     let room = 1;
     for (const key of ['soap', 'body', 'repel'] as const) {
       if (!what[key]) continue;
-      const mean = this.totals[key] / cells;
+      const mean = key === 'body' && this.gpuShare !== null ? this.gpuShare : this.totals[key] / cells;
       room = Math.min(room, 1 - Math.min(1, mean / CEILING[key]));
     }
     return room;
@@ -303,7 +303,18 @@ export class LiquidPhase {
    * the GPU's own fields (oil, soap, acidity: see WebGPUFluid.addMix) hear of
    * the same liquid on the same disc. Set by the plate.
    */
-  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number) => void;
+  onDeposit?: (cx: number, cy: number, radius: number, what: LiquidDeposit, amount: number, seconds?: number) => void;
+
+  /*
+    The share of the dish that is poured liquid, as the GPU last read it
+    (WebGPUFluid.speciesShare), or null where the GPU does not hold the
+    liquid. Set by the plate about once a second. On a thin gap nothing
+    fades a pour any more (PLAN 18d-2): the liquid stays until it is pushed
+    out over the rim. So the body here, which still fades, would let the
+    automation pour glycerine for ever into a dish that keeps all of it;
+    its headroom reads this instead, the liquid that is really there.
+  */
+  gpuShare: number | null = null;
 
   /*
     Set by the plate when the GPU carries each poured liquid's own viscosity
@@ -315,8 +326,13 @@ export class LiquidPhase {
   */
   thickOnGpu = false;
 
-  deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1): void {
-    this.onDeposit?.(cx, cy, radius, what, amount);
+  /**
+   * A pour of `what` on a disc. `seconds`, for a held bottle: the deposit is
+   * that long of its stream (lib/liquidProps.ts, pourShare), which is what a
+   * pour that is volume on a thin gap puts down; without, a one-shot dose.
+   */
+  deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1, seconds?: number): void {
+    this.onDeposit?.(cx, cy, radius, what, amount, seconds);
     const s = this.size;
     const r = Math.max(1, radius);
     const r2 = r * r;
