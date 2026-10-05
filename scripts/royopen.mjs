@@ -40,6 +40,10 @@
  *   5. a mean of 3.69 against a budget of 0.9 (0.45 since, the fix's).
  * And after: 0.1%; black 9.9%, white 57%; red 12.8%, yellow 6.8%, blue
  * 9.8%; 254 dots; a mean of 0.115 against 0.45.
+ * After #267 moved the pigment's grain behind the gooey curve, the same seed
+ * printed its fields solid (47 dots, white 38%); with the fields re-laid at
+ * 0.75 of their old strength: 0.0%; black 8.1%, white 59%; red 12.9%,
+ * yellow 6.2%, blue 10.1%; 272 dots; a mean of 0.109.
  *
  * And a control, so a counter that cannot see black cannot pass line 2: the
  * same seed with every cell made to absorb all three channels as much as its

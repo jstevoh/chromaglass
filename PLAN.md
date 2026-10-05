@@ -4708,6 +4708,10 @@ Open:
   cloud session). Dye Budget went from 0.9 to 0.45 on the reasoning that a fuller plate
   runs the inks over each other into black; if it reads too empty or still muddies, the
   budget and Roy's injection styles are the two knobs.
+  The opening's dot fields are tuned to the print's tint band, which any change to
+  the dye's opacity before the print moves: #267 (the grain after the curve) took
+  the band down by a quarter and the deploy read 47 dots; the fields were re-laid
+  at 0.75 (272). A change there re-runs `npm run royopen` and re-sweeps TINT.
 - **21f. Violet is laid flat** (QA-16, #293). A comic's violet is solid magenta
   with a second screen of cyan dots over it; the print lays it as the flat colour
   that reads from a step back (`BENDAY_VIOLET`), since Roy has one screen. Green
