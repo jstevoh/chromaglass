@@ -3123,7 +3123,7 @@ its carry turned off.
 ### 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
 **First part shipped**: on a thin gap (every look) the moving Blow is the breath's
-stress on the surface, ½ρ_air C_f U² (about 0.2 Pa), a body force the solve takes in
+stress on the surface, ½ρ_air C_f U² (about 0.38 Pa), a body force the solve takes in
 for as long as the breath goes on, so the column goes at τh/2μ; its push and its three
 carries (`blowDye`, `blowOil`, `blowCarry`) no longer run there (`src/lib/breath.ts`,
 hsBody; `npm run airblow`, 5 checks). Not yet judged on the Mac (judging §44). How it
@@ -3151,10 +3151,17 @@ same number. Open, each its own PR:
   the liquid for one step in every few (the drag time is about eight steps), a fraction
   of the mouse's. Hold the breath between messages as the pointer's direction is held
   (BLOW_DIR_HOLD_MS), then let it blow as air (15b-remote is the same for the Finger).
-- **15g-6 The breath's numbers.** 6 m/s at the surface and C_f 0.01 are a reading of a
-  breath through pursed lips at a hand's height, not a measurement. A phone recording of
-  a real breath across a dish of oil (`npm run watch`) would set the speed the colour
-  goes at, against the lab's 1.04% of the plate over a 1.5 s stroke.
+- **15g-6 The breath's numbers.** 8 m/s at the surface and C_f 0.01 are a firm breath
+  from a few centimetres, set so the air moves a pool about as far as the carries did on
+  the Mac (at 6 m/s `npm run tools` read a third of it), not a measurement. A phone
+  recording of a real breath across a dish of oil (`npm run watch`) would set the speed
+  the colour goes at, against the lab's 2.72% of the plate over a 1.5 s stroke.
+- **15g-7 Blow's stroke to the right moves less than to the left in the app.** On
+  `npm run tools` (Mac) the rightward stroke has read weaker since the carries (145.9
+  carried against 352.4, 4 October) and with the air (+0.13% against +1.15% on #300,
+  6 m/s), where the lab's airblow reads the two alike (2.72%, 2.82%). Something in the
+  app pushes colour left during a Blow stroke, or the stroke to the right runs fewer
+  steps of breath; the check prints both (wind steps, aired, readings) to find which.
 
 What follows is the item as it was written, before its first part shipped:
 

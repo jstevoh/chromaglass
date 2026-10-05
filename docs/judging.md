@@ -1177,7 +1177,7 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
 - Does the colour stream along the way you blow, with the liquid either side curling
   back (the flow round a jet), rather than a blob hopping ahead of the cursor?
 - Is it about as strong as before? If it feels weak or too strong, say which way: the
-  breath's speed (6 m/s at the surface, PLAN 15g-6) is a guess to set by eye.
+  breath's speed (8 m/s at the surface, PLAN 15g-6) is a guess to set by eye.
 - In a thick look it should move much less. Does that read as the liquid being thick,
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.

@@ -40,9 +40,10 @@
  *   3. A pool of colour the wind is drawn across goes the wind's way, out
  *      to the right and out to the left, its centre of mass at least 0.5% of
  *      the plate, where left alone it moves under 0.1%. Measured in software
- *      +1.04% and +1.11%, as far as the carries moved a pool (1.06% in
- *      `npm run wind`), and the old push alone +0.02%: the bar is half of
- *      what the air does and twenty-five times what the push did.
+ *      +2.72% and +2.82% at the breath's 8 m/s (+1.04% and +1.11% at the
+ *      6 m/s it was first set to, as far as the carries moved a pool: 1.06%
+ *      in `npm run wind`), and the old push alone +0.02%: the bar is under a
+ *      fifth of what the air does and twenty-five times what the push did.
  *   4. And keeps its colour to 0.5% (the carries kept 99.4% of a puff's;
  *      the old eraser lost 21%), the pool left alone to 0.1%.
  *   5. A pool of ferrofluid and a drop of oil under the same wind are

@@ -48,18 +48,31 @@
  */
 
 /*
-  The breath, at the surface. Air leaves pursed lips or a straw at 10 to
-  20 m/s and slows as it spreads; a Blow at a hand's height over the dish
-  reaches the liquid at about 6 m/s across the tool's footprint (BLOW_RADIUS,
-  6 mm at the app's 192 cells on a 0.2 m dish). C_f is the skin friction of
-  a wall jet at a breath's Reynolds numbers (U·r/ν_air about 2×10³), about
-  0.01. So τ = ½ · 1.2 · 0.01 · 6² ≈ 0.22 Pa at the jet's middle, at the
-  tool's default Amount; the Amount scales the stress (how hard one blows).
-  On the default liquid in the 6 mm middle of the plate that drives the
-  column at τh/2μ ≈ 3 cm/s, about half a cell a step on the app's plate.
+  The breath, at the surface. Air leaves pursed lips at 10 to 30 m/s when
+  one blows to push something, and slows as it spreads; a firm Blow from a
+  few centimetres over the dish reaches the liquid at about 8 m/s across
+  the tool's footprint (BLOW_RADIUS, 6 mm at the app's 192 cells on a 0.2 m
+  dish). C_f is the skin friction of a wall jet at a breath's Reynolds
+  numbers (U·r/ν_air about 3×10³), about 0.01. So τ = ½ · 1.2 · 0.01 · 8²
+  ≈ 0.38 Pa at the jet's middle, at the tool's default Amount; the Amount
+  scales the stress (how hard one blows). On the default liquid in the 6 mm
+  middle of the plate that drives the column at τh/2μ ≈ 5 cm/s.
+
+  Why 8 and not the gentler 6 m/s this was first written with: at 6 the
+  Mac's `npm run tools` read a stroke moving its pool 0.13% to 0.51% of the
+  plate out to the right and 1.15% out to the left (#300), against the
+  carries' 1.77% and 1.95% on main: the same Blow at a third of the push it
+  had, which a person feels as the tool getting weaker. A breath is not a
+  measured number either way (PLAN 15g-6 asks for a recording of one); a
+  firm one is the Blow the tool was tuned as, so the air is set to move a
+  pool about as far as the carries did, which is how 18a-2 set every look's
+  forces when they became forces. In the lab (`npm run airblow`, its pool
+  and stroke) 6 m/s moved the pool 1.04%, 8 m/s 2.72% and 10 m/s 5.25%,
+  steeper than the stress's U² because a faster film keeps up with the hand;
+  the app's slower runner gave the 6 m/s Blow about 0.6 of the lab's.
 */
 export const AIR_DENSITY = 1.2;
-export const BREATH_SPEED = 6;
+export const BREATH_SPEED = 8;
 export const WALL_JET_FRICTION = 0.01;
 export const BREATH_STRESS = 0.5 * AIR_DENSITY * WALL_JET_FRICTION * BREATH_SPEED * BREATH_SPEED;
 
