@@ -1145,7 +1145,7 @@ and drop them with the Dropper (desk and phone) on Glycerine Drift, Deep Ocean, 
 
 Every bottle you pour now adds liquid to the plate: on a thin gap (every look) it pushes
 what is already there out of its way, and what reaches the rim leaves the dish. A held
-bottle is a thin stream, 2 mL a second. And a poured liquid no longer fades: glycerine
+bottle lets go as a squeezed dropper does, half a millilitre a second. And a poured liquid no longer fades: glycerine
 stays thick until clear liquid poured after it has pushed it out. On the desk and the phone:
 - hold the Dropper of Water in the middle of a colourful plate (Deep Ocean, Aurora Borealis):
   the colour round it should be pushed outward into rings, slowly, as water dropped into a

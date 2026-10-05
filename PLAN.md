@@ -3796,7 +3796,7 @@ its frame rate live. "Free" means no new passes or texture reads.
   K = We·Oh^−0.4 above about 2100 from `dropHeight`, not on any energy above 0.02.
 - **18c-4** An oil drop as a lens or a film by the spreading coefficient
   S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
-- **18c-5** The held pour's rate is one number, 2 mL/s (`HELD_POUR`,
+- **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,
   `src/lib/liquidProps.ts`), whatever the tool and the Amount. A Pour should let go more
   than a Dropper, and the Amount should be the rate.
 

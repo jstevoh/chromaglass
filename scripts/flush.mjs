@@ -47,7 +47,7 @@
  *   4. And the water is where it was poured: the middle of the dish is
  *      clear liquid again, its share under 0.05.
  *   5. And the app's held stream, on the CPU: a second of a held Dropper
- *      pours 2 mL (HELD_POUR), no step of it clipped at a whole column.
+ *      pours 0.5 mL (HELD_POUR), no step of it clipped at a whole column.
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -67,7 +67,7 @@ const check = (name, ok, detail = '') => {
   5. The held stream the app pours with (pourShare, LiquidVisualizer's
   onDeposit), which the lab's pours do not go through: a second of a held
   Dropper at its default width (3 cells of the 128 its geometry was tuned
-  at), a step at a time at 60 a second, puts down 2 mL, and no step of it
+  at), a step at a time at 60 a second, puts down 0.5 mL, and no step of it
   is clipped at a whole column, so the rate is the rate.
 */
 {
@@ -75,7 +75,7 @@ const check = (name, ok, detail = '') => {
   const dome = Math.PI * (r * DISH_METRES) ** 2 / 2 * DISH_REST_GAP * DISH_METRES;
   const one = pourShare(r, 1, 1 / steps);
   const mL = one * dome * steps * 1e6;
-  check('a held bottle pours 2 mL a second, unclipped', Math.abs(mL - HELD_POUR * 1e6) < 1e-9 && one < 1 && pourShare(r, 0.35) === 0.35,
+  check('a held Dropper pours 0.5 mL a second, unclipped', Math.abs(mL - HELD_POUR * 1e6) < 1e-9 && one < 1 && pourShare(r, 0.35) === 0.35,
     `${mL.toFixed(3)} mL in a second of a Dropper ${(r * DISH_METRES * 1000).toFixed(1)} mm wide, ${one.toFixed(3)} of the column a step; a dropped dose of 0.35 is 0.35`);
 }
 

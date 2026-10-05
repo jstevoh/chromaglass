@@ -95,15 +95,22 @@ export function speciesOf(what: Poured | undefined): Species | null {
 }
 
 /*
-  How fast a held bottle pours, m³ a second: 2 mL/s, a dropper squeezed or a
-  bottle tipped to a thin stream. On a thin gap a pour is volume (PLAN 18c):
-  it pushes the liquid already there out of its way, and what reaches the rim
-  leaves. So a held tool cannot put a whole column of its disc down every
-  step, as the body's dose did (a disc a dropper wide holds a fifth of a
-  millilitre, which a step at that rate would fill twelve times a second);
-  it puts down what the stream lets go in the step.
+  How fast a held bottle pours, m³ a second: 0.5 mL/s, a dropper's bulb
+  squeezed steadily, about ten drops of 0.05 mL a second. On a thin gap a
+  pour is volume (PLAN 18c): it pushes the liquid already there out of its
+  way, and what reaches the rim leaves. So a held tool cannot put a whole
+  column of its disc down every step, as the body's dose did (a disc a
+  dropper wide holds a fifth of a millilitre, which a step would fill three
+  times a second at this rate); it puts down what the dropper lets go in
+  the step.
+
+  It was 2 mL/s first, a bottle tipped to a thin stream, and on the Mac
+  (`node scripts/mirror.mjs`) four held drops of the Dropper on Classic's
+  second plate pushed the colour of the drops before them two cells of a
+  6×6 grid out from the hand (74.7 past the plate's drift, 27 allowed,
+  twice). A dropper is not a stream; a Pour should let go more (PLAN 18c-5).
 */
-export const HELD_POUR = 2e-6;
+export const HELD_POUR = 0.5e-6;
 
 /**
  * The share of the column a pour adds at the middle of its disc: what the

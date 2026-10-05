@@ -2169,7 +2169,8 @@ its dome in a buffer and hsDivergence takes it as a source, the flow u_r = Q/(2Ï
 pushes what was there outward, and what crosses the open rim leaves. A liquid that mixes
 with the clear one is added to the species field as its share; the flux-form carry
 removes the pour's own outflow from the column, so every poured share is accounted for.
-A held bottle is a 2 mL/s stream (`HELD_POUR`), its share a step that stream over the
+A held bottle is a squeezed dropper, 0.5 mL/s (`HELD_POUR`; 2 mL/s pushed the colour of
+earlier drops two cells out on the Mac's mirror check), its share a step that over the
 dome it lands as; a dropped dose (a drop that falls, the automation's) is its amount.
 The first version mixed the pour into the column, (was + f)/(1 + f), and then let its own
 flow carry f out, counting the outflow twice: half of every pour vanished.
