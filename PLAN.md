@@ -238,7 +238,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
-- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9m**,
+- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
@@ -411,7 +411,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m and 9o–9r open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9aa (the maze too coarse, and its haze; measured) open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -691,6 +691,41 @@ not yet reach, and it needs a render change rather than a solver one.
 
 **Shipped**: what each preset puts in its dish. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+**4a-clock. Clock Glass and Ferro Paint after their references** (**shipped**, #280).
+The owner, 2026-10-04: "the clock glass preset is really underwhelming as is the ferro
+presets. They don't look anything like the inspirations." Judged against the Mac gallery
+of that morning (`/mnt/project-files/lamp-ground/gallery/`, 12 s and 30 s):
+
+- Clock Glass was one lavender-magenta disc. A clock-glass dish (the Joshua Light Show,
+  the Fillmore) is coloured oil and water that will not mix: cells of red, amber and
+  blue oil with dark rims in a purple water. The look laid three water dyes in rings on
+  top of each other, with radii in the wrong units (below), so they blended at once.
+  It now lays a purple water round twelve bodies of oil, each with one of red, amber and
+  cobalt in it, with Oil Bodies and Oil Tension on (`src/lib/oilLay.ts`). Laying it found
+  a fault in Oil Bodies itself: the oil's share of the dye started empty when a plate
+  first had bodies, on the reasoning that the colour inside a body would be handed to it
+  in a few steps. It was not: the bodies' colour ran out into halos in the water. The
+  share now starts from the plate as it is (`fluid.ts`, bodiesFresh). `npm run
+  clockglass` (lab, 192², 300 steps): the dish's colours spread 0.248 rad against the old
+  lay's 0.101, in 4 separate regions off the water, and the oil holds 97% of the colour
+  laid in it (17% with the share starting empty, 3 regions). `npm run bodies` 17/17.
+- Ferro Paint opened as one green with black holes, where Colored I and II hold amber,
+  teal and coral in regions. Its sixteen patches were laid with a radius of `S × 0.15`
+  in `splatBlob`'s 128-grid units, which it scales by GRID_SCALE again: 0.225 of the
+  plate, nearly the patches' spacing, so all sixteen lay over each other. Now 0.09.
+- Open from this: **4a-units**. Roy, 1963 lays its shapes the same way (`S × fr` in
+  128-grid units, 1.5 times the size meant); its panel may want them halved, by eye.
+  **4a-clock-fade**: on a fade (the set list, the desk's Go) the seed is laid in shares
+  over the fade (addSeedShare) while every body's oil lands at once, so on a long fade
+  the bodies move before their colour arrives and some of it lands in the water: the
+  halo this fixed for a hard lay. Lay the oil in the same shares, and give `npm run
+  clockglass` a case that lays through the handover. Also unmeasured: the look's own
+  doses (`['oil', 'water', 'oil', 'syrup']`, about seven small clear bodies at the
+  lay) and the app's finer GPU grid (the check lays at 192², the app runs 384² and up).
+  And the automation's drops still land any of a look's dyes anywhere, so over a minute
+  the regions blur: where each dye lands belongs to the "more going on in every look"
+  work (several areas of interest across the plate), not to these two looks.
+
 ### 5. Playing it: sound learn, shutter, and a look link
 
 **Partly shipped** (#154, #155): the bands and sound learn's music source and triggers (`npm run bands`, `npm run learn`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -808,6 +843,33 @@ Open, from building 9e (in the order to do them):
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
 
+- **9aa. The maze is two to three times coarser than its period, and leaves a haze**
+  (measured 2026-10-04, building 4a-clock). Ferro Maze, Ferro Paint and Magnet Garden
+  in the Mac gallery are fat black blobs with a brown haze round them, where the
+  references are dense thin stripes on clean white. The lab reproduces it (256², Ferro
+  Maze's settings and pour, Thin Gap on; with it off the same): after 900 steps the
+  domains are about 30 cells wide where the period asked is 12, and the black (cells
+  past half full) falls from 21% to 15% of the plate as ferrofluid leaks into a film
+  under half full, the haze (9d's "ghost smears"). Tried, each 600 steps, none of them
+  a fix on its own:
+  - the field coil at full strength under the whole plate (MAZE_UNIFORM 0.45 → 1):
+    the same blobs, and the leak faster (black 21% → 11.5%);
+  - the double well steepened everywhere, not only under the hand (phaseMu's
+    `wellNeed`): the leak slowed (black 17.7% kept, against 15.4%), the blobs stayed;
+  - MAZE_GAIN ×4 (the maze's Darcy flow): droplets, and the leak faster (12.5%);
+  - the dipoles' repulsion nearly unscreened (m² from 0.16 k*² to 0.005 k*²), which is
+    the real physics: parallel dipoles in a thin layer repel at long range, and a
+    screening shorter than a pool lets a pool sit as a pool. **The haze went entirely
+    and the black stayed at 17.8%**, but at that fill the domains became separate dots
+    (with the repulsion ×4 and ×16, smaller dots). Ohta–Kawasaki's dots are right for
+    a fifth of the plate: a labyrinth needs about half (Magnetic Pattern I's disc is
+    half black).
+  So the next step is both: the long-range repulsion, and a pour that fills the
+  maze's region to about half (a disc for Ferro Maze, as the reference), with the
+  period then set by the sharp-interface balance and not the linear one (the dots
+  came out about twice the asked period). Every ferrofluid check moves with it
+  (`maze`, `fingers`, `domes`, `spikes`, `ferrodye`, `ferropour`), so it is its own PR
+  in lane C after 9t. Probes in `/mnt/project-files/clock-ferro-looks/`.
 - **9j. Spikes that follow the music.** A real ferrofluid speaker's spikes jump on the
   kick. The spikes now answer the magnet's field, so the maze's audio breathing
   could drive their height too.

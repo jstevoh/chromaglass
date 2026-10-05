@@ -15,8 +15,10 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
+import { clockGlassBodies, clockGlassCell } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
-import { phasePourShape } from '../src/presetPlate';
+import { phasePourShape, PRESET_CONTRACTS } from '../src/presetPlate';
+import { PALETTE_RGB } from '../src/constants';
 import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
@@ -215,8 +217,15 @@ const api = {
     if (!p) throw new Error(`no look ${id}`);
     // Over the defaults, as the app lays a look: a key the look leaves out
     // is the default there, not off.
-    return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id) };
+    return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id), dyes: (PRESET_CONTRACTS[id] ?? []).map((i) => ({ ...PALETTE_RGB[i] })) };
   },
+  /** Clock Glass's oil bodies as the app lays them (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
+  clockGlassBodies(seed: number, dyes: number) {
+    let s = seed;
+    return clockGlassBodies(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
+  },
+  /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
+  clockGlassCell,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** Pour the ferrofluid as the app lays a look's (phasePour): the same drops, not a copy of them. Returns how many. */

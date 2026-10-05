@@ -1913,10 +1913,18 @@ export const PRESETS: Preset[] = [
   {
     id: 'clock-glass',
     name: 'Clock Glass',
-    description: 'Two curved clock glasses with the dye between them: lavender, ice and magenta pool in the deep middle, and a press leaves a thin bright film that creeps back.',
+    description: 'Two curved clock glasses with coloured oil and water between them: cells of red, amber and blue oil, each with its dark rim, drift in purple water and gather in the deep middle, and a press spreads them into a thin bright film that creeps back.',
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
+      /*
+        Oil and water, as a clock-glass dish is (seedPreset's 'clock-glass'):
+        the oil rounds into bodies under its own surface tension and each
+        keeps its own colour (Oil Bodies), so the dish holds several colours
+        side by side instead of blending them into one. Oil & Water's values.
+      */
+      oilTension: 0.9,
+      oilBodies: 1,
       globalSpeed: 0.0126,
       surge: 0.4,
       layerCount: 1,

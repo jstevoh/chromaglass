@@ -1993,7 +1993,8 @@ export class WebGPUFluid {
         to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
         not stop. The oil's colour does mix inside a body, slowly
         (bodyPartition's inside rate), as two dyed oils do. (A share begun
-        this step is empty, and the transport below clears it first.)
+        this step is skipped here: the transport below starts it from the
+        plate as it is.)
       */
       if (bodiesOn && !bodiesFresh) {
         const od = this.oilDye!;
@@ -2078,11 +2079,24 @@ export class WebGPUFluid {
       /*
         With Oil Bodies, the dye and the oil's share of it cross the same
         faces as the oil does (bodyAdvect, and why). A share left from an
-        earlier stretch with it off is stale, so it starts empty: whatever
-        is inside a body is handed to it within a few steps.
+        earlier stretch with it off is stale, so it starts again from the
+        plate as it is: the colour in each cell is the oil's as far as the
+        cell is oil (bodyLand, with the whole dye as what lands), which is
+        what a dish holds the moment anyone starts telling its two liquids
+        apart. It started empty, on the reasoning that whatever was inside a
+        body would be handed to it within a few steps; measured, it was not.
+        Clock Glass lays its bodies with their colours in them (seedPreset),
+        and with an empty start each colour was the water's: it spread out
+        of its body as the water's colour spreads and left a dark ring of
+        clear oil inside a wide halo (the lab, 300 steps; npm run
+        clockglass).
       */
       const od = this.oilDye!;
-      if (bodiesFresh) for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      if (bodiesFresh) {
+        for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+        this.run(pass, 'bodyLand', od.write, [od.read, this.dye.read, this.deltaMulTex, mix!.read], this.arg('body start', [0, 0, 0, 0]));
+        od.swap();
+      }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv);
@@ -2807,7 +2821,10 @@ export class WebGPUFluid {
   }
 
   private ensureOilDye(): PingPong {
-    if (!this.oilDye) this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye');
+    // A share just made starts from the plate as it is, as a stale one does
+    // (the 'advect dye' stage, bodiesFresh): the oil already laid holds the
+    // colour already in it.
+    if (!this.oilDye) { this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye'); this.oilDyeStale = true; }
     return this.oilDye;
   }
 

@@ -708,6 +708,13 @@ jobs:
       - name: A clear film that tears
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lace
+      # Clock Glass (PLAN 4a-clock): its dish holds several colours apart, in
+      # bodies of oil that keep the colour laid in them, where the old lay was
+      # one blended disc. Two 192² plates of 300 steps; in the open shard, as
+      # the plate shard is near its timeout.
+      - name: Clock Glass keeps its colours apart
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run clockglass
       # Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to
       # the screen, a pool one flat ink outlined in black, and only Roy prints.
       - name: The Ben-Day print
