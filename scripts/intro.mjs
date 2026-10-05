@@ -70,6 +70,15 @@ const browser = await launchChromium(chromium);
 const instruments = () => {
   const w = window;
   const at = w.__introAt = { frames: 0, shown: 0, hidden: 0 };
+  /*
+    When it left the page, from the removal itself: the frames that read
+    everything else can stall a second and a half on a software plate just
+    as the plate starts, and a frame-sampled "gone" read 3,007 ms on a run
+    where the page had removed it a second after it began to leave (#286).
+  */
+  new MutationObserver(() => {
+    if (at.removedAt === undefined && at.shown > 0 && !document.getElementById('cg-intro')) at.removedAt = performance.now();
+  }).observe(document, { childList: true, subtree: true });
   const frame = () => {
     const n = ++at.frames;
     const el = document.getElementById('cg-intro');
@@ -205,10 +214,10 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   */
   const leftOnStep = stepped && !at.noCount && at.leaving >= at.stepped && at.leaving - at.stepped <= 1;
   const faded = at.fade !== undefined && at.fade.ms >= 500;
-  const goneIn = at.goneAt !== undefined && at.goneAt - at.leavingAt <= 3000;
+  const goneIn = at.goneAt !== undefined && at.removedAt !== undefined && at.removedAt - at.leavingAt <= 3000;
   check('4. it leaves on the frame the plate first steps, fades, and is gone from the page',
     leftOnStep && faded && goneIn && !after.there,
-    `${at.noCount ? 'no stepCount on the lead plate to read; ' : ''}${stepped ? `plate stepped on frame ${at.stepped} (${s(at.steppedAt)}), intro leaving on frame ${at.leaving} (${s(at.leavingAt)}) for "${rec.reason}"` : 'the plate never stepped, or the intro never went'}; ${at.fade ? `a ${at.fade.ms} ms fade on opacity` : 'no fade started'}; gone ${at.goneAt !== undefined ? `${Math.round(at.goneAt - at.leavingAt)} ms after` : 'never'}`);
+    `${at.noCount ? 'no stepCount on the lead plate to read; ' : ''}${stepped ? `plate stepped on frame ${at.stepped} (${s(at.steppedAt)}), intro leaving on frame ${at.leaving} (${s(at.leavingAt)}) for "${rec.reason}"` : 'the plate never stepped, or the intro never went'}; ${at.fade ? `a ${at.fade.ms} ms fade on opacity` : 'no fade started'}; gone ${at.removedAt !== undefined ? `${Math.round(at.removedAt - at.leavingAt)} ms after (seen on a frame ${at.goneAt !== undefined ? `${Math.round(at.goneAt - at.leavingAt)} ms after` : 'never'})` : 'never'}`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {
