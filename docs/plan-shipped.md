@@ -2211,7 +2211,11 @@ with the same expression, limiter and floor; the species' stage keeps only the r
 `npm run thick` times all three on one plate (the stage alone, the colour's carry, the
 two together) and asks that the species now add under half of what it cost alone, and
 carries the alcohol run both ways and asks for the same fields. Software, 256²: alone
-1.00 of the colour's carry, riding it 0.34; the fields the same to the bit.
+1.00 of the colour's carry, riding it 0.34; the fields the same to the bit. CI's Mac,
+768², 15 substeps: alone 13.54 ms (1.02 of the colour's carry), riding it 6.73 ms (0.51),
+so the faces were half of a carry there, not all of it; the fields the same to 1e-4 of
+the largest (Metal's compiler orders the two kernels' arithmetic its own way, and the
+species feeds the flow back through the drag over 30 steps).
 Under the maze's flow the colour moves in sixths, so the species there still has its own
 stage (18d-11b).
 The open items are 18d-3 to 18d-11 in PLAN.md.
