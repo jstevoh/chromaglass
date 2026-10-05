@@ -362,6 +362,13 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
   Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
   to 21d hold the rest of its open work. Deferred by the owner: fix later.
+  Cause, found and measured in the lab: Roy's seed (`seedPreset` 'roy' in
+  `LiquidVisualizer.tsx`) passes `splatBlob` radii in cells (`S * fr`), but `splatBlob`
+  takes 128-grid units and scales by `GRID_SCALE` itself, so the four pools come out
+  4 to 5 times too wide, overlap across the plate, and the three inks stacked print
+  black (57 % of the view black, none white, yellow or blue). A fix and a new check
+  (`royopen`, 1 of 6 on main, 6 of 6 with the fix) wait in the shared files under
+  `handoff/roy-black-stain/`; its PLAN hunk for §21 is to be merged with this entry.
 
 **Tier 4. Polish.**
 
