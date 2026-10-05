@@ -208,7 +208,7 @@ merge conflicts are the shared documents', which 0.6 ends.
 ### Wave 5. Playing it: the instrument
 
 **§26, every control does something you can see** (the owner, 2026-10-05): ~~26a-c Plate
-Rock, Beat Squeeze, Turbulence~~ (this PR); **26d** the rest of the sweep (M, lanes B and G).
+Rock, Beat Squeeze, Turbulence~~ (#305); **26d** the rest of the sweep (M, lanes B and G).
 
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
@@ -5232,7 +5232,7 @@ against the look's own drift. On 20 of 24 looks: Turbulence visible on 5, Beat S
 Plate Rock 9, Swirl 3, Evolve Speed 5, Fingering 5, Lacing 4, Tempo Sync 4. On the `all`
 shard's three looks about twenty more read nothing on all three (26d has the list).
 
-- **26a. Plate Rock is the plate tipped (shipped, this PR).** It went through the
+- **26a. Plate Rock is the plate tipped (shipped, #305).** It went through the
   half-resolution current as a stir, 0.2 × the spring's swing × tanh of the dye over the
   mean, and its dial went as its square (the kick's shove × R, then the swing × R). Now
   the dial is applied once and, on a thin gap, the tilt is the dye's weight down the
@@ -5240,7 +5240,7 @@ shard's three looks about twenty more read nothing on all three (26d has the lis
   liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
   forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
   own stir moves them 0.79).
-- **26b. Beat Squeeze presses the glass, not a palm (shipped, this PR).** The kick
+- **26b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
   span the dish (`KICK_RADII`) and the depth is `kickDepth` (0.005 × squeeze × (0.6 +
@@ -5249,7 +5249,7 @@ shard's three looks about twenty more read nothing on all three (26d has the lis
   - **26b-1, open.** Let go, the ring comes back 87% of the way at the default and 79%
     at full; a squeeze film with nothing fingering should come all the way. The rest is
     the colour's first-order carry (18a-8).
-- **26c. Turbulence reaches (shipped, this PR).** The dial was the stir's speed, so
+- **26c. Turbulence reaches (shipped, #305).** The dial was the stir's speed, so
   full was a look's 0.3 tripled, and with the band playing the music multiplied it and
   then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
   dial runs as t(1 + 3t³) (`lib/stir.ts`; a look's 0.3 within 8% of before, full four
