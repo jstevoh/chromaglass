@@ -2056,6 +2056,16 @@ up (d027626's 111 minutes, which this section first counted as a docs-only wait,
 PRs' site changes going out). The gain grows with 19i and 0.3: fewer red or superseded
 deploys leave more docs merges directly on top of a live commit.
 
+### 19r. Smaller, for the same pass: the open shard evened
+
+**Shipped** (the open shard's half). The open shard had gathered eight checks since #239
+evened the shards and ran 17.4 to 18.7 minutes green on 2026-10-04 against its 20-minute
+timeout (startup 393 s, the phone's fingers 268 s, the lamp 124 s), while show ran 8.9 to
+10.7. #280's third attempt was killed by the timeout inside the phone's fingers, and three
+open PRs (#267, #280, #281) each add a check to open. The phone's fingers moved to show:
+open about 14 minutes, show about 15, both from the step times of the intro PR's green run.
+Nothing on show needs a cold shader cache, which is why the fingers ran after `startup`.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -2210,6 +2220,22 @@ hot-spot, beads, bubbles or closeup texture). `npm run benday` measures the prin
 a lab plate: a wash is 242 separate dots against 256 on the lattice, one size to
 2.7%, fixed while the plate turns; a pool is one flat ink with a line all the way
 round it and a line where red meets yellow; and only Roy prints.
+
+**Shipped: Roy opens as a panel, not a black stain.** The owner, 2026-10-04, over a
+screenshot nine seconds in: "The Roy preset always starts with this giant black stain.
+Get rid of it. It needs to look more like an abstract colorful Roy Lichtenstein
+painting." The stain was the look's seed: `splatBlob` takes its radius in the 128 grid's
+units and scales it itself, and Roy's seed handed it cells, so its four pools came out
+four to five times too wide, lay over each other across the whole glass, and three inks
+over each other print black. The seed is now a laid-out panel in the plate's view: seven
+flat shapes and three brushstrokes of the three inks, apart on white paper, and four
+even fields of pale wash at the strength each ink prints as Ben-Day dots (measured per
+ink, a narrow band: blue about 0.1, yellow and red about 0.12). Dye Budget 0.9 → 0.45, so
+the drops cannot fill the plate back into one wash (inferred, 21e). `npm run royopen`
+lays the app's own seed and prints it in the lab: on main 71% of the plate absorbing all
+three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots, mean
+3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
+0.115. The phone lays the same seed (it is the plate, not a control).
 
 ## 22. Spin the plate
 

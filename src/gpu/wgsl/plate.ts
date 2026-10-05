@@ -586,6 +586,20 @@ fn pigmentGrain(grainTex: texture_2d<f32>, fuv: vec2f) -> f32 {
   return mix(grainAt(a * U.grainScale), grainAt(b * U.grainScale), U.grainMix) - 0.5;
 }
 
+/*
+  What the grain does to the colour's depth at a point, as a factor on the
+  opacity the curve made: the grain is more or less pigment, so it scales the
+  dye's optical depth, and an opacity a = 1 - exp(-t) with t times g is
+  1 - (1 - a)^g. A thin wash takes the grain nearly in proportion; a body
+  already near opaque hardly moves. Taken against the bare opacity (the
+  dye's own, before the gooey curve) so the factor is the pigment's alone,
+  and the curve, which is the meniscus, keeps deciding where the edge is.
+*/
+fn grainedDepth(bare: f32, grain: f32) -> f32 {
+  let a = clamp(bare, 1e-4, 0.999);
+  return (1.0 - pow(1.0 - a, grain)) / a;
+}
+
 // Satellite droplets: the hundreds of tiny beads that sit on the glass around
 // every drop in a macro photograph. Each cell of a jittered grid holds one
 // small lens, shaded like the big bubbles — dim toward the lamp, bright away
@@ -1856,11 +1870,13 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
 
   - its key: dark is black ink, and anything lit is paper with ink on it.
     Lichtenstein has no shading, so the key is a step, not a ramp;
-  - its ink: whichever of the three process inks (BENDAY_RED, _YELLOW,
-    _BLUE) its hue is nearest, at full strength. Taking the pixel's own hue
-    instead was the first try, and it printed the plate's gradients as
-    gradients (red running through orange into yellow across one pool) and
-    the tints as rainbow dots, which is a photograph, not a print;
+  - its ink: whichever of the look's inks (BENDAY_RED, _YELLOW, _BLUE) its
+    hue is nearest, at full strength, or, where the hue is far from all three,
+    two of them printed over each other (benDayInkIndex): green and violet.
+    Taking the pixel's own hue instead was the first try, and it printed the
+    plate's gradients as gradients (red running through orange into yellow
+    across one pool) and the tints as rainbow dots, which is a photograph,
+    not a print;
   - its coverage: how much of the pixel is that ink rather than paper,
     (max - min) / max. Little is bare paper, some is the tint (the dots) and
     most is the solid ink.
@@ -1890,22 +1906,91 @@ const BENDAY_SOLID: f32 = 0.62;
 const BENDAY_RED = vec3f(0.89, 0.1, 0.12);
 const BENDAY_YELLOW = vec3f(1.0, 0.86, 0.06);
 const BENDAY_BLUE = vec3f(0.08, 0.33, 0.78);
-fn chromaDir(c: vec3f) -> vec3f { return normalize(c - vec3f((c.r + c.g + c.b) / 3.0)); }
-/** Which of the three inks a colour's hue is nearest: 0 red, 1 yellow, 2 blue. */
+/*
+  Green and violet, as a printer made them (QA-16).
+
+  The owner, 2026-10-04, from the corner dot on Roy: a green dye "cannot be
+  added", it prints as another colour. Snapping every hue to the nearest of
+  three inks put a green (120 degrees, the yellow ink is at 52 and the blue
+  at 219) on the yellow, and a teal or a violet on the blue: there was no
+  green on the press at all.
+
+  A comic had no green ink either. It was printed in transparent process
+  inks over white paper, and a colour the press had no ink for was two inks
+  laid over each other, each a filter on the light the paper sends back, so
+  the overprint is their product. The look's three inks are themselves such
+  overprints: its red is magenta over yellow and its blue is cyan with
+  magenta over it. So the two missing inks are divided out of them: the
+  magenta is RED / YELLOW, (0.89, 0.116, 2.0) clipped to what a filter can
+  pass, and the cyan is BLUE / magenta, (0.09, 2.8, 0.78) clipped the same
+  way (the look's blue lets through more green than a full magenta would,
+  which is the half-strength magenta a comic's blue was). Green is then that
+  cyan over the yellow, a clean bright green (0.09, 0.86, 0.05), and not the
+  look's blue over its yellow, (0.08, 0.28, 0.05), which is olive going on
+  black: the blue already carries the magenta that kills a green, and that
+  is why the obvious overprint was not taken. Violet is the magenta with
+  the cyan at half, the colourist's chart's 100 % magenta and 50 % cyan,
+  laid flat at the colour it reads as from a step back rather than as a
+  second screen of dots over the magenta (PLAN 21f).
+
+  Which hues take an overprint is how far they are from the inks: within
+  BENDAY_OWN of an ink, the ink alone, as before; past it from both inks
+  either side, the two together. The red and yellow inks are 53 degrees
+  apart, so no hue between them is past 40 degrees from both: an orange
+  still prints red or yellow, Roy's red-against-yellow seams are what they
+  were, and red over yellow would only have printed red again (the red ink
+  passes almost no green for the yellow to keep). Between yellow and blue
+  (167 degrees) everything from a lime to a turquoise prints green; between
+  blue and red (139) a purple or a magenta prints violet. A cyan, 39 degrees
+  from the blue, stays blue, and a pink stays red.
+*/
+const BENDAY_MAGENTA = vec3f(0.89, 0.116, 1.0);
+const BENDAY_CYAN = vec3f(0.09, 1.0, 0.78);
+const BENDAY_GREEN = BENDAY_CYAN * BENDAY_YELLOW;
+const BENDAY_VIOLET = BENDAY_MAGENTA * mix(vec3f(1.0), BENDAY_CYAN, 0.5);
+/* The inks' own hues, as benDayHue reads them, folded when the shader compiles. */
+const BENDAY_RED_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_RED.g - BENDAY_RED.b), BENDAY_RED.r - 0.5 * (BENDAY_RED.g + BENDAY_RED.b)));
+const BENDAY_YELLOW_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_YELLOW.g - BENDAY_YELLOW.b), BENDAY_YELLOW.r - 0.5 * (BENDAY_YELLOW.g + BENDAY_YELLOW.b)));
+const BENDAY_BLUE_HUE: f32 = degrees(atan2(0.8660254 * (BENDAY_BLUE.g - BENDAY_BLUE.b), BENDAY_BLUE.r - 0.5 * (BENDAY_BLUE.g + BENDAY_BLUE.b)));
+/** How near an ink's hue (in degrees) a colour prints in that ink alone. */
+const BENDAY_OWN: f32 = 40.0;
+/** A colour's hue round the colour wheel, in degrees from red toward green. */
+fn benDayHue(c: vec3f) -> f32 {
+  return degrees(atan2(0.8660254 * (c.g - c.b), c.r - 0.5 * (c.g + c.b)));
+}
+/** How far apart two hues are round the wheel, in degrees, 0 to 180. */
+fn benDayApart(a: f32, b: f32) -> f32 {
+  let d = abs(a - b) % 360.0;
+  return min(d, 360.0 - d);
+}
+/**
+ * Which ink a colour prints in: 0 red, 1 yellow, 2 blue, and the overprints
+ * 3 green (between yellow and blue) and 4 violet (between blue and red).
+ */
 fn benDayInkIndex(hue: vec3f) -> f32 {
-  let a = hue - vec3f((hue.r + hue.g + hue.b) / 3.0);
-  let r = dot(a, chromaDir(BENDAY_RED));
-  let y = dot(a, chromaDir(BENDAY_YELLOW));
-  let b = dot(a, chromaDir(BENDAY_BLUE));
-  if (r >= y && r >= b) { return 0.0; }
-  if (y >= b) { return 1.0; }
+  let h = benDayHue(hue);
+  let r = benDayApart(h, BENDAY_RED_HUE);
+  let y = benDayApart(h, BENDAY_YELLOW_HUE);
+  let b = benDayApart(h, BENDAY_BLUE_HUE);
+  let near = min(r, min(y, b));
+  if (near > BENDAY_OWN) {
+    // Past every ink's own reach: the two inks either side of it. The red
+    // and yellow are too close for a hue between them to get here, so it
+    // is green beside the yellow and violet beside the red.
+    if (y < r) { return 3.0; }
+    return 4.0;
+  }
+  if (r <= y && r <= b) { return 0.0; }
+  if (y <= b) { return 1.0; }
   return 2.0;
 }
 fn benDayInk(hue: vec3f) -> vec3f {
   let i = benDayInkIndex(hue);
   if (i < 0.5) { return BENDAY_RED; }
   if (i < 1.5) { return BENDAY_YELLOW; }
-  return BENDAY_BLUE;
+  if (i < 2.5) { return BENDAY_BLUE; }
+  if (i < 3.5) { return BENDAY_GREEN; }
+  return BENDAY_VIOLET;
 }
 /*
   The outline of the front plate's shapes, as thick as a pen's line.
@@ -2129,15 +2214,66 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     more0 *= dish0.x;
   }
 
-  if (U.granulation > 0.002 && fluid0.a > 0.004) {
-    let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
-    fluid0.a = fluid0.a * grain;
-    more0 *= grain;
-  }
-
+  let bare0 = fluid0.a;   // the opacity the dye alone gives, for the grain below
   if (useBlur && fluid0.a > 0.0) {
     let contrast = 1.2 + U.gooey * 4.0;
     fluid0.a = clamp((fluid0.a - 0.5) * contrast + 0.5, 0.0, 1.0);
+  }
+
+  /*
+    The pigment's grain, after the edge and not before it.
+
+    What was reported: on the laptop, quite a few looks "very pixelated, like
+    a computer with poor graphics, less like liquids". Photographed on CI's
+    Mac at a laptop's size (npm run pixels), the mark common to them was the
+    dye's edges: every boundary between colour and clear dissolved into a
+    sandpaper fringe of flecks a few cells across, on Oil and Water, Oil
+    Wheel, Poster 1969, Red Cabbage, Colorful Cosmos and most of the rest,
+    at the top rung as at the bottom. So it was not the grid's size.
+
+    It was this block's order. Granulation (0.5 in every look by default)
+    scaled the opacity by the pigment's noise, about 0.6 to 1.4, and the
+    gooey edge's contrast curve came after it, with a slope of 1.2 + 4 x
+    Gooey (3.6 at Colorful Cosmos's 0.6). Inside a body the opacity is near
+    1 and the curve clamps, so the grain did little; at the edge, where the
+    opacity passes 0.5, the curve multiplied the grain's ±40% three to five
+    times and thresholded it, and the edge went wherever the noise said. The
+    grain's coordinates ride the flow (seedGrain), so they are sheared
+    hardest exactly at the edges, into flecks.
+
+    Neither half of that is the liquid. The curve is the meniscus: surface
+    tension pulling a body's rim crisp, set by how much dye is there. The
+    grain is pigment settling within the wash, which changes how deep the
+    colour is at a point, not where the body ends. So the edge is made from
+    the dye first and the grain then varies the depth of what is inside it,
+    as much as it always did in the body's interior. Measured in the lab with
+    the solver's own grain field (npm run pixels describes the fringe): the
+    ragged ring at every edge is gone and the bodies' insides are as they
+    were.
+
+    How much the grain varies the depth is Beer and Lambert's, not a
+    multiple of the opacity (grainedDepth). Before, the opacity times the
+    grain could pass 1 on a look with no Gooey, and mix() then drew past
+    the dye's own colour; and on an opaque body the grain is the most it
+    can be, so its opacity should move least, which a multiple got backwards.
+  */
+  /*
+    The liquid's own thickness, kept from before the grain for the soap
+    film below (thinFilm). The film's colour is interference, set by how
+    thick the liquid is, and it cycles every few hundredths of opacity: read
+    after the grain, every grain was a jump round the rainbow, and Sunny Side
+    Up and Soap Film threw single pixels of another colour along every thin
+    edge (7.1% and 3.0% of the edges' pixels flecks, as grainedge reads them).
+    Pigment settling deeper in a place does not make the liquid thicker there.
+    It takes every later change to the opacity but the grain's (the dark
+    blend's 0.6 and the closeup's, below), so with no grain the film is
+    drawn exactly as it was.
+  */
+  var film0 = fluid0.a;
+  if (U.granulation > 0.002 && fluid0.a > 0.004) {
+    let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
+    fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
+    more0 *= grain;
   }
 
   let sharp0 = dof < 0.55;
@@ -2148,7 +2284,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
   }
   fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
-  if (darkBlend) { fluid0.a *= 0.6; }
+  if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
 
   if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
     var edge0 = boundaryLine(near0.z);
@@ -2193,7 +2329,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    fluid0 = mix(fluid0, macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof), macroAmt);
+    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+    // The film follows what the closeup does to the opacity, as it did when
+    // it read fluid0.a here; only the grain is kept out of it.
+    film0 = mix(film0, detail0.a * film0 / max(fluid0.a, 1e-4), macroAmt);
+    fluid0 = mix(fluid0, detail0, macroAmt);
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
@@ -2503,14 +2643,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  if (U.thinFilm > 0.001 && fluid0.a > 0.004 && fluid0.a < 0.4) {
-    let thin = smoothstep(0.4, 0.04, fluid0.a) * smoothstep(0.004, 0.03, fluid0.a);
-    let filmT = fluid0.a * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
+  if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
+    let thin = smoothstep(0.4, 0.04, film0) * smoothstep(0.004, 0.03, film0);
+    let filmT = film0 * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
     // The soap film's thickness: the dye amount, with a little of the same
     // grain centred on it. The rainbow's phase carries 1.4 periods of noise,
     // which as thickness would be up to 290 nm that is not the dye's, and
     // would put the thinnest film at straw rather than black.
-    let filmThick = fluid0.a * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
+    let filmThick = film0 * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
     let filmC = filmColourAt(filmT + U.time * 0.02, filmThick);
     outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
   }
@@ -2548,15 +2688,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       more1 *= dish1.x;
     }
 
-    if (U.granulation > 0.002 && fluid1.a > 0.004) {
-      let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      fluid1.a = fluid1.a * grain;
-      more1 *= grain;
-    }
-
+    let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
     if (useBlur && fluid1.a > 0.0) {
       let contrast = 1.2 + U.gooey * 4.0;
       fluid1.a = clamp((fluid1.a - 0.5) * contrast + 0.5, 0.0, 1.0);
+    }
+
+    // The grain after the edge, not before it: see the front plate's.
+    if (U.granulation > 0.002 && fluid1.a > 0.004) {
+      let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
+      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
+      more1 *= grain;
     }
 
     let sharp1 = dof < 0.55;

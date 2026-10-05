@@ -32,6 +32,11 @@
  *   6. each ink is where it was laid: a wash is red and white, the pools
  *      are the five inks (white, black, red, yellow, blue) and hardly
  *      anything else, where at 0 the washes are none of them
+ *   7. a colour the three inks do not have prints as two of them over each
+ *      other, as a comic printed it (QA-16: a green dye on Roy printed as
+ *      yellow): a green pool prints the green of cyan over yellow, a violet
+ *      one the violet of magenta and half cyan, each flat, where nearest-ink
+ *      put the green on the yellow and the violet on the blue
  *
  * Each was tried against a shader that gets it wrong (check-skeptic,
  * patched in the bundle): a halftone, a 0° screen, a lattice on the glass,
@@ -56,6 +61,9 @@ if (!Number.isFinite(ROWS) || !Number.isFinite(DOT)) throw new Error(`benday: co
 const PITCH = SIZE / ROWS;
 const RED = [0.05, 1.6, 1.6], YELLOW = [0.02, 0.1, 1.6], BLUE = [1.6, 0.9, 0.25];
 const INKS = { white: [255, 255, 255], black: [0, 0, 0], red: [227, 26, 31], yellow: [255, 219, 15], blue: [20, 84, 199] };
+/** The overprints (plate.ts, BENDAY_GREEN and _VIOLET), for 7 only: 6 counts the five inks. */
+const OVER = { ...INKS, green: [23, 219, 12], violet: [124, 30, 227] };
+const GREEN = [1.6, 0.05, 1.6], VIOLET = [0.5, 1.6, 0.1];
 
 const at = (px, x, y) => { const k = (y * SIZE + x) * 4; return [px[k], px[k + 1], px[k + 2]]; };
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -142,13 +150,22 @@ try {
   // ── 2. A pale wash prints as even dots ─────────────────────────────
   /*
     Two washes, both in the tint's band (coverage 0.22 to 0.55, read at 0):
-    0.14 reads about 255,165,165 and 0.16 about 255,140,140. Ben-Day dots are
+    0.10 reads about 255,166,166 and 0.11 about 255,142,142. Ben-Day dots are
     one size in both; a halftone's would be about a fifth bigger in the
     deeper one, which is what tells the two apart (on one wash a halftone's
     dots are one size too).
+
+    They were 0.14 and 0.16 until the pigment's grain moved after the gooey
+    curve (PLAN 1a). The lab draws without the solver's grain field, so the
+    plate reads one blank grain value everywhere, a factor of about 0.75; in
+    front of the curve that thinned every wash by a quarter before the curve
+    steepened it four times, and 0.14 landed pale. Behind the curve the same
+    factor is a quarter of the optical depth, and 0.14 reads 255,88,88, past
+    the band. The washes are the same tints as before, laid thinner; nothing
+    the print is asked changed.
   */
   const washes = [];
-  for (const d of [0.14, 0.16]) {
+  for (const d of [0.10, 0.11]) {
     const lay = [[0.5, 0.5, 1.2, RED, d]];
     const on = await render(lay);
     const off = await render(lay, { benDay: 0 });
@@ -204,7 +221,8 @@ try {
   // ── 3. The screen's dots, not the glass's ──────────────────────────
   // A plate turned under the screen: a lattice fixed to the glass would turn
   // with it (13.9% of the pixels kept, tried).
-  const lumpy = [[0.5, 0.5, 1.2, RED, 0.13], [0.3, 0.6, 0.25, RED, 0.03], [0.7, 0.35, 0.3, RED, 0.02]];
+  // Its densities scaled with the washes' (see there): a pale lumpy tint.
+  const lumpy = [[0.5, 0.5, 1.2, RED, 0.095], [0.3, 0.6, 0.25, RED, 0.02], [0.7, 0.35, 0.3, RED, 0.015]];
   const turned0 = await render(lumpy, {}, { rotation: 0 });
   const turned1 = await render(lumpy, {}, { rotation: 0.35 });
   let both = 0, either = 0;
@@ -317,6 +335,41 @@ try {
   const off = shares(lumpyOff, 0, 0, SIZE, SIZE);
   check('and at 0 the washes are tints, not inks', off.other > 0.5, `${pct(off.other)} of the pixels are none of the inks at 0`);
   check('Roy ships the print full', ROY === 1, `Roy's Ben-Day Dots is ${ROY}`);
+
+  // ── 7. Green and violet, as overprints ──────────────────────────────
+  /*
+    A green pool and a violet one, apart. Each is read in a 21 px square in
+    its middle: the share of pixels within 45 of the overprint's colour, and
+    the square's mean against every ink and overprint (the film grain
+    averages out of a mean). At 0 the same pools must be green and violet to
+    begin with (their hue past 40 degrees from every ink), and the print must
+    move the middle more than 30 levels from them, so the check is of the
+    print and not of a dye that was already the overprint's colour.
+  */
+  const over = [[0.32, 0.5, 0.12, GREEN, 2.5], [0.68, 0.5, 0.12, VIOLET, 2.5]];
+  const overOn = await render(over);
+  const overOff = await render(over, { benDay: 0 });
+  const hueOf = ([r, g, b]) => ((Math.atan2(0.8660254 * (g - b), r - 0.5 * (g + b)) * 180 / Math.PI) + 360) % 360;
+  const square = (px, fx) => {
+    const x0 = Math.round(SIZE * fx) - 10, y0 = Math.round(SIZE * 0.5) - 10;
+    const m = [0, 0, 0];
+    const near = {};
+    for (let y = y0; y < y0 + 21; y++) for (let x = x0; x < x0 + 21; x++) {
+      const c = at(px, x, y);
+      c.forEach((v, k) => { m[k] += v / 441; });
+      const k = Object.entries(OVER).reduce((a, [n, v]) => (dist(c, v) < a.d ? { n, d: dist(c, v) } : a), { n: '', d: Infinity });
+      if (k.d < 45) near[k.n] = (near[k.n] ?? 0) + 1 / 441;
+    }
+    const k = Object.entries(OVER).reduce((a, [n, v]) => (dist(m, v) < a.d ? { n, d: dist(m, v) } : a), { n: '', d: Infinity });
+    return { mean: m.map(Math.round), ink: k.n, share: near };
+  };
+  for (const [name, fx, from] of [['green', 0.32, [80, 180]], ['violet', 0.68, [250, 330]]]) {
+    const on = square(overOn, fx), off = square(overOff, fx);
+    const h = hueOf(off.mean);
+    check(`a ${name} pool prints flat in the ${name} overprint, not the nearest ink`,
+      h > from[0] && h < from[1] && on.ink === name && (on.share[name] ?? 0) > 0.9 && dist(on.mean, off.mean) > 30,
+      `at 0 ${off.mean.join(',')} (hue ${h.toFixed(0)}°); printed ${on.mean.join(',')} (${on.ink}, ${dist(on.mean, off.mean).toFixed(0)} from the unprinted), ${pct(on.share[name] ?? 0)} of its middle the ${name}`);
+  }
 } finally {
   await close();
 }

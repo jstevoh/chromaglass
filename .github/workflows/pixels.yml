@@ -1,0 +1,57 @@
+name: Pixels
+
+# Does the plate show its grid? Every look photographed at a laptop's size
+# (1440×900 at 2x) on a GPU that presents, as the website runs it and held on
+# the ladder's top rung, with the lattice at the solver's cell pitch measured
+# (scripts/pixels.mjs). Pictures come back as the `pixels-*` artifacts.
+#
+# On request only, like the gallery: Actions → Pixels → Run workflow, or on a
+# pull request by labelling it `pixels` (once per labelling). A cloud session
+# can label a PR but gets a 403 on `workflow_dispatch`.
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Comma-separated look ids (blank for all)'
+        required: false
+        default: ''
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: pixels-${{ github.ref }}-${{ github.event.label.name || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pixels:
+    name: Pixels (macOS, ${{ matrix.how }})
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'pixels'
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - how: governed
+            args: ''
+          - how: top rung
+            args: '--rung 0'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Photograph every look at a laptop's size
+        run: npm run pixels -- ${{ matrix.args }}
+        env:
+          PIXELS_ONLY: ${{ inputs.only }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pixels-${{ matrix.how == 'governed' && 'governed' || 'top-rung' }}
+          path: pixels/
+          retention-days: 14

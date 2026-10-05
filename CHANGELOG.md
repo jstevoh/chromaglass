@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The saturation grade keeps the hue instead of clipping each channel.
 - `npm run colours` checks all three.
 
+### Fixed — Roy, 1963 prints green, and the zoom chip leaves Record alone (QA-16, QA-4)
+
+- On Roy, a green dye now prints green, and a purple or magenta one violet, as a
+  comic printed them: two transparent inks over each other (cyan over yellow,
+  magenta with half cyan). Before, every colour was snapped to the nearest of red,
+  yellow and blue, so green printed yellow. `npm run benday` checks both.
+- Zoomed in on the Perform or Design desk, the zoom chip sits at the top of the
+  plate instead of on top of Record performance. `npm run layout` checks it at
+  three desk widths.
+
+### Fixed — Roy, 1963 opened on a black stain (PLAN 21)
+
+- Roy now opens as a comic panel: flat red, yellow and blue shapes and
+  brushstrokes on white paper, with fields of Ben-Day dots. Its seed laid four
+  pools several times too wide, which ran into each other over the whole plate
+  and printed black. Its Dye Budget is 0.45 (was 0.9), so the plate keeps paper
+  showing. `npm run royopen` measures the opening.
+
 ### Changed — eleven looks on the lamp (PLAN 18b-1)
 
 - Timbre Shifter, Microscopic Chaos, Poster 1969, Fillmore East 1969, Crowd

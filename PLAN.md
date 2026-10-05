@@ -104,8 +104,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
   (11-blowbubble), and `tools`' "Pour lays more than Drop", which passes at 0 against 0.
-- **0.4** **19r** (E, S): the open shard is back near its 15-minute timeout (median 12.6, green
-  maximum 14.1, one cancelled at 15.3); even it again.
+- **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
+  docs/plan-shipped.md 19r).
 - **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
   only their shards, a new check edits no shared file, and `npm run quick` runs what
   the diff needs, in parallel.
@@ -238,7 +238,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
-- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, **9v**, ~~**9w**~~ #266, **9z**, **9m**,
+- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
@@ -314,7 +314,8 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 - **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
   phone. Draft #269 (PLAN 15i).
-- **QA-4** Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
+- ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).
+  Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
   top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
   The chip is `fixed top-3 … translate-y-9` in `src/App.tsx` (the `macroZoom > 1.05`
   block, about line 3984) and lands on the desk's top strip, where
@@ -332,9 +333,12 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   it back there fast (`aimed()` in `src/lib/macroCamera.ts`, rate 6 + 6 × chase). The chip
   only sets `macroCamera` (`src/App.tsx`, `macro-camera-hold`). Fix: on switching to
   Hold, write the camera's current centre into the aim. Desk, phone
-  (`PhoneStage.tsx`), and it shows on the wall.
+  (`PhoneStage.tsx`), and it shows on the wall. Left out of the QA-fixes PR: the
+  centre lives in `LiquidVisualizer`'s `MacroCamera` (private `camX/Y`) and App
+  cannot read it yet, so it needs a getter plumbed to the chip and the phone.
 
-- **QA-16** On Roy, 1963 a green dye cannot be added: it prints as another colour.
+- ~~**QA-16**~~ **Fixed, #293**: a hue past 40° from every ink prints as two inks overprinted, green (cyan over yellow) and violet (magenta, half cyan); `npm run benday` 7 (main: green printed yellow, violet blue). Violet is laid flat, 21f.
+  On Roy, 1963 a green dye cannot be added: it prints as another colour.
   Desk (the owner's report from the corner dot, plate `roy`). Likely cause, read in
   the code but not yet run: the Ben-Day print snaps every pixel's hue to the nearest of
   three inks (`benDayInkIndex` in `src/gpu/wgsl/plate.ts`, red, yellow or blue), so a
@@ -358,7 +362,8 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   between them, across the presets in general. Wall, desk. Thread "More colour in the
   looks".
 
-- **QA-15** Roy, 1963 always opens on a giant black stain over flat red, filling most of
+- ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run royopen` 6/6 (main 1/6). Story in §21 of `docs/plan-shipped.md`.
+  Roy, 1963 always opens on a giant black stain over flat red, filling most of
   the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
   Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
   to 21d hold the rest of its open work. Deferred by the owner: fix later.
@@ -371,6 +376,13 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   `handoff/roy-black-stain/`; its PLAN hunk for §21 is to be merged with this entry.
 
 **Tier 4. Polish.**
+
+- ~~**QA-17** The phone's **Looks** tab wore a sparkle, the icon apps use for AI, and the
+  owner wants nothing in the app to read as AI.~~ Shipped: Looks is a palette; the
+  other sparkles (Random on the desk and the remote, Evolve, Automation, the track's
+  Evolution, "A band in a box") are a shuffle, an hourglass or a drum, and the MIDI
+  auto-map's magic wand is an ear, since it builds the map by listening. Desk, phone,
+  remote. No user-facing text said "AI", "magic" or "smart".
 
 - **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
   `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
@@ -399,7 +411,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a disc 9v, open; carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m and 9o–9r open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9aa (the maze too coarse, and its haze; measured) open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -527,6 +539,19 @@ has to be still itself, and asks the old plate to drift by more than the same ba
 the instrument is shown to see what it was built for; that line turns round to ask
 the old plate to stay once its bubbles stop pressing.
 
+*Found 2026-10-05 (#267, #281 and #287 red on it), **fixed in the ferrodrift control's
+PR:*** **the old-plate line sat on its bar.** Its four bubbles at 0.15, set down 2.5 s
+after the pour, were never what pulled the ring: the band's own were. Over eleven Mac
+runs the old plate pulled 0.0029–0.0091 on the six where the band had dropped no air
+before Audio Impact was held, and 0.0062–0.0260 on the five where its dice had dropped
+three to seven onto the dye ring, against a bar of 0.004 over silence. The check now
+holds Audio Impact at 0 from before the band starts, asks that the music released no
+air on any page, and sets down eight of the band's largest bubbles where it drops them,
+from the pour on, on both plates. Still open: with the same four bubbles the old
+plate's pull varied threefold (0.0029 → 0.0091), with its readings sometimes
+accelerating (0.310 → 0.281 in twelve seconds) and sometimes linear; what makes one
+press pull three times another is not measured, and belongs with the press item above.
+
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
 the One, default 0, which leaves every kick's weight at exactly 1) read 0.040 → 0.046
@@ -644,6 +669,55 @@ Two things to settle, in this order:
 
 **Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+#### 1a. The grain at the dye's edge made the plate look digital (shipped)
+
+Reported 2026-10-04 on the laptop's web app: "quite a few of the looks seem very
+pixelated ... less like liquids", and "it's always been this way to a point. It just
+looks very digital." `npm run pixels` (new, `pixels.yml` on the Mac, or a PR labelled
+`pixels`) photographed every look at 1440×900 on a Retina panel: every look's dye edges
+were a ragged fringe of single lit and dark flecks, at the governed rung and the top one.
+The cause was granulation (on at 0.5 in every look) scaling the opacity *before* the gooey
+contrast curve, which is steepest at the edge's half opacity, so every grain there became
+fully on or off. **Shipped:** the grain is drawn after the edge, as optical depth
+(`grainedDepth`, wgsl/plate.ts). `npm run grainedge`, seven looks in the lab: flecks (edge pixels
+moved over 40 levels in a channel) 6–35% before, 0–0.61% after, every look held under 2%;
+the bodies keep a grain that is a texture, weaker than before inside thick pools, where
+the dye already stops nearly all the light. The soap film's colour reads the liquid's thickness from before the
+grain (Sunny Side Up 7.1% → 0.25%, Soap Film 3.0% → 0.2% on the edge check). The owner's eyes on a laptop: `docs/judging.md` §40.
+
+Found with it, open:
+
+- **1b. Agate's Liesegang rings are dots on a 128² lattice** (lane C, `liesStep` in
+  wgsl/fluid.ts, `LIES_GRID`). The precipitate nucleates once per cell of its own grid, so
+  at a laptop's size Agate shows a regular grid of dots where real Liesegang bands are
+  continuous rings. Measure: the `lock` of `npm run pixels` on Agate at the lattice's pitch
+  rather than the solver's.
+- **1c. A Retina laptop on the website opens at one device pixel per CSS pixel**
+  (`platform.ts`: the hosted ladder starts on `{512, 1}`, tops out at 1.5x). The plate is
+  drawn at a quarter of the panel's pixels and upscaled until the governor climbs, and
+  never above 1.5x. Whether it can open higher without missing frames is for
+  `npm run pixels -- --rung 0` and the frame time on the owner's laptop.
+- **1d. On CI's Mac every look settles on 256²**: the governed `pixels` run went
+  512 → 384 → 256 in every look in its first twenty seconds. If the owner's laptop does
+  the same, the plate is drawn from a quarter of the cells most of the time; a look's
+  grid should be measured on the owner's machine (judging §40) before the ladder is changed.
+- **1e. The lab draws without the grain field unless asked** (`lab.render`'s `grain`
+  option, scripts/lab-entry.ts). Without it the plate reads a blank texture and every
+  look's grain is one value, about 0.75, everywhere: each lab check of a look with grain
+  measures a plate a quarter thinner in optical depth than the app's. `benday` had its
+  washes tuned on that (re-laid in 1a). Draw with the grain by default, and re-read the
+  checks that move.
+- **1f. Roy's print flips ink on the grain** (PLAN 21). The Ben-Day print decides ink or
+  paper per pixel from the finished picture's coverage, so the grain under it flips
+  pixels at every tint's threshold: 8.2% of Roy's edge pixels on the Mac against 0.02%
+  for the plate under the print. A print should read the dye's coverage before the grain
+  (or Roy ship without one); the owner's eye decides which (judging §40).
+- **1g. On the lamp the grain mottles a thin edge** (18b's looks: Poster 1969, Fillmore,
+  Microscopic Chaos and the rest on the lamp). This fix does not change them (the same
+  numbers before and after it): the grain's soft blotches, about ten pixels across,
+  move a thin edge's pixels 9–10.6 levels on average (`npm run grainedge` prints it), with
+  no flecks. Watercolour-like, not dithered; whether it is too strong is the owner's call.
+
 ### 2. Lacing
 
 **Shipped**; its 4–8 px gate moved to batch 3. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -665,6 +739,41 @@ not yet reach, and it needs a render change rather than a solver one.
 ### 4a. What is in each preset's dish
 
 **Shipped**: what each preset puts in its dish. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+**4a-clock. Clock Glass and Ferro Paint after their references** (**shipped**, #280).
+The owner, 2026-10-04: "the clock glass preset is really underwhelming as is the ferro
+presets. They don't look anything like the inspirations." Judged against the Mac gallery
+of that morning (`/mnt/project-files/lamp-ground/gallery/`, 12 s and 30 s):
+
+- Clock Glass was one lavender-magenta disc. A clock-glass dish (the Joshua Light Show,
+  the Fillmore) is coloured oil and water that will not mix: cells of red, amber and
+  blue oil with dark rims in a purple water. The look laid three water dyes in rings on
+  top of each other, with radii in the wrong units (below), so they blended at once.
+  It now lays a purple water round twelve bodies of oil, each with one of red, amber and
+  cobalt in it, with Oil Bodies and Oil Tension on (`src/lib/oilLay.ts`). Laying it found
+  a fault in Oil Bodies itself: the oil's share of the dye started empty when a plate
+  first had bodies, on the reasoning that the colour inside a body would be handed to it
+  in a few steps. It was not: the bodies' colour ran out into halos in the water. The
+  share now starts from the plate as it is (`fluid.ts`, bodiesFresh). `npm run
+  clockglass` (lab, 192², 300 steps): the dish's colours spread 0.248 rad against the old
+  lay's 0.101, in 4 separate regions off the water, and the oil holds 97% of the colour
+  laid in it (17% with the share starting empty, 3 regions). `npm run bodies` 17/17.
+- Ferro Paint opened as one green with black holes, where Colored I and II hold amber,
+  teal and coral in regions. Its sixteen patches were laid with a radius of `S × 0.15`
+  in `splatBlob`'s 128-grid units, which it scales by GRID_SCALE again: 0.225 of the
+  plate, nearly the patches' spacing, so all sixteen lay over each other. Now 0.09.
+- Open from this: **4a-units**. Roy, 1963 lays its shapes the same way (`S × fr` in
+  128-grid units, 1.5 times the size meant); its panel may want them halved, by eye.
+  **4a-clock-fade**: on a fade (the set list, the desk's Go) the seed is laid in shares
+  over the fade (addSeedShare) while every body's oil lands at once, so on a long fade
+  the bodies move before their colour arrives and some of it lands in the water: the
+  halo this fixed for a hard lay. Lay the oil in the same shares, and give `npm run
+  clockglass` a case that lays through the handover. Also unmeasured: the look's own
+  doses (`['oil', 'water', 'oil', 'syrup']`, about seven small clear bodies at the
+  lay) and the app's finer GPU grid (the check lays at 192², the app runs 384² and up).
+  And the automation's drops still land any of a look's dyes anywhere, so over a minute
+  the regions blur: where each dye lands belongs to the "more going on in every look"
+  work (several areas of interest across the plate), not to these two looks.
 
 ### 5. Playing it: sound learn, shutter, and a look link
 
@@ -783,6 +892,33 @@ Open, from building 9e (in the order to do them):
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
 
+- **9aa. The maze is two to three times coarser than its period, and leaves a haze**
+  (measured 2026-10-04, building 4a-clock). Ferro Maze, Ferro Paint and Magnet Garden
+  in the Mac gallery are fat black blobs with a brown haze round them, where the
+  references are dense thin stripes on clean white. The lab reproduces it (256², Ferro
+  Maze's settings and pour, Thin Gap on; with it off the same): after 900 steps the
+  domains are about 30 cells wide where the period asked is 12, and the black (cells
+  past half full) falls from 21% to 15% of the plate as ferrofluid leaks into a film
+  under half full, the haze (9d's "ghost smears"). Tried, each 600 steps, none of them
+  a fix on its own:
+  - the field coil at full strength under the whole plate (MAZE_UNIFORM 0.45 → 1):
+    the same blobs, and the leak faster (black 21% → 11.5%);
+  - the double well steepened everywhere, not only under the hand (phaseMu's
+    `wellNeed`): the leak slowed (black 17.7% kept, against 15.4%), the blobs stayed;
+  - MAZE_GAIN ×4 (the maze's Darcy flow): droplets, and the leak faster (12.5%);
+  - the dipoles' repulsion nearly unscreened (m² from 0.16 k*² to 0.005 k*²), which is
+    the real physics: parallel dipoles in a thin layer repel at long range, and a
+    screening shorter than a pool lets a pool sit as a pool. **The haze went entirely
+    and the black stayed at 17.8%**, but at that fill the domains became separate dots
+    (with the repulsion ×4 and ×16, smaller dots). Ohta–Kawasaki's dots are right for
+    a fifth of the plate: a labyrinth needs about half (Magnetic Pattern I's disc is
+    half black).
+  So the next step is both: the long-range repulsion, and a pour that fills the
+  maze's region to about half (a disc for Ferro Maze, as the reference), with the
+  period then set by the sharp-interface balance and not the linear one (the dots
+  came out about twice the asked period). Every ferrofluid check moves with it
+  (`maze`, `fingers`, `domes`, `spikes`, `ferrodye`, `ferropour`), so it is its own PR
+  in lane C after 9t. Probes in `/mnt/project-files/clock-ferro-looks/`.
 - **9j. Spikes that follow the music.** A real ferrofluid speaker's spikes jump on the
   kick. The spikes now answer the magnet's field, so the maze's audio breathing
   could drive their height too.
@@ -932,7 +1068,7 @@ Open, from building 9i:
   held and set down: k = 0.5 to 2 times the size, the dipole k times deeper with k³
   the strength, which is a real magnet scaled (magnetostatics has no length of its
   own): the same field share over it, reaching k times as far (the pull is weaker
-  than a scaled magnet's at a big Size, see 9v), so the spikes' patch and
+  than a scaled magnet's at a big Size; since 9v a magnet k times as wide at the same gap), so the spikes' patch and
   the pool it brings are k times as wide (lab: 0.3%, 1.1% and 4.6% of the plate at k
   0.5, 1 and 2). It is the performer's, kept across looks (`RIG_KEYS`) and never
   drifted, on the Settings sheet, the desks' Magnet options (right-click the Magnet)
@@ -964,19 +1100,64 @@ Open, from building 9i:
   gather into it" (the ring pour this item takes away) and `scripts/ferro.mjs`'s
   "not at its mirror", whose two arms ran on two grids when the governor moved the
   solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
-- **9v. The magnet as a disc, not a deepened dipole.** Magnet Size scales the
-  solver's dipole (9x). A real disc magnet held at a fixed gap is flatter over
-  its face than a dipole, and a bigger one at the same gap is somewhat stronger at
-  the glass, not equal; the dipole's saturation (`MAGNET_BSAT`) stands in for the
-  flat face today. Replace `magnetEnergy` (and `spikeAmp`, which must agree) with a
-  finite disc's field (a disc of radius a at depth g: the on-axis field
-  Br/2 · (1 − g/√(g² + a²)) and its off-axis form), with Size setting a.
-  And put the saturation in field units: `MAGNET_BSAT` is a number in the
-  dipole's geometric units, so the k-deeper dipole sits lower on the curve than
-  the magnet it stands for and pulls less than the 1/k a scaled magnet does
-  (lib/magnetSize.ts: at Size 0.9, 0.47 of it one height out and 0.33 at one and
-  a half; at Size 0, 1.2 to 2.2 times it). A big magnet holds its pool more
-  weakly at the edge of its reach than a real one.
+- **9v. The magnet as a real magnet, not a deepened dipole (shipped).** The
+  solver's magnet was a point dipole, and Magnet Size (9x) sank it k times deeper
+  with k³ the strength: a magnet scaled gap and all, its axis field the same at
+  every Size, and with the liquid's saturation (`MAGNET_BSAT`) a number in the
+  dipole's own units, a big one pulled less at the edge of its reach than the
+  magnet it stood for. Now the magnet is a uniformly magnetised cylinder
+  (`src/gpu/wgsl/magnetDisc.ts`): its field is Derby and Olbert's closed form in
+  Bulirsch's elliptic integral, four rounds of an AGM, handed to a dipole of its
+  volume past six to eight half-sizes. At the tool's own size it is a rod 0.05 of
+  the plate in radius and twice as long (20 mm by 40 mm on the 20 cm dish), its
+  face 0.06 above where the dipole stood (13.5 mm under the liquid held to the
+  glass), so at the default its spikes reach where they did (0.157 of the plate
+  out against 0.156, on its axis 0.952 of the hand's field against 0.954).
+  Flatter shapes were tried first (a 32 by 16 mm disc, 24 by 24, a 20 by 30 mm
+  rod): matched at the spikes' patch, their fields fell away faster past it,
+  and `npm run fingers` lost its reach (the discs 8 to 5 on the 0.12 circle, the
+  short rod 7 to 6 on the 0.09, under the check's 7; on Metal too). This rod's
+  fingers are 10/8/9/5 on the four circles in 7 sectors, main's 12/7/8/3 in 6. Magnet Size sets the radius, k = 0.5 to 2 times it, the gap and
+  strength untouched: a bigger magnet is stronger at the glass (on its axis 0.26,
+  0.95, 2.22 at k 0.5, 1, 2, where the deepened dipole stayed at 0.95) and reaches
+  further (spikes out to 0.050, 0.157, 0.339; the dipole's 0.078, 0.156, 0.312).
+  The saturation is a field on the same scale (`MAGNET_BS`, spikes.ts):
+  ψ = B²/(1 + B/Bs) with B the strength times the magnet's field, so a weaker
+  magnet pulls the far liquid as its square; Ferro Maze's own magnet went 0.3 →
+  0.45 and Ferro Paint's 0.5 → 0.6 to gather as they did. Both constants carry
+  the old ones over at the hand's magnet, so `MAGNET_GAIN` and phaseMu's χ keep
+  their tuning. The radius rides `GpuStepParams.magnetRadius` (`Sim.magRadius`,
+  and the standing layer's `Film.size`); every shader including `SPIKES_WGSL` defines
+  `magnetRadius()`. `npm run disc` (lab, Mac plate shard) runs the shader's own
+  text against a Biot–Savart sum over the side current: within 0.0073% on and
+  off the face and at the rim, 1.24% where it hands over to the dipole (the point
+  dipole there 2.5%), 1.2% past it; at Size 0.9 the pull at the edge of its
+  spikes is the real magnet's (1.000), where main's deepened dipole pulled 0.31
+  of it; the plate's far shortcut (spikeAmp answers far points without the
+  integrals) never drops a spike; every look's own magnet stays under the onset
+  (Magnet Garden 0.148, Ferro Paint 0.099, Ferro Maze 0.023 against 0.18). In the
+  lab on the rod: `spikes` 6/6 (outline 2.83, main 2.85), `fingers` 4/4. `npm run magnet` (Mac)
+  now asks that Size makes the held and the set-down magnet k times as wide with
+  its height and strength as they were. On the phone, Size is the same setting on
+  the Magnet panel and the other fingers' magnets are the same magnet. A saved
+  look with its own magnet at a low Strength pulls as its square now (0.3 pulls
+  about a third as hard as it did). Judging §37.
+  Open, found here:
+  - **9v-cost.** The field is elliptic integrals wherever the magnet reaches (in
+    the solver five evaluations a cell a magnet, and per pixel on the plate inside
+    twice the rim and gap). Measure it with `npm run stages` on the Mac with the
+    Magnet held; if it shows, tabulate the magnet's field once per radius and gap
+    (it is a function of ρ/a and z/a only) and sample it.
+  - **9v-tilt.** The magnet is held upright under the glass here. A hand tilts
+    it, and a tilted magnet's field leans: its spikes lean and its pool slides toward the
+    lower rim. Needs the magnet's direction in the step.
+  - **9v-grade.** Every magnet is one grade, its strength a share of the hand's.
+    A real set (ceramic against neodymium) differs in remanence by about three
+    times; a Grade choice beside Size would be that, MIDI-learnable.
+  - **9v-height.** Magnet Height is still where the old dipole stood, and the
+    face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
+    Saying the setting as the gap itself would be plainer, but changes every
+    saved look's magnet; worth doing with a look version bump.
 - **9w. Carry the ferrofluid across a new solver** (**shipped**). The dye was
   carried when the governor moved the grid; the phase was not, so the frame loop
   poured the look's ring onto every new solver while Ferrofluid was up: a pool
@@ -2750,6 +2931,16 @@ for, and the GPU was asked for only after they had arrived and drawn.
   pipeline is asked for? Its animations are the compositor's, but the compositor
   presents through the same GPU process that is starting; a screen recording of a
   cold load on the owner's Mac would say. A still picture is still not a black plate.
+- *The intro and the GPU device (14v-5, in progress).* Held still, the intro did not
+  end the startup red: #280's run (37252349929) stopped frames 2.50 s from 2.87 s with
+  the intro already still, on the opening's first compile (`fluid/fill:rgba32float`),
+  outside Chromium's hold. What changed with the intro is when the GPU device comes:
+  given 0.04 s after it was asked before the intro (#272's run), 1.7 to 2.6 s after
+  with it, so the first compile, which stops frames on a cold Metal cache in every
+  run (the `?prepare=0` control too), no longer falls inside the hold. Taken out:
+  the pools' `mix-blend-mode: screen`, a blended group the GPU process must build
+  a surface and compositing for as the page first paints. Whether that was it is the
+  Mac's "device asked, given" line.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -3098,6 +3289,27 @@ Tool Amount; a second pass at right angles makes the chevron. On the phone each 
 is a rake, and OSC gets `/comb`. *Measure:* a lab check in the manner of
 `npm run ferrohands` (N parallel bands moved a stroke, mass exact), and
 `npm run detail`'s hard-edge share after a two-way comb against the Marbling column.
+
+### 15k. Inked balls rolled across the plate (proposed 2026-10-05)
+
+The owner's idea, in their words: "Imagine we covered some Balls in ink and we rolled
+them around the canvas by tilting the mouse or with the mouse. It would leave behind a
+messy trail that eventually runs out of ink and then can push other ink around as it
+roles." Not built.
+
+The physics to model, rather than a painted trail: a ball rolling on the glass touches
+it along a small contact patch, and each turn lays down part of the ink on its surface
+there, more where it presses or slows and in a broken, uneven line where the coat is
+patchy, so the trail starts dense and thins as the ball's ink load runs out (deposition
+proportional to what is left, so it fades rather than stops). A ball also picks up some
+of the wet colour it rolls through, so it can carry one colour into another. Tilting
+the plate gives the balls a downhill pull and they roll on with their own momentum;
+with the mouse the hand pushes them. A dry ball is still a solid moving through the
+thin layer, so it pushes the other liquid aside and drags a wake behind it: the same
+moving obstacle 15b builds for the Finger, which this should share. *Measure:* a lab
+check that a ball's deposited dye falls off with distance as its load depletes, that
+total dye is conserved (laid plus left on the ball), and that a dry ball moves dye
+already on the plate. Ships with the phone (tilt is the phone's own motion sensor).
 
 ## 16. Many plates: each projector its own source (rig-plan R1)
 **Partly shipped**: 16a, 16b, 16c and 16f are shipped (#231, #226, #232, #273). What 16a, 16b and 16c each left undone is listed below in that order, then 16d and 16e, which are open. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -3777,8 +3989,8 @@ its frame rate live. "Free" means no new passes or texture reads.
 ### 18j. Milky liquids scatter
 
 - **Where:** everything in the plate is a pure absorber. `colourBody` pushes opacity
-  and saturation up to imitate a body of colour, `granulation` modulates alpha with
-  noise, and the Liesegang precipitate is a lerp.
+  and saturation up to imitate a body of colour, `granulation` modulates the dye's
+  optical depth with noise (1a), and the Liesegang precipitate is a lerp.
 - **The real phenomenon:** pigment and fat droplets scatter light (Mie), handled as
   two-flux Kubelka–Munk. With a projector's small aperture almost all scattered light
   misses the lens, so a milky liquid throws dark or grey with a soft forward halo. It
@@ -3981,6 +4193,20 @@ as `npm run` names. Each new check held red by the `check-skeptic`.
 
 ### 19d. The build and what it ships
 
+- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05 (this PR).**
+  On #287's merged head (37252828490) the control built its 47 on its first step at
+  3.23 s, its frames kept coming, then stopped 9.98 s from 5.59 s with no build in it
+  and more than a second after them: nothing priced, its own wait 13.80 s, and both 1b
+  lines red. When the frames stop after the builds is the GPU process's business, so
+  no window of time is right. A stop is now also the compile when the first submit to
+  run one of the pipelines built on the frames was handed over before it began and was
+  done as the frames came back (within a quarter second), with the page's own timer
+  running through it: a pipeline cannot run before it is built, the page's thread is
+  free while the GPU compiles, and a runner's stall later has no first use out through
+  it. Line 2 now also needs a one-device control, as line 1 did. Each stop prints its
+  first uses and the page's longest silence in it. *Still open:* read the first Mac runs' prints to
+  see the follow stop (#283's run: 11.27 s from 5.20 s) carries first uses too; if it
+  does, the one-second window is that same compile and could go.
 - The main route loads about 527 KB of script gzipped (1.68 MB raw): the App's chunk
   236 KB, the engine's 186, React's 66. Only the routes are lazy (`main.tsx`: the App,
   the remote, the cast). `motion` is 42 KB of it, for 53 simple uses in six components;
@@ -4207,9 +4433,12 @@ user. *Size:* S.
 
 ### 19r. Smaller, for the same pass
 
-- The open shard is back near its timeout after #239's rebalance: median 12.6 minutes, green
-  maximum 14.1, one cancelled at 15.3 (#240). `startup` (349 s) and the phone's fingers
-  (224 s) dominate it; move one, as #239 did.
+- The open shard evened again: **shipped** (docs/plan-shipped.md 19r). New checks go on the
+  shortest shard, not open, which holds `startup` (393 s alone).
+- Re-running an older deploy cancels main's newest one: `deploy.yml`'s group keeps one run
+  waiting, and the re-run takes that place. On 2026-10-05 re-running be02853's deploy
+  cancelled e978aca's (#286) and 6bcbf8f's. Harmless while those were docs merges; a re-run
+  should be of main's newest deploy, or the deploy should refuse a tree older than main.
 - `npm run lint` takes 18 to 24 s; `tsc --incremental` with a kept `tsbuildinfo` takes 3.5 s
   warm. A Playwright cache on ubuntu saves 23 s a Measure part.
 - `tools`' "Pour lays more than Drop" passes at 0 against 0: a check that cannot fail on the
@@ -4490,7 +4719,7 @@ then 20e, then 20c on 18a's solver (shipped) once 18d gives each liquid its visc
 this look holds 18b and 18e to.
 
 ## 21. Looks after painters
-**Partly shipped**: Roy, 1963, and Ben-Day Dots are in, measured by `npm run benday`. What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Roy, 1963, and Ben-Day Dots are in, measured by `npm run benday`; Roy opens as a panel, not a black stain (`npm run royopen`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 The owner, 2026-09-27, over a screenshot of Classic at 2.8x covered in red dots on
 white by accident: "kinda cool, Roy Lichtenstein type style ... let's reserve this
@@ -4507,6 +4736,24 @@ Open:
 - **21c. The dots do not grow with the zoom.** The screen is fixed to the picture,
   as a print's is; the owner's accidental dots at 2.8x were about twice the size.
   If a bigger dot is wanted in the closeup, the pitch could follow the zoom.
+- **21e. Judge Roy a minute in** (docs/judging.md §38). The opening is measured; what
+  the pours, drops and the music make of it over a minute is not (no app frames in a
+  cloud session). Dye Budget went from 0.9 to 0.45 on the reasoning that a fuller plate
+  runs the inks over each other into black; if it reads too empty or still muddies, the
+  budget and Roy's injection styles are the two knobs.
+  The opening's dot fields are tuned to the print's tint band, which any change to
+  the dye's opacity before the print moves: #267 (the grain after the curve) took
+  the band down by a quarter and the deploy read 47 dots; the fields were re-laid
+  at 0.75 (272). A change there re-runs `npm run royopen` and re-sweeps TINT.
+- **21f. Violet is laid flat** (QA-16, #293). A comic's violet is solid magenta
+  with a second screen of cyan dots over it; the print lays it as the flat colour
+  that reads from a step back (`BENDAY_VIOLET`), since Roy has one screen. Green
+  is a true overprint and needs nothing. Lay the cyan as dots over the magenta if
+  violet reads too smooth beside the dotted washes.
+  Found with it: the seam line is drawn wherever two inks meet, and there are five
+  now, so a player's pool shading from yellow to teal gets two pen lines inside it
+  (yellow, green, blue) where it had one. A comic outlines each colour area, so
+  this is inferred to be right; judge it on the Mac (judging.md §38).
 - **21d. More painters.** The same print with other inks is the start of more looks
   after painters (a Warhol screen print's off-register blocks, Riley's black and
   white, Rothko's soft fields); none is planned yet.

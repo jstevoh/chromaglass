@@ -3,6 +3,9 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '../src/gpu/wgsl/spikes';
+import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
+import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
@@ -12,6 +15,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
+import { clockGlassBodies, clockGlassCell } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
@@ -214,8 +218,15 @@ const api = {
     if (!p) throw new Error(`no look ${id}`);
     // Over the defaults, as the app lays a look: a key the look leaves out
     // is the default there, not off.
-    return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id) };
+    return { settings: { ...DEFAULT_SETTINGS, ...p.settings }, pour: phasePourShape(id), dyes: (PRESET_CONTRACTS[id] ?? []).map((i) => ({ ...PALETTE_RGB[i] })) };
   },
+  /** Clock Glass's oil bodies as the app lays them (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
+  clockGlassBodies(seed: number, dyes: number) {
+    let s = seed;
+    return clockGlassBodies(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
+  },
+  /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
+  clockGlassCell,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */
@@ -378,6 +389,13 @@ const api = {
   },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /**
+   * The magnet's field as the solver and the plate both include it
+   * (wgsl/spikes.ts with wgsl/magnetDisc.ts), and the TypeScript the solver
+   * ramps on, for `npm run disc` to run the shader's own text against the
+   * physics.
+   */
+  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /**
@@ -472,6 +490,13 @@ const api = {
       sources?: ('front' | 'back' | 'film')[];
       /** Draw the wall as it is drawn into a texture (see `flipped` below); with sources, always. */
       flip?: boolean;
+      /*
+        The pigment's coordinates as the app hands them (the solver's grain
+        field, carried by the flow), rather than none. Without it the grain
+        is one value over the whole plate, which hides what the flow does to
+        it (npm run pixels, the speckle at dye edges).
+      */
+      grain?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -508,7 +533,12 @@ const api = {
     fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
-    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
+    // Asked for the grain and there is none (an adapter without
+    // float32-filterable): the plate would read a blank 1×1 texture and draw
+    // one grain value everywhere, which a check of the grain would take for
+    // a grain. Say so instead.
+    if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
+    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a

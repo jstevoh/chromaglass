@@ -25,6 +25,7 @@ import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup
 import type { Opening } from './opening';
 import { kernel } from './wgsl/fluid';
 import { SPIKE_ONSET, fieldOnAxis, spikesOnAxis } from './wgsl/spikes';
+import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { splatKernel } from './wgsl/splat';
 import { STATS_GROUPS, STATS_KERNELS } from './wgsl/stats';
 import { SPLAT_FLOATS, type SplatList } from './splats';
@@ -489,7 +490,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 48;      // 36 scalars (33 is the vec2's alignment), then the fingers' three magnets at 36..47
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48
 
 export class WebGPUFluid {
   readonly N: number;
@@ -1256,6 +1257,7 @@ export class WebGPUFluid {
       f[36 + k * 4] = m?.x ?? 0; f[37 + k * 4] = m?.y ?? 0;
       f[38 + k * 4] = p.magnetHeight; f[39 + k * 4] = m ? p.magnetStrength : 0;
     }
+    f[48] = p.magnetRadius ?? MAGNET_RADIUS;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1548,7 +1550,7 @@ export class WebGPUFluid {
       And the magnet's own field is a maze field as strong as its spikes, on
       a look with a Labyrinth (see HAND_SCREEN).
     */
-    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    const spikeAmt = this.phaseLive ? spikesOnAxis(p.magnetStrength, p.magnetHeight, p.magnetRadius) : 0;
     const spikes = spikeAmt > 0;
     /*
       And whether the layer stands up under them (standing.ts): each magnet
@@ -1561,13 +1563,14 @@ export class WebGPUFluid {
       look's own magnet (Magnet Garden's is at 0.14, the onset 0.18) keeps
       its maze, which the film does not model.
     */
-    const onAxis = this.phaseLive && p.magnetStrength > 0.0001 ? fieldOnAxis(p.magnetStrength, p.magnetHeight) : 0;
+    const onAxis = this.phaseLive && p.magnetStrength > 0.0001 ? fieldOnAxis(p.magnetStrength, p.magnetHeight, p.magnetRadius) : 0;
     if (spikes) this.filmHeld = true;
     else if (onAxis < FILM_FROM * SPIKE_ONSET) this.filmHeld = false;
     const filmMags: FilmMagnet[] = [];
     if (this.filmHeld) {
-      filmMags.push({ x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength });
-      for (const m of (p.extraMagnets ?? []).slice(0, 3)) filmMags.push({ x: m.x, y: m.y, height: p.magnetHeight, strength: p.magnetStrength });
+      const radius = p.magnetRadius ?? MAGNET_RADIUS;
+      filmMags.push({ x: p.magnetX, y: p.magnetY, height: p.magnetHeight, strength: p.magnetStrength, radius });
+      for (const m of (p.extraMagnets ?? []).slice(0, 3)) filmMags.push({ x: m.x, y: m.y, height: p.magnetHeight, strength: p.magnetStrength, radius });
     }
     if (filmMags.length && !this.layer) this.layer = new StandingFilm(this.device, this.pipelines, this.disposer, this.N);
     const filmOn = filmMags.length > 0 && !!this.layer?.isReady();
@@ -1990,7 +1993,8 @@ export class WebGPUFluid {
         to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
         not stop. The oil's colour does mix inside a body, slowly
         (bodyPartition's inside rate), as two dyed oils do. (A share begun
-        this step is empty, and the transport below clears it first.)
+        this step is skipped here: the transport below starts it from the
+        plate as it is.)
       */
       if (bodiesOn && !bodiesFresh) {
         const od = this.oilDye!;
@@ -2075,11 +2079,24 @@ export class WebGPUFluid {
       /*
         With Oil Bodies, the dye and the oil's share of it cross the same
         faces as the oil does (bodyAdvect, and why). A share left from an
-        earlier stretch with it off is stale, so it starts empty: whatever
-        is inside a body is handed to it within a few steps.
+        earlier stretch with it off is stale, so it starts again from the
+        plate as it is: the colour in each cell is the oil's as far as the
+        cell is oil (bodyLand, with the whole dye as what lands), which is
+        what a dish holds the moment anyone starts telling its two liquids
+        apart. It started empty, on the reasoning that whatever was inside a
+        body would be handed to it within a few steps; measured, it was not.
+        Clock Glass lays its bodies with their colours in them (seedPreset),
+        and with an empty start each colour was the water's: it spread out
+        of its body as the water's colour spreads and left a dark ring of
+        clear oil inside a wide halo (the lab, 300 steps; npm run
+        clockglass).
       */
       const od = this.oilDye!;
-      if (bodiesFresh) for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      if (bodiesFresh) {
+        for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+        this.run(pass, 'bodyLand', od.write, [od.read, this.dye.read, this.deltaMulTex, mix!.read], this.arg('body start', [0, 0, 0, 0]));
+        od.swap();
+      }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv);
@@ -2804,7 +2821,10 @@ export class WebGPUFluid {
   }
 
   private ensureOilDye(): PingPong {
-    if (!this.oilDye) this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye');
+    // A share just made starts from the plate as it is, as a stale one does
+    // (the 'advect dye' stage, bodiesFresh): the oil already laid holds the
+    // colour already in it.
+    if (!this.oilDye) { this.oilDye = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'oil dye'); this.oilDyeStale = true; }
     return this.oilDye;
   }
 

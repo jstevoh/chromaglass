@@ -1043,6 +1043,81 @@ through the hues between them rather than switching.
 
 ---
 
+## 37. The Magnet is a real magnet (PLAN 9v)
+
+The magnet under the glass was a point; it is a cylinder magnet now, a rod 20 mm
+across and 40 mm long at the tool's own size on the 20 cm dish, and Magnet Size
+makes it a wider rod held at the same gap (10 mm to 40 mm across), not the same
+magnet scaled away. On Classic, desk and phone:
+
+- at the tool's own Size the spikes should stand as far out and as tall as before
+  (`npm run disc`: out to 0.157 of the plate against 0.156);
+- Size all the way up: the hedgehog should be wider and the spikes taller than
+  before at the same Size (on its axis 2.2 times the tool's own field, where the
+  deepened point stayed at 0.95), and a pool dragged with it should stay with it
+  from further out;
+- Size all the way down: a few spikes under the fingertip, now weaker than the
+  tool's own size (a quarter of its field), where before they were as strong;
+- Ferro Maze and Ferro Paint: their own magnets were turned up (0.3 to 0.45, 0.5
+  to 0.6) because a magnet's strength is now its field, whose pull far off goes as
+  its square. Say whether each still gathers its ferrofluid as it did. A look you
+  saved with a low Magnet Strength was not turned up: at 0.3 its far pull is now
+  about a third of what it was. Say if Strength should read the old way (it would
+  need a saved-look version, PLAN 9v-height);
+- the frame time with the Magnet held (below): the field is now worked out from
+  elliptic integrals wherever the magnet reaches, on the plate and in the solver.
+
+## 38. Roy, 1963 opens as a panel (PLAN 21e)
+
+Pick Roy, 1963. It should open as a Lichtenstein panel: flat red, yellow and blue
+shapes and brushstrokes apart on white, outlined in black, with fields of Ben-Day
+dots, and no black stain. The opening is measured (`npm run royopen`); a minute of
+the show is not:
+
+- watch it for a minute with music: do the pours and drops keep it a print, or do
+  the inks run together into dark patches again? Its Dye Budget is now 0.45 (was
+  0.9): say if it reads too empty, or still muddies;
+- are the dot fields big enough, and is there enough colour? Say which way.
+- add a green, then a purple, with the bottles: they should print as a bright
+  comic green and a violet, flat and outlined, not as yellow or blue (QA-16).
+
+## 39. Clock Glass and Ferro Paint after their references (PLAN 4a-clock)
+
+- **Clock Glass** now lays a purple water with a dozen bodies of red, amber and cobalt
+  oil scattered over the dish, each with a dark rim, the way a clock-glass dish at the
+  Fillmore looked. Bodies that touch merge and mix their colours, as dyed oils do. Say
+  whether there are enough of them, whether they are too big, and whether the purple
+  should be another water colour. The automation's drops still land any of the dyes
+  anywhere, so over a minute or two watch whether the water keeps one colour or drifts.
+- **Ferro Paint** opens with amber, teal and coral in their own patches instead of
+  one green. They still blur together over a minute as new drops land.
+- **Oil & Water**, and any plate where oil is poured with colour already on it: the
+  oil now keeps the colour that was in it when its bodies are first tracked, instead
+  of letting it run out into the water. If oil you pour onto a coloured plate looks
+  more tinted than before, that is why.
+- Ferro Maze, Magnet Garden and Ferro Paint's maze are unchanged: still coarser than
+  the references, with a brown haze. That is PLAN 9aa, its own change.
+
+## 40. The dye's edges, on the laptop (PLAN 1a–1d)
+
+The looks were reported as "very pixelated ... very digital" on the laptop's web app. The
+largest cause was the pigment's grain thresholding every dye edge into a fringe of single
+lit and dark flecks; the grain now sits inside the colour and the edges are smooth lines.
+On the laptop, in the browser, full screen:
+
+- Classic, Velvet Underground, Jellyfish Bloom, Oil & Water and Colorful Cosmos: look
+  closely at where one colour meets another or the dark. The edge should be a soft line
+  the way a liquid's is, with no crawling dots along it, and the colour inside should
+  still have a fine pigment texture (the Granulation control turns it up and down);
+- say whether any look still reads as "digital", and where: a regular grid of dots
+  (Agate's rings are one, PLAN 1b), blocky steps along an edge, or the picture soft and
+  upscaled overall (PLAN 1c);
+- with `?debug`, run `chromaglassDebug().engine` in the console after half a minute on
+  each: it says which grid the laptop settled on (`WebGPU · 512² · 1.5x` is the top).
+  On CI's Mac every look settled on 256² (PLAN 1d); if yours does too, say which looks.
+
+---
+
 ## Reading the frame time while you do it
 
 `?debug` puts `chromaglassDebug()` on the window. `status.frameMs` is the real

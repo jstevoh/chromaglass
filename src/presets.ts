@@ -1924,10 +1924,18 @@ export const PRESETS: Preset[] = [
   {
     id: 'clock-glass',
     name: 'Clock Glass',
-    description: 'Two curved clock glasses with the dye between them: lavender, ice and magenta pool in the deep middle, and a press leaves a thin bright film that creeps back.',
+    description: 'Two curved clock glasses with coloured oil and water between them: cells of red, amber and blue oil, each with its dark rim, drift in purple water and gather in the deep middle, and a press spreads them into a thin bright film that creeps back.',
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
+      /*
+        Oil and water, as a clock-glass dish is (seedPreset's 'clock-glass'):
+        the oil rounds into bodies under its own surface tension and each
+        keeps its own colour (Oil Bodies), so the dish holds several colours
+        side by side instead of blending them into one. Oil & Water's values.
+      */
+      oilTension: 0.9,
+      oilBodies: 1,
       globalSpeed: 0.0126,
       surge: 0.4,
       layerCount: 1,
@@ -2023,7 +2031,15 @@ export const PRESETS: Preset[] = [
       phaseAmount: 1,
       phaseScale: 0.4,
       phaseSharp: 0.75,
-      magnetStrength: 0.3,
+      /*
+        The strength is the magnet's field (gpu/wgsl/magnetDisc.ts, PLAN.md
+        9v), and far off, where this look's magnet works, the pull goes as
+        its square: 0.45 gathers the maze as 0.3 did when the strength was
+        the pull's own scale (0.96 of the old pull from 0.1 to 0.2
+        of the plate out). Still far under the spikes' onset: 0.02 of the
+        hand's field (\`npm run disc\`).
+      */
+      magnetStrength: 0.45,
       magnetHeight: 0.4,
       magnetWalk: 0.3,
       beatSqueeze: 0.3,
@@ -2073,7 +2089,9 @@ export const PRESETS: Preset[] = [
       phaseAmount: 0.8,
       phaseScale: 0.3,
       phaseSharp: 0.75,
-      magnetStrength: 0.5,
+      // The magnet's field, not its pull (see Ferro Maze): 0.6 gathers
+      // as 0.5 did, and stays under the spikes (0.10 of the hand's field).
+      magnetStrength: 0.6,
       magnetHeight: 0.3,
       magnetWalk: 0.5,
       // The black pushes the colour aside and packs it along its edges, as in
@@ -2143,7 +2161,18 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.0,
       saturationBoost: 1.5,
       colourBody: 0.5,
-      dyeBudget: 0.9,
+      /*
+        A print is mostly paper. The budget is the mean the regulator lets the
+        plate fill to before it evaporates the excess, and at 0.9 Roy could
+        fill to eight times the panel it opens with (0.115, npm run royopen),
+        where the inks run into each other and three inks over each other
+        print black: the opening's stain again, laid by the drops instead of
+        the seed. At 0.45 it holds about four times the opening, room for the
+        pours and drops to add shapes, and it caps the plate short of one wash.
+        Inferred from the regulator and the print, not watched on a live
+        plate here (no app frames in a cloud session): docs/judging.md §37.
+      */
+      dyeBudget: 0.45,
       glossiness: 0.0,
       postBlurRadius: 0.1,
       edgeRelief: 0.0,

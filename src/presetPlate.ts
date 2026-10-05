@@ -90,7 +90,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
-  'clock-glass':        [23, 7, 20],            // the second projector: emerald, purple, cobalt
+  'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
   'oil-on-water':       [0, 17, 1, 21],
   'colorful-cosmos':    [18, 10, 20, 2, 17, 21],
   'sunny-side-up':      [7, 23, 10, 20, 2],
@@ -256,8 +256,9 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // blend into a third, so a shape stays one ink with a line round it.
   'roy':                ['milk', 'ink'],
   'home-movie':         ['water', 'water', 'soap'],
-  // Syrup finds the low point of a curved glass, which is the middle.
-  'clock-glass':        ['water', 'syrup'],
+  // Oil that rounds into bodies, as a clock-glass dish is laid; syrup finds
+  // the low point of a curved glass, which is the middle.
+  'clock-glass':        ['oil', 'water', 'oil', 'syrup'],
 };
 
 /**

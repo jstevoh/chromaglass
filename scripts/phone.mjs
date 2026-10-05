@@ -37,7 +37,7 @@
  *
  * The last two need the plate running. A runner with no WebGPU shows the
  * "needs WebGPU" screen instead and attaches no hands, so there they are
- * reported as not run, and `PHONE_GPU=1` (the open shard in checks.yml)
+ * reported as not run, and `PHONE_GPU=1` (the show shard in checks.yml)
  * makes them required. `PW_WEBGPU=1` runs the fingers here in software; the
  * dye needs readbacks the software adapter does not give the app.
  */

@@ -7,9 +7,11 @@ import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
+import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
 import { plateAreas, areaForBand, areaCentre, areaDye, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
-import { sizedMagnet } from '../lib/magnetSize';
+import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
+import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -969,6 +971,8 @@ class FluidSimulation {
    * solver with the first finger's magnet (GpuStepParams.extraMagnets).
    */
   extraMagnets: readonly { x: number; y: number }[] = [];
+  /** The magnet's radius, Magnet Size's (magnetFor; gpu/wgsl/magnetDisc.ts). */
+  magnetRadius = MAGNET_RADIUS;
   /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
   viewHalfW = 0.33;
   viewHalfH = 0.21;
@@ -2478,34 +2482,145 @@ class FluidSimulation {
         // A patchwork of the three dyes over the whole plate, touching, so
         // the ferrofluid fingers through colour everywhere and amber meets
         // teal (the references' green) along the seams.
+        //
+        // Each patch a Gaussian of sigma 0.09 of the plate, on a
+        // grid a quarter of the plate apart. The radius was S × 0.15 in
+        // splatBlob's 128-grid units, which it scales by GRID_SCALE again:
+        // 0.225 of the plate, nearly the spacing, so the sixteen patches lay
+        // on top of each other and the plate opened as one mixed green
+        // (the Mac gallery at 12 s and 30 s: a green plate with black
+        // holes, where Colored I and II hold amber, teal and coral apart).
         for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
           const c = col(i + j * 2);
           const x = S * (0.14 + i * 0.24) + Math.sin(j * 1.7 + i) * 4 * k;
           const y = S * (0.14 + j * 0.24) + Math.cos(i * 1.3 + j) * 4 * k;
-          this.splatBlob(x, y, S * 0.15, 2.0, c.r, c.g, c.b);
+          this.splatBlob(x, y, (S * 0.09) / k, 2.6, c.r, c.g, c.b);
         }
         break;
       }
 
       case 'roy': {
-        // A panel's shapes: a few big flat pools of the three inks, each in a
-        // thin wash of itself twice as wide, so the print (benDay) has solid
-        // ink to outline and a tint round it to lay as dots from the start.
-        const shapes: [number, number, number][] = [[0.3, 0.32, 0.16], [0.68, 0.4, 0.18], [0.42, 0.7, 0.14], [0.75, 0.75, 0.1]];
-        shapes.forEach(([fx, fy, fr], i) => {
+        /*
+          A panel, laid out: flat shapes and two brushstrokes of the three
+          inks, apart on white paper, and three fields of pale wash for the
+          print (benDay) to lay as Ben-Day dots.
+
+          The owner, 2026-10-04: Roy "always starts with this giant black
+          stain". It was this seed. splatBlob takes its radius in the 128
+          grid's units and scales it by GRID_SCALE itself, and the old seed
+          handed it plate fractions times S, already in cells: each of the
+          four pools came out a Gaussian 0.24 of the plate wide in its core
+          and 0.43 in its wash, so all four lay over each other across the
+          whole glass. Red over blue over yellow absorbs every channel, and
+          the print draws dark as black: the lab, rendering the dye the app
+          had laid, printed 57% of the view black and 37% red, with no white,
+          no yellow and no blue (the owner's screenshot, nine seconds in).
+
+          Here every size is a plate fraction turned into splatBlob's units
+          (u). A solid shape is a Gaussian of half its radius: at 1.2 it is
+          solid ink out to about two sigma, and gone a little past that, so
+          shapes laid apart stay apart and the paper between them is paper.
+          The composition sits in the middle 0.7 of the plate, which is what
+          the plate's view shows at 1x.
+
+          A field of dots has to be an even wash at the strength the print
+          reads as a tint, and that strength is narrow and not the same for
+          each ink. Measured in the lab on flat squares through the real plate
+          shader with Roy's settings: blue prints dots from 0.09 to 0.11 and
+          is solid by 0.13, yellow from 0.11 to 0.13, red from 0.11 to 0.13
+          and solid by 0.15. One wide Gaussian crosses that band in a thin
+          ring, so a field is a lattice of small ones, 1.3 sigma apart, which
+          sums to the even wash (TINT) in the band's middle.
+
+          Those were the strengths until the pigment's grain moved after the
+          gooey curve (#267, PLAN 1a): the grain the lab reads (a blank field,
+          about 0.75) had thinned every wash by a quarter in front of the
+          curve, and behind it thins the depth instead, so the same wash
+          printed solid. The deploy that took both read 47 dots on Roy's
+          opening against the 150 royopen asks. Swept as a whole (the seed's
+          TINT times 0.6 to 0.9, `npm run royopen`): 0.6 printed 29 dots, 0.7
+          256, 0.75 272, 0.8 240 and 0.9 102, every ink's fields dotting
+          across 0.7 to 0.8, so TINT is the old strengths times 0.75, the
+          band's middle. It is the same scaling the print's own check took
+          (benday's washes 0.14 → 0.10).
+        */
+        const u = S / GRID_SCALE;
+        const M = (v: number) => 0.5 + (v - 0.5) * 0.7;
+        const TINT = [0.098, 0.09, 0.071];
+        const ink = (x: number, y: number, r: number, amount: number, i: number) => {
           const c = col(i);
-          this.splatBlob(fx * S, fy * S, S * fr * 1.8, 0.5, c.r, c.g, c.b);
-          this.splatBlob(fx * S, fy * S, S * fr, 2.6, c.r, c.g, c.b);
-        });
+          this.splatBlob(M(x) * S, M(y) * S, r * 0.7 * 0.5 * u, amount, c.r, c.g, c.b);
+        };
+        const field = (x: number, y: number, R: number, i: number) => {
+          const sg = 0.02, dx = sg * 1.3, dy = dx * Math.sqrt(3) / 2;
+          const per = TINT[i % TINT.length] * dx * dy / (2 * Math.PI * sg * sg);
+          const c = col(i);
+          R *= 0.7;
+          for (let j = -Math.floor(R / dy); j * dy <= R; j++) {
+            for (let k = -Math.ceil(R / dx); k * dx <= R; k++) {
+              const ox = (k + (j & 1 ? 0.5 : 0)) * dx, oy = j * dy;
+              if (ox * ox + oy * oy > R * R) continue;
+              this.splatBlob((M(x) + ox) * S, (M(y) + oy) * S, sg * u, per, c.r, c.g, c.b);
+            }
+          }
+        };
+        const shape = (x: number, y: number, r: number, i: number, lobes: [number, number][]) => {
+          ink(x, y, r, 1.2, i);
+          for (const [a, f] of lobes) ink(x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.85, r * f, 1.0, i);
+        };
+        // A brushstroke: a chain of shapes along a bend from (x0, y0) through
+        // (xm, ym) to (x1, y1), fattest in the middle.
+        const stroke = (x0: number, y0: number, xm: number, ym: number, x1: number, y1: number, r: number, i: number) => {
+          for (let t = 0; t <= 1.0001; t += 0.05) {
+            const v = 1 - t;
+            ink(v * v * x0 + 2 * v * t * xm + t * t * x1, v * v * y0 + 2 * v * t * ym + t * t * y1,
+              r * (0.6 + 0.4 * Math.sin(Math.PI * t)), 0.9, i);
+          }
+        };
+        field(0.74, 0.27, 0.21, 2);
+        field(0.25, 0.74, 0.2, 0);
+        field(0.18, 0.2, 0.17, 1);
+        field(0.9, 0.86, 0.12, 1);
+        shape(0.3, 0.36, 0.09, 0, [[2.6, 0.6], [4.2, 0.5]]);
+        shape(0.5, 0.14, 0.05, 2, [[0.3, 0.6]]);
+        shape(0.86, 0.46, 0.05, 1, []);
+        shape(0.68, 0.74, 0.1, 2, [[5.6, 0.55], [1.9, 0.5]]);
+        shape(0.16, 0.86, 0.055, 2, [[0, 0.6]]);
+        shape(0.46, 0.86, 0.05, 1, [[3.4, 0.7]]);
+        shape(0.6, 0.3, 0.045, 1, []);
+        stroke(0.36, 0.58, 0.52, 0.42, 0.7, 0.54, 0.05, 0);
+        stroke(0.86, 0.88, 0.95, 0.74, 0.84, 0.62, 0.035, 0);
+        stroke(0.08, 0.56, 0.16, 0.44, 0.06, 0.3, 0.04, 1);
         break;
       }
 
       case 'clock-glass': {
-        // Curved glasses gather the liquid in the middle; seed it there, in
-        // rings, so the dome has something to hold from the first frame.
-        for (let ring = 0; ring < 3; ring++) {
-          const c = col(ring);
-          this.splatBlob(cx, cy, S * (0.3 - ring * 0.09), 2.4, c.r, c.g, c.b);
+        /*
+          A clock-glass dish is coloured water and oil that will not mix
+          (src/lib/oilLay.ts, and why): the water is the first dye, laid wide
+          and deepest in the middle where the bowed glasses hold the most,
+          and bodies of oil are laid over it across the dish, each with one
+          of the other dyes in it. With Oil Bodies on (the look's) each body
+          keeps its colour while it moves, and two only mix where they merge,
+          as two dyed oils do. The oil is laid only where the solver is there
+          to take it; before it is, the colours still land, as spots in the
+          water.
+        */
+        const water = col(0);
+        const bodies = clockGlassBodies(this.rng.float, harmony.length);
+        /*
+          Each cell as clockGlassCell lays it (and why): a body's colour in
+          its oil and nowhere else, the water's wash in what is left.
+        */
+        const g = this.gpu;
+        for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
+        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+          const cell = clockGlassCell((x + 0.5) / S, (y + 0.5) / S, S, bodies);
+          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
+          if (cell.dye > 0) {
+            const c = col(bodies[cell.body].dye);
+            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
+          }
         }
         break;
       }
@@ -3593,9 +3708,10 @@ class FluidSimulation {
       */
       magnetY: Math.max(0, Math.min(1, settings.magnetY ?? 0.5)),
       // Held further away for a bigger look, which is what spreads the pull.
-      magnetHeight: Math.max(0.02, (settings.magnetHeight ?? 0.25) * (0.5 + (settings.phaseScale ?? 0.4))),
+      magnetHeight: magnetDepth(settings.magnetHeight, settings.phaseScale),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
       extraMagnets: this.extraMagnets,
+      magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
@@ -4177,7 +4293,7 @@ interface FrameView {
   /** Where the lamp and its second have wandered to, under the plate. */
   lamp: { x: number; y: number; x2: number; y2: number };
   /** The magnets the lead plate was last stepped with: what stands the ferrofluid up into spikes. */
-  magnets: readonly { x: number; y: number; height: number; strength: number }[];
+  magnets: readonly { x: number; y: number; height: number; strength: number; radius: number }[];
   gelAngle: number;
   kaleidoPhase: number;
   /** The second plate's throw: how magnified, and how far it has drifted. */
@@ -5148,7 +5264,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The settings handed to the lead plate's step, with the magnet where it is now. */
   const magnetStepRef = useRef<Record<string, unknown>>({});
   /** What the lead plate's magnet was last given, for the harness: where, how strong, and whether a hand held it. */
-  const lastMagnetRef = useRef<{ x: number; y: number; strength: number; height: number; held: boolean; field: number } | null>(null);
+  const lastMagnetRef = useRef<{ x: number; y: number; strength: number; height: number; radius: number; held: boolean; field: number } | null>(null);
   /** The maze field's kick envelope: 1 on a kick, falling over about a second (see magnetFor). */
   const mazeKickRef = useRef({ env: 0, at: 0 });
   /** The lead solver the phase was last laid on, so a rebuilt one gets it too. */
@@ -6099,7 +6215,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const magnetFor = <T extends Partial<VisualizerSettings>>(look: T): T => {
         const now = showNow();
         const lead = fluidsRef.current[0];
-        if (lead) lead.extraMagnets = [];
+        if (lead) { lead.extraMagnets = []; lead.magnetRadius = MAGNET_RADIUS; }
         const hand = magnetHandRef.current;
         const held = hand !== null && now - hand.at < 250;
         const lookX = look.magnetX ?? 0.5, lookY = look.magnetY ?? 0.5;
@@ -6177,7 +6293,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (!held && !placed && !walks) {
           // Said as it is, so the harness does not read the last held magnet
           // as still held once the hand has gone stale.
-          lastMagnetRef.current = { x: lookX, y: lookY, strength, height: look.magnetHeight ?? 0.25, held: false, field };
+          lastMagnetRef.current = { x: lookX, y: lookY, strength, height: look.magnetHeight ?? 0.25, radius: MAGNET_RADIUS, held: false, field };
           return field === lab ? look : Object.assign(magnetStepRef.current, look, { ferroLabyrinth: field }) as T;
         }
         let mx: number, my: number, ms = strength, mh = look.magnetHeight ?? 0.25;
@@ -6199,14 +6315,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
         /*
           The magnet's size (Magnet Size, lib/magnetSize.ts): held or set
-          down it is the same magnet, k times deeper with k³ the strength,
-          so the same field over it reaching k times as far. Not the walk's:
-          that is the look's own magnet, which nobody's hand chose. Read
-          from the folded look, so a patch (a fader's LFO, the room, the
-          sound) aimed at Magnet Size moves it as it moves any other setting.
+          down it is the same magnet, k times as wide with its face
+          where it was, its height and strength as they were (PLAN.md 9v).
+          Not the walk's: that is the look's own magnet, which nobody's hand
+          chose. Read from the folded look, so a patch (a fader's LFO, the
+          room, the sound) aimed at Magnet Size moves it as it moves any
+          other setting.
         */
-        if (held || placed) ({ strength: ms, height: mh } = sizedMagnet(ms, mh, look.magnetSize ?? settingsRef.current.magnetSize));
-        lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, held, field };
+        const radius = held || placed ? magnetRadiusAt(look.magnetSize ?? settingsRef.current.magnetSize) : MAGNET_RADIUS;
+        if (lead) lead.magnetRadius = radius;
+        lastMagnetRef.current = { x: Math.max(0.05, Math.min(0.95, mx)), y: Math.max(0.05, Math.min(0.95, my)), strength: ms, height: mh, radius, held, field };
         // The other fingers' magnets, while the first is held (see the hands
         // loop): each finger that held one within the same quarter second.
         if (lead) {
