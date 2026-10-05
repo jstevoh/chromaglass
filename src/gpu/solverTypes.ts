@@ -284,8 +284,11 @@ export interface PlateSolver {
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),
    * U the hand's own motion in cells a step and χ how much of the cell it
    * fills, held as a solid for the next step only (PLAN 15b; hsPrep).
+   * `breath`, when a Blow's wind blows on a thin gap: L²×4 of (τx, τy, 0, 0),
+   * the air's stress on the surface in pascals, for the next step only
+   * (PLAN 15g; lib/breath.ts, hsBody).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null): void;
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;

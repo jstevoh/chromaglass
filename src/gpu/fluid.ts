@@ -400,6 +400,13 @@ const DRIP_WEIGHT = 0.5;
 */
 const AIR_SHEAR = 0.5;
 /*
+  The clear liquid's density, kg/m³, to turn a Blow's stress into the speed
+  it drives the liquid to (τh/2μ, μ = ρν; lib/breath.ts). The plate's
+  liquids are water and oils, 0.8 to 1.26 of water's; the clear liquid is
+  taken as water's, as liquidProps takes the poured ones' against it.
+*/
+const LIQUID_DENSITY = 1000;
+/*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
   at 1, on a log scale, which is how viscosities are spread: a light mineral
@@ -735,6 +742,11 @@ export class WebGPUFluid {
   private handLive = false;
   /** The fastest hand laid for the next step, in the hands' cells a step (the ferrofluid's substeps follow it). */
   private handFastest = 0;
+  /** A Blow's breath on the liquid (applyDeltas' `breath`, lib/breath.ts), on the CPU's grid and on the solver's, made at the first breath on a thin gap. */
+  private cpuBreathTex: GPUTexture | null = null;
+  private breathTex: GPUTexture | null = null;
+  /** Whether the next step has a breath on it: laid each step the wind blows, gone the step after, as the hands are. */
+  private breathLive = false;
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
@@ -1348,7 +1360,7 @@ export class WebGPUFluid {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -1378,6 +1390,14 @@ export class WebGPUFluid {
       for (let k = 0; k < hands.length; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
       this.handFastest = fastest;
     }
+    if (breath) {
+      if (!this.breathTex) {
+        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        this.cpuBreathTex = this.disposer.track(this.device.createTexture({ label: 'breath (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+        this.breathTex = this.disposer.track(this.device.createTexture({ label: 'breath', size: [this.N, this.N], format: RGBA32, usage }));
+      }
+      q.writeTexture({ texture: this.cpuBreathTex! }, breath, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+    }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
     this.writeSplatArgs(0);
@@ -1391,6 +1411,7 @@ export class WebGPUFluid {
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
     if (hands) this.handLive = true;
+    if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
     this.foldDeltas(pass);
     pass.end();
     q.submit([enc.finish()]);
@@ -1561,6 +1582,9 @@ export class WebGPUFluid {
     const hands = this.handLive ? this.handTex : null;
     const handCells = this.handLive ? this.handFastest * N / this.L : 0;
     this.handLive = false;
+    // And a Blow's breath, the same way (lib/breath.ts).
+    const breath = this.breathLive ? this.breathTex : null;
+    this.breathLive = false;
     /*
       The substeps a hand in the liquid needs of the carries that take a
       fixed number (the ferrofluid's, and the colour's under a maze's flow):
@@ -1889,8 +1913,8 @@ export class WebGPUFluid {
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
-      On a thin gap, Rain Drip's heavy dye and Updraft's shear join the body
-      forces (hsBody), and the velocity is kept here, after all of them and
+      On a thin gap, Rain Drip's heavy dye, Updraft's shear and a Blow's
+      breath (PLAN 15g) join the body forces (hsBody), and the velocity is kept here, after all of them and
       before the stirring, so hsPrep can read the two apart: a body force
       moves a liquid as its viscosity says, a stir as the dial says (PLAN
       18a-2, wgsl/thinGap.ts). With no body force this step there is nothing
@@ -1898,13 +1922,24 @@ export class WebGPUFluid {
       place, which makes the body forces' share zero.
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
-    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1);
+    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath);
     if (thinBody) {
+      /*
+        The breath is laid as its stress, in pascals (lib/breath.ts), and
+        read as every body force here is, as the speed it drives the
+        reference liquid to at the rest gap: τh₀/2μ_ref in m/s, then in the
+        flow's units, plate widths a step over the step's displacement
+        (real seconds over the plate's width and disp, as hsPrep's hand).
+      */
+      const h0 = REST_GAP * PLATE_METRES;
+      const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+      const breathScale = breath ? (h0 / (2 * LIQUID_DENSITY * NU_REF)) * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
+      const breathTex = breath ?? this.blank('rgba');
       stage('thin body', (pass) => {
         this.ensureThinGap();
-        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}`,
-          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, 0, 0, 0, 0, 0]),
-          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write]);
+        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}`,
+          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale, 0, 0, 0, 0]),
+          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex]);
         this.vel.swap();
       });
     }

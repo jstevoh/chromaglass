@@ -133,6 +133,7 @@
     "thingap": "node scripts/thingap.mjs",
     "presslift": "node scripts/presslift.mjs",
     "fingerflow": "node scripts/fingerflow.mjs",
+    "airblow": "node scripts/airblow.mjs",
     "forces": "node scripts/forces.mjs",
     "thick": "node scripts/thick.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",

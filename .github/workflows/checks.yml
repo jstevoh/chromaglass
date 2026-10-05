@@ -599,6 +599,14 @@ jobs:
       - name: The Finger drags the liquid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingerflow
+      # A Blow's wind on a thin gap as air on the film (PLAN 15g): the breath's
+      # stress moves the liquid at τh/2μ, slower in a thick one, stops with
+      # the breath, and carries the colour, the ferrofluid and the oil along
+      # by the flow alone, none lost; the old push alone moved nothing.
+      - name: The wind is air on the film
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 8
+        run: npm run airblow
       # The plate's forces as forces on a thin gap (PLAN 18a-2): a body force
       # (Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity
       # says, Glass Smear is the glass sliding and Updraft a draught's shear,
