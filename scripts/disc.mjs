@@ -14,8 +14,8 @@
  * elliptic integral) and the saturation a field on its scale.
  *
  * A field that looks plausible is still not the field, so this runs the
- * shader's own text (SPIKES_WGSL, which the solver and the plate both
- * include) on the GPU and holds what it gives to the physics, worked out
+ * shader's own text (SPIKES_WGSL, which the solver and the standing layer
+ * both include) on the GPU and holds what it gives to the physics, worked out
  * here independently: the field of the cylinder's side current summed by
  * Biot–Savart, loop by loop, with nothing in common with the shader's
  * algebra. Then what follows from a real magnet, read off the same shader:

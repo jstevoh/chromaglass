@@ -228,8 +228,9 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.1** ~~**18a-every** Thin Gap in every look~~ #248 (the owner's pick came before 2.1's
   reading; 2.1 still reads it), then ~~**15b**~~ (the Finger, shipped), **15g**,
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
-- **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground, 0 in every look;
-  the owner picks the looks, judging §31), then **18f** heat from the lamp (which unblocks 10.6
+- **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
+  go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
+  it), then **18f** heat from the lamp (which unblocks 10.6
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
 - **6.3** **18c** a pour adds liquid, then **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
@@ -237,7 +238,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
-- **6.8** The ferrofluid: **9t** (then **9u**, **9k**), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9m**,
+- **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
@@ -333,6 +334,14 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   Hold, write the camera's current centre into the aim. Desk, phone
   (`PhoneStage.tsx`), and it shows on the wall.
 
+- **QA-16** On Roy, 1963 a green dye cannot be added: it prints as another colour.
+  Desk (the owner's report from the corner dot, plate `roy`). Likely cause, read in
+  the code but not yet run: the Ben-Day print snaps every pixel's hue to the nearest of
+  three inks (`benDayInkIndex` in `src/gpu/wgsl/plate.ts`, red, yellow or blue), so a
+  green lands on yellow or blue. A real comic printed green as yellow and blue dots
+  overlapping on the paper; doing that keeps the three inks and gives back green,
+  orange and purple. Next to QA-15; deferred with it.
+
 **Tier 3. On the wall, it looks wrong.**
 
 - **QA-7** Looks read as pixelated, "very digital", on a laptop. Wall, desk. Draft #267.
@@ -348,6 +357,11 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-14** The looks carry too few colours: the owner wants many, with subtle gradients
   between them, across the presets in general. Wall, desk. Thread "More colour in the
   looks".
+
+- **QA-15** Roy, 1963 always opens on a giant black stain over flat red, filling most of
+  the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
+  Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
+  to 21d hold the rest of its open work. Deferred by the owner: fix later.
 
 **Tier 4. Polish.**
 
@@ -378,7 +392,7 @@ Where each batch stands, as of 2026-09-27:
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
 | 8 | The desk | **Shipped** |
-| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept; the gaps still narrow, 9t), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m, 9o–9r and 9t open |
+| 9 | Ferrofluid after the references | Sharp edge and two looks **shipped** (#161); maze detail **shipped** (#167); dye carried **shipped** (#168); the magnet's spikes, 9e, **shipped** (#183, with the phone's fingers as magnets), not yet judged on the Mac; fingers past the spikes, 9i, **shipped** (#200, `npm run fingers`), not yet judged on the Mac; Blow and Finger move it, 9n, **shipped** (#206, `npm run ferrohands`), not yet judged on the Mac; picking the Magnet no longer gathers a black pool in the middle, 9s, **shipped** (`npm run magnet`), and pours nothing, with Magnet Size, 9x, **shipped**; brings no ferrofluid at all, only moving what is poured, 9y, **shipped**; the pool it sets down is 9u, open; colour between the domes, 9f, **shipped** (`npm run domes`: the dye kept), not yet judged on the Mac; the ferrofluid standing up in domes as a layer that keeps its volume, 9t, **shipped** (`npm run standing`: the gaps open), not yet judged on the Mac; the magnet as a real magnet, with Magnet Size its radius and the saturation a field, 9v, **shipped** (`npm run disc`), not yet judged on the Mac (judging §37); carrying the ferrofluid, the mix and the reactions across a new solver, 9w, **shipped** (`npm run regrid`, and `npm run magnet`'s check 8 on the Mac); the dye at its own grid across one, 9z, open; 9g, 9h, 9j, 9k–9m and 9o–9r open |
 | 10 | Playing like a show | Step 0, film every look, **shipped** (#162); its first full baseline not yet run; step 1, rest, big events and darkness, **shipped** on the sequencer (#170), not yet filmed; step 2, the song's shape, **heard** live (builds, drops, breakdowns; `npm run shape`) and **followed** by Pacing (#182, Follow the Song; `npm run pacing`), not yet filmed; step 3, accents, the one **shipped** (#184, Accent the One; `npm run downbeat`), not yet seen on the Mac, every other bar, fills only, a hand's variation and a press pulled onto the beat not started; step 4, press round and lift into fingers, **shipped** (#185, `npm run lift`), not yet seen on the Mac, and Beat Squeeze, found never to have pressed the plate, **pressing** on every kick and let go after each (`npm run lift`, `npm run squeeze` on the Mac), not yet seen on the Mac; step 5, oil and water as bodies, **shipped** (#179, Oil Bodies, on in Oil & Water), not yet judged on the Mac; steps 6 and 7 not started |
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
@@ -386,7 +400,7 @@ Where each batch stands, as of 2026-09-27:
 | 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half still open; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v); 14x, the microphone taking the hand's own clicks for kicks, **shipped** (`npm run clicks`); 14v-3, the intro over the opening's black plate, **shipped** (`npm run intro`) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15i, picking a bottle lays nothing, **shipped** (`npm run bottles`, Mac); 15e, 15f, 15g, 15j open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16f, add and take off the back plate on every look, **shipped** (#273, `layout`, `phone`); 16d–16e not started |
-| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (0 in every look, the owner picks which go on the lamp; `npm run lamp`), 18b-1 to 18b-6 left |
+| 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (`npm run lamp`); **18b-1 which looks go on it, shipped** (#262: eleven looks on the lamp, ten picked by a written rule from Mac pictures, `npm run lampjudge`, one by the owner); 18b-2 to 18b-9 left |
 | 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
@@ -956,7 +970,8 @@ Open, from building 9e (in the order to do them):
   while the hand is still opened the gaps to 41%, but it was a look-driven tuning
   and was dropped under the physics rule. The phone's finger magnets get the same.
   Judging notes: docs/judging.md §22.
-- **9t. Domes that stand up out of the layer** (found building 9f). The ferrofluid is
+- **9t, as found. Domes that stand up out of the layer** (found building 9f; built as
+  the 9t below, **shipped**, with a film rather than the cap raised). The ferrofluid is
   a plan-view layer capped at full (phaseRelax, and the double well's minimum at 1),
   so a pool the magnet pulls together can only spread sideways, and the domes pack.
   A real Rosensweig peak rises many layer depths out of the pool and draws the
@@ -1074,6 +1089,78 @@ Open, from building 9i:
   window, and that the magnet let go of has strength. Left: a hold while the show is stopped
   or draining gives no magnet, because the hand is read in the solver's step; a
   hold after Start does.
+- **9t. The ferrofluid stands up as a layer that keeps its volume** (**shipped**).
+  The plate kept the ferrofluid as one number a cell, held at or under full: a plan
+  view that keeps the liquid's area, so a pool under the Magnet could only be packed
+  into domes (spikes.ts's lattice, wells in the separation, a pull eased to half) and
+  84% of the plate within 0.08 of the magnet stayed black, where every reference has
+  black domes with the colour between them. A real layer keeps its volume: a dome
+  standing up takes its height out of the layer round it, and the gaps open by
+  themselves. Now, round each magnet past the onset (the hand's, and the phone's other
+  fingers), a patch of the plate's cells is stepped as a thin film of the Rosensweig
+  instability (`src/gpu/standing.ts`, `wgsl/standing.ts`): tension, gravity, the
+  field's lift as a half-Laplacian through an FFT, the glass's wetting, a cell past
+  full a dome that much taller. The plate's own passes step aside under it (the
+  separation, Cahn–Hilliard, the maze's flow and the magnet's pull), and the
+  water's flow carries only the layer's mean there, the film its shape; its cap at
+  full is raised to the top glass there. The plate draws each dome from
+  the layer's own slope, the white point on the top of each. In the lab on 384², a
+  pool 0.12 in radius under the hand's Magnet: from 84% black to 47% within 0.08 of it, 13
+  domes a median 0.032 apart (2π l_c is 0.04), none made or lost; flat under
+  the onset; back to a pool when the field is turned down (`npm run standing`).
+  `npm run spikes` moved to 384² and reads the domes the layer makes (28 within 0.12 of the hand, 16 with a white point on
+  the top against 1.8 half a pitch off, 6/6). The
+  plate's film beyond a domain's line reads the least of four points on the way out, not
+  one four and a half cells off, which had landed in the next dome and drawn dark dashes
+  on every dome's side facing it.
+  Shortcuts, each still to replace:
+  - **9t-1. The lift held near the onset.** G under the hand is 2.8 (a real layer's is
+    hundreds), so the domes grow at a scale the grid draws; at the lab's G 4.3 they set
+    as bars along the grid. A finer film grid under the magnet (the patch at twice the
+    plate's cells) would let it rise.
+  - **9t-2. No pull under the film.** The magnet's Kelvin pull is in the film's
+    pressure, worked out from the liquid's susceptibility (EFH1, χ0 2.6), and scaled to
+    nothing: at the whole of it the pool gathered into one heap with no domes on it (the
+    lift being held low, 9t-1), and at a tenth or a quarter its gathering front set the
+    domes along the grid. With 9t-1's finer grid it can come back.
+  - **9t-3. No hysteresis.** Real domes stay a few per cent under the field that raised
+    them; turned to 0.95 of the onset on the axis, these were all gone two seconds on.
+  - **9t-4. Slower than a real layer.** Domes start a second and a half after the Magnet
+    arrives and stand by four; a real layer takes a fraction of a second (9t-1 again).
+  - **9t-5. The model's own simplifications:** the lift saturating with the layer's
+    height (S(h)), small slopes, a flat water top, no finite-depth correction to the
+    lift, a (9, 3) wetting law at a 10° angle, the mobility capped at full, a noise of
+    a hundredth of the pressure scale to seed it, the window (full to half the
+    patch's half-width, none past three quarters, and no further than 0.083 and 0.125
+    of the plate on any grid: at 0.65 and 0.9 the fingers at a pool's rim fell to
+    7/5/5/4, against 11/10/9/5 with the film off, 9t-8), and each patch stepping its own magnet in turn
+    where two fingers' overlap.
+  - **9t-6. The film's cost**, up to four patches of 128² on 384², eight substeps each,
+    13 dispatches a substep (eight FFT passes, then pressure, flux, apply, sum and
+    take), is not yet measured on a Mac or a phone.
+  - **9t-7. 256².** A capillary length is 1.6 cells there, and the domes are coarse
+    (9g).
+  - **9t-8. Fewer fingers past a pool's rim: fixed in #247.** With the film's window
+    stepping the water's flow aside, nothing carried the layer out of it: the window
+    kept 7212 of the pool's 13029 where the plate alone kept 5429, the rim had less to
+    finger with, and `npm run fingers` counted 6/4/5/2 on the Mac against main's
+    12/9/9/3. The flow now carries the layer's mean under the window (wgsl/fluid.ts,
+    carried): 9/12/9/5 in 7 sectors, the domes standing (the flow carrying each cell
+    as outside instead poured the domes into slabs). Left: the last dome on the
+    magnet's axis lies down more slowly when the field is turned down (1.12 at the
+    end of `npm run standing`'s leg, 1.06 after 960 steps more; that check now asks under 1.2
+    and at most 30 cells past 1.05, where it asked under 1.1), and the window still
+    stands in for the film fingering at its own edge, which a real layer does by the
+    same repulsion that raises its domes (9t-1).
+  - **9t-9. The magnets still reach the plate's uniforms unread.** The plate drew its
+    spikes from them; the domes come from the layer now, and the app still computes and
+    uploads them every frame (plateUniforms.ts, magnetsOnPlate). Take them out, with the
+    harnesses that tell the plate of them.
+  - **9t-10. The first Magnet of a session waits for the film's build.** Its nine kernels
+    are built behind the show the first time a magnet passes the onset (a moment or two
+    on a cold cache), and until then the pool only gathers. Starting the build at half
+    the onset would build it on every Magnet Garden show, whose own magnet is there;
+    starting it when the Magnet tool is picked would not.
 - **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
   behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
   share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
@@ -1183,7 +1270,7 @@ Open, from building 9i:
   0.45 and Ferro Paint's 0.5 → 0.6 to gather as they did. Both constants carry
   the old ones over at the hand's magnet, so `MAGNET_GAIN` and phaseMu's χ keep
   their tuning. The radius rides `GpuStepParams.magnetRadius` (`Sim.magRadius`,
-  `U.magnetRadius`); every shader including `SPIKES_WGSL` defines
+  and the standing layer's `Film.size`); every shader including `SPIKES_WGSL` defines
   `magnetRadius()`. `npm run disc` (lab, Mac plate shard) runs the shader's own
   text against a Biot–Savart sum over the side current: within 0.0073% on and
   off the face and at the rim, 1.24% where it hands over to the dipole (the point
@@ -3933,7 +4020,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | # | Item | Gain | GPU cost | Needs |
 |---|---|---|---|---|
 | 18a | The plate is a Hele-Shaw cell | Large: tools move every liquid, thick liquids stop, fingering becomes possible | About −2 ms a step (a saving) | Retuning every look; the owner's feel call (15b) |
-| 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground. **Shipped** (#256), behind Lamp Ground |
+| 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground. **Shipped** (#256), behind Lamp Ground; eleven looks on it (#262, 18b-1) |
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
@@ -4366,8 +4453,49 @@ its frame rate live. "Free" means no new passes or texture reads.
   the hot-spot lifted the middle to 1.28 times the lamp, which burnt a white ground
   out (the doubling read 0.89 where the law says 0.96); the lamp ground is now set
   down by the hot-spot's peak. Halfway the picture is half of each to a byte. The gooey edge's contrast is left out of the amount (18b-4)
-- **18b-1. The owner picks the looks** (judging §31). Each look's dyes and Dye Budget
-  were set for black; one moved to the lamp may want less dye.
+- **18b-1. Which looks go on the lamp. Shipped (#262), by rule rather than taste**, as the
+  owner asked ("automatically judge which looks should use the lamp ground"). A PR
+  labelled `lamp-gallery` photographs every look on CI's Mac at 12 and 30 s, each moment
+  on both grounds a quarter second apart (`GALLERY_GROUNDS=0,1`), and `npm run lampjudge`
+  reads each pair pixel against pixel (`groundPairOf` in `scripts/judge.mjs`). The rule:
+  a look whose own description says it is light itself (Galaxy, Cyberpunk Neon, Aurora
+  Borealis, Solar Flare, Stardust Collapse, Lumia) or a picture with its own ground (Oil
+  on Water, Colorful Cosmos, Sunny Side Up, Soap Film, Roy, 1963) keeps black; every
+  other look is a dish, and goes on the lamp when, at both moments and over the dish, the
+  bare lamp is at most 45%, black at most 30%, and lit colour at least 20% and at least
+  0.6 of what it shows on black. **On the lamp: Timbre Shifter, Microscopic Chaos,
+  Poster 1969, Fillmore East 1969, Crowd Plate, Milk Marbling, Red Cabbage, Chemical
+  Clock, Home Movie, Clock Glass**, and **Sensual Laboratory, the owner's pick** (2026-10-04:
+  "looks washed out by the light" on black, where its Multiply lays grey graphite on a cream
+  platen; on the lamp the graphite reads dark; `OWNER` in `lampjudge.mjs`). The rule had kept
+  it on black on its colour gates, which a look with no colour on either ground cannot pass
+  (18b-9). Ferro Maze draws the same on both grounds (its own
+  dye is the light table's white) and keeps 0. The pictures, every pick and its reason:
+  the gallery page linked from #262; the pictures are in the project's shared files.
+  `npm run lamp` now renders every look at 0 for its byte-for-byte line and asks that the
+  looks shipped on the lamp draw on it. The owner can overrule any pick (Save Look).
+  Found on the way: a projector set to the film alone kept the look's lamp ground, so on
+  a look on the lamp it threw the bare lamp with the film over it; the film alone now
+  takes the lamp ground out too (`plateSources.ts`, `npm run map`), as `wall`'s film-alone
+  line on the Mac (Fillmore East) would have found.
+- **18b-8. The dishes too deep for the lamp.** Eighteen looks are dishes by their own
+  description but fail the rule with the dye they were given for black: on the lamp the
+  dish goes black (ink over 30%) and the colour goes with it: Classic, Deep Ocean, Acid
+  Trip, Bass Drop, Boiling Point, Fractal Dream, Velvet Underground, Neon Coral Reef, Oil
+  Wheel, Macro Bead, Cell Bloom, Glycerine Drift, Oil & Water, Magnet Garden, Ferro Paint;
+  Jellyfish Bloom and Lacing Run keep under a tenth of their lit colour; Agate keeps 46%
+  of it. Several say outright that
+  they are lit from beneath (Deep Ocean, Jellyfish Bloom, Velvet Underground, Oil Wheel,
+  Magnet Garden), so on a real projector they would be on the lamp. Each wants its dye
+  thinned for the lamp (Dye Budget, or the dish's own amounts), judged by the same rule,
+  rather than the black ground keeping it: a look stays dark on a projector only by being
+  deep dye (18b-2). One look at a time, `lamp-gallery` before and after.
+- **18b-9. The rule's colour gates on a look with no colour.** `lampjudge`'s lit-colour
+  gates (20% of the dish, 0.6 of black's) fail any look that has no colour on either
+  ground, which is a graphite or ferrofluid look's whole point; Sensual Laboratory failed
+  them and the owner put it on the lamp by eye. Hold such a look (lit colour on black
+  under a fifth) to its contrast instead, the spread between its dark dye and the platen
+  on each ground, and see whether the rule then agrees with the owner unaided.
 - **18b-2. The dark ground the physical way.** A look that stays dark should get there
   with a dense base dye in the dish or a dimmed lamp, not with the black ground, once
   the owner has picked; then the black ground can go.

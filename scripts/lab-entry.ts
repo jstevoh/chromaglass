@@ -203,6 +203,9 @@ const api = {
     await l.solver['device'].queue.onSubmittedWorkDone();
   },
   addPhase(x: number, y: number, r: number, a: number) { lab!.solver.addPhase(x, y, r, a); },
+  /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
+  prepareFilm() { return lab!.solver.prepareFilm(); },
+  filmSteps() { return lab!.solver.filmSteps; },
   /** Thin Gap's viscosity for a Thickness, and the ferrofluid's (src/gpu/fluid.ts), so a check never copies either. */
   thinGapViscosity,
   ferroViscosity: FERRO_NU,

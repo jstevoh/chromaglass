@@ -640,6 +640,13 @@ jobs:
       - name: The ferrofluid's spikes
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run spikes
+      # The ferrofluid stands up as a layer keeping its volume: flat under the
+      # onset, domes a capillary wavelength apart past it, gaps opening wider
+      # the stronger the field, the domes sinking back down, none lost. In the
+      # open shard: the plate shard is near its timeout (11m58s of 15).
+      - name: The ferrofluid's standing domes
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run standing
       # Past the spikes, the held magnet pulls a big pool's edge out in black
       # fingers, on Classic and on Magnet Garden; with no magnet or the look's
       # own far one the edge stays put.

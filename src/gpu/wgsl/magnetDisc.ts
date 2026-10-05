@@ -78,7 +78,7 @@
  *
  * Each shader that includes this defines `fn magnetRadius() -> f32`, the
  * magnet's radius in plate widths now (Sim.magRadius in the solver,
- * U.magnetRadius on the plate): one for every magnet under the glass, since
+ * Film.size in the standing layer, standing.ts): one for every magnet under the glass, since
  * the phone's fingers each hold the same magnet.
  */
 

@@ -303,7 +303,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
       mags[k * 4] = m.x; mags[k * 4 + 1] = m.y; mags[k * 4 + 2] = Math.max(0.02, m.height); mags[k * 4 + 3] = Math.max(0, m.strength);
     });
     pack.set('magnets', ...mags);
-    pack.set('magnetRadius', view.magnets?.[0]?.radius ?? MAGNET_RADIUS);
     pack.set('lightPlay', clamp01(s.lightPlay ?? 0));
     pack.set('iridescence', clamp01(s.iridescence ?? 0));
   }
@@ -428,9 +427,13 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 }
 
 /**
- * The magnets under the lead plate as its last step had them, for the plate
- * to draw the spikes they raise (plate.ts, spikeAt): the one in the step and
- * the other fingers', at its height, strength and size. None with the magnet off.
+ * The magnets under the lead plate as its last step had them: the one in
+ * the step and the other fingers', at its height, strength and size. None with the
+ * magnet off. The plate drew the spikes they raised from these, on a lattice
+ * round each (plate.ts, spikeAt); it draws the domes from the layer's own
+ * height now (PLAN 9t). The app and the harnesses still compute and upload
+ * them every frame (LiquidVisualizer, lab-entry.ts) and the shader no longer
+ * reads them; taking them out of the uniforms is a plan item (PLAN 9t-9).
  */
 export function magnetsOnPlate(p: GpuStepParams | null): { x: number; y: number; height: number; strength: number; radius: number }[] {
   if (!p || p.magnetStrength <= 0.0001) return [];

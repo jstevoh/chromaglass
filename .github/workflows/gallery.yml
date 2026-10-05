@@ -24,6 +24,10 @@ name: Preset gallery
 # 37 Mac jobs sat queued or running at once. Mac runners are capped per
 # account (the busiest hours never held more than five to eight at once), so
 # every gallery run was a Checks shard not running. PLAN.md 19a.
+#
+# Labelled `lamp-gallery` instead, it photographs every preset at 12 and 30
+# seconds, each moment twice, on black and on the lamp (Lamp Ground 0 and 1),
+# for `npm run lampjudge`, which picks each look's ground (PLAN 18b-1).
 on:
   workflow_dispatch:
     inputs:
@@ -35,6 +39,10 @@ on:
         description: 'Seconds after load to photograph'
         required: false
         default: '8,20,40'
+      grounds:
+        description: 'Lamp Ground values to photograph each moment at, e.g. 0,1 (blank: as each look ships)'
+        required: false
+        default: ''
   pull_request:
     types: [labeled]
 
@@ -50,7 +58,7 @@ concurrency:
 jobs:
   gallery:
     name: Gallery (macOS)
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'gallery'
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'gallery' || github.event.label.name == 'lamp-gallery'
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -66,7 +74,8 @@ jobs:
         run: npm run gallery
         env:
           GALLERY_ONLY: ${{ inputs.only }}
-          GALLERY_TIMES: ${{ inputs.times }}
+          GALLERY_TIMES: ${{ inputs.times || (github.event.label.name == 'lamp-gallery' && '12,30') || '' }}
+          GALLERY_GROUNDS: ${{ inputs.grounds || (github.event.label.name == 'lamp-gallery' && '0,1') || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
