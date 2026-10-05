@@ -147,9 +147,21 @@ try {
   const c = shown.cnt;
   const f = (v) => v.toFixed(1);
 
-  // The control: every cell absorbing all three channels as its strongest.
+  /*
+    The control: every cell absorbing all three channels as its strongest,
+    made opaque. A dye's strongest band now passes 4% a unit, not 0.2%
+    (src/lib/dye.ts, DYE_FLOOR, PLAN 18l), so the strongest channel of a
+    cell is half the absorbance it was, and the same seed made to absorb
+    "everything" at that strength printed a dark grey the counter rightly
+    does not call black (15.4% black against 37.1% inked, where at the old
+    floor it read 53.9%). So it is scaled to the old floor's absorbance, an
+    opaque ink's: ln(1/0.002) / ln(1/0.04). The seed's own print is not
+    touched (black 7.8% and white 59.5% with the new floor, 8.1% and 59.1%
+    with the old).
+  */
+  const OPAQUE = Math.log(1 / 0.002) / Math.log(1 / 0.04);
   const dark = dye.slice();
-  for (let i = 0; i < n; i++) { const m = Math.max(dark[4 * i], dark[4 * i + 1], dark[4 * i + 2]); dark[4 * i] = dark[4 * i + 1] = dark[4 * i + 2] = m; }
+  for (let i = 0; i < n; i++) { const m = OPAQUE * Math.max(dark[4 * i], dark[4 * i + 1], dark[4 * i + 2]); dark[4 * i] = dark[4 * i + 1] = dark[4 * i + 2] = m; }
   const ctl = (await print(dark)).cnt;
   const inked = c.red + c.yellow + c.blue;
   const instrument = ctl.black > 0.6 * (inked + c.black);

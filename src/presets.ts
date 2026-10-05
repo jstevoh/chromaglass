@@ -895,6 +895,15 @@ export const PRESETS: Preset[] = [
     name: 'Poster, 1969',
     description: 'Two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster: orange against ultramarine, the colours that vibrate.',
     settings: {
+      /*
+        Its print's grain stays a texture, not flecks, at the half it had:
+        with the dye's depth drawn (Transmission 1, PLAN 18l) the pigment's
+        grain varies the depth of this poster's strong, saturated inks on the
+        lamp, and each ±40% of depth swings their colour far enough to fleck
+        the edges (in npm run grainedge, 4.1% of the edges' pixels flecks, the
+        line asks under 2%; 0.6% at 0.5). PLAN 18l-7.
+      */
+      transmission: 0.5,
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
       globalSpeed: 0.0126,

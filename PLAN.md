@@ -4046,6 +4046,12 @@ its frame rate live. "Free" means no new passes or texture reads.
   carries that tenth into white, so the spread reads 1.30 times against the bar's 1.3
   (1.50 at 0.5). The grade shots pin 0.5; re-derive the contrast line on a plate whose
   bright end has headroom at 1 (a dimmer lamp or a lower frontBright), then drop the pin.
+- **18l-7. Poster 1969 keeps Transmission 0.5.** At 1 the pigment's grain (#267) varies
+  the depth of its strong inks on the lamp enough to fleck the edges (`npm run grainedge`
+  4.1% of edge pixels, the line asks under 2%; 0.6% at 0.5). Decide with the grain's
+  owner whether a deep ink's grain should swing its colour less, then drop the pin.
+  (`npm run royopen`'s black control is now scaled to an opaque ink, since a dye's
+  strongest band passes 4% a unit: at that strength the control printed dark grey.)
 - **18l-1. Real dye spectra (the shortcut kept).** Still three bands: a dye's colour is
   three transmissions, and the 4%/96% limits stand in for the tails of a real absorption
   band. Spectral Optics' six bands cannot reproduce the palette's saturated colours (its
