@@ -1050,8 +1050,6 @@ magnet scaled away. On Classic, desk and phone:
 - the frame time with the Magnet held (below): the field is now worked out from
   elliptic integrals wherever the magnet reaches, on the plate and in the solver.
 
----
-
 ## 38. Roy, 1963 opens as a panel (PLAN 21e)
 
 Pick Roy, 1963. It should open as a Lichtenstein panel: flat red, yellow and blue
@@ -1065,6 +1063,8 @@ the show is not:
 - are the dot fields big enough, and is there enough colour? Say which way.
 - add a green, then a purple, with the bottles: they should print as a bright
   comic green and a violet, flat and outlined, not as yellow or blue (QA-16).
+
+---
 
 ## Reading the frame time while you do it
 
