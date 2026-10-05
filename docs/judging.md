@@ -1099,6 +1099,18 @@ On the laptop, in the browser, full screen:
   each: it says which grid the laptop settled on (`WebGPU · 512² · 1.5x` is the top).
   On CI's Mac every look settled on 256² (PLAN 1d); if yours does too, say which looks.
 
+## 41. The magnet's thin fingers (PLAN 9ab)
+
+A finger the magnet pulls out thinner than the plate's grid used to be drawn as nothing,
+because the plate draws only past the ferrofluid's half-full line. Now it's drawn as thin
+ferrofluid: brown where it's thin, near black at two-fifths full. On Magnet Garden and
+Ferro Maze, desk and phone, hold the Magnet close to a pool's edge:
+- the fingers should run out to their thin tips and fade to brown there, not stop short
+  with bare dye beyond them (`npm run fingers`: 13 fingers 0.12 out, where 2 used to be drawn);
+- the edge of a thick domain should stay a razor line with no brown smudge round it;
+- say whether Ferro Maze's haze between its domains (PLAN 9aa) reads browner than before.
+  The haze is the same ferrofluid under half full, so it is drawn by the same rule.
+
 ---
 
 ## Reading the frame time while you do it
