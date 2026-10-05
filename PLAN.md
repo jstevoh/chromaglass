@@ -5242,3 +5242,51 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   about 0.06 of the bass area (turned by the plate's angle), and on classic at the
   middle (the check-skeptic's design).
 
+
+## 26. A reaction that prints: Turing stripes in black and white (proposed 2026-10-05)
+
+The owner sent a VJ pack ("Mask Reaction Diff", made with Karl Sims' RD Tool and
+smoothed with an FXAA plugin, 1h): black-and-white labyrinths, fingerprints and combed
+stripes that grow out of a shape and are dragged into whorls. Worth a look of our own,
+because most of it is already on the plate, and what is missing is real chemistry, not
+an effect. What it is, physically: a **Turing pattern**. Two reactants diffusing at
+different speeds, one feeding the other, settle into stripes or spots of one fixed
+width. It is real in a dish: the CIMA/CDIMA reaction in a gel (Castets, De Kepper, 1990)
+grows exactly these labyrinths, and Gray–Scott is the model of a cubic autocatalysis
+like it. On a projector a pattern reads black and white when what it makes is an opaque
+precipitate in a clear liquid under a white lamp, the way Liesegang's bands already
+print (18b's lamp ground, 18l's absorbers).
+
+What the plate has today, and what is missing:
+- **Gray–Scott** (`src/lib/chemistry.ts`, the `chemistry` setting; Sensual Laboratory
+  0.85, Neon Coral Reef 0.7) runs on the CPU at the solver's grid with feed and kill fixed
+  at 0.042 / 0.062 (`LiquidVisualizer.tsx`, `chem.step`), so it only ever grows coral.
+  It deposits dye that the flow carries, but the reactants sit still under the stir
+  (18k), so it can never be combed into the whorls in the owner's pictures.
+- **BZ** (Oregonator, 256² GPU grid) and **Liesegang** (128², 1b) are real reactions on
+  their own grids; neither makes stripes of a fixed width.
+- **The ferrofluid maze** (9aa) is a labyrinth too, but a magnetic one (dipoles
+  repelling within a surface), and stays the magnet's.
+
+Steps:
+- **26a. Gray–Scott on the GPU, carried by the flow.** A compute field at the dye's
+  grid, advected by the same velocity as the dye (one flux pass), so a stir drags the
+  stripes and they heal back to their own width behind it. This is 18k's "chemistry
+  sits still" fixed, and the coral looks keep their look at today's feed and kill.
+- **26b. The pattern as a control.** One knob along Pearson's map, spots → worms →
+  labyrinth → holes (feed and kill moved together, about 0.03/0.055 to 0.04/0.06), and
+  one for the stripe's width (the diffusion lengths, in plate units so it is the same
+  size at every rung). MIDI-learnable, on both desks and the phone.
+- **26c. Where it grows: the poured liquid is the reagent.** The owner's "grow mask"
+  and "dual patterns" are what happens when the feed comes from a reagent that is
+  somewhere: the reaction runs only where its liquid was poured (a bottle on the shelf),
+  and two pours with different feeds make two patterns that meet. A shape, a word or
+  the camera can lay the reagent, as images already pour (`injectImage`).
+- **26d. The look: "Turing Print"** (name open). A clear liquid, a white lamp, the
+  product drawn as an opaque precipitate: black on white, inverted by the lamp. Its edge
+  goes through the plate's own reconstruction (Catmull-Rom and `fwidth`), so the stripes
+  need no FXAA pass; at 256² a 12-pixel stripe is two cells, so it wants the 512² rung or
+  its own finer field like BZ's. Its phone version with it.
+- **Measure:** a lab check that the stripe width holds within 10% at every rung and
+  after a stir (the pattern's own wavelength, by FFT), that a pour with no reagent grows
+  nothing, and the cost of the field in `npm run stages` (target under 0.3 ms at 512²).
