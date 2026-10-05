@@ -2597,7 +2597,48 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           where the domain had drawn it in. The references' water is clear.
           So the first eighth is not drawn; a quarter-full film still is.
         */
-        let film = 9.0 * pow(clamp((phFar - 0.12) / 0.88, 0.0, 0.43), 1.5) * (0.4 + 0.6 * amt);
+        var film = 9.0 * pow(clamp((phFar - 0.12) / 0.88, 0.0, 0.43), 1.5) * (0.4 + 0.6 * amt);
+        /*
+          A strand thinner than the grid, drawn as what it is.
+
+          What was reported: the deploy after #267 went red on npm run
+          fingers, "and they reach out", 4 fingers 0.12 past the poured edge
+          against 7. Measured in the lab on Magnet Garden under the hand's
+          magnet: the ferrofluid's field held 13 fingers on that circle
+          (phase over 0.2), and the half-full line this layer draws held 2.
+          The rest had pulled out thinner than the solver's interface, their
+          whole width under half full, so no line ran round them and the edge
+          above drew nothing; the read that passed was the dye's own shade
+          underneath. A finger the magnet has pulled out is ferrofluid all the
+          same, only less of it, and less of it is thinner, not gone.
+
+          The razor edge above is right next to a domain: there the ramp
+          outside the line is the solver's diffuse interface, and the amount
+          it holds is what the domain's inside lacks, so the line carries it.
+          With no line near (nowhere up the slope within the interface's
+          width reaches half full), there is nothing to carry it, and the
+          strand is drawn by Beer and Lambert through the thickness its phase
+          says: the same optical depth the inside has at full thickness (13
+          at the line's foot of 1.2 plus 12), times the fraction past the
+          trace the solver leaves (the first eighth, as for the film above).
+          Thin is brown and lets the lamp through, as the inside's thin
+          sliver does; a strand two-fifths full is near black.
+
+          The read up the slope is four cells at most, the interface's width
+          on any grid the app runs (the solver's ramp is three to four cells),
+          and only where the phase is under half full: every other pixel
+          takes no more reads than before.
+        */
+        if (ph < 0.5) {
+          var peak = ph;
+          if (slope > 1e-4) {
+            for (var k = 1.0; k < 4.5; k += 1.0) {
+              peak = max(peak, viewAt(fuvBase - outward * k * cell).phase);
+            }
+          }
+          let strand = (1.0 - smoothstep(0.42, 0.5, peak)) * 13.2 * clamp((ph - 0.12) / 0.88, 0.0, 1.0) * (0.4 + 0.6 * amt);
+          film = max(film, strand);
+        }
         let lit = outColor * exp(-film * vec3f(0.45, 0.7, 1.0)) * (1.0 + 0.6 * lens * amt);
         outColor = mix(lit, pc, cover);
       }
