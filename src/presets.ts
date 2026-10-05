@@ -2145,7 +2145,18 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.0,
       saturationBoost: 1.5,
       colourBody: 0.5,
-      dyeBudget: 0.9,
+      /*
+        A print is mostly paper. The budget is the mean the regulator lets the
+        plate fill to before it evaporates the excess, and at 0.9 Roy could
+        fill to eight times the panel it opens with (0.115, npm run royopen),
+        where the inks run into each other and three inks over each other
+        print black: the opening's stain again, laid by the drops instead of
+        the seed. At 0.45 it holds about four times the opening, room for the
+        pours and drops to add shapes, and it caps the plate short of one wash.
+        Inferred from the regulator and the print, not watched on a live
+        plate here (no app frames in a cloud session): docs/judging.md §37.
+      */
+      dyeBudget: 0.45,
       glossiness: 0.0,
       postBlurRadius: 0.1,
       edgeRelief: 0.0,

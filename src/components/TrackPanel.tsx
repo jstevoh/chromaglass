@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Sparkles, Circle, Trash2 } from 'lucide-react';
+import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Hourglass, Circle, Trash2 } from 'lucide-react';
 import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence';
 import { clockText } from '../lib/performanceTake';
 import { MusicSettings } from '../lib/musicTypes';
@@ -169,7 +169,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
       {trackState && (
         <section className="mb-8">
           <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-            <Sparkles size={12} /> Evolution
+            <Hourglass size={12} /> Evolution
           </h3>
           <div className="text-xs opacity-70 mb-2">
             Listened <span className="font-bold text-white">{trackState.listenCount}</span> time{trackState.listenCount === 1 ? '' : 's'}

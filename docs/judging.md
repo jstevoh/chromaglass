@@ -1050,7 +1050,21 @@ magnet scaled away. On Classic, desk and phone:
 - the frame time with the Magnet held (below): the field is now worked out from
   elliptic integrals wherever the magnet reaches, on the plate and in the solver.
 
-## 38. Clock Glass and Ferro Paint after their references (PLAN 4a-clock)
+## 38. Roy, 1963 opens as a panel (PLAN 21e)
+
+Pick Roy, 1963. It should open as a Lichtenstein panel: flat red, yellow and blue
+shapes and brushstrokes apart on white, outlined in black, with fields of Ben-Day
+dots, and no black stain. The opening is measured (`npm run royopen`); a minute of
+the show is not:
+
+- watch it for a minute with music: do the pours and drops keep it a print, or do
+  the inks run together into dark patches again? Its Dye Budget is now 0.45 (was
+  0.9): say if it reads too empty, or still muddies;
+- are the dot fields big enough, and is there enough colour? Say which way.
+- add a green, then a purple, with the bottles: they should print as a bright
+  comic green and a violet, flat and outlined, not as yellow or blue (QA-16).
+
+## 39. Clock Glass and Ferro Paint after their references (PLAN 4a-clock)
 
 - **Clock Glass** now lays a purple water with a dozen bodies of red, amber and cobalt
   oil scattered over the dish, each with a dark rim, the way a clock-glass dish at the

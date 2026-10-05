@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Sparkles, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, Minimize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
+import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, Minimize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
@@ -832,7 +832,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* One-shot gestures */}
           <div className="mb-7 flex gap-3">
             <ActionButton label="Seed" icon={Droplets} onPress={() => action('seed')} connected={connected} />
-            <ActionButton label="Random" icon={Sparkles} onPress={() => action('lucky')} connected={connected} />
+            <ActionButton label="Random" icon={Shuffle} onPress={() => action('lucky')} connected={connected} />
             <ActionButton label="Drain" icon={Waves} onPress={() => action('drain')} connected={connected} />
             <ActionButton label="Clear" icon={Eraser} onPress={() => action('clear')} tone="warn" connected={connected} />
           </div>

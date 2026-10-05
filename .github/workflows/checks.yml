@@ -720,6 +720,12 @@ jobs:
       - name: The Ben-Day print
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run benday
+      # Roy opens as a panel: the app's own seed for the look, printed by the
+      # lab, is paper and three inks with fields of dots, not a black stain.
+      # In the open shard: the plate shard is near its timeout.
+      - name: Roy opens as a panel
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run royopen
       # The mixer: each source moved lands only where that source is (the
       # film under the back plate, the logo under the film), the LED ring
       # passes the front plate from lamp to beam, every grade does what its

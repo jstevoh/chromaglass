@@ -2141,6 +2141,22 @@ a lab plate: a wash is 242 separate dots against 256 on the lattice, one size to
 2.7%, fixed while the plate turns; a pool is one flat ink with a line all the way
 round it and a line where red meets yellow; and only Roy prints.
 
+**Shipped: Roy opens as a panel, not a black stain.** The owner, 2026-10-04, over a
+screenshot nine seconds in: "The Roy preset always starts with this giant black stain.
+Get rid of it. It needs to look more like an abstract colorful Roy Lichtenstein
+painting." The stain was the look's seed: `splatBlob` takes its radius in the 128 grid's
+units and scales it itself, and Roy's seed handed it cells, so its four pools came out
+four to five times too wide, lay over each other across the whole glass, and three inks
+over each other print black. The seed is now a laid-out panel in the plate's view: seven
+flat shapes and three brushstrokes of the three inks, apart on white paper, and four
+even fields of pale wash at the strength each ink prints as Ben-Day dots (measured per
+ink, a narrow band: blue about 0.1, yellow and red about 0.12). Dye Budget 0.9 → 0.45, so
+the drops cannot fill the plate back into one wash (inferred, 21e). `npm run royopen`
+lays the app's own seed and prints it in the lab: on main 71% of the plate absorbing all
+three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots, mean
+3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
+0.115. The phone lays the same seed (it is the plate, not a control).
+
 ## 22. Spin the plate
 
 **22a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the

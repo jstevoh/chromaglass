@@ -314,7 +314,8 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 - **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
   phone. Draft #269 (PLAN 15i).
-- **QA-4** Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
+- ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).
+  Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
   top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
   The chip is `fixed top-3 … translate-y-9` in `src/App.tsx` (the `macroZoom > 1.05`
   block, about line 3984) and lands on the desk's top strip, where
@@ -332,9 +333,12 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   it back there fast (`aimed()` in `src/lib/macroCamera.ts`, rate 6 + 6 × chase). The chip
   only sets `macroCamera` (`src/App.tsx`, `macro-camera-hold`). Fix: on switching to
   Hold, write the camera's current centre into the aim. Desk, phone
-  (`PhoneStage.tsx`), and it shows on the wall.
+  (`PhoneStage.tsx`), and it shows on the wall. Left out of the QA-fixes PR: the
+  centre lives in `LiquidVisualizer`'s `MacroCamera` (private `camX/Y`) and App
+  cannot read it yet, so it needs a getter plumbed to the chip and the phone.
 
-- **QA-16** On Roy, 1963 a green dye cannot be added: it prints as another colour.
+- ~~**QA-16**~~ **Fixed, #293**: a hue past 40° from every ink prints as two inks overprinted, green (cyan over yellow) and violet (magenta, half cyan); `npm run benday` 7 (main: green printed yellow, violet blue). Violet is laid flat, 21f.
+  On Roy, 1963 a green dye cannot be added: it prints as another colour.
   Desk (the owner's report from the corner dot, plate `roy`). Likely cause, read in
   the code but not yet run: the Ben-Day print snaps every pixel's hue to the nearest of
   three inks (`benDayInkIndex` in `src/gpu/wgsl/plate.ts`, red, yellow or blue), so a
@@ -358,7 +362,8 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   between them, across the presets in general. Wall, desk. Thread "More colour in the
   looks".
 
-- **QA-15** Roy, 1963 always opens on a giant black stain over flat red, filling most of
+- ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run royopen` 6/6 (main 1/6). Story in §21 of `docs/plan-shipped.md`.
+  Roy, 1963 always opens on a giant black stain over flat red, filling most of
   the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
   Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
   to 21d hold the rest of its open work. Deferred by the owner: fix later.
@@ -371,6 +376,13 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   `handoff/roy-black-stain/`; its PLAN hunk for §21 is to be merged with this entry.
 
 **Tier 4. Polish.**
+
+- ~~**QA-17** The phone's **Looks** tab wore a sparkle, the icon apps use for AI, and the
+  owner wants nothing in the app to read as AI.~~ Shipped: Looks is a palette; the
+  other sparkles (Random on the desk and the remote, Evolve, Automation, the track's
+  Evolution, "A band in a box") are a shuffle, an hourglass or a drum, and the MIDI
+  auto-map's magic wand is an ear, since it builds the map by listening. Desk, phone,
+  remote. No user-facing text said "AI", "magic" or "smart".
 
 - **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
   `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
@@ -526,6 +538,19 @@ the band and four bubbles set down where the band drops them, against a silence 
 has to be still itself, and asks the old plate to drift by more than the same bar, so
 the instrument is shown to see what it was built for; that line turns round to ask
 the old plate to stay once its bubbles stop pressing.
+
+*Found 2026-10-05 (#267, #281 and #287 red on it), **fixed in the ferrodrift control's
+PR:*** **the old-plate line sat on its bar.** Its four bubbles at 0.15, set down 2.5 s
+after the pour, were never what pulled the ring: the band's own were. Over eleven Mac
+runs the old plate pulled 0.0029–0.0091 on the six where the band had dropped no air
+before Audio Impact was held, and 0.0062–0.0260 on the five where its dice had dropped
+three to seven onto the dye ring, against a bar of 0.004 over silence. The check now
+holds Audio Impact at 0 from before the band starts, asks that the music released no
+air on any page, and sets down eight of the band's largest bubbles where it drops them,
+from the pour on, on both plates. Still open: with the same four bubbles the old
+plate's pull varied threefold (0.0029 → 0.0091), with its readings sometimes
+accelerating (0.310 → 0.281 in twelve seconds) and sometimes linear; what makes one
+press pull three times another is not measured, and belongs with the press item above.
 
 *Found 2026-09-27, not yet done:* **the wall's "output gain lifts what reaches the
 wall" went red on a run that does not touch the output.** #184's tools shard (Accent
@@ -4086,6 +4111,20 @@ as `npm run` names. Each new check held red by the `check-skeptic`.
 
 ### 19d. The build and what it ships
 
+- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05 (this PR).**
+  On #287's merged head (37252828490) the control built its 47 on its first step at
+  3.23 s, its frames kept coming, then stopped 9.98 s from 5.59 s with no build in it
+  and more than a second after them: nothing priced, its own wait 13.80 s, and both 1b
+  lines red. When the frames stop after the builds is the GPU process's business, so
+  no window of time is right. A stop is now also the compile when the first submit to
+  run one of the pipelines built on the frames was handed over before it began and was
+  done as the frames came back (within a quarter second), with the page's own timer
+  running through it: a pipeline cannot run before it is built, the page's thread is
+  free while the GPU compiles, and a runner's stall later has no first use out through
+  it. Line 2 now also needs a one-device control, as line 1 did. Each stop prints its
+  first uses and the page's longest silence in it. *Still open:* read the first Mac runs' prints to
+  see the follow stop (#283's run: 11.27 s from 5.20 s) carries first uses too; if it
+  does, the one-second window is that same compile and could go.
 - The main route loads about 527 KB of script gzipped (1.68 MB raw): the App's chunk
   236 KB, the engine's 186, React's 66. Only the routes are lazy (`main.tsx`: the App,
   the remote, the cast). `motion` is 42 KB of it, for 53 simple uses in six components;
@@ -4595,7 +4634,7 @@ then 20e, then 20c on 18a's solver (shipped) once 18d gives each liquid its visc
 this look holds 18b and 18e to.
 
 ## 21. Looks after painters
-**Partly shipped**: Roy, 1963, and Ben-Day Dots are in, measured by `npm run benday`. What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Roy, 1963, and Ben-Day Dots are in, measured by `npm run benday`; Roy opens as a panel, not a black stain (`npm run royopen`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 The owner, 2026-09-27, over a screenshot of Classic at 2.8x covered in red dots on
 white by accident: "kinda cool, Roy Lichtenstein type style ... let's reserve this
@@ -4612,6 +4651,20 @@ Open:
 - **21c. The dots do not grow with the zoom.** The screen is fixed to the picture,
   as a print's is; the owner's accidental dots at 2.8x were about twice the size.
   If a bigger dot is wanted in the closeup, the pitch could follow the zoom.
+- **21e. Judge Roy a minute in** (docs/judging.md §38). The opening is measured; what
+  the pours, drops and the music make of it over a minute is not (no app frames in a
+  cloud session). Dye Budget went from 0.9 to 0.45 on the reasoning that a fuller plate
+  runs the inks over each other into black; if it reads too empty or still muddies, the
+  budget and Roy's injection styles are the two knobs.
+- **21f. Violet is laid flat** (QA-16, #293). A comic's violet is solid magenta
+  with a second screen of cyan dots over it; the print lays it as the flat colour
+  that reads from a step back (`BENDAY_VIOLET`), since Roy has one screen. Green
+  is a true overprint and needs nothing. Lay the cyan as dots over the magenta if
+  violet reads too smooth beside the dotted washes.
+  Found with it: the seam line is drawn wherever two inks meet, and there are five
+  now, so a player's pool shading from yellow to teal gets two pen lines inside it
+  (yellow, green, blue) where it had one. A comic outlines each colour area, so
+  this is inferred to be right; judge it on the Mac (judging.md §38).
 - **21d. More painters.** The same print with other inks is the start of more looks
   after painters (a Warhol screen print's off-register blocks, Riley's black and
   white, Rothko's soft fields); none is planned yet.
