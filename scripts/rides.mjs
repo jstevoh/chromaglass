@@ -38,6 +38,11 @@
  *      colour's first-order carry keeps the rest, PLAN 27b-1). And the
  *      ferrofluid poured round Classic's middle stays where it was poured
  *      through four kicks (its carry keeps up with the press, PLAN 27b-2).
+ *   5. Plate Rock's cover glass (PLAN 27a-1): the top glass rides on the film
+ *      in the bottom glass's bowl, a damped pendulum (rests at R_c sinθ, or
+ *      against the rim; swings at about 1 Hz on oil; creeps in glycerine),
+ *      and on a plate whose colour is spread evenly, which the tilt alone
+ *      cannot move, its slide sloshes the picture.
  *   4. Turbulence's dial reaches: with the band playing (energy 0.8, Sound
  *      Drive 0.45) full stirs at least four times as fast as 0.5 (it was 1.33
  *      times), a look's own 0.3 stays within 10% of what it was, and in the
@@ -59,7 +64,8 @@ const check = (name, ok, detail = '') => {
 // ── 4, the curve, in node ───────────────────────────────────────────
 const out = 'node_modules/.cache/rides-lib.mjs';
 await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { stirOf, stirBefore, kickDepth, KICK_RADII, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK } = await import(`../${out}`);
+const { stirOf, stirBefore, kickDepth, KICK_RADII, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK,
+  stepCover, coverDrag, BOWL_RADIUS, COVER_ROOM } = await import(`../${out}`);
 const { createNoise2D } = await import('simplex-noise');
 // The app's sway noise, on a fixed table (the app keys its own on the show's seed).
 let seedN = 11;
@@ -83,6 +89,25 @@ const tilts = ({ R, sway = false, t0 = 0, kicks = true, before = false }) => {
   }
   return out;
 };
+/*
+  The same rock with the cover glass riding it (stepCover, PLAN 27a-1): a
+  step's tilt and the glass's slide, m/s, for a liquid of Thickness `t`.
+*/
+const glassDrag = (t) => coverDrag(t);
+const covers = ({ R, t = 0.45, steps = 120 }) => {
+  const rock = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 }, cover = { x: 0, y: 0, vx: 0, vy: 0 };
+  const out = [];
+  for (let k = 0; k < steps; k++) {
+    if (R > 0 && k % 30 === 0) kickRock(rock, 0.8, 1);
+    stepRock(rock, 1 / 60);
+    const [sx, sy] = rockSwing(rock, R, 0, 0);
+    // The plate's sinθ as the solver takes it: the hold's tilt (swing × 0.004) × 10 and the rock × CUR_ROCK (LiquidVisualizer's step).
+    const tx = sx * (0.04 + CUR_ROCK), ty = sy * (0.04 + CUR_ROCK);
+    stepCover(cover, tx, ty, glassDrag(t), 1 / 60);
+    out.push([tx, ty, cover.vx, cover.vy]);
+  }
+  return out;
+};
 const BAND = [0.8, 0.45];
 {
   const now = stirOf(1, ...BAND) / stirOf(0.5, ...BAND), was = stirBefore(1, ...BAND) / stirBefore(0.5, ...BAND);
@@ -100,11 +125,47 @@ const BAND = [0.8, 0.45];
     `${now.toFixed(3)} of full (it was ${was.toFixed(3)}, the dial squared); full tips it ${peak(tilts({ R: 1 })).toFixed(3)} (sinθ)`);
 }
 
+{
+  /*
+    5a. The cover glass as the pendulum it is (lib/plateRock.ts). Held
+    tipped two degrees it comes to rest where the bowl's curve holds it,
+    R_c sinθ (6 mm in the 0.18 m bowl); tipped further it stops against the
+    rim (COVER_ROOM). Let go it swings at its own √(g/R_c), about 1.2 Hz. And
+    in glycerine the film holds it (τ = m_A h/μ is three hundredths of a
+    second, against the swing's 0.16): let go, it creeps back without ever
+    swinging past the middle.
+  */
+  const hold = (sin, t, seconds) => {
+    const c = { x: 0, y: 0, vx: 0, vy: 0 };
+    for (let k = 0; k < seconds * 240; k++) stepCover(c, sin, 0, glassDrag(t), 1 / 240);
+    return c;
+  };
+  const two = Math.sin(2 * Math.PI / 180), twelve = 0.2;
+  const rest = hold(two, 0.45, 20).x, stop = hold(twelve, 0.45, 20).x;
+  check('Plate Rock\'s cover glass: tipped 2° it rests where the bowl holds it, tipped 12° against the rim',
+    Math.abs(rest / (BOWL_RADIUS * two) - 1) < 0.02 && Math.abs(stop - COVER_ROOM) < 1e-9,
+    `${(rest * 1000).toFixed(2)} mm (R_c sinθ ${(BOWL_RADIUS * two * 1000).toFixed(2)}), ${(stop * 1000).toFixed(1)} mm at 12° (the rim ${(COVER_ROOM * 1000).toFixed(0)} mm)`);
+  const c = { x: 0.01, y: 0, vx: 0, vy: 0 };
+  const crossings = [];
+  for (let k = 1; k < 240 * 6; k++) { const was = c.x; stepCover(c, 0, 0, glassDrag(0.45), 1 / 240); if (was > 0 !== c.x > 0) crossings.push(k / 240); }
+  const hz = crossings.length > 2 ? (crossings.length - 1) / (2 * (crossings[crossings.length - 1] - crossings[0])) : 0;
+  check('let go on the default oil it swings at about 1.2 Hz, near the hand\'s 0.9', hz > 1.05 && hz < 1.3, `${hz.toFixed(3)} Hz, ${crossings.length} crossings in 6 s`);
+  const swings = (t) => {
+    const g = { x: 0.01, y: 0, vx: 0, vy: 0 };
+    let n = 0;
+    for (let k = 1; k < 240 * 6; k++) { const was = g.x; stepCover(g, 0, 0, glassDrag(t), 1 / 240); if (was > 0 !== g.x > 0) n++; }
+    return { n, left: g.x };
+  };
+  const gly = swings(1);
+  check('and in glycerine the film holds it: let go, it creeps back to the middle without once swinging past it',
+    gly.n === 0 && gly.left < 0.01 && crossings.length >= 6, `${gly.n} crossings, ${(gly.left * 1000).toFixed(2)} mm of 10 left after 6 s; on the oil ${crossings.length}`);
+}
+
 const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 try {
-  const r = await page.evaluate(async ({ KICK_RADII, kicks, stirs, rocks }) => {
+  const r = await page.evaluate(async ({ KICK_RADII, kicks, stirs, rocks, glasses }) => {
     const res = {};
     const DEF = 0.45, THICK = 0.75;
     // The app's plate at the default Speed: its step and its glass (lift.mjs's APP_GLASS).
@@ -188,6 +249,66 @@ try {
       for (const [name, s] of Object.entries(stirs)) { const o = await run({ turb: s }); res.stir[name] = { moved: moved(o), speed: o.speed }; }
     }
 
+    // ── 5b. An evenly coloured plate, rocked with its cover glass ──────
+    {
+      /*
+        The dye's weight is even, so the tilt alone moves nothing; the
+        colour is red and blue in a checker of 32-cell squares, so a slide
+        of the liquid shows as the red moving. `glass` is covers(): the
+        tilt and the glass's slide a step.
+      */
+      const N = 192;
+      const lay = () => {
+        const d = new Array(N * N * 4).fill(0);
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          const r = 0.5 + 0.5 * Math.sin(2 * Math.PI * i / 64) * Math.sin(2 * Math.PI * j / 64), k = (i + j * N) * 4;
+          d[k] = r; d[k + 2] = 1 - r; d[k + 3] = 1;
+        }
+        lab.addDye(d); lab.flush();
+      };
+      const reds = async () => { const f = await lab.field('dye'); const a = new Float32Array(f.length / 4); for (let i = 0; i < a.length; i++) a[i] = f[i * 4]; return a; };
+      /*
+        Where the checker sits, in cells, inside the middle of the dish: the
+        phase of the red against the checker's own wave on each axis (a
+        slide of d cells turns it by 2πd/64), so the reading is how far the
+        picture went, not how much its pixels changed (which saturates).
+      */
+      const where = (a) => {
+        const K = 2 * Math.PI / 64;
+        let sx = 0, cx = 0, sy = 0, cy = 0;
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+          if (Math.hypot(i + 0.5 - N / 2, j + 0.5 - N / 2) > 0.3 * N) continue;
+          const v = a[i + j * N] - 0.5;
+          sx += v * Math.sin(K * i) * Math.sin(K * j); cx += v * Math.cos(K * i) * Math.sin(K * j);
+          sy += v * Math.sin(K * i) * Math.sin(K * j); cy += v * Math.sin(K * i) * Math.cos(K * j);
+        }
+        return [Math.atan2(-cx, sx) / K, Math.atan2(-cy, sy) / K];
+      };
+      const run = async (glass, { cover = true, t = DEF, turb = 0 } = {}) => {
+        await lab.create(N, N); lay();
+        const mean = meanOf(await dyeA());
+        await lab.step(2, { ...app(N, mean), gapThickness: t });
+        const snaps = [];
+        for (let k = 0; k < 120; k++) {
+          const g = glass ? glass[k] : [0, 0, 0, 0];
+          await lab.step(1, { ...app(N, mean), gapThickness: t, turbScale: turb, rockX: g[0], rockY: g[1], coverX: cover ? g[2] : 0, coverY: cover ? g[3] : 0 });
+          if (k % 10 === 9) snaps.push(await reds());
+        }
+        return snaps;
+      };
+      const still = await run(null), stillThick = await run(null, { t: THICK });
+      const tot = still[0].reduce((a, b) => a + b, 0);
+      const moved = (o, base = still) => Math.max(...o.map((sn, i) => { let d = 0; for (let k = 0; k < sn.length; k++) d += Math.abs(sn[k] - base[i][k]); return d / tot; }));
+      // The farthest the checker went from where the still plate's is, in cells.
+      const went = (o, base = still) => Math.max(...o.map((sn, i) => { const [x, y] = where(sn), [x0, y0] = where(base[i]); return Math.hypot(x - x0, y - y0); }));
+      const both = (o, base) => ({ moved: moved(o, base), cells: went(o, base) });
+      res.evenTilt = both(await run(glasses.full, { cover: false }));
+      res.evenFull = both(await run(glasses.full));
+      res.evenDefault = both(await run(glasses.def));
+      res.evenThick = both(await run(glasses.thick, { t: THICK }), stillThick);
+      res.evenStir = both(await run(null, { turb: stirs['a look\'s 0.3'] }));
+    }
+
     // ── 3. A kick's press ──────────────────────────────────────────────
     {
       const N = 192;
@@ -257,6 +378,7 @@ try {
     return res;
   }, {
     KICK_RADII,
+    glasses: { full: covers({ R: 1 }), def: covers({ R: 0.45 }), thick: covers({ R: 1, t: 0.75 }) },
     kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
     stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
     rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
@@ -290,6 +412,23 @@ try {
   */
   check('and with no kicks the sway alone moves it under half what the kicks do',
     r.sway < 0.5 * r.rockDefault, `${r.sway.toFixed(3)} against the kicks' ${r.rockDefault.toFixed(3)} at 0.45`);
+  /*
+    5b. The case 27a-1 is about: a plate whose colour is spread evenly, red
+    and blue in a checker with the dye's weight the same everywhere. The
+    tilt alone moves none of it (its weight is even), and that was all a
+    rock did; with the cover glass sliding on the film the whole picture
+    sloshes with the hand, at least half as much as a look's own stir moves
+    it in the same two seconds, and the dial still reads as a dial (the
+    default under nine tenths of full). The thick liquid is printed: its
+    glass swings less but drags the liquid at half its speed all the same.
+  */
+  const e = (o) => `${o.cells.toFixed(1)} cells (changed ${o.moved.toFixed(3)})`;
+  check('Plate Rock on an evenly coloured plate: the tilt alone moves nothing, the cover glass slides the picture 5 cells or more at full and changes it at least half as much as a look\'s own stir',
+    r.evenTilt.cells < 0.5 && r.evenFull.cells >= 5 && r.evenFull.moved >= 0.5 * r.evenStir.moved,
+    `tilt alone ${e(r.evenTilt)}; with the glass ${e(r.evenFull)} at full, the stir changed it ${r.evenStir.moved.toFixed(3)}`);
+  check('and the dial is a dial: the default 0.45 slides it under nine tenths of full\'s distance, and more than a third',
+    r.evenDefault.cells < 0.9 * r.evenFull.cells && r.evenDefault.cells > r.evenFull.cells / 3,
+    `${e(r.evenDefault)} at 0.45; ${e(r.evenThick)} in the thick liquid`);
   // 3.
   const k = (o) => `out ${o.out.toFixed(1)} cells, back to ${o.back.toFixed(1)}`;
   check('Beat Squeeze: a kick at the default presses the glass across the dish and a ring 30 cells out goes 4 cells or more',

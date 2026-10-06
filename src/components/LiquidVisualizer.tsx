@@ -40,7 +40,7 @@ import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFra
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { CUR_ROCK, kickRock, stepRock, rockSwing, swayAt } from '../lib/plateRock';
+import { CUR_ROCK, kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -1010,6 +1010,9 @@ class FluidSimulation {
   dropFingering = 0;
   rockX = 0;
   rockY = 0;
+  /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
+  coverX = 0;
+  coverY = 0;
   // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
   // at half the logical grid: velocity, warm pressure and divergence.
   private readonly CM = GRID_SIZE / 2;
@@ -1117,7 +1120,7 @@ class FluidSimulation {
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
-    this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0;
+    this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0; this.coverX = 0; this.coverY = 0;
     this.phrase = { drive: 1, gust: 0, drift: 0.5 };
     this.tempoMul = 1;
     this.paceMul = 1;
@@ -3948,6 +3951,8 @@ class FluidSimulation {
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
       rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
       rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
+      coverX: this.coverX,
+      coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
         No stir for the look's motor (PLAN 22j). The current had one, a
@@ -4756,6 +4761,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
+  const coverRef = useRef<CoverGlass>({ x: 0, y: 0, vx: 0, vy: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
   /** The camera pass, built the first time a frame asks for it. */
@@ -8437,7 +8443,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const rockX = swingX + ext.x * 1.1 * extK;
             const rockY = swingY + ext.y * 1.1 * extK;
-            for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; }
+            /*
+              And the cover glass slides on its film as the pair tips, and
+              drags the liquid with it (lib/plateRock.ts, PLAN 27a-1): what
+              makes a rock show on a look whose colour is spread evenly. Its
+              drag is the look's own liquid's: it swings on a light oil and
+              creeps on glycerine. It is tipped as the solver's plate is
+              (the step's rockX below: the hold's tilt × 10 and the rock ×
+              CUR_ROCK, sinθ).
+            */
+            const cover = coverRef.current;
+            stepCover(cover, tiltX * 10 + rockX * CUR_ROCK, tiltY * 10 + rockY * CUR_ROCK,
+              coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS);
+            for (const fluid of fluidsRef.current) {
+              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
+              fluid.coverX = cover.vx; fluid.coverY = cover.vy;
+            }
 
             // ── Oil beads ───────────────────────────────────────
             {

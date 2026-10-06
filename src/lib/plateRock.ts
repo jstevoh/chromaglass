@@ -57,3 +57,82 @@ export function stepRock(rock: RockSpring, dt: number): void {
 export function rockSwing(rock: RockSpring, R: number, swayX: number, swayY: number): [number, number] {
   return [(rock.x + swayX * ROCK_SWAY) * R, (rock.y + swayY * ROCK_SWAY) * R];
 }
+
+/*
+  The cover glass (PLAN 27a-1). The tilt above moves only the colour that is
+  heavier than the plate's mean, so on a look whose colour is spread evenly a
+  rock moved almost nothing (the Mac's controls run on #305: Plate Rock
+  visible on 7 looks of 23, and "nothing" on the even ones, Boiling Point,
+  Crowd Plate, Red Cabbage, Clock Glass). That is the right answer for the
+  weight, and not the whole of what a hand rocking a clock glass shows.
+
+  The top glass is not fixed to the bottom one. It rides on the liquid film,
+  nested in the bottom glass's curve, and tipping the pair makes it slide
+  downhill on that film until the curve (or the bottom glass's rim) stops it,
+  then back when the hand tips the other way. A glass sliding over a film
+  drags it with a shear, linear across the gap, so the liquid's column goes
+  at half the glass's speed (Couette; it is what Glass Smear already is in
+  hsPrep), and everything in it, colour spread evenly or not, goes with it:
+  the picture sloshes with the hand.
+
+  The glass is a damped pendulum in the bottom glass's bowl:
+
+      dv/dt = g sinθ − (g/R_c) x − v/τ,     τ = m_A h / μ
+
+  m_A the cover's mass per area (2 mm of glass, 5 kg/m²), R_c the bowl's
+  radius of curvature (a 20 cm clock glass 3 cm deep: 0.18 m, so the glass
+  swings at about 1.2 Hz on its own, near the 0.9 Hz a hand rocks it at,
+  which is why a projectionist's rock builds; a shallower 2 cm glass, 0.26
+  m, held the cover only where the default Plate Rock already put it against
+  the rim, and the dial's two ends slid the picture alike, 10.5 cells and
+  11.7), and τ the film's shear drag
+  on it, which the liquid's viscosity sets: 1.4 s on the default light oil
+  in the 6 mm middle, so the glass swings a few times before it settles, and
+  three hundredths of a second in glycerine, so it creeps. It slides only as
+  far as the gap between the two glasses' rims lets it (COVER_ROOM), where
+  it stops dead: a glass against glass does not bounce.
+
+  It moves the liquid in real seconds, not the plate's: the slide is laid in
+  m/s and fluid.ts turns it into the flow's units with the step's seconds
+  (as a Blow's breath), so a slow look's picture sloshes as far as a fast
+  one's when the same hand rocks it.
+*/
+export type CoverGlass = { x: number; y: number; vx: number; vy: number };
+import { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './turntable';
+/** The cover's mass per area, kg/m²: 2 mm of glass at 2,500 kg/m³. */
+export const COVER_KG_M2 = 5;
+/** The bottom glass's radius of curvature, m: a 20 cm clock glass 3 cm deep. */
+export const BOWL_RADIUS = 0.18;
+/*
+  How far the cover can slide before its rim meets the bottom glass's, m: a
+  14 cm glass pressed into the 20 cm one. At 0.02 the default Plate Rock
+  already drove it to the rim on every kick and the dial's two ends read
+  alike on an evenly coloured plate (lab: 0.405 at 0.45 against 0.471 at
+  full); at 0.03 the default stops short of it.
+*/
+export const COVER_ROOM = 0.03;
+const G = 9.81;
+/** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (6 mm in the middle). */
+export function coverDrag(thickness: number, density = 1000): number {
+  return (density * thicknessViscosity(thickness)) / (COVER_KG_M2 * DISH_REST_GAP * DISH_METRES);
+}
+/**
+ * One step of `dt` seconds: the plate tipped by `tiltX`, `tiltY` (sinθ, the
+ * swing × CUR_ROCK the solver takes) and the film's drag `drag` (coverDrag).
+ * The drag is taken implicitly, so glycerine's 30 per second is as steady
+ * as the oil's 0.7 at any step.
+ */
+export function stepCover(c: CoverGlass, tiltX: number, tiltY: number, drag: number, dt: number): void {
+  const w2 = G / BOWL_RADIUS;
+  c.vx = (c.vx + dt * (G * tiltX - w2 * c.x)) / (1 + dt * drag);
+  c.vy = (c.vy + dt * (G * tiltY - w2 * c.y)) / (1 + dt * drag);
+  c.x += c.vx * dt; c.y += c.vy * dt;
+  const r = Math.hypot(c.x, c.y);
+  if (r > COVER_ROOM) {
+    // Against the rim: held there, and what was going outward stops.
+    const nx = c.x / r, ny = c.y / r;
+    c.x = nx * COVER_ROOM; c.y = ny * COVER_ROOM;
+    const out = c.vx * nx + c.vy * ny;
+    if (out > 0) { c.vx -= out * nx; c.vy -= out * ny; }
+  }
+}

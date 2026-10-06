@@ -33,7 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { dyeAbsorbances } from '../lib/dye';
@@ -462,7 +462,7 @@ const LIQUID_DENSITY = 1000;
   for glycerine.
 */
 export function thinGapViscosity(thickness: number): number {
-  return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
+  return thicknessViscosity(thickness);   // lib/turntable.ts, where the cover glass reads it too
 }
 /** The drag time ρh²/12μ, in seconds, at the plate's rest gap, for a Thickness. */
 export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
@@ -4236,13 +4236,21 @@ export class WebGPUFluid {
       taken at half smearX, so the liquid, colour and all, goes at a quarter
       (0.25): a look's smear moves its colour as fast as it did, and now
       moves the liquid it is in with it.
+
+      Plate Rock's cover glass is the same glass moving (PLAN 27a-1,
+      lib/plateRock.ts): its slide, in m/s, in the flow's units (seconds
+      over the plate's width and disp, as the breath's), and the liquid
+      dragged toward half of it.
     */
+    const toFlow = seconds / (PLATE_METRES * Math.max(disp, 1e-9));
+    const glassX = 0.25 * p.smearX + 0.5 * (p.coverX ?? 0) * toFlow;
+    const glassY = 0.25 * p.smearY + 0.5 * (p.coverY ?? 0) * toFlow;
     const hand = hands ?? this.blankPhase();
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}`,
       this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
-        NU_REF / nu, 0.25 * p.smearX, 0.25 * p.smearY]),
+        NU_REF / nu, glassX, glassY]),
       [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
