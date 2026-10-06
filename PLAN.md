@@ -209,7 +209,7 @@ merge conflicts are the shared documents', which 0.6 ends.
 
 **§27, every control does something you can see** (the owner, 2026-10-05): ~~27a-c Plate
 Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G);
-~~27e Sound Drive's bass as the glass~~ (#PR), then **27e-1** the kick's drop, **27e-2** the
+~~27e Sound Drive's bass as the glass~~ (#307), then **27e-1** the kick's drop, **27e-2** the
 film's measure.
 
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
@@ -5505,7 +5505,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
     rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
     dials say.
-- **27e. The music should move the picture more (first part shipped, #PR).** The owner,
+- **27e. The music should move the picture more (first part shipped, #307).** The owner,
   2026-10-05: "Generally I don't feel like music is having as much impact on the visuals
   as I would like." 27a-c make the kick's two rides and the stir answer harder. Read
   from the frame loop, the rest of Sound Drive is dye (the centre pulse, the mid's
