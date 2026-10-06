@@ -221,6 +221,7 @@ Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the loa
 (S); **14m-guest** (M, after 1.1).
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
+**5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
 **R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**.
 
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
@@ -860,6 +861,77 @@ meter and an on/off per channel. *Measure:* `npm run bands` on a four-channel fi
 a kick on channel 1 only: the kick onset follows channel 1, not the mix. **Home: 24.1**
 (2026-10-04), the audio-voice half of the Patch inputs; Chrome gives a page at most two
 input channels, so above two it is the Mac app's alone.
+
+**Follow an instrument** (`5-follow`, *proposed 2026-10-05 by the owner*: "the guitar
+can control one aspect of the visuals"). The show hears a mix as drums and bands:
+`audioFeatures.ts` names `level`, `kick`, `bass`, `snare`, `hats` and eight log-spaced
+bands, and sound learn binds any of them to a setting or a trigger (`soundLearn.ts`).
+That is enough for the drums, because each owns a corner of the spectrum and an onset
+shape, and the kick and snare onsets look at where the new energy landed. It is not
+enough for a guitar, a voice or a keyboard: they share 200 Hz–5 kHz with each other and
+with the snare's ring, so the band a guitar falls in moves with whatever else plays
+there, and a binding on "band 5" is not a binding on the guitar. The ask is one
+instrument driving one aspect of the plate: the guitar's level rides Swirl, its strums
+drop dye, the note it plays picks the hue; the voice warms the lamp; the bass line's
+pitch tilts the plate.
+
+What it builds on, so none of it is new plumbing:
+
+- **Named sources.** A followed instrument is one more `SourceName` (`guitar`, `voice`,
+  `keys`, `note`) with the reading every source has (a value in its own `AutoRange`,
+  an onset with its `at`), so sound learn, the music button beside each Learn, the
+  patch cord on the `bands` plate source, the desks and the phone take it as they take
+  `snare`.
+- **The ear per input channel** (above, home 24.1). When the guitar has its own
+  channel (a DI, a band's desk, a rack voice), following it is naming the channel, and
+  that is the surest route live. This item is the case where it has none, which is the
+  home listener's every case (§23): one stereo mix from a stereo or a streaming app.
+- **Pitch and chroma already exist offline.** `songMapWorker.ts` works out an
+  autocorrelation pitch, a 12-bin chroma and a spectral centroid about four times a
+  second for the song map; `useAudioAnalyzer` has a live `spectralCentroid`; and
+  `songTrack.ts` decodes a whole file for the render (§6), which is where §17's set of
+  files would be analysed too.
+- **MIDI notes as voices** (24.3): an instrument that is a synth needs no listening,
+  its notes arrive exactly.
+
+Three steps of rising cost, one PR each:
+
+- **5-follow-a. Notes apart from hits, live.** Split each analyser frame into its
+  harmonic and percussive parts by median filtering across time and across frequency
+  (Fitzgerald, 2010): a held note is a horizontal line in the spectrogram, a hit a
+  vertical one. Read the harmonic part by its harmonic series rather than its band: a
+  pitch and pitch class with a confidence, its brightness, and an onset only when a
+  new note starts there, so a strum counts and a snare does not. That gives a `note`
+  source and a low, mid and high `tonal` source, cheap enough for every frame. This is
+  what the instrument physically is (a string's harmonic series over a decaying
+  envelope, against a drum's broadband burst), and it follows "the guitar" wherever the
+  guitar is what plays in its register, which on many band records it is. It cannot
+  tell a guitar from a piano on the same notes; that needs the next step.
+- **5-follow-b. Real stems, for files.** For a song the show plays itself (§17) or
+  renders (§6), separate it before it plays with a source-separation model (Demucs v4
+  has a six-stem model with guitar and piano beside drums, bass, vocals and other;
+  Open-Unmix has four), once per song in a worker on the GPU (onnxruntime-web on
+  WebGPU, or native in the Mac app), and analyse each stem through the same
+  `analysePcm` the render uses, so `guitar` is the guitar's own stem. Cached with the
+  song map. The model's size and licence, and how long a song takes on a laptop, are
+  unmeasured and decide site or Mac app (§23: probably the app).
+- **5-follow-c. Stems live.** The same separation on the live input, if a streaming
+  model fits a frame's budget at a latency the plate can afford (to measure; a model's
+  look-ahead is latency, and §14e already finds the kick late). Until then the live
+  show uses 5-follow-a and the channel route.
+
+The phone's Sound sheet lists the followed instruments with a meter each, and Learn
+on the phone offers them as sources, in the same PR as each step.
+
+*Measure:* a new node check, `follow`, beside `bands`: a song built from known stems
+(a plucked-string guitar part by Karplus–Strong over the band in the box's drums, bass
+and pad from `simulatedMusic.ts`), mixed, with the follower run on the mix. The
+`guitar` (or `note`) source's level tracks the guitar stem's own envelope (r ≥ 0.7);
+it calls nine in ten of the guitar's note starts within two frames and fires on fewer
+than one in ten snare hits; and with the guitar stem muted it stays under 0.1, so a
+follower that only reads the mids fails. The bars are proposals, set against the first
+measured run. 5-follow-b adds the same test on a real multitrack whose licence allows
+it, on the Mac shard.
 
 ### 6. Render a song
 
