@@ -11,6 +11,7 @@ import { PIN_RANGE } from '../../lib/deskPins';
 import { PickList } from './PickList';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { DESK_TOOLS } from './tools';
+import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 
 /**
  * The bench, to the handoff's Design screen.
@@ -120,6 +121,8 @@ export interface DesignDeskProps {
 }
 
 export function DesignDesk(p: DesignDeskProps) {
+  const bottle = [...p.dyeBottles, ...p.behaviourBottles].find(l => l.id === p.bottleId);
+  const natural = isNatural(bottle);
   /**
    * The document menu, hung off the look's own name.
    *
@@ -270,7 +273,7 @@ export function DesignDesk(p: DesignDeskProps) {
               }`}
               data-testid={`bottle-${l.id}`}
             >
-              <span className="h-3.5 w-3.5 shrink-0 rounded-xs border border-border-strong" style={{ background: l.color }} />
+              <span className="h-3.5 w-3.5 shrink-0 rounded-xs border border-border-strong" style={bottleSwatch(l)} />
               <span className="text-[13px]">{l.name}</span>
               {l.behaviour && <span className="ml-auto text-[12px] text-faint">changes the plate</span>}
             </button>
@@ -278,12 +281,33 @@ export function DesignDesk(p: DesignDeskProps) {
         </Group>
 
         <Group title="Dye">
+          {/*
+            The bottle's own colour with no dye in it (lib/liquidColour.ts):
+            what it pours until a dye is picked, and the way back after.
+          */}
+          {bottle?.own && (
+            <button
+              onClick={() => p.onDye(bottle.own!)}
+              aria-pressed={natural}
+              className={`mb-1.5 flex h-8 w-full items-center gap-2 rounded-md border px-2 text-left text-[13px] transition-colors ${
+                natural ? 'border-border-strong bg-hover text-text' : 'border-border text-muted hover:bg-hover hover:text-text'
+              }`}
+              data-testid="dye-natural"
+              title={`${bottle.name} as it is, with no dye in it`}
+            >
+              <span
+                className="h-3.5 w-3.5 shrink-0 rounded-full border border-dashed border-border-strong"
+                style={isClearLiquid(bottle) ? { background: 'transparent' } : { background: bottle.own }}
+              />
+              Natural · {isClearLiquid(bottle) ? 'clear' : 'its own colour'}
+            </button>
+          )}
           <div className="grid grid-cols-6 gap-1.5">
             {p.swatches.map((c, i) => (
               <Swatch
                 key={c.hex}
                 hex={c.hex}
-                selected={p.dye?.toLowerCase() === c.hex.toLowerCase()}
+                selected={!natural && p.dye?.toLowerCase() === c.hex.toLowerCase()}
                 onClick={() => p.onDye(c.hex)}
                 // The grid is the palette in order, so the index *is* the
                 // palette index a dye pad fires.

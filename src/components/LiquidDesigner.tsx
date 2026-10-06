@@ -11,6 +11,7 @@ import type { LiquidBehaviour, LiquidType } from '../types';
 import {
   BEHAVIOUR_PROPERTIES, DROP_RANGES, freshId, isCustomLiquid, meets, readLiquidFile, writeLiquidFile,
 } from '../lib/liquidFile';
+import { bottleSwatch } from '../lib/liquidColour';
 
 export interface LiquidDesignerProps {
   shelf: LiquidType[];
@@ -147,7 +148,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
         <ul className="mb-4 divide-y divide-white/5">
           {custom.map((l) => (
             <li key={l.id} className="flex items-center gap-2 py-1.5">
-              <span className="w-4 h-4 rounded-full border border-white/20 shrink-0" style={{ background: l.color }} />
+              <span className="w-4 h-4 rounded-full border border-white/20 shrink-0" style={bottleSwatch(l)} />
               <button type="button" className="text-left flex-1 min-w-0" onClick={() => onPick?.(l.id)} title="Pick this bottle">
                 <div className="text-[13px] truncate">{l.name}</div>
                 {l.description && <div className="text-[11px] opacity-40 truncate">{l.description}</div>}

@@ -4,6 +4,7 @@ import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, Mon
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
+import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import type { VisualizerSettings } from '../types';
@@ -351,7 +352,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     return () => window.clearInterval(id);
   }, [padTool, padTouchCount, padLayer, send]);
   const chooseColor = (hex: string) => { setPadColor(hex); send({ type: 'dye', color: hex }); setPadTool('drop'); };
-  const chooseLiquid = (id: string) => { setPadLiquid(id); send({ type: 'liquid', id }); setPadTool('drop'); };
+  /*
+    A bottle picked here pours what that bottle holds on the laptop: its own
+    colour, or the dye picked for it (lib/liquidColour.ts). The pad's colour
+    was kept across bottles, so a drop of Glycerine after a red was picked for
+    Water came out red; a bottle picked clears it.
+  */
+  const chooseLiquid = (id: string) => { setPadLiquid(id); setPadColor(null); send({ type: 'liquid', id }); setPadTool('drop'); };
+  const padBottle = DEFAULT_LIQUID_TYPES.find(l => l.id === padLiquid);
   const toggleFull = async () => {
     const next = !padFull;
     setPadFull(next);
@@ -489,7 +497,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 }`}
                 title={liq.description}
               >
-                <span className="h-2.5 w-2.5 rounded-full border border-white/30" style={{ backgroundColor: liq.color }} />
+                <span className="h-2.5 w-2.5 rounded-full border border-white/30" style={bottleSwatch(liq)} />
                 {liq.name}
                 {/* A dot for the four that do something the dye cannot. */}
                 {liq.behaviour && <span className="h-1 w-1 rounded-full bg-amber-300/80" />}
@@ -500,12 +508,24 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       </div>
       {/* Dye colours: a tap picks the colour this pad drops and the laptop's dropper with it */}
       <div className="mt-3 flex flex-wrap gap-1.5" data-testid="remote-dyes">
+        {/* The bottle as it is, with no dye in it: its own colour, or clear. */}
+        {padBottle?.own && (
+          <button
+            onClick={() => chooseColor(padBottle.own!)}
+            disabled={!connected}
+            className={`h-7 w-7 rounded-full border-2 border-dashed transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === padBottle.own.toLowerCase() ? 'border-white scale-110' : 'border-white/40'}`}
+            style={isClearLiquid(padBottle) ? { backgroundColor: 'transparent' } : { backgroundColor: padBottle.own }}
+            title={`Natural: ${padBottle.name.toLowerCase()} with no dye`}
+            aria-label={`Natural ${padBottle.name}`}
+            data-testid="remote-dye-natural"
+          />
+        )}
         {PALETTE.map((c) => (
           <button
             key={c.hex}
             onClick={() => chooseColor(c.hex)}
             disabled={!connected}
-            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() ? 'border-white scale-110' : 'border-white/20'}`}
+            className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-90 disabled:opacity-30 md:h-8 md:w-8 ${padColor?.toLowerCase() === c.hex.toLowerCase() && padColor.toLowerCase() !== padBottle?.own?.toLowerCase() ? 'border-white scale-110' : 'border-white/20'}`}
             style={{ backgroundColor: c.hex }}
             title={c.name}
             aria-label={c.name}

@@ -43,6 +43,7 @@
     "render-lab": "node scripts/render-lab.mjs",
     "render-app": "npm run build && node scripts/render-app.mjs",
     "liquids": "node --experimental-strip-types scripts/liquids.mjs",
+    "natural": "node --experimental-strip-types scripts/natural.mjs",
     "liquidfile": "node --experimental-strip-types scripts/liquidfile.mjs",
     "seed": "esbuild scripts/seed.mjs --bundle --platform=node --format=esm --log-level=warning --external:typescript --external:playwright --external:esbuild --outfile=node_modules/.cache/seed.mjs && node node_modules/.cache/seed.mjs",
     "setlist": "esbuild scripts/setlist.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/setlist.mjs && node node_modules/.cache/setlist.mjs",

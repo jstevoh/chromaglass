@@ -33,6 +33,7 @@ import { Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
+import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
 import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
 import { PRESETS } from './presets';
@@ -357,6 +358,9 @@ export default function App() {
     // Which bottle is in the hand, as the shelf does (npm run bottles).
     (window as unknown as { chromaglassLiquid?: unknown }).chromaglassLiquid =
       (id: string) => { setSelectedLiquidId(id); };
+    // A bottle's colour, as a dye swatch or Natural does (`npm run bottles` puts a dye in Glycerine).
+    (window as unknown as { chromaglassLiquidColour?: unknown }).chromaglassLiquidColour =
+      (id: string, hex: string) => { updateLiquidColor(id, hex); };
     // Every bottle on the bench, by id (npm run bottles picks each one).
     (window as unknown as { chromaglassBottles?: unknown }).chromaglassBottles =
       () => liquidTypesRef.current.map(l => l.id);
@@ -2581,7 +2585,8 @@ export default function App() {
   }, [luckyArmed]);
 
   const triggerLucky = () => {
-    const next = luckyLook(settings, liquidTypes.map(t => t.color));
+    // The room's light from the bottles' colours, but not a clear bottle's white (lib/liquidColour.ts): seven of them would make most rolls white.
+    const next = luckyLook(settings, liquidTypes.filter(t => !(isNatural(t) && isClearLiquid(t))).map(t => t.color));
     previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
     // A look coming in, like a Go's: a take on the gel or the lumia stops.
     lookTakesLevels();
@@ -3338,7 +3343,7 @@ export default function App() {
           visualizerRef.current?.applyGesture({ tool: 'blow', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
           break;
         case 'drop':
-          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer, amount: message.amount, color: message.color ?? selectedLiquid?.color });
+          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer, amount: message.amount, ...laidColour(selectedLiquid, message.color) });
           break;
         case 'press':
           visualizerRef.current?.applyGesture({ tool: 'press', x: message.x, y: message.y, layer: message.layer, amount: message.amount });
@@ -3659,7 +3664,7 @@ export default function App() {
     runTrigger(b, { action: runAction, preset: cuePreset, dye: colourDye });
   };
   const gamepad = useGamepad({
-    gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, color: tool === 'drop' ? selectedLiquid?.color : undefined }),
+    gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, ...(tool === 'drop' ? laidColour(selectedLiquid) : {}) }),
     action: runAction,
     cycleDye: (dir) => selectDye((selectedDyeIndex < 0 ? 0 : selectedDyeIndex) + dir),
     cycleLayer: (dir) => setActiveLayer(l => Math.max(0, Math.min(stageLayers - 1, l + dir))),
@@ -4280,7 +4285,7 @@ export default function App() {
                         >
                           <span
                             className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
-                            style={{ backgroundColor: liq.color }}
+                            style={bottleSwatch(liq)}
                           />
                           <span className="text-[11px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
                           {isSelected && (
@@ -4310,8 +4315,25 @@ export default function App() {
                 <div className="flex flex-col gap-1.5 w-full">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
                   <div className="grid grid-cols-5 min-[440px]:grid-cols-8 gap-1">
+                    {/*
+                      The liquid's own colour, with no dye in it (lib/liquidColour.ts):
+                      what every bottle the shelf ships pours until a dye is
+                      picked, and the way back to it after one was.
+                    */}
+                    {selectedLiquid?.own && (
+                      <button
+                        onClick={() => updateLiquidColor(selectedLiquidId, selectedLiquid.own!)}
+                        data-testid="dye-natural"
+                        aria-pressed={isNatural(selectedLiquid)}
+                        className={`w-[26px] h-[26px] rounded-full border-2 border-dashed transition-transform hover:scale-110 ${
+                          isNatural(selectedLiquid) ? 'border-white scale-110 shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'border-white/40'
+                        }`}
+                        style={isClearLiquid(selectedLiquid) ? { backgroundColor: 'transparent' } : { backgroundColor: selectedLiquid.own }}
+                        title={`Natural: ${selectedLiquid.name.toLowerCase()} as it is, ${isClearLiquid(selectedLiquid) ? 'clear' : 'its own colour'}, no dye`}
+                      />
+                    )}
                     {DROPPER_COLORS.map(hex => {
-                      const isCurrent = selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
+                      const isCurrent = !isNatural(selectedLiquid) && selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
                       return (
                         <button
                           key={hex}
