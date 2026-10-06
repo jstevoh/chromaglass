@@ -1550,6 +1550,56 @@ the hand held both 150 ms and three frames with no move (`BLOW_STRAW_FRAMES`).
 `tools` asks that the stroke blows no straw before its first move
 (`blowSteps.strawFirst`), and prints the stroke's straw steps under "keeps it".
 
+### 15g. Blow as air on a thin film: the moving wind (first part, shipped)
+
+What was reported: Blow moved colour with a stand-in. A moving Blow added a disc of
+velocity along the stroke and moved the colour, the oil and the ferrofluid by a take
+from under the hand and a put a hop ahead (`blowDye`, `blowOil`, `blowCarry`), once a
+dye reading. On a thin gap the disc is mostly the divergent part of a flow, which the
+solve takes back out, so the carries were all that moved anything. The owner's rule
+(build from the physics) made it a shortcut to replace.
+
+What was built: the breath is laid as the air's tangential stress on the surface,
+τ = ½ρ_air C_f U² (1.2 kg/m³, C_f 0.01 for a wall jet, U 8 m/s at the surface: about
+0.38 Pa at the jet's middle, falling as (1 − (d/r)²)² to its edge, scaled by the tool's
+Amount), in pascals on the CPU grid (`src/lib/breath.ts`, `layBreath`), uploaded beside
+the hands (`applyDeltas`' `breath`) and added in `hsBody` as the speed it drives the
+reference liquid to at the rest gap, τh₀/2μ_ref, over the gap in rest gaps, as Updraft's
+draught is. `hsPrep` reads it as a body force, so the column's mean goes at τh/2μ: as the
+depth, and slower in a thick liquid. `blowWind` and `blowPhase` lay it and return on a
+thin gap when the wind moves, so neither the push nor any carry runs there; the app
+counts those steps (`blowSteps.aired`), which `npm run tools` now asks for in place of
+the carried colour.
+
+Measured (`npm run airblow`, lab, software WebGPU, Classic's step on the app's grids),
+first at 6 m/s (the 8 m/s numbers follow):
+- held in one place, the liquid under the breath went 10.7 mm/s, 0.37 of τh₀/2μ
+  (29 mm/s): a rigid film lets through about half of a disc of force, the rest being
+  divergence; on a liquid ten times as thick, 0.101 as fast against 0.100 from its
+  viscosity;
+- half a second after the breath stopped, 0.31 mm/s, under twice the drag time's
+  e^(−0.5/τ) of the speed it had (0.26);
+- a pool drawn across as the pointer draws it moved +1.04% of the plate the wind's way
+  out to the right and +1.11% out to the left (the carries: 1.06% in `npm run wind`),
+  keeping all its colour (−0.00%); left alone +0.00%; the old push alone +0.02%;
+- a pool of ferrofluid went +2.89% and a drop of oil +0.83% by the flow alone, none of
+  either made or lost.
+
+Found by the Mac's `npm run tools` on the PR: with the carries gone, the stroke out to the
+left moved its pool −0.26% (+0.20% to beat) and the one to the right +0.51%. On that
+runner the pointer's moves came about 120 ms apart, and in the gap between the direction's
+150 ms hold and the straw's hold the wind was a puff, whose ring carry moved 80 to 106 of a
+pool of 210 to 244 out round the hand, backwards near the pool's leading edge (inferred
+from the counts the check prints: 3 to 4 puff carries a stroke, no directed one). The wind
+now blows along the hand's last way until the hand is held (BLOW_STRAW_FRAMES).
+
+Then the Mac's next run read the stroke out to the right +0.13% and to the left +1.15%:
+the air at 6 m/s moved a pool about a third as far as the carries had (1.77%, 1.95% on
+main), and a pre-existing pull to the left (PLAN 15g-7) outweighed it to the right. The
+breath was set to a firm 8 m/s (0.38 Pa): in the lab the pool then moved +2.72% and
++2.82%, held 19.0 mm/s (0.37 of τh₀/2μ), thick 0.101 as fast, pressed to a third of the
+gap 0.42 of its τh/2μ, ferrofluid +7.08%, oil +2.07%, nothing made or lost (5/5).
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the

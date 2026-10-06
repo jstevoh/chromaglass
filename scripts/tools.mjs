@@ -303,9 +303,13 @@ try {
 
     And the app has to have run the wind, not the straw: the pointer's Blow
     counts its steps each way and what the wind carried (blowSteps in
-    chromaglassDebug). A slow runner whose moves come further apart than
-    the 150 ms the wind is held for would blow the straw along the stroke,
-    and a middle that moved then would be the straw's, not the wind's.
+    chromaglassDebug). On a thin gap (every look) the moving wind carries
+    nothing by hand: it is air on the film, a force the solve takes in, and
+    the flow moves the colour (PLAN.md §15g, `npm run airblow` in the lab),
+    so what it counts there is the steps it laid the breath on (aired). A
+    slow runner whose moves come further apart than the 150 ms the wind is
+    held for would blow the straw along the stroke, and a middle that moved
+    then would be the straw's, not the wind's.
   */
   {
     /*
@@ -360,7 +364,7 @@ try {
           before, early, late, strokeSteps, wa, wb, along, idle, bar,
           earlyAlong: toward(sign, early.cx, early.cy), lateAlong: toward(sign, late.cx, late.cy),
           stepsOk: before.steps > 0 && early.steps > 0 && late.steps > 0 && strokeSteps > 0,
-          wind: d('wind'), straw: d('straw'), carried: d('carried'), directed: d('directed'), carries: d('carries'),
+          wind: d('wind'), straw: d('straw'), carried: d('carried'), directed: d('directed'), carries: d('carries'), aired: d('aired'),
           readings: rb1 - rb0, strokeMs, poolX: wa.cx - from[0], poolY: wa.cy - from[1],
           strawFirst: (steps1?.strawFirst ?? NaN) - (steps0?.strawFirst ?? NaN),
         };
@@ -382,7 +386,7 @@ try {
       */
       const again = await windRun(C, [C[0] + half, C[1]], 1);
       for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
-        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
+        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
       }
       /*
         The plate's own drift, signed, at its rate toward where the stroke
@@ -451,10 +455,18 @@ try {
         has to keep half its pool to be judged at all.
       */
       const pct = (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`;
-      const { wind, straw, carried, strawFirst } = fwd;
-      console.log(`     the stroke ran ${wind} wind steps and ${straw} straw steps; the wind carried ${carried.toFixed(1)} of colour (back the other way: ${back.wind}, ${back.straw}, ${back.carried.toFixed(1)})`);
-      check('Blow drawn across a pool is the wind, and the wind carries colour', wind > straw && carried > 1 && back.wind > back.straw && back.carried > 1,
-        `${wind} wind steps against ${straw} straw, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.carried.toFixed(1)}`);
+      const { wind, straw, carried, strawFirst, aired } = fwd;
+      console.log(`     the stroke ran ${wind} wind steps and ${straw} straw steps; the wind blew ${aired} as air on the film and carried ${carried.toFixed(1)} of colour (back the other way: ${back.wind}, ${back.straw}, ${back.aired}, ${back.carried.toFixed(1)})`);
+      /*
+        The wind reached the liquid: as air on the film on a thin gap, on
+        every step it had a way to go (layBreath lays nothing only at the
+        plate's border, which a stroke from the middle never reaches), or by
+        its carries off one. Whether it moved the colour is the line after
+        next, from the colour itself.
+      */
+      const reached = (r) => (r.directed > 0 && r.aired >= r.directed) || r.carried > 1;
+      check('Blow drawn across a pool is the wind, and the wind reaches the liquid', wind > straw && reached(fwd) && back.wind > back.straw && reached(back),
+        `${wind} wind steps against ${straw} straw, ${aired} as air on the film, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.aired}, ${back.carried.toFixed(1)}`);
       /*
         And no straw where it was pressed. A straw step blows a real bubble,
         whose air takes the dye under it off the plate while it sits there
