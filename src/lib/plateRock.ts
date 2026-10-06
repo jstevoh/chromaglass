@@ -1,6 +1,6 @@
 /**
  * Plate Rock's hand: a damped spring the kicks shove, and the slow sway
- * between them (PLAN 26a). The frame loop drives it and the plate takes its
+ * between them (PLAN 27a). The frame loop drives it and the plate takes its
  * swing as a tilt (fluid.ts ROCK_FALL); `npm run rides` drives the same code.
  *
  * The slider is how far the hand tips the glass and is applied once, by

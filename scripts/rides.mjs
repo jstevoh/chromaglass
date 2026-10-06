@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The three rides that barely moved anything, each as the thing it stands for
- * (PLAN 26a–c).
+ * (PLAN 27a–c).
  *
  *   npm run rides          (the stir's curve in node; the plate in the lab: any adapter that computes)
  *
@@ -35,9 +35,9 @@
  *      against the old kick (a palm's three discs at 0.0024 × squeeze × bass),
  *      which moved the default's under 3. And let go, the ring comes back at
  *      least three quarters of the way (all of it is the physics; the
- *      colour's first-order carry keeps the rest, PLAN 26b-1). And the
+ *      colour's first-order carry keeps the rest, PLAN 27b-1). And the
  *      ferrofluid poured round Classic's middle stays where it was poured
- *      through four kicks (its carry keeps up with the press, PLAN 26b-2).
+ *      through four kicks (its carry keeps up with the press, PLAN 27b-2).
  *   4. Turbulence's dial reaches: with the band playing (energy 0.8, Sound
  *      Drive 0.45) full stirs at least four times as fast as 0.5 (it was 1.33
  *      times), a look's own 0.3 stays within 10% of what it was, and in the
@@ -301,14 +301,14 @@ try {
     All the way back is what the physics says (a squeeze film with nothing
     fingering is Stokes flow, and runs backward), and three quarters is what
     the colour's first-order carry keeps of a deep press: it diffuses the
-    ring's edge each way, and the deeper the press the more (PLAN 26b-1,
+    ring's edge each way, and the deeper the press the more (PLAN 27b-1,
     with 18a-8's carry).
   */
   const share = (o) => 1 - Math.abs(o.back) / o.out;
   check('let go, the ring comes back at least three quarters of the way', share(r.kickDefault) >= 0.75 && share(r.kickFull) >= 0.75,
     `default ${(100 * share(r.kickDefault)).toFixed(0)}% (${r.kickDefault.back.toFixed(2)} cells short), full ${(100 * share(r.kickFull)).toFixed(0)}% (${r.kickFull.back.toFixed(2)})`);
   /*
-    3b. And the ferrofluid is given back too. With the kicks of 26b,
+    3b. And the ferrofluid is given back too. With the kicks of 27b,
     Classic's ring of ferrofluid was drawn into the middle while the band
     played (`npm run ferrodrift` on the Mac): the glass coming down moves the
     liquid up to 14 cells a step on 256², and the ferrofluid took a fixed six

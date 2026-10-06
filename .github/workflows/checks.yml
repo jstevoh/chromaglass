@@ -413,6 +413,15 @@ jobs:
       - name: The phone
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run phone
+      # Saving a preset under a name (scripts/saves.mjs, PLAN.md QA-18): on both
+      # desks, a narrow window and the phone, Save asks for a name every time,
+      # saves the settings as they are, lists the preset where that surface
+      # lists presets, and Replace writes over without adding one. No GPU. The
+      # site is already built by the steps above, so the script runs on it
+      # rather than `npm run saves` building it a third time.
+      - name: Saving presets
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/saves.mjs
       # The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served
       # with Brotli over a slowed network, and the page asks for the app's
       # chunks alongside its entry and for the GPU before the app has
@@ -605,6 +614,14 @@ jobs:
       - name: The Finger drags the liquid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingerflow
+      # A Blow's wind on a thin gap as air on the film (PLAN 15g): the breath's
+      # stress moves the liquid at τh/2μ, slower in a thick one, stops with
+      # the breath, and carries the colour, the ferrofluid and the oil along
+      # by the flow alone, none lost; the old push alone moved nothing.
+      - name: The wind is air on the film
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 8
+        run: npm run airblow
       # The plate's forces as forces on a thin gap (PLAN 18a-2): a body force
       # (Rain Drip's heavy colour, the magnet) moves a liquid as its viscosity
       # says, Glass Smear is the glass sliding and Updraft a draught's shear,
@@ -613,7 +630,7 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 4
         run: npm run forces
-      # The rides that barely moved anything (PLAN 26a-c): Plate Rock tips
+      # The rides that barely moved anything (PLAN 27a-c): Plate Rock tips
       # the plate and the colour slides downhill through the clear liquid as
       # Darcy says, Beat Squeeze presses the glass across the dish and the
       # colour goes out and comes back, and Turbulence's dial reaches, each

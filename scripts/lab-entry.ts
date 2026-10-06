@@ -25,6 +25,7 @@ import { PALETTE_RGB } from '../src/constants';
 import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
+import { layBreath, BREATH_STRESS } from '../src/lib/breath';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
 export const BASE: GpuStepParams = {
@@ -54,6 +55,8 @@ type Lab = {
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
   /** The hands laid this step (layFinger), or null with none down. */
   hands: Float32Array | null;
+  /** A Blow's breath laid this step (layBreath), or null with none. */
+  breath: Float32Array | null;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -68,7 +71,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null };
+    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null };
     return { N, L };
   },
   /** A disc of colour flat to its edge, for a force the same everywhere in a pool (`npm run thick`). */
@@ -176,9 +179,9 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
-    l.hands = null;
+    l.hands = null; l.breath = null;
   },
   /**
    * A Finger in the liquid on a thin gap, laid as the app lays one
@@ -193,6 +196,19 @@ const api = {
     if (!l.hands) l.hands = new Float32Array(l.L * l.L * 4);
     return layFinger(l.hands, l.L, x, y, r, mx, my, edge);
   },
+  /**
+   * A Blow's wind on a thin gap, laid as the app lays it (lib/breath.ts,
+   * blowWind): at grid cell (x, y) of the L × L plate, `r` cells in radius,
+   * blowing along (dx, dy) at `share` of a default breath's stress. Held
+   * for the step after the next flush.
+   */
+  breath(x: number, y: number, r: number, dx: number, dy: number, share = 1) {
+    const l = lab!;
+    if (!l.breath) l.breath = new Float32Array(l.L * l.L * 4);
+    return layBreath(l.breath, l.L, x, y, r, dx, dy, share);
+  },
+  /** A default breath's stress at its middle, in pascals (lib/breath.ts). */
+  breathStress: BREATH_STRESS,
   /*
     `flushed` says the first of these steps follows a flush, as the app's
     loop says it (`gpu.step(p, applied)`): the gap then takes its press and

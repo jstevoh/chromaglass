@@ -362,7 +362,7 @@ console.log('The strokes, as drawn\n');
     stops at rest, 0.030; then the spring), laid as the app's `pressKick`
     lays them, through the same squishDisc and KickRelease: the three discs
     of KICK_RADII at GRID_SCALE (96, 66 and 36 on the app's plate of 192,
-    a glass pressed across most of the dish, PLAN 26b) about a centre up to thirty cells at GRID_SCALE off the middle
+    a glass pressed across most of the dish, PLAN 27b) about a centre up to thirty cells at GRID_SCALE off the middle
     (`npm run squeeze` asks the app's own glue), each pressed kickDepth(squeeze, bass, 1), the
     Fillmore's squeeze (0.9) at a bass of 0.7, kicks at 140 bpm (closer than
     a hold and a release, so they overlap), for 40 s, then a second of no
@@ -416,7 +416,7 @@ console.log('The strokes, as drawn\n');
     /*
       "Does not add up" was a fixed floor, the film never under 0.020, set
       when a kick pressed 0.0024 a disc and left 0.0255. A kick presses deeper
-      now (kickDepth, PLAN 26b), so the floor is the kick's own: one kick on
+      now (kickDepth, PLAN 27b), so the floor is the kick's own: one kick on
       its own, the first of the same show, read the same tenth of a second
       after it lands. Kicks at 140 bpm come closer than a hold and a release,
       so a little of the last is still down when the next lands; more than a

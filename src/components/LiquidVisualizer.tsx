@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { layFinger } from '../lib/handSolid';
+import { layBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -1141,6 +1142,11 @@ class FluidSimulation {
   /** The fingers in the liquid this step on a thin gap (lib/handSolid.ts), made when one first touches it. */
   private hands: Float32Array | null = null;
   private handsLaid = false;
+  /** A Blow's wind on a thin gap this step, as the air's stress on the surface (lib/breath.ts), made at the first breath. */
+  private breath: Float32Array | null = null;
+  private breathLaid = false;
+  /** Whether the last blowWind blew as air on the film (PLAN 15g) rather than by the carries: `npm run tools` counts it. */
+  lastBlowAired = false;
   /*
     How many readbacks have landed. The rim deposit needs it: the mirror
     refreshes only when `readbackAsync` has something, and depositing from a
@@ -1582,12 +1588,13 @@ class FluidSimulation {
       da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
-    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null);
+    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null);
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
+    if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
     this.dirty = false;
   }
 
@@ -2021,6 +2028,7 @@ class FluidSimulation {
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
+    if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
     this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null;
@@ -3056,8 +3064,33 @@ class FluidSimulation {
    * step at a share sized for one carry a reading. Returns the colour it
    * moved (in the mirror's units), for `npm run tools`.
    */
-  blowWind(x: number, y: number, radius: number, strength: number, dx: number, dy: number): number {
+  blowWind(x: number, y: number, radius: number, strength: number, dx: number, dy: number, air = true): number {
     const moving = Math.hypot(dx, dy) > 1e-4;
+    this.lastBlowAired = false;
+    /*
+      On a thin gap (every look since #248) the moving wind is air on the
+      film (PLAN.md §15g; lib/breath.ts has the physics and the numbers,
+      `npm run airblow` the check): the breath's stress on the surface, a
+      force the solve takes in with the other body forces for as long as the
+      breath goes on, and the flow it drives carries the colour, the oil and
+      the ferrofluid, so neither the push below nor any carry runs. The
+      Amount (`strength` against the tool's own) is how hard one blows.
+      Held still, a puff is the jet's pressure and an outward shear, which a
+      rigid film moves nothing by; it keeps the carries until the jet's
+      dimple is built (PLAN.md 15g-2). And a remote hand's wind (`air`
+      false) keeps them too: its strokes arrive a message at a time, so a
+      breath laid only on those steps would push the liquid for one step in
+      every few, a fraction of the mouse's, until it is held between
+      messages as the pointer's direction is (PLAN.md 15g-5).
+    */
+    if (moving && air && this.airsFilm()) {
+      if (!this.breath) this.breath = new Float32Array(GRID_AREA * 4);
+      const r = radius * GRID_SCALE;
+      if (layBreath(this.breath, this.size, x, y, r, dx, dy, strength / BLOW_STRENGTH) > 0) {
+        this.dirty = true; this.breathLaid = true; this.lastBlowAired = true;
+      }
+      return 0;
+    }
     if (moving) this.blowDirected(x, y, radius, strength, dx, dy);
     else this.blowAir(x, y, radius, strength, false);
     if (!this.gpu) return 0;
@@ -3075,6 +3108,11 @@ class FluidSimulation {
     return moved;
   }
 
+  /** Whether a moving Blow blows as air on the film here: a thin gap on the GPU (blowWind). */
+  private airsFilm(): boolean {
+    return !!this.gpu && this.thinGap;
+  }
+
   /**
    * A hand's Blow on the ferrofluid (PLAN.md §9n): held still it opens a
    * hole, moved it pushes the ferrofluid along (blowCarry). Its own method,
@@ -3089,6 +3127,8 @@ class FluidSimulation {
    */
   blowPhase(x: number, y: number, radius: number, strength: number, dx: number, dy: number): void {
     if (!this.gpu?.carryPhase) return;
+    // A moving wind on a thin gap is air on the film, whose flow carries the ferrofluid (blowWind).
+    if (Math.hypot(dx, dy) > 1e-4 && this.airsFilm()) return;
     const c = blowCarry(x, y, radius, strength, dx, dy, this.size);
     this.gpu.carryPhase(c.x, c.y, c.r, c.ux, c.uy, c.take, c.hop, c.outward);
   }
@@ -3515,7 +3555,7 @@ class FluidSimulation {
 
     const turbDetail = Math.max(1, Math.min(4, Math.round(settings.turbulenceDetail ?? 3)));
     /*
-      Turbulence, the hand stirring the layer (PLAN 26c). Measured on the
+      Turbulence, the hand stirring the layer (PLAN 27c). Measured on the
       Mac with the band playing (`npm run controls`, 2026-10-05): turned
       from a look's own value to full it changed nothing a person could see
       on five looks of six. Two reasons, both fixed here.
@@ -4914,7 +4954,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * `carries` the ones whose carry ran (a fresh dye reading), so a stroke that pushed little says
    * whether the wind lost its direction or waited on readings.
    */
-  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0, directed: 0, carries: 0 });
+  const blowStepsRef = useRef({ straw: 0, wind: 0, carried: 0, strawFirst: 0, directed: 0, carries: 0, aired: 0 });
   /**
    * Every finger on the glass after the first (the phone).
    *
@@ -5200,11 +5240,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     switch (g.tool) {
       case 'blow':
-        // The wind carries the colour and the oil, as the mouse's does
-        // (blowWind, PLAN.md §15c); a directed one erased 15% a step at
+        // The wind moves the colour and the oil, as the mouse's does
+        // (blowWind's carries, PLAN.md §15c; a remote's wind is not yet
+        // air on the film, 15g-5); a directed one erased 15% a step at
         // its middle, a puff 20% everywhere under it.
         if (g.dx !== undefined && g.dy !== undefined && (g.dx !== 0 || g.dy !== 0)) {
-          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
+          af.blowWind(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy, false);
           af.blowPhase(x, y, remoteBlowRadius(amt, true), BLOW_STRENGTH * amt, g.dx, g.dy);
         } else {
           af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
@@ -7183,14 +7224,34 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
                   if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
                 } else {
-                  // The wind: it carries the colour (and an oil body's oil)
-                  // the way the hand last went, as the ferrofluid above, or
-                  // out from under it held still; it used to erase it.
-                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, going ? going.x : 0, going ? going.y : 0);
+                  // The wind: moving on a thin gap, the breath's air on the
+                  // film, whose flow takes the colour, the oil and the
+                  // ferrofluid the way the hand last went (PLAN.md §15g);
+                  // held still, or off a thin gap, it carries them (§15c).
+                  // It used to erase them.
+                  /*
+                    Along the way the hand last went until the hand is held,
+                    not only for the 150 ms the ferrofluid's push keeps it
+                    (BLOW_DIR_HOLD_MS). Between the two the wind was a puff,
+                    and a puff carries the colour under the hand out onto a
+                    ring a palm and more across: on a runner whose moves came
+                    120 ms apart, a stroke's three or four puffs moved 80 to
+                    106 of a pool of 210 to 244 out round the hand, which
+                    near the pool's leading edge is backwards, and the
+                    stroke out to the left moved the pool -0.26% against the
+                    air's push (`npm run tools` on #300). A pointer that is
+                    late is not a hand that stopped; a hand that stopped is
+                    held within BLOW_STRAW_FRAMES and blows the straw, or on
+                    a plate that is not the lead, the puff.
+                  */
+                  const aim = going ?? (hand.blowDir.moved && hand.blowDir.still < BLOW_STRAW_FRAMES ? hand.blowDir : null);
+                  const carried = af.blowWind(x, y, BLOW_RADIUS, BLOW_STRENGTH * k, aim ? aim.x : 0, aim ? aim.y : 0);
                   blowStepsRef.current.carried += carried;
                   blowStepsRef.current.wind++;
                   if (going) blowStepsRef.current.directed++;
                   if (carried > 0) blowStepsRef.current.carries++;
+                  // On a thin gap the moving wind is air on the film and carries nothing by hand (PLAN.md §15g).
+                  if (af.lastBlowAired) blowStepsRef.current.aired++;
                   if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
                     bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
                   }
@@ -7962,7 +8023,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
-            // The hand's spring and sway, the slider applied once (lib/plateRock.ts, PLAN 26a).
+            // The hand's spring and sway, the slider applied once (lib/plateRock.ts, PLAN 27a).
             if (R > 0 && kickStep) kickRock(rock, bass01, accent);
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
@@ -7983,7 +8044,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // let go: `pressKick`.
                 /*
                   And across the dish (KICK_RADII), deeper, and less at the
-                  mercy of the bass reading (PLAN 26b). Measured in the lab on
+                  mercy of the bass reading (PLAN 27b). Measured in the lab on
                   a thin gap (`npm run rides`), a ring of colour 30 cells out
                   from a kick's centre: the old kick at the default squeeze and
                   the bass a kick usually reads (0.5, about 0.7) went out 1.7
@@ -8014,7 +8075,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               slider; the phone's tilt joins it. On a thin gap that is the
               plate tipped (× CUR_ROCK, sinθ), and a phone held tipped slides
               the colour downhill for as long as it is held, as a dish tipped
-              in the hand does (PLAN 26a).
+              in the hand does (PLAN 27a).
             */
             const rockX = swingX + ext.x * 1.1 * extK;
             const rockY = swingY + ext.y * 1.1 * extK;

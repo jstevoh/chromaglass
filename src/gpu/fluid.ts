@@ -399,7 +399,7 @@ const DRIP_WEIGHT = 0.5;
 */
 const AIR_SHEAR = 0.5;
 /*
-  Plate Rock's tilt, as the dye's weight down the tilted plate (PLAN 26a).
+  Plate Rock's tilt, as the dye's weight down the tilted plate (PLAN 27a).
 
   A hand rocking the clock glass tips the plate a few degrees. Flat on the
   projector gravity is straight through the glass and moves nothing; tipped
@@ -435,6 +435,13 @@ const AIR_SHEAR = 0.5;
   before, where a look's own stir moves it 0.79.
 */
 export const ROCK_FALL = 12;
+/*
+  The clear liquid's density, kg/m³, to turn a Blow's stress into the speed
+  it drives the liquid to (τh/2μ, μ = ρν; lib/breath.ts). The plate's
+  liquids are water and oils, 0.8 to 1.26 of water's; the clear liquid is
+  taken as water's, as liquidProps takes the poured ones' against it.
+*/
+const LIQUID_DENSITY = 1000;
 /*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
@@ -754,6 +761,14 @@ export class WebGPUFluid {
    * same pour on it: a "before" that is read, not remembered.
    */
   readsSpecies = true;
+  /**
+   * Whether the species rides the colour's carry (PLAN 18d-11a). Only `npm
+   * run thick` turns it off, to carry the same plate the way 18d-1 did, in a
+   * stage of its own, and ask that both ways give the same fields.
+   */
+  fuseSpecies = true;
+  /** How the last step carried the species: with the colour ('pair'), in its own stage ('alone'), or not at all (null). For `npm run thick`. */
+  lastSpeciesCarry: 'pair' | 'alone' | null = null;
   /*
     How much of the plate the oil poured since it was last cleared covers,
     as a share of its area. Cahn–Hilliard and the flux transport both keep
@@ -776,6 +791,11 @@ export class WebGPUFluid {
   private handLive = false;
   /** The fastest hand laid for the next step, in the hands' cells a step (the ferrofluid's substeps follow it). */
   private handFastest = 0;
+  /** A Blow's breath on the liquid (applyDeltas' `breath`, lib/breath.ts), on the CPU's grid and on the solver's, made at the first breath on a thin gap. */
+  private cpuBreathTex: GPUTexture | null = null;
+  private breathTex: GPUTexture | null = null;
+  /** Whether the next step has a breath on it: laid each step the wind blows, gone the step after, as the hands are. */
+  private breathLive = false;
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
@@ -1012,6 +1032,8 @@ export class WebGPUFluid {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
       add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
+      // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
+      add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
     } else {
@@ -1430,7 +1452,7 @@ export class WebGPUFluid {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -1460,6 +1482,14 @@ export class WebGPUFluid {
       for (let k = 0; k < hands.length; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
       this.handFastest = fastest;
     }
+    if (breath) {
+      if (!this.breathTex) {
+        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        this.cpuBreathTex = this.disposer.track(this.device.createTexture({ label: 'breath (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+        this.breathTex = this.disposer.track(this.device.createTexture({ label: 'breath', size: [this.N, this.N], format: RGBA32, usage }));
+      }
+      q.writeTexture({ texture: this.cpuBreathTex! }, breath, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+    }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
     this.writeSplatArgs(0);
@@ -1473,6 +1503,7 @@ export class WebGPUFluid {
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
     if (hands) this.handLive = true;
+    if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
     this.foldDeltas(pass);
     pass.end();
     q.submit([enc.finish()]);
@@ -1643,6 +1674,9 @@ export class WebGPUFluid {
     const hands = this.handLive ? this.handTex : null;
     const handCells = this.handLive ? this.handFastest * N / this.L : 0;
     this.handLive = false;
+    // And a Blow's breath, the same way (lib/breath.ts).
+    const breath = this.breathLive ? this.breathTex : null;
+    this.breathLive = false;
     /*
       The substeps a hand in the liquid needs of the carries that take a
       fixed number (the ferrofluid's, and the colour's under a maze's flow):
@@ -1972,8 +2006,8 @@ export class WebGPUFluid {
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
-      On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt and Updraft's
-      shear join the body forces (hsBody), and the velocity is kept here, after all of them and
+      On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt, Updraft's
+      shear and a Blow's breath (PLAN 15g) join the body forces (hsBody), and the velocity is kept here, after all of them and
       before the stirring, so hsPrep can read the two apart: a body force
       moves a liquid as its viscosity says, a stir as the dial says (PLAN
       18a-2, wgsl/thinGap.ts). With no body force this step there is nothing
@@ -1982,14 +2016,25 @@ export class WebGPUFluid {
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
-    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || rockOn);
+    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
+      /*
+        The breath is laid as its stress, in pascals (lib/breath.ts), and
+        read as every body force here is, as the speed it drives the
+        reference liquid to at the rest gap: τh₀/2μ_ref in m/s, then in the
+        flow's units, plate widths a step over the step's displacement
+        (real seconds over the plate's width and disp, as hsPrep's hand).
+      */
+      const h0 = REST_GAP * PLATE_METRES;
+      const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+      const breathScale = breath ? (h0 / (2 * LIQUID_DENSITY * NU_REF)) * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
+      const breathTex = breath ?? this.blank('rgba');
       stage('thin body', (pass) => {
         this.ensureThinGap();
-        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}`,
-          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, 0,
+        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}`,
+          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
             rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, 0, 0]),
-          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write]);
+          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex]);
         this.vel.swap();
       });
     }
@@ -2123,6 +2168,15 @@ export class WebGPUFluid {
         od.swap();
       }
     }, a > 0);
+    /*
+      The poured liquids' species rides the colour's carry when it can (PLAN
+      18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found
+      once for both. Where the colour is carried some other way (the maze's
+      sixths), the species' stage carries it alone, as it always did.
+    */
+    const speciesOn = thin && !!this.species && this.speciesLive;
+    const rider = speciesOn && this.fuseSpecies ? this.species! : undefined;
+    let speciesCarried = false;
     stage('advect dye', (pass) => {
       /*
         Under the maze's flow the dye crosses faces, as the ferrofluid does
@@ -2189,7 +2243,8 @@ export class WebGPUFluid {
         return;
       }
       if (!bodiesOn && thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
+        speciesCarried = !!rider;
         return;
       }
       if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
@@ -2216,7 +2271,8 @@ export class WebGPUFluid {
       }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
+        speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
         return;
       }
@@ -2472,8 +2528,9 @@ export class WebGPUFluid {
     */
     stage('species', (pass) => {
       this.speciesDisp = disp;
-      this.stepSpecies(pass);
-    }, thin && !!this.species && this.speciesLive);
+      this.stepSpecies(pass, !speciesCarried);
+    }, speciesOn);
+    this.lastSpeciesCarry = !speciesOn ? null : speciesCarried ? 'pair' : 'alone';
 
     /*
       The clear film (PLAN §20b, wgsl/film.ts).
@@ -2784,37 +2841,45 @@ export class WebGPUFluid {
   }
 
   /**
-   * The species' stage (PLAN 18d): its carry in the colour's substeps, then
-   * the rim. What the flow has carried past the rim has left the dish over
+   * The species' stage (PLAN 18d): its carry in the colour's substeps, unless
+   * the colour's carry has taken it along already (`carry` false, PLAN 18d-11a:
+   * bodyAdvectPairSub), then the rim. What the flow has carried past the rim has left the dish over
    * it (the open rim, OPEN_RIM, where the thin solve holds the pressure at
    * the air's), so it is taken off the plate there; nothing else takes any
    * away (18d-2: a liquid leaves by being flushed, it does not fade).
    */
-  private stepSpecies(pass: GPUComputePassEncoder): void {
+  private stepSpecies(pass: GPUComputePassEncoder, carry = true): void {
     const sp = this.species!;
-    this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
+    if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
     this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
   }
 
   /**
-   * What the species' stage costs the GPU (PLAN 18d-11), as benchSwirl times
-   * the swirl's: `reps` of it back to back on the plate's own textures, after
-   * a thin step has planned the carry's substeps, submit to done, in ms. Two
+   * What the species costs the GPU (PLAN 18d-11), as benchSwirl times the
+   * swirl's: `reps` of it back to back on the plate's own textures, after a
+   * thin step has planned the carry's substeps, submit to done, in ms. Two
    * counts and the slope between them leave out the submit's fixed cost. For
-   * `npm run thick`; CI's Mac grants no timestamp queries. `dye` times the
-   * colour's own carry instead, the same kernel in the same substeps on the
-   * dye's texture: the work every thin step already does, so the species'
-   * cost can be read as a share of it on whatever GPU runs the bench.
+   * `npm run thick`; CI's Mac grants no timestamp queries. `what`:
+   *   'alone', the species' stage as 18d-1 ran it, its own carry and the rim;
+   *   'dye', the colour's own carry alone, the work every thin step does
+   *     whether anything is poured or not;
+   *   'pair', the two together as a thin step now runs them (18d-11a): the
+   *     colour's carry taking the species along, then the rim.
+   * So the species costs a step 'alone' as it was and 'pair' less 'dye' as
+   * it is, each readable as a share of 'dye' on whatever GPU runs the bench.
    */
-  async benchSpecies(reps: number, dye = false): Promise<number> {
+  async benchSpecies(reps: number, what: 'alone' | 'dye' | 'pair' = 'alone'): Promise<number> {
     if (!this.species || !this.speciesLive || !this.carryInd) return NaN;
     const enc = this.device.createCommandEncoder({ label: 'bench species' });
     const pass = enc.beginComputePass({ label: 'bench species' });
     const args = this.arg('bench dye carry', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]);
     for (let k = 0; k < reps; k++) {
-      if (dye) this.carrySubsteps(pass, 'bodyAdvect', this.dye, args);
-      else this.stepSpecies(pass);
+      if (what === 'alone') this.stepSpecies(pass);
+      else {
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, args, what === 'pair' ? this.species : undefined);
+        if (what === 'pair') this.stepSpecies(pass, false);
+      }
     }
     pass.end();
     await this.device.queue.onSubmittedWorkDone();
@@ -3836,24 +3901,26 @@ export class WebGPUFluid {
    * indirectly so one this step does not need runs no workgroups. The field
    * ends swapped once, as a single carry leaves it.
    */
-  private carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer): void {
-    const kernelName = `${name}Sub`;
+  private carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong): void {
+    // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
+    const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
-    const group = (src: GPUTexture, dst: GPUTexture) => {
-      const key = `${kernelName}:${src.label}:${dst.label}:${args.label}:${this.squeeze.read.label}`;
+    const group = (src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
+      const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}`;
       let g = this.groups.get(key);
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!]);
+        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : [])]);
         this.groups.set(key, g);
       }
       return g;
     };
     const w = Math.ceil(this.N / 8);
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, group(field.read, field.write));
+    pass.setBindGroup(0, group(field.read, field.write, also?.read, also?.write));
     pass.dispatchWorkgroups(w, w);
     field.swap();
-    const there = group(field.read, field.write), back = group(field.write, field.read);
+    also?.swap();
+    const there = group(field.read, field.write, also?.read, also?.write), back = group(field.write, field.read, also?.write, also?.read);
     for (let k = 0; k < CARRY_PAIRS; k++) {
       pass.setBindGroup(0, there);
       pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);

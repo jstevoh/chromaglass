@@ -206,7 +206,7 @@ try {
     /*
       And pressed as deep as a kick at this look's squeeze: each disc
       kickDepth(0.9, the bass /70 capped at 1, the accent 1 at Accent 0),
-      0.005 × 0.9 × (0.6 + 0.4 × the bass) since PLAN 26b, so the softest
+      0.005 × 0.9 × (0.6 + 0.4 × the bass) since PLAN 27b, so the softest
       kick presses 0.0027 at the middle. On a thin gap a disc is a bowl
       (3 × depth × (1 − r²/R²)², squishDisc), whose mean over its own cells
       is the depth itself, and the three nested discs count each cell once

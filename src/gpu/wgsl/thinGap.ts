@@ -195,17 +195,27 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       rocking the glass tips it a few degrees, which puts g·sinθ in the
       plate, and the colour where it is thicker than the mean slides
       downhill as Rain Drip's does, the clear liquid rising past it (PLAN
-      26a). A.b.xy is that tilt's in-plane gravity times the weight of a
+      27a). A.b.xy is that tilt's in-plane gravity times the weight of a
       unit of dye (fluid.ts, ROCK_FALL), signed downhill.
 
+      **A Blow's breath is the same physics where the hand blows** (PLAN
+      15g, lib/breath.ts): the air's stress τ on the surface, laid in
+      pascals, drives the column's mean at τh/2μ. A.a.w turns τ into
+      τh₀/2μ_ref in the flow's units, the speed it drives the reference
+      liquid to at the rest gap, which is how hsPrep reads a body force;
+      over the gap in rest gaps, as Updraft's, the liquid then answers as h
+      and as its own viscosity. \`breath\` is 1×1 and empty with no Blow.
+
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
-      AIR_SHEAR), the rest gap h0, 0); A.b = (Plate Rock's pull, x and y, 0, 0).
+      AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
+      A.b = (Plate Rock's pull, x and y, 0, 0).
     */
     hsBody: `${HEAD}${NOISE}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
 @group(0) @binding(4) var sq: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(6) var breath: texture_2d<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -221,6 +231,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
     let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
     v = vec4f(v.xy + vec2f(gx, gy) * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
+  }
+  if (A.a.w > 0.0) {
+    let tau = textureLoad(breath, min(q, vec2i(textureDimensions(breath)) - 1), 0).xy;
+    v = vec4f(v.xy + tau * A.a.w / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
   }
   textureStore(dst, q, safeVel(v));
 }`,

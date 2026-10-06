@@ -1176,7 +1176,7 @@ out. On the desk and the phone:
 - say if any liquid's own colour looks wrong to you, or if Oil's pale gold is too faint to
   be worth it.
 
-## 45. Beat Squeeze, Plate Rock and Turbulence do something (PLAN 26a–c)
+## 45. Beat Squeeze, Plate Rock and Turbulence do something (PLAN 27a–c)
 
 With music playing (a song with a clear kick), on Classic and on Fillmore East, on the
 Perform desk and on the phone:
@@ -1199,3 +1199,18 @@ frame interval, `status.label` is the solver and grid actually running, and
 `status.steppedDown` says whether the governor has had to retreat. `?set=` takes
 any setting by name, semicolon separated, and lasts for that page load only —
 nothing it does reaches a saved look.
+
+## 44. Blow as air on the film (PLAN 15g)
+
+The moving Blow no longer carries the colour by hand: its breath drags the liquid's
+surface, and the flow it makes moves the colour, the oil and the ferrofluid. On Classic,
+then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a pool:
+
+- Does the colour stream along the way you blow, with the liquid either side curling
+  back (the flow round a jet), rather than a blob hopping ahead of the cursor?
+- Is it about as strong as before? If it feels weak or too strong, say which way: the
+  breath's speed (8 m/s at the surface, PLAN 15g-6) is a guess to set by eye.
+- In a thick look it should move much less. Does that read as the liquid being thick,
+  or as the tool not working?
+- A Blow held still (not the straw) still does what it did; that is 15g-2.
+

@@ -72,6 +72,39 @@
  *      ratio of two carries in the same substeps carries over. It asserts
  *      only that it measured something; the numbers are the finding,
  *      against PLAN 18d's budget of 0.5 to 0.7 ms for the whole of 18d.
+ *      The first reading on CI's Mac (#299): the stage alone 12.36 ms, the
+ *      colour's carry 12.28, 1.01 of it.
+ *   7. And what it costs now (PLAN 18d-11a): the species rides the colour's
+ *      carry, one pass through the faces for both (bodyAdvectPairSub), and
+ *      what it adds is that pass less the colour's carry alone, timed the
+ *      same way. Asked under three quarters of what the stage cost carried
+ *      alone, on the same plate in the same run. The first guess was that
+ *      the faces were all of a carry's cost (the two carries cost the same
+ *      though the species moves twice the bytes), and on software they
+ *      nearly are: 256², 0.34 of the colour's carry against 1.00 alone. On
+ *      CI's Mac they are half of it: at 768² in 15 substeps the stage alone
+ *      13.54 ms, the colour's carry 13.26, the two together 19.99, so the
+ *      species adds 6.73 ms, 0.50 of what it cost alone; the rest is its own
+ *      texels, nine reads and a write of rgba32f a cell a substep. A bar at
+ *      half sat on that reading; three quarters is a quarter saved at the
+ *      least, and a pair that saved nothing reads 1. Under 0.9 of the
+ *      colour's carry the pair would be timing less than it runs, so that
+ *      fails too.
+ *   8. Both ways carry the same: the alcohol run (whose pool moves three
+ *      cells) again with the species in a stage of its own (`fuseSpecies`
+ *      off), and the colour and the species after 30 steps the same to a
+ *      half float's last place at the field's largest (1/1024 of it). On
+ *      software they are the same to the bit. On Metal they are not: its
+ *      compiler is free to reorder the two kernels' arithmetic differently
+ *      (fast math), a carry's last bit differs, and the species feeds the
+ *      flow back through the drag (hsPrep), so 30 steps grow a last bit to
+ *      about 1e-4 of the largest (CI's Mac: 8.6e-5 in the colour, 1.4e-4 in
+ *      the species of 1.36). The colour is kept in half floats, so a
+ *      difference under its last place is none the plate can hold; a
+ *      carry missed or made twice moves the pool three cells and reads
+ *      near 1. Two runs that both carried
+ *      the same way would match too, so each says how its last step carried
+ *      the species (`lastSpeciesCarry`), and the check asks for one of each.
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -120,9 +153,10 @@ try {
       own viscosity says: syrup in the thickest look read 4 to 5 times colour
       alone, its pool 1.3. Real, and not what this asks.
     */
-    const run = async (t, bottle, ignored = false) => {
+    const run = async (t, bottle, ignored = false, separate = false) => {
       await lab.create(N, N);
       lab.solver().readsSpecies = !ignored;
+      lab.solver().fuseSpecies = !separate;
       lab.dyeDisc(0.5, 0.5, 0.08, [1, 0, 0], 1);
       let sp = null;
       if (bottle) sp = lab.addSpecies(0.5, 0.5, 0.08, 50, bottle);
@@ -130,11 +164,23 @@ try {
       const before = await read();
       const mean = await meanDye();
       await lab.step(STEPS, { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, meanDensity: mean });
-      return { sp, before, after: await read(), nuClear: lab.thinGapViscosity(t) };
+      const fields = bottle === 'alcohol' ? { dye: [...await lab.field('dye')], species: [...await lab.field('species')], how: lab.solver().lastSpeciesCarry } : null;
+      return { sp, before, after: await read(), nuClear: lab.thinGapViscosity(t), fields };
     };
-    for (const [name, t, bottle, ignored] of [['glycerine', 0.45, 'glycerine'], ['glycerine unread', 0.45, 'glycerine', true], ['colour 0.45', 0.45, null],
-      ['alcohol', 0.06, 'alcohol'], ['colour 0.06', 0.06, null], ['syrup thick', 1, 'syrup'], ['syrup unread', 1, 'syrup', true], ['colour 1', 1, null]]) {
-      out[name] = await run(t, bottle, ignored);
+    for (const [name, t, bottle, ignored, separate] of [['glycerine', 0.45, 'glycerine'], ['glycerine unread', 0.45, 'glycerine', true], ['colour 0.45', 0.45, null],
+      ['alcohol', 0.06, 'alcohol'], ['alcohol separate', 0.06, 'alcohol', false, true], ['colour 0.06', 0.06, null], ['syrup thick', 1, 'syrup'], ['syrup unread', 1, 'syrup', true], ['colour 1', 1, null]]) {
+      out[name] = await run(t, bottle, ignored, separate);
+    }
+    // 8. The alcohol run carried both ways: the largest difference in any channel, against the largest value.
+    {
+      const diff = (k) => {
+        const a = out.alcohol.fields[k], b = out['alcohol separate'].fields[k];
+        let d = 0, m = 0;
+        for (let i = 0; i < a.length; i++) { d = Math.max(d, Math.abs(a[i] - b[i])); m = Math.max(m, Math.abs(b[i])); }
+        return { d, m };
+      };
+      out.same = { dye: diff('dye'), species: diff('species'), how: [out.alcohol.fields.how, out['alcohol separate'].fields.how] };
+      delete out.alcohol.fields; delete out['alcohol separate'].fields;
     }
     out.steps = STEPS; out.stepSeconds = lab.stepSeconds;
     // 6. The stage's cost, on a stirred plate of glycerine.
@@ -146,16 +192,16 @@ try {
       lab.addSpecies(0.5, 0.5, 0.2, 2, 'glycerine');
       lab.flush();
       await lab.step(STEPS, { thinGap: 1, gapThickness: 0.45, gapSpring: 0, turbScale: 1 });
-      const slope = async (dye) => {
+      const slope = async (what) => {
         const all = [];
         for (let k = 0; k < 3; k++) {
-          const a = await lab.solver().benchSpecies(few, dye), b = await lab.solver().benchSpecies(many, dye);
+          const a = await lab.solver().benchSpecies(few, what), b = await lab.solver().benchSpecies(many, what);
           all.push((b - a) / (many - few));
         }
         return all;
       };
-      const all = await slope(false), dyeAll = await slope(true);
-      out.cost = { grid: G, ms: Math.min(...all), all, dye: Math.min(...dyeAll), carry: await lab.solver().readCarry() };
+      const all = await slope('alone'), dyeAll = await slope('dye'), pairAll = await slope('pair');
+      out.cost = { grid: G, ms: Math.min(...all), all, dye: Math.min(...dyeAll), pair: Math.min(...pairAll), pairAll, carry: await lab.solver().readCarry() };
     }
     return out;
   }, process.platform === 'darwin');
@@ -193,7 +239,15 @@ try {
   const c = r.cost;
   check(`the species' stage was timed (${process.platform === 'darwin' ? 'Metal' : 'software, not the finding'})`,
     Number.isFinite(c.ms) && c.ms > 0,
-    `${f(c.ms, 3)} ms a step at ${c.grid}² (the three: ${c.all.map((x) => f(x, 3)).join(', ')}), against ${f(c.dye, 3)} ms for the colour's own carry on the same GPU (${f(c.ms / c.dye, 2)} of it), in ${c.carry?.n ?? '?'} substeps`);
+    `carried alone (18d-1's way) ${f(c.ms, 3)} ms a step at ${c.grid}² (the three: ${c.all.map((x) => f(x, 3)).join(', ')}), against ${f(c.dye, 3)} ms for the colour's own carry on the same GPU (${f(c.ms / c.dye, 2)} of it), in ${c.carry?.n ?? '?'} substeps`);
+  const extra = c.pair - c.dye;
+  check('the species riding the colour\'s carry costs under three quarters of carrying it alone',
+    Number.isFinite(c.pair) && c.pair > c.dye * 0.9 && extra < 0.75 * c.ms,
+    `the colour's carry with the species ${f(c.pair, 3)} ms (the three: ${c.pairAll.map((x) => f(x, 3)).join(', ')}), so the species adds ${f(extra, 3)} ms (${f(extra / c.dye, 2)} of the colour's carry), against ${f(c.ms, 3)} carried alone`);
+  const sd = r.same.dye, ss = r.same.species;
+  check('the species riding the colour\'s carry moves both exactly as carried apart',
+    r.same.how[0] === 'pair' && r.same.how[1] === 'alone' && sd.m > 0.5 && ss.m > 1 && sd.d <= sd.m / 1024 && ss.d <= ss.m / 1024,
+    `carried ${r.same.how.join(' and ')}; largest difference ${sd.d.toExponential(2)} in the colour (of ${f(sd.m)}), ${ss.d.toExponential(2)} in the species (of ${f(ss.m)})`);
   check('no GPU pass failed validation (a stage that never ran would read as an unchanged pool)', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the lab ran', false, e.message.slice(0, 300));

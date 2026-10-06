@@ -375,13 +375,13 @@ export class PressLifts {
   the palm-sized press moved the picture 0.15 at most at the default
   squeeze, the dish-wide one 0.43; at full, 0.37 against 0.76. The volume a
   kick moves is the press's depth times its area, and the palm had a
-  seventh of the dish's area (PLAN 26b).
+  seventh of the dish's area (PLAN 27b).
 */
 export const KICK_RADII = [64, 44, 24];
 /**
  * How deep Beat Squeeze presses each of KICK_RADII on a kick, for the slider,
  * the bass the analyser reads (0–1, /70) and the bar's accent. The numbers and
- * why are at the call in LiquidVisualizer's frame loop (PLAN 26b).
+ * why are at the call in LiquidVisualizer's frame loop (PLAN 27b).
  */
 export function kickDepth(squeeze: number, bass01: number, accent: number): number {
   return 0.005 * squeeze * (0.6 + 0.4 * bass01) * accent;

@@ -660,7 +660,7 @@ console.log('\nWiring');
     /const accentAt = songClockRef\.current \+ \(kickRef\.current\.predicted \? Math\.max\(0, currentSettings\.beatLead \?\? 0\) \/ 1000 : 0\);\s*const accent = kickStep \? accentRef\.current\.kick\(barGridRef\.current, accentAt, currentSettings\.beatAccent \?\? 0\) : 1;/.test(vis));
   /*
     The rock's shove and the squeeze's depth moved into src/lib/plateRock.ts
-    and src/lib/squish.ts (PLAN 26a, 26b), so the lab's `npm run rides` could
+    and src/lib/squish.ts (PLAN 27a, 27b), so the lab's `npm run rides` could
     measure the same numbers the app uses. The grep now reads that the frame
     loop hands them the accent, and the helpers are called to show the accent
     scales what they give: a grep of a helper's body would pass on a helper
