@@ -181,6 +181,19 @@ interface PerformDeskProps {
   */
   onSendToWall: () => void;
   onSave: () => void;
+  /**
+   * Your saved presets, this desk's own list of them (PLAN QA-18a). A click
+   * cues one, as a cue row does, a double-click sends it, and + puts it in
+   * the set.
+   */
+  savedLooks: { id: string; name: string; swatch: string }[];
+  /** A look cued from outside the set (a saved preset here, or ⌘K), for Go to name. */
+  cuedLook: { id: string; name: string } | null;
+  /** The look on the plate, by its preset id, for the saved list's live mark. */
+  liveLookId: string | null;
+  onCueSaved: (id: string) => void;
+  onSendSaved: (id: string) => void;
+  onAddSavedToSet: (id: string) => void;
   /** Whether there is anything to save, for the dot on the button. */
   dirty: boolean;
   onFreeze: () => void;
@@ -223,7 +236,15 @@ export function PerformDesk(p: PerformDeskProps) {
   const setAct = (a: SetAction, name?: string) => { p.onSetAction(a, name); setSetMenu(false); };
   const [renaming, setRenaming] = useState(false);
   const [saved, setSaved] = useState(false);
-  const next = p.cues.find(c => c.id === p.nextId) ?? null;
+  /*
+    What Go sends: the cued set item, or else a look cued from outside the set.
+    Go always sent the cued look (goLook in App), but the button read its name
+    from the set alone, so a look cued from ⌘K, or now from Your presets,
+    showed "Nothing cued" with Go greyed out while Space would have sent it.
+  */
+  const next: Cue | null = p.cues.find(c => c.id === p.nextId)
+    ?? (p.cuedLook ? { id: p.cuedLook.id, name: p.cuedLook.name, swatch: '', fade: 0, kind: 'saved' } : null);
+  const [savedOpen, setSavedOpen] = useState(true);
   const live = p.cues.find(c => c.id === p.liveId) ?? null;
 
   return (
@@ -383,6 +404,60 @@ export function PerformDesk(p: PerformDeskProps) {
             </div>
           )}
         </div>
+        {/*
+          Your presets, on the desk you play from.
+
+          A preset saved here went into a list only the Design desk showed
+          (and ⌘K by name): the owner asked for this desk to have them too
+          (2026-10-06). Beside the set rather than in it, because the set is
+          the show's running order and the library is everything you have
+          kept; + puts one in the set. A click cues, as a cue row does, so a
+          look picked mid-show waits for Go rather than cutting the wall.
+          Folds away to a line when the set wants the room.
+        */}
+        {p.savedLooks.length > 0 && (
+          <div className="shrink-0 border-t border-border px-2 pb-1 pt-1.5" data-testid="perform-saved">
+            <button
+              onClick={() => setSavedOpen(v => !v)}
+              aria-expanded={savedOpen}
+              className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[12px] text-muted hover:text-text"
+              data-testid="perform-saved-toggle"
+            >
+              <span>Your presets</span>
+              <span className="font-mono text-[11px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
+            </button>
+            {savedOpen && (
+              <div className="max-h-[26vh] overflow-y-auto scrollbar-hide" data-testid="perform-saved-list">
+                {p.savedLooks.map(l => {
+                  const state = l.id === p.liveLookId ? 'live' : l.id === p.cuedLook?.id ? 'next' : 'idle';
+                  return (
+                    <div key={l.id} className={`group flex h-9 items-center rounded-md border ${state === 'live' ? 'border-live-border bg-live-bg' : state === 'next' ? 'border-accent-border bg-elevated' : 'border-transparent hover:bg-hover'}`}>
+                      <button
+                        onClick={() => p.onCueSaved(l.id)}
+                        onDoubleClick={() => p.onSendSaved(l.id)}
+                        title={`Cue ${l.name}; Go sends it. Double-click sends it now.`}
+                        className="flex h-full min-w-0 flex-1 items-center gap-2.5 px-2 text-left"
+                        data-testid={`perform-saved-${l.id}`}
+                        data-state={state}
+                      >
+                        <span className="h-4 w-4 shrink-0 rounded-sm" style={{ background: l.swatch }} />
+                        <span className={`truncate text-[13px] ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
+                      </button>
+                      {state === 'live' ? <Tag tone="live">live</Tag> : state === 'next' ? <Tag tone="next">next</Tag> : null}
+                      <button
+                        onClick={() => p.onAddSavedToSet(l.id)}
+                        title={`Add ${l.name} to the set`}
+                        aria-label={`Add ${l.name} to the set`}
+                        className="ml-1 mr-1 shrink-0 rounded px-1.5 py-0.5 text-[13px] text-faint hover:bg-hover hover:text-text"
+                        data-testid={`perform-saved-add-${l.id}`}
+                      >+</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         <div className="shrink-0 border-t border-border p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <span className="text-[13px] text-muted">Fade</span>

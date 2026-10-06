@@ -5,7 +5,7 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop,
+  Laptop, Save,
 } from 'lucide-react';
 import { Slider } from '../ui';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -79,6 +79,13 @@ export interface PhoneStageProps {
   onLook: (id: string) => void;
   onRandomLook: () => void;
   onRevert: (() => void) | null;
+  /**
+   * Save the current settings as a new preset under a name, the desk's Save
+   * on the phone. It lands under Yours in this same sheet.
+   */
+  onSaveLook?: (name: string) => void;
+  /** The name the save field starts with. */
+  saveSuggestion?: string;
   /**
    * The back plate's own look (PLAN.md §16a): a look sent to the back plate
    * alone, what it is on (null while it follows the front), and the way back
@@ -303,7 +310,15 @@ export function PhoneStage(p: PhoneStageProps) {
   const close = () => setSheet(null);
   /** Where a look picked in the looks sheet goes: the whole plate, or the back plate alone. */
   const [lookTo, setLookTo] = useState<'all' | 'back'>('all');
-  const open = (s: SheetName) => { setAmountOpen(false); if (s === 'looks') setPrinting(p.benDay > 0.001); setSheet(cur => (cur === s ? null : s)); };
+  /** The Looks sheet's name field, while a save is being named; null when it is not. */
+  const [saveName, setSaveName] = useState<string | null>(null);
+  const saveNamed = () => {
+    const name = saveName?.trim();
+    if (!name || !p.onSaveLook) return;
+    p.onSaveLook(name);
+    setSaveName(null);
+  };
+  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') setPrinting(p.benDay > 0.001); setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
 
@@ -670,10 +685,30 @@ export function PhoneStage(p: PhoneStageProps) {
 
       {sheet === 'looks' && (
         <PhoneSheet title="Looks" onClose={close} testId="phone-sheet-looks">
-          <div className={`grid gap-1.5 ${p.onRevert ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-1.5 ${[p.onRevert, p.onSaveLook].filter(Boolean).length === 2 ? 'grid-cols-3' : [p.onRevert, p.onSaveLook].some(Boolean) ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
+            {/* The desk's Save, here: a new preset from what is on the plate,
+                under a name, listed under Yours below as soon as it is saved. */}
+            {p.onSaveLook && <Tile icon={Save} label="Save" on={saveName !== null} onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} testId="phone-save-look" />}
           </div>
+          {saveName !== null && (
+            <form className="mt-2 flex gap-1.5" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="phone-save-form">
+              <input
+                autoFocus
+                onFocus={e => e.currentTarget.select()}
+                value={saveName}
+                onChange={e => setSaveName(e.target.value)}
+                aria-label="Name for the new preset"
+                // 16 px: under it, iOS zooms the page in on focus.
+                className="h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-elevated px-3 text-[16px] text-text outline-none focus:border-accent"
+                data-testid="phone-save-name"
+              />
+              <button type="submit" disabled={!saveName.trim()} className="h-12 shrink-0 rounded-lg bg-text px-4 text-[14px] font-medium text-bg disabled:opacity-40" data-testid="phone-save-confirm">
+                Save
+              </button>
+            </form>
+          )}
           <div className="mt-3">
             <Slider label="Lamp Ground" value={p.lampGround} min={0} max={1} step={0.05} onChange={p.onLampGround}
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
