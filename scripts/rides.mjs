@@ -35,7 +35,9 @@
  *      against the old kick (a palm's three discs at 0.0024 × squeeze × bass),
  *      which moved the default's under 3. And let go, the ring comes back at
  *      least three quarters of the way (all of it is the physics; the
- *      colour's first-order carry keeps the rest, PLAN 26b-1).
+ *      colour's first-order carry keeps the rest, PLAN 26b-1). And the
+ *      ferrofluid poured round Classic's middle stays where it was poured
+ *      through four kicks (its carry keeps up with the press, PLAN 26b-2).
  *   4. Turbulence's dial reaches: with the band playing (energy 0.8, Sound
  *      Drive 0.45) full stirs at least four times as fast as 0.5 (it was 1.33
  *      times), a look's own 0.3 stays within 10% of what it was, and in the
@@ -219,10 +221,43 @@ try {
       res.far = await kick(app_, kicks.def, 70);
       res.farPalm = await kick([40, 27, 15].map((r) => Math.round(r * 1.5)), kicks.def, 70);
     }
+    // ── 3b. The ferrofluid under the kicks ─────────────────────────────
+    {
+      const N = 256, G = N / 128, over = app(N, 0);
+      const { settings: L, pour } = lab.look('classic');
+      const ringOut = async () => {
+        const f = await lab.phase(); let t = 0, s = 0, disc = 0, dn = 0;
+        for (let y = 0; y < f.n; y++) for (let x = 0; x < f.n; x++) {
+          const v = f.data[x + y * f.n], d = Math.hypot((x + 0.5) / f.n - 0.5, (y + 0.5) / f.n - 0.5);
+          t += v; s += v * d; if (d < 0.12) { disc += v; dn++; }
+        }
+        return { r: s / t, disc: disc / dn };
+      };
+      const kicked = async (amount) => {
+        await lab.create(N, N);
+        lab.pour(pour, L.phaseScale ?? 1); lab.flush();
+        await lab.step(2, over);
+        const before = await ringOut();
+        let held = null;
+        // Four kicks near the middle, where the app lands them (30 cells of 128 either way), each held and let go as a kick is.
+        let seed = 7; const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) - 0.5;
+        for (let k = 0; k < 4; k++) {
+          const cx = N / 2 + rnd() * 60 * G, cy = N / 2 + rnd() * 60 * G;
+          for (const r of KICK_RADII) lab.squish(cx, cy, Math.round(r * G), amount, 0, 'press', 0, true);
+          lab.flush(over.dt);
+          await lab.step(9, over, true);
+          if (k === 0) held = await ringOut();
+          for (let j = 0; j < 20; j++) { for (const r of KICK_RADII) lab.squish(cx, cy, Math.round(r * G), -amount / 20, 0, 'press', 0, true); lab.flush(over.dt); await lab.step(1, over, true); }
+          await lab.step(1, over);
+        }
+        return { before, held, after: await ringOut() };
+      };
+      res.ferro = await kicked(kicks.classic);
+    }
     return res;
   }, {
     KICK_RADII,
-    kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), before: 0.0024 * 0.5 * 0.7 },
+    kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
     stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
     rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
   });
@@ -272,6 +307,23 @@ try {
   const share = (o) => 1 - Math.abs(o.back) / o.out;
   check('let go, the ring comes back at least three quarters of the way', share(r.kickDefault) >= 0.75 && share(r.kickFull) >= 0.75,
     `default ${(100 * share(r.kickDefault)).toFixed(0)}% (${r.kickDefault.back.toFixed(2)} cells short), full ${(100 * share(r.kickFull)).toFixed(0)}% (${r.kickFull.back.toFixed(2)})`);
+  /*
+    3b. And the ferrofluid is given back too. With the kicks of 26b,
+    Classic's ring of ferrofluid was drawn into the middle while the band
+    played (`npm run ferrodrift` on the Mac): the glass coming down moves the
+    liquid up to 14 cells a step on 256², and the ferrofluid took a fixed six
+    substeps of 0.45 of a cell, so it went out short and came back in full,
+    a ratchet inward every kick. In the lab, these four kicks took the ring's
+    mean distance from the middle from 0.307 to 0.253 of the plate and the
+    disc 0.12 round the middle from 0.095 to 0.34. Carried in the colour's
+    substep plan (phasePlan), 0.307 to 0.311. The bar is a sixth of that
+    pull, either way. And the first kick, held, has to have pushed the ring
+    out, or a press that never landed would pass as a ring left alone.
+  */
+  const fr = r.ferro, moved = fr.after.r - fr.before.r;
+  check('and the ferrofluid poured round Classic\'s middle stays where it was poured through four kicks, its mean distance moving under 0.009 of the plate either way',
+    fr.held.r - fr.before.r > 0.005 && Math.abs(moved) < 0.009 && fr.after.disc < fr.before.disc + 0.05,
+    `pushed out to ${fr.held.r.toFixed(4)} by the first kick, held; ${fr.before.r.toFixed(4)} → ${fr.after.r.toFixed(4)} (${moved >= 0 ? '+' : ''}${moved.toFixed(4)}), the disc 0.12 round the middle ${fr.before.disc.toFixed(3)} → ${fr.after.disc.toFixed(3)}; before the phase took the plan's substeps, 0.307 → 0.253 and the disc 0.095 → 0.34`);
   // 4.
   const s = r.stir;
   check('Turbulence: the plate goes as fast as it is stirred, full at least three times half way',

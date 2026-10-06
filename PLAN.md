@@ -5240,7 +5240,18 @@ shard's three looks about twenty more read nothing on all three (26d has the lis
   liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
   forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
   own stir moves them 0.79).
-- **26b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
+  - **26a-1, open.** On the Mac's controls run on #305 (shards 3–5 of 5, the same looks
+    as the measure above plus deep-ocean) Plate Rock read visible on 7 of 23 looks, 9 of
+    20 before. The run is not a like-for-like floor: each look's own drift with the band
+    rose with the stronger kicks and stir, and Macro Zoom, untouched, fell too (×21.9 to
+    ×5.1 on agate, ×26.2 to ×3.6 on poster-1969). The absolute change at full is about
+    what it was (neon-coral-reef's cast 0.629→0.680 before, 0.649→0.694 after), and the
+    old one was mostly the slow sway draining colour to one side, which 26a took out.
+    The tilt moves colour only where it is heavier than the plate's mean, so on a look
+    whose colour is spread evenly the picture hardly changes. Next: what a hand-rocked
+    dish shows on those looks (the oil and water layers sloshing, the pools running to
+    the low side), and a measure that holds the drift floor still across runs.
+ Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
   span the dish (`KICK_RADII`) and the depth is `kickDepth` (0.005 × squeeze × (0.6 +
@@ -5249,6 +5260,13 @@ shard's three looks about twenty more read nothing on all three (26d has the lis
   - **26b-1, open.** Let go, the ring comes back 87% of the way at the default and 79%
     at full; a squeeze film with nothing fingering should come all the way. The rest is
     the colour's first-order carry (18a-8).
+  - **26b-2. The ferrofluid is given back too (shipped, #305).** The deeper kick drew
+    Classic's poured ring of ferrofluid into the middle (`npm run ferrodrift` on the Mac:
+    its mean distance 0.308 to 0.273 before the plate was even held; in the lab four
+    kicks took it 0.307 to 0.253). The press moves the liquid up to 14 cells a step on
+    256² and the ferrofluid took a fixed six substeps of 0.45 of a cell, so it went out
+    short and came back in full. It now takes the colour's own substep plan (`phasePlan`,
+    never fewer than six): the same four kicks leave it at 0.311 (`npm run rides`).
 - **26c. Turbulence reaches (shipped, #305).** The dial was the stir's speed, so
   full was a look's 0.3 tripled, and with the band playing the music multiplied it and
   then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
