@@ -349,10 +349,13 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   "Replace “name”" button and the look menu's "Save over"; the look menu lists your
   presets to open or take out. The phone's Looks sheet has the same Save, landing under
   Yours. The narrow window's preset menu said "Save as file" and promised a download
-  that saving stopped doing; it says Save. Open: QA-18a.
-- **QA-18a** The Perform desk has no list of your saved presets of its own (⌘K and the
-  set list's Add both find them). Its header has no look menu to hang one off; decide
-  whether the cue list's Add or a header menu is the place. Desk.
+  that saving stopped doing; it says Save.
+- ~~**QA-18a**~~ **Fixed, this PR** (the owner's ask, 2026-10-06; `npm run saves`, 33
+  lines). The Perform desk had no list of your saved presets of its own (⌘K and the set
+  list's Add found them). It has **Your presets** under the set now: a click cues one
+  (Go names it), a double-click sends it, + puts it in the set, and the list folds to
+  its heading. Go also names a look cued from outside the set (⌘K): it read "Nothing
+  cued", greyed out, while Space would have sent it. Desk.
 
 **Tier 3. On the wall, it looks wrong.**
 

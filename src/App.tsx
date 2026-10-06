@@ -5309,6 +5309,12 @@ export default function App() {
           setName={setList.name}
           savedSets={savedSets.map(x => x.name)}
           onAddToSet={() => setAddingToSet(true)}
+          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
+          cuedLook={cued && !cued.item ? { id: cued.id, name: cued.name } : null}
+          liveLookId={activePresetId}
+          onCueSaved={cueLook}
+          onSendSaved={(id) => goLookNow(id)}
+          onAddSavedToSet={(id) => addToSet('saved', id)}
           onSetAction={onSetAction}
           onItemAction={onItemAction}
           songNow={currentSong ? songLabel(currentSong) : null}

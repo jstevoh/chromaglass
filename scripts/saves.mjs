@@ -201,6 +201,33 @@ try {
     await page.waitForTimeout(300);
     const list = await stored(page);
     check('perform: it is saved under that name', list?.length === 1 && list[0].name === 'Encore', JSON.stringify(list?.map(p => p.name)));
+
+    // This desk's own list of them (QA-18a): it was in none before.
+    const encore = list?.[0]?.id;
+    const row = page.getByTestId(`perform-saved-${encore}`);
+    check('perform: listed under Your presets on this desk', await row.count() === 1 && (await row.innerText()).includes('Encore'));
+    // A second, so a cue moves off the look that is live.
+    await page.getByTestId('save-look').click();
+    await page.getByTestId('save-name').fill('Last song');
+    await page.getByTestId('save-confirm').click();
+    await page.waitForTimeout(300);
+    const last = (await stored(page))?.find(p => p.name === 'Last song')?.id;
+    check('perform: a second one joins the list', await count(page, `perform-saved-${last}`) === 1);
+    const goBefore = (await page.getByTestId('go-button').innerText()).trim();
+    await page.getByTestId(`perform-saved-${encore}`).click();
+    await page.waitForTimeout(250);
+    const go = page.getByTestId('go-button');
+    check('perform: a click cues it, and Go names it', (await go.innerText()).includes('Encore') && await go.isEnabled()
+      && await page.getByTestId(`perform-saved-${encore}`).getAttribute('data-state') === 'next', `Go read "${goBefore}", now "${(await go.innerText()).trim()}"`);
+    const items = async () => Number((await page.getByTestId('set-count').innerText()).match(/\d+/)?.[0] ?? NaN);
+    const n0 = await items();
+    await page.getByTestId(`perform-saved-add-${encore}`).click();
+    await page.waitForTimeout(250);
+    const n1 = await items();
+    const inSet = await page.locator('[data-testid^="cue-"]').filter({ hasText: 'Encore' }).count();
+    check('perform: + puts it in the set', n1 === n0 + 1 && inSet >= 1, `${n0} → ${n1} items`);
+    await page.getByTestId('perform-saved-toggle').click();
+    check('perform: the list folds away to its heading', await count(page, 'perform-saved-list') === 0 && await count(page, 'perform-saved-toggle') === 1);
     await ctx.close();
   }
 
