@@ -57,7 +57,8 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, type Presser, type Stroke } from '../lib/squish';
+import { levels01 } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -1066,10 +1067,12 @@ class FluidSimulation {
    * Public for `npm run squeeze`, which reads how many release steps it laid.
    */
   readonly kickRelease = new KickRelease();
+  /** Sound Drive's bass, as a hand on the glass (lib/squish.ts `BassPress`, PLAN 27e). */
+  readonly bassPress = new BassPress();
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.bassPress.forget(); this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -2031,7 +2034,7 @@ class FluidSimulation {
     if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
-    this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null;
+    this.pressLift.forget(); this.kickRelease.forget(); this.bassPress.forget(); this.lastLift = null;
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
@@ -2790,6 +2793,17 @@ class FluidSimulation {
     y = Math.round(y);
     KICK_RADII.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
     this.kickRelease.kick(x, y, KICK_RADII.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+  }
+
+  /**
+   * Sound Drive's bass on a thin gap (PLAN 27e): the glass held `depth` down
+   * over a disc of `radius` cells about (x, y), followed each step and let up
+   * as the bass falls (depth 0 lets it all go). Off a thin gap it lets go of
+   * anything it held: there the bass burst pushes as it always has.
+   */
+  pressBass(x: number, y: number, radius: number, depth: number): void {
+    if (!this.thinGap) { if (this.bassPress.depth > 0) this.bassPress.letGo(this.size, false, this.squishCell); return; }
+    this.bassPress.follow(this.size, x, y, radius, depth, true, this.squishCell);
   }
 
   /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
@@ -7817,6 +7831,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
 
             // ── Audio input to fluid ──────────────────────────────
+            // Where Sound Drive's bass holds the glass this step (PLAN 27e); null lets it up.
+            let bassPressAt: { x: number; y: number; r: number; depth: number } | null = null;
             if (currentAudioData && currentSettings.audioMappings) {
               const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
               const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
@@ -7839,10 +7855,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
                 if (activeFluid) {
-                  const bass01   = Math.min(1, currentAudioData.bass   / 70);
-                  const treble01 = Math.min(1, currentAudioData.treble / 70);
-                  const energy01 = Math.min(1, currentAudioData.energy / 70);
-                  const mid01    = Math.min(1, currentAudioData.mid    / 70);
+                  // Energy is 0–1 already; over 70 it never reached the swell's gate (levels01).
+                  const { bass: bass01, treble: treble01, energy: energy01, mid: mid01 } = levels01(currentAudioData);
 
                   // audioImpact (0–1) controls visual punch; auto mode adds extra multiplier
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
@@ -7890,8 +7904,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     activeFluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
                   }
 
-                  // A hit on the velocity route: radial burst — scales with impact + auto mode
-                  if (vel01 > 0.25) {
+                  /*
+                    The velocity route: on a thin gap, the hand on the glass
+                    following it (lib/squish.ts BassPress, PLAN 27e). The burst
+                    below pushed straight out from a point, which on a thin gap
+                    the projection takes out whole (0.006 of the plate's colour
+                    moved in two seconds of a held bass, in the lab); a palm
+                    pressed as deep as the bass is loud squeezes the liquid out
+                    from under it and lets it back as the bass falls. As wide as
+                    the burst reached at the burst's own 1×, half again wider
+                    (a palm's bowl, which is shallow at its edge), and no wider
+                    than an area look's bass area.
+                  */
+                  bassPressAt = {
+                    x: bassX, y: bassY,
+                    r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
+                    depth: bassPressDepth(vel01, currentSettings.audioImpact ?? 0.45),
+                  };
+                  // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
+                  if (vel01 > 0.25 && !activeFluid.thinGap) {
                     // In an area, no wider than the area: the push is that well's, not the plate's.
                     const burstR = Math.round(Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity,
                       18 * GRID_SCALE * Math.max(0.4, impactMul)));
@@ -7983,16 +8014,39 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     }
                   }
 
-                  // Energy: roaming swell in a third hue
+                  /*
+                    Energy: roaming swell in a third hue. It read the energy
+                    over 70 and never once poured until PLAN 27e (levels01).
+                    On an area look it roams its own area in turn, in that
+                    area's dye, as the mid's stream and the treble's sparks do,
+                    so the music stays in the areas.
+                  */
                   if (energy01 > 0.15) {
-                    const swellCol = colFor(2.6);
-                    const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
-                    const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
+                    const swellArea = musicAreas ? areaForBand(musicAreas, 'mid', turn + 2) : null;
+                    const swellAt = swellArea ? areaCentre(swellArea, GRID_SIZE) : { x: centerX, y: centerY };
+                    const swellR = swellArea ? swellArea.r * GRID_SIZE * 0.6 : GRID_SIZE * 0.25;
+                    const swellCol = swellArea ? areaCycle(activeLayerRef.current, swellArea, areaTime + 1.1) : colFor(2.6);
+                    const ex = Math.floor(swellAt.x + Math.cos(time * 0.4) * swellR);
+                    const ey = Math.floor(swellAt.y + Math.sin(time * 0.3) * swellR);
                     activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
               }
             }
+            /*
+              The bass's hand on the glass, on the plate the music plays (the
+              active one), every running step: let up on every other plate,
+              and on this one when the music is quiet, off or Sound Drive is
+              0, so nothing is left pressed when the bass stops. Stopped or
+              draining, the plate does not step, so a held press moves
+              nothing; the first running step after lets it up if the music
+              has gone, and a drain's clear forgets it.
+            */
+            fluidsRef.current.forEach((pl, li) => {
+              if (!pl) return;
+              const on = bassPressAt && li === activeLayerRef.current;
+              pl.pressBass(on ? bassPressAt!.x : 0, on ? bassPressAt!.y : 0, on ? bassPressAt!.r : 1, on ? bassPressAt!.depth : 0);
+            });
           }
 
 

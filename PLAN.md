@@ -208,7 +208,9 @@ merge conflicts are the shared documents', which 0.6 ends.
 ### Wave 5. Playing it: the instrument
 
 **§27, every control does something you can see** (the owner, 2026-10-05): ~~27a-c Plate
-Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G).
+Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G);
+~~27e Sound Drive's bass as the glass~~ (#PR), then **27e-1** the kick's drop, **27e-2** the
+film's measure.
 
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
@@ -5503,13 +5505,44 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
     rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
     dials say.
-- **27e. The music should move the picture more (open, its own thread).** The owner,
+- **27e. The music should move the picture more (first part shipped, #PR).** The owner,
   2026-10-05: "Generally I don't feel like music is having as much impact on the visuals
-  as I would like." 27a-c make the kick's two rides and the stir answer harder; what the
-  rest of the plate takes from the music (Sound Drive's pours and swells, the bands'
-  routes, the beat clock's accents, the song's shape) has not been measured as a whole.
-  First measure: on `film.yml`'s real songs, how much the picture's motion and colour
-  follow loudness and the kick at beat scale and over 20 s (light-show plan targets r
-  about 0.4 over 20 s), against the same take with the sound off; then pick the routes
-  that read weakest and make each the thing it stands for.
+  as I would like." 27a-c make the kick's two rides and the stir answer harder. Read
+  from the frame loop, the rest of Sound Drive is dye (the centre pulse, the mid's
+  stream, the treble's sparks, the kick's ring, the energy's swell) and two pushes, and
+  on a thin gap (every look since #248) both pushes were nothing: the bass burst (a
+  radial velocity every step while the velocity route is over 0.25) and the kick
+  ring's outward kick push straight out from a point, a gradient, which the projection
+  takes out whole. In the lab on forty pools (`npm run musicforce`), the burst held two
+  seconds at a bass of 0.8 moved 0.006 of the plate's colour; a look's own stir 0.86.
+  And the energy's swell divided the energy (0–1) by 70 as though it were a band, so it
+  never reached its gate of 0.15 on any look.
+  - **Shipped.** The bass is a hand on the glass (`BassPress`, lib/squish.ts): pressed
+    as deep as the velocity route is loud over a palm where the burst was (0.004 a
+    disc at full and Sound Drive 0.45, up to half again), followed each step, let up as
+    the bass falls and all the way when the music stops, moved with an area look's
+    bass. The glass moves the liquid only while it moves, so the plate breathes out as
+    the bass comes in and back as it goes. Lab: 0.30 of the colour moved as a bass of
+    0.8 comes in (the burst 0.006), back to 0.017 once it falls to 0.3; Classic's
+    ferrofluid ring 0.3072 → 0.3069 through three swells; nothing at Sound Drive 0. The
+    swell reads the energy on its own scale (`levels01`, lib/soundLevels.ts) and now
+    pours, on an area look in its areas in turn: every look gains that dye source while
+    the music is loud, which no check measures yet (27e-2's film will). Off a thin gap
+    the burst pushes as before.
+  - **27e-1, open.** The kick ring is still 14 one-cell specks of dye with an outward
+    kick the projection removes (0.008 of the colour over four kicks). A drop that
+    lands is a volume source (PLAN 18c): poured on each kick in the lab, a drop 0.04 of
+    the plate across moved 0.04 a kick and stays, but every drop's volume leaves over
+    the rim, so at a kick a beat it would flush the plate in about three minutes and
+    push Classic's ferrofluid ring out about 0.002 a drop. A drop on the bar's one, or
+    the ring's colour laid where Beat Squeeze's press carries it, without the flush.
+  - **27e-2, open.** The first measure is still owed: on `film.yml`'s real songs, how
+    much the picture's motion and colour follow loudness and the kick at beat scale
+    and over 20 s (light-show plan targets r about 0.4 over 20 s), against the same take
+    with the sound off; and the Mac's `controls` run for Sound Drive before and after
+    this (it read visible on 13 of 20 looks before).
+  - **27e-3, open.** Sound Drive scales none of the kick's forces (Beat Squeeze, Plate
+    Rock) and the stir's music term at most doubles it; Lumia at Sound Drive 0.12 hears
+    almost nothing. Whether one dial should be the music's reach on all of them is a
+    question for the owner once 27e-2 says which reads weakest.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.

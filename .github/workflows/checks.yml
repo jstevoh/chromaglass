@@ -639,6 +639,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 6
         run: npm run rides
+      # The music's own pushes as forces a thin gap keeps (PLAN 27e): Sound
+      # Drive's bass is a hand on the glass that presses as the bass comes in
+      # and lets up as it goes (the burst it replaces moved nothing), and the
+      # energy's swell reads the energy on its own scale. In the open shard:
+      # the plate shard is near its timeout.
+      - name: The music pushes the plate
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 6
+        run: npm run musicforce
       # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as
