@@ -2209,7 +2209,7 @@ faces, every substep. The species follows exactly the colour's flow, so one kern
 (`bodyAdvectPairSub`) now finds each face's Courant number once and moves both fields,
 with the same expression, limiter and floor; the species' stage keeps only the rim.
 `npm run thick` times all three on one plate (the stage alone, the colour's carry, the
-two together) and asks that the species now add under half of what it cost alone, and
+two together) and asks that the species now add under three quarters of what it cost alone, and
 carries the alcohol run both ways and asks for the same fields. Software, 256²: alone
 1.00 of the colour's carry, riding it 0.34; the fields the same to the bit. CI's Mac,
 768², 15 substeps: alone 13.54 ms (1.02 of the colour's carry), riding it 6.73 ms (0.51),
@@ -2218,7 +2218,23 @@ the largest (Metal's compiler orders the two kernels' arithmetic its own way, an
 species feeds the flow back through the drag over 30 steps).
 Under the maze's flow the colour moves in sixths, so the species there still has its own
 stage (18d-11b).
-The open items are 18d-3 to 18d-11 in PLAN.md.
+**18d-12** (2026-10-05): each liquid pours its own colour, and a dye picked for it tints it
+(`npm run natural`, `npm run bottles`). The owner: "Some of the liquids don't carry color.
+Let's make them by default the correct color, but allow them to have color as well." Each
+bottle had one colour and it was all dye (Syrup red-orange, Alcohol mint, Oil orange,
+Glycerine, Silicone, Soap and Milk pale swatches), and a dye picked replaced it. Now every
+bottle that is a liquid of its own carries `own`, what 6 mm of it passes of the lamp's light:
+Syrup amber (maple syrup's numbers, so its Amber grade: 75% at 560 nm through 6 mm, 27% in
+the blue), sunflower Oil a pale gold, Ferrofluid black, Milk white (it scatters, `scatter`
+2/mm, laid as a white body until 18j), and Water, Glycerine, Alcohol, Silicone, Soap,
+vinegar and washing soda clear. A clear liquid with no dye lays no colour at all: what shows
+is the colour its volume pushes aside, and the lamp through it on a lamp ground. A dye
+picked goes into the liquid (`pourTint`, `src/lib/liquidColour.ts`): transmissions multiply,
+so absorbances add, and every hand's pour (the mouse, other fingers, a take, the phone's
+Drop, the remote) reads it. A Natural swatch on the shelf, the Design desk, the phone's Dye
+sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by default
+(the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
+The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 

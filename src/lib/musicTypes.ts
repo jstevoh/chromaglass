@@ -50,6 +50,7 @@ export interface GestureEvent {
   dx?: number;    // normalized movement direction (streak)
   dy?: number;
   color?: string; // hex dye color (absent for blow)
+  clear?: boolean; // a clear liquid poured with no dye: it laid no colour (lib/liquidColour.ts, laidColour)
 }
 
 export interface ListenRecord {

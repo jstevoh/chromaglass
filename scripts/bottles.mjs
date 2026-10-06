@@ -165,7 +165,7 @@ try {
       const autoInject = f.autoInject.bind(f);
       f.autoInject = (...a) => { auto++; try { return autoInject(...a); } finally { auto--; } };
       const addDensity = f.addDensity.bind(f);
-      f.addDensity = (x, y, amount, ...rest) => { window.__bottleLog.dye.push({ x: x / L, y: y / L, a: Math.max(0, amount), auto: auto > 0, b: task() }); return addDensity(x, y, amount, ...rest); };
+      f.addDensity = (x, y, amount, r, g, b, ...rest) => { window.__bottleLog.dye.push({ x: x / L, y: y / L, a: Math.max(0, amount), rgb: [r, g, b], auto: auto > 0, b: task() }); return addDensity(x, y, amount, r, g, b, ...rest); };
       const squeezeOut = f.squeezeOut.bind(f);
       f.squeezeOut = (...a) => { window.__bottleLog.squeeze++; return squeezeOut(...a); };
       const addVelocity = f.addVelocity.bind(f);
@@ -261,8 +261,12 @@ try {
         const hand = l.dye.filter((c) => !c.auto);
         const laid = new Set(hand.map((c) => c.b));
         const push = l.push.filter((c) => !c.auto && laid.has(c.b));
+        // The colour the hand laid, weighted by how much of it landed near the stroke.
+        const onHand = hand.filter((c) => near(c, pts) && c.a > 0);
+        const w = onHand.reduce((a, c) => a + c.a, 0);
+        const rgb = w > 0 ? [0, 1, 2].map((i) => onHand.reduce((a, c) => a + c.a * c.rgb[i], 0) / w) : null;
         return {
-          dye: tally(hand).a, push: tally(push).a,
+          dye: tally(hand).a, push: tally(push).a, rgb,
           shown: tally(l.dye.filter((c) => c.auto)).a,
           stir: tally(l.push.filter((c) => !c.auto && !laid.has(c.b))).a,
         };
@@ -519,6 +523,49 @@ try {
   check('an Oil Pour lays the dye a Water Pour does per push (only a magnetic bottle changes it)',
     water.pour.push > 0 && oil.pour.push > 0 && oil.pour.same && Math.abs(op - wp) < 0.1 * wp,
     `${op.toFixed(2)} against ${wp.toFixed(2)}; not counted: the show's own dye near the strokes (oil ${oil.pour.shown.toFixed(1)}, water ${water.pour.shown.toFixed(1)}), the mouse's stir (oil ${oil.pour.stir.toFixed(2)} of ${(oil.pour.stir + oil.pour.push).toFixed(2)}, water ${water.pour.stir.toFixed(2)} of ${(water.pour.stir + water.pour.push).toFixed(2)})`);
+
+  /*
+    ── A bottle's own colour, and a dye in it (lib/liquidColour.ts) ────
+
+    The owner, 2026-10-05: "Some of the liquids don't carry color. Let's
+    make them by default the correct color, but allow them to have color as
+    well." `npm run natural` holds the arithmetic; this holds the hand to
+    it, through the real pointer: what the Pour lays per push.
+      - Glycerine as it is (Natural) is clear: the Pour pushes and lays no
+        colour at all.
+      - Glycerine with Cherry Red picked for it lays Water's dye per push,
+        and lays red: the dye is in it.
+      - Syrup as it is lays its own amber, Water's dye per push.
+    Water's Pour above is the control: the same tool, the same push.
+  */
+  const near3 = (a, b) => !!a && a.every((v, i) => Math.abs(v - b[i]) < 0.02);
+  const fmt3 = (a) => a ? `(${a.map((v) => v.toFixed(3)).join(', ')})` : 'none';
+  // The ambient orbits lay dye straight onto the plate every frame, not
+  // through autoInject, so near the stroke they would read as the hand's
+  // (as scripts/tools.mjs found): off for these three, back on after.
+  await page.evaluate(() => window.chromaglassDebug().ambientSeed(false));
+  await bottle('glycerine');
+  await clear();
+  const glyClear = await arm('pour');
+  check('a Glycerine Pour, as it is, pushes and lays no colour: it is clear', glyClear.same && glyClear.push > 0 && glyClear.dye === 0,
+    `${glyClear.dye.toFixed(2)} dye for ${glyClear.push.toFixed(2)} of push${same(glyClear)}`);
+  await page.evaluate(() => window.chromaglassLiquidColour('glycerine', '#ff0000'));
+  await settle(600);
+  await clear();
+  const glyRed = await arm('pour');
+  const gp = perPush(glyRed);
+  check('Glycerine with Cherry Red picked lays red, Water\'s dye per push: the dye is in it',
+    glyRed.same && glyRed.push > 0 && Math.abs(gp - wp) < 0.1 * wp && near3(glyRed.rgb, [1, 0, 0]),
+    `${gp.toFixed(2)} against ${wp.toFixed(2)} per push, laid ${fmt3(glyRed.rgb)}${same(glyRed)}`);
+  await page.evaluate(() => window.chromaglassLiquidColour('glycerine', '#ffffff'));
+  await bottle('syrup');
+  await clear();
+  const syr = await arm('pour');
+  const sp = perPush(syr);
+  check('a Syrup Pour, as it is, lays its own amber, Water\'s dye per push',
+    syr.same && syr.push > 0 && Math.abs(sp - wp) < 0.1 * wp && near3(syr.rgb, [0xde / 255, 0xbf / 255, 0x45 / 255]),
+    `${sp.toFixed(2)} against ${wp.toFixed(2)} per push, laid ${fmt3(syr.rgb)} (#debf45 is (0.871, 0.749, 0.271))${same(syr)}`);
+  await page.evaluate(() => window.chromaglassDebug().ambientSeed(true));
 
   // ── The other hands ──────────────────────────────────────────────
   const AT = [0.3, 0.25];

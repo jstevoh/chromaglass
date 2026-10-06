@@ -282,6 +282,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run liquids
 
+      # Each liquid pours its own colour (syrup amber, glycerine clear, milk
+      # white), and a dye picked for it tints it by Beer and Lambert.
+      - name: Each liquid's own colour
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run natural
+
       # A liquid someone made: the file reads back as what they meant, a bad
       # one says why, and "how it meets the others" agrees with the shelf.
       - name: The liquids file
@@ -407,6 +413,15 @@ jobs:
       - name: The phone
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run phone
+      # Saving a preset under a name (scripts/saves.mjs, PLAN.md QA-18): on both
+      # desks, a narrow window and the phone, Save asks for a name every time,
+      # saves the settings as they are, lists the preset where that surface
+      # lists presets, and Replace writes over without adding one. No GPU. The
+      # site is already built by the steps above, so the script runs on it
+      # rather than `npm run saves` building it a third time.
+      - name: Saving presets
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/saves.mjs
       # The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served
       # with Brotli over a slowed network, and the page asks for the app's
       # chunks alongside its entry and for the GPU before the app has

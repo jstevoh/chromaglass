@@ -338,6 +338,24 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   green lands on yellow or blue. A real comic printed green as yellow and blue dots
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
+- ~~**QA-18**~~ **Fixed, this PR** (`npm run saves`, 28 lines, in Measure's browser part; main fails "Save asks
+  for a name again with a saved look open"). Save did not let the owner name a new
+  preset from the current settings. Desk. It asked for a name once; after that the look
+  just saved (or any saved look opened) was the document and Save wrote over it, a toast
+  the only sign. Saved presets were in no list on either desk (⌘K found them by name),
+  ⌘S on the Perform desk reached the browser's Save Page, and the save sheet's fields
+  were 200 px wide in a 480 px sheet. Now Save always asks for a name (button, ⌘S on
+  both desks, ⌘K) and makes a new preset; writing over the open one is the sheet's
+  "Replace “name”" button and the look menu's "Save over"; the look menu lists your
+  presets to open or take out. The phone's Looks sheet has the same Save, landing under
+  Yours. The narrow window's preset menu said "Save as file" and promised a download
+  that saving stopped doing; it says Save.
+- ~~**QA-18a**~~ **Fixed, this PR** (the owner's ask, 2026-10-06; `npm run saves`, 33
+  lines). The Perform desk had no list of your saved presets of its own (⌘K and the set
+  list's Add found them). It has **Your presets** under the set now: a click cues one
+  (Go names it), a double-click sends it, + puts it in the set, and the list folds to
+  its heading. Go also names a look cued from outside the set (⌘K): it read "Nothing
+  cued", greyed out, while Space would have sent it. Desk.
 
 **Tier 3. On the wall, it looks wrong.**
 
@@ -710,6 +728,33 @@ Found with it, open:
   numbers before and after it): the grain's soft blotches, about ten pixels across,
   move a thin edge's pixels 9–10.6 levels on average (`npm run grainedge` prints it), with
   no flecks. Watercolour-like, not dithered; whether it is too strong is the owner's call.
+- **1h. A screen-space anti-aliasing pass (FXAA and its kind): not for the plate; the
+  projector's warp is the one place the picture itself aliases** (asked 2026-10-05, from
+  an After Effects FXAA plugin). FXAA finds pixels whose brightness jumps against their
+  neighbours and blurs along the edge it guesses, which repairs one-pixel stair steps on
+  rasterised triangles. The plate has none to repair: it is one full-screen shader whose
+  edges are already drawn as coverage over a pixel and a half (`fwidth` in wgsl/plate.ts:
+  the rims, the drops, the ferrofluid's line), and the dye is read through a Catmull-Rom
+  filter (`textureBicubic`), not nearest texels. What reads as blocky comes from the
+  **simulation grid**, not the final image: at 256² on a 1440-wide panel one cell is
+  about 5.6 pixels, so a step along a dye edge is five pixels tall, far wider than FXAA's
+  one-pixel blend, and the fixes for that are the grid's own (1b, 1c, 1d). Run over the
+  finished frame, FXAA would also take things that are meant to be there: the pigment's
+  grain (1a), Roy's Ben-Day dots (a regular high-contrast pattern is exactly what it
+  smears), and the razor edge of a thick ferrofluid domain (judging §41). A temporal
+  pass (TAA) is worse on a liquid: everything moves every frame, so its history ghosts.
+  Where the **final image** does alias is the projector's pass (`src/gpu/wgsl/output.ts`):
+  each wall pixel takes one bilinear tap of the plate (`textureSampleLevel(..., 0.0)`, no
+  mip levels), so a surface whose corner pins shrink the picture (a keystoned far side,
+  a small mapped shape) skips texels and the grain, the dots and thin fingers shimmer
+  there as the liquid moves; and a surface's `feather` is in its own space, so on a
+  shrunk side a 0.01 feather can fall under a pixel and its outline stair-steps. The real
+  fix is to filter by the pixel's footprint: take as many taps as the warp shrinks the
+  picture (its derivatives give the count), or build mip levels of the plate's picture
+  when a surface needs them, and give the feather a floor of a wall pixel and a half.
+  Measure with `npm run map` (the lab, `PW_WEBGPU=1`): a pinned surface at a half and a
+  quarter of its size, a fixed picture panned a fraction of a texel a frame, and how
+  much each wall pixel flickers beyond the pan itself (shimmer) before and after, and the outline's width in wall pixels. Unbuilt; nothing to judge yet.
 
 ### 2. Lacing
 
@@ -2873,10 +2918,9 @@ read in the code.**
   dial it had off (stardust-collapse to poster-1969: nine switched on, ten pulled);
   re-anchored at the Go, none. A fader is also fought by a glide in flight. Re-anchor at
   the end of a look fade, and treat a ride as a hand's write.
-- *⌘S never saves over the open look.* The keyboard's ⌘S opens the save sheet
-  (`setShowSave(true)`) where the desk's button calls `saveLook()`, and it matches before
-  the shifted branch, so ⇧⌘S never runs (`App.tsx`). Measured: the button wrote over
-  "Mine"; ⌘S offered "Mine copy".
+- ~~*⌘S never saves over the open look.*~~ Settled by QA-18: the button, ⌘S and ⌘K all
+  ask for a name now, and writing over is the sheet's Replace. Do not make ⌘S write over
+  again: a Save that silently wrote over the open look is what the owner reported.
 - *A sequence in the set list reads "missing" on every load.* The `cues` memo reads
   `sequencerRef.current`, which is assigned further down the same render, and its
   dependencies do not change on load. Go still plays it; the list says `slow-build · seq
@@ -3843,6 +3887,21 @@ its frame rate live. "Free" means no new passes or texture reads.
   (`advect dye`, bodiesOn), and under the maze's flow the species still takes a stage of
   its own (the colour goes in the maze's sixths there, not carryPlan's substeps). Found
   in 18d-11a; Oil Bodies' pair would save a whole carry on every look with Oil Bodies.
+- **18d-12 shipped** (each liquid pours its own colour, a dye picked tints it;
+  `npm run natural`, judging §44; story in `docs/plan-shipped.md` §18d). Found with it:
+  - **18d-12a** The automation's pours of a bottle (`pourLiquid`, the look's own liquids
+    and an area's) lay the liquid and no colour, so a look that doses syrup doses clear
+    syrup. Give them the bottle's own colour (amber syrup, white milk, gold oil) as the
+    hand's pours have; a look change in every look that doses a coloured bottle, so judge
+    it on the Mac.
+  - **18d-12b** Soap and Silicone still clear any colour where they land, a dye picked for
+    them included: the CPU's dye multiply (18d-5) thins whatever dye is under the soap,
+    and cannot tell the soap's own dye from the plate's. On a thin gap their pour is
+    volume and pushes the colour aside, which is the real clear disc; deleting the
+    multiply there (18d-5) is what lets a dyed soap show its dye.
+  - **18d-12c** Milk is laid as a white body (its `scatter`), which is milk seen by
+    reflected light on the black ground. On the lamp's ground real milk throws a warm grey
+    shadow, and a dye in milk is a pastel, not the dye: both are 18j's scattering.
 - **Found:** at the plate's 6 mm rest gap, a liquid as thin as water has a drag time of
   about 3 s, so for a second or so it moves as a free liquid, not a Hele-Shaw one. Alcohol
   in a thick look read 14 times a pool of colour, where Darcy's bound is 2. That is right
@@ -5199,3 +5258,51 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   about 0.06 of the bass area (turned by the plate's angle), and on classic at the
   middle (the check-skeptic's design).
 
+
+## 26. A reaction that prints: Turing stripes in black and white (proposed 2026-10-05)
+
+The owner sent a VJ pack ("Mask Reaction Diff", made with Karl Sims' RD Tool and
+smoothed with an FXAA plugin, 1h): black-and-white labyrinths, fingerprints and combed
+stripes that grow out of a shape and are dragged into whorls. Worth a look of our own,
+because most of it is already on the plate, and what is missing is real chemistry, not
+an effect. What it is, physically: a **Turing pattern**. Two reactants diffusing at
+different speeds, one feeding the other, settle into stripes or spots of one fixed
+width. It is real in a dish: the CIMA/CDIMA reaction in a gel (Castets, De Kepper, 1990)
+grows exactly these labyrinths, and Gray–Scott is the model of a cubic autocatalysis
+like it. On a projector a pattern reads black and white when what it makes is an opaque
+precipitate in a clear liquid under a white lamp, the way Liesegang's bands already
+print (18b's lamp ground, 18l's absorbers).
+
+What the plate has today, and what is missing:
+- **Gray–Scott** (`src/lib/chemistry.ts`, the `chemistry` setting; Sensual Laboratory
+  0.85, Neon Coral Reef 0.7) runs on the CPU at the solver's grid with feed and kill fixed
+  at 0.042 / 0.062 (`LiquidVisualizer.tsx`, `chem.step`), so it only ever grows coral.
+  It deposits dye that the flow carries, but the reactants sit still under the stir
+  (18k), so it can never be combed into the whorls in the owner's pictures.
+- **BZ** (Oregonator, 256² GPU grid) and **Liesegang** (128², 1b) are real reactions on
+  their own grids; neither makes stripes of a fixed width.
+- **The ferrofluid maze** (9aa) is a labyrinth too, but a magnetic one (dipoles
+  repelling within a surface), and stays the magnet's.
+
+Steps:
+- **26a. Gray–Scott on the GPU, carried by the flow.** A compute field at the dye's
+  grid, advected by the same velocity as the dye (one flux pass), so a stir drags the
+  stripes and they heal back to their own width behind it. This is 18k's "chemistry
+  sits still" fixed, and the coral looks keep their look at today's feed and kill.
+- **26b. The pattern as a control.** One knob along Pearson's map, spots → worms →
+  labyrinth → holes (feed and kill moved together, about 0.03/0.055 to 0.04/0.06), and
+  one for the stripe's width (the diffusion lengths, in plate units so it is the same
+  size at every rung). MIDI-learnable, on both desks and the phone.
+- **26c. Where it grows: the poured liquid is the reagent.** The owner's "grow mask"
+  and "dual patterns" are what happens when the feed comes from a reagent that is
+  somewhere: the reaction runs only where its liquid was poured (a bottle on the shelf),
+  and two pours with different feeds make two patterns that meet. A shape, a word or
+  the camera can lay the reagent, as images already pour (`injectImage`).
+- **26d. The look: "Turing Print"** (name open). A clear liquid, a white lamp, the
+  product drawn as an opaque precipitate: black on white, inverted by the lamp. Its edge
+  goes through the plate's own reconstruction (Catmull-Rom and `fwidth`), so the stripes
+  need no FXAA pass; at 256² a 12-pixel stripe is two cells, so it wants the 512² rung or
+  its own finer field like BZ's. Its phone version with it.
+- **Measure:** a lab check that the stripe width holds within 10% at every rung and
+  after a stir (the pattern's own wavelength, by FFT), that a pour with no reagent grows
+  nothing, and the cost of the field in `npm run stages` (target under 0.3 ms at 512²).
