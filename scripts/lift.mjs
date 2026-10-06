@@ -71,7 +71,7 @@ console.log('The strokes, as drawn\n');
 {
   const out = 'node_modules/.cache/lift-squish.mjs';
   await build({ entryPoints: ['src/lib/squish.ts'], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-  const { squishDisc, spokesAt, PressLift, PressLifts, RELEASE_MS, LIFT_SECONDS, KickRelease, KICK_HOLD, KICK_RELEASE } = await import(`../${out}`);
+  const { squishDisc, spokesAt, PressLift, PressLifts, RELEASE_MS, LIFT_SECONDS, KickRelease, KICK_HOLD, KICK_RELEASE, KICK_RADII, kickDepth } = await import(`../${out}`);
   /*
     Off the diagonal: a press at (96, 96) could not tell x from y, and a lift
     laid transposed (the check-skeptic's swap of x and y in PressLift) passed
@@ -332,7 +332,7 @@ console.log('The strokes, as drawn\n');
     let fractional = 0, whole = 0, differ = 0, kept = 0, laid = 0;
     for (let k = 0; k < 40; k++) {
       const fx = S / 2 + Math.sin(k * 1.7) * 30 + 0.13 + (k % 7) * 0.11, fy = S / 2 + Math.cos(k * 2.3) * 30 + 0.29;
-      for (const r of [40, 27, 15]) {
+      for (const r of KICK_RADII) {
         const got = new Map(), want = new Map();
         squishDisc(S, fx, fy, r, 0.0024, 0.85, 'press', 0, (idx, gap) => { got.set(idx, gap); if (Number.isInteger(idx)) whole++; else fractional++; });
         squishDisc(S, Math.round(fx), Math.round(fy), r, 0.0024, 0.85, 'press', 0, (idx, gap) => want.set(idx, gap));
@@ -361,9 +361,9 @@ console.log('The strokes, as drawn\n');
     deltas (a press closes the gap down to the floor, 0.004; an opening
     stops at rest, 0.030; then the spring), laid as the app's `pressKick`
     lays them, through the same squishDisc and KickRelease: the three discs
-    at 40, 27 and 15 cells at GRID_SCALE (60, 41 and 23 on the app's plate of
-    192) about a centre up to thirty cells at GRID_SCALE off the middle
-    (`npm run squeeze` asks the app's own glue), each pressed 0.0024 × squeeze × bass, the
+    of KICK_RADII at GRID_SCALE (96, 66 and 36 on the app's plate of 192,
+    a glass pressed across most of the dish, PLAN 27b) about a centre up to thirty cells at GRID_SCALE off the middle
+    (`npm run squeeze` asks the app's own glue), each pressed kickDepth(squeeze, bass, 1), the
     Fillmore's squeeze (0.9) at a bass of 0.7, kicks at 140 bpm (closer than
     a hold and a release, so they overlap), for 40 s, then a second of no
     kicks. On three glasses: none at all (only the release can bring it
@@ -377,22 +377,22 @@ console.log('The strokes, as drawn\n');
   */
   {
     const S = 192, REST = 0.03, FLOOR = 0.004;
-    // The app's plate: 192 cells, GRID_SCALE 1.5, so the kick's discs are 60, 41 and 23 cells and its centre wanders 45.
-    const RADII = [40, 27, 15].map((r) => Math.round(r * 1.5)), SPREAD = 30 * 1.5;
-    const kickShow = (spring, release, stepsPerSecond = 60) => {
+    // The app's plate: 192 cells, GRID_SCALE 1.5, so the kick's discs are 96, 66 and 36 cells and its centre wanders 45.
+    const RADII = KICK_RADII.map((r) => Math.round(r * 1.5)), SPREAD = 30 * 1.5;
+    const kickShow = (spring, release, stepsPerSecond = 60, kicksUntil = 40) => {
       const dt = 1 / stepsPerSecond;
       const gap = new Float64Array(S * S).fill(REST), dg = new Float64Array(S * S);
       const rel = new KickRelease();
       const cell = (idx, g) => { dg[idx] += g; };
       let seed = 7;
       const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
-      const every = 60 / 140, a = 0.0024 * 0.9 * 0.7;
+      const every = 60 / 140, a = kickDepth(0.9, 0.7, 1);
       const steps = Math.round(41 * stepsPerSecond);
       let nextKick = 0, dips = [], pendingDip = -1, pressed = 0, at = [0, 0];
       const disc = (r, cx = S / 2, cy = S / 2) => { let sum = 0, n = 0, floored = 0; for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { if (Math.hypot(x - cx, y - cy) >= r) continue; n++; sum += gap[x + y * S]; if (gap[x + y * S] < 1.5 * FLOOR) floored++; } return { mean: sum / n, floored: floored / n }; };
       for (let st = 0; st < steps; st++) {
         const t = st * dt;
-        if (t < 40 && t >= nextKick) {
+        if (t < kicksUntil && t >= nextKick) {
           nextKick += every;
           const cx = Math.round(S / 2 + rnd() * SPREAD), cy = Math.round(S / 2 + rnd() * SPREAD);
           for (const r of RADII) squishDisc(S, cx, cy, r, a, 0.85, 'press', 0, (idx, g) => { cell(idx, g); if (g) pressed++; });
@@ -413,14 +413,24 @@ console.log('The strokes, as drawn\n');
     const glasses = [['no spring at all', 0], ['the Fillmore\'s glass', 0.00023], ['the default look\'s glass', 0.00048]];
     const say = (r) => `${(100 * r.end.floored).toFixed(0)} % of the pressed disc on the floor, its mean ${r.end.mean.toFixed(4)}`;
     const control = kickShow(0.00023, false);
+    /*
+      "Does not add up" was a fixed floor, the film never under 0.020, set
+      when a kick pressed 0.0024 a disc and left 0.0255. A kick presses deeper
+      now (kickDepth, PLAN 27b), so the floor is the kick's own: one kick on
+      its own, the first of the same show, read the same tenth of a second
+      after it lands. Kicks at 140 bpm come closer than a hold and a release,
+      so a little of the last is still down when the next lands; more than a
+      quarter of a kick's depth below a lone one is a press that builds.
+    */
+    const lone = kickShow(0, true, 60, 0.01).dips[0];
     check('pressed on every kick and never let go, the lead plate\'s middle goes to the floor', control.end.floored > 0.5 && control.pressed > 100000,
       `on the Fillmore's glass after 40 s at 140 bpm: ${say(control)}`);
     for (const [name, spring] of glasses) {
       const r = kickShow(spring, true);
       const shallowest = Math.max(...r.dips), deepest = Math.min(...r.dips);
       check(`let go, it breathes: every kick presses and the plate comes back to rest, on ${name}`,
-        r.end.floored === 0 && Math.abs(r.end.mean - REST) < 1e-4 && r.far < 1e-4 && r.left === 0 && r.dips.length > 80 && shallowest < REST - 0.003 && deepest > 0.02,
-        `${say(r)}, farthest cell ${r.far.toExponential(1)} from rest; a tenth of a second after each of ${r.dips.length} kicks the film under it at ${deepest.toFixed(4)}–${shallowest.toFixed(4)}`);
+        r.end.floored === 0 && Math.abs(r.end.mean - REST) < 1e-4 && r.far < 1e-4 && r.left === 0 && r.dips.length > 80 && shallowest < REST - 0.003 && deepest > lone - 0.25 * (REST - lone),
+        `${say(r)}, farthest cell ${r.far.toExponential(1)} from rest; a tenth of a second after each of ${r.dips.length} kicks the film under it at ${deepest.toFixed(4)}–${shallowest.toFixed(4)}, a lone kick ${lone.toFixed(4)}`);
     }
     // The governor: half the steps, each twice as long, the same release in seconds.
     // A release counted in steps also gives everything back at half the rate,

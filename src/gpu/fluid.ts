@@ -399,6 +399,43 @@ const DRIP_WEIGHT = 0.5;
 */
 const AIR_SHEAR = 0.5;
 /*
+  Plate Rock's tilt, as the dye's weight down the tilted plate (PLAN 27a).
+
+  A hand rocking the clock glass tips the plate a few degrees. Flat on the
+  projector gravity is straight through the glass and moves nothing; tipped
+  by θ it has g·sinθ in the plate, and between two glasses a liquid denser
+  than the one round it slides downhill at Darcy's speed h²Δρ g sinθ / 12μ
+  while the lighter one rises past it. A plate of one liquid evenly coloured
+  does not move at all (no weight is heavier than its neighbour): what moves
+  is the colour, where it is thicker than the plate's mean.
+
+  It went through the half-resolution current as a stir, × 0.2 of the
+  spring's swing and × tanh of the dye over the mean, and was capped there
+  with everything else the current carries. Measured in the lab on a thin
+  gap at the default Speed (dt 0.003), forty pools of colour rocked at
+  0.9 Hz at the most the app ever handed it: the picture differed from the
+  same plate left still by 0.024 at most over two seconds (the dye's L1
+  change against its total), where Turbulence at 0.5 moves it 0.72. Plate
+  Rock was a dial that did nothing a person could see.
+
+  So on a thin gap it is a body force in `hsBody`, with Rain Drip's
+  heavy colour: `rock` is the plate's tilt (sinθ: the app's spring at
+  full Plate Rock swings to about 0.2 on a strong kick, twelve degrees,
+  which a hand on a clock glass does), and ROCK_FALL is how fast a unit of
+  dye over the mean falls on a plate stood straight up, in the flow's
+  per-step speeds, read against the reference liquid as every body force
+  is. Its size: dyed water in a light mineral oil (Δρ about 150 kg/m³) in
+  the plate's 6 mm middle, tipped fifteen degrees, would slide at about a
+  quarter of the plate a second; colour in the same liquid (Δρ of ten or
+  so) at a fiftieth. ROCK_FALL puts a pool at 0.73 in the flow's speeds at
+  twelve degrees (`npm run rides`), about 6% of the plate a second at the
+  default Speed, between the two, so a kick at full Plate Rock swings a pool
+  a few percent of the plate and the spring brings it back. With forty
+  pools rocked as the app rocks them the colour moved 0.43 against 0.028
+  before, where a look's own stir moves it 0.79.
+*/
+export const ROCK_FALL = 12;
+/*
   The clear liquid's density, kg/m³, to turn a Blow's stress into the speed
   it drives the liquid to (τh/2μ, μ = ρν; lib/breath.ts). The plate's
   liquids are water and oils, 0.8 to 1.26 of water's; the clear liquid is
@@ -674,6 +711,9 @@ export class WebGPUFluid {
   private carryMost: GPUBuffer | null = null;
   private carryInd: GPUBuffer | null = null;
   private carrySub: GPUBuffer | null = null;
+  /** The ferrofluid's substeps on a thin gap (phasePlan): one indirect dispatch each, and the share 1/m and m. */
+  private phaseInd: GPUBuffer | null = null;
+  private phaseSub: GPUBuffer | null = null;
   /** False until a thin step has recorded the gap, and again whenever the glasses are re-laid rather than pressed. */
   private hsPrimed = false;
   /** V-cycles a thin solve takes: the old solver's count, which leaves under 2% of the flow's divergence (`npm run thingap`). */
@@ -939,13 +979,16 @@ export class WebGPUFluid {
       ['phaseAdvect', [R32], open.phase],
       ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
-      // The two volume forms (phaseGrid, phaseCHVolume) run only on a thin
+      // The two volume forms (phaseGridPlan, phaseCHVolume) run only on a thin
       // gap. Every look opens on one now (Thin Gap, on in every look), so a
       // ferrofluid look carries its ferrofluid as a volume from its first
       // steps and waits for them; a look opened with Thin Gap off builds them
       // behind, as it did when no look opened on one (`npm run startup`
       // fails a pipeline waited for and asked for by none).
-      ['phaseGrid', [R32], open.phase && open.thinGap],
+      // And their substeps, as many as the step's flow needs (phasePlan).
+      ['phaseAdvectPlan', [R32], open.phase && open.thinGap],
+      ['phaseGridPlan', [R32], open.phase && open.thinGap],
+      ['phasePlan', [R32], open.phase && open.thinGap],
       ['phaseRelax', [R32], open.phase],
       ['screenJacobi', [R32], open.phase],
       ['phaseMu', [RG32], open.phase],
@@ -1252,19 +1295,52 @@ export class WebGPUFluid {
     pass.dispatchWorkgroups(w, w);
   }
 
-  /** phaseGrid: the phase's grid filter as a volume, on the gaps phaseAdvect's substep ended at. */
-  private runPhaseGrid(pass: GPUComputePassEncoder, args: GPUBuffer, stand: GPUTexture): void {
-    const pipe = this.pipeline('phaseGrid', this.phase.write.format);
-    const key = `phaseGrid:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${stand.label}`;
-    let group = this.groups.get(key);
-    if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, this.phase.write, this.squeeze.read, this.ensurePhaseGap(), stand]);
-      this.groups.set(key, group);
-    }
-    pass.setPipeline(pipe);
-    pass.setBindGroup(0, group);
+  /**
+   * The ferrofluid carried as a volume on a thin gap: phasePlan picks the
+   * substeps from the colour's plan this step (planCarry, run in the advect
+   * dye stage before this), at least `least`, and each is phaseAdvectPlan from
+   * the read field to the write and phaseGridPlan back, dispatched
+   * indirectly, so one not needed runs no workgroups and the phase ends in
+   * the read field whatever the count.
+   */
+  private runPhasePlanned(pass: GPUComputePassEncoder, least: number, disp: number, stand: GPUTexture): void {
     const w = Math.ceil(this.N / 8);
-    pass.dispatchWorkgroups(w, w);
+    const plan = this.pipeline('phasePlan', R32);
+    const planArgs = this.arg('phase plan', [least, CARRY_SUBSTEPS, w, 0]);
+    let group = this.groups.get(`phasePlan:${planArgs.label}`);
+    if (!group) {
+      group = bindGroup(this.device, plan, [this.sim, planArgs, this.carrySub!, this.phaseInd!, this.phaseSub!]);
+      this.groups.set(`phasePlan:${planArgs.label}`, group);
+    }
+    pass.setPipeline(plan);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(1);
+    const adv = this.pipeline('phaseAdvectPlan', this.phase.write.format);
+    const grid = this.pipeline('phaseGridPlan', this.phase.write.format);
+    const gap = this.ensurePhaseGap();
+    const there = this.phase.read, back = this.phase.write;
+    for (let j = 0; j < CARRY_SUBSTEPS; j++) {
+      const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}`;
+      let ga = this.groups.get(ka);
+      if (!ga) {
+        ga = bindGroup(this.device, adv, [this.sim, a, there, this.velForced, back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        this.groups.set(ka, ga);
+      }
+      pass.setPipeline(adv);
+      pass.setBindGroup(0, ga);
+      pass.dispatchWorkgroupsIndirect(this.phaseInd!, 12 * j);
+      const g = this.arg(`phase grid plan ${j}`, [j, 0, 0, 0]);
+      const kg = `phaseGridPlan:${back.label}:${this.squeeze.read.label}:${g.label}:${stand.label}`;
+      let gg = this.groups.get(kg);
+      if (!gg) {
+        gg = bindGroup(this.device, grid, [this.sim, g, back, there, this.squeeze.read, gap, stand, this.phaseSub!]);
+        this.groups.set(kg, gg);
+      }
+      pass.setPipeline(grid);
+      pass.setBindGroup(0, gg);
+      pass.dispatchWorkgroupsIndirect(this.phaseInd!, 12 * j);
+    }
   }
 
   /** The gap as the phase has now seen it (phaseGapSeen), every step the phase moves, whichever solver. */
@@ -1302,7 +1378,8 @@ export class WebGPUFluid {
     i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
     f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
     f[26] = p.meanDensity; f[27] = p.maxCurrent;
-    f[28] = p.rockX; f[29] = p.rockY;
+    // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
+    f[28] = thin ? 0 : p.rockX; f[29] = thin ? 0 : p.rockY;
     f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
     const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
     f[34] = -(p.gravityX ?? 0) / gl; f[35] = -(p.gravityY ?? -1) / gl;
@@ -1910,8 +1987,9 @@ export class WebGPUFluid {
         room. The dish is drawn turned (Rotation, and a flick), and gravity
         does not turn with it: reported, Lava Lamp's wax poured off toward
         whichever corner the dish had started turned to and the plate was
-        empty in twenty seconds. (Its rock and tilt move the dye already,
-        through the lasting current.)
+        empty in twenty seconds. (Its rock moves the dye already: on a thin
+        gap as the dye's weight down the tipped plate, in hsBody, and on the
+        old plate through the lasting current.)
 
         And a lamp under it, just where the plate goes out of view: what
         sinks there is warmed, rises, cools as it goes and sinks again,
@@ -1928,8 +2006,8 @@ export class WebGPUFluid {
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
-      On a thin gap, Rain Drip's heavy dye, Updraft's shear and a Blow's
-      breath (PLAN 15g) join the body forces (hsBody), and the velocity is kept here, after all of them and
+      On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt, Updraft's
+      shear and a Blow's breath (PLAN 15g) join the body forces (hsBody), and the velocity is kept here, after all of them and
       before the stirring, so hsPrep can read the two apart: a body force
       moves a liquid as its viscosity says, a stir as the dial says (PLAN
       18a-2, wgsl/thinGap.ts). With no body force this step there is nothing
@@ -1937,7 +2015,8 @@ export class WebGPUFluid {
       place, which makes the body forces' share zero.
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
-    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath);
+    const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
+    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
       /*
         The breath is laid as its stress, in pascals (lib/breath.ts), and
@@ -1953,7 +2032,8 @@ export class WebGPUFluid {
       stage('thin body', (pass) => {
         this.ensureThinGap();
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}`,
-          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale, 0, 0, 0, 0]),
+          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
+            rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, 0, 0]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex]);
         this.vel.swap();
       });
@@ -2301,12 +2381,17 @@ export class WebGPUFluid {
         as lines every other cell through the black.
       */
       const grid = this.arg('phase grid', [0, 0, 0, 0]);
-      for (let k = 0; k < subs; k++) {
+      /*
+        Carried as a volume, in as many substeps as the step's flow needs,
+        never fewer than these (phasePlan in wgsl/fluid.ts, and why: a kick's
+        press drew the ferrofluid into the middle), the filter moving volume
+        too (phaseGrid, and why).
+      */
+      if (volume) this.runPhasePlanned(pass, subs, disp, stand);
+      else for (let k = 0; k < subs; k++) {
         this.runPhaseAdvect(pass, adv(k));
         this.phase.swap();
-        // Carried as a volume, the filter moves volume too (phaseGrid, and why).
-        if (volume) this.runPhaseGrid(pass, this.arg(`phase grid ${k}`, [(k + 1) / subs, 0, 0, 0]), stand);
-        else this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read, stand], grid);
+        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read, stand], grid);
         this.phase.swap();
       }
       this.runPhaseGapSeen(pass);
@@ -3790,6 +3875,8 @@ export class WebGPUFluid {
       this.carryMost = this.disposer.track(this.device.createBuffer({ label: 'carry courant', size: 16, usage: GPUBufferUsage.STORAGE }));
       this.carryInd = this.disposer.track(this.device.createBuffer({ label: 'carry pairs', size: 12 * CARRY_PAIRS, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT }));
       this.carrySub = this.disposer.track(this.device.createBuffer({ label: 'carry substeps', size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
+      this.phaseInd = this.disposer.track(this.device.createBuffer({ label: 'phase substeps', size: 12 * CARRY_SUBSTEPS, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT }));
+      this.phaseSub = this.disposer.track(this.device.createBuffer({ label: 'phase share', size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
     }
     return this.hsPrev;
   }

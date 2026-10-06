@@ -3944,6 +3944,69 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
 KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
 
+/*
+  The ferrofluid's carry on a thin gap in as many substeps as the step's flow
+  needs (PLAN 27b-2), as the colour's carries take them (carryPlan, above).
+
+  What was reported: with the deeper, dish-wide kick of PLAN 27b, the
+  ferrofluid poured round Classic's middle was drawn into it while the band
+  played (`npm run ferrodrift` on the Mac: its mean distance from the middle
+  0.308 to 0.273 in the 2.5 s before the check holds the plate, the disc 0.12
+  round the middle 0.130 to 0.278). In the lab, six kicks at Classic's
+  squeeze pulled the ring from 0.307 to 0.236 of the plate out, the disc from
+  0.095 to 0.47, where the old palm's kicks moved it 0.0005. It is the bug
+  carryPlan's comment tells for the colour: the glass coming down moves the
+  liquid up to 14 cells a step on 256² (the plan's own Courant number, read
+  step by step), and the ferrofluid took a fixed six substeps of 0.45 of a
+  cell, 2.7 cells a step. So it was left behind by the press and carried in
+  all the way by the slower release: out short, back in full, a ratchet to
+  the middle every kick. With 33 substeps every step the same six kicks left
+  the ring at 0.310, the colour's own ring, carried in its plan, at 0.311.
+
+  So the phase takes the plan's count, never fewer than the six (or a hand's)
+  it took before, so a step that needs no more is carried exactly as it was.
+  Each substep is phaseAdvect then phaseGrid, which is already a pair: the
+  first writes the write field from the read, the second the read from the
+  write, so a substep not needed is two dispatches of no workgroups and the
+  phase ends where it began. phasePlan writes one indirect dispatch for each
+  substep and the share 1/m; the two kernels take their substep's place in
+  the step, j of m, from A.a.y and A.a.x.
+*/
+function sharedOut(src: string, name: string, after: string, binding: number, swap: Record<string, string>): string {
+  const bound = `${after}\n@group(0) @binding(${binding}) var<storage, read> psub: array<f32>;`;
+  const keys = Object.keys(swap);
+  if (!src.includes(after) || keys.some((k) => !src.includes(k)) || src.includes('psub')) throw new Error(`${name} cannot take the phase's plan: its bindings or its substep moved`);
+  return src.replace(after, bound).replace(new RegExp(keys.map((k) => k.replaceAll('.', '\\.')).join('|'), 'g'), (m) => swap[m]);
+}
+KERNELS.phaseAdvectPlan = sharedOut(KERNELS.phaseAdvect, 'phaseAdvectPlan', '@group(0) @binding(10) var stand: texture_2d<f32>;', 11, {
+  'A.a.y': '(A.a.y * psub[0])', 'A.a.z': '((A.a.y + 1.0) * psub[0])', 'A.b.y': '(A.b.y * psub[0])',
+});
+KERNELS.phaseGridPlan = sharedOut(KERNELS.phaseGrid, 'phaseGridPlan', '@group(0) @binding(6) var stand: texture_2d<f32>;', 7, {
+  'A.a.x': '((A.a.x + 1.0) * psub[0])',
+});
+/*
+  The phase's substeps: the colour's plan (sub[1], odd), never fewer than
+  A.a.x, never more than A.a.y; A.a.z the workgroups across the grid. One
+  indirect dispatch a substep, the share in psub.
+*/
+KERNELS.phasePlan = `${HEAD}
+@group(0) @binding(2) var<storage, read> sub: array<f32>;
+@group(0) @binding(3) var<storage, read_write> ind: array<u32>;
+@group(0) @binding(4) var<storage, read_write> psub: array<f32>;
+@compute @workgroup_size(1)
+fn main() {
+  let m = u32(clamp(max(A.a.x, sub[1]), 1.0, A.a.y));
+  let w = u32(A.a.z);
+  for (var j = 0u; j < u32(A.a.y); j++) {
+    let on = j < m;
+    ind[3u * j] = select(0u, w, on);
+    ind[3u * j + 1u] = select(0u, w, on);
+    ind[3u * j + 2u] = 1u;
+  }
+  psub[0] = 1.0 / f32(m);
+  psub[1] = f32(m);
+}`;
+
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {
   const src = KERNELS[name];

@@ -1176,6 +1176,20 @@ out. On the desk and the phone:
 - say if any liquid's own colour looks wrong to you, or if Oil's pale gold is too faint to
   be worth it.
 
+## 45. Beat Squeeze, Plate Rock and Turbulence do something (PLAN 27a–c)
+
+With music playing (a song with a clear kick), on Classic and on Fillmore East, on the
+Perform desk and on the phone:
+- **Beat Squeeze** from 0 to the top: each kick should press the whole picture outward from
+  near the middle and let it come back, a breath on the beat. At the default 0.5 it should
+  be plain without being a lurch; say if full is too much;
+- **Plate Rock** from 0 to the top: the colours should slosh one way on a kick and swing
+  back, the thicker colour sliding through the thinner. At 0 nothing sloshes. Say if full
+  pours the colour off the dish;
+- **Turbulence** from 0 to the top: at a look's own value it should look as it did; past
+  the middle it should start churning, and at the top stir the plate into streaks within
+  a second or two. Say where on the slider it stops being pleasant.
+
 ---
 
 ## Reading the frame time while you do it

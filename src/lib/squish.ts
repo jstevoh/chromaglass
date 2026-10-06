@@ -361,6 +361,31 @@ export class PressLifts {
   forget(): void { this.list = []; }
 }
 
+/*
+  Beat Squeeze's press, as nested discs in cells of a 128-cell plate (the
+  app scales them by GRID_SCALE): a rough dome, deepest in the middle.
+
+  They were 40, 27 and 15, a palm's press in the middle of the plate, and a
+  palm is not what presses on the beat: the projectionist pushes the top
+  glass, and a glass is rigid, so the gap closes over most of the dish at
+  once and the liquid under all of it goes out toward the rim, the picture
+  blooming outward and drawn back as the glass lifts. Measured in the lab on
+  a thin gap (forty pools of colour, a kick every half second held and let
+  go as the app does, the dye's L1 change against the same plate unpressed):
+  the palm-sized press moved the picture 0.15 at most at the default
+  squeeze, the dish-wide one 0.43; at full, 0.37 against 0.76. The volume a
+  kick moves is the press's depth times its area, and the palm had a
+  seventh of the dish's area (PLAN 27b).
+*/
+export const KICK_RADII = [64, 44, 24];
+/**
+ * How deep Beat Squeeze presses each of KICK_RADII on a kick, for the slider,
+ * the bass the analyser reads (0–1, /70) and the bar's accent. The numbers and
+ * why are at the call in LiquidVisualizer's frame loop (PLAN 27b).
+ */
+export function kickDepth(squeeze: number, bass01: number, accent: number): number {
+  return 0.005 * squeeze * (0.6 + 0.4 * bass01) * accent;
+}
 /** How long a kick's press stays down before the glass lets go (s): the same pause that tells a hand's press from its lift. */
 export const KICK_HOLD = RELEASE_MS / 1000;
 /** How long the glass takes to give a kick's press back (s): a third of a second, done before the next kick at 120 bpm. */
