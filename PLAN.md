@@ -100,8 +100,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
   (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #308, ~~the Finger's "adds none"
-  on thin pools (0-finger)~~ #314, the wall's gain (0-wallgain), `qa` with no adapter
-  (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
+  on thin pools (0-finger)~~ #314, the wall's gain (0-wallgain), ~~`qa` with no adapter
+  (11-qaguard)~~, the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
   (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
@@ -1759,9 +1759,10 @@ the Mac show shard's `qa` at two checks that passed on the same tree in the PR's
 hour before: "the plate, not the hole, takes the pointer" (the cursor over a DIV at the
 desk's preview) and "the run completed" (`__cgFrame` returned null in the look-fade
 colour section), with "requestAdapter did not answer in 10s" in the console. Neither
-touches the Mixer; the second looks like the adapter going away under the run. Worth a
-`qa` guard that says "no frame" rather than throwing, so the run goes on to the checks
-after it. And #193's first show shard died before any test ran: the runner could not
+touches the Mixer; the second looks like the adapter going away under the run.
+**Fixed (this PR):** `apart`, `luma`, `jumps`, `colour` and `throughTheHole` in `qa.mjs`
+guard against `null` frames and missing adapter without throwing, reporting `no frame`
+rather than aborting the suite with `the run completed`. And #193's first show shard died before any test ran: the runner could not
 resolve github.com at checkout.
 
 Found while shipping step 4, not yet done: #195's deploy (main 6c6d17e) went red on
