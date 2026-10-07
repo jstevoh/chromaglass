@@ -5456,7 +5456,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     whose colour is spread evenly the picture hardly changes. Next: what a hand-rocked
     dish shows on those looks (the oil and water layers sloshing, the pools running to
     the low side), and a measure that holds the drift floor still across runs.
- Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
+- **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
   span the dish (`KICK_RADII`) and the depth is `kickDepth` (0.005 × squeeze × (0.6 +
@@ -5472,6 +5472,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     256² and the ferrofluid took a fixed six substeps of 0.45 of a cell, so it went out
     short and came back in full. It now takes the colour's own substep plan (`phasePlan`,
     never fewer than six): the same four kicks leave it at 0.311 (`npm run rides`).
+  - **27b-3. Breathing beat squeeze and organic liquid injection (shipped).** The owner
+    found linear squeeze jumping too fast (only comfortable at 1%), and automated liquid
+    additions looking too geometrically planned. Squeeze is now shaped quadratically
+    (`squeeze²` in `kickDepth`), opening the bottom half into a gentle breathing range.
+    The release uses a cosine ease (`0.5 * (1 - cos(π · p))`), removing sharp velocity
+    discontinuities at the hold and release boundaries. Automated liquid doses break out
+    of the 14-spoke equidistant circle into natural droplet clusters with randomized
+    radial depths (0.55–1.2×), varying droplet sizes, and 2D simplex noise flow drift.
+    Verified locally: `npm run lift` (33/33), `npm run squeeze` (9/9 on GPU, gap giveback
+    balanced at 3532.566), `npm run downbeat` (91/91).
 - **27c. Turbulence reaches (shipped, #305).** The dial was the stir's speed, so
   full was a look's 0.3 tripled, and with the band playing the music multiplied it and
   then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
