@@ -10,6 +10,26 @@ run the agents and skills in `.claude/`.
 GitHub holds all the shared state. Neither tool can see the other's conversation, so a
 handoff that is not in a branch, a PR or `PLAN.md` never happened.
 
+## Who takes what
+
+When both tools have credit, the owner splits the work by what each can run (2026-10-06):
+
+- **Antigravity** runs on the owner's Mac, which has a real GPU. It can read the app's
+  frames, which a cloud session cannot (the "What can be verified where" table in
+  `CLAUDE.md`). So it takes the work that has to be reproduced on a GPU: Mac-only reds
+  (Order of work 0.3: 0-finger, 0-wallgain, the wall's stamps, 11-magnetdrag,
+  11-blowbubble), the frame budget (Wave 4, measured with `npm run stages`), and anything
+  judged by its pixels.
+- **Claude Code** runs in cloud sessions. It takes CI and scripts (lane E: 19i, 19k, 19m,
+  19l, …), docs (lane F), and logic, sound and server work that the node harnesses and
+  the lab can verify.
+
+This decides who takes which work. It does not change the order: each tool still takes
+the first open step of its kind in `PLAN.md`'s Order of work. When one tool is out of
+credit, the other carries on with whatever is next, of either kind. A cloud session that
+reaches a GPU-only step says so in its PR and leaves the pixels to the Mac CI or to
+Antigravity.
+
 ## Claiming
 
 - Before starting, run `gh pr list` and `git log origin/main -10`, then take the first
