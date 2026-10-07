@@ -96,6 +96,35 @@ const noteIds = async () => {
   for (const [id, n] of Object.entries(now)) if (n > 1) seenIds[id] = Math.max(seenIds[id] ?? 0, n);
 };
 
+/*
+  The Alpha label beside the name (the owner, 2026-10-06). Asked where, not
+  whether: exactly one on screen, reading "Alpha", at 11px or more, its top
+  within the first 80px (the top bar, not somewhere down the panel or on the
+  plate), the thing actually drawn at its middle, and over no control. A label
+  rendered off-screen, twice, shrunk, or laid over the mode switch is red.
+*/
+const alphaBadge = () => page.evaluate(() => {
+  const shown = [...document.querySelectorAll('[data-alpha-badge]')]
+    .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+  if (shown.length !== 1) return { ok: false, why: `${shown.length} on screen` };
+  const el = shown[0];
+  const r = el.getBoundingClientRect();
+  const px = parseFloat(getComputedStyle(el).fontSize);
+  const atMiddle = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  const over = [...document.querySelectorAll('button, input, select')].filter((b) => {
+    const q = b.getBoundingClientRect();
+    return q.width > 0 && q.height > 0 && q.left < r.right && q.right > r.left && q.top < r.bottom && q.bottom > r.top;
+  }).map((b) => b.getAttribute('data-testid') || b.textContent.trim().slice(0, 20));
+  const why = [
+    el.textContent.trim() === 'Alpha' ? '' : `reads "${el.textContent.trim()}"`,
+    px >= 11 ? '' : `${px}px`,
+    r.top >= 0 && r.top < 80 ? '' : `top at ${Math.round(r.top)}px`,
+    atMiddle && el.contains(atMiddle) ? '' : 'covered',
+    over.length ? `over ${over.join(', ')}` : '',
+  ].filter(Boolean);
+  return { ok: why.length === 0, why: why.join('; ') || `${px}px at ${Math.round(r.left)},${Math.round(r.top)}` };
+});
+
 try {
   await page.goto(URL, { waitUntil: 'networkidle' });
   const desk = await appears('design-desk') || await appears('perform-desk');
@@ -129,6 +158,8 @@ try {
       l.tiny.length ? l.tiny.slice(0, 6).join(', ') : `${n} controls`);
     check(`on ${mode}, none of it is under 60% opacity`, n > 20 && l.faint.length === 0, l.faint.slice(0, 6).join(', '));
     check(`on ${mode}, nothing is smaller than 24px`, n > 20 && l.small.length === 0, l.small.slice(0, 6).join(', '));
+    const alpha = await alphaBadge();
+    check(`on ${mode}, the Alpha label sits by the name`, alpha.ok, alpha.why);
   }
   for (const [name, button, panel] of [
     ['settings', 'open-all-settings', 'settings-panel'],
@@ -330,6 +361,8 @@ try {
   await settle(1500);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check('nothing spills off a phone-width screen', overflow <= 2, `${overflow}px of overflow`);
+  const alphaSmall = await alphaBadge();
+  check('and at phone width the Alpha label sits by the name', alphaSmall.ok, alphaSmall.why);
 
   // ── Nothing is on the screen twice ─────────────────────────────
   const dupes = Object.entries(seenIds);

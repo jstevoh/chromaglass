@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Segmented, StatusDot } from '../ui';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
+import { AlphaBadge } from '../AlphaBadge';
 
 /**
  * The bar across the top of both desks.
@@ -113,6 +114,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         */}
         <img src={LOCKUP_URL} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
         <img src={MARK_URL} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
+        <AlphaBadge />
         <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
         {breadcrumb}
       </div>

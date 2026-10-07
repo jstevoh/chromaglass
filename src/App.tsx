@@ -85,6 +85,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
+import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
@@ -5125,9 +5126,18 @@ export default function App() {
             phone: the card shares the row with the button pill, and at 375
             wide 24px tall is what fits — any taller and the image is only
             letterboxed into the same width with empty bands above and below.
+            The Alpha label sits beside the name from 640 up. On a phone it is a
+            tab on the card's top edge instead: beside the name at 420 wide it
+            ran out of the card and under the button pill (`npm run layout`,
+            "covered; over record-button"), and under the name it made the card
+            20px taller, over the bottle rail's heading.
           */}
-          <h1>
+          <span className="absolute -top-2.5 right-3 rounded bg-black sm:hidden">
+            <AlphaBadge />
+          </span>
+          <h1 className="flex items-center gap-2">
             <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
+            <AlphaBadge className="hidden sm:inline-block" />
           </h1>
           {/* The preset's name is the menu: one click from the top of the screen. */}
           <button
