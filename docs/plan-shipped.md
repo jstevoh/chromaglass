@@ -989,7 +989,7 @@ without thinning it, so a press can add up to about as much again as it had"*. T
 same note says it is tracked on its own, and this is that item. A flow that spreads
 has to thin what it carries; ours multiplies it.
 
-*0-tap, the tapped clock's two stopwatches. **Shipped in #PR0TAP** (2026-10-06).* "The tapped
+*0-tap, the tapped clock's two stopwatches. **Shipped in #308** (2026-10-06).* "The tapped
 beat drives the show's clock" (`npm run squeeze`) went red twice on trees that could not
 move it: 396.6 against 401.4 ms on #195's deploy and 401.7 against 404.1 on #216's show
 shard, a docs-only tree, while #203 and #211 on the same code read 405.8 against 405.8 and

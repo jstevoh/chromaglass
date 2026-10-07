@@ -99,7 +99,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
-  (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #PR0TAP, the Finger's "adds none"
+  (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #308, the Finger's "adds none"
   on thin pools (0-finger), the wall's gain (0-wallgain), `qa` with no adapter
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
@@ -609,7 +609,7 @@ against 3.5 on #194 (that one: see the `startup` item in §0's CI list, fixed by
 telling Chromium's hold on the page apart by the page's own thread). Each wants what §0 asks of the Finger: find whether the check or
 the product is wrong, from the numbers it prints.
 
-*0-tap, the tapped clock's two stopwatches:* **shipped** (#PR0TAP). "The tapped beat drives
+*0-tap, the tapped clock's two stopwatches:* **shipped** (#308). "The tapped beat drives
 the show's clock" read the clock against the harness's own stamps of its taps; it now reads
 the tempo source's period (`chromaglassTempo()` under `?debug`) and asks two claims, each on
 one stopwatch (`npm run squeeze`, 400.1 against 400.1 ms, and three controls red where they
