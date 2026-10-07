@@ -994,6 +994,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (p.x > 0) { d += exchange(p, p - vec2i(1, 0), sp, n); }
   if (p.x < n - 1) { d += exchange(p, p + vec2i(1, 0), sp, n); }
   if (p.y > 0) { d += exchange(p, p - vec2i(0, 1), sp, n); }
+  if (p.y < n - 1) { d += exchange(p, p + vec2i(0, 1), sp, n); }
   let outVal = c + d;
   textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
@@ -3302,6 +3303,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (st > 0.0) {
     lap = face(p, p + vec2i(1, 0), n) + face(p, p - vec2i(1, 0), n) + face(p, p + vec2i(0, 1), n) + face(p, p - vec2i(0, 1), n);
   }
+  // Not clamped: Cahn–Hilliard dips a little either side of an edge and
   let outVal = textureLoad(src, p, 0).r + A.b.x * lap;
   textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
