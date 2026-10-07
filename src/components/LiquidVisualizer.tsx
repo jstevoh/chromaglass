@@ -7921,11 +7921,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const drops = 6 + DICE.music.int(7);
                     for (let d = 0; d < drops; d++) {
                       const a = (d / drops) * Math.PI * 2 + (DICE.music.float() - 0.5) * 0.45 + time;
-                      const rad = ringR * (0.55 + 0.65 * DICE.music.float());
+                      const rad = ringR * (0.9 + 0.3 * DICE.music.float());
                       const rx2 = Math.floor(bassX + Math.cos(a) * rad);
                       const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.4 + 0.8 * DICE.music.float()) * impactMul;
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * impactMul;
                         activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward expansion with natural fluid swirl
                         const swirl = 0.2 * (DICE.music.float() - 0.5);
@@ -7934,10 +7934,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                         activeFluid.addVelocity(rx2, ry2, pvx, pvy);
                       }
                     }
-                    // The beat dose: lands organically in the active area rather than fixed to a circle
+                    // The beat dose: lands organically around the active area
                     {
                       const da = DICE.music.angle();
-                      const doseDist = ringR * (0.2 + 0.8 * DICE.music.float());
+                      const doseDist = ringR * (0.95 + 0.15 * DICE.music.float());
                       if (bassArea) {
                         doseArea(activeFluid, activeLayerRef.current, bassArea,
                           bassX + Math.cos(da) * doseDist, bassY + Math.sin(da) * doseDist, bass01);
