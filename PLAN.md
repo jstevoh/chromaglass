@@ -163,9 +163,10 @@ Judged in this order, because these gate code:
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
   look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
   ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
-- **2.6** **P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
-  roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).
-  Recommended: delete; it unblocks 3.2.
+- **2.6** ~~**P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
+  roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).~~
+  **Decided by the owner, 2026-10-06: delete.** The deletion is 3.1; 18a-9's and 22d's
+  CPU halves go with it.
 
 Then the rest of `docs/judging.md` in its own order, an area a sitting (the looks, the
 Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
@@ -181,7 +182,8 @@ numbers, merged the day it is green so no other branch has to chase it. The poin
 session has to read to make a change, and the faults that come from scattered state; the
 merge conflicts are the shared documents', which 0.6 ends.
 
-- **3.1** **P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines, if 2.6 says so.
+- **3.1** **P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines (2.6 decided: delete). Next in
+  lane G once #307 has merged.
 - **3.2** **14l** (G, L): `FluidSimulation` out of `LiquidVisualizer.tsx`; then device recovery as
   `useGpuStage` (which S16's fault came from); then the pointer and touch handlers as
   `usePlateInput`; then the frame loop as a module; then the imperative handle.
@@ -3864,7 +3866,8 @@ its frame rate live. "Free" means no new passes or texture reads.
     the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
     radial flow (the pressed rings in the picture). A staggered grid takes all three,
     and `dampGrid`'s job.
-  - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
+  - ~~**18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.~~
+    Dropped: the owner decided to delete the CPU solver's stepping (2.6, 2026-10-06; 3.1).
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
@@ -5027,7 +5030,8 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
 - **22c. Coriolis is left out.** In a flat gap it is a pure gradient for a
   divergence-free flow and the projection takes it; with a varying gap a sliver is
   left. Add 2ω_l ẑ×u where h varies, and measure what it changes.
-- **22d. The CPU solver gets the bulk lag and not the swirl.** Where there is no
+- ~~**22d. The CPU solver gets the bulk lag and not the swirl.**~~ Dropped with the CPU
+  solver's stepping (2.6, decided 2026-10-06; 3.1). Where there is no
   WebGPU, `FluidSimulation`'s own step (`LiquidVisualizer.tsx`) turns the picture
   with the liquid but has no swirl; give it `spinSwirl`'s few lines.
 - **22e. The liquid's drag on the dish is ignored.** The dish is a flywheel with its
