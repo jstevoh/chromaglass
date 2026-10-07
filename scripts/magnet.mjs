@@ -177,7 +177,11 @@ try {
 
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
-  const at = (fx) => [box.x + box.width * fx, box.y + box.height * 0.5];
+  // Drag offset from the middle row (y=0.35 rather than 0.50): the check asks
+  // that the pool end nearer the hand than the hand's mirror across y=0.5.
+  // Along y=0.5 the hand and its mirror are the same point, which degenerates
+  // the mirror check into a coin-flip against float jitter.
+  const at = (fx, fy = 0.35) => [box.x + box.width * fx, box.y + box.height * fy];
 
   /*
     2. The first touch on the bare plate brings no ferrofluid.
