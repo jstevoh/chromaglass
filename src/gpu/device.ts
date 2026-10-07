@@ -118,9 +118,16 @@ async function askGpu(): Promise<Gpu | GpuFailure> {
 
   let device: GPUDevice;
   try {
-    // The default limits: every pass reads its fields as textures and writes
-    // one storage texture. A pass that needs more asks for it here, by name.
-    device = await settles(adapter.requestDevice({ requiredFeatures: want }), 'requestDevice');
+    // The top rung (1024² particles, 128 MiB buffer) and future passes: request
+    // storage buffer and buffer binding limits up to what the adapter supports.
+    const wantLimits: Record<string, number> = {};
+    if (adapter.limits.maxStorageBufferBindingSize) {
+      wantLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
+    }
+    if (adapter.limits.maxBufferSize) {
+      wantLimits.maxBufferSize = adapter.limits.maxBufferSize;
+    }
+    device = await settles(adapter.requestDevice({ requiredFeatures: want, requiredLimits: wantLimits }), 'requestDevice');
   } catch (e) {
     return { failure: 'no-device', detail: String((e as Error)?.message ?? e) };
   }

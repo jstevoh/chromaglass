@@ -46,12 +46,12 @@ export const PER_CELL = 4;
 export const SPLAT_SCALE = 2;
 
 /**
- * Workgroup size, matching `@workgroup_size(64)` in both compute shaders.
+ * Workgroup size, matching `@workgroup_size(256)` in both compute shaders.
  * It is here as well because the dispatch count has to agree with it, and a
  * disagreement is silent: too few groups and the tail of the population
  * simply stops moving.
  */
-const GROUP = 64;
+const GROUP = 256;
 
 export interface ParticleParams {
   /** 0 to 1: how much of the picture is particles. At 0 nothing runs. */
@@ -166,7 +166,8 @@ export class WebGPUParticles {
    * wrong for no gain.
    */
   step(enc: GPUCommandEncoder, dye: GPUTexture, velForced: GPUTexture, p: ParticleParams, timing?: (label: string) => GPUComputePassTimestampWrites | undefined): void {
-    this.live = Math.min(this.capacity, Math.round(this.capacity * Math.max(0, Math.min(1, p.amount))));
+    const maxLive = Math.min(this.capacity, 65535 * GROUP);
+    this.live = Math.min(maxLive, Math.round(this.capacity * Math.max(0, Math.min(1, p.amount))));
     if (this.live === 0) return;
 
     this.frame = (this.frame + 1) >>> 0;
