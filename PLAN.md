@@ -4559,6 +4559,7 @@ like day (`npm run macqueue -- --hours 24` for the time).
   2026-10-05 bundle of small fixes; left open here.
 
 ### 19i. A green Mac result carries across a merge of main
+**Shipped**: When the new head's tree differs from the tree of the PR's last green Mac run only in files main changed (disjoint from the PR's own site files), or only in files that never reach a Mac shard, the shards are skipped with the verdict "carried" (annotated on What the change reaches), and the deploy gate follows that chain back to the run that passed. 14 selftest cases in `reach.mjs` and deploy gate history verified.
 
 *Measured 2026-10-04 over 25 merged PRs (#204 to #244), 103 `Checks` runs.* A PR ran its
 checks about four times. Of those runs, 53 started on a push that only merged main in, and
