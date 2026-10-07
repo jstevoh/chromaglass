@@ -989,6 +989,33 @@ without thinning it, so a press can add up to about as much again as it had"*. T
 same note says it is tracked on its own, and this is that item. A flow that spreads
 has to thin what it carries; ours multiplies it.
 
+*0-tap, the tapped clock's two stopwatches. **Shipped in #308** (2026-10-06).* "The tapped
+beat drives the show's clock" (`npm run squeeze`) went red twice on trees that could not
+move it: 396.6 against 401.4 ms on #195's deploy and 401.7 against 404.1 on #216's show
+shard, a docs-only tree, while #203 and #211 on the same code read 405.8 against 405.8 and
+403.2 against 403.2. It compared the beat clock's period with the harness's own mean tap
+interval. But the harness stamps each tap in the page just before calling
+`chromaglassAction('tap-tempo')`, and the app stamps it again inside `tapTempo`, so a pause
+between the two (a collection, the first call into `runAction` on a busy runner) lands in
+one mean and not the other. Both reds read short, which is what a late first stamp does:
+14.4 and 7.2 ms spread over three gaps, where the check allowed 2 ms on the mean. The clock
+itself is handed the tempo source's reading by `setExternal` every frame with the same
+`now`, so it was on the app's period throughout. The check measured the dispatch.
+
+Now the app exposes the tempo source's reading under `?debug` (`chromaglassTempo()`, in
+`App.tsx` where the source lives, rather than on `chromaglassDebug()`, so the fix did not
+need `LiquidVisualizer.tsx` while #307 held it), and the check asks two claims, each on one
+stopwatch. The feature: the clock's period is the tapped source's to within 0.5 ms, and
+that is not the band's 492. The dispatch: the source's period is the harness's mean to
+within 30 ms, six times the worst gap seen (4.8 ms on the mean) and well under what a
+dropped or doubled tap does (100 ms or more). On the owner's Mac, real WebGPU: 400.1
+against 400.1 ms, and 400.1 against 400.1 ms; 9/9. Controls, each run and restored: the tap
+ignored by the app read the clock at 491.5 ms with no tapped tempo, both claims red; the
+clock ignoring what it is handed read 491.8 against a source of 401.2, the first red and
+the second green; the second tap dropped read 603.9 against the harness's 402.6, the
+second red and the first green. They also found that "and the show kicks on it" passes
+with no tap at all (25 and 24 kicks against a floor of 22.5), written into PLAN §0.
+
 ### 5. Playing it: sound learn, shutter, and a look link
 
 **Sound learn.** Today the music drives three fixed things: sound drive, beat squeeze

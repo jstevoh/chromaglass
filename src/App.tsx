@@ -290,6 +290,21 @@ export default function App() {
   const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
   const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
   const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
+  /*
+    The tempo source's own reading, for `npm run squeeze` (PLAN 0-tap). That
+    check asked whether the beat clock ran at the tapped period by comparing
+    it with the harness's own stamps of its taps, and the harness stamps a
+    tap a moment before the app does, so a pause between the two went red
+    on a clock that was right. With the source's period to hand, the clock
+    is judged against what it was actually given. Here rather than on
+    `chromaglassDebug()` because the source lives here, and so a check of
+    the tempo does not have to edit the plate.
+  */
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { chromaglassTempo?: unknown }).chromaglassTempo =
+      () => tempoRef.current?.read(performance.now()) ?? null;
+  }, []);
 
   // Load-in is geometry, and geometry can be checked exactly. `npm run wall`
   // drives this to set a corner pin or a mask on a plate that is already
