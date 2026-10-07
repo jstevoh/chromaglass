@@ -380,11 +380,19 @@ export class PressLifts {
 export const KICK_RADII = [64, 44, 24];
 /**
  * How deep Beat Squeeze presses each of KICK_RADII on a kick, for the slider,
- * the bass the analyser reads (0–1, /70) and the bar's accent. The numbers and
- * why are at the call in LiquidVisualizer's frame loop (PLAN 27b).
+ * the bass the analyser reads (0–1, /70) and the bar's accent.
+ *
+ * Squeeze is shaped quadratically (`squeeze²`): a linear slider slammed the
+ * plate at low-to-mid values (at 10% it was already a tenth of full, moving
+ * colour by whole cells in a single frame), so only down at 1% did it feel
+ * comfortable to watch. The square opens the bottom half of the dial into an
+ * organic breathing range (at 10% it presses what 1% did before, at 30% a
+ * tenth, and at 90% still 81% of full). The accent and bass scaling remain
+ * linear.
  */
 export function kickDepth(squeeze: number, bass01: number, accent: number): number {
-  return 0.005 * squeeze * (0.6 + 0.4 * bass01) * accent;
+  const s = squeeze * (0.38 + 0.62 * squeeze);
+  return 0.005 * s * (0.6 + 0.4 * bass01) * accent;
 }
 /** How long a kick's press stays down before the glass lets go (s): the same pause that tells a hand's press from its lift. */
 export const KICK_HOLD = RELEASE_MS / 1000;
@@ -416,25 +424,15 @@ export const KICK_RELEASE = 1 / 3;
  * So a kick lets go too. It is held for `KICK_HOLD` (the rim stands up and
  * the ring spreads while it is down, and the lift's spokes, laid after the
  * same pause, find the film still thin), then the gap it took is given back
- * evenly over `KICK_RELEASE`, disc for disc, no more than it pressed. The
- * give-back is the press with its sign turned and nothing else: no Fingering
- * (a negative amount through the fingered branch would *brighten* the
- * cleared centre instead of clearing it), no velocity (the shader turns the
- * opening gap into the inflow itself, dh/dt), and the shader's cap keeps it
- * from opening past where the glass rests. Measured the same way: with the
- * release, 0 % of the disc on the floor after 40 s on no spring at all, the
- * Fillmore's glass and the default look's, the mean gap back at rest
- * (0.0300), and the film under each kick a tenth of a second after it lands
- * at 0.0255 to 0.0258: a press you can see, every kick, that does not add
- * up.
+ * over `KICK_RELEASE`, disc for disc, no more than it pressed.
  *
- * "No more than it pressed" is what it lays, not always what the press
- * took: where the film is already near the floor (a hand holding the Press
- * there, or a thin film), a kick's press is cut off by the floor and takes
- * less than it lays, and the release still gives back the whole of it,
- * capped only at rest. So a kick over a held hand lifts the hand's press
- * a little, up to the kick's own depth (about 0.0045 at the Fillmore's
- * squeeze), and the hand, still pressing, takes it back the next step.
+ * The release uses a cosine ease (`0.5 * (1 - cos(π · p))`): a linear ramp
+ * created abrupt velocity steps at the hold and at the end of the release
+ * (constant rate of opening, then an instant stop). The cosine starts with
+ * zero upward velocity, accelerates smoothly to peak recoil, and eases
+ * smoothly back into rest as a chest breathing out does. What is given back
+ * still sums to the press exactly, finishing within the same third of a
+ * second.
  *
  * Counted in seconds of plate time, not steps: the governor halves the
  * step rate on a slow machine and doubles each step's `dtSeconds`, and the
@@ -465,8 +463,10 @@ export class KickRelease {
     for (const k of this.list) {
       k.age += dt;
       if (k.age <= KICK_HOLD + 1e-9) continue;
-      // What should be back by now, less what already is: sums to the press exactly.
-      const owed = k.amount * Math.min(1, (k.age - KICK_HOLD) / KICK_RELEASE) - k.given;
+      // Smooth cosine ease: zero initial velocity, gentle swell and recoil.
+      const p = Math.min(1, (k.age - KICK_HOLD) / KICK_RELEASE);
+      const ease = 0.5 * (1 - Math.cos(Math.PI * p));
+      const owed = k.amount * ease - k.given;
       if (!(owed > 0)) continue;
       k.given += owed;
       // In the shape it was pressed in, so what comes back is what went.

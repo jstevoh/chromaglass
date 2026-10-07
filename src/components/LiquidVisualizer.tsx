@@ -7909,50 +7909,55 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     }
                   }
 
-                  // Beat edge: a fresh-colored ring of dye blooms outward on each
-                  // kick so bass hits are visible in COLOR, not just motion
+                  // Beat edge: an organic bloom of varied droplets on each kick
+                  // rather than a rigid geometric ring, so bass hits are visible
+                  // in natural color dispersion
                   if (kickRef.current.kick && simStep === 0) {
                     // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
                     const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
-                    const drops = 14;
+                    // Natural droplet count and organic dispersal with varied depths and sizes
+                    const drops = 6 + DICE.music.int(7);
                     for (let d = 0; d < drops; d++) {
-                      const a = (d / drops) * Math.PI * 2 + time;
-                      const rx2 = Math.floor(bassX + Math.cos(a) * ringR);
-                      const ry2 = Math.floor(bassY + Math.sin(a) * ringR);
+                      const a = (d / drops) * Math.PI * 2 + (DICE.music.float() - 0.5) * 0.45 + time;
+                      const rad = ringR * (0.9 + 0.3 * DICE.music.float());
+                      const rx2 = Math.floor(bassX + Math.cos(a) * rad);
+                      const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        activeFluid.addDensity(rx2, ry2, bass01 * 1.1 * impactMul, ringCol.r, ringCol.g, ringCol.b);
-                        activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * impactMul;
+                        activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
+                        // Outward expansion with natural fluid swirl
+                        const swirl = 0.2 * (DICE.music.float() - 0.5);
+                        const pvx = (Math.cos(a) - Math.sin(a) * swirl) * (0.18 + 0.15 * DICE.music.float()) * bass01;
+                        const pvy = (Math.sin(a) + Math.cos(a) * swirl) * (0.18 + 0.15 * DICE.music.float()) * bass01;
+                        activeFluid.addVelocity(rx2, ry2, pvx, pvy);
                       }
                     }
-                    // The beat is when an operator adds something, so it is
-                    // when the plate's own liquids arrive too — somewhere on
-                    // the ring rather than always dead centre, which would
-                    // build one permanent patch of soap in the middle and
-                    // leave the rest of the plate clean.
+                    // The beat dose: lands organically around the active area
                     {
                       const da = DICE.music.angle();
+                      const doseDist = ringR * (0.95 + 0.15 * DICE.music.float());
                       if (bassArea) {
                         doseArea(activeFluid, activeLayerRef.current, bassArea,
-                          bassX + Math.cos(da) * ringR, bassY + Math.sin(da) * ringR, bass01);
+                          bassX + Math.cos(da) * doseDist, bassY + Math.sin(da) * doseDist, bass01);
                       } else {
                         doseLiquid(activeFluid, liquidsOf(activeLayerRef.current),
-                          centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
+                          centerX + Math.cos(da) * doseDist, centerY + Math.sin(da) * doseDist, bass01);
                       }
                     }
                   }
                   lastBass01Ref.current = bass01;
 
-                  // Mid: orbital injection in its own hue
+                  // Mid: organic meandering injection in its own hue
                   if (mid01 > 0.2) {
                     // On an area look, round the edge of its mid area, in that area's dye.
                     const midArea = musicAreas ? areaForBand(musicAreas, 'mid', turn) : null;
                     const midAt = midArea ? areaCentre(midArea, GRID_SIZE) : { x: centerX, y: centerY };
                     const midCol = midArea ? areaCycle(activeLayerRef.current, midArea, areaTime + 0.65) : colFor(1.3);
                     const orbitR = midArea ? midArea.r * GRID_SIZE * 0.8 : GRID_SIZE * 0.3;
-                    const mx = Math.floor(midAt.x + Math.cos(time * 0.6) * orbitR);
-                    const my = Math.floor(midAt.y + Math.sin(time * 0.8) * orbitR);
+                    const mx = Math.floor(midAt.x + (noise2D(time * 0.25, 12.3) * 0.7 + Math.cos(time * 0.45) * 0.3) * orbitR);
+                    const my = Math.floor(midAt.y + (noise2D(47.1, time * 0.25) * 0.7 + Math.sin(time * 0.55) * 0.3) * orbitR);
                     if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
                       activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.06 * autoAmp, midCol.r, midCol.g, midCol.b, mid01);
                       activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
@@ -7983,11 +7988,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     }
                   }
 
-                  // Energy: roaming swell in a third hue
+                  // Energy: roaming swell wandering naturally across the canvas
                   if (energy01 > 0.15) {
                     const swellCol = colFor(2.6);
-                    const ex = Math.floor(centerX + Math.cos(time * 0.4) * GRID_SIZE * 0.25);
-                    const ey = Math.floor(centerY + Math.sin(time * 0.3) * GRID_SIZE * 0.25);
+                    const ex = Math.floor(centerX + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * GRID_SIZE * 0.28);
+                    const ey = Math.floor(centerY + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * GRID_SIZE * 0.28);
                     activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
