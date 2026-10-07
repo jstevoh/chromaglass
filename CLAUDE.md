@@ -135,6 +135,11 @@ When CI is red, use the `steward` skill.
 - **More than one session works on this repo at once.** Before starting, look
   at open PRs (`list_pull_requests`) and recent commits on `main` so two
   sessions do not rebuild the same thing; keep to your own branch and PR.
+- **Some of those sessions are Antigravity's** (branches `antigravity/…`). How work is
+  claimed and handed between the two tools, the handoff block in every PR body, and
+  the light review pass a Claude Code session owes Antigravity's PRs (the
+  `review-owed` label, about one per session) are in `docs/handoff.md`. Check that
+  label at the start of a session.
 
 ## Agents and skills in this repo
 
