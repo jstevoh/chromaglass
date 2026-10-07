@@ -16,13 +16,30 @@ When both tools have credit, the owner splits the work by what each can run (202
 
 - **Antigravity** runs on the owner's Mac, which has a real GPU. It can read the app's
   frames, which a cloud session cannot (the "What can be verified where" table in
-  `CLAUDE.md`). So it takes the work that has to be reproduced on a GPU: Mac-only reds
-  (Order of work 0.3: 0-finger, 0-wallgain, the wall's stamps, 11-magnetdrag,
-  11-blowbubble), the frame budget (Wave 4, measured with `npm run stages`), and anything
-  judged by its pixels.
-- **Claude Code** runs in cloud sessions. It takes CI and scripts (lane E: 19i, 19k, 19m,
-  19l, …), docs (lane F), and logic, sound and server work that the node harnesses and
-  the lab can verify.
+  `CLAUDE.md`). So it takes the work that has to be reproduced on a GPU:
+  - **Order of work 0.3**: Mac-only reds (0-finger, 0-wallgain, the wall's stamps,
+    11-magnetdrag, 11-blowbubble), then 19s.
+  - **2.4 / 10.0**: The first `film.yml` baseline (cloud sessions get a 403 on
+    `workflow_dispatch`; Antigravity runs as the owner and can dispatch it).
+  - **2.1 18a-11** (Thin Gap's cost) and **2.5** (wall smoothness / H2b numbers):
+    measured with `npm run stages` on a real GPU.
+  - **1.3 S19/S18, 1.9 S17, 1.12** (flash guard → 14r → S21): GPU pipeline work
+    in `src/gpu/`.
+  - **Wave 4** frame budget (H2c-4, H2c-1/3/2, 14j): before/after numbers from `stages`.
+  - **3.1 P7-cpu delete**: already decided (delete CPU solver stepping, ~1,000 lines);
+    next in lane G once #307 lands.
+  - *Exception on lane E*: **19i** is being finished by Antigravity (already in progress
+    locally). Claude Code sessions should not pick up 19i.
+- **Claude Code** runs in cloud sessions. It takes CI and scripts (lane E: 19k, 19m,
+  19l, 19o–19n, 19c–19t), docs (lane F: 19m, 19f), and logic, sound and server work
+  that the node harnesses and the lab can verify:
+  - Wave 1 server, sanitizer and sound items (1.1 14m/14o, 1.2 14n, 1.4 S14, 1.5 14s,
+    1.6, 1.7, 1.11).
+  - The review pass on PRs labelled `review-owed`.
+
+*Note on 19l*: Once 19l ships (headed Chromium under xvfb in cloud sessions), cloud sessions
+will be able to read app frames and take over parts of the GPU verification. Until then,
+anything judged by its pixels stays on the Mac.
 
 This decides who takes which work. It does not change the order: each tool still takes
 the first open step of its kind in `PLAN.md`'s Order of work. When one tool is out of
