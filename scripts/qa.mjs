@@ -659,6 +659,7 @@ try {
   {
     /** Mean absolute difference per channel, 0 for identical frames. */
     const apart = (a, b) => {
+      if (!a || !b) return NaN;
       let sum = 0;
       for (let i = 0; i < a.length; i++) if (i % 4 !== 3) sum += Math.abs(a[i] - b[i]);
       return sum / (a.length * 0.75);
@@ -729,10 +730,13 @@ try {
 
     // The bug, exactly: the zoom on its own, with no switch thrown anywhere.
     const far = apart(plate, await at(9));
+    const okFar = !isNaN(far) && !isNaN(drift) && far > Math.max(6, drift * 4);
     check('the zoom alone moves the picture, with no switch thrown',
-      far > Math.max(6, drift * 4),
-      `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift` +
-      (far > Math.max(6, drift * 4) ? '' : ` — ${await showState()}`));
+      okFar,
+      isNaN(far) || isNaN(drift)
+        ? 'no frame'
+        : `${far.toFixed(1)} from the plate against ${drift.toFixed(1)} of drift` +
+          (okFar ? '' : ` — ${await showState()}`));
 
     // That it is a *travel* and not a cut is checked in `npm run plate`, on
     // the ramp itself, because it cannot honestly be checked here. This asked
@@ -1150,7 +1154,7 @@ try {
       new MutationObserver(() => {
         if (document.querySelector('[data-testid="gl-lost"]')) window.__sawLost = true;
       }).observe(document.body, { childList: true, subtree: true });
-      window.chromaglassDebug().loseDevice();
+      window.chromaglassDebug?.().loseDevice?.();
     });
     await settle(1500);
     check('a lost context is noticed and said so',
@@ -1747,7 +1751,9 @@ try {
     // did nothing. Nothing about the layout looked wrong, which is why this
     // asks the question hit-testing answers rather than the one geometry does.
     const throughTheHole = await page.evaluate(() => {
-      const r = document.querySelector('[data-testid="desk-preview"]').getBoundingClientRect();
+      const p = document.querySelector('[data-testid="desk-preview"]');
+      if (!p) return { ok: false, what: 'no desk-preview' };
+      const r = p.getBoundingClientRect();
       const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
       return { ok: el === document.getElementById('liquid-canvas'),
                what: el?.dataset?.testid || el?.id || el?.tagName || 'nothing' };
@@ -2028,11 +2034,13 @@ try {
   // Ocean's own colour than Solar Flare's does.
   {
     const colour = () => page.evaluate(() => {
-      const c = window.chromaglassDebug().plateStats()[0].colour;
+      const stats = window.chromaglassDebug?.().plateStats?.();
+      if (!stats || !stats[0]?.colour) return null;
+      const c = stats[0].colour;
       const t = c.reduce((a, b) => a + b, 0) || 1;
       return c.map((v) => v / t);
     });
-    const dist = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
+    const dist = (a, b) => (!a || !b ? NaN : Math.hypot(...a.map((v, i) => v - b[i])));
     const goTo = async (id, fade) => {
       await page.evaluate((id) => window.chromaglassApplyPreset?.(id), id);
       await settle(400);
@@ -2041,16 +2049,20 @@ try {
     };
     // The frame's mean brightness, 0-255: what a flash is a jump in.
     const luma = () => page.evaluate(async () => {
-      const d = await window.__cgFrame(32, 18); let s = 0;
+      const d = await window.__cgFrame(32, 18);
+      if (!d) return null;
+      let s = 0;
       for (let i = 0; i < d.length; i += 4) s += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
       return s / (d.length / 4);
     });
     const jumps = async (ms) => {
-      const seen = [await luma()];
+      const first = await luma();
+      const seen = [first];
       for (let t = 0; t < ms; t += 200) { await settle(200); seen.push(await luma()); }
+      if (seen.some((v) => v === null)) return { worst: NaN, seen, noFrame: true };
       let worst = 0;
       for (let i = 1; i < seen.length; i++) worst = Math.max(worst, Math.abs(seen[i] - seen[i - 1]));
-      return { worst, seen };
+      return { worst, seen, noFrame: false };
     };
     await goTo('solar-flare', 0);
     await settle(6000);
@@ -2068,17 +2080,25 @@ try {
       jump in brightness from one fifth of a second to the next during the
       fade, against the same look's own on a plate left alone.
     */
-    check('and it fades rather than flashing', fade.worst < 3 * calm.worst + 4,
-      `largest step in brightness ${fade.worst.toFixed(1)} through the fade, against ${calm.worst.toFixed(1)} on the plate alone `
-      + `(fade ${fade.seen.map((v) => v.toFixed(0)).join(' ')})`);
+    const okFade = !fade.noFrame && !calm.noFrame && fade.worst < 3 * calm.worst + 4;
+    check('and it fades rather than flashing', okFade,
+      fade.noFrame || calm.noFrame
+        ? 'no frame'
+        : `largest step in brightness ${fade.worst.toFixed(1)} through the fade, against ${calm.worst.toFixed(1)} on the plate alone `
+        + `(fade ${fade.seen.map((v) => (v === null ? 'null' : v.toFixed(0))).join(' ')})`);
     await goTo('deep-ocean', 0);
     await settle(8000);
     const own = await colour();
-    const f = (c) => c.map((v) => v.toFixed(2)).join('/');
+    const f = (c) => (c ? c.map((v) => v.toFixed(2)).join('/') : 'n/a');
+    const dFaded = dist(faded, own);
+    const dFrom = dist(from, own);
+    const okColour = !isNaN(dFaded) && !isNaN(dFrom) && dFaded < 0.35 * dFrom;
     check('a look fades all the way into the next: none of the last one\'s colour is left',
-      dist(faded, own) < 0.35 * dist(from, own),
-      `Solar Flare ${f(from)}, faded into Deep Ocean ${f(faded)}, Deep Ocean cut to ${f(own)}: `
-      + `${dist(faded, own).toFixed(3)} from its own colour against ${dist(from, own).toFixed(3)} for Solar Flare`);
+      okColour,
+      isNaN(dFaded) || isNaN(dFrom)
+        ? 'no frame'
+        : `Solar Flare ${f(from)}, faded into Deep Ocean ${f(faded)}, Deep Ocean cut to ${f(own)}: `
+        + `${dFaded.toFixed(3)} from its own colour against ${dFrom.toFixed(3)} for Solar Flare`);
   }
 
   // ── Songs: a look for each song, and what happens while it plays ──
