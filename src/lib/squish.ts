@@ -391,7 +391,8 @@ export const KICK_RADII = [64, 44, 24];
  * linear.
  */
 export function kickDepth(squeeze: number, bass01: number, accent: number): number {
-  return 0.005 * (squeeze * squeeze) * (0.6 + 0.4 * bass01) * accent;
+  const s = squeeze * (0.38 + 0.62 * squeeze);
+  return 0.005 * s * (0.6 + 0.4 * bass01) * accent;
 }
 /** How long a kick's press stays down before the glass lets go (s): the same pause that tells a hand's press from its lift. */
 export const KICK_HOLD = RELEASE_MS / 1000;
