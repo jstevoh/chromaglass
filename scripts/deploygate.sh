@@ -197,11 +197,11 @@ apart() {
   if grep -qx package.json <<<"$overlap" && { scriptsonly "$base" "$tested" || scriptsonly "$base" "$before"; }; then
     overlap=$(grep -vx package.json <<<"$overlap" || true)
   fi
-  [ -z "$overlap" ] || { echo "false the PR and main's newer changes both touch $(echo "$overlap" | head -3 | paste -sd' ')"; return; }
+  [ -z "$overlap" ] || { echo "false the PR and main's newer changes both touch $(echo "$overlap" | head -3 | paste -sd' ' -)"; return; }
   # Everything that differs from what was tested must be main's own newer
   # change; anything else (a squash that is not head + main) is unexplained.
   stray=$(comm -23 <(printf '%s\n' "$moved") <(printf '%s\n' "$since") | grep -v '^$' || true)
-  [ -z "$stray" ] || { echo "false $(echo "$stray" | head -3 | paste -sd' ') differs from the tested tree and is not main's change"; return; }
+  [ -z "$stray" ] || { echo "false $(echo "$stray" | head -3 | paste -sd' ' -) differs from the tested tree and is not main's change"; return; }
   # Every commit main took since the base: green if any deploy of it
   # succeeded; red if one failed, timed out, is still going, or was cancelled
   # after a failed attempt; not found if no deploy of it is among the last
@@ -302,11 +302,37 @@ judge() {
       echo "false #$pr's head ${head:0:7} has no green Checks run"; continue
     fi
     while read -r url tested; do
+      run_id="${url##*/}"
       # The four shards by name, every one green: a run that skipped them, or
       # ran fewer, is not a Mac run. A new shard in checks.yml goes here too.
-      shards=$(api "actions/runs/${url##*/}/jobs?per_page=100&filter=latest" \
+      shards=$(api "actions/runs/$run_id/jobs?per_page=100&filter=latest" \
         | jq -r '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
           | if . == ["open=success", "plate=success", "show=success", "tools=success"] then "ran" else (join(",") | if . == "" then "none" else . end) end')
+      if [ "$shards" != ran ]; then
+        # Check if the run carried the Mac shards from an earlier run (PLAN.md 19i)
+        carried_job=$(api "actions/runs/$run_id/jobs?per_page=100&filter=latest" \
+          | jq -r '.jobs[] | select(.name == "What the change reaches") | .id // empty')
+        carried_run=""
+        carried_tested=""
+        if [ -n "$carried_job" ]; then
+          carried_notice=$(api "check-runs/$carried_job/annotations" \
+            | jq -r '.[] | select(.title == "carried") | .message // empty' | head -1)
+          if [[ "$carried_notice" =~ ^run\ ([0-9]+)\ tests\ ([0-9a-f]{40})$ ]]; then
+            carried_run="${BASH_REMATCH[1]}"
+            carried_tested="${BASH_REMATCH[2]}"
+          fi
+        fi
+        if [ -n "$carried_run" ] && [ -n "$carried_tested" ]; then
+          carried_shards=$(api "actions/runs/$carried_run/jobs?per_page=100&filter=latest" \
+            | jq -r '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
+              | if . == ["open=success", "plate=success", "show=success", "tools=success"] then "ran" else (join(",") | if . == "" then "none" else . end) end')
+          if [ "$carried_shards" = ran ]; then
+            url="https://github.com/$REPO/actions/runs/$carried_run"
+            tested="$carried_tested"
+            shards=ran
+          fi
+        fi
+      fi
       if [ "$shards" != ran ]; then
         echo "false #$pr's run $url did not run the Mac shards ($shards)"; continue
       fi
@@ -319,7 +345,7 @@ judge() {
         # newest: a reopened PR's later run, red on a newer main, outranks an
         # older green one.
         newest=$(api "actions/workflows/checks.yml/runs?head_sha=$head&event=pull_request&per_page=1" | jq -r '.workflow_runs[0].id // empty') || newest=""
-        if [ "$newest" != "${url##*/}" ]; then
+        if [ "$newest" != "$run_id" ]; then
           echo "false #$pr's run $url tested ${tested:0:7}, not the tree being deployed, and is not the head's newest run"; continue
         fi
         verdict=$(apart "$tested" "$tree" "$before") || verdict="false rule 5 could not be read"
