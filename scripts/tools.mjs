@@ -66,7 +66,10 @@ try {
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
   const screen = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
-  const tool = (t) => page.evaluate((t) => window.chromaglassTool?.(t), t);
+  const tool = async (t) => {
+    await page.evaluate((want) => window.chromaglassTool?.(want), t);
+    await page.waitForFunction((want) => window.chromaglassDebug?.().tool?.() === want, t, { timeout: 10000 });
+  };
   const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await page.waitForTimeout(2500); };
   const settle = (ms) => page.waitForTimeout(ms);
 
@@ -530,7 +533,7 @@ try {
     await pool(A);
     const idle = await idleChange(A, 2500);
     const p = await snap(`${t}0`);
-    await hold(t, A, 1500);
+    await hold(t, A, 1800);
     await settle(700);
     await snap(`${t}1`);
     // Held still, the Blow is a straw: it blows a bubble, and what it clears

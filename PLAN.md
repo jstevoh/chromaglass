@@ -102,8 +102,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #308, ~~the Finger's "adds none"
   on thin pools (0-finger)~~ #314, the wall's gain (0-wallgain), `qa` with no adapter
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
-  14b-askline, 19c-wallmutant), ~~the Magnet's drag (11-magnetdrag)~~ #313, "Blow held still"
-  (11-blowbubble), and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
+  14b-askline, 19c-wallmutant), ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
+  (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
   docs/plan-shipped.md 19r).
 - **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
