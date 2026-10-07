@@ -100,9 +100,9 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
   (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #308, ~~the Finger's "adds none"
-  on thin pools (0-finger)~~ #314, the wall's gain (0-wallgain), ~~`qa` with no adapter
-  (11-qaguard)~~, the other deploy reds (0-deployreds), the wall's stamps (21-wall,
-  14b-askline, 19c-wallmutant), ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
+  on thin pools (0-finger)~~ #314, ~~the wall's gain (0-wallgain)~~ #131, ~~`qa` with no adapter
+  (11-qaguard)~~ #316, ~~the other deploy reds (0-deployreds)~~ #194, ~~the wall's stamps (21-wall,
+  14b-askline, 19c-wallmutant)~~, ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
   (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
   docs/plan-shipped.md 19r).
@@ -4354,13 +4354,11 @@ bill changes it: more Mac runners at once (19g).
   (followed through every harness's imports with esbuild's metafile), and none opens
   `?cast`, so `CastDisplay` has no check (S15 in `docs/stability-plan.md` needs one).
 
-- `wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
-  own next frame on a runner whose two windows are handed different refreshes (the Mac
-  read 1.69 slots per window's frame there once, with the gate right); only the one-refresh
-  busy phase and the arithmetic catch it. The `check-skeptic`'s mutant turning down one of
-  the show's frames in two passed every in-app clock line, idle and busy, though the
-  comment on the floor says it is under it; only the arithmetic lines caught it. Build
-  that mutant as a control and make an in-app line see it.
+- ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
+  own next frame on a runner whose two windows are handed different refreshes~~ **Done:**
+  built that mutant (`rule: 'half-show'`) as a control in `scripts/wall.mjs` arithmetic,
+  and added an in-app check line on its own clock (`m.gate.frame >= 0.8 * m.hz`) that sees
+  it and fails cleanly if show frames are turned down.
 - `render-app`'s "the live loop draws again after every render" wants more than 5
   frames in the half second after each render, and read 5 after render M (music
   playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
@@ -5015,7 +5013,8 @@ count is page-wide), and whether the 2.4 ms is a Mac display link stamping the r
 a frame is for (inferred, not measured). And the line catches a wrongly converted wall
 only because the harness opens the wall five seconds after the show (the conversion's
 error is that gap, caught by the one-second stale bound); with under a second between
-them it would pass. The harness should check its own gap is over a second.
+them it would pass. **Fixed:** the harness (`scripts/wall.mjs`) checks its own gap is
+over a second (`originGap >= 1000`).
 
 ## 22. Spin the plate
 **Partly shipped** (#223, #252, #258, #261): the Spin tool, Auto Spin, the one dish under a plate, the cut of the swirl's projection and the look's motor retune are in. The shortcuts and what is open are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
