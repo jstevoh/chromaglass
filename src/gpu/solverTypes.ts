@@ -198,7 +198,13 @@ export interface GpuStepParams {
    * `npm run grating`, to step the same pressed plate with the pass off.
    */
   gridDamp?: number;
+  /**
+   * For lab checks only (PLAN 1.3 / S18): mutate simF uniforms directly after writeSim
+   * before copying to GPU buffer, allowing tests to inject corrupted uniform values.
+   */
+  rawSim?: (simF: Float32Array) => void;
 }
+
 
 /**
  * What one solver hands the next when the grid moves (PLAN 9w): the liquids

@@ -1365,31 +1365,34 @@ export class WebGPUFluid {
 
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
-    f[0] = this.N; f[1] = this.L; f[2] = p.dt; f[3] = p.time; f[4] = disp; f[5] = p.visc;
-    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.immiscibility; f[9] = 0;
-    f[10] = p.vibIntensity; f[11] = p.vibFrequency; f[12] = p.drip; f[13] = p.air;
-    f[14] = p.smearX; f[15] = p.smearY;
+    const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
+    f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
+    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = 0;
+    f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
+    f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
       neither damps nor clamps it: only the heat decays there.
     */
     const thin = this.thinGapOn(p);
-    f[16] = thin ? 1 : p.damping; f[17] = p.heatDecay; f[18] = thin ? 1000 : MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
-    i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
-    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
-    f[26] = p.meanDensity; f[27] = p.maxCurrent;
+    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
+    i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
+    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
+    f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
-    f[28] = thin ? 0 : p.rockX; f[29] = thin ? 0 : p.rockY;
-    f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
-    const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
-    f[34] = -(p.gravityX ?? 0) / gl; f[35] = -(p.gravityY ?? -1) / gl;
-    const extras = p.magnetStrength > 0.0001 ? p.extraMagnets ?? [] : [];
+    f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
+    f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5);
+    const gx = fin(p.gravityX, 0), gy = fin(p.gravityY, -1);
+    const gl = Math.hypot(gx, gy) || 1;
+    f[34] = -gx / gl; f[35] = -gy / gl;
+    const magStrength = fin(p.magnetStrength, 0);
+    const extras = magStrength > 0.0001 ? p.extraMagnets ?? [] : [];
     for (let k = 0; k < 3; k++) {
       const m = extras[k];
-      f[36 + k * 4] = m?.x ?? 0; f[37 + k * 4] = m?.y ?? 0;
-      f[38 + k * 4] = p.magnetHeight; f[39 + k * 4] = m ? p.magnetStrength : 0;
+      f[36 + k * 4] = fin(m?.x, 0); f[37 + k * 4] = fin(m?.y, 0);
+      f[38 + k * 4] = fin(p.magnetHeight, 0.05); f[39 + k * 4] = m ? magStrength : 0;
     }
-    f[48] = p.magnetRadius ?? MAGNET_RADIUS;
+    f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1740,6 +1743,10 @@ export class WebGPUFluid {
     if (!this.phaseLive) this.phaseGapPrimed = false;
     this.thinLive = thin;
     this.writeSim(p, disp);
+    if (p.rawSim) {
+      p.rawSim(this.simF);
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    }
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
     /*

@@ -116,6 +116,13 @@ fn clampP(p: vec2i, n: f32) -> vec2i { return clamp(p, vec2i(0), vec2i(i32(n) - 
   Lacing Run were 36864 of 36864 cells NaN by their eighth second. The bits
   cannot be optimised away.
 */
+fn finite1(x: f32) -> bool {
+  return (bitcast<u32>(x) & 0x7f800000u) != 0x7f800000u;
+}
+fn finite2(v: vec2f) -> bool {
+  let e = bitcast<vec2u>(v) & vec2u(0x7f800000u);
+  return all(e != vec2u(0x7f800000u));
+}
 fn finite4(v: vec4f) -> bool {
   let e = bitcast<vec4u>(v) & vec4u(0x7f800000u);
   return all(e != vec4u(0x7f800000u));
@@ -812,12 +819,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (A.a.x > 0.5) {
     let d = volumeFlux(p, vec2i(1, 0), n) - volumeFlux(p - vec2i(1, 0), vec2i(1, 0), n)
           + volumeFlux(p, vec2i(0, 1), n) - volumeFlux(p - vec2i(0, 1), vec2i(0, 1), n);
-    textureStore(dst, p, vec4f((ph(p, n) * gapAt(p, n, A.a.y) - d) / gapAt(p, n, A.a.z), 0.0, 0.0, 0.0));
+    let val = (ph(p, n) * gapAt(p, n, A.a.y) - d) / gapAt(p, n, A.a.z);
+    textureStore(dst, p, select(vec4f(0.0), vec4f(val, 0.0, 0.0, 0.0), finite1(val)));
     return;
   }
   let dx = flux(p, vec2i(1, 0), n) - flux(p - vec2i(1, 0), vec2i(1, 0), n);
   let dy = flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
-  textureStore(dst, p, vec4f(ph(p, n) - dx - dy, 0.0, 0.0, 0.0));
+  let val = ph(p, n) - dx - dy;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(val, 0.0, 0.0, 0.0), finite1(val)));
 }`,
 
   /*
@@ -932,7 +941,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let e = bad(p, n).x;
   let out = pair(e, bad(p + vec2i(1, 0), n)) + pair(e, bad(p - vec2i(1, 0), n))
           + pair(e, bad(p + vec2i(0, 1), n)) + pair(e, bad(p - vec2i(0, 1), n));
-  textureStore(dst, p, vec4f(textureLoad(src, p, 0).r - out, 0.0, 0.0, 0.0));
+  let outVal = textureLoad(src, p, 0).r - out;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
 
   phaseSeparate: `${HEAD}
@@ -985,7 +995,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (p.x < n - 1) { d += exchange(p, p + vec2i(1, 0), sp, n); }
   if (p.y > 0) { d += exchange(p, p - vec2i(0, 1), sp, n); }
   if (p.y < n - 1) { d += exchange(p, p + vec2i(0, 1), sp, n); }
-  textureStore(dst, p, vec4f(c + d, 0.0, 0.0, 0.0));
+  let outVal = c + d;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
 
   /*
@@ -1032,7 +1043,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
     d += aside(p, q, S.n) * 0.125 * ((raw(q) - c) - (mean3(q, n) - sp)) * min(hp, gapAt(q, n));
   }
-  textureStore(dst, p, vec4f(c + d / hp, 0.0, 0.0, 0.0));
+  let outVal = c + d / hp;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
 
   squeezeUpdate: `${HEAD}
@@ -1124,7 +1136,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // The spring back toward the dome, and its motion counts.
   let g3 = gap + (rest - gap) * S.gapSpring;
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  textureStore(dst, vec2i(id.xy), vec4f(g3, dhdt, 0.0, 0.0));
+  let out = vec4f(g3, dhdt, 0.0, 0.0);
+  textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy)));
 }`,
 
   /*
@@ -1161,7 +1174,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let h = sv.r;
   let src = clamp(12.0 * S.visc * sv.g / (h * h * h), -100.0, 100.0);
   let s = packedAt(x - 1, y, n) + packedAt(x + 1, y, n) + packedAt(x, y - 1, n) + packedAt(x, y + 1, n);
-  pr[parity * n * half + i] = (s - src) * 0.25;
+  let pNew = (s - src) * 0.25;
+  pr[parity * n * half + i] = select(0.0, pNew, finite1(pNew));
 }`,
 
   /** `squeezeVel`, reading the pressure from the buffer the sweeps wrote. */
@@ -2064,7 +2078,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   c = c * S.curDamp + f * (1.0 - S.curDamp);
   let s = length(c);
   if (s > S.maxCur) { c *= S.maxCur / s; }
-  textureStore(dst, q, vec4f(c, 0.0, 0.0));
+  textureStore(dst, q, select(vec4f(0.0), vec4f(c, 0.0, 0.0), finite2(c)));
 }`,
 
   // The flow the dye rides: the main field plus the current, sampled up from M.
@@ -2265,7 +2279,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let dx = velGM(p + vec2i(1, 0), m).x - velGM(p - vec2i(1, 0), m).x;
   let dy = velGM(p + vec2i(0, 1), m).y - velGM(p - vec2i(0, 1), m).y;
-  textureStore(dst, p, vec4f(-0.5 * (dx + dy) / m, 0.0, 0.0, 0.0));
+  let divVal = -0.5 * (dx + dy) / m;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(divVal, 0.0, 0.0, 0.0), finite1(divVal)));
 }`,
 
   curPressure: `${HEAD}
@@ -2278,7 +2293,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let s = textureLoad(pr, clampP(p - vec2i(1, 0), m), 0).r + textureLoad(pr, clampP(p + vec2i(1, 0), m), 0).r
         + textureLoad(pr, clampP(p - vec2i(0, 1), m), 0).r + textureLoad(pr, clampP(p + vec2i(0, 1), m), 0).r;
-  textureStore(dst, p, vec4f((textureLoad(dv, p, 0).r + s) * 0.25, 0.0, 0.0, 0.0));
+  let prVal = (textureLoad(dv, p, 0).r + s) * 0.25;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(prVal, 0.0, 0.0, 0.0), finite1(prVal)));
 }`,
 
   curGradient: `${HEAD}
@@ -2292,7 +2308,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(cur, p, 0);
   let gx = textureLoad(pr, clampP(p + vec2i(1, 0), m), 0).r - textureLoad(pr, clampP(p - vec2i(1, 0), m), 0).r;
   let gy = textureLoad(pr, clampP(p + vec2i(0, 1), m), 0).r - textureLoad(pr, clampP(p - vec2i(0, 1), m), 0).r;
-  textureStore(dst, p, vec4f(v.xy - 0.5 * vec2f(gx, gy) * m, v.z, v.w));
+  let out = vec4f(v.xy - 0.5 * vec2f(gx, gy) * m, v.z, v.w);
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   // Pigment coordinates: A.a.xy says which phase to keep and which to reseed.
@@ -2469,7 +2486,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = flux(p, vec2i(1, 0), n) - flux(p - vec2i(1, 0), vec2i(1, 0), n)
         + flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
   let m = here.rgb - d;
-  textureStore(dst, p, vec4f(m.r, max(m.g, 0.0), m.b, here.a));
+  let out = vec4f(m.r, max(m.g, 0.0), m.b, here.a);
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   /*
@@ -2533,7 +2551,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
         + flux(p, vec2i(0, 1), n) - flux(p - vec2i(0, 1), vec2i(0, 1), n);
   // Upwind and limited, so it never takes more than a cell holds; the floor
   // is only for the rounding in a half-float dye.
-  textureStore(dst, p, max(textureLoad(src, p, 0) - d, vec4f(0.0)));
+  let out = max(textureLoad(src, p, 0) - d, vec4f(0.0));
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   /*
@@ -2898,7 +2917,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let e = max(m.r - 1.0, 0.0) + min(m.r, 0.0);
   let out = pair(e, bad(p + vec2i(1, 0), n)) + pair(e, bad(p - vec2i(1, 0), n))
           + pair(e, bad(p + vec2i(0, 1), n)) + pair(e, bad(p - vec2i(0, 1), n));
-  textureStore(dst, p, vec4f(m.r - out, m.gba));
+  let outVal = vec4f(m.r - out, m.gba);
+  textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
 
   /*
@@ -2945,7 +2965,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
   let d = face(p, vec2i(1, 0), n) - face(p - vec2i(1, 0), vec2i(1, 0), n)
         + face(p, vec2i(0, 1), n) - face(p - vec2i(0, 1), vec2i(0, 1), n);
-  textureStore(dst, p, textureLoad(src, p, 0) - d);
+  let outVal = textureLoad(src, p, 0) - d;
+  textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
 
   /*
@@ -2971,7 +2992,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = m.r;
   let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
   let mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
-  textureStore(dst, p, vec4f(m.rgb, mu));
+  let outVal = vec4f(m.rgb, mu);
+  textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
 
   /*
@@ -3001,7 +3023,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = clamp(m.r + A.a.x * lap.a, -0.25, 1.25);
   let s = clamp((m.g + A.a.y * lap.g) * A.a.z, 0.0, 1.0);
   let a = clamp(m.b + A.a.w * lap.b, -1.0, 1.0);
-  textureStore(dst, p, vec4f(c, s, a, m.a));
+  let outVal = vec4f(c, s, a, m.a);
+  textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
 
   /*
@@ -3142,7 +3165,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = S.n;
   let s = ps(p + vec2i(1, 0), n) + ps(p - vec2i(1, 0), n) + ps(p + vec2i(0, 1), n) + ps(p - vec2i(0, 1), n);
   let c = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
-  textureStore(dst, p, vec4f((s + c) / (4.0 + A.a.x), 0.0, 0.0, 0.0));
+  let outVal = (s + c) / (4.0 + A.a.x);
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
 
   /*
@@ -3208,7 +3232,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let well = min(max(1.0, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
   let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap;
   let repel = A.b.y * chi * w;
-  textureStore(dst, p, vec4f(local + repel, local + repel * (1.0 - close) * step(1e-6, A.b.z), 0.0, 0.0));
+  let outVal = vec4f(local + repel, local + repel * (1.0 - close) * step(1e-6, A.b.z), 0.0, 0.0);
+  textureStore(dst, p, select(vec4f(0.0), outVal, finite2(outVal.xy)));
 }`,
 
   /*
@@ -3279,8 +3304,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     lap = face(p, p + vec2i(1, 0), n) + face(p, p - vec2i(1, 0), n) + face(p, p + vec2i(0, 1), n) + face(p, p - vec2i(0, 1), n);
   }
   // Not clamped: Cahn–Hilliard dips a little either side of an edge and
-  // brings itself back, and a clamp there makes or loses ferrofluid.
-  textureStore(dst, p, vec4f(textureLoad(src, p, 0).r + A.b.x * lap, 0.0, 0.0, 0.0));
+  let outVal = textureLoad(src, p, 0).r + A.b.x * lap;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
 
   /*
@@ -3316,7 +3341,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let q = p + select(vec2i(0, 1 - 2 * (k & 1)), vec2i(1 - 2 * (k & 1), 0), k < 2);
     flow += aside(p, q, n) * (uu(q, n) - up) * min(hp, hh(q, n));
   }
-  textureStore(dst, p, vec4f(textureLoad(src, p, 0).r + A.b.x * flow / hp, 0.0, 0.0, 0.0));
+  let outVal = textureLoad(src, p, 0).r + A.b.x * flow / hp;
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
 }`,
 
   /*
