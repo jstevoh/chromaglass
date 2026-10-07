@@ -99,7 +99,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
-  (19h-2, #240, found: the old push), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
+  (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #PR0TAP, the Finger's "adds none"
   on thin pools (0-finger), the wall's gain (0-wallgain), `qa` with no adapter
   (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
@@ -609,23 +609,17 @@ against 3.5 on #194 (that one: see the `startup` item in §0's CI list, fixed by
 telling Chromium's hold on the page apart by the page's own thread). Each wants what §0 asks of the Finger: find whether the check or
 the product is wrong, from the numbers it prints.
 
-*Read 2026-09-28, on #216's show shard, a docs-only tree:* "the tapped beat drives the
-show's clock" read a beat every 401.7 ms against 404.1 ms tapped, its second red, after
-#195's 396.6 against 401.4; the runs of #203 and #211 on the same code read 405.8
-against 405.8 and 403.2 against 403.2. The clock is not the suspect §11 names:
-`setExternal` is handed the tap's reading right before `update` on every frame, with the
-same `now`, so every frame ends on the tempo source's own period, and nothing in the
-check clears the tap (only Tempo: Listen Again does). The two numbers come from two
-stopwatches. The check stamps each tap in the page just before `chromaglassAction('tap-tempo')`, and the app stamps it again
-inside `tapTempo`, so a pause between the two stamps (a collection, or the first call
-into `runAction` on a busy runner) lands in one and not the other. Both reds read the
-app's mean shorter, which is what a late first stamp does, by 14.4 and 7.2 ms over the
-three gaps, where the check allows 6. This is read in the code, not run. *Proposed:*
-`chromaglassDebug()` returns the tempo source's reading. The check then asks that the
-clock's period is that period to within 0.5 ms (the feature: the tap drives the clock).
-Separately, allowing for dispatch, it asks that the app's taps are the harness's
-(a tap dropped or doubled moves the mean by a third or more). The `check-skeptic` holds
-both halves red.
+*0-tap, the tapped clock's two stopwatches:* **shipped** (#PR0TAP). "The tapped beat drives
+the show's clock" read the clock against the harness's own stamps of its taps; it now reads
+the tempo source's period (`chromaglassTempo()` under `?debug`) and asks two claims, each on
+one stopwatch (`npm run squeeze`, 400.1 against 400.1 ms, and three controls red where they
+should be). The story is in docs/plan-shipped.md §0.
+
+*Found 2026-10-06, by 0-tap's controls, not yet done:* **"and the show kicks on it" passes
+on the ear alone.** With the tap switched off, the band's own kicks heard by the ear made 25
+and 24 in 12 s against a floor of 22.5 (three quarters of 30 tapped beats), so the claim
+that the kicks come from the tapped clock can pass with no tapped clock. It wants to count
+kicks on the tapped grid (within a fraction of a period of a tapped beat), not kicks at all.
 
 Still to see: the Finger's check on the Mac over a run of builds, and whether the
 looks with Polarity have lost an edge movement the owner liked (docs/judging.md
