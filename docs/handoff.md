@@ -55,8 +55,12 @@ instructions by hand:
 - **prepush-reviewer**: reads its own diff against the list in that file and runs
   `npm run lint` plus whatever the "Which checks for which files" table in `CLAUDE.md` asks
   for.
-- **steward, ship**: followed step by step. A merge needs CI green on the current head,
-  as `ship` says, and the owner's go-ahead in the Antigravity conversation.
+- **steward, ship**: followed step by step. Merging works the same as for Claude Code
+  (the owner, 2026-10-06): as soon as CI is green on the current head, without asking.
+  The head contains main's latest commit, the PR is marked ready, it is squash-merged,
+  the deploy is watched to green and reported in Pacific time, and the branch is
+  restarted from `main`. The squash body ends with
+  `Co-Authored-By: Antigravity <noreply@google.com>`.
 
 Doing these by hand is close to the real thing but not the same. So every Antigravity PR
 that changes a check, or anything under `src/`, carries the `review-owed` label and names
