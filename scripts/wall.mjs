@@ -251,7 +251,7 @@ const check = (name, ok, detail = '') => {
     };
     const next = { frame: 0, ask: 0 };
     const gate = new DrawGate();
-    let busy = 0, lastAsk = -Infinity, lastDraw = -Infinity, asks = 0;
+    let busy = 0, lastAsk = -Infinity, lastDraw = -Infinity, asks = 0, showDraws = 0;
     const draws = [];
     for (;;) {
       const f = clocks.frame[next.frame] ?? Infinity, a = clocks.ask[next.ask] ?? Infinity;
@@ -266,13 +266,19 @@ const check = (name, ok, detail = '') => {
       const at = stamp === 'refresh' ? refreshAt : ranAt;
       let drawn;
       if (rule === 'gate') drawn = gate.offer(source, at);
-      else if (rule === 'old') {
+      else if (rule === 'half-show') {
+        // Mutant: gate turns down one of the show's frames in two (PLAN.md §19c)
+        drawn = source === 'frame' ? (next.frame % 2 === 0 ? gate.offer(source, at) : false) : gate.offer(source, at);
+      } else if (rule === 'old') {
         drawn = source === 'frame' || ranAt - lastAsk >= 6;
         if (source === 'ask' && drawn) lastAsk = ranAt;
       } else {
         drawn = source === 'frame' || at - lastDraw >= 0.6 * 1000 / wallHz;
       }
-      if (drawn) { lastDraw = at; busy = ranAt + cost; }
+      if (drawn) {
+        lastDraw = at; busy = ranAt + cost;
+        if (ranAt >= 1000 && source === 'frame') showDraws++;
+      }
       // The first second is the gate learning the clocks; judged after it.
       if (ranAt < 1000) continue;
       if (source === 'ask') asks++;
@@ -281,7 +287,12 @@ const check = (name, ok, detail = '') => {
       if (drawn) draws.push(ranAt);
     }
     const gaps = draws.slice(1).map((t, i) => t - draws[i]).sort((a, b) => a - b);
-    return { perS: draws.length / (seconds - 1), asksPerS: asks / (seconds - 1), medianGap: gaps[gaps.length >> 1] ?? 0 };
+    return {
+      perS: draws.length / (seconds - 1),
+      showPerS: showDraws / (seconds - 1),
+      asksPerS: asks / (seconds - 1),
+      medianGap: gaps[gaps.length >> 1] ?? 0,
+    };
   };
   /**
    * Over twenty phases between the two clocks: the highest rate and where,
@@ -290,15 +301,16 @@ const check = (name, ok, detail = '') => {
    * one frame in two (30), passed every ceiling here in review.
    */
   const sweep = (showHz, wallHz, opts) => {
-    let hi = { perS: 0, phase: 0 }, lo = Infinity, shortest = Infinity;
+    let hi = { perS: 0, phase: 0 }, lo = Infinity, shortest = Infinity, minShow = Infinity;
     for (let i = 0; i < 20; i++) {
       const phase = (i / 20) * (1000 / wallHz);
       const r = run({ showHz, wallHz, phase, ...opts });
       if (r.perS > hi.perS) hi = { perS: r.perS, phase };
       lo = Math.min(lo, r.perS);
+      minShow = Math.min(minShow, r.showPerS);
       shortest = Math.min(shortest, r.medianGap);
     }
-    return { ...hi, min: lo, medianGap: shortest };
+    return { ...hi, min: lo, minShow, medianGap: shortest };
   };
   console.log('One clock with the wall up, in arithmetic (draws a second, lowest to highest of twenty phases):\n');
   /*
@@ -334,6 +346,11 @@ const check = (name, ok, detail = '') => {
             // Why the show's own frames are gated too (lib/drawGate.ts).
             check(`  control: gating the asks alone still doubles at some phase`, asksOnly.perS > 1.5 * faster,
               `${asksOnly.perS.toFixed(1)}/s against ${faster} Hz`);
+            if (!jitter) {
+              const halving = sweep(showHz, wallHz, { rule: 'half-show', jitter, cost });
+              check('  control: turning down one of the show\'s frames in two cuts the show\'s draws in half', halving.minShow < 0.8 * showHz,
+                `${halving.minShow.toFixed(1)}/s against ${showHz} Hz handed (expected < ${(0.8 * showHz).toFixed(1)})`);
+            }
           } else {
             // Why each offer carries its refresh's time (lib/drawGate.ts).
             check(`  control: the same gate stamped with when its callback ran draws past it`, ran.perS > 1.1 * faster,
@@ -1049,6 +1066,7 @@ let failed = 0;
       return {
         gate: a.gate && b.gate ? { frame: (b.gate.frame - a.gate.frame) / s, ask: (b.gate.ask - a.gate.ask) / s } : null,
         skipped: a.skipped && b.skipped ? (b.skipped.frame - a.skipped.frame + b.skipped.ask - a.skipped.ask) / s : null,
+        skippedFrame: a.skipped && b.skipped ? (b.skipped.frame - a.skipped.frame) / s : null,
         offered: a.gate && b.gate && a.skipped && b.skipped ? {
           frame: (b.gate.frame - a.gate.frame + b.skipped.frame - a.skipped.frame) / s,
           ask: (b.gate.ask - a.gate.ask + b.skipped.ask - a.skipped.ask) / s,
@@ -1114,10 +1132,19 @@ let failed = 0;
     */
     await wall.goto(`http://localhost:${PORT}/?cast=true&debug`, { waitUntil: 'load' });
     // The mirror (not the receiver a window with no opener becomes; see
-    // CastDisplay), on the clock this page controls.
     await wall.waitForSelector('[data-testid="cast-display"]', { timeout: 30_000 });
     if (await wall.evaluate(() => typeof window.__phaseMs !== 'number')) throw new Error('the projector window came up on the untouched clock');
     await show.waitForFunction(() => window.__asks > 30, null, { timeout: 30_000 });
+    /*
+      The wall opened at least a second after the show (PLAN.md §14b, §21).
+      An unconverted timestamp from the wall (missing `timeOrigin` offset)
+      is that gap behind, and the stale bound (STAMP_OLDEST_MS = 1000) catches
+      it only because the gap is over a second.
+    */
+    const originGap = (await wall.evaluate(() => performance.timeOrigin)) - (await show.evaluate(() => performance.timeOrigin));
+    check('the wall opened at least a second after the show, so an unconverted timestamp trips the stale bound',
+      originGap >= 1000,
+      `${(originGap / 1000).toFixed(2)} s between windows`);
     /*
       Two clocks need the show's own to be running, so it is measured first
       on its own: the projector window open, its asks held back (its
@@ -1224,6 +1251,16 @@ let failed = 0;
           const least = 0.9 * alone;
           check('  and at least 0.9 times what either window alone would have drawn in the same seconds', m.drawn >= least && counted(alone) >= enough,
             `${f1(m.drawn)} a second against ${f1(least)} (0.9 of ${f1(alone)}: the show's window handed ${f1(m.hz)}, the wall's ${f1(m.wallServable)} the harness did not hold; ${counted(alone)} in ${f1(m.seconds)} s)`);
+        }
+        /*
+          The gate turns down a show frame only when an ask drew in the same
+          refresh: a mutant turning down one of the show's frames in two
+          (PLAN.md §19c) turns down frames with no ask to account for them.
+        */
+        if (m.skippedFrame !== null && m.gate?.ask !== undefined) {
+          check('  and the gate skipped a show frame only where an ask drew',
+            m.skippedFrame <= m.gate.ask + 2,
+            `${f1(m.skippedFrame)} show frames skipped a second, against ${f1(m.gate.ask)} asks drawn`);
         }
         /*
           Each clock against its own window's refresh: the show's frames
