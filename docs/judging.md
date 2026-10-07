@@ -506,7 +506,15 @@ On Classic, then Oil & Water, then a look with a Plate Shape:
   liquid should go out of the dish, not bunch up against it;
 - on a look with Plate Shape up: where the glasses are tight, the colour should
   move slower than where they are open;
-- the frame time with it on and off (below): it should be the same or faster;
+- the frame time with it on and off: measured on the Mac GPU (`npm run stages`, 2026-10-07, PLAN 18a-11):
+  At 768²:
+  - Thin Gap off: 31.7 ms a solver step across both layers (16.5 ms Layer 0, 15.2 ms Layer 1), 20.4 steps/s, 50.4 ms/frame.
+  - Thin Gap on: 67.8 ms a solver step (51.1 ms Layer 0, 16.7 ms Layer 1), 11.4 steps/s, 90.6 ms/frame.
+    Thin Gap projection (~7.1 ms/layer) costs about the same as the incompressibility projection it replaces (~6.7 ms/layer). The difference is Layer 0's conservative height-advected dye transport (36.1 ms vs 1.3 ms).
+  At 512² (the hosted grid ceiling):
+  - Thin Gap on (steps=60): 19.7 ms a solver step (12.7 ms Layer 0, 7.0 ms Layer 1), 32.8 steps/s, 33.4 ms/frame (30 fps).
+  - Thin Gap on with H2b (steps=30): 14.95 ms a solver step, 27.5 steps/s (92% speed), 19.2 ms/frame (52 fps).
+  Thin Gap runs smoothly on the hosted ceiling and requires no look turned off;
 - the same on the phone (Settings → Squish Plate → Thin Gap), and a MIDI pad
   learned to it.
 
