@@ -126,6 +126,7 @@
     "filmtable": "node scripts/filmtable.mjs",
     "filmlook": "node scripts/filmlook.mjs",
     "particles": "node scripts/particles.mjs",
+    "finite": "node scripts/finite.mjs",
     "derive": "node scripts/derive.mjs",
     "straw": "node scripts/straw.mjs",
     "lift": "node scripts/lift.mjs",

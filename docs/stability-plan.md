@@ -188,7 +188,7 @@ Chromium, the day it was found) or read in the code.
     plate runs, with the black box naming it. **Measure:** a `?debug` hook that makes one
     named pipeline fail: the plate steps without it, and `npm run crash` reads its line.
     It is next to #212's startup work; take it after that merges.
-18. **S18 — A non-finite number in a carried field stops the dye for good.**
+18. **S18 — A non-finite number in a carried field stops the dye for good.** (*Shipped*)
     - *Read in the code.* The dye and the velocity have had `finite4` and `safeVel`
       since "36864 of 36864 cells NaN" (`wgsl/fluid.ts`). The fields carried from step to
       step have not: the lasting current (`currentForces`), its gradient
@@ -202,8 +202,8 @@ Chromium, the day it was found) or read in the code.
       the gap's spring, …) unchecked, so one non-finite uniform is enough.
 
     **Do:** those stores guarded with `select(0, x, finite)`; `GpuStepParams` sanitised in
-    `writeSim`. **Measure:** a lab check that sets one step's rock to NaN and finds the
-    plate moving again two steps later.
+    `writeSim`. **Measure:** `npm run finite` verifies writeSim sanitises non-finite uniforms
+    and that the plate recovers motion two steps after uniform corruption.
 19. **S19 — Dye Particles at full on a 1024² grid invalidates every step.** (*Shipped*)
     - *Read in the code.* `capacity = grid² × PER_CELL` (4) and `groups = ceil(live /
       64)` (`particles.ts`): at 1024² with Dye Particles at 1.0 that is 65,536
