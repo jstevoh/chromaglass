@@ -114,7 +114,9 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
     // Object settings: sceneMappings
     if (key === 'sceneMappings' && Array.isArray(value)) {
       const validMappings = value.filter(m =>
-        m && typeof m === 'object' && typeof m.source === 'string' && typeof m.target === 'string' &&
+        m && typeof m === 'object' &&
+        (m.source === undefined || typeof m.source === 'string') &&
+        typeof m.setting === 'string' &&
         typeof m.depth === 'number' && Number.isFinite(m.depth)
       ).slice(0, 32);
       out.sceneMappings = validMappings;
