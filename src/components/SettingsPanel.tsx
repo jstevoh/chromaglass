@@ -1640,7 +1640,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {/* The Room Section */}
       <section id="settings-room" className={`${SECTION_CARD} ${shown('room') ? SECTION_GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
         <h3 className={SECTION_TITLE}>
-          <Video size={12} /> The Room
+          <Camera size={12} /> The Room
         </h3>
         <Info>
           The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
@@ -1774,7 +1774,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       */}
       <section id="settings-film" className={`${SECTION_CARD} ${shown('film') ? SECTION_GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
         <h3 className={SECTION_TITLE}>
-          <Film size={12} /> Film
+          <Video size={12} /> Video
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
@@ -1836,6 +1836,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               Off
             </button>
           </div>
+          
+          {/* Demo Videos */}
+          <div className="mt-3 flex flex-col gap-1">
+            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>
+            {[
+              { src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
+              { src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
+              { src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
+            ].map(v => (
+              <button
+                key={v.src}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(v.src);
+                    const blob = await res.blob();
+                    if (onFilmFile) onFilmFile(new File([blob], v.title, { type: 'video/webm' }));
+                  } catch (e) { console.error('Failed to load demo video', e); }
+                }}
+              >
+                <span className="text-[12px] font-medium">{v.title}</span>
+                <span className="text-[10px] text-white/40">Load</span>
+              </button>
+            ))}
+          </div>
+
           <Info>
             <span className="text-white/60">Window</span> is the way to a film you did not download.
             Open one in another tab — the Internet Archive's Prelinger collection is thousands of

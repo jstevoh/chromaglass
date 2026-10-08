@@ -3007,7 +3007,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let curvedB = max((1.0 - flatB) * R, spx);
         let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
-        cp = mix(outColor * tint, vec3f(1.0), 0.18);
+        cp = outColor;
         let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
