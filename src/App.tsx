@@ -2570,7 +2570,7 @@ export default function App() {
         if (!file) return;
         try {
           const text = await file.text();
-          await importShowKit(text, (res) => {
+          await importShowKit(text, (res: any) => {
             if (res.list) {
               changeSet(res.list);
               setLiveItemId(null);
