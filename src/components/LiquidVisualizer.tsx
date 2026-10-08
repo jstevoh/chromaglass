@@ -1371,6 +1371,11 @@ class FluidSimulation {
         }
         oil = 0;
       }
+      
+      if (g.addLiquidDrop) {
+        g.addLiquidDrop(cx / L, cy / L, Math.max(1.5, radius) / L, what, amount, seconds);
+      }
+      
       if (oil <= 0 && soap <= 0 && acid === 0) return;
       g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
     };
@@ -1949,6 +1954,7 @@ class FluidSimulation {
     */
     this.liquid.setTilt(this.tiltX + this.rockX * 0.02, this.tiltY + this.rockY * 0.02);
     this.liquid.thickOnGpu = this.thinGap && !!this.gpu?.pour;
+    this.liquid.gpuNative = !!this.gpu?.addLiquidDrop;
     this.readPouredShare();
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
     // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
@@ -3876,8 +3882,8 @@ class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      rockX: this.rockX * CUR_ROCK,
-      rockY: this.rockY * CUR_ROCK,
+      rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
+      rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
         No stir for the look's motor (PLAN 22j). The current had one, a

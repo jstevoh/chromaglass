@@ -1653,9 +1653,11 @@ export class WebGPUFluid {
       this.run(pass, 'bodyLand', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.mix.read], this.arg('none', [0, 0, 0, 0]));
       od.swap();
     }
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
+    this.vel.swap();
+    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
     this.vel.swap();
     this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
@@ -3064,6 +3066,27 @@ export class WebGPUFluid {
    * Pour into the mix: oil, surfactant and acidity (+ acid, − base), each an
    * amount in `what`, as a soft disc at (x, y) in plate units.
    */
+  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void {
+    const take = Math.min(1, Math.max(0, amount)) * 0.6;
+    const soap = (what.soap ?? 0) * amount;
+    const body = (what.body ?? 0) * amount;
+    const repel = (what.repel ?? 0) * amount;
+    const weight = what.weight ?? 0;
+    const polar = what.polarity ?? 0;
+    const enc = this.device.createCommandEncoder({ label: 'add liquid drop' });
+    const pass = enc.beginComputePass({ label: 'add liquid drop' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'liquidSplat0', this.liquids0.write, [this.liquids0.read],
+      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, weight]));
+    this.liquids0.swap();
+    this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
+      this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
+    this.liquids1.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
   addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
     const m = this.ensureMix();
     const enc = this.device.createCommandEncoder({ label: 'add mix' });
