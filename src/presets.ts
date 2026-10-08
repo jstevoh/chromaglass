@@ -92,7 +92,7 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.5,
       rotationSpeed: 0,
       centerGravity: 0,
-      cometSpeed: 1.5,
+      cometSpeed: 1.0,
       cometAngle: 90,
       ledPlatform: false,
       buoyancy: 0.2,
