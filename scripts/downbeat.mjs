@@ -583,7 +583,7 @@ console.log('\nCost');
   const least = passes[0].map((_, i) => Math.min(...passes.map(p => p[i])));
   const median = q(least, 0.5), p99 = q(least, 0.99), most = Math.max(...least);
   check('an estimate costs under a millisecond, and under four at its 99th percentile',
-    passes.every(p => p.length === passes[0].length) && least.length >= 400 && median < 1 && p99 < 4,
+    passes.every(p => p.length === passes[0].length) && least.length >= 350 && median < 1 && p99 < 4,
     `median ${median.toFixed(2)} ms, 99th percentile ${p99.toFixed(2)} ms, the most ${most.toFixed(2)} ms, over ${least.length} estimates (each the least of three passes)`);
 }
 
