@@ -250,6 +250,7 @@ export interface PlateSolver {
    * Optional because only the WebGPU solver carries a phase field.
    */
   addPhase?(x: number, y: number, radius: number, amount: number): void;
+  addLiquidDrop?(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void;
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;

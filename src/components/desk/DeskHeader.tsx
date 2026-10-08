@@ -166,7 +166,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           on={dots.video}
           label="Video" tight={tight}
           onClick={onVideo}
-          title={dots.video ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
+          title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
           testId="dot-video"
         />
         <StatusDot

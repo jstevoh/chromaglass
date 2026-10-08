@@ -775,23 +775,31 @@ export default function App() {
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
   const videoFrameRaf = useRef<number | null>(null);
 
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !videoPlayerRef.current) return;
     videoPlayerRef.current.src = URL.createObjectURL(file);
     videoPlayerRef.current.play();
+    setIsVideoPlaying(true);
     
     const loop = (time: number) => {
       if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
         visualizerRef.current?.pourVideo(videoPlayerRef.current);
         videoFrameRaf.current = requestAnimationFrame(loop);
+      } else {
+        setIsVideoPlaying(false);
       }
     };
     
     videoPlayerRef.current.onplay = () => {
+      setIsVideoPlaying(true);
       if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
       loop(performance.now());
     };
+
+    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
+    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
 
     e.target.value = '';
   }, []);
@@ -3979,9 +3987,9 @@ export default function App() {
 
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
-    video: isCasting,
+    video: isVideoPlaying,
     midi: midi.enabled,
-  }), [audioSource, isCasting, midi.enabled]);
+  }), [audioSource, isVideoPlaying, midi.enabled]);
 
   /*
     Where each status dot goes.
@@ -4000,7 +4008,7 @@ export default function App() {
   }, []);
   const deskOpen = useMemo(() => ({
     sound: () => openSettingsAt('audio-input'),
-    video: () => openSettingsAt('projectors'),
+    video: () => videoInputRef.current?.click(),
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
   }), [openSettingsAt]);
 

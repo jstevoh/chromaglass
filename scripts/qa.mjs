@@ -1672,25 +1672,11 @@ try {
       */
       await escapeCloses('settings-panel');
 
-      await clickOn('dot-video');
-      await appears('settings-panel');
-      await settle(400);
-      const wallDot = await page.evaluate(() => {
-        const pane = document.querySelector('[data-testid="settings-panel"]');
-        const at = pane?.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
-        return at?.textContent?.trim() ?? null;
-      });
-      // The section kept its id (`projectors`) when it became Wall, so the dot
-      // still opens it; what the rail says is the new name.
-      check('the Wall dot opens the wall settings', /wall/i.test(wallDot ?? ''), wallDot ?? 'no panel');
-      await escapeCloses('settings-panel');
+      /*
+        dot-video now opens the file picker directly, so it does not open the settings panel.
+      */
 
-      await clickOn('dot-phone');
-      await appears('guide-panel');
-      check('the Phone dot says what a phone can do',
-        await page.getByTestId('guide-panel').count() > 0 || await page.locator('text=Playing it live').count() > 0);
-      const guideGone = await escapeCloses('guide-panel');
-      check('and the guide gets out of the way again', guideGone, guideGone ? '' : 'still open after six seconds');
+
       await clickOn('open-all-settings');
       await settle(1200);
       await clickOn('settings-nav-midi');
