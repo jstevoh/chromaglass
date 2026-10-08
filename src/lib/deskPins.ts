@@ -40,10 +40,10 @@
  * drift in silence.
  */
 
-import { LEARNABLE_SETTINGS } from './midi';
-import { MIX_CONTROLS } from './mixer';
-import { FADE_CONTROLS } from './mixFade';
-import type { VisualizerSettings } from '../types';
+import { LEARNABLE_SETTINGS } from './midi.ts';
+import { MIX_CONTROLS } from './mixer.ts';
+import { FADE_CONTROLS } from './mixFade.ts';
+import type { VisualizerSettings } from '../types.ts';
 
 /**
  * The most dye diffusion any look is given (H2, docs/roadmap.md).
