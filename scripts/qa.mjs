@@ -1672,7 +1672,7 @@ try {
       */
       await escapeCloses('settings-panel');
 
-      await clickOn('dot-wall');
+      await clickOn('dot-video');
       await appears('settings-panel');
       await settle(400);
       const wallDot = await page.evaluate(() => {
