@@ -180,6 +180,7 @@ try {
     const gridAfter = await grid();
     check('two rung changes a frame apart keep the plate', litAfter > 0.2 && litAfter > litBefore * 0.5,
       `${gridBefore}² → ${gridAfter}²; ${(litBefore * 100).toFixed(0)}% lit before, ${(litAfter * 100).toFixed(0)}% after`);
+    await settleFrames();
 
     // Out of memory at the bottom rung: capped, and rebuilt rather than stopped.
     let before = await recoveries();
@@ -226,6 +227,23 @@ try {
     const hangBack = await waitRecovery(before, 45_000);
     const timedOut = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().some((e) => /did not answer/.test(e.msg)));
     check('a GPU request that never answers times out and recovers', hangBack && timedOut, `${timedOut ? 'timed out' : 'no timeout line'}${hangBack ? ', then back' : ', never back'}`);
+    await settleFrames();
+
+    // S17: a pipeline that fails to build is skipped, not fatal.
+    const pipeFramesBefore = await page.evaluate(() => window.chromaglassDebug().webgpu?.frames ?? 0);
+    const fatalsBefore = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => e.level === 'fatal').length);
+    await page.evaluate(() => window.chromaglassDebug().failPipeline('forcesB'));
+    const pipeAdvanced = await page.waitForFunction(
+      (fb) => (window.chromaglassDebug().webgpu?.frames ?? 0) >= fb + 15,
+      pipeFramesBefore,
+      { timeout: 10_000 },
+    ).then(() => true).catch(() => false);
+    const pipeLine = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().find((e) => e.source === 'pipeline' && /forcesB/.test(e.msg)));
+    const fatalsAfter = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => e.level === 'fatal').length);
+    const newFatal = fatalsAfter > fatalsBefore;
+    check('a pipeline that fails to build is skipped and logged, not fatal', pipeAdvanced && !newFatal && !!pipeLine,
+      `${pipeAdvanced ? 'frames advanced' : 'frames stalled'}; ${pipeLine?.msg?.slice(0, 100) ?? 'no pipeline error'}${newFatal ? '; new fatal recorded' : ''}`);
+    await page.evaluate(() => window.chromaglassDebug().resetFailures());
     await settleFrames();
 
     // ── 4. Frames that stop ──────────────────────────────────────────

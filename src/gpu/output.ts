@@ -241,6 +241,7 @@ export class WebGPUOutput {
     // projector's (S4): a second one on another format must not be handed
     // the first one's pipeline.
     const pipeline = this.pipelines.renderPipeline(`output ${this.format}`, outputRecipe(this.device, this.format));
+    if (!pipeline) return;
     const pass = encoder.beginRenderPass({
       label: 'output',
       colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],

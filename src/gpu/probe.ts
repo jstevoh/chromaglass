@@ -62,12 +62,14 @@ export class WebGPUFrameProbe {
     new Uint32Array(args).set([width, height, PROBE_GROUPS, 0]);
     this.device.queue.writeBuffer(this.args, 0, args);
 
-    const pass = encoder.beginComputePass({ label: 'probe' });
     const tiles = this.pipelines.computePipeline('probeTiles', PROBE_KERNELS.probeTiles);
+    const fold = this.pipelines.computePipeline('probeFold', PROBE_KERNELS.probeFold);
+    if (!tiles || !fold) return;
+
+    const pass = encoder.beginComputePass({ label: 'probe' });
     pass.setPipeline(tiles);
     pass.setBindGroup(0, bindGroup(this.device, tiles, [this.args, frame.createView(), this.partials]));
     pass.dispatchWorkgroups(PROBE_GROUPS);
-    const fold = this.pipelines.computePipeline('probeFold', PROBE_KERNELS.probeFold);
     pass.setPipeline(fold);
     pass.setBindGroup(0, bindGroup(this.device, fold, [this.args, this.partials, this.result]));
     pass.dispatchWorkgroups(1);
@@ -129,6 +131,7 @@ export class WebGPUFrameProbe {
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     }));
     return (encoder: GPUCommandEncoder, target: GPUTextureView): boolean => {
+      if (!pipeline) return false;
       const pass = encoder.beginRenderPass({
         label: 'probe self-test',
         colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],

@@ -285,6 +285,7 @@ export class WebGPUPlate {
         ['packVel', fields[i].velForced, this.layers[i].vel],
       ] as const) {
         const pipe = this.pipelines.computePipeline(name, PACK_KERNELS[name]);
+        if (!pipe) continue;
         packPass.setPipeline(pipe);
         packPass.setBindGroup(0, this.device.createBindGroup({
           layout: pipe.getBindGroupLayout(0),
@@ -301,22 +302,24 @@ export class WebGPUPlate {
 
     // ── Derive ──────────────────────────────────────────────────────
     const derive = this.pipelines.renderPipeline('derive', deriveRecipe(this.device));
-    for (let i = 0; i < fields.length; i++) {
-      const pass = encoder.beginRenderPass({
-        label: `derive ${i}`,
-        colorAttachments: [{ view: this.layers[i].derived.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
-      });
-      pass.setPipeline(derive);
-      pass.setBindGroup(0, this.device.createBindGroup({
-        layout: derive.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: this.sampler },
-          { binding: 2, resource: this.layers[i].dye.createView() },
-        ],
-      }));
-      pass.draw(6);
-      pass.end();
+    if (derive) {
+      for (let i = 0; i < fields.length; i++) {
+        const pass = encoder.beginRenderPass({
+          label: `derive ${i}`,
+          colorAttachments: [{ view: this.layers[i].derived.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
+        });
+        pass.setPipeline(derive);
+        pass.setBindGroup(0, this.device.createBindGroup({
+          layout: derive.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: this.uniformBuffer } },
+            { binding: 1, resource: this.sampler },
+            { binding: 2, resource: this.layers[i].dye.createView() },
+          ],
+        }));
+        pass.draw(6);
+        pass.end();
+      }
     }
 
     // ── Display ─────────────────────────────────────────────────────
@@ -400,6 +403,7 @@ export class WebGPUPlate {
     format: GPUTextureFormat,
   ): void {
     const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
+    if (!display) return;
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
     const grain = (i: number) => fields[i]?.grain ?? this.blank;
