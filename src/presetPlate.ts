@@ -56,6 +56,7 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 
 export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
+  'comet':              [18, 20, 23, 7, 16, 2],
   'galaxy':             [18, 23, 10, 8, 16, 7],
   'deep-ocean':         [16, 19, 7, 9, 22, 18],
   'cyberpunk':          [20, 2, 10, 18, 16, 6],
@@ -114,6 +115,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'classic':            ['drop'],
+  'comet':              ['pour', 'streak'],
   'galaxy':             ['spray', 'streak'],
   'deep-ocean':         ['pour', 'drop'],
   'cyberpunk':          ['streak', 'splatter'],
@@ -180,6 +182,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Oil and water with a drop of soap in it now and then: the thing that is
   // being imitated, done the way it was actually done.
   'classic':            ['water', 'water', 'soap'],
+  'comet':              ['syrup', 'glycerine'],
   // Points of light that must not feather at the edge, and are white anyway.
   'galaxy':             ['water', 'milk'],
   // Syrup is heavier than the water it is in, so it goes down the slope

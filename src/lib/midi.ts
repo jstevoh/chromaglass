@@ -167,6 +167,7 @@ const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 
  */
 export const MUSIC_SOURCE_LABELS: Record<MusicSource, string> = {
   level: 'Level', kick: 'Kick', bass: 'Bass', snare: 'Snare', hats: 'Hats',
+  note: 'Pitch/Note', tonalLow: 'Tonal (Low)', tonalMid: 'Tonal (Mid)', tonalHigh: 'Tonal (High)',
   ...Object.fromEntries(BAND_SOURCES.map((b, i) => [b, `Band ${i + 1} · ${hz(BAND_EDGES_HZ[i])}–${hz(BAND_EDGES_HZ[i + 1])} Hz`])) as Record<typeof BAND_SOURCES[number], string>,
   beat: 'Every beat', bar: 'Every bar',
   build: 'Each build', drop: 'Each drop', breakdown: 'Each breakdown',

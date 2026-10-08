@@ -274,6 +274,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'spinAudioDepth', label: "Spin From Music", min: 0, max: 1, section: 'layers' },
   { key: 'ledSpeed', label: "LED Rotation Speed", min: 0, max: 2, section: 'layers' },
   { key: 'centerGravity', label: "Center Gravity (Concave)", min: 0, max: 1, section: 'layers' },
+  { key: 'cometSpeed', label: "Comet Flow", min: 0, max: 1, section: 'layers' },
+  { key: 'cometAngle', label: "Flow Direction", min: 0, max: 360, section: 'layers' },
   { key: 'gooeyEffect', label: "Gooey Blending", min: 0, max: 1, section: 'layers' },];
 
 /** Everything that can be pinned to a desk, MIDI's forty first. */

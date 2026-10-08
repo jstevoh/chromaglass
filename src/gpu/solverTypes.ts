@@ -27,6 +27,8 @@ export interface GpuStepParams {
   gravity: number;      // centre-gravity strength (already × 0.05)
   tiltX: number;        // plate tilt, applied as a uniform acceleration
   tiltY: number;
+  cometX: number;
+  cometY: number;
   advection: number;
   /** Interface sharpening, 0 = off. Counteracts the solver's own numerical diffusion. */
   sharpness: number;

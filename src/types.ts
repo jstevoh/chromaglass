@@ -636,6 +636,11 @@ export interface VisualizerSettings {
   advection: number;
   damping: number;
   heatDecay: number;
+
+  /** Constant directional pull on heavy dye (0-1), simulating a steady tilt or wind for comet effects. */
+  cometSpeed: number;
+  /** Direction of the comet pull, in degrees. */
+  cometAngle: number;
   
   // Automation
   /**
@@ -1002,6 +1007,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  cometSpeed: 0.0,
+  cometAngle: 0.0,
   // Enough to be felt without the plate ever looking like it is pulsing to a
   // beat it invented: a busy few seconds every ten or so, and genuinely quiet
   // in between.

@@ -3472,6 +3472,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="centerGravity"
         />
         <Slider
+          label="Comet Flow"
+          value={settings.cometSpeed}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ cometSpeed: v })}
+          settingKey="cometSpeed"
+        />
+        {(settings.cometSpeed ?? 0) > 0 && (
+          <div className="pl-4 border-l-2 border-white/10 ml-2">
+            <Slider
+              label="Flow Direction"
+              value={settings.cometAngle}
+              min={0}
+              max={360}
+              step={5}
+              onChange={(v: number) => onUpdate({ cometAngle: v })}
+              settingKey="cometAngle"
+            />
+          </div>
+        )}
+        <Slider
           label="Gooey Blending"
           value={settings.gooeyEffect}
           min={0}
