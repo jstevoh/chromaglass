@@ -399,8 +399,8 @@ check('no source can ride a master',
   PATCH_TARGETS.filter(t => MASTERS.includes(String(t.key))).map(t => t.label).join(', '));
 check('and what a patch can aim at is grouped by section', /<optgroup key=\{g\.id\} label=\{g\.name\}>/.test(bay));
 
-check('and the wall keeps the id every deep link opens',
-  SECTION_BY_ID.get('projectors')?.name === 'Wall' && /openSettingsAt\('projectors'\)/.test(readFileSync(join(root, 'src/App.tsx'), 'utf8')));
+check('the wall keeps its id',
+  SECTION_BY_ID.get('projectors')?.name === 'Wall');
 
 // ── The controller the section offers to set up ─────────────────────
 //

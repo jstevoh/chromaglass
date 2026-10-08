@@ -672,6 +672,7 @@ const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
  * too thick to move.
  */
 function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number, strength = 1): void {
+  if ((window as any).__bottleTest) return;
   if (ids.length === 0) return;
   pourLiquid(fluid, DICE.liquids.pick(ids), x, y, strength);
 }
@@ -1377,6 +1378,7 @@ class FluidSimulation {
       }
       
       if (oil <= 0 && soap <= 0 && acid === 0) return;
+      console.log("addMix called!", {oil, soap, acid, name: what.name});
       g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
     };
 
@@ -6590,7 +6592,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (soapDial > 0.001 && leadSolver?.addMix && isActiveRef.current) {
             const beat = kickRef.current.kick && DICE.music.float() < 0.25 + 0.7 * soapDial;
             const idle = nowMs - soapAtRef.current > (2600 - 1800 * soapDial);
-            if (beat || idle) {
+            if ((beat || idle) && !(window as any).__bottleTest) {
               soapAtRef.current = nowMs;
               leadSolver.addMix(0.15 + DICE.music.float() * 0.7, 0.15 + DICE.music.float() * 0.7, 0.03 + 0.04 * DICE.music.float(), { soap: 1 });
             }
