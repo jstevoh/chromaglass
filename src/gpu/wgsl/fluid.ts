@@ -457,12 +457,15 @@ export const KERNELS: Record<string, string> = {
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
 @group(0) @binding(4) var mulT: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var liquids0: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
+  let soap = textureLoad(liquids0, p, 0).r;
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z
@@ -496,6 +499,84 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     u = v.xy + dir * max(0.0, s - dot(v.xy, dir));
   }
   textureStore(dst, p, safeVel(vec4f(u, v.z + a.z, 0.0)));
+}`,
+
+  liquidForces: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var liquids1: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let l0 = textureLoad(liquids0, p, 0);
+  let l1 = textureLoad(liquids1, p, 0);
+  
+  let soap = l0.r;
+  let body = l0.g;
+  let repel = l0.b;
+  let heavy = l0.a;
+  let polar = l1.r;
+  
+  if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
+    textureStore(dst, p, safeVel(v));
+    return;
+  }
+  
+  var fx = 0.0;
+  var fy = 0.0;
+  let dt = S.dt;
+  let s = S.n;
+  
+  if (soap > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
+    fx -= gx * A.a.x * dt * s;
+    fy -= gy * A.a.x * dt * s;
+  }
+  
+  if (body > 0.0 && A.a.y == 0.0) {
+    let k = min(0.9, body * A.a.z * dt);
+    fx -= v.x * k;
+    fy -= v.y * k;
+  }
+  
+  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
+    fx += S.rock.x * heavy * A.a.w * dt * s;
+    fy += S.rock.y * heavy * A.a.w * dt * s;
+  }
+  
+  if (polar != 0.0) {
+    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
+    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
+    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
+    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
+    fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
+    fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
+  }
+  
+  if (repel > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).b - textureLoad(liquids0, p - vec2i(1, 0), 0).b) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).b - textureLoad(liquids0, p - vec2i(0, 1), 0).b) * 0.5;
+    let g = sqrt(gx * gx + gy * gy);
+    if (g > 1e-5) {
+      let nx = -gx / g;
+      let ny = -gy / g;
+      let outF = v.x * nx + v.y * ny;
+      if (outF > 0.0) {
+        let k = min(0.9, repel * A.b.y * dt * 60.0);
+        fx -= nx * outF * k;
+        fy -= ny * outF * k;
+      }
+    }
+  }
+  
+  let maxf = A.b.z;
+  fx = clamp(fx, -maxf, maxf);
+  fy = clamp(fy, -maxf, maxf);
+  
+  textureStore(dst, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -2427,6 +2508,40 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
     density, index, the mode; the rim's radius for the rim).
   */
+  liquidSplat0: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  let d = length(uv - A.a.xy) / max(A.a.z, 1e-4);
+  let w = select(0.0, 1.0 - d * d, d < 1.0);
+  let v = textureLoad(src, vec2i(id.xy), 0);
+  if (w <= 0.0) {
+    textureStore(dst, vec2i(id.xy), v);
+    return;
+  }
+  let take = clamp(A.a.w * w, 0.0, 1.0);
+  textureStore(dst, vec2i(id.xy), mix(v, A.b, take));
+}`,
+
+  liquidSplat1: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  let d = length(uv - A.a.xy) / max(A.a.z, 1e-4);
+  let w = select(0.0, 1.0 - d * d, d < 1.0);
+  let v = textureLoad(src, vec2i(id.xy), 0);
+  if (w <= 0.0) {
+    textureStore(dst, vec2i(id.xy), v);
+    return;
+  }
+  let take = clamp(A.a.w * w, 0.0, 1.0);
+  textureStore(dst, vec2i(id.xy), mix(v, A.b, take));
+}`,
+
   speciesSplat: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
