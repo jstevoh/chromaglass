@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
-import { ImagePlus, SlidersHorizontal } from 'lucide-react';
+import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
 import { PerformanceButton } from './PerformanceButton';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
@@ -46,6 +46,7 @@ export interface DesignDeskProps {
   paletteLock: number | null;
   onPalette: (i: number | null) => void;
   onImageDye: () => void;
+  onVideoDye: () => void;
 
   tool: string;
   onTool: (t: string) => void;

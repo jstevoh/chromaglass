@@ -2091,7 +2091,7 @@ export const PRESETS: Preset[] = [
       advection: 0.35,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.06,
+      automateRate: 0.15,
       platePressure: 0.3,
       glassSmear: 0.1,
       rainDrip: 0.0,

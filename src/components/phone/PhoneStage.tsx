@@ -5,7 +5,7 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save,
+  Laptop, Save, Video,
 } from 'lucide-react';
 import { Slider } from '../ui';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -110,6 +110,7 @@ export interface PhoneStageProps {
   paletteLock: number | null;
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
+  onVideoDye: () => void;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -679,6 +680,12 @@ export function PhoneStage(p: PhoneStageProps) {
             className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2"
           >
             <ImagePlus size={18} /> A photo as dye
+          </button>
+          <button
+            onClick={() => { p.onVideoDye(); close(); }}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2"
+          >
+            <Video size={18} /> A video as dye
           </button>
         </PhoneSheet>
       )}

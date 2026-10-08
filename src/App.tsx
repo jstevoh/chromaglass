@@ -773,7 +773,7 @@ export default function App() {
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
-  const videoFrameRaf = useRef<number>();
+  const videoFrameRaf = useRef<number | null>(null);
 
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -781,7 +781,7 @@ export default function App() {
     videoPlayerRef.current.src = URL.createObjectURL(file);
     videoPlayerRef.current.play();
     
-    const loop = () => {
+    const loop = (time: number) => {
       if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
         visualizerRef.current?.pourVideo(videoPlayerRef.current);
         videoFrameRaf.current = requestAnimationFrame(loop);
@@ -790,7 +790,7 @@ export default function App() {
     
     videoPlayerRef.current.onplay = () => {
       if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
-      loop();
+      loop(performance.now());
     };
 
     e.target.value = '';
@@ -4876,6 +4876,7 @@ export default function App() {
             paletteLock={paletteLock}
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
+            onVideoDye={() => videoInputRef.current?.click()}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -5553,6 +5554,7 @@ export default function App() {
           paletteLock={paletteLock}
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
+          onVideoDye={() => videoInputRef.current?.click()}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}

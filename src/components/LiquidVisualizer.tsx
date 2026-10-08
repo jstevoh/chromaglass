@@ -5616,9 +5616,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     pourVideo: (video: HTMLVideoElement) => {
       // Pour video onto the GPU fluid directly
       const fluid = fluidsRef.current[activeLayerRef.current];
-      if (fluid && fluid.gpu && fluid.gpu.pourImage) {
-        // Map video into the central visible region, just like injectImage
-        fluid.gpu.pourImage(video, [0.19, 0.31, 0.81, 0.69]);
+      if (fluid && fluid.gpu) {
+        const gpuFluid = fluid.gpu as unknown as { pourImage: (src: HTMLVideoElement, box: number[]) => void };
+        if (gpuFluid.pourImage) {
+          // Map video into the central visible region, just like injectImage
+          gpuFluid.pourImage(video, [0.19, 0.31, 0.81, 0.69]);
+        }
       }
     },
     pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {
