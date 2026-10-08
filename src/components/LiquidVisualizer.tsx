@@ -5217,11 +5217,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
     if (!af || drainFrameRef.current > 0) return;
+    const S = GRID_SIZE;
+    const kToolRaw = toolAmountRef.current;
+    const kTool = kToolRaw * kToolRaw;
+    const kSoftTool = Math.sqrt(kTool);
     if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
       const airy = g.tool === 'blow' || g.tool === 'press';
-      bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * GRID_SCALE, airy ? 'air' : 'dye');
+      bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * kSoftTool * GRID_SCALE, airy ? 'air' : 'dye', kSoftTool);
     }
-    const S = GRID_SIZE;
     const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
     /*
@@ -5236,7 +5239,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const dyeOf = (liq: LiquidType | undefined) => bottleDye(liq) * poured.dose;
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
     // And the amount set for this tool, on top of how hard this hand pressed.
-    const kTool = toolAmountRef.current;
     const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2 * kTool;
     if (LAYING_TOOLS.has(g.tool) && (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0) handPoursFerro(af);
 
@@ -7132,13 +7134,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const rgb = poured.rgb;
               const heat = liq?.heatAmount ?? 0.05;
               // The Amount set for this tool (1 is what it always did).
-              const k = toolAmountRef.current;
+              const kRaw = toolAmountRef.current;
+              const k = kRaw * kRaw;
               // Its square root for a push and a reach: twice the dye is not twice the shove, and a drop with twice the dye in it covers twice the area.
               const kSoft = Math.sqrt(k);
               // Whatever lands on the lead plate lands on its bubbles too:
               // dye bursts the one under it and shoves the rest, air shoves.
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                if (tool !== 'magnet') bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye');
+                if (tool !== 'magnet') bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * kSoft * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye', kSoft);
               }
               if (activeLayerRef.current === 0 && tool !== 'press' && tool !== 'magnet' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
 

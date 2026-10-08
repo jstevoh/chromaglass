@@ -36,13 +36,10 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
     is this?" has an answer the app already knows and a picker that was three
     clicks away through a menu that does not mention sound.
   */
-  onMic?: () => void;
-  onWall?: () => void;
+  onSound?: () => void;
+  onVideo?: () => void;
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
-  onPhone?: () => void;
-  /** Start or stop a performance (T). */
-  onPerformance?: () => void;
   onSearch: () => void;
   /** Design's Save and Send to wall; Perform has nothing here. */
   trailing?: ReactNode;

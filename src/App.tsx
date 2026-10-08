@@ -5446,6 +5446,7 @@ export default function App() {
           onSound={deskOpen.sound}
           onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
+          onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
           layers={stageLayers}
@@ -5576,6 +5577,7 @@ export default function App() {
           onSound={deskOpen.sound}
           onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
+          onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}

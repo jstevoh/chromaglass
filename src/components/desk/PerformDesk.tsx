@@ -138,6 +138,7 @@ interface PerformDeskProps {
   onSound: () => void;
   onVideo: () => void;
   onMidi: () => void;
+  onPerformance: () => void;
   /** The performance being recorded: its clock and the song attached so far. */
   performance: { clock: string; title?: string } | null;
   layer: number;
