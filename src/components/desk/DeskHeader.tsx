@@ -18,7 +18,6 @@ export interface DeskDots {
   sound: boolean;
   video: boolean;
   midi: boolean;
-  
 }
 
 export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onMidi, onSearch, trailing }: {
@@ -30,7 +29,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   /*
     Every dot opens the thing it reports on.
 
-    A dot that says "Mic" and cannot be clicked is half a control. It is the
+    A dot that says "Sound" and cannot be clicked is half a control. It is the
     one place on either desk where the state of an input is named, so it is
     where a hand goes when that input is the problem — and "which microphone
     is this?" has an answer the app already knows and a picker that was three
@@ -100,7 +99,83 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
     */
     <header ref={headerRef} className="relative col-span-3 flex items-center justify-between gap-4 border-b border-border px-4">
       <div className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium">
-        
+        {/*
+          The name where there is room for it, the mark alone where there is
+          not. Below 1280 this side is already giving way to the centred mode
+          switch (see below), and what it has room for belongs to the
+          breadcrumb — the look that is up is what someone reads here.
+        */}
+        <img src={LOCKUP_URL} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
+        <img src={MARK_URL} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
+        <AlphaBadge />
+        <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+        {breadcrumb}
+      </div>
+      {/*
+        Out of the flow, so it is centred on the *header* rather than on
+        whatever happens to be either side of it. Three columns did pin it, but
+        only by letting the sides give way — and at 1440 the right-hand cluster
+        needs more room than half of what is left, so Design's status dots were
+        clipped. Taking the switch out of the flow centres it exactly and leaves
+        the sides their natural width.
+      */}
+      {/*
+        Centred out of the flow only while there is room for it.
+
+        Taking the switch out of the flow centres it exactly, and at 1440 that
+        is right. But out of the flow it also stops pushing anything, so as the
+        window narrows the right-hand cluster slides straight underneath it —
+        measured at 1024, a laptop width: the switch was painted on top of the
+        Mic, Wall and MIDI dots. Those dots became clickable recently, so
+        reaching for Mic there did not merely miss, it switched the desk to
+        Design.
+
+        Putting it back into the flow below a width fixes the overlap and
+        brings back the thing taking it out of the flow was for: in the flow
+        its position depends on the two sides, so switching Perform to Design
+        — which adds Save and Send to wall on the right — slides it sideways,
+        and the one control whose job is to be in the same place every time
+        moves when you use it. Measured at 1280 it was still overlapping
+        anyway, because 1280 is not where it stops fitting.
+
+        So it stays pinned, and the *labels* on the status dots make room
+        instead: they move under their dots, small (see `StatusDot`). They
+        used to go altogether, and a row of unlabelled dots was reported as
+        impossible to read.
+      */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div ref={switchRef} className="pointer-events-auto">
+          <Segmented
+            value={mode}
+            options={[['perform', 'Perform'], ['design', 'Design'], ['sound', 'Sound']] as const}
+            onChange={onMode}
+            height={32}
+            testId="mode-segmented"
+          />
+        </div>
+      </div>
+      <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`}>
+        <StatusDot
+          on={dots.sound}
+          label="Sound" tight={tight}
+          onClick={onSound}
+          title={dots.sound ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
+          testId="dot-sound"
+        />
+        <StatusDot
+          on={dots.video}
+          label="Video" tight={tight}
+          onClick={onVideo}
+          title={dots.video ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
+          testId="dot-video"
+        />
+        <StatusDot
+          on={dots.midi}
+          label={midiName ?? 'MIDI'} short="MIDI" tight={tight}
+          onClick={onMidi}
+          title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
+          testId="dot-midi"
+        />
         <button
           onClick={onSearch}
           className={`ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong ${tight ? 'px-2' : 'px-3'} text-[13px] text-muted transition-colors hover:bg-hover hover:text-text`}

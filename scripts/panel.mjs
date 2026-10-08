@@ -900,7 +900,7 @@ check('and nothing but a lost context rebuilds the renderer',
   is where a hand goes when the microphone is the problem.
 */
 const header = readFileSync(join(root, 'src/components/desk/DeskHeader.tsx'), 'utf8');
-for (const [dot, handler] of [['mic', 'onMic'], ['wall', 'onWall'], ['midi', 'onMidi'], ['phone', 'onPhone']]) {
+for (const [dot, handler] of [['sound', 'onSound'], ['video', 'onVideo'], ['midi', 'onMidi']]) {
   check(`the ${dot} dot opens something`,
     new RegExp(`dots\\.${dot}[\\s\\S]{0,240}onClick=\\{${handler}\\}`).test(header)
     || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));
