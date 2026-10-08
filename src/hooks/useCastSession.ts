@@ -164,7 +164,16 @@ export function useCastSender(
     if (windowFullscreen !== false) return;
     const fire = (e: Event) => {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      // Do not steal focus/fullscreen if the user is interacting with UI controls or panels
+      if (
+        t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'SELECT' ||
+          t.closest('button, a, [role="slider"], [role="switch"], [role="tab"], [role="option"], [role="menuitem"], [data-testid$="-panel"], [data-testid$="-sheet"]'))
+      ) {
+        return;
+      }
       fillWindow();
     };
     window.addEventListener('pointerdown', fire, { capture: true });
