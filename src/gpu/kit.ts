@@ -941,24 +941,4 @@ if (typeof window !== 'undefined') {
     const fail = params.get('failPipeline');
     if (fail) PipelineCache.failPipeline(fail);
   } catch { /* ignore */ }
-
-  let existingDebug: unknown = w.chromaglassDebug;
-  Object.defineProperty(w, 'chromaglassDebug', {
-    configurable: true,
-    enumerable: true,
-    get() {
-      if (!existingDebug) return undefined;
-      return (...args: unknown[]) => {
-        const res = typeof existingDebug === 'function' ? (existingDebug as (...a: unknown[]) => unknown)(...args) : existingDebug;
-        if (res && typeof res === 'object') {
-          (res as Record<string, unknown>).failPipeline = (name: string) => PipelineCache.failPipeline(name);
-          (res as Record<string, unknown>).resetFailures = () => PipelineCache.resetFailures();
-        }
-        return res;
-      };
-    },
-    set(v) {
-      existingDebug = v;
-    },
-  });
 }

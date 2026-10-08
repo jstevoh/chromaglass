@@ -232,7 +232,7 @@ try {
     // S17: a pipeline that fails to build is skipped, not fatal.
     const pipeFramesBefore = await page.evaluate(() => window.chromaglassDebug().webgpu?.frames ?? 0);
     const fatalsBefore = await page.evaluate(() => window.chromaglassDebug().crash.thisLoad().filter((e) => e.level === 'fatal').length);
-    await page.evaluate(() => window.chromaglassDebug().failPipeline('forcesB'));
+    await page.evaluate(() => window.chromaglassFailPipeline('forcesB'));
     const pipeAdvanced = await page.waitForFunction(
       (fb) => (window.chromaglassDebug().webgpu?.frames ?? 0) >= fb + 15,
       pipeFramesBefore,
@@ -243,7 +243,7 @@ try {
     const newFatal = fatalsAfter > fatalsBefore;
     check('a pipeline that fails to build is skipped and logged, not fatal', pipeAdvanced && !newFatal && !!pipeLine,
       `${pipeAdvanced ? 'frames advanced' : 'frames stalled'}; ${pipeLine?.msg?.slice(0, 100) ?? 'no pipeline error'}${newFatal ? '; new fatal recorded' : ''}`);
-    await page.evaluate(() => window.chromaglassDebug().resetFailures());
+    await page.evaluate(() => window.chromaglassResetFailures());
     await settleFrames();
 
     // ── 4. Frames that stop ──────────────────────────────────────────
