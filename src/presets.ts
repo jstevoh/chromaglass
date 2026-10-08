@@ -83,7 +83,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'comet',
     name: 'Comet River',
-    description: 'A constant, drifting stream pulls heavy ink into long comet tails, simulating a tilted plate or a slow wind.',
+    description: 'A raging torrent that pulls ink off the plate instantly. A single poured point acts as a comet head while the stream rips a tail from it.',
     settings: {
       globalSpeed: 0.012,
       surge: 0.6,
@@ -92,13 +92,13 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.5,
       rotationSpeed: 0,
       centerGravity: 0,
-      cometSpeed: 0.1,
+      cometSpeed: 1.5,
       cometAngle: 90,
       ledPlatform: false,
       buoyancy: 0.2,
       advection: 0.45,
       damping: 0.99,
-      automateRate: 0.3,
+      automateRate: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
       evaporationRate: 0.008,
@@ -108,7 +108,7 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.6,
       saturationBoost: 1.5,
       sceneMappings: [
-        { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.2 },
+        { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
         { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 45 }
       ],
       audioMappings: {
