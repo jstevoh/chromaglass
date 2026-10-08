@@ -5548,3 +5548,9 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   about 0.4 over 20 s), against the same take with the sound off; then pick the routes
   that read weakest and make each the thing it stands for.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
+
+## Business Plan: The PRO Desktop App
+Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
+* **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
+* **PRO Desktop App ($200+ Paid):** The native desktop wrapper (Electron) will be sold as a premium, standalone product with a "buy once, use forever" model (no subscriptions).
+  * **Pro Features:** NDI/Syphon/Spout output, custom MIDI mapping, offline use, custom ISF shader imports, video injections (HAP/WebM), and Wallpaper Mode.

@@ -771,6 +771,31 @@ export default function App() {
     e.target.value = '';
   }, []);
 
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const videoFrameRaf = useRef<number>();
+
+  const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !videoPlayerRef.current) return;
+    videoPlayerRef.current.src = URL.createObjectURL(file);
+    videoPlayerRef.current.play();
+    
+    const loop = () => {
+      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
+        visualizerRef.current?.pourVideo(videoPlayerRef.current);
+        videoFrameRaf.current = requestAnimationFrame(loop);
+      }
+    };
+    
+    videoPlayerRef.current.onplay = () => {
+      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
+      loop();
+    };
+
+    e.target.value = '';
+  }, []);
+
   const userPresetsRef = useRef<UserPreset[]>([]);
 
   /*
@@ -5587,7 +5612,11 @@ export default function App() {
       {/* The file input the bench's Image dye button reaches for. It lives
           in the narrow-screen toolbar, which is not rendered under a desk. */}
       {(deskUp || phone) && (
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
+        </>
       )}
       {/* The crash report, under a desk: its header has no room for a
           button that is idle nearly always, so the chip says when there is

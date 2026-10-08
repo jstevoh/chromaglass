@@ -760,6 +760,7 @@ export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
   injectImage: (imageData: ImageData) => void;
+  pourVideo: (video: HTMLVideoElement) => void;
   /**
    * Pour words into the lead plate: each row drawn at the biggest size its
    * share of the box allows, in `colour` (default: the look's brightest dye;
@@ -5611,6 +5612,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     injectImage: (imageData: ImageData) => {
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
+    },
+    pourVideo: (video: HTMLVideoElement) => {
+      // Pour video onto the GPU fluid directly
+      const fluid = fluidsRef.current[activeLayerRef.current];
+      if (fluid && fluid.gpu && fluid.gpu.pourImage) {
+        // Map video into the central visible region, just like injectImage
+        fluid.gpu.pourImage(video, [0.19, 0.31, 0.81, 0.69]);
+      }
     },
     pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {
       const fluid = fluidsRef.current[0];

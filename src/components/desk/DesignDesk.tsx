@@ -322,6 +322,13 @@ export function DesignDesk(p: DesignDeskProps) {
           >
             <ImagePlus size={13} className="mr-1.5 inline" /> Image dye…
           </button>
+          <button
+            onClick={p.onVideoDye}
+            className="mt-2 h-9 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
+            data-testid="video-dye"
+          >
+            <Video size={13} className="mr-1.5 inline" /> Video dye…
+          </button>
         </Group>
 
         <Group title="Palette">

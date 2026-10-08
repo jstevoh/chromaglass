@@ -1553,8 +1553,9 @@ export class WebGPUFluid {
    * `box` is where it lands, in plate coordinates (0..1). `flipY` is for a
    * source that counts its rows downwards, which a 2D canvas does.
    */
-  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
-    const w = src.width, h = src.height;
+  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement | HTMLVideoElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
+    const w = 'videoWidth' in src ? src.videoWidth : src.width;
+    const h = 'videoHeight' in src ? src.videoHeight : src.height;
     if (!w || !h) return;
     const tex = this.device.createTexture({
       label: 'pour source', size: [w, h], format: 'rgba8unorm',
