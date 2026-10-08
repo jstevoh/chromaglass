@@ -174,7 +174,7 @@ Chromium, the day it was found) or read in the code.
     **Do:** the film belongs to the component, not the GPU effect: stopped on unmount
     only, attached again after a rebuild. **Measure:** `npm run crash`'s forced loss
     with a film playing: the film still draws after the recovery.
-17. **S17 — One pipeline that fails to build takes down the whole step.**
+17. **S17 — One pipeline that fails to build takes down the whole step.** (*Shipped*)
     - *Read in the code.* `prepareCompute` swallows an async build's failure ("built on
       the frame instead", `kit.ts`); `computePipeline` then builds it synchronously and
       caches the invalid pipeline; and the step is one compute pass in one encoder, the

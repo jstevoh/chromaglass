@@ -142,6 +142,7 @@ export class WebGPUCamera {
     if (!this.scene) return;
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
     const pipeline = this.pipelines.renderPipeline(cameraName(format, toTexture), cameraRecipe(this.device, format, toTexture));
+    if (!pipeline) return;
     const pass = encoder.beginRenderPass({
       label: 'camera',
       colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],

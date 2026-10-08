@@ -142,7 +142,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   (#207's note), timeouts on song ID and lyrics.
 - **1.8** **14k**'s build version in the cast hello (B, S), after 0.8's show tag: a projector
   window from another build says so.
-- **1.9** **S17** (C, M): a pipeline that fails to build is skipped, not fatal (#212 has merged).
+- **1.9** ~~**S17**~~ (C, M): ~~a pipeline that fails to build is skipped, not fatal (#212 has merged).~~
 - **1.10** **S16** (G, S): a GPU rebuild keeps the film.
 - **1.11** **13-recmem** (B, M): Record streams to disk; a set-length take cannot run out of memory.
 - **1.12** **14i-guard, then 14r, then S21** (C, S then M then M): the flash guard in linear light,

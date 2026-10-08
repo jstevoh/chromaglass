@@ -188,14 +188,20 @@ export class WebGPUParticles {
     const seed = this.pipelines.computePipeline('particle seed', SEED_WGSL);
     const advect = this.pipelines.computePipeline('particle advect', ADVECT_WGSL);
 
-    const pass = enc.beginComputePass({ label: 'particles', timestampWrites: timing?.('particles') });
-    pass.setPipeline(seed);
-    pass.setBindGroup(0, bindGroup(this.device, seed, [this.uniform, this.buffer, dye]));
-    pass.dispatchWorkgroups(groups);
-    pass.setPipeline(advect);
-    pass.setBindGroup(0, bindGroup(this.device, advect, [this.uniform, this.buffer, velForced]));
-    pass.dispatchWorkgroups(groups);
-    pass.end();
+    if (seed || advect) {
+      const pass = enc.beginComputePass({ label: 'particles', timestampWrites: timing?.('particles') });
+      if (seed) {
+        pass.setPipeline(seed);
+        pass.setBindGroup(0, bindGroup(this.device, seed, [this.uniform, this.buffer, dye]));
+        pass.dispatchWorkgroups(groups);
+      }
+      if (advect) {
+        pass.setPipeline(advect);
+        pass.setBindGroup(0, bindGroup(this.device, advect, [this.uniform, this.buffer, velForced]));
+        pass.dispatchWorkgroups(groups);
+      }
+      pass.end();
+    }
   }
 
   /**
@@ -210,6 +216,7 @@ export class WebGPUParticles {
   splat(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
     if (this.live === 0) return;
     const pipeline = this.pipelines.renderPipeline('particle splat', splatRecipe(this.device));
+    if (!pipeline) return;
 
     const pass = enc.beginRenderPass({
       label: 'particle splat',

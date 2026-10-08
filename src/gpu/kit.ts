@@ -1,3 +1,5 @@
+import * as crashLog from '../lib/crashLog';
+
 /**
  * The small kit everything on WebGPU is built from (docs/webgpu-plan.md, P1):
  * pipelines cached by name, ping-pong textures, a readback ring, per-pass GPU
@@ -99,6 +101,15 @@ export type PipelineLedger = {
 
 const ledger: PipelineLedger = { devices: 0, ahead: 0, onFrame: [], asking: null };
 
+/**
+ * Pipelines that failed to build (async compile rejection, error scope on
+ * synchronous build, or simulated for test: S17, docs/stability-plan.md).
+ * Remembered so callers skip the stage rather than invalidating the encoder
+ * and the step.
+ */
+const failedPipelines = new Set<string>();
+const simulatedFailures = new Set<string>();
+
 function deviceStore(device: GPUDevice) {
   let dev = shared.get(device);
   if (!dev) { dev = { modules: new Map(), scopes: new Map(), index: ++ledger.devices }; shared.set(device, dev); }
@@ -141,6 +152,25 @@ export class PipelineCache {
   /** The number the ledger gives `device` (from 1, in the order devices first asked). */
   static deviceIndex(device: GPUDevice): number {
     return deviceStore(device).index;
+  }
+
+  /**
+   * Simulate a build failure for named pipeline(s) under ?debug (S17).
+   * Matches full name, base name, scoped key, or substring.
+   */
+  static failPipeline(name: string): void {
+    simulatedFailures.add(name);
+  }
+
+  /** Clear recorded and simulated failures (for harness test resets). */
+  static resetFailures(): void {
+    failedPipelines.clear();
+    simulatedFailures.clear();
+  }
+
+  /** Whether a pipeline is currently marked failed or simulated to fail. */
+  static isFailed(name: string): boolean {
+    return failedPipelines.has(name) || simulatedFailures.has(name);
   }
 
   /**
@@ -187,25 +217,90 @@ export class PipelineCache {
    * gets two pipelines rather than whichever was built first; and one file
    * with two entry points (the pressure self-test's) gets both.
    */
-  computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline {
+  private isSimulated(name: string): boolean {
+    const base = name.split(':')[0];
+    const scopedName = this.scope ? `${this.scope}/${name}` : name;
+    const scopedBase = this.scope ? `${this.scope}/${base}` : base;
+    for (const s of simulatedFailures) {
+      if (s === name || s === base || s === scopedName || s === scopedBase) return true;
+      if (name.includes(s) || scopedName.includes(s)) return true;
+    }
+    return false;
+  }
+
+  private isFailed(name: string): boolean {
+    const base = name.split(':')[0];
+    const scopedName = this.scope ? `${this.scope}/${name}` : name;
+    const scopedBase = this.scope ? `${this.scope}/${base}` : base;
+    return failedPipelines.has(name) ||
+           failedPipelines.has(base) ||
+           failedPipelines.has(scopedName) ||
+           failedPipelines.has(scopedBase) ||
+           this.isSimulated(name);
+  }
+
+  private markFailed(name: string, reason: string): void {
+    const scopedName = this.scope ? `${this.scope}/${name}` : name;
+    if (failedPipelines.has(scopedName)) return;
+    failedPipelines.add(scopedName);
+    failedPipelines.add(name);
+    failedPipelines.add(name.split(':')[0]);
+    crashLog.record('error', 'pipeline', `${scopedName} failed to build: ${reason}`);
+  }
+
+  computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline | null {
+    if (this.isFailed(name)) {
+      if (!failedPipelines.has(name)) this.markFailed(name, 'refused by debug hook');
+      return null;
+    }
     const bySource = this.computeSlot(name, entryPoint);
     this.asked(name);
     let p = bySource.get(code);
     if (!p) {
-      p = this.device.createComputePipeline(this.computeDescriptor(name, code, entryPoint));
-      bySource.set(code, p);
-      this.onFrame(name);
+      this.device.pushErrorScope('validation');
+      try {
+        p = this.device.createComputePipeline(this.computeDescriptor(name, code, entryPoint));
+        bySource.set(code, p);
+        this.onFrame(name);
+      } catch (err) {
+        this.device.popErrorScope().catch(() => {});
+        this.markFailed(name, err instanceof Error ? err.message : String(err));
+        return null;
+      }
+      this.device.popErrorScope().then((err) => {
+        if (err) {
+          this.markFailed(name, err.message);
+          bySource.delete(code);
+        }
+      });
     }
     return p;
   }
 
-  renderPipeline(name: string, make: RenderRecipe): GPURenderPipeline {
+  renderPipeline(name: string, make: RenderRecipe): GPURenderPipeline | null {
+    if (this.isFailed(name)) {
+      if (!failedPipelines.has(name)) this.markFailed(name, 'refused by debug hook');
+      return null;
+    }
     this.asked(name);
     let p = this.render.get(name);
     if (!p) {
-      p = this.device.createRenderPipeline({ label: name, ...make((code) => this.module(code, name)) });
-      this.render.set(name, p);
-      this.onFrame(name);
+      this.device.pushErrorScope('validation');
+      try {
+        p = this.device.createRenderPipeline({ label: name, ...make((code) => this.module(code, name)) });
+        this.render.set(name, p);
+        this.onFrame(name);
+      } catch (err) {
+        this.device.popErrorScope().catch(() => {});
+        this.markFailed(name, err instanceof Error ? err.message : String(err));
+        return null;
+      }
+      this.device.popErrorScope().then((err) => {
+        if (err) {
+          this.markFailed(name, err.message);
+          this.render.delete(name);
+        }
+      });
     }
     return p;
   }
@@ -217,12 +312,15 @@ export class PipelineCache {
    *
    * It never throws, and says whether the pipeline is in the cache now. A
    * pipeline that will not build ahead (a validation error, a device lost
-   * mid-way) is left for the frame to build the old way, which is also where
-   * its error is reported the way every other one is.
+   * mid-way, or simulated refusal: S17) is marked failed and skipped.
    */
   async prepareCompute(name: string, code: string, entryPoint = 'main', use = false, times?: BuildTimes): Promise<boolean> {
     const bySource = this.computeSlot(name, entryPoint);
     if (bySource.has(code)) return true;
+    if (this.isFailed(name)) {
+      this.markFailed(name, 'refused by debug hook');
+      return false;
+    }
     try {
       const p = await this.device.createComputePipelineAsync(this.computeDescriptor(name, code, entryPoint));
       if (times) times.compiled = performance.now();
@@ -231,17 +329,24 @@ export class PipelineCache {
       if (this.ledger) this.ledger.ahead++;
       if (use) { await firstUse(this.device, p, code); if (times) times.used = performance.now(); }
       return true;
-    } catch { return false; /* built on the frame instead (above) */ }
+    } catch (err) {
+      this.markFailed(name, err instanceof Error ? err.message : String(err));
+      return false;
+    }
   }
 
   /** Whether `computePipeline` would find this one built, without building or asking for it. */
   hasCompute(name: string, code: string, entryPoint = 'main'): boolean {
-    return this.computeSlot(name, entryPoint).has(code);
+    return !this.isFailed(name) && this.computeSlot(name, entryPoint).has(code);
   }
 
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
   async prepareRender(name: string, make: RenderRecipe, use = false, times?: BuildTimes): Promise<boolean> {
     if (this.render.has(name)) return true;
+    if (this.isFailed(name)) {
+      this.markFailed(name, 'refused by debug hook');
+      return false;
+    }
     try {
       // The sources it is made of, for the scraps its first draw binds.
       const codes = new Set<string>();
@@ -253,7 +358,10 @@ export class PipelineCache {
       if (this.ledger) this.ledger.ahead++;
       if (use) { await firstDraw(this.device, p, desc, [...codes]); if (times) times.used = performance.now(); }
       return true;
-    } catch { return false; /* built on the frame instead */ }
+    } catch (err) {
+      this.markFailed(name, err instanceof Error ? err.message : String(err));
+      return false;
+    }
   }
 
   /** `prepareCompute`, handed over to be asked for later (see `Prep`). */
@@ -814,4 +922,23 @@ export async function scoped<T>(device: GPUDevice, label: string, fn: () => T, d
   const err = await device.popErrorScope();
   if (err) console.error(`WebGPU validation error in ${label}:`, err.message);
   return out;
+}
+
+// ── Debug hook for pipeline failure simulation (S17) ─────────────────
+
+if (typeof window !== 'undefined') {
+  const w = window as unknown as {
+    chromaglassFailPipeline?: (name: string) => void;
+    chromaglassResetFailures?: () => void;
+    chromaglassDebug?: unknown;
+    location?: Location;
+  };
+  w.chromaglassFailPipeline = (name: string) => PipelineCache.failPipeline(name);
+  w.chromaglassResetFailures = () => PipelineCache.resetFailures();
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fail = params.get('failPipeline');
+    if (fail) PipelineCache.failPipeline(fail);
+  } catch { /* ignore */ }
 }

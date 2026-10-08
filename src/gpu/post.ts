@@ -224,7 +224,7 @@ export class WebGPUPostChain {
     return (this.ringNext - d + RING_FRAMES * 2) % RING_FRAMES;
   }
 
-  private pipeline(name: string, code: string, format: GPUTextureFormat, toTexture: boolean, stages = GPUShaderStage.FRAGMENT): GPURenderPipeline {
+  private pipeline(name: string, code: string, format: GPUTextureFormat, toTexture: boolean, stages = GPUShaderStage.FRAGMENT): GPURenderPipeline | null {
     return this.pipelines.renderPipeline(passName(name, format, toTexture), passRecipe(this.device, name, code, format, toTexture, stages));
   }
 
@@ -243,6 +243,8 @@ export class WebGPUPostChain {
    */
   stock(encoder: GPUCommandEncoder, seed: number, st: StockSettings): void {
     if (st.stock <= 0.001 || this.targets.length !== 2) return;
+    const pipe = this.pipeline('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true);
+    if (!pipe) return;
     const out = 1 - this.cur;
     this.pack.set('stock', st.stock);
     this.pack.set('stockType', Math.max(0, Math.min(4, Math.round(st.stockType))));
@@ -255,7 +257,6 @@ export class WebGPUPostChain {
     this.pack.set('resolution', this.size[0], this.size[1]);
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
 
-    const pipe = this.pipeline('stock', STOCK_PASS_WGSL, PICTURE_FORMAT, true);
     const pass = encoder.beginRenderPass({
       label: 'film stock',
       colorAttachments: [{ view: this.targets[out].createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
@@ -277,6 +278,8 @@ export class WebGPUPostChain {
 
   effects(encoder: GPUCommandEncoder, frame: number, seed: number, test: PostTest | null): void {
     if (!test || test.mode === 0 || this.targets.length !== 2) return;
+    const pipe = this.pipeline('test', TEST_PASS_WGSL, PICTURE_FORMAT, true);
+    if (!pipe) return;
     const ring = this.ensureRing();
     const out = 1 - this.cur;
 
@@ -287,7 +290,6 @@ export class WebGPUPostChain {
     this.pack.set('resolution', this.size[0], this.size[1]);
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
 
-    const pipe = this.pipeline('test', TEST_PASS_WGSL, PICTURE_FORMAT, true);
     const pass = encoder.beginRenderPass({
       label: 'post effects',
       colorAttachments: [{ view: this.targets[out].createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
@@ -313,8 +315,9 @@ export class WebGPUPostChain {
 
   /** One frame into the ring, scaled down on the way. */
   private push(encoder: GPUCommandEncoder, picture: GPUTexture): void {
-    const ring = this.ensureRing();
     const pipe = this.pipeline('ring blit', BLIT_WGSL, PICTURE_FORMAT, true);
+    if (!pipe) return;
+    const ring = this.ensureRing();
     const pass = encoder.beginRenderPass({
       label: 'history push',
       colorAttachments: [{
@@ -355,6 +358,7 @@ export class WebGPUPostChain {
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
 
     const pipe = this.pipeline('finish', FINISH_PASS_WGSL, this.format, toTexture);
+    if (!pipe) return;
     const pass = encoder.beginRenderPass({
       label: 'post finish',
       colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],

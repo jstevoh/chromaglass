@@ -1205,7 +1205,7 @@ export class WebGPUFluid {
     return buf;
   }
 
-  private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline {
+  private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline | null {
     return this.pipelines.computePipeline(`${name}:${format}`, kernel(name, format));
   }
 
@@ -1219,6 +1219,7 @@ export class WebGPUFluid {
     size = this.N,
   ): void {
     const pipe = this.pipeline(name, dst.format);
+    if (!pipe) return;
     const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => (r instanceof GPUTexture ? r.label : 'sampler')).join(',')}:${args.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1234,6 +1235,7 @@ export class WebGPUFluid {
   /** As run, with the pressure buffer bound after the texture written. */
   private runPressed(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
+    if (!pipe) return;
     const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => r.label).join(',')}:${args.label}:press`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1253,6 +1255,7 @@ export class WebGPUFluid {
    */
   private runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
+    if (!pipe) return;
     const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1280,6 +1283,7 @@ export class WebGPUFluid {
    */
   private runPhaseAdvect(pass: GPUComputePassEncoder, args: GPUBuffer): void {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
+    if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}`;
     let group = this.groups.get(key);
@@ -1304,8 +1308,11 @@ export class WebGPUFluid {
    * the read field whatever the count.
    */
   private runPhasePlanned(pass: GPUComputePassEncoder, least: number, disp: number, stand: GPUTexture): void {
-    const w = Math.ceil(this.N / 8);
     const plan = this.pipeline('phasePlan', R32);
+    const adv = this.pipeline('phaseAdvectPlan', this.phase.write.format);
+    const grid = this.pipeline('phaseGridPlan', this.phase.write.format);
+    if (!plan || !adv || !grid) return;
+    const w = Math.ceil(this.N / 8);
     const planArgs = this.arg('phase plan', [least, CARRY_SUBSTEPS, w, 0]);
     let group = this.groups.get(`phasePlan:${planArgs.label}`);
     if (!group) {
@@ -1315,8 +1322,6 @@ export class WebGPUFluid {
     pass.setPipeline(plan);
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(1);
-    const adv = this.pipeline('phaseAdvectPlan', this.phase.write.format);
-    const grid = this.pipeline('phaseGridPlan', this.phase.write.format);
     const gap = this.ensurePhaseGap();
     const there = this.phase.read, back = this.phase.write;
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
@@ -1346,6 +1351,7 @@ export class WebGPUFluid {
   /** The gap as the phase has now seen it (phaseGapSeen), every step the phase moves, whichever solver. */
   private runPhaseGapSeen(pass: GPUComputePassEncoder): void {
     const pipe = this.pipeline('phaseGapSeen', R32);
+    if (!pipe) return;
     const key = `phaseGapSeen:${this.squeeze.read.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1608,6 +1614,7 @@ export class WebGPUFluid {
     cache = true,
   ): void {
     const pipe = this.pipelines.computePipeline(`${name}:${format}`, splatKernel(name, format));
+    if (!pipe) return;
     const label = (r: GPUBuffer | GPUTexture | GPUSampler) => (r instanceof GPUSampler ? 'sampler' : r.label);
     const key = `splat ${name}:${format}:${rest.map(label).join(',')}`;
     let group = cache ? this.groups.get(key) : undefined;
@@ -1870,32 +1877,36 @@ export class WebGPUFluid {
         this between steps, it carries on from where the last one left off.
       */
       const rb = this.pipelines.computePipeline('squeezeRedBlack', kernel('squeezeRedBlack', 'r32float'));
-      const half = Math.ceil((this.N * (this.N / 2)) / 64);
-      for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
-        for (const parity of [0, 1]) {
-          const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
-          let group = this.groups.get(key);
-          if (!group) {
-            group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
-            this.groups.set(key, group);
+      if (rb) {
+        const half = Math.ceil((this.N * (this.N / 2)) / 64);
+        for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
+          for (const parity of [0, 1]) {
+            const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
+            let group = this.groups.get(key);
+            if (!group) {
+              group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
+              this.groups.set(key, group);
+            }
+            pass.setPipeline(rb);
+            pass.setBindGroup(0, group);
+            pass.dispatchWorkgroups(half);
           }
-          pass.setPipeline(rb);
-          pass.setBindGroup(0, group);
-          pass.dispatchWorkgroups(half);
         }
       }
 
       const sv = this.pipelines.computePipeline('squeezeVelBuf', kernel('squeezeVelBuf', 'rgba16float'));
-      const svKey = `squeezeVelBuf:${this.vel.write.label}:${this.squeeze.read.label}`;
-      let svGroup = this.groups.get(svKey);
-      if (!svGroup) {
-        svGroup = bindGroup(this.device, sv, [this.sim, none, this.vel.read, this.squeeze.read, this.vel.write, this.spress]);
-        this.groups.set(svKey, svGroup);
+      if (sv) {
+        const svKey = `squeezeVelBuf:${this.vel.write.label}:${this.squeeze.read.label}`;
+        let svGroup = this.groups.get(svKey);
+        if (!svGroup) {
+          svGroup = bindGroup(this.device, sv, [this.sim, none, this.vel.read, this.squeeze.read, this.vel.write, this.spress]);
+          this.groups.set(svKey, svGroup);
+        }
+        pass.setPipeline(sv);
+        pass.setBindGroup(0, svGroup);
+        pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
+        this.vel.swap();
       }
-      pass.setPipeline(sv);
-      pass.setBindGroup(0, svGroup);
-      pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
-      this.vel.swap();
     });
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
@@ -3512,6 +3523,7 @@ export class WebGPUFluid {
    */
   private clearBuffer(pass: GPUComputePassEncoder, buf: GPUBuffer, key: string): void {
     const pipe = this.pipelines.computePipeline('mgZero', kernel('mgZero', 'r32float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       // The Sim, then the Args, then the buffer: every kernel here takes
@@ -3531,6 +3543,7 @@ export class WebGPUFluid {
   /** Red-black sweeps on level 0, the packed buffer. */
   private smooth0(pass: GPUComputePassEncoder, sweeps: number): void {
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
+    if (!pipe) return;
     const half = Math.ceil((this.N * (this.N / 2)) / 64);
     for (let k = 0; k < sweeps; k++) {
       for (const parity of [0, 1]) {
@@ -3551,6 +3564,7 @@ export class WebGPUFluid {
   /** A one-dimensional dispatch over buffers, its bind group cached under `key`. */
   private dispatchBuf(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count: number): void {
     const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...resources]);
@@ -3564,6 +3578,7 @@ export class WebGPUFluid {
   /** As dispatchBuf, over the grid in 8 × 8 tiles, with no args of its own. */
   private dispatchBuf2(pass: GPUComputePassEncoder, name: string, key: string, resources: (GPUBuffer | GPUTexture)[]): void {
     const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), ...resources]);
@@ -3653,16 +3668,18 @@ export class WebGPUFluid {
     }
 
     const grad = this.pipelines.computePipeline('gradientSubtractBuf', kernel('gradientSubtractBuf', 'rgba16float'));
-    const gkey = `gradientSubtractBuf:${this.vel.write.label}`;
-    let ggroup = this.groups.get(gkey);
-    if (!ggroup) {
-      ggroup = bindGroup(this.device, grad, [this.sim, none, this.vel.read, this.vel.write, this.press]);
-      this.groups.set(gkey, ggroup);
+    if (grad) {
+      const gkey = `gradientSubtractBuf:${this.vel.write.label}`;
+      let ggroup = this.groups.get(gkey);
+      if (!ggroup) {
+        ggroup = bindGroup(this.device, grad, [this.sim, none, this.vel.read, this.vel.write, this.press]);
+        this.groups.set(gkey, ggroup);
+      }
+      pass.setPipeline(grad);
+      pass.setBindGroup(0, ggroup);
+      pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
+      this.vel.swap();
     }
-    pass.setPipeline(grad);
-    pass.setBindGroup(0, ggroup);
-    pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
-    this.vel.swap();
   }
 
   /**
@@ -3912,6 +3929,7 @@ export class WebGPUFluid {
     // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
+    if (!pipe) return;
     const group = (src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
       const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}`;
       let g = this.groups.get(key);
@@ -3956,6 +3974,7 @@ export class WebGPUFluid {
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
   private hsRun(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count?: number): void {
     const pipe = this.pipelines.computePipeline(`${name}:thin`, kernel(name, 'rgba16float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...resources]);
@@ -4233,6 +4252,7 @@ export class WebGPUFluid {
 
   private statsRun(pass: GPUComputePassEncoder, name: string, rest: (GPUBuffer | GPUTexture)[], groups: number): void {
     const pipe = this.pipelines.computePipeline(name, STATS_KERNELS[name]);
+    if (!pipe) return;
     // The dye is a ping-pong, so the key has to name the half that is bound:
     // a group cached under the kernel's name alone would go on measuring
     // whichever texture happened to be the read side when it was made.
