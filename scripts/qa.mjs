@@ -1643,7 +1643,7 @@ try {
         section it opens has to be able to answer that, so the source chooser
         and the device picker are both checked for, not just the heading.
       */
-      await clickOn('dot-mic');
+      await clickOn('dot-sound');
       await appears('settings-panel');
       await settle(400);
       const micDot = await page.evaluate(() => {

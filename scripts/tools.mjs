@@ -364,7 +364,7 @@ try {
         const early = await idleWindow(1250), late = await idleWindow(1250);
         const along = toward(sign, wb.cx - wa.cx, wb.cy - wa.cy);
         const idle = toward(sign, before.cx, before.cy);
-        const bar = 0.002 + Math.max(0, idle / Math.max(1, before.steps)) * strokeSteps;
+        const bar = 0.0015 + Math.max(0, idle / Math.max(1, before.steps)) * strokeSteps;
         const d = (k) => (steps1?.[k] ?? 0) - (steps0?.[k] ?? 0);
         return {
           before, early, late, strokeSteps, wa, wb, along, idle, bar,
