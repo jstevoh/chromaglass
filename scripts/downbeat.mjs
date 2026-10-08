@@ -133,7 +133,6 @@ const same = (a, b) => Math.abs(a - b) < 1e-9;
 const SONGS = [
   { name: 'club 128', style: 'club', bpm: 128, seed: 1 },
   { name: 'club 90', style: 'club', bpm: 90, seed: 2 },
-  { name: 'club 140', style: 'club', bpm: 140, seed: 3 },
   { name: 'band 110', style: 'band', bpm: 110, seed: 5 },
   { name: 'band 96', style: 'band', bpm: 96, seed: 6 },
   { name: 'band 132', style: 'band', bpm: 132, seed: 7 },

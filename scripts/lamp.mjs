@@ -105,7 +105,7 @@ const BEFORE_LAMP = {
       // Each call site of the two composites back to the mix it was.
       for (const [fn, n, to] of [
         ['chemOnGround', 3, (x) => x[1]],
-        ['onGround', 3, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
+        ['onGround', 2, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
       ]) {
         let at = 0, done = 0;
         const call = new RegExp(`(?<![\\w])${fn}\\(`, 'g');
