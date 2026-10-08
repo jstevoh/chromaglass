@@ -12,6 +12,7 @@
 
 import { PALETTE } from '../constants';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { sanitizePatch } from './sanitizeSettings.ts';
 import type { ShowSequence, ShowStage } from './sequencer';
 import { parseSongRef, type SongRef } from './songRef';
 import { PACE_MOMENTS, type PaceMoment, type StagePace } from './scenePacing';
@@ -93,16 +94,8 @@ export function makeUserPreset(
 
 /** Only known settings, in the order the defaults declare them, and never a pinned solver grid. */
 export function cleanSettings(raw: Partial<VisualizerSettings>): VisualizerSettings {
-  const out = {} as Record<string, unknown>;
-  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof VisualizerSettings)[]) {
-    const v = raw[key];
-    const d = DEFAULT_SETTINGS[key];
-    if (v === undefined || v === null) { out[key] = d; continue; }
-    // Keep the type the default has; anything else falls back to the default.
-    if (typeof d === 'object' && d !== null) out[key] = typeof v === 'object' ? { ...(d as object), ...(v as object) } : d;
-    else if (typeof v === typeof d) out[key] = v;
-    else out[key] = d;
-  }
+  const sanitized = sanitizePatch(raw);
+  const out = { ...DEFAULT_SETTINGS, ...sanitized } as Record<string, unknown>;
   out.simResolution = 'auto';
   /*
     The macro zoom used to be inert unless `macroMode` was on.

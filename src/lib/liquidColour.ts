@@ -46,14 +46,20 @@ type Bottle = Pick<LiquidType, 'color' | 'own' | 'behaviour'> | undefined;
   (`npm run natural`) can load this file without the app's module graph.
   The same reading: #rrggbb to 0..1, anything else white.
 */
+const MAX_HEX_CACHE = 512;
 const hexCache = new Map<string, { r: number; g: number; b: number }>();
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  if (typeof hex !== 'string' || hex.length > 9) return { r: 1, g: 1, b: 1 };
   const hit = hexCache.get(hex);
   if (hit) return hit;
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   const rgb = m
     ? { r: parseInt(m[1], 16) / 255, g: parseInt(m[2], 16) / 255, b: parseInt(m[3], 16) / 255 }
     : { r: 1, g: 1, b: 1 };
+  if (hexCache.size >= MAX_HEX_CACHE) {
+    const oldest = hexCache.keys().next().value;
+    if (oldest !== undefined) hexCache.delete(oldest);
+  }
   hexCache.set(hex, rgb);
   return rgb;
 }

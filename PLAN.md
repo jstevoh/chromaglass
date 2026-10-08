@@ -317,6 +317,14 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-1** The plate pulses each time a control is pressed or a tool is picked. Desk;
   the pulse reaches the wall. Thread "Plate pulses on control clicks", no PR yet.
 - **QA-2** The mouse pointer shows on the show screen. Wall, Mac. Draft #271.
+- **QA-19** Interacting with settings switches to and maximizes the performance window. Desk, wall.
+  When the additional window that is used for performances is showing and not maximized,
+  interacting with settings to change something automatically switches focus to the
+  additional window and maximizes it. The performer needs to be able to use the settings
+  without the overall extra window changing states (besides the light show settings
+  themselves updating). Cause: `useCastSession.ts` captures any `pointerdown`/`keydown`
+  outside raw text inputs and delegates `fillWindow()`, forcing the performance receiver window
+  fullscreen.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 

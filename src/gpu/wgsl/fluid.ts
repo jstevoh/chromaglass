@@ -61,7 +61,7 @@ struct Sim {
   curDamp: f32,
   curBuoy: f32,
   curGrav: f32,
-  spare25: f32,       // the motor's stir until PLAN 22j: the dish drags the liquid now
+  cometX: f32,        // explicit constant flow force for comet effects
   meanD: f32,
   maxCur: f32,
   rock: vec2f,
@@ -81,6 +81,7 @@ struct Sim {
   plateCurve: f32,
   gapSpring: f32,
   gapMemory: f32,
+  cometY: f32,
   // Up the screen, in the plate: the dish is drawn turned, the room is not.
   up: vec2f,
   /*

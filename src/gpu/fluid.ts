@@ -1383,11 +1383,11 @@ export class WebGPUFluid {
     const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
-    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
+    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
     f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
-    f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5);
+    f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5); f[33] = fin(p.cometY, 0);
     const gx = fin(p.gravityX, 0), gy = fin(p.gravityY, -1);
     const gl = Math.hypot(gx, gy) || 1;
     f[34] = -gx / gl; f[35] = -gy / gl;

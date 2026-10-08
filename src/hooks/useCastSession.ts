@@ -158,22 +158,7 @@ export function useCastSender(
     return true;
   }, [cleanup, openChannel, readWindowFullscreen]);
 
-  // While our window is up with its title bar showing, the next click or key
-  // anywhere in this window fills it (delegation needs the gesture itself).
-  useEffect(() => {
-    if (windowFullscreen !== false) return;
-    const fire = (e: Event) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
-      fillWindow();
-    };
-    window.addEventListener('pointerdown', fire, { capture: true });
-    window.addEventListener('keydown', fire, { capture: true });
-    return () => {
-      window.removeEventListener('pointerdown', fire, { capture: true });
-      window.removeEventListener('keydown', fire, { capture: true });
-    };
-  }, [windowFullscreen, fillWindow]);
+  // (Auto-fill on next click was removed to let users interact with settings while windowed)
 
   const startCast = useCallback(async (mode: 'window' | 'device' = 'device', screen?: ScreenLike | null) => {
     const debug = new URLSearchParams(window.location.search).has('debug') ? '&debug' : '';
