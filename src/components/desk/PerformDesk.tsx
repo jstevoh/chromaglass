@@ -478,41 +478,7 @@ export function PerformDesk(p: PerformDeskProps) {
           >
             {next ? `Go to ${next.name}` : 'Nothing cued'}
           </Button>
-          {/* The second projector's Go (§16a): the same cued look, to the
-              back plate only. Quieter than Go, because Go is the one a hand
-              should find in the dark. The row says what the back plate is on,
-              so an operator can tell a back plate following the front from
-              one that was given a look an hour ago. */}
-          {p.onGoBackPlate && (
-            <div className="mt-2 flex items-center gap-2">
-              <Button
-                full height={36}
-                onClick={p.onGoBackPlate}
-                disabled={!next || next.kind === 'sequence'}
-                midiKey="action:go-back-plate"
-                testId="go-back-plate-button"
-                title={next ? `Send ${next.name} to the back plate only: its liquid and its colours, over the fade` : 'Cue a look first'}
-              >
-                {next ? 'To Back Plate' : 'Back Plate'}
-              </Button>
-              {p.backLook ? (
-                <Button
-                  height={36}
-                  onClick={() => p.onBackFollowsFront?.()}
-                  midiKey="action:back-follows-front"
-                  testId="back-follows-front-button"
-                  title={`The back plate is on ${p.backLook}. Press to have it follow the front again.`}
-                >
-                  Follow Front
-                </Button>
-              ) : null}
-            </div>
-          )}
-          {p.onGoBackPlate && (
-            <p className="mt-1 truncate text-[12px] text-faint" data-testid="back-plate-on">
-              Back plate: {p.backLook ?? 'follows the front'}
-            </p>
-          )}
+          {/* The second projector's Go (§16a) is temporarily hidden per user request */}
           <div className="mt-2 flex gap-2">
             <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} midiKey="action:revert" testId="back-button">Back</Button>
             {/* Inverted while it is on: a blacked-out room is exactly when

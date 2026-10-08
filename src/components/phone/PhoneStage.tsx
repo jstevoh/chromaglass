@@ -728,35 +728,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <p className="-mt-3 text-[12px] leading-snug text-dim">The plate printed as a comic: flat inks, black lines, the pale washes in dots.</p>
             </div>
           )}
-          {p.onBackLook && (
-            <div className="mt-3">
-              <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="group" aria-label="Send a look to">
-                {([['all', 'Whole plate'], ['back', 'Back plate']] as const).map(([v, label]) => (
-                  <button
-                    key={v}
-                    onClick={() => setLookTo(v)}
-                    aria-pressed={lookTo === v}
-                    data-testid={`phone-send-to-${v}`}
-                    className={`h-10 rounded-md text-[14px] ${lookTo === v ? 'bg-accent-bg text-accent-text' : 'text-muted active:bg-active'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-1 flex min-h-[40px] items-center justify-between gap-2">
-                <span className="truncate text-[12px] text-dim" data-testid="phone-back-plate-on">Back plate: {p.backLook ?? 'follows the front'}</span>
-                {p.backLook && (
-                  <button
-                    onClick={() => { p.onBackFollowsFront?.(); setLookTo('all'); }}
-                    data-testid="phone-back-follows-front"
-                    className="h-10 shrink-0 rounded-md border border-border px-3 text-[13px] text-text-2 active:bg-active"
-                  >
-                    Follow front
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {/* The second projector's look routing (§16a) is temporarily hidden per user request */}
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>
