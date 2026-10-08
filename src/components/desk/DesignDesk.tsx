@@ -107,11 +107,9 @@ export interface DesignDeskProps {
   dots: DeskDots;
   midiName: string | null;
   /** The controller panel, from the header's MIDI dot. */
-  onMic: () => void;
-  onWall: () => void;
+  onSound: () => void;
+  onVideo: () => void;
   onMidi: () => void;
-  onPhone: () => void;
-  onPerformance: () => void;
   /** The performance being recorded: its clock and the song attached so far. */
   performance: { clock: string; title?: string } | null;
   onSearch: () => void;
@@ -235,11 +233,9 @@ export function DesignDesk(p: DesignDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
-        onMic={p.onMic}
-        onWall={p.onWall}
+        onSound={p.onSound}
+        onVideo={p.onVideo}
         onMidi={p.onMidi}
-        onPhone={p.onPhone}
-        onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
           <>

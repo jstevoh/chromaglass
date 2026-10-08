@@ -107,6 +107,10 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.4,
       boundaryContrast: 0.6,
       saturationBoost: 1.5,
+      sceneMappings: [
+        { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
+        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 45 }
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -291,6 +295,9 @@ export const PRESETS: Preset[] = [
       gelWheel: 0.55,
       gelSpeed: 0.6,
       ledColor: '#12002c',
+      sceneMappings: [
+        { source: 'sound', feature: 'complexity', setting: 'turbulenceScale', depth: 0.25 }
+      ],
       audioMappings: {
         velocity: 'treble',
         density: 'timbre',
@@ -328,7 +335,11 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.2,
       vibrationFrequency: 1.0,
       dropHeight: 0.9,
-      beatSqueeze: 0.8,
+      beatSqueeze: 0.20,
+      sceneMappings: [
+        { source: 'sound', feature: 'kick', setting: 'plateRock', depth: 0.5 },
+        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -416,6 +427,10 @@ export const PRESETS: Preset[] = [
       bubbles: 0.5,
       dropHeight: 0.7,
       saturationBoost: 1.4,
+      sceneMappings: [
+        { source: 'sound', feature: 'energy', setting: 'airVelocity', depth: 0.05 },
+        { source: 'sound', feature: 'treble', setting: 'bubbles', depth: 0.4 }
+      ],
       audioMappings: {
         velocity: 'energy',
         density: 'complexity',
@@ -461,6 +476,9 @@ export const PRESETS: Preset[] = [
       cells: 0.45,
       saturationBoost: 1.15,
       dyeBudget: 0.55,
+      sceneMappings: [
+        { source: 'sound', feature: 'hats', setting: 'beads', depth: 0.5 }
+      ],
       audioMappings: {
         velocity: 'complexity',
         density: 'energy',
@@ -505,6 +523,10 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.15,
       ledColor: '#020818',
       secondLamp: 0.35,
+      sceneMappings: [
+        { source: 'sound', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
+        { source: 'sound', feature: 'tonalMid', setting: 'hueJourney', depth: 0.5 }
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -922,6 +944,9 @@ export const PRESETS: Preset[] = [
       gelSpeed: 0.25,
       dishVignette: 0.7,
       spinDrag: 0.08,
+      sceneMappings: [
+        { source: 'sound', feature: 'mid', setting: 'rotationSpeed', depth: 0.03 }
+      ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -978,7 +1003,7 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.0,
       bubbles: 0.07,
       plateRock: 0.5,
-      beatSqueeze: 0.7,
+      beatSqueeze: 0.17,
       layerScaleVariety: 0.0,
       hueJourney: 0,
       lightPlay: 0.15,
@@ -1023,7 +1048,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,
       postBlurRadius: 0.3,
       plateRock: 0.25,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.07,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
@@ -1086,7 +1111,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,
       postBlurRadius: 0.3,
       plateRock: 0.25,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.07,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
@@ -1149,7 +1174,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,
       postBlurRadius: 0.3,
       plateRock: 0.25,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.07,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
@@ -1294,6 +1319,9 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.55,
       glossiness: 0.18,
       macroSync: 0.35,
+      sceneMappings: [
+        { source: 'sound', feature: 'mid', setting: 'beads', depth: 0.3 }
+      ],
       audioMappings: {
         velocity: 'mid',
         density: 'bass',
@@ -1416,7 +1444,7 @@ export const PRESETS: Preset[] = [
       dishSpread: 0.0,
       dishVignette: 0.0,
       plateRock: 0.3,
-      beatSqueeze: 0.9,
+      beatSqueeze: 0.20,
       layerScaleVariety: 0.0,
       backgroundLoop: 0.6,
       hueJourney: 4,
@@ -1471,7 +1499,7 @@ export const PRESETS: Preset[] = [
       beads: 0.2,
       fingering: 0.6,              // a palm on the glass lifts into spokes as they move on
       plateRock: 0.2,
-      beatSqueeze: 0.5,
+      beatSqueeze: 0.13,
       lightPlay: 0.35,
       lampMotion: 0.25,
       lampHotspot: 0.5,
@@ -1550,13 +1578,17 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.3,
       bubbles: 0.0,
       plateRock: 0.1,
-      beatSqueeze: 0.25,
+      beatSqueeze: 0.06,
       layerScaleVariety: 0.0,
       hueJourney: 0,               // four food colourings, and they stay those four
       lightPlay: 0.2,
       lampHotspot: 0.35,
       iridescence: 0,
       secondLamp: 0,
+      sceneMappings: [
+        { source: 'sound', feature: 'bass', setting: 'beads', depth: 0.2 },
+        { source: 'sound', feature: 'treble', setting: 'airVelocity', depth: 0.02 }
+      ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -1607,7 +1639,7 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
-      beatSqueeze: 0.4,
+      beatSqueeze: 0.10,
       layerScaleVariety: 0.0,
       hueJourney: 7,
       lightPlay: 0.6,
@@ -1616,6 +1648,9 @@ export const PRESETS: Preset[] = [
       iridescence: 0.6,
       thinFilm: 1.0,
       secondLamp: 0,
+      sceneMappings: [
+        { source: 'sound', feature: 'energy', setting: 'beads', depth: 0.15 }
+      ],
       audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
@@ -1665,7 +1700,7 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.35,
       bubbles: 0.05,
       plateRock: 0.45,             // the rock is what supplies the current
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.07,
       layerScaleVariety: 0.3,
       hueJourney: 9,
       lightPlay: 0.4,
@@ -1689,7 +1724,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0126,
       advection: 0.45,
       platePressure: 0.5,
-      beatSqueeze: 0.5,
+      beatSqueeze: 0.13,
       dyeBudget: 0.9,
       oilTension: 0.9,
       // Oil and water as separate bodies, each with its own colour (roadmap §I).
@@ -1736,7 +1771,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0105,
       advection: 0.4,
       platePressure: 0.35,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.07,
       dyeBudget: 0.9,
       phIndicator: 1,
       thicknessOptics: 0.4,
@@ -1780,7 +1815,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       advection: 0.3,
       platePressure: 0.2,
-      beatSqueeze: 0.2,
+      beatSqueeze: 0.05,
       dyeBudget: 0.35,
       bzReaction: 1,
       ledColor: '#fbf6ee',
@@ -1821,7 +1856,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       advection: 0.3,
       platePressure: 0.2,
-      beatSqueeze: 0.2,
+      beatSqueeze: 0.05,
       dyeBudget: 0.5,
       liesegang: 1,
       thicknessOptics: 0.3,
@@ -1910,7 +1945,7 @@ export const PRESETS: Preset[] = [
       magnetStrength: 0.9,
       magnetHeight: 0.3,
       magnetWalk: 0.7,
-      beatSqueeze: 0.4,
+      beatSqueeze: 0.10,
       lampHotspot: 0.4,
       secondLamp: 0.3,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
@@ -2015,7 +2050,7 @@ export const PRESETS: Preset[] = [
       plateCurve: 0.6,
       depthDrag: 1.5,
       plateSpring: 0.35,
-      beatSqueeze: 0.6,
+      beatSqueeze: 0.15,
       transmission: 0.35,
       dishVignette: 0.8,
       lampHotspot: 0.5,
@@ -2086,9 +2121,12 @@ export const PRESETS: Preset[] = [
       magnetStrength: 0.45,
       magnetHeight: 0.4,
       magnetWalk: 0.3,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.07,
       lampHotspot: 0.0,
       secondLamp: 0.0,
+      sceneMappings: [
+        { source: 'sound', feature: 'bass', setting: 'magnetStrength', depth: 0.4 }
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
@@ -2146,7 +2184,7 @@ export const PRESETS: Preset[] = [
       // value, for the same reasons (npm run maze measures it; on the
       // hosted 512² it is still above the twelve-cell floor).
       mazeDetail: 0.5,
-      beatSqueeze: 0.4,
+      beatSqueeze: 0.10,
       lampHotspot: 0.3,
       secondLamp: 0.2,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
@@ -2230,7 +2268,7 @@ export const PRESETS: Preset[] = [
       secondLamp: 0,
       lampWarmth: 0,
       plateRock: 0.4,
-      beatSqueeze: 0.6,
+      beatSqueeze: 0.15,
       layerScaleVariety: 0,
       hueJourney: 0,
       // Zoomed in it is still a print: the closeup's paint cells, lacing,

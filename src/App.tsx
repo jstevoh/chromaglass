@@ -2141,13 +2141,6 @@ export default function App() {
       .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
   }, [allPresets, swatchOf]);
   const setActive = setList.items.length > 0;
-  useEffect(() => {
-    if (cuedRef.current?.item != null) {
-      const c = cues.find(x => x.id === cuedRef.current!.item);
-      if (c?.missing) setCued(null);
-    }
-  }, [cues]);
-
   const cues = useMemo<Cue[]>(() => {
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
@@ -2582,7 +2575,7 @@ export default function App() {
               changeSet(res.list);
               setLiveItemId(null);
             }
-            if (res.userPresets && res.userPresets.length) { for (const p of res.userPresets) userPresets.upsert(p); }
+            if (res.presets && res.presets.length) { for (const p of res.presets) userPresets.upsert(p); }
             if (res.sequences && res.sequences.length) { for (const q of res.sequences) sequencer.upsertSequence(q); }
           });
           alert('Show kit imported! Reloading the page to apply MIDI map, liquids, and wall configurations.');
@@ -3960,13 +3953,10 @@ export default function App() {
   const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
 
   const deskDots = useMemo(() => ({
-    mic: audioSource !== 'none',
-    wall: isCasting,
+    sound: audioSource !== 'none',
+    video: isCasting,
     midi: midi.enabled,
-    phone: remoteLink.status === 'connected',
-    rec: recorder.recording ? String(recorder.seconds) : null,
-    perf: perfClock,
-  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
+  }), [audioSource, isCasting, midi.enabled]);
 
   /*
     Where each status dot goes.
@@ -3984,13 +3974,9 @@ export default function App() {
     setShowHelp(false);
   }, []);
   const deskOpen = useMemo(() => ({
-    mic: () => openSettingsAt('audio-input'),
-    wall: () => openSettingsAt('projectors'),
+    sound: () => openSettingsAt('audio-input'),
+    video: () => openSettingsAt('projectors'),
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
-    // The phone has no setting to change — it either found the relay or it did
-    // not — so this goes to the part of the guide that says what it does and
-    // what has to be running for it to connect at all.
-    phone: () => { setHelpFocus('live'); setShowHelp(true); setShowSettings(false); setShowMidi(false); setShowSequencer(false); },
   }), [openSettingsAt]);
 
   /*
@@ -5457,11 +5443,9 @@ export default function App() {
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           midiName={midi.activeInputName ?? null}
-          onMic={deskOpen.mic}
-          onWall={deskOpen.wall}
+          onSound={deskOpen.sound}
+          onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
-          onPhone={deskOpen.phone}
-          onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
           layers={stageLayers}
@@ -5589,11 +5573,9 @@ export default function App() {
           }}
           dots={deskDots}
           midiName={midi.activeInputName ?? null}
-          onMic={deskOpen.mic}
-          onWall={deskOpen.wall}
+          onSound={deskOpen.sound}
+          onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
-          onPhone={deskOpen.phone}
-          onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
