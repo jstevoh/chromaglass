@@ -1988,6 +1988,12 @@ export default function App() {
   const [liveItemId, setLiveItemId] = useState<string | null>(null);
   /** The desk's list as last drawn, for the keys and pads that step it. */
   const cuesRef = useRef<Cue[]>([]);
+  useEffect(() => {
+    if (cuedRef.current?.kind === 'item') {
+      const c = cues.find(x => x.id === cuedRef.current!.item);
+      if (c?.missing) setCued(null);
+    }
+  }, [cues]);
   /** The sequencer, from above where it is created (a set item can be a sequence). */
   const sequencerRef = useRef<{ startAt: (id: string, positionSec: number) => void; sequences: ShowSequence[] } | null>(null);
   const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
