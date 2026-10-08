@@ -3769,8 +3769,8 @@ class FluidSimulation {
       buoyancy: settings.buoyancy,
       gravity: (settings.centerGravity || 0) * 0.05,
       tiltX: this.tiltX, tiltY: this.tiltY,
-      cometX: (settings.cometSpeed ?? 0) * 0.1 * Math.cos((settings.cometAngle ?? 0) * Math.PI / 180),
-      cometY: (settings.cometSpeed ?? 0) * 0.1 * Math.sin((settings.cometAngle ?? 0) * Math.PI / 180),
+      cometX: (settings.cometSpeed ?? 0) * 1.5 * Math.cos((settings.cometAngle ?? 0) * Math.PI / 180),
+      cometY: (settings.cometSpeed ?? 0) * 1.5 * Math.sin((settings.cometAngle ?? 0) * Math.PI / 180),
       advection: settings.advection,
       // The nine-point stencil pushes about twice as hard per unit as the
       // four-point one it replaced, so the slider maps to half of what it did.

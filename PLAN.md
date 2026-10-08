@@ -328,6 +328,8 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
+- **QA-20** Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
+
 - **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
   phone. Draft #269 (PLAN 15i).
 - ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).

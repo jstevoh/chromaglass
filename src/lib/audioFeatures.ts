@@ -573,10 +573,19 @@ export class AudioFeatures {
     const vals = new Float64Array(15);
     let pNum = 0, pDen = 0;
     for (let k = 1; k <= this.top; k++) {
-      for (let i = 0; i < 15; i++) {
+            for (let i = 0; i < 15; i++) {
         vals[i] = this.specRing[i][k];
       }
-      vals.sort();
+      // Insertion sort is much faster for 15 elements than V8's typed array sort overhead
+      for (let i = 1; i < 15; i++) {
+        const v = vals[i];
+        let j = i - 1;
+        while (j >= 0 && vals[j] > v) {
+          vals[j + 1] = vals[j];
+          j--;
+        }
+        vals[j + 1] = v;
+      }
       const median = vals[7];
       hDb[k] = median;
       const p = Math.pow(10, median / 10);

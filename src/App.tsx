@@ -76,6 +76,7 @@ import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
+import { exportShowKit, importShowKit, SHOW_KIT_FORMAT } from './lib/showKit';
 import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
@@ -1988,12 +1989,6 @@ export default function App() {
   const [liveItemId, setLiveItemId] = useState<string | null>(null);
   /** The desk's list as last drawn, for the keys and pads that step it. */
   const cuesRef = useRef<Cue[]>([]);
-  useEffect(() => {
-    if (cuedRef.current?.kind === 'item') {
-      const c = cues.find(x => x.id === cuedRef.current!.item);
-      if (c?.missing) setCued(null);
-    }
-  }, [cues]);
   /** The sequencer, from above where it is created (a set item can be a sequence). */
   const sequencerRef = useRef<{ startAt: (id: string, positionSec: number) => void; sequences: ShowSequence[] } | null>(null);
   const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
@@ -2146,6 +2141,13 @@ export default function App() {
       .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
   }, [allPresets, swatchOf]);
   const setActive = setList.items.length > 0;
+  useEffect(() => {
+    if (cuedRef.current?.item != null) {
+      const c = cues.find(x => x.id === cuedRef.current!.item);
+      if (c?.missing) setCued(null);
+    }
+  }, [cues]);
+
   const cues = useMemo<Cue[]>(() => {
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
@@ -2561,7 +2563,37 @@ export default function App() {
       const list = setListRef.current;
       downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
         writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
-    } else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
+    }     else if (a === 'export-show') {
+      const list = setListRef.current;
+      exportShowKit(list, userPresetsRef.current, sequencer.sequences).then(text => {
+        downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'show'}.chromaglass-show.json`, text);
+      });
+    } else if (a === 'import-show') {
+      const el = document.createElement('input');
+      el.type = 'file';
+      el.accept = '.json';
+      el.onchange = async () => {
+        const file = el.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          await importShowKit(text, (res) => {
+            if (res.list) {
+              changeSet(res.list);
+              setLiveItemId(null);
+            }
+            if (res.userPresets && res.userPresets.length) { for (const p of res.userPresets) userPresets.upsert(p); }
+            if (res.sequences && res.sequences.length) { for (const q of res.sequences) sequencer.upsertSequence(q); }
+          });
+          alert('Show kit imported! Reloading the page to apply MIDI map, liquids, and wall configurations.');
+          window.location.reload();
+        } catch (err) {
+          alert('Failed to import show kit: ' + (err instanceof Error ? err.message : String(err)));
+        }
+      };
+      el.click();
+    }
+    else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
     else if (a === 'song-shows') setShowSongs(true);
   }, [changeSet, changeSaved]);
   const onItemAction = useCallback((id: string, a: SetItemAction) => {

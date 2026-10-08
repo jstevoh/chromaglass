@@ -53,7 +53,7 @@ export interface Cue {
 /** What a set item's menu can do. */
 export type SetItemAction = 'link-song' | 'unlink-song' | 'capture' | 'up' | 'down' | 'remove';
 /** What the set's own menu can do. */
-export type SetAction = 'import' | 'export' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
+export type SetAction = 'import' | 'export' | 'import-show' | 'export-show' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
 
 /**
  * What the strip starts with: the controls a light show is actually played on.
@@ -340,6 +340,9 @@ export function PerformDesk(p: PerformDeskProps) {
               <div className="my-1 h-px bg-border" />
               <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
               <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
+              <div className="my-1 h-px bg-border" />
+              <MenuItem onClick={() => setAct('import-show')} testId="set-import-show">Import show kit…</MenuItem>
+              <MenuItem onClick={() => setAct('export-show')} testId="set-export-show">Export show kit</MenuItem>
               <MenuItem onClick={() => setAct('song-shows')} testId="set-song-shows">Song shows…</MenuItem>
             </div>
           )}
