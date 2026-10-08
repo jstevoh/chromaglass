@@ -215,6 +215,79 @@ try {
   }
   check('the back plate\'s button takes the back plate out, and leaves the front plate where it is',
     backWas > 0 && backNow === 0 && frontHeld, `back ${backWas} → ${backNow}${frontHeld ? '' : ', the front plate moved'}`);
+
+  // ── S14n: One malformed message cannot end the plate (PLAN.md §14n) ──
+  const settingsBefore = await shown();
+  const cacheBefore = await display.evaluate(() => window.chromaglassHexCacheSize?.() ?? 0);
+  const governorBefore = await display.evaluate(() => {
+    const g = window.chromaglassGovernor?.();
+    return g ? { rungs: g.ladder?.length, rungIndex: g.rungIndex } : null;
+  });
+
+  // Send malformed patch and gesture over a controller socket
+  const ws = new WebSocket(`ws://localhost:${PORT}/remote-ws`);
+  await new Promise((resolve, reject) => {
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'hello', role: 'controller', key: KEY }));
+      resolve();
+    };
+    ws.onerror = reject;
+  });
+
+  // 1. Send malformed patch: simResolution: "x", NaN, and unknown key
+  ws.send(JSON.stringify({
+    type: 'patch',
+    settings: {
+      simResolution: 'x',
+      globalSpeed: NaN,
+      notARealSettingAtAll: 9999,
+    },
+  }));
+
+  // 2. Send 1,000-character colour gesture and malformed blow gesture
+  const longColor = '#' + 'f'.repeat(1000);
+  ws.send(JSON.stringify({
+    type: 'drop',
+    x: 0.5,
+    y: 0.5,
+    layer: 0,
+    amount: 0.5,
+    color: longColor,
+  }));
+  ws.send(JSON.stringify({
+    type: 'dye',
+    color: longColor,
+  }));
+  ws.send(JSON.stringify({
+    type: 'blow',
+    x: 0.5,
+    y: 0.5,
+    layer: 0,
+    dx: 'notANumber',
+    dy: 'alsoNotANumber',
+  }));
+
+  // Also call hexToRgb directly with 1,000-char colour to ensure it rejects caching
+  await display.evaluate((c) => window.chromaglassHexToRgb?.(c), longColor);
+
+  // Wait for batches to settle
+  await display.waitForTimeout(300);
+
+  const settingsAfter = await shown();
+  const cacheAfter = await display.evaluate(() => window.chromaglassHexCacheSize?.() ?? 0);
+  const governorAfter = await display.evaluate(() => {
+    const g = window.chromaglassGovernor?.();
+    return g ? { rungs: g.ladder?.length, rungIndex: g.rungIndex } : null;
+  });
+  const hasLongColor = await display.evaluate((c) => window.chromaglassHexCacheHas?.(c) ?? false, longColor);
+
+  check('malformed simResolution "x" is dropped', settingsAfter.simResolution === settingsBefore.simResolution, `simResolution is ${JSON.stringify(settingsAfter.simResolution)}`);
+  check('NaN globalSpeed is dropped', settingsAfter.globalSpeed === settingsBefore.globalSpeed && Number.isFinite(settingsAfter.globalSpeed), `globalSpeed is ${settingsAfter.globalSpeed}`);
+  check('unknown settings are dropped', !('notARealSettingAtAll' in settingsAfter), 'unknown key dropped');
+  check('governor ladder is untouched by malformed simResolution', JSON.stringify(governorAfter) === JSON.stringify(governorBefore), `${JSON.stringify(governorBefore)} → ${JSON.stringify(governorAfter)}`);
+  check('1000-character colour is not cached in hexCache', cacheAfter === cacheBefore && !hasLongColor, `hexCache size ${cacheBefore} → ${cacheAfter}, in cache: ${hasLongColor}`);
+
+  ws.close();
 } catch (err) {
   check('the run completed', false, String(err).split('\n').slice(0, 12).join(' | '));
 } finally {

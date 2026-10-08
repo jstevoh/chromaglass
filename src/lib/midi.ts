@@ -9,7 +9,7 @@
  * (`useMidi`) owns the devices and the wiring.
  */
 
-import type { VisualizerSettings } from '../types';
+import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types.ts';
 // With its extension, because `npm run panel` and `npm run rungs` load this
 // file through esbuild but a strip-types harness may load it directly, and
 // node resolves no extensionless import.
@@ -794,7 +794,16 @@ export function parseMidiMap(text: string): MidiMap {
       // is always live — which is exactly what `undefined` means, so old maps
       // keep working without being migrated.
       bank: Number.isInteger(b.bank) && (b.bank as number) >= 0 && (b.bank as number) < MIDI_BANKS ? b.bank : undefined,
-    }));
+    }))
+    .filter(b => {
+      if (b.target.kind === 'setting') {
+        const keyKnown = b.target.key in DEFAULT_SETTINGS;
+        const minOk = typeof b.target.min === 'number' && Number.isFinite(b.target.min);
+        const maxOk = typeof b.target.max === 'number' && Number.isFinite(b.target.max);
+        return keyKnown && minOk && maxOk;
+      }
+      return true;
+    });
   const map: MidiMap = { format: MIDI_FORMAT, version: 1, name: typeof o.name === 'string' ? o.name : 'MIDI map', device: typeof o.device === 'string' ? o.device : undefined, bindings };
   // Only when the file says something about the music: absent stays absent,
   // so an old controller file loaded over a rig leaves the rig's music alone.

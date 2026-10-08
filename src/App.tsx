@@ -32,6 +32,7 @@ import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
+import { sanitizePatch } from './lib/sanitizeSettings';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
 import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
@@ -365,6 +366,8 @@ export default function App() {
         // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
         return settingsRef.current;
       };
+    (window as unknown as { chromaglassGovernor?: unknown }).chromaglassGovernor =
+      () => (visualizerRef.current as unknown as { governor?: unknown })?.governor ?? null;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
@@ -1511,13 +1514,15 @@ export default function App() {
   };
 
   const updateSettings = (patch: Partial<VisualizerSettings>) => {
+    const clean = sanitizePatch(patch);
+    if (Object.keys(clean).length === 0) return;
     /*
       Hold stays where the closeup is (QA-12, reported by the owner as the
       picture jumping when Hold was pressed): see holdWhereItIs. Here rather
       than at the chip, so the desk's chip, the phone's Hold, the Camera menu
       and anything else that sets the mode all get it.
     */
-    const newSettings = holdWhereItIs(patch, settingsRef.current.macroCamera, () => visualizerRef.current?.macroCentre() ?? null);
+    const newSettings = holdWhereItIs(clean, settingsRef.current.macroCamera, () => visualizerRef.current?.macroCentre() ?? null);
     setSettings(prev => ({ ...prev, ...newSettings }));
     setDocDirty(true);
     handOnLevels(Object.keys(newSettings));
@@ -3278,7 +3283,9 @@ export default function App() {
   const pendingPatchRef = useRef<Partial<VisualizerSettings> | null>(null);
   const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queuePatch = (partial: Partial<VisualizerSettings>) => {
-    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...partial };
+    const clean = sanitizePatch(partial);
+    if (Object.keys(clean).length === 0) return;
+    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...clean };
     if (patchTimerRef.current) return;
     patchTimerRef.current = setTimeout(() => {
       patchTimerRef.current = null;
@@ -3309,10 +3316,14 @@ export default function App() {
           // Arm, do not apply: `preset` is the destructive one.
           if (message.presetId) cueLook(message.presetId); else setCued(null);
           break;
-        case 'dye':
-          updateLiquidColor(selectedLiquidId, message.color);
-          setActiveTool('dropper');
+        case 'dye': {
+          const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
+          if (color) {
+            updateLiquidColor(selectedLiquidId, color);
+            setActiveTool('dropper');
+          }
           break;
+        }
         case 'liquid':
           // Only a bottle that is actually on the bench: the pad may be a
           // newer build than the display, or the other way round.
@@ -3355,25 +3366,62 @@ export default function App() {
             default: unhandled('an action from the phone', message.action);
           }
           break;
-        case 'blow':
-          visualizerRef.current?.applyGesture({ tool: 'blow', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+        case 'blow': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
+          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'blow', x, y, layer, amount, dx, dy });
           break;
-        case 'drop':
-          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer, amount: message.amount, ...laidColour(selectedLiquid, message.color) });
+        }
+        case 'drop': {
+          if (message.color !== undefined && (typeof message.color !== 'string' || message.color.length > 9)) {
+            break;
+          }
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const color = typeof message.color === 'string' ? message.color : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'drop', x, y, layer, amount, ...laidColour(selectedLiquid, color) });
           break;
-        case 'press':
-          visualizerRef.current?.applyGesture({ tool: 'press', x: message.x, y: message.y, layer: message.layer, amount: message.amount });
+        }
+        case 'press': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'press', x, y, layer, amount });
           break;
-        case 'finger':
-          visualizerRef.current?.applyGesture({ tool: 'finger', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+        }
+        case 'finger': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
+          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'finger', x, y, layer, amount, dx, dy });
           break;
+        }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
-        case 'spin':
-          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount, id: message.id });
+        case 'spin': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'spin', x, y, layer, amount, id });
           break;
-        case 'tilt':
-          visualizerRef.current?.setExternalTilt(message.x, message.y);
+        }
+        case 'tilt': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
+          visualizerRef.current?.setExternalTilt(x, y);
           break;
+        }
         /*
           Not this display's, and each for its own reason. Naming them is the
           point: without these four the switch below cannot ask the compiler

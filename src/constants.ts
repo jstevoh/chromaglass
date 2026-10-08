@@ -135,15 +135,42 @@ export function getAudioValue(audioData: AudioData | null, feature: AudioFeature
   }
 }
 
-// Fast hex → {r,g,b} (0-1). Cached for hot-path usage.
+// Fast hex → {r,g,b} (0-1). Cached for hot-path usage, bounded (PLAN §14n).
+export const MAX_HEX_CACHE = 512;
 const hexCache = new Map<string, { r: number; g: number; b: number }>();
+
+export function hexCacheSize(): number {
+  return hexCache.size;
+}
+
+if (typeof window !== 'undefined') {
+  const win = window as unknown as {
+    chromaglassHexCacheSize?: () => number;
+    chromaglassHexToRgb?: (hex: string) => { r: number; g: number; b: number };
+    chromaglassHexCacheHas?: (hex: string) => boolean;
+  };
+  win.chromaglassHexCacheSize = hexCacheSize;
+  win.chromaglassHexToRgb = hexToRgb;
+  win.chromaglassHexCacheHas = (hex: string) => hexCache.has(hex);
+}
+
+export function clearHexCache(): void {
+  hexCache.clear();
+}
+
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  if (typeof hex !== 'string' || hex.length > 9) return { r: 1, g: 1, b: 1 };
   const cached = hexCache.get(hex);
   if (cached) return cached;
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   const rgb = result
     ? { r: parseInt(result[1], 16) / 255, g: parseInt(result[2], 16) / 255, b: parseInt(result[3], 16) / 255 }
     : { r: 1, g: 1, b: 1 };
+  if (hexCache.size >= MAX_HEX_CACHE) {
+    const oldest = hexCache.keys().next().value;
+    if (oldest !== undefined) hexCache.delete(oldest);
+  }
   hexCache.set(hex, rgb);
   return rgb;
 }
+
