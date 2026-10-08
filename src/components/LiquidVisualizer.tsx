@@ -2027,6 +2027,8 @@ class FluidSimulation {
 
   clearAll() {
     this.liquid.clear();
+    this.gpu?.clear();
+    if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);

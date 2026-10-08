@@ -1419,6 +1419,12 @@ export class WebGPUFluid {
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
+    if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    this.mixLive = false;
+    this.rxnLive = false;
+    this.liesLive = false;
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
@@ -4335,8 +4341,9 @@ export class WebGPUFluid {
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species'): Promise<Float32Array> {
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix'): Promise<Float32Array> {
     const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
+      : which === 'mix' ? (this.mixLive ? this.mix?.read : this.blank('rgba'))
       : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba')) : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;

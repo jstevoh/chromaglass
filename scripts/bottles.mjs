@@ -190,10 +190,12 @@ try {
       const pressMix = g.pressMix.bind(g);
       g.pressMix = (x, y, r, outer, take) => { window.__bottleLog.press.push({ x, y, r, outer, a: take }); return pressMix(x, y, r, outer, take); };
     }
-    window.__soapNear = (pts, rad) => {
-      const s = window.chromaglassDebug().fluids[0].liquid.soap; let t = 0;
+    window.__soapNear = async (pts, rad) => {
+      const gpu = window.chromaglassDebug().fluids[0].gpu;
+      const s = gpu ? await gpu.readField('mix') : window.chromaglassDebug().fluids[0].liquid.soap; 
+      let t = 0;
       for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
-        if (pts.some((p) => Math.hypot(x / L - p[0], y / L - p[1]) < rad)) t += s[x + y * L];
+        if (pts.some((p) => Math.hypot(x / L - p[0], y / L - p[1]) < rad)) t += gpu ? s[(x + y * L) * 4 + 1] : s[x + y * L];
       }
       return t;
     };

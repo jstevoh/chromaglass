@@ -4008,7 +4008,7 @@ export default function App() {
   }, []);
   const deskOpen = useMemo(() => ({
     sound: () => openSettingsAt('audio-input'),
-    video: () => videoInputRef.current?.click(),
+    video: () => openSettingsAt('film'),
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
   }), [openSettingsAt]);
 
