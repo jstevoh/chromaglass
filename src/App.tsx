@@ -2558,7 +2558,7 @@ export default function App() {
         writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
     }     else if (a === 'export-show') {
       const list = setListRef.current;
-      exportShowKit(list, userPresetsRef.current, sequencer.sequences).then(text => {
+      exportShowKit(list, userPresetsRef.current, sequencer.sequences).then((text: string) => {
         downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'show'}.chromaglass-show.json`, text);
       });
     } else if (a === 'import-show') {
