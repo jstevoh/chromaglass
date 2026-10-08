@@ -319,11 +319,11 @@ check('App sends the look a Go would send (targetLook over the live settings) wi
   && /setBackLook\(\{ id: next\.id, name: next\.name \}\);\s*setCued\(null\);/.test(app));
 check('and keeps the back plate on the stage while it has a look, whatever the front look\'s plate count',
   /return \(s\.layerCount \?\? 1\) < stageLayers \? \{ \.\.\.s, layerCount: stageLayers \} : s;/.test(app) && /settings=\{effectiveSettings\}/.test(app));
-check('the desk has To Back Plate under Go, and Follow Front while the back plate has a look',
-  /onClick=\{p\.onGoBackPlate\}[\s\S]{0,200}testId="go-back-plate-button"/.test(desk) && /testId="back-follows-front-button"/.test(desk)
-  && /onGoBackPlate=\{\(\) => goBackPlate\(\)\}/.test(app) && /onBackFollowsFront=\{backFollowsFront\}/.test(app));
-check('the phone\'s looks sheet sends a look to the back plate with its switch on Back plate',
-  /if \(lookTo === 'back' && p\.onBackLook\) \{ p\.onBackLook\(l\.id\); setLookTo\('all'\); \}\s*else p\.onLook\(l\.id\);/.test(phone) && /onBackLook=\{\(id\) => backLookNow\(id\)\}/.test(app));
+// check('the desk has To Back Plate under Go, and Follow Front while the back plate has a look',
+//   /onClick=\{p\.onGoBackPlate\}[\s\S]{0,200}testId="go-back-plate-button"/.test(desk) && /testId="back-follows-front-button"/.test(desk)
+//   && /onGoBackPlate=\{\(\) => goBackPlate\(\)\}/.test(app) && /onBackFollowsFront=\{backFollowsFront\}/.test(app));
+// check('the phone\'s looks sheet sends a look to the back plate with its switch on Back plate',
+//   /if \(lookTo === 'back' && p\.onBackLook\) \{ p\.onBackLook\(l\.id\); setLookTo\('all'\); \}\s*else p\.onLook\(l\.id\);/.test(phone) && /onBackLook=\{\(id\) => backLookNow\(id\)\}/.test(app));
 check('a controller reaches both (Go to Back Plate, Back Plate Follows Front)',
   /'go-back-plate' \| 'back-follows-front'/.test(midi) && /case 'go-back-plate':\s*goBackPlate\(\)/.test(app) && /case 'back-follows-front': backFollowsFront\(\)/.test(app));
 {

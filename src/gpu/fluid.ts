@@ -548,6 +548,8 @@ export class WebGPUFluid {
   private readonly dyeFormat: GPUTextureFormat;
 
   private readonly dye: PingPong;
+  private readonly liquids0: PingPong;
+  private readonly liquids1: PingPong;
   private readonly vel: PingPong;
   private readonly squeeze: PingPong;
   /** The plate shape the gap was last laid at; a change re-seeds it. */
@@ -1122,6 +1124,8 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
+    this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
+    this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
     this.squeeze = pp(this.N, RG32, 'squeeze');
     /*
@@ -2264,9 +2268,16 @@ export class WebGPUFluid {
       if (!bodiesOn && thin) {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
         speciesCarried = !!rider;
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
-      if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
+      if (!bodiesOn) { 
+        this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids0, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye'); 
+        return; 
+      }
       /*
         With Oil Bodies, the dye and the oil's share of it cross the same
         faces as the oil does (bodyAdvect, and why). A share left from an
@@ -2293,6 +2304,8 @@ export class WebGPUFluid {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -2300,6 +2313,10 @@ export class WebGPUFluid {
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
       od.swap();
+      this.runPressed(pass, 'bodyAdvect', this.liquids0.write, [this.liquids0.read, this.velForced], adv);
+      this.liquids0.swap();
+      this.runPressed(pass, 'bodyAdvect', this.liquids1.write, [this.liquids1.read, this.velForced], adv);
+      this.liquids1.swap();
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to

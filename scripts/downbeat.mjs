@@ -479,7 +479,7 @@ console.log('\nQuieter, slower, on the page\'s clock');
     Each asked on a song whose one is known on ten kicks or more: "known as
     long" and "placed alike" are also true of two grids that know nothing.
   */
-  const s = SONGS[3];
+  const s = SONGS.find(s => s.name === 'band 110');
   const { run: base } = kept[s.name];
   const quiet = arrange({ bpm: s.bpm, sections: BAND, style: s.style, seed: s.seed, gainDb: -20 });
   const kicks = kicksOf(quiet.truth, s.style);
@@ -577,7 +577,7 @@ console.log('\nCost');
     against it. An estimate that is slow every time, as a slow one would
     be, is slow in all three and is counted.
   */
-  const { readings, kicks } = kept[SONGS[4].name];
+  const { readings, kicks } = kept[SONGS.find(s => s.name === 'band 96').name];
   const q = (a, f) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(f * s.length))]; };
   const passes = [0, 1, 2].map(() => listen(readings, kicks).estimateMs);
   const least = passes[0].map((_, i) => Math.min(...passes.map(p => p[i])));
