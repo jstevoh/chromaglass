@@ -3475,7 +3475,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           label="Comet Flow"
           value={settings.cometSpeed}
           min={0}
-          max={1.0}
+          max={2.0}
           step={0.05}
           onChange={(v: number) => onUpdate({ cometSpeed: v })}
           settingKey="cometSpeed"
