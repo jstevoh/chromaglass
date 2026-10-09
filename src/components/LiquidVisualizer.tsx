@@ -3203,13 +3203,19 @@ class FluidSimulation {
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     switch (style) {
       case 'spray': {
-        const sprayR = (8 + energy * 5) * k;
-        const count = 8 + Math.floor(energy * 8);
-        for (let p = 0; p < count; p++) {
-          const a = this.rng.angle(), d = this.rng.float() * sprayR;
-          const px = Math.floor(x + Math.cos(a) * d), py = Math.floor(y + Math.sin(a) * d);
-          if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
-          this.addDensity(px, py, amount * (1 - d / sprayR) * 0.25, r, g, b);
+        const sprayR = Math.round((12 + energy * 8) * k);
+        for (let ddy = -sprayR; ddy <= sprayR; ddy++) {
+          for (let ddx = -sprayR; ddx <= sprayR; ddx++) {
+            const dd = Math.sqrt(ddx*ddx + ddy*ddy);
+            if (dd > sprayR) continue;
+            const px = Math.floor(x + ddx);
+            const py = Math.floor(y + ddy);
+            if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
+            const noise = this.rng.float();
+            if (noise > 0.4) continue;
+            const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * (1 - noise);
+            this.addDensity(px, py, amount * w, r, g, b);
+          }
         }
         break;
       }
@@ -6500,6 +6506,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const t = magnetWalkRef.current;
           mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
+
+          // Audio-Reactive Ferrofluid (Rosensweig Instability spikes)
+          if (ms > 0 && isActiveRef.current && currentAudioData) {
+            const energy = Math.min(1, currentAudioData.energy);
+            const env = mazeKickRef.current.env ?? 0;
+            // The magnetic field pulses violently with the kick and energy, causing spikes to jump
+            ms = Math.min(1.0, ms * (0.4 + 0.4 * energy + 0.8 * env));
+          }
         }
         /*
           The magnet's size (Magnet Size, lib/magnetSize.ts): held or set
@@ -7406,11 +7420,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
                 const fg = currentSettings.fingering ?? 0;
                 const pa = 0.004 * k;
-                af.applySquish(x, y, 30, pa, fg, true);
+                const prR = 30;
+                af.applySquish(x, y, prR, pa, fg, true);
                 af.applySquish(x, y, 18, pa, fg);
                 af.applySquish(x, y, 8, pa, fg);
                 // And the liquid goes where a squeezed film sends it.
-                af.squeezeOut(x, y, 30 * GRID_SCALE, pa);
+                af.squeezeOut(x, y, prR * GRID_SCALE, pa);
+
+                // The Photoscope (European School): Shearing/Twisting!
+                // Twisting one slide against another tears the film into cellular structures.
+                // We add a strong rotational velocity field within the press radius.
+                const twistR = prR * GRID_SCALE;
+                const twistAmount = 40.0 * pa * kSoft;
+                for (let ddy = -twistR; ddy <= twistR; ddy++) {
+                  for (let ddx = -twistR; ddx <= twistR; ddx++) {
+                    const dd = Math.sqrt(ddx*ddx + ddy*ddy);
+                    if (dd > twistR || dd < 0.1) continue;
+                    const px = Math.floor(x + ddx);
+                    const py = Math.floor(y + ddy);
+                    if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
+                    // Rotational velocity: (-dy, dx) normalized, stronger towards the center
+                    const w = Math.pow(1 - dd/twistR, 2) * twistAmount;
+                    af.addVelocity(px, py, -(ddy / dd) * w, (ddx / dd) * w);
+                  }
+                }
+                
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
@@ -7502,22 +7536,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
-                // Wide cone of fine mist — many small random particles in a radius
-                const sprayR = 10 * GRID_SCALE * kSoft;
+                // Spray paint: soft continuous gaussian-like spray with noise
+                const sprayR = Math.round(16 * GRID_SCALE * kSoft);
                 const tint = bottleDye(liq) * poured.dose;
-                for (let p = 0; p < 12; p++) {
-                  const angle = DICE.hands.angle();
-                  const dist = DICE.hands.float() * sprayR;
-                  const px = Math.floor(x + Math.cos(angle) * dist);
-                  const py = Math.floor(y + Math.sin(angle) * dist);
-                  if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
-                  const w = (1 - dist / sprayR) * 0.4 * k;
-                  af.addDensity(px, py, w * tint, rgb.r, rgb.g, rgb.b);
-                  if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
-                  // The liquid too, at the first point of the mist a step: one
-                  // deposit a step, as a held Dropper makes (see layBottle).
-                  if (p === 0) layBottle(af, px, py, bottleReach(liq, 1.5 * GRID_SCALE), liq, 1 - dist / sprayR);
+                for (let ddy = -sprayR; ddy <= sprayR; ddy++) {
+                  for (let ddx = -sprayR; ddx <= sprayR; ddx++) {
+                    const dd = Math.sqrt(ddx*ddx + ddy*ddy);
+                    if (dd > sprayR) continue;
+                    const px = Math.floor(x + ddx);
+                    const py = Math.floor(y + ddy);
+                    if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
+                    const noise = DICE.hands.float();
+                    if (noise > 0.4) continue; // stippling effect
+                    const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * k * (1 - noise);
+                    af.addDensity(px, py, w * tint, rgb.r, rgb.g, rgb.b);
+                    if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
+                  }
                 }
+                layBottle(af, x, y, bottleReach(liq, 4 * GRID_SCALE), liq, 0.5);
 
               } else if (tool === 'splatter') {
                 // Fling droplets outward from cursor — random sizes, random directions
