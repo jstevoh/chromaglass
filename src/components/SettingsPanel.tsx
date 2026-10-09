@@ -569,7 +569,581 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <Lightbulb size={12} /> Master
         </h3>
         {/* The house lights */}
-              </section>
+        <Slider
+          label="Dimmer"
+          value={settings.dimmer ?? 1}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ dimmer: v })}
+          settingKey="dimmer"
+        />
+        {onBlackout && (
+          <button
+            onClick={onBlackout}
+            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            title="Fade the plate to black and back (B on the keyboard)"
+            data-testid="blackout-button"
+          >
+            {blackout ? 'Lights up' : 'Blackout'}
+          </button>
+        )}
+        {/* The same switch as the one at the bottom of Wall → Output, where it
+            used to live alone: the last control of the longest section. */}
+        {output && onOutput && (
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[13px] font-medium text-text">Flash Limit</span>
+            <button
+              onClick={() => onOutput({ ...output, flashGuard: !output.flashGuard })}
+              className={`w-10 h-5 rounded-full relative transition-colors ${output.flashGuard ? 'bg-white' : 'bg-white/20'}`}
+              title="Hold the whole screen below three flashes a second (photosensitivity)"
+              aria-label="Flash Limit"
+              aria-pressed={output.flashGuard}
+              data-testid="flash-limit-master"
+            >
+              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${output.flashGuard ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        )}
+
+        {/* 0–0.3, the desk's and the controller's range: the timestep stops
+            growing near 0.21, so 70% of the old 0–1 travel only raced the clocks. */}
+        <Slider
+          label="Speed"
+          value={settings.globalSpeed}
+          min={0.0}
+          max={0.3}
+          step={0.001}
+          onChange={(v: number) => onUpdate({ globalSpeed: v })}
+          settingKey="globalSpeed"
+        />
+        {/* How far the speed follows the music instead of the look: the
+            tempo and how loud it has been. Random Evolve leans harder. */}
+        <Slider
+          label="Tempo Sync"
+          value={settings.tempoSync ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ tempoSync: v })}
+          settingKey="tempoSync"
+        />
+      </section>
+
+      {/*
+        The mixer (lib/mixer.ts, docs/rig-plan.md R7): the same panel the
+        Perform desk and the phone open, with the pin chips this sheet puts on
+        every control. Its sliders are drawn from MIX_CONTROLS, and `npm run
+        panel` reads that list as this section's, since there is no literal
+        slider here to read.
+      */}
+      <section id="settings-mixer" className={`${SECTION_CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
+        <h3 className={SECTION_TITLE}>
+          <SlidersVertical size={12} /> Mixer
+        </h3>
+        <MixerPanel
+          settings={settings}
+          onSetting={onUpdate}
+          hasFilm={filmSource !== 'none'}
+          hasMark={markLoaded}
+          chips={(k) => <PinChips settingKey={k} />}
+          onFade={mixTakes?.onFade}
+          backLook={backLook}
+          fading={mixTakes?.fading}
+          testId="settings-mixer-panel"
+        />
+      </section>
+
+      {/* Sound Section */}
+      <section id="settings-audio-input" className={`${SECTION_CARD} ${shown('audio-input') ? SECTION_GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
+        <h3 className={SECTION_TITLE}>
+          <Activity size={12} /> Audio Input
+        </h3>
+        <Slider
+          label="Sensitivity"
+          value={settings.sensitivity}
+          min={0.1}
+          max={3.0}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ sensitivity: v })}
+          settingKey="sensitivity"
+        />
+        <Slider
+          label="Bass Boost"
+          value={settings.bassBoost}
+          min={1.0}
+          max={3.0}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ bassBoost: v })}
+          settingKey="bassBoost"
+        />
+
+        {/* What is listening at all */}
+        {onAudioSource && (
+          <div className="mb-3.5 flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-text">Source</span>
+            <Segmented
+              value={audioSource === 'file' ? 'file' : audioSource}
+              options={[
+                ['none', 'Off'],
+                ['microphone', 'Mic'],
+                ['system', 'System'],
+                ['file', 'File'],
+                ['simulated', 'Band'],
+              ] as const}
+              onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
+              height={32}
+              testId="audio-source"
+            />
+            <Info>
+              <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
+            </Info>
+          </div>
+        )}
+
+        {/* The input: a USB interface fed from the desk, not the laptop's own microphone */}
+        {onAudioInput && (
+          <div className="mb-3.5 flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-text">Input</span>
+            <select
+              value={audioInputId}
+              onChange={(e) => onAudioInput(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+              data-testid="audio-input"
+            >
+              <option value="">Default microphone</option>
+              {audioInputs.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+            <Info>
+              On stage, ask the sound desk for an aux send into a USB audio interface and pick it here: a clean feed heavy on kick, snare and bass drives the plate better than a microphone hearing the room.
+            </Info>
+          </div>
+        )}
+
+        {/* Room calibration */}
+        <div className="mb-3 mt-2 flex items-center justify-between">
+          <span className="text-[13px] font-medium text-text">Auto Calibrate</span>
+          <button
+            onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
+            className={`w-10 h-5 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
+            title="Learn this room's noise floor and dynamics, and drive the visuals from where the music sits between them"
+          >
+            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        {/* The beat, ahead of the microphone */}
+        <Slider
+          label="Beat Prediction"
+          value={settings.beatPrediction ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ beatPrediction: v })}
+          settingKey="beatPrediction"
+        />
+        <Slider
+          label="Beat Lead"
+          value={settings.beatLead ?? 0}
+          min={0}
+          max={250}
+          step={5}
+          onChange={(v: number) => onUpdate({ beatLead: v })}
+          settingKey="beatLead"
+        />
+        <Info>
+          A microphone hears late. Once the clock has locked onto the tempo, kicks fire from it, this many milliseconds ahead of the onset being heard; a breakdown or silence hands back to plain detection.
+        </Info>
+
+        {/* Somewhere to get the tempo from besides the microphone */}
+        {onTap && (
+          <div className="mb-4 mt-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] font-medium text-text">Tempo</span>
+              <span className="font-mono text-[12px] opacity-50" data-testid="tempo-readout">
+                {tempo?.source
+                  ? `${tempo.bpm} bpm \u00b7 ${tempo.source === 'clock' ? 'midi clock' : tempo.source === 'tap' ? 'tapped' : 'set'}`
+                  : 'listening'}
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                onClick={onTap}
+                data-testid="tempo-tap"
+                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
+                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
+              >
+                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
+              </button>
+              <button
+                onClick={onTempoClear}
+                disabled={!tempo?.source}
+                data-testid="tempo-listen"
+                title="Back to working the tempo out from what it can hear"
+                className={`min-h-9 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
+                  tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
+                }`}
+              >
+                Listen
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={60}
+                max={200}
+                step={1}
+                placeholder="bpm"
+                aria-label="Tempo in beats per minute"
+                data-testid="tempo-bpm"
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  const v = parseFloat((e.target as HTMLInputElement).value);
+                  if (Number.isFinite(v)) onTempoBpm?.(v);
+                }}
+                onBlur={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v)) onTempoBpm?.(v);
+                }}
+                className="h-9 w-24 rounded-lg border border-white/10 bg-white/5 px-3 font-mono text-[12px] outline-none focus:border-accent-border"
+              />
+              <span className="text-[12px] opacity-30">off the setlist</span>
+            </div>
+            <Info>
+              The beat clock works the tempo out from what it hears, which is the right answer on a clean feed from the desk and a hard one in a loud room. Three ways to tell it instead.
+              {' '}<span className="text-white/70">MIDI clock</span> needs nothing set up: if the desk is sending it down the cable the faders are already on, the show locks to it{midiClocked ? ' \u2014 and it is arriving now' : ''}.
+              {' '}<span className="text-white/70">Tap</span> sets the tempo *and* the bar, so tap on the downbeats and the plate is pressed on the downbeats; one tap on its own re-phases a tempo that is already running, which is how to get back on the bar after a fill.
+              {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
+              {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
+            </Info>
+            {/*
+              Timecode is not a tempo, so it is its own line rather than a
+              fourth way of setting one. Shown only while a desk is sending:
+              a readout that says nothing all evening is worse than no readout.
+            */}
+            {timecode && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2" data-testid="timecode-readout">
+                <span className="text-[13px] font-medium text-text">Timecode</span>
+                <span className="font-mono text-[13px] tabular-nums">{timecode}</span>
+                <span className="text-[12px] opacity-40">the sequence is following the desk</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Song detection: the master switch for everything that follows a song. */}
+        {onSongDetection && (
+          <div className="mb-4 mt-2 flex items-center justify-between gap-3" data-testid="song-detection">
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium text-text">Song Detection</div>
+              <div className="text-[12px] text-muted">Listen for which song is playing, so set items, song shows and looks made for a song go up on their own.</div>
+            </div>
+            <button
+              role="switch"
+              aria-checked={!!songDetection}
+              onClick={() => onSongDetection(!songDetection)}
+              className={`h-5 w-9 shrink-0 rounded-full relative transition-colors ${songDetection ? 'bg-white' : 'bg-white/20'}`}
+              title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
+              data-testid="song-detection-toggle"
+            >
+              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${songDetection ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        )}
+
+        {/* A new song, a new look */}
+        <div className="flex flex-col gap-2 mb-4 mt-2">
+          <div className="text-[13px] font-medium text-text">On a New Song</div>
+          <div className="grid grid-cols-3 gap-1">
+            {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => onUpdate({ onNewSong: mode })}
+                className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
+                  (settings.onNewSong ?? 'off') === mode ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+                title={mode === 'off' ? 'Keep the look across songs' : mode === 'preset' ? 'Switch to another preset when a new song starts' : 'Roll a random look when a new song starts'}
+                data-testid={`new-song-${mode}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <Info>
+            A new song is heard as a gap of a few seconds between tracks, or named by track identification. The sequencer keeps control while it is running.
+          </Info>
+        </div>
+        {settings.autoCalibrate !== false && (
+          <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-3">
+            {calibration ? (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[12px] opacity-60">
+                    {calibration.calibrating ? 'Listening to the room' : calibration.signal ? 'Calibrated' : 'Room is quiet'}
+                  </span>
+                  <span className="text-[12px] font-mono opacity-50">
+                    {calibration.floorDb.toFixed(0)} → {calibration.peakDb.toFixed(0)} dB
+                  </span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${calibration.calibrating ? 'bg-white/60' : 'bg-emerald-400/80'}`}
+                    style={{ width: `${Math.round(calibration.progress * 100)}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <span className="text-[12px] opacity-40">Waiting for audio</span>
+            )}
+            <button
+              onClick={() => onRecalibrate?.()}
+              className="mt-3 w-full rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-[13px] font-medium opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
+            >
+              Recalibrate room
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Sound Mappings Section */}
+      <section id="settings-audio-mappings" className={`${SECTION_CARD} ${shown('audio-mappings') ? SECTION_GRID : 'hidden'} ${focusSection === 'audio-mappings' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-mappings">
+        <h3 className={SECTION_TITLE}>
+          <Activity size={12} /> Sound Mappings
+        </h3>
+
+        {/*
+          Sound Drive: how hard the music moves the plate at all.
+
+          It is the headline ride — the first fader on every factory map and
+          the one a hand is on through a chorus — and until now the only place
+          it existed was the narrow-screen toolbar, which a desktop never
+          draws. The panel that claims to hold every setting did not hold the
+          most important one.
+        */}
+        <Slider
+          label="Sound Drive"
+          value={settings.audioImpact}
+          min={0}
+          max={1}
+          step={0.01}
+          icon={Activity}
+          onChange={(v: number) => onUpdate({ audioImpact: v })}
+          settingKey="audioImpact"
+        />
+        {/*
+          The four selects below are the fixed wiring — which audio band drives
+          velocity, density, colour and rotation — and they stay, because they
+          are what the solver reads directly. The other way in is a patch,
+          which can take *any* audio feature to *any* setting; Sound Impact,
+          the master over those, sits with the patch bay under Patches.
+        */}
+        {['velocity', 'density', 'color', 'rotation'].map((param) => (
+          <div key={param} className="flex flex-col gap-2 mb-4">
+            <span className="text-[13px] font-medium text-text">{param}</span>
+            <select
+              value={settings.audioMappings[param as keyof typeof settings.audioMappings]}
+              onChange={(e) => onUpdate({
+                audioMappings: {
+                  ...settings.audioMappings,
+                  [param]: e.target.value
+                }
+              })}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] focus:outline-none focus:border-white/30 transition-all"
+            >
+              {['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'].map((feature) => (
+                <option key={feature} value={feature} className="bg-gray-900">
+                  {feature}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+        <p className="mb-3 text-[12px] leading-relaxed text-white/40">
+          Any sound feature onto any other control is a patch, in {goTo('patches', 'sound')}.
+        </p>
+      </section>
+
+      {/* Light Show Look Section */}
+      <section id="settings-look" className={`${SECTION_CARD} ${shown('look') ? SECTION_GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
+        <h3 className={SECTION_TITLE}>
+          <Palette size={12} /> Light Show Look
+        </h3>
+        <Slider
+          label="Turbulence Scale"
+          value={settings.turbulenceScale}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turbulenceScale: v })}
+          settingKey="turbulenceScale"
+        />
+        <Slider
+          label="Turbulence Detail"
+          value={settings.turbulenceDetail}
+          min={1}
+          max={4}
+          step={1}
+          onChange={(v: number) => onUpdate({ turbulenceDetail: Math.round(v) })}
+          settingKey="turbulenceDetail"
+        />
+        <Slider
+          label="Sharpness"
+          value={settings.sharpness ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sharpness: v })}
+          settingKey="sharpness"
+        />
+        {/*
+          Dye carried by particles (H1). The grid keeps the body of colour and
+          these add the structure a grid cannot hold, so it reads as detail
+          appearing rather than as a different plate — and at 0 the solver
+          allocates none of them, which is where every look made before this
+          sits.
+        */}
+        <Slider
+          label="Dye Particles"
+          value={settings.particles ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ particles: v })}
+          settingKey="particles"
+        />
+        <Slider
+          label="Particle Colour"
+          disabled={(settings.particles ?? 0) <= 0.001 && 'needs Dye Particles above 0'}
+          value={settings.particleMix ?? 0.6}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ particleMix: v })}
+          settingKey="particleMix"
+        />
+        <Slider
+          label="Granulation"
+          value={settings.granulation ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ granulation: v })}
+          settingKey="granulation"
+        />
+        {/* "Fineness", not "Size": the number is grain cells across the
+            plate, so up is finer grain, not bigger. */}
+        <Slider
+          label="Grain Fineness"
+          disabled={(settings.granulation ?? 0) <= 0.002 && 'needs Granulation above 0'}
+          value={settings.grainScale ?? 320}
+          min={60}
+          max={900}
+          step={20}
+          onChange={(v: number) => onUpdate({ grainScale: v })}
+          settingKey="grainScale"
+        />
+        <Slider
+          label="Dye Budget"
+          value={settings.dyeBudget ?? 0.85}
+          min={0.1}
+          max={1.2}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ dyeBudget: v })}
+          settingKey="dyeBudget"
+        />
+        <Slider
+          label="Edge Relief"
+          value={settings.edgeRelief ?? 0.4}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ edgeRelief: v })}
+          settingKey="edgeRelief"
+        />
+        <Slider
+          label="Lacing"
+          value={settings.lacing ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ lacing: v })}
+          settingKey="lacing"
+        />
+        <Slider
+          label="Bubbles"
+          value={settings.bubbles ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ bubbles: v })}
+          settingKey="bubbles"
+        />
+        <Slider
+          label="Plate Rock"
+          value={settings.plateRock ?? 0.45}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateRock: v })}
+          settingKey="plateRock"
+        />
+        <Slider
+          label="Layer Scale Variety"
+          disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
+          value={settings.layerScaleVariety ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ layerScaleVariety: v })}
+          settingKey="layerScaleVariety"
+        />
+        <Slider
+          label="Boundary Glow"
+          value={settings.boundaryContrast}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ boundaryContrast: v })}
+          settingKey="boundaryContrast"
+        />
+        <Slider
+          label="Saturation"
+          value={settings.saturationBoost}
+          min={0.5}
+          max={2.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ saturationBoost: v })}
+          settingKey="saturationBoost"
+        />
+        {/* How solid the colour reads: a tint the light shows through, or a body of colour. */}
+        <Slider
+          label="Colour Body"
+          value={settings.colourBody ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ colourBody: v })}
+          settingKey="colourBody"
+        />
+        {/* The plate printed as a comic: flat inks, black outlines, the tints in even dots. The Roy look's own control. */}
+        <Slider
+          label="Ben-Day Dots"
+          value={settings.benDay ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ benDay: v })}
+          settingKey="benDay"
+        />
+        <Slider
+          label="Glossiness"
+          value={settings.glossiness}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ glossiness: v })}
+          settingKey="glossiness"
+        />
+      </section>
 
       {/* Show Section */}
       <section id="settings-show" className={`${SECTION_CARD} ${shown('show') ? SECTION_GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">

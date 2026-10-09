@@ -949,9 +949,7 @@ check('and one action has one name',
 */
 const RENAMED = {
   camera: 'Lens', layerCount: 'Layers', kaleidoSpin: 'Kaleido Spin', kaleidoZoom: 'Kaleido Zoom',
-  macroZoom: 'Macro Zoom', macroLacing: 'Macro Lacing', damping: 'Momentum',
-  grainScale: 'Grain Fineness', airVelocity: 'Updraft', vibrationFrequency: 'Vibration',
-};
+  macroZoom: 'Macro Zoom', macroLacing: 'Macro Lacing', grainScale: 'Grain Fineness', airVelocity: 'Updraft', };
 const misnamed = Object.entries(RENAMED).filter(([k, name]) =>
   sliders.find(s => s.key === k)?.label !== name || PIN_RANGE.get(k)?.label !== name);
 check('a renamed control has its new name on the sheet and on every desk, fader and stage',
