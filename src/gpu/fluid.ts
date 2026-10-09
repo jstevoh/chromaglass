@@ -1690,6 +1690,50 @@ export class WebGPUFluid {
    * GPU twin of `lib/chemistry.ts`, which was never wired in and has gone
    * (S13); the show grows the reaction on the CPU and lays its dye from there.
    */
+  
+  
+  addReagent(x: number, y: number, radius: number, amount: number, pattern_val: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'add reagent' });
+    const pass = enc.beginComputePass({ label: 'add reagent' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'addReagent', this.chem.write, [this.chem.read],
+      this.arg('reagent splat', [x, y, radius, amount, pattern_val, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  seedChemistry(x: number, y: number, radius: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'seed chemistry' });
+    const pass = enc.beginComputePass({ label: 'seed chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'seedChem', this.chem.write, [this.chem.read],
+      this.arg('seedChem splat', [x, y, radius, 0, 0, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5): void {
+    if (!this.chemLive) return;
+    const enc = this.device.createCommandEncoder({ label: 'step chemistry' });
+    const pass = enc.beginComputePass({ label: 'step chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    // feed and kill in z and w, Du and Dv in x and y
+    const args = this.arg('chem rates', [Du, Dv, feed, kill, 0, 0, 0, 0]);
+    for (let i = 0; i < iters; i++) {
+      this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
+      this.chem.swap();
+    }
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
   depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
     if (amount <= 0) return;
     const log = dyeAbsorbances(...colour);
@@ -4419,6 +4463,7 @@ export class WebGPUFluid {
       lies: this.liesLive && this.lies ? this.lies.read : null,
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
+      chem: this.chemLive ? this.chem.read : null,
     };
   }
 

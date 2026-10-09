@@ -207,6 +207,7 @@ export interface GpuStepParams {
   rawSim?: (simF: Float32Array) => void;
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
+  addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
   stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number): void;
   chem?: any;
@@ -320,6 +321,7 @@ export interface PlateSolver {
   dispose(): void;
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
+  addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
   stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number): void;
   chem?: any;

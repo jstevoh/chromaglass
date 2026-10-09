@@ -1348,6 +1348,9 @@ class FluidSimulation {
         const r = Math.max(1.5, radius) / L;
         g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
       }
+      if (what?.reagent && g.addReagent) {
+        g.addReagent(cx / L, cy / L, Math.max(1.5, radius) / L, what.reagent * amount, currentSettings.chemistryPattern ?? 0);
+      }
       if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
       let oil = oilOn && !filmOn ? clearOil : 0;

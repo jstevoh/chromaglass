@@ -14,6 +14,8 @@ export interface LiquidBehaviour {
   soap?: number;
   /** Thicker than water: it crawls where it lies while the plate flows past. */
   body?: number;
+  /** Feeds the Turing reaction. */
+  reagent?: number;
   /** Refuses to let go of itself: a pool of it keeps its edge. */
   repel?: number;
   /*
@@ -174,6 +176,8 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // is. Each writes into the liquid field, and the field goes on acting for as
   // long as the liquid is there — which is the whole difference between soap
   // and a blue dye called Soap.
+  { id: 'reagent', name: 'Turing Reagent', color: '#ff88ff', own: '#ffffff', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
+    behaviour: { reagent: 1, weight: 0.02 } },
   { id: 'soap',      name: 'Soap',      color: '#ffffff', own: '#ffffff',
     description: 'Breaks the film: colour runs away from it and curls into filaments',
     // 0.12 before, which was physically right and a usability trap: the
