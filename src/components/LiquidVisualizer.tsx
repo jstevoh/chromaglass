@@ -8213,7 +8213,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // Fewer than it used to be, on purpose. A field of forty reads as
               // foam on a shower door; three or four reading as air trapped in
               // the oil is the thing the references actually show.
-              const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
+              const room = bubbles.bubbles.filter((b) => !b.daughter).length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
               /*
                 And only as hard as Sound Drive lets the music reach the

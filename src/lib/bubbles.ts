@@ -45,6 +45,8 @@ export interface Bubble {
   straw?: boolean;
   /** On the end of the straw this step: held there and growing. */
   held?: boolean;
+  /** Micro-satellite daughter spawned from a pop spray. */
+  daughter?: boolean;
 }
 
 export const MAX_BUBBLES = 128;
@@ -134,16 +136,16 @@ export class BubbleField {
    */
   private spawnDaughters(b: Bubble, bs: Bubble[]): void {
     if (b.r < 1.8 || bs.length >= MAX_BUBBLES) return;
-    const count = Math.min(Math.floor(2 + b.r * 0.6 + this.rng.float() * 2), Math.min(8, MAX_BUBBLES - bs.length));
+    const count = Math.min(2 + this.rng.int(2), MAX_BUBBLES - bs.length);
     if (count <= 0) return;
     const angleBase = this.rng.angle();
     for (let k = 0; k < count; k++) {
       const jitter = this.rng.centred() * 0.35;
       const a = angleBase + (k * 2 * Math.PI) / count + jitter;
       const u = this.rng.float();
-      const rDaughter = Math.max(0.6, b.r * (0.12 + 0.16 * u));
+      const rDaughter = Math.max(0.5, b.r * (0.12 + 0.14 * u));
       const dist = b.r * (0.85 + 0.15 * u);
-      const life = 2.5 + this.rng.float() * 3.5;
+      const life = 0.8 + this.rng.float() * 0.8;
       const nb = this.make(
         b.x + Math.cos(a) * dist,
         b.y + Math.sin(a) * dist,
@@ -151,6 +153,7 @@ export class BubbleField {
         life,
         0.18 + this.rng.float() * 0.1,
       );
+      nb.daughter = true;
       // Radial burst ejection kick (cells/s): fast initial momentum
       const vKick = 35 + this.rng.float() * 30;
       nb.kx = Math.cos(a) * vKick;
