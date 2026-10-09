@@ -127,7 +127,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
           ) : (
             <div className="flex gap-1.5">
               <button onClick={() => setSaving(true)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Save the current settings as a new preset" data-testid="preset-save">
-                <Save size={12} /> Save current
+                <Save size={12} /> Save As...
               </button>
               <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest" title="Load a preset file" data-testid="preset-load">
                 <FolderOpen size={12} /> Load file

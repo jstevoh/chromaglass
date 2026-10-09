@@ -74,13 +74,13 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
         )}
         <div className="mt-auto flex items-center justify-end gap-2">
           {replaceName && onReplace && (
-            <Button height={40} onClick={onReplace} testId="save-replace" title={`Write the current settings over “${replaceName}”, keeping its name`}>
-              <span className="max-w-[180px] truncate">Replace “{replaceName}”</span>
+            <Button height={40} onClick={onReplace} testId="save-replace" title={`Save changes to “${replaceName}”`}>
+              <span className="max-w-[180px] truncate">Save “{replaceName}”</span>
             </Button>
           )}
           <span className="flex-1" />
           <Button height={40} onClick={onClose} testId="save-cancel">Cancel</Button>
-          <Button height={40} variant="primary" onClick={save} testId="save-confirm">Save</Button>
+          <Button height={40} variant="primary" onClick={save} testId="save-confirm">Save As...</Button>
         </div>
       </div>
     </Sheet>
