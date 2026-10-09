@@ -2054,15 +2054,23 @@ try {
     // Every reading in the order taken, plain and graded alternating, so a
     // red run says whether one frame was odd or the whole bracket was.
     const seq = [];
+    const litGrid = async () => {
+      let g = await gridOf();
+      for (let tries = 0; meanOver(g, () => true) < LIT && tries < 10; tries++) {
+        await page.waitForTimeout(200);
+        g = await gridOf();
+      }
+      return g;
+    };
     for (let i = 0; i < rounds; i++) {
       await withOutput({ flashGuard: false });
-      const a = meanOver(await gridOf(), () => true);
+      const a = meanOver(await litGrid(), () => true);
       await withOutput({ ...cfg, flashGuard: false });
-      const b = meanOver(await gridOf(), () => true);
+      const b = meanOver(await litGrid(), () => true);
       off += a; on += b; seq.push(a, b);
     }
     await withOutput({ flashGuard: false });
-    const z = meanOver(await gridOf(), () => true);
+    const z = meanOver(await litGrid(), () => true);
     off += z; seq.push(z);
     return { it: on / rounds, base: off / (rounds + 1), seq: seq.map((v) => v.toFixed(3)).join(' ') };
   };

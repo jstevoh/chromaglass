@@ -10270,7 +10270,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   plate.drawSource(encoder, kind, out.sourceView(kind, size.width, size.height), size, live,
                     stage?.profiler.renderPass(`plate ${kind}`), stageFormat);
                 }
-                out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+                const drew = out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+                if (!drew) return false;
               }
               return true;
             };
