@@ -3773,19 +3773,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   
-  var d = textureLoad(src, p, 0);
-  d *= 1.0 - DYE_DAMP;
-  let ex = max(d.w - MAX_DYE, 0.0);
-  d -= vec4f(d.rgb * (ex / max(d.w, 1e-6)), ex);
-  d.w = max(d.w - DYE_EVAP, 0.0);
-  textureStore(dst, p, max(vec4f(0.0), d));
+  var d = textureLoad(src, p, 0) * S.evap;
+  if (!finite4(d)) { d = vec4f(0.0); }
+  if (d.a > 6.0) { d *= 6.0 / d.a; }
+  textureStore(dst, p, max(d, vec4f(0.0)));
   
-  var d2 = textureLoad(src2, p, 0);
-  d2 *= 1.0 - DYE_DAMP;
-  let ex2 = max(d2.w - MAX_DYE, 0.0);
-  d2 -= vec4f(d2.rgb * (ex2 / max(d2.w, 1e-6)), ex2);
-  d2.w = max(d2.w - DYE_EVAP, 0.0);
-  textureStore(dst2, p, max(vec4f(0.0), d2));
+  var d2 = textureLoad(src2, p, 0) * S.evap;
+  if (!finite4(d2)) { d2 = vec4f(0.0); }
+  if (d2.a > 6.0) { d2 *= 6.0 / d2.a; }
+  textureStore(dst2, p, max(d2, vec4f(0.0)));
 }`,
   decayDye: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -4350,6 +4346,8 @@ fn main() {
   psub[0] = 1.0 / f32(m);
   psub[1] = f32(m);
 }`;
+
+KERNELS.deltaDyeB = KERNELS.deltaDye;
 
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {

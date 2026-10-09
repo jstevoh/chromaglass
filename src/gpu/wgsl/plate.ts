@@ -120,7 +120,7 @@ fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
   // unit is exp(-a) for one unit of the dye, so unit^amount is exp(-a·amount).
   let rgb = pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
   if (U.spectral <= 0.001) { return rgb; }
-  return mix(rgb, spectralThrough(unit, unitB, max(amount, 0.0)), U.spectral);
+  return mix(rgb, spectralThrough(unit, max(amount, 0.0)), U.spectral);
 }
 
 /*
@@ -2680,6 +2680,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
       outColor = chemOnGround(outColor, mix(outColor, col, U.bzShow * 0.85), col, U.bzShow * 0.85);
+    }
+    // Turing Print: chemistry as a stark, opaque precipitate (black on white)
+    if (U.chemistry > 0.001 && (view.bzu > 0.0005 || view.bz > 0.0005)) {
+      // activator (bzu) creates stark black precipitate
+      let chemVal = smoothstep(0.2, 0.6, view.bzu);
+      let precipitate = vec3f(0.05, 0.05, 0.08); // stark black
+      let w = chemVal * clamp(U.chemistry, 0.0, 1.0) * 0.95;
+      outColor = chemOnGround(outColor, mix(outColor, precipitate, w), precipitate, w);
     }
     // Liesegang's precipitate: brick-red bands (silver chromate) in the gel.
     if (U.liesShow > 0.001) {
