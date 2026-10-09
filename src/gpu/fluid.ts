@@ -607,6 +607,8 @@ export class WebGPUFluid {
   private readonly velForced: GPUTexture;
   private readonly scratchA: GPUTexture;
   private readonly scratchB: GPUTexture;
+  private readonly scratchA2: GPUTexture;
+  private readonly scratchB2: GPUTexture;
   private readonly readTarget: GPUTexture;
   private readonly deltaDyeTex: GPUTexture;
   private readonly deltaDyeBTex: GPUTexture;
@@ -4263,7 +4265,9 @@ export class WebGPUFluid {
       this.run(pass, 'macCormack', field.write, [phi0, this.scratchA, this.scratchB, velTex, this.sampler], last);
     }
     field.swap();
-  });
+  }
+
+  drain(pull: number, t: number, enc: GPUCommandEncoder): void {
     const pass = enc.beginComputePass({ label: 'drain' });
     this.run(pass, 'drainVel', this.vel.write, [], this.arg('drain', [pull, t, 0, 0]));
     this.vel.swap();
