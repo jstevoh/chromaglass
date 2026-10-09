@@ -2935,10 +2935,19 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let filmT = smoothstep(0.02, 0.28, rimF.a);
       let tint = mix(vec3f(1.0), rimCol / max(max(rimCol.r, max(rimCol.g, rimCol.b)), 1e-3), filmT);
 
-      // Through it: the liquid beyond. Because the solver removed the dye
-      // from the bubble's interior, outColor is already the lamp shining through!
+      // Through it: the liquid beyond, magnified by the lens (more toward the
+      // middle), in the closeup; the projector's view of it (below) is the
+      // liquid right there, a flat slab of air being a window, not a lens.
+      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play) * dropCam;
+      let lensF = decodeFluid(layer0, lensUv, 0.0, false);
+      let lensCol = mix(bgColor, lensF.rgb, lensF.a);
+      // And the lamp through the clear gap, carrying the liquid's hue
+      // (0.18 toward white: measured, see git history of this block).
+      let through = mix(tint, vec3f(1.0), 0.18) * (0.45 + 0.5 * h + 0.55 * ground);
+      // Some bubbles are all but clear, some milky with a thicker film.
       let clarity = mix(0.3, 0.95, k1);
-      var c = outColor;
+      var c = mix(lensCol, through, 0.25 + 0.55 * clarity);
+      c = mix(outColor, c, smoothstep(0.0, 0.2, h));
 
       // The film: interference colour, strongest at a glancing angle (the
       // rim), thicker at the bottom where it drains to, thinner with age
@@ -3007,7 +3016,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let curvedB = max((1.0 - flatB) * R, spx);
         let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
-        cp = outColor;
+        cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);
         let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));

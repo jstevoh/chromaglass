@@ -1444,7 +1444,7 @@ export const PRESETS: Preset[] = [
       dishSpread: 0.0,
       dishVignette: 0.0,
       plateRock: 0.3,
-      beatSqueeze: 0.0,
+      beatSqueeze: 0.1,
       layerScaleVariety: 0.0,
       backgroundLoop: 0.6,
       hueJourney: 4,

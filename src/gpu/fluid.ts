@@ -893,6 +893,7 @@ export class WebGPUFluid {
       ['gapReshape', [RG32], false],
       ['deltaDye', [dye], true],
       ['deltaVel', [VEL], true],
+      ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RG32], true],
       ['scaleDye', [dye], true],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
@@ -946,6 +947,8 @@ export class WebGPUFluid {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      ['liquidSplat0', [VEL], false],
+      ['liquidSplat1', [VEL], false],
       /*
         The dye across faces is also how the dye moves wherever the maze
         flows (the advect dye stage), from the maze's first step, so a look
@@ -1075,6 +1078,7 @@ export class WebGPUFluid {
       ...THIN_GAP_KERNELS.map((name): [string, string] => [`${name}:thin`, kernel(name, 'rgba16float')]),
       [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
+      [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
     ];
   }
 
