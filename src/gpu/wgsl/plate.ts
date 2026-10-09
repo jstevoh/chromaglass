@@ -345,7 +345,7 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
 fn decodeFluid(t: texture_2d<f32>, tB: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
-    rawB = textureBicubic(tB, fuv);
+
   let rawB = textureBicubic(tB, fuv);
   var rawAlpha = raw.a; // we assume rawB.a is identical
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
@@ -977,7 +977,7 @@ fn decodeFluidDof(t: texture_2d<f32>, tB: texture_2d<f32>, fuv: vec2f, blurFluid
   if (dof < 0.02) { return decodeFluid(t, tB, fuv, blurFluid, useBlur); }
   let r = dof * 0.022 / (1.5 * U.camZoom);
   let raw = (tex2(t, fuv) + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0)) + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
-    rawB = (tex2(tB, fuv) + tex2(tB, fuv + vec2f(r, 0.0)) + tex2(tB, fuv - vec2f(r, 0.0)) + tex2(tB, fuv + vec2f(0.0, r)) + tex2(tB, fuv - vec2f(0.0, r))) * 0.2;
+
   let rawB = (tex2(tB, fuv) + tex2(tB, fuv + vec2f(r, 0.0)) + tex2(tB, fuv - vec2f(r, 0.0)) + tex2(tB, fuv + vec2f(0.0, r)) + tex2(tB, fuv - vec2f(0.0, r))) * 0.2;
   return decodeFluidRaw(raw, rawB);
 }
@@ -1667,7 +1667,7 @@ fn decodeFluidParts(t: texture_2d<f32>, tB: texture_2d<f32>, pt: texture_2d<f32>
   var rawB: vec4f;
   if (dof < 0.02) {
     raw = textureBicubic(t, fuv);
-    rawB = textureBicubic(tB, fuv);
+
     if (useBlur) { raw.a = blurAlpha(t, fuv, blurFluid); }
   } else {
     let r = dof * 0.022 / (1.5 * U.camZoom);
