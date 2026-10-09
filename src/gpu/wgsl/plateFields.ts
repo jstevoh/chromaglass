@@ -20,7 +20,6 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'bubbleShape', type: 'vec4f', count: 40, note: 'stretch axis × magnitude, wobble amplitude, wobble phase' },
   { name: 'bubbles', type: 'vec4f', count: 40, note: 'x, y, r (fluid uv) and opacity' },
   { name: 'lamp', type: 'vec4f' },
-  { name: 'magnets', type: 'vec4f', count: 4, note: 'the magnets under the glass as the lead plate was stepped: x, y (fluid uv), height, strength; strength 0 is none' },
   { name: 'lamp2', type: 'vec4f' },
   { name: 'markRect', type: 'vec4f', note: 'where it sits: centre xy, half-size xy, all in screen uv' },
   /*

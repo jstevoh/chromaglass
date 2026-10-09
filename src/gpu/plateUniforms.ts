@@ -298,11 +298,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const lamp = view.lamp;
     pack.set('lamp', lamp.x, lamp.y, 0.55, clamp01(s.lampHotspot ?? 0));
     pack.set('lamp2', lamp.x2, lamp.y2, 0.45, clamp01(s.secondLamp ?? 0));
-    const mags = new Array<number>(16).fill(0);
-    (view.magnets ?? []).slice(0, 4).forEach((m, k) => {
-      mags[k * 4] = m.x; mags[k * 4 + 1] = m.y; mags[k * 4 + 2] = Math.max(0.02, m.height); mags[k * 4 + 3] = Math.max(0, m.strength);
-    });
-    pack.set('magnets', ...mags);
     pack.set('lightPlay', clamp01(s.lightPlay ?? 0));
     pack.set('iridescence', clamp01(s.iridescence ?? 0));
   }

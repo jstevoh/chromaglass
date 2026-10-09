@@ -62,10 +62,49 @@ export function dyeAbsorbance(channel: number): number {
 const isClear = (r: number, g: number, b: number) => Math.min(r, g, b) >= DYE_CEILING;
 
 /** The absorbance of one unit of the liquid named by this colour, all three channels. */
-export function dyeAbsorbances(r: number, g: number, b: number): [number, number, number] {
-  if (isClear(r, g, b)) return [r, g, b].map(c => -Math.log(Math.min(1, c))) as [number, number, number];
-  return [dyeAbsorbance(r), dyeAbsorbance(g), dyeAbsorbance(b)];
+export function dyeAbsorbances(r: number, g: number, b: number): [number, number, number, number, number, number] {
+  if (isClear(r, g, b)) {
+    const c = -Math.log(Math.min(1, Math.min(r, g, b)));
+    return [c, c, c, c, c, c];
+  }
+  
+  // Real Spectral Synthesis!
+  // To get beautiful subtractive mixing, we want each color to be a smooth, 
+  // wide absorption band.
+  // We will map the 6 bands to roughly: 
+  // 0: 420nm (Violet)
+  // 1: 470nm (Blue)
+  // 2: 520nm (Cyan/Green)
+  // 3: 570nm (Yellow/Green)
+  // 4: 620nm (Orange)
+  // 5: 670nm (Red)
+  
+  // Convert RGB to an approximate absorption spectrum.
+  // Instead of using pure RGB (which creates artificial blocks), we use the old 
+  // Spectral Optics matrix to create a smooth 6-band absorbance, but we widen it 
+  // slightly so Blue and Yellow overlap more in the Green bands!
+  
+  const ar = dyeAbsorbance(r);
+  const ag = dyeAbsorbance(g);
+  const ab = dyeAbsorbance(b);
+  
+  // We use a modified matrix that allows "Blue" to transmit more Cyan/Green,
+  // and "Yellow" to transmit more Cyan/Green.
+  // ar (absorbs Red): Cyan ink.
+  // ag (absorbs Green): Magenta ink.
+  // ab (absorbs Blue): Yellow ink.
+  
+  let b0 = ab * 0.90 + ag * 0.10 + ar * 0.00; // Violet
+  let b1 = ab * 0.60 + ag * 0.35 + ar * 0.05; // Blue
+  let b2 = ab * 0.15 + ag * 0.50 + ar * 0.35; // Cyan-Green
+  let b3 = ab * 0.05 + ag * 0.50 + ar * 0.45; // Yellow-Green
+  let b4 = ab * 0.00 + ag * 0.20 + ar * 0.80; // Orange
+  let b5 = ab * 0.00 + ag * 0.05 + ar * 0.95; // Red
+
+  return [b0, b1, b2, b3, b4, b5];
 }
+
+
 
 /** WGSL for the same, so a picture poured as dye (`wgsl/splat.ts`) is the same dye. */
 export const DYE_ABSORBANCE_WGSL = /* wgsl */ `

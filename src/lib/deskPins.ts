@@ -201,7 +201,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'macroDepth', label: "Depth / Focus", min: 0, max: 1, section: 'macro' },
   { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 1, section: 'macro' },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
-  { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
+
   { key: 'phaseAmount', label: "Ferrofluid", min: 0, max: 1, section: 'physics' },
   { key: 'phaseScale', label: "Domain Size", min: 0, max: 1, section: 'physics' },
   { key: 'phaseSharp', label: "Phase Edge", min: 0, max: 1, section: 'physics' },
@@ -211,7 +211,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'magnetY', label: "Magnet Up", min: 0, max: 1, section: 'physics' },
   { key: 'magnetWalk', label: "Magnet Walk", min: 0, max: 1, section: 'physics' },
   { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'physics' },
-  { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'physics' },
+
   { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1, section: 'master' },
   { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 1, section: 'physics' },
   { key: 'oilTension', label: "Oil Tension", min: 0, max: 1, section: 'physics' },
@@ -233,7 +233,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.08, section: 'heat' },
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'heat' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
-  { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
+
 
   { key: 'chemistryPattern', label: "Pattern (Spots to Labyrinth)", min: 0, max: 1, section: 'lamp' },
   { key: 'chemistryWidth', label: "Pattern Width", min: 0.1, max: 1, section: 'lamp' },
@@ -262,7 +262,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'diffusionRate', label: "Diffusion Rate", min: 0, max: DIFFUSION_CEILING, section: 'physics' },
   { key: 'buoyancy', label: "Buoyancy", min: 0, max: 2, section: 'physics' },
   { key: 'advection', label: "Advection", min: 0, max: 2, section: 'physics' },
-  { key: 'damping', label: "Momentum", min: 0.8, max: 1, section: 'physics' },
+
   // The mark. Opacity above all, because taking a logo off between sets is a
   // thing a hand does on a fader rather than a thing anyone opens a panel for.
   { key: 'markMix', label: "Logo Opacity", min: 0, max: 1, section: 'mark' },

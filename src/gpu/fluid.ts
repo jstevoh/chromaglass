@@ -548,6 +548,7 @@ export class WebGPUFluid {
   private readonly dyeFormat: GPUTextureFormat;
 
   private readonly dye: PingPong;
+  public readonly dyeB: PingPong;
   public readonly chem: PingPong;
   public readonly activeMat: PingPong;
   public chemLive = false;
@@ -608,9 +609,11 @@ export class WebGPUFluid {
   private readonly scratchB: GPUTexture;
   private readonly readTarget: GPUTexture;
   private readonly deltaDyeTex: GPUTexture;
+  private readonly deltaDyeBTex: GPUTexture;
   private readonly deltaVelTex: GPUTexture;
   private readonly deltaMulTex: GPUTexture;
   private readonly cpuDyeTex: GPUTexture;
+  private readonly cpuDyeBTex: GPUTexture;
   private readonly cpuVelTex: GPUTexture;
   private readonly cpuMulTex: GPUTexture;
   private splatBuf: GPUBuffer | null = null;
@@ -1135,6 +1138,7 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
+    this.dyeB = pp(this.N, this.dyeFormat, 'dyeB');
     this.chem = pp(this.N, 'rgba16float', 'chem');
     this.activeMat = pp(this.N, 'r32float', 'activeMat');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
@@ -1183,9 +1187,11 @@ export class WebGPUFluid {
     this.scratchB = tex(this.N, this.dyeFormat, 'scratch b');
     this.readTarget = tex(this.L, RGBA32, 'readback');
     this.deltaDyeTex = tex(this.N, RGBA32, 'dye delta');
+    this.deltaDyeBTex = tex(this.N, RGBA32, 'dye b delta');
     this.deltaVelTex = tex(this.N, RGBA32, 'velocity delta');
     this.deltaMulTex = tex(this.N, R32, 'dye multiplier');
     this.cpuDyeTex = tex(this.L, RGBA32, 'dye delta (cpu)');
+    this.cpuDyeBTex = tex(this.L, RGBA32, 'dye b delta (cpu)');
     this.cpuVelTex = tex(this.L, RGBA32, 'velocity delta (cpu)');
     this.cpuMulTex = tex(this.L, R32, 'dye multiplier (cpu)');
 
@@ -1398,7 +1404,7 @@ export class WebGPUFluid {
       neither damps nor clamps it: only the heat decays there.
     */
     const thin = this.thinGapOn(p);
-    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
+    f[16] = thin ? 1 : fin(0.99, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
@@ -1489,7 +1495,7 @@ export class WebGPUFluid {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, dyeAddB: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -1506,6 +1512,7 @@ export class WebGPUFluid {
       itself, in project().
     */
     q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+    q.writeTexture({ texture: this.cpuDyeBTex }, dyeAddB, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
     if (hands) {
@@ -1535,6 +1542,7 @@ export class WebGPUFluid {
     // Onto the full grid, the same bilinear the delta passes used to do
     // themselves, so the two paths meet at one place.
     this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
+    this.upsample(pass, this.cpuDyeBTex, this.deltaDyeBTex);
     this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
@@ -1613,7 +1621,9 @@ export class WebGPUFluid {
     this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // the picture adds; it takes nothing away
     this.splatRun(pass, 'pourImage', 'rgba32float', [this.splatBuf, this.deltaDyeTex, tex, this.sampler], this.N, false);
     this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaDyeB', this.dyeB.write, [this.dyeB.read, this.deltaDyeBTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
+    this.dyeB.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
     tex.destroy();
@@ -1662,7 +1672,7 @@ export class WebGPUFluid {
   }
 
   private splatPass(pass: GPUComputePassEncoder): void {
-    this.splatRun(pass, 'splatDeltas', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex], this.N);
+    this.splatRun(pass, 'splatDeltas', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, this.deltaDyeBTex, this.deltaVelTex, this.deltaMulTex], this.N);
   }
 
   /** Dye, velocity and the plate gap take up whatever is in the delta fields. */
@@ -1678,7 +1688,9 @@ export class WebGPUFluid {
       od.swap();
     }
     this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaDyeB', this.dyeB.write, [this.dyeB.read, this.deltaDyeBTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
+    this.dyeB.swap();
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
     this.vel.swap();
     this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
@@ -1850,7 +1862,7 @@ export class WebGPUFluid {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
-    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
+    this.squeezeGain = Math.max(0, Math.min(1, 0.4)) * 2.2;
     this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
     this.lastDt = p.dt;
@@ -2231,7 +2243,7 @@ export class WebGPUFluid {
       // The gap rides along: the plate's depth is a mobility on the flow that
       // carries the dye (F), and this is the field that carries it.
       this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read],
-        this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
+        this.arg('current grid', [0, this.M, 0, swirlScale]));
     }, !thin);
 
     // 9. Dye: diffuse, then advect through the forced velocity
@@ -4459,6 +4471,7 @@ export class WebGPUFluid {
   get fields() {
     return {
       dye: this.dye.read,
+      dyeB: this.dyeB.read,
       vel: this.vel.read,
       velForced: this.velForced,
       grain: this.grain?.read ?? null,

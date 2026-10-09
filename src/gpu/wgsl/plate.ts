@@ -120,7 +120,7 @@ fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
   // unit is exp(-a) for one unit of the dye, so unit^amount is exp(-a·amount).
   let rgb = pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
   if (U.spectral <= 0.001) { return rgb; }
-  return mix(rgb, spectralThrough(unit, max(amount, 0.0)), U.spectral);
+  return mix(rgb, spectralThrough(unit, unitB, max(amount, 0.0)), U.spectral);
 }
 
 /*
@@ -342,10 +342,12 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
   return result;
 }
 
-fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
+fn decodeFluid(t: texture_2d<f32>, tB: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
-  var rawAlpha = raw.a;
+    rawB = textureBicubic(tB, fuv);
+  let rawB = textureBicubic(tB, fuv);
+  var rawAlpha = raw.a; // we assume rawB.a is identical
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
 
   let totalDensity = decodeDensity(rawAlpha);
@@ -955,7 +957,7 @@ fn resolved(size: f32, lo: f32, hi: f32) -> f32 {
 
 // Decode an already-fetched texel — the defocused path doesn't need bicubic
 // filtering or a gooey blur, so it costs 5 plain fetches instead of 5 decodes.
-fn decodeFluidRaw(raw: vec4f) -> vec4f {
+fn decodeFluidRaw(raw: vec4f, rawB: vec4f) -> vec4f {
   dyeThrough = vec3f(1.0);
   let totalDensity = decodeDensity(raw.a);
   if (totalDensity < 0.001 / DENSITY_SCALE) { return vec4f(0.0); }
@@ -971,13 +973,13 @@ fn decodeFluidRaw(raw: vec4f) -> vec4f {
 
 // 5-tap defocus. The blur radius is constant in screen space, so the
 // out-of-focus surround holds still as the camera zooms.
-fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
-  if (dof < 0.02) { return decodeFluid(t, fuv, blurFluid, useBlur); }
+fn decodeFluidDof(t: texture_2d<f32>, tB: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
+  if (dof < 0.02) { return decodeFluid(t, tB, fuv, blurFluid, useBlur); }
   let r = dof * 0.022 / (1.5 * U.camZoom);
-  let raw = (tex2(t, fuv)
-           + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0))
-           + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
-  return decodeFluidRaw(raw);
+  let raw = (tex2(t, fuv) + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0)) + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
+    rawB = (tex2(tB, fuv) + tex2(tB, fuv + vec2f(r, 0.0)) + tex2(tB, fuv - vec2f(r, 0.0)) + tex2(tB, fuv + vec2f(0.0, r)) + tex2(tB, fuv - vec2f(0.0, r))) * 0.2;
+  let rawB = (tex2(tB, fuv) + tex2(tB, fuv + vec2f(r, 0.0)) + tex2(tB, fuv - vec2f(r, 0.0)) + tex2(tB, fuv + vec2f(0.0, r)) + tex2(tB, fuv - vec2f(0.0, r))) * 0.2;
+  return decodeFluidRaw(raw, rawB);
 }
 
 // Paint cells, lacing and relief lighting for one layer's decoded dye.
@@ -1321,6 +1323,8 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
  * used to have, because this pass is at WebGPU's limit of sixteen.
  */
 @group(0) @binding(17) var view0: texture_2d<u32>;
+@group(0) @binding(26) var layer0B: texture_2d<f32>;
+@group(0) @binding(27) var layer1B: texture_2d<f32>;
 `;
 
 /** Reading view0, between its texels. Only with the display's own bindings. */
@@ -1657,11 +1661,13 @@ fn foldRaw(raw: vec4f, pt: texture_2d<f32>, uv: vec2f) -> vec4f {
   the plain decode: they are asking about the dye's shape, and a boundary
   found on particle speckle would be a noisy boundary rather than a finer one.
 */
-fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
-  if (U.particles <= 0.001) { return decodeFluidDof(t, fuv, blurFluid, useBlur, dof); }
+fn decodeFluidParts(t: texture_2d<f32>, tB: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
+  if (U.particles <= 0.001) { return decodeFluidDof(t, tB, fuv, blurFluid, useBlur, dof); }
   var raw: vec4f;
+  var rawB: vec4f;
   if (dof < 0.02) {
     raw = textureBicubic(t, fuv);
+    rawB = textureBicubic(tB, fuv);
     if (useBlur) { raw.a = blurAlpha(t, fuv, blurFluid); }
   } else {
     let r = dof * 0.022 / (1.5 * U.camZoom);
@@ -2192,7 +2198,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   gapScale *= 1.0 - view.film;
   filmWater = 1.0 - view.film;
-  var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
+  var fluid0 = decodeFluidParts(layer0, layer0B, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
   filmWater = 1.0;
   // What the lamp gets through, and the decode it came with (onGround).
@@ -2718,7 +2724,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
       fuv1 = macroWarp(fuv1);
     }
-    var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof);
+    var fluid1 = decodeFluidParts(layer1, layer1B, parts1, fuv1, blurFluid, useBlur, dof);
     let through1 = dyeThrough;
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;

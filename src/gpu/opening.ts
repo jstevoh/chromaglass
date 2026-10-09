@@ -95,7 +95,7 @@ export function lookOpensSpinning(s: Partial<VisualizerSettings>): boolean {
   const motor = lookMotorRate(s.rotationSpeed ?? 0);
   if (!(motor > 0)) return false;
   const viscosity = s.viscosity ?? DEFAULT_SETTINGS.viscosity;
-  const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + (s.platePressure ?? DEFAULT_SETTINGS.platePressure ?? 0) * 0.8);
+  const bed = (viscosity === 'thin' ? 0.8 : 1.7) * (1 + 0.4 * 0.8);
   const dragRate = (0.04 + (s.spinDrag ?? DEFAULT_SETTINGS.spinDrag ?? 0.25) * 1.2) * bed;
   const tau = dragSeconds(carrierViscosity(viscosity));
   let dish = 0, liquid = 0;

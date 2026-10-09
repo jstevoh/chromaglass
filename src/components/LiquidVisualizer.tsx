@@ -19,7 +19,7 @@ import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
-import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
+import { fillPlateUniforms } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
@@ -947,6 +947,9 @@ class FluidSimulation {
   densityR: Float32Array;
   densityG: Float32Array;
   densityB: Float32Array;
+  density3: Float32Array;
+  density4: Float32Array;
+  density5: Float32Array;
 
   vx: Float32Array;
   vy: Float32Array;
@@ -1140,7 +1143,8 @@ class FluidSimulation {
   get stepCount(): number { return this.stepIndex; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
-  private dyeAdd: Float32Array;     // interleaved upload buffers
+  private dyeAdd: Float32Array;
+  dyeAddB: Float32Array;     // interleaved upload buffers
   private velAdd: Float32Array;
   /** The fingers in the liquid this step on a thin gap (lib/handSolid.ts), made when one first touches it. */
   private hands: Float32Array | null = null;
@@ -1396,6 +1400,9 @@ class FluidSimulation {
     this.densityR = new Float32Array(GRID_AREA);
     this.densityG = new Float32Array(GRID_AREA);
     this.densityB = new Float32Array(GRID_AREA);
+    this.density3 = new Float32Array(GRID_AREA);
+    this.density4 = new Float32Array(GRID_AREA);
+    this.density5 = new Float32Array(GRID_AREA);
 
     this.vx = new Float32Array(GRID_AREA);
     this.vy = new Float32Array(GRID_AREA);
@@ -1411,6 +1418,7 @@ class FluidSimulation {
 
     this.mul = new Float32Array(GRID_AREA).fill(1);
     this.dyeAdd = new Float32Array(GRID_AREA * 4);
+    this.dyeAddB = new Float32Array(GRID_AREA * 4);
     this.velAdd = new Float32Array(GRID_AREA * 4);
     this.rbDensity = new Float32Array(GRID_AREA);
     this.rbVx = new Float32Array(GRID_AREA);
@@ -1596,15 +1604,16 @@ class FluidSimulation {
 
   private flushDeltas(dt: number) {
     const gpu = this.gpu!;
-    const da = this.dyeAdd, va = this.velAdd;
+    const da = this.dyeAdd, dab = this.dyeAddB, va = this.velAdd;
     for (let i = 0; i < GRID_AREA; i++) {
       const i4 = i * 4;
       da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
+      dab[i4] = this.density3[i]; dab[i4 + 1] = this.density4[i]; dab[i4 + 2] = this.density5[i]; dab[i4 + 3] = this.density[i];
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
-    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null);
+    gpu.applyDeltas(da, this.dyeAddB, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null);
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
+    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0); this.density3.fill(0); this.density4.fill(0); this.density5.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
@@ -1910,10 +1919,13 @@ class FluidSimulation {
     // At render time: channel = exp(-densityChannel / density)
     // This gives r1^w1 * r2^w2 weighted mixing — physically correct subtractive colorimetry.
     // The absorbance is a real dye's, never a perfect filter's (lib/dye.ts).
-    const [ar, ag, ab] = dyeAbsorbances(r, g, b);
+        const [ar, ag, ab, a3, a4, a5] = dyeAbsorbances(r, g, b);
     this.densityR[index] += amount * ar;
     this.densityG[index] += amount * ag;
     this.densityB[index] += amount * ab;
+    this.density3[index] += amount * a3;
+    this.density4[index] += amount * a4;
+    this.density5[index] += amount * a5;
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
@@ -2037,7 +2049,7 @@ class FluidSimulation {
     this.liquid.clear();
     this.gpu?.clear();
     if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
+    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0); this.density3.fill(0); this.density4.fill(0); this.density5.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
@@ -3357,7 +3369,7 @@ class FluidSimulation {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
-    dynamicSpeed += settings.platePressure * 0.02;
+    dynamicSpeed += 0.4 * 0.02;
     dynamicSpeed += settings.airVelocity * 0.01;
     dynamicSpeed += settings.automateRate * 0.01;
 
@@ -3523,8 +3535,8 @@ class FluidSimulation {
     this.fvy.set(this.vy);
     let densSum = 0, colR = 0, colG = 0, colB = 0;
     for (let i = 0; i < GRID_AREA; i++) {
-      this.vx[i] *= p.damping;
-      this.vy[i] *= p.damping;
+      this.vx[i] *= 0.99;
+      this.vy[i] *= 0.99;
       const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
       if (speedSq > 0.000004) {
         const factor = 0.002 / Math.sqrt(speedSq);
@@ -3651,7 +3663,7 @@ class FluidSimulation {
       number (both solvers halve it).
     */
     {
-      const vf = Math.max(0, Math.min(1, settings.vibrationFrequency ?? 0));
+      const vf = Math.max(0, Math.min(1, 0));
       if (vf > 0.005) {
         const energy = audioData ? Math.min(1, audioData.energy) : 0;
         vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
@@ -3825,7 +3837,6 @@ class FluidSimulation {
       // three-quarters of the way up, short of where a bright rim appears along
       // boundaries and thin dye goes blocky.
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
-      damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, immiscibility,
       /*
@@ -3888,7 +3899,7 @@ class FluidSimulation {
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
-      depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
+      depthDrag: Math.max(0, Math.min(3, 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
@@ -3910,7 +3921,6 @@ class FluidSimulation {
       */
       gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
-      platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -3919,7 +3929,7 @@ class FluidSimulation {
       // The lasting current. Damping is its drag per step — the first thing that
       // control has ever visibly done — and the cap keeps a step's travel under
       // ¾ of a cell whatever the Speed and Advection.
-      currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
+      currentDamp: Math.max(0.8, Math.min(0.995, 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
       rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
       rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
@@ -6643,7 +6653,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
         let dynamicSpeed = 0.05;
-        dynamicSpeed += currentSettings.platePressure * 0.02;
+        dynamicSpeed += 0.4 * 0.02;
         dynamicSpeed += currentSettings.airVelocity * 0.01;
         dynamicSpeed += currentSettings.automateRate * 0.01;
         let speedMultiplier = currentSettings.globalSpeed / 0.05;
@@ -8677,7 +8687,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const motor = lookMotor(motorRate, motorWay, musicSpeed, dirMod);
             const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
-              * (1 + (patch.layer(l).platePressure ?? 0) * 0.8);
+              * (1 + (0.4) * 0.8);
             /*
               The range was measured and widened. At (0.15 + drag*3) a flicked
               plate lost three-quarters of its speed in 2s at the slowest
@@ -9110,7 +9120,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           rotations: rotationAnglesRef.current,
           harmony: harmonyRef.current,
           lamp: lampRef.current,
-          magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
+          magnets: [],
           gelAngle: gelAngleRef.current,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
@@ -9644,7 +9654,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
          * than with the stage's own hooks, so the phone check can ask it
          * wherever the plate steps, software WebGPU included.
          */
-        magnets: () => magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
+        magnets: () => [],
         hands: () => ({
           hands: [
             ...(isMouseDownRef.current ? [{ ...mousePosRef.current, laid: { ...dropLaidRef.current } }] : []),

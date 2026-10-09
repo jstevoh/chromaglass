@@ -372,7 +372,6 @@ export interface VisualizerSettings {
   audioMappings: AudioMappings;
   
   // Squish Plate
-  platePressure: number;
   /*
     The two glasses, and how they sit together (2026-09-21).
 
@@ -420,7 +419,6 @@ export interface VisualizerSettings {
     leave off, because `plateCurve` is zero in all thirty-two presets and the
     dome is opt-in regardless. Turn it up with the plate shape.
   */
-  depthDrag: number;
   /*
     The plate as a Hele-Shaw cell (PLAN §18a, src/gpu/wgsl/thinGap.ts).
 
@@ -561,7 +559,6 @@ export interface VisualizerSettings {
   
   // Manual/Interaction
   airVelocity: number;
-  vibrationFrequency: number;
   dropHeight?: number;        // how far a dropped liquid falls: 0 lays it on the plate, 1 splashes
   
   // Mixer
@@ -638,7 +635,6 @@ export interface VisualizerSettings {
   diffusionRate: number;
   buoyancy: number;
   advection: number;
-  damping: number;
   heatDecay: number;
 
   /** Constant directional pull on heavy dye (0-1), simulating a steady tilt or wind for comet effects. */
@@ -915,7 +911,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     color: 'treble',
     rotation: 'none',
   },
-  platePressure: 0.4,       // glass plate squeeze — drives radial spreading
   /*
     Flat, which is what it was before this existed.
 
@@ -929,7 +924,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     no measurement yet says it earns its place. So it is a control, off.
   */
   plateCurve: 0,
-  depthDrag: 0,
   thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
   plateSpring: 0.35,        // a press takes about a second to lift
@@ -965,7 +959,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
-  vibrationFrequency: 0.0,
   dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
@@ -1011,7 +1004,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
   buoyancy: 0.45,
   advection: 0.45,
-  damping: 0.97,
   heatDecay: 0.98,
   cometSpeed: 0.0,
   cometAngle: 0.0,

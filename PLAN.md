@@ -17,7 +17,7 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
    * **Luma-keying:** During the canvas extraction, convert brightness to alpha so standard downloaded MP4s act as transparent fluid overlays.
    * **Physical Interaction:** Calculate basic Optical Flow (frame differencing) on the video canvas and pipe the motion vectors into `fluid.addVelocity()`, allowing motion inside the video to physically push the WebGPU fluids.
 7. **Future Visual Targets:**btractive Mixing (subtractive color physics).
-   * Fully Dynamic GPU Ferrohydrodynamics (solving Rosensweig instability natively).
+   ~* Fully Dynamic GPU Ferrohydrodynamics (solving Rosensweig instability natively).*~ (Completed in PR #247 & cleanup completed)
 
 ### Claude (UI & Stability Track)
 **Focus:** React architecture, new UI implementation, bug cleanup, and test stability.

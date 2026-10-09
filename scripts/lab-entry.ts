@@ -1,3 +1,4 @@
+import { fillPlateUniforms, PlateView } from '../src/gpu/plateUniforms';
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
@@ -7,7 +8,7 @@ import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
-import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
+
 import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
 import { speciesOf } from '../src/lib/liquidProps';
@@ -189,7 +190,7 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
+    l.solver.applyDeltas(l.dyeAdd, l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
     l.hands = null; l.breath = null;
   },
@@ -238,7 +239,7 @@ const api = {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
       l.solver.step(p, flushed && k === 0);
-      l.magnets = magnetsOnPlate(p);
+      l.magnets = [];
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
@@ -590,7 +591,7 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
+    const layer = { dye: l.solver['dye'].read, dyeB: l.solver['dyeB'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
