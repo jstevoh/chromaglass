@@ -2879,6 +2879,35 @@ class FluidSimulation {
   }
 
   /**
+   * Cavity collapse and fluid shockwave when a bubble pops.
+   *
+   * Surface tension and pressure drive surrounding liquid rapidly inward
+   * to fill the collapsing void, while asymmetric rupture rolls an annular
+   * vortex ring into the flow. Unlike an outward air puff, dye is preserved
+   * rather than erased, leaving the fill pass (bubbleDye.ts) to heal the hole.
+   */
+  popBubble(x: number, y: number, radius: number, strength: number) {
+    radius = Math.round(radius * GRID_SCALE);
+    const r2 = radius * radius;
+    for (let i = -radius; i <= radius; i++) {
+      for (let j = -radius; j <= radius; j++) {
+        const distSq = i * i + j * j;
+        if (distSq >= r2 || distSq === 0) continue;
+        const nx = x + i;
+        const ny = y + j;
+        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
+          const idx = nx + ny * this.size;
+          const dist = Math.sqrt(distSq);
+          this.dirty = true;
+          const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
+          this.vx[idx] += ((-i / dist) + (-j / dist) * swirl) * strength;
+          this.vy[idx] += ((-j / dist) + (i / dist) * swirl) * strength;
+        }
+      }
+    }
+  }
+
+  /**
    * A finger drawn through the liquid: it carries what it touches and loosens it.
    *
    * The drag is the easy half and it is deliberately not a push. A push is
@@ -8245,11 +8274,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035);
                 }
               }
-              // A pop is a puff of air into the dye where the bubble was.
+              // A pop is an inward cavity collapse into the void left behind.
               for (const ev of bubbles.events) {
                 if (ev.kind === 'pop' && lead) {
                   const px = Math.round(ev.x), py = Math.round(ev.y);
-                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035, true);
+                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.popBubble(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.04);
                 }
               }
             }

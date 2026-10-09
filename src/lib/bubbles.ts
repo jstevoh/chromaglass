@@ -47,7 +47,7 @@ export interface Bubble {
   held?: boolean;
 }
 
-export const MAX_BUBBLES = 40;
+export const MAX_BUBBLES = 128;
 
 /**
  * How fast gas crosses from a small bubble to a large neighbour, in cells² a
@@ -124,6 +124,42 @@ export class BubbleField {
     this.bubbles.push(b);
   }
 
+  /**
+   * Rayleigh-Plateau rim breakup when a bubble pops.
+   *
+   * When a bubble film ruptures, surface tension rapidly pulls the rim back
+   * (Culick velocity). The retracting rim destabilizes into a spray of
+   * daughter micro-satellites flung radially outward into the surrounding
+   * liquid, where viscous Darcy drag slows them down to the fluid speed.
+   */
+  private spawnDaughters(b: Bubble, bs: Bubble[]): void {
+    if (b.r < 1.8 || bs.length >= MAX_BUBBLES) return;
+    const count = Math.min(Math.floor(2 + b.r * 0.6 + this.rng.float() * 2), Math.min(8, MAX_BUBBLES - bs.length));
+    if (count <= 0) return;
+    const angleBase = this.rng.angle();
+    for (let k = 0; k < count; k++) {
+      const jitter = this.rng.centred() * 0.35;
+      const a = angleBase + (k * 2 * Math.PI) / count + jitter;
+      const u = this.rng.float();
+      const rDaughter = Math.max(0.6, b.r * (0.12 + 0.16 * u));
+      const dist = b.r * (0.85 + 0.15 * u);
+      const life = 2.5 + this.rng.float() * 3.5;
+      const nb = this.make(
+        b.x + Math.cos(a) * dist,
+        b.y + Math.sin(a) * dist,
+        rDaughter,
+        life,
+        0.18 + this.rng.float() * 0.1,
+      );
+      // Radial burst ejection kick (cells/s): fast initial momentum
+      const vKick = 35 + this.rng.float() * 30;
+      nb.kx = Math.cos(a) * vKick;
+      nb.ky = Math.sin(a) * vKick;
+      nb.wvel = 2.0 + this.rng.float() * 2.0;
+      bs.push(nb);
+    }
+  }
+
   /** Blow `count` bubbles at (x, y), scattered within `spread` cells. Fresh air arrives wobbling. */
   spawn(x: number, y: number, r: number, count = 1, spread = 0): void {
     const N = this.grid;
@@ -190,6 +226,10 @@ export class BubbleField {
     // Fingers as long as the growth is fast, relaxing toward that.
     const want = Math.min(1, speed / (N * 0.03)) * 0.55;
     b.fing += (want - b.fing) * (1 - Math.exp(-dt / 0.25));
+    // Saffman-Taylor wavelength scaling: faster blowing destabilizes into more fingers
+    if (speed > 0.5) {
+      b.lobes = Math.min(16, Math.max(6, Math.round(7 + speed * 1.5)));
+    }
     // Held at the straw.
     const k = Math.min(1, dt * 8);
     b.x += (x - b.x) * k; b.y += (y - b.y) * k;
@@ -225,15 +265,7 @@ export class BubbleField {
       if (kind === 'dye' && dist < r + b.r * 0.6 && b.age > 0.3) {
         this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
         bs.splice(i, 1);
-        if (b.r > 2 && bs.length < MAX_BUBBLES - 2) {
-          const n = 2 + this.rng.int(2);
-          for (let k = 0; k < n; k++) {
-            const a = this.rng.angle();
-            const nb = this.make(b.x + Math.cos(a) * b.r, b.y + Math.sin(a) * b.r, b.r * (0.25 + this.rng.float() * 0.2), 2 + this.rng.float() * 2.5, 0.12);
-            nb.kx = Math.cos(a) * 20; nb.ky = Math.sin(a) * 20;
-            bs.push(nb);
-          }
-        }
+        this.spawnDaughters(b, bs);
         continue;
       }
       if (dist < reach) {
@@ -266,13 +298,13 @@ export class BubbleField {
       if (!b.held) b.fing *= Math.exp(-dt / 1.2);
       if (b.held) { b.held = false; b.age += dt; b.wph += b.wvel * dt; continue; }
       const [vx, vy] = velocity(b.x, b.y);
-      // Ride the dye, climb the tilt, carry any kick, and wander a little.
-      const dx = vx * CELLS_PER_UNIT * 1.4 - tiltX * 900 + b.kx + this.rng.centred() * (0.5 + agitation * 1.5);
-      const dy = vy * CELLS_PER_UNIT * 1.4 - tiltY * 900 + b.ky + this.rng.centred() * (0.5 + agitation * 1.5);
+      // Ride the dye (Bretherton lubrication speedup), climb the tilt, carry any kick, and wander a little.
+      const dx = vx * CELLS_PER_UNIT * 1.32 - tiltX * 900 + b.kx + this.rng.centred() * (0.5 + agitation * 1.5);
+      const dy = vy * CELLS_PER_UNIT * 1.32 - tiltY * 900 + b.ky + this.rng.centred() * (0.5 + agitation * 1.5);
       b.x += dx * dt;
       b.y += dy * dt;
-      b.kx *= Math.exp(-dt / 0.5);
-      b.ky *= Math.exp(-dt / 0.5);
+      b.kx *= Math.exp(-dt / 0.22);
+      b.ky *= Math.exp(-dt / 0.22);
       b.age += dt;
 
       // Shape: stretch along the direction it is being dragged, relaxing
@@ -291,9 +323,8 @@ export class BubbleField {
       b.wph += b.wvel * dt;
     }
 
-    // Cluster: bubbles nearby drift gently toward one another and then rest
-    // against each other — the packed fields in every reference frame — and
-    // only merge once they have sat pressed together for a while.
+    // Foam contact: bubbles in thin gap flow push apart when overlapping to rest
+    // edge-to-edge as foam with Plateau borders, without unphysical long-range pull.
     for (let i = 0; i < bs.length; i++) {
       for (let j = i + 1; j < bs.length; j++) {
         const a = bs[i], c = bs[j];
@@ -303,13 +334,9 @@ export class BubbleField {
         // A held bubble does not give: the other takes the whole of the move.
         const ka = heldNow.has(a) ? 0 : heldNow.has(c) ? 2 : 1;
         const kc = heldNow.has(c) ? 0 : heldNow.has(a) ? 2 : 1;
-        if (dist < touch * 3 && dist > touch * 0.95) {
-          const pull = 2.5 * dt * (1 - dist / (touch * 3));
-          a.x += (ddx / dist) * pull * ka; a.y += (ddy / dist) * pull * ka;
-          c.x -= (ddx / dist) * pull * kc; c.y -= (ddy / dist) * pull * kc;
-        } else if (dist < touch * 0.95) {
+        if (dist < touch * 0.98) {
           // Overlapping: push apart to rest edge to edge.
-          const push = (touch * 0.95 - dist) * 0.5;
+          const push = (touch * 0.98 - dist) * 0.5;
           a.x -= (ddx / dist) * push * ka; a.y -= (ddy / dist) * push * ka;
           c.x += (ddx / dist) * push * kc; c.y += (ddy / dist) * push * kc;
         }
@@ -397,14 +424,8 @@ export class BubbleField {
       if (b.age > b.life * lifeScale || atEdge || shaken) {
         this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
         bs.splice(i, 1);
-        if (!atEdge && b.r > 2 && bs.length < MAX_BUBBLES - 2) {
-          const n = 2 + this.rng.int(2);
-          for (let k = 0; k < n; k++) {
-            const a = this.rng.angle();
-            const nb = this.make(b.x + Math.cos(a) * b.r * 0.9, b.y + Math.sin(a) * b.r * 0.9, b.r * (0.25 + this.rng.float() * 0.2), 2 + this.rng.float() * 2.5, 0.12);
-            nb.kx = Math.cos(a) * 18; nb.ky = Math.sin(a) * 18;
-            bs.push(nb);
-          }
+        if (!atEdge) {
+          this.spawnDaughters(b, bs);
         }
       }
     }
@@ -415,6 +436,7 @@ export class BubbleField {
     const N = this.grid;
     let n = 0;
     for (const b of this.bubbles) {
+      if (n >= MAX_BUBBLES) break;
       const end = b.life * lifeScale;
       const fadeIn = Math.min(1, b.age / 0.35);
       const fadeOut = Math.min(1, Math.max(0, (end - b.age) / 1.2));
