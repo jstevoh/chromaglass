@@ -548,6 +548,9 @@ export class WebGPUFluid {
   private readonly dyeFormat: GPUTextureFormat;
 
   private readonly dye: PingPong;
+  public readonly chem: PingPong;
+  public readonly activeMat: PingPong;
+  public chemLive = false;
   private readonly liquids0: PingPong;
   private readonly liquids1: PingPong;
   private readonly vel: PingPong;
@@ -1128,6 +1131,8 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
+    this.chem = pp(this.N, 'rgba16float', 'chem');
+    this.activeMat = pp(this.N, 'r16float', 'activeMat');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
@@ -1687,6 +1692,50 @@ export class WebGPUFluid {
    * GPU twin of `lib/chemistry.ts`, which was never wired in and has gone
    * (S13); the show grows the reaction on the CPU and lays its dye from there.
    */
+  
+  
+  addReagent(x: number, y: number, radius: number, amount: number, pattern_val: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'add reagent' });
+    const pass = enc.beginComputePass({ label: 'add reagent' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'addReagent', this.chem.write, [this.chem.read],
+      this.arg('reagent splat', [x, y, radius, amount, pattern_val, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  seedChemistry(x: number, y: number, radius: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'seed chemistry' });
+    const pass = enc.beginComputePass({ label: 'seed chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'seedChem', this.chem.write, [this.chem.read],
+      this.arg('seedChem splat', [x, y, radius, 0, 0, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5): void {
+    if (!this.chemLive) return;
+    const enc = this.device.createCommandEncoder({ label: 'step chemistry' });
+    const pass = enc.beginComputePass({ label: 'step chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    // feed and kill in z and w, Du and Dv in x and y
+    const args = this.arg('chem rates', [Du, Dv, feed, kill, 0, 0, 0, 0]);
+    for (let i = 0; i < iters; i++) {
+      this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
+      this.chem.swap();
+    }
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
   depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
     if (amount <= 0) return;
     const log = dyeAbsorbances(...colour);
@@ -2287,12 +2336,14 @@ export class WebGPUFluid {
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
       if (!bodiesOn) { 
         this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
         this.macCormack(pass, this.liquids0, this.velForced, disp, 'dye'); 
-        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye');
+        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
         return; 
       }
       /*
@@ -2323,6 +2374,7 @@ export class WebGPUFluid {
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -2334,6 +2386,10 @@ export class WebGPUFluid {
       this.liquids0.swap();
       this.runPressed(pass, 'bodyAdvect', this.liquids1.write, [this.liquids1.read, this.velForced], adv);
       this.liquids1.swap();
+      if (this.chemLive) {
+        this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
+        this.chem.swap();
+      }
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
@@ -4409,6 +4465,7 @@ export class WebGPUFluid {
       lies: this.liesLive && this.lies ? this.lies.read : null,
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
+      chem: this.chemLive ? this.chem.read : null,
     };
   }
 

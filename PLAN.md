@@ -1,85 +1,34 @@
-# Plan: a plate with real detail, a show you can render, and a show that plays like one
+# ChromaGlass Master Plan
 
-Three threads of work, merged into one running order.
+This plan directs the ongoing development of ChromaGlass. It has been restructured to be friendly and clear, separating tasks by Agent (Gemini vs. Claude) and reprioritized to maximize artistic visual impact and performance stability.
 
-**The look.** Filmed liquid (acrylic pour, oil and milk macro) carries structure at
-every scale. Ours does not: measured on a 512 px centre crop, the reference frames
-put 4.2–7.3 % of their pixels on a hard edge with a typical local contrast of 2–7,
-while our settled Fillmore plate manages 2.4 % and 0.8. At the scales that read on a
-wall (4–8 px) the reference carries three to five times more structure. The cause is
-numerical diffusion: every solver step advects and diffuses the dye, so anything
-finer than about eight cells is gone within a second, and nothing generates structure
-below the grid.
+## 🤖 Agent Directives & Roles
 
-**The instrument.** The show can be played from the music more directly than
-sound-drive-and-hope, and a finished song deserves a rendered film rather than a
-screen capture.
+### Gemini (Visuals & Physics Track)
+**Focus:** High-impact WebGPU shaders, fluid dynamics, and rendering algorithms.
+**Current Priority: Fully Coupled Advection-Reaction-Diffusion (Moving Chemistry)**
+*This is the highest-impact visual task, moving the static Gray-Scott reactions into the turbulent flow.*
+1. **Prepare the Data:** Modify `src/gpu/fluid.ts` to expose the chemistry PingPong texture (`this.chem`) to the fluid's velocity field.
+2. **Write the WGSL Advection:** Add an advection pass for the chemistry texture using the fluid's velocity field (`disp`). This can likely reuse the existing semi-Lagrangian advection logic currently used for dye (`bilerpN` or similar).
+3. **Integration:** Run this new advection pass immediately *prior* to the `grayScott` reaction-diffusion step in the pipeline.
+4. **Tuning:** Tune the `feed`, `kill`, and diffusion rates. When Turing patterns are sheared by turbulence, they can explode numerically. Tuning is required to ensure visual stability.
+5. **Future Visual Targets:** 
+   * Real-Time Spectral Subtractive Mixing (subtractive color physics).
+   * Fully Dynamic GPU Ferrohydrodynamics (solving Rosensweig instability natively).
 
-**The show.** Twenty-odd filmed liquid light shows, from the Joshua Light Show's 1969
-*Liquid Loops* to a band's show in 2023, were measured with the watch tool
-(`npm run watch`) on 2026-09-26. Real shows move in swells and scenes, spend a third
-or more of the time near black, hold two or three hues a frame (the owner wants more, 18l), and do not follow the
-kick. Ours is equally busy all the time, which `src/lib/phrasing.ts` measured and
-stopped short of fixing. Batch 10 is that thread; its yardstick is the table there.
+### Claude (UI & Stability Track)
+**Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
+**Current Priority: Bug Cleanup & New Performance UI**
+*The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
+1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
+2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
+3. **New UI Implementation:** Implement the new UI layer as specified by the owner, ensuring it correctly binds to `LiquidVisualizer.tsx` without disrupting the WebGPU context.
 
-| Measure (512 px centre crop) | Pour | Drops | Marbling | Ours now |
-|---|---|---|---|---|
-| Pixels on a hard edge | 7.3 % | 4.2 % | 5.6 % | 2.4 % |
-| Typical local contrast | 7.2 | 2.0 | 6.5 | 0.8 |
-| Structure at 4 px | 1.5 % | 0.9 % | 1.3 % | 0.3 % |
-| Structure at 8 px | 2.3 % | 2.2 % | 2.5 % | 0.5 % |
+---
 
-`npm run detail` (`scripts/detail.mjs`) produces this table, so every batch is judged
-the same way rather than by eye.
+## 📋 Detailed Order of Work & Historical Tracker
 
-> **This is the plate's own running order.** The engine work it now sits on — the
-> WebGPU port, the effects, air and the second liquid — is in
-> [docs/roadmap.md](docs/roadmap.md), which says what comes first and links the
-> plans behind each piece. The port landed on 2026-09-20 and the shader freeze with
-> it: there is one shading language in the tree now, WGSL in `src/gpu/wgsl/`.
-
-## Order of work
-
-*Written 2026-10-04 from an inventory of every open item in this file and in
-`docs/stability-plan.md`, `docs/webgpu-plan.md`, `docs/crash-plan.md`, `docs/rig-plan.md`,
-`docs/roadmap.md` and `docs/judging.md`: about 270 items, of which about 30 were the same
-work written in two to six places.* This list is the plan: work from the top. Each line
-is one PR unless it says otherwise. The detail, the evidence and the measure for each
-step are in its section (`§` and the item's id), not here.
-
-**How to use it.** A session takes the first open step in a lane nobody else is in,
-reads only that step's section (`grep -n '^##' PLAN.md`, then `sed -n` the part), and,
-when it ships, strikes the step here in the same PR (`~~…~~ #NNN`) and marks its section
-shipped. What it finds along the way goes into the section it belongs to, and here only
-if it changes the order.
-
-**The owner's QA list** (below, after the duplicates table) is ranked separately: a fix
-thread for a QA item takes the top open line in its tier.
-
-**Why this order.** Five rules, in priority:
-
-1. **First, whatever makes every later PR cheaper.** On 2026-10-03, 46 % of the PR check
-   runs that finished were red, two thirds of them on a line the PR had not touched (19h).
-   Over the week to 10-04 a merged change took a median 90 minutes to go live, and 64 % of
-   the PRs' Mac minutes went on pushes that added none of the PR's own code (19i). Every
-   step below pays that toll on every push, so Wave 0 is the largest saving in the file.
-2. **Then whatever can stop a show or hand it to a stranger,** smallest first (Wave 1).
-3. **The owner's Mac judging runs beside the code, in the order that unblocks code** (Wave 2):
-   47 items wait on the owner's eyes, and a few of them gate whole sections.
-4. **Seams before the features that crowd them** (Wave 3): `LiquidVisualizer.tsx` is 10,109
-   lines and `App.tsx` about 5,000. They are not where merges conflict (none of the last 25
-   recorded conflicts was in them; the shared documents were, which Wave 0 fixes), but a
-   session must read them to change them, and three of Wave 1's faults (S16, 14s, 14u) come
-   from state scattered through them.
-5. **The frame budget before effects that spend it** (Wave 4), **then features in the order
-   their dependencies allow** (Waves 5 to 7).
-
-**Lanes.** Steps in different lanes touch different files and can run in parallel
-sessions; steps in one lane go one after another. **A** `server/` and the Workers. **B**
-`App.tsx`, the desks, the phone, `src/lib` outside sound. **C** `src/gpu/` and
-`src/gpu/wgsl/`. **D** sound and time: `useAudioAnalyzer`, `audioFeatures`, `beatClock`,
-`barGrid`, `songShape`, `soundLearn`, `useMidi`. **E** `scripts/`, `.github/`, the build.
-**F** docs. **G** `LiquidVisualizer.tsx`, one session at a time, always.
+*Note: The detailed historical waves, CI/CD tracking, and 270+ sub-items are preserved below. When an item ships, strike it out and move its story to `docs/plan-shipped.md`.*
 
 ### Wave 0. Every change cheaper and faster to ship (lanes E, F)
 

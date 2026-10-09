@@ -189,7 +189,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // while everything else drifts — which is what depth looks like.
   'deep-ocean':         ['water', 'glycerine', 'syrup'],
   // Neon wants hard edges and punched holes, not a soft wash.
-  'cyberpunk':          ['water', 'silicone'],
+  'cyberpunk':          ['water', 'silicone', 'reagent', 'active'],
   // A blob that crawls while the oil around it climbs — which is the lamp.
   // Alcohol is lighter than all of it and carries heat, so it is what goes
   // up: the lamp needs something to rise, not only something to sit.
@@ -208,7 +208,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'solar-flare':        ['water', 'soap', 'alcohol'],
   // A bell holds its shape and lags the water it is drifting in.
   'jellyfish-bloom':    ['water', 'milk'],
-  'fractal-dream':      ['water', 'silicone'],
+  'fractal-dream':      ['water', 'silicone', 'reagent', 'active'],
   // Three pools apart, one liquid each, poured into its own area of the
   // dish (lib/plateAreas.ts): glycerine that holds, soap the bass breaks
   // open, syrup that settles. Ink was here, and did nothing a pool showed.

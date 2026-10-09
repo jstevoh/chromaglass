@@ -14,6 +14,8 @@ export interface LiquidBehaviour {
   soap?: number;
   /** Thicker than water: it crawls where it lies while the plate flows past. */
   body?: number;
+  /** Feeds the Turing reaction. */
+  reagent?: number;
   /** Refuses to let go of itself: a pool of it keeps its edge. */
   repel?: number;
   /*
@@ -174,6 +176,8 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // is. Each writes into the liquid field, and the field goes on acting for as
   // long as the liquid is there — which is the whole difference between soap
   // and a blue dye called Soap.
+  { id: 'reagent', name: 'Turing Reagent', color: '#ff88ff', own: '#ffffff', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
+    behaviour: { reagent: 1, weight: 0.02 } },
   { id: 'soap',      name: 'Soap',      color: '#ffffff', own: '#ffffff',
     description: 'Breaks the film: colour runs away from it and curls into filaments',
     // 0.12 before, which was physically right and a usability trap: the
@@ -323,6 +327,7 @@ export interface SceneMapping {
 }
 
 export interface VisualizerSettings {
+  activeDrive: number;
   // Sound Settings
   sensitivity: number;
   bassBoost: number;
@@ -704,6 +709,8 @@ export interface VisualizerSettings {
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
   lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye (or over it, by the Mixer's order), no beat, no dye
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
+  chemistryPattern: number;
+  chemistryWidth: number;
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
@@ -1023,7 +1030,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
-  benDay: 0,                // no print: only the Roy look lays Ben-Day dots
+  benDay: 0,
+  activeDrive: 0.5,                // no print: only the Roy look lays Ben-Day dots
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
@@ -1058,6 +1066,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmPhysics: 0,           // the rainbow: the film every look was made with
   lumia: 0,
   chemistry: 0,
+  chemistryPattern: 0,
+  chemistryWidth: 0.5,
   gelWheel: 0,
   gelSpeed: 0.5,
   filmMix: 0.7,

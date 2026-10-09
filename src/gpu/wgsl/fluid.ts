@@ -3812,6 +3812,75 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    *
    * A.a = (amount, threshold, 0, 0), A.b.rgb = the dye's absorbance (lib/dye.ts).
    */
+    addReagent: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let uv = uvOf(id);
+  var c = textureLoad(src, p, 0);
+  let d = distance(uv, A.a.xy);
+  if (d <= A.a.z) {
+    let f = 0.5 + 0.5 * (1.0 - d / A.a.z);
+    c.b = min(1.0, c.b + A.a.w * f);
+    // A.b.x is the pattern value to bake in. Blend it based on amount.
+    if (c.b > 0.0) {
+      c.a = mix(c.a, A.b.x, A.a.w * f / c.b);
+    }
+  }
+  textureStore(dst, p, c);
+}`,
+
+  seedChem: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let c = textureLoad(src, p, 0);
+  let uv = uvOf(id);
+  let d = distance(uv, A.a.xy);
+  var un = c.r;
+  var vn = c.g;
+  if (d <= A.a.z) {
+    vn = max(vn, 0.5 + 0.5 * (1.0 - d / A.a.z));
+    un = min(un, 0.5);
+  }
+  textureStore(dst, p, vec4f(un, vn, 0.0, 0.0));
+}`,
+
+  grayScott: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  if (p.x == 0 || p.x == i32(S.n) - 1 || p.y == 0 || p.y == i32(S.n) - 1) {
+    textureStore(dst, p, vec4f(1.0, 0.0, 0.0, 0.0));
+    return;
+  }
+  let c = textureLoad(src, p, 0);
+  let l = textureLoad(src, p - vec2i(1, 0), 0)
+        + textureLoad(src, p + vec2i(1, 0), 0)
+        + textureLoad(src, p - vec2i(0, 1), 0)
+        + textureLoad(src, p + vec2i(0, 1), 0)
+        - 4.0 * c;
+  let uvv = c.r * c.g * c.g;
+    let reagent = c.b;
+  let pattern_val = c.a;
+  
+  let target_feed = 0.03 + pattern_val * 0.01;
+  let target_kill = 0.055 + pattern_val * 0.005;
+  
+  let feed = mix(0.0, target_feed, reagent);
+  let kill = mix(0.06, target_kill, reagent);
+
+  let un = c.r + A.a.x * l.r - uvv + feed * (1.0 - c.r);
+  let vn = c.g + A.a.y * l.g + uvv - (feed + kill) * c.g;
+  textureStore(dst, p, vec4f(clamp(un, 0.0, 1.0), clamp(vn, 0.0, 1.0), c.b, c.a));
+}`,
+
   depositChem: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var chem: texture_2d<f32>;

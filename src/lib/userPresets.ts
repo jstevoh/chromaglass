@@ -52,6 +52,7 @@ export interface UserPreset {
   injectStyles?: string[];
   /** What is in the dish, as liquid ids. Absent means dye and nothing else — which is every preset saved before liquids existed. */
   liquids?: string[];
+  rides?: string[];
   /** The song this look was made for: it is applied when that song is identified. */
   song?: SongRef;
 }
