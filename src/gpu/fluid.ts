@@ -1014,7 +1014,11 @@ export class WebGPUFluid {
       ['mixForce', [VEL], false],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
-      ['depositChem', [dye], false],
+      ['depositChem', [dye], open.chemistry],
+      ['grayScott', [VEL], open.chemistry],
+      ['addReagent', [VEL], open.chemistry],
+      ['seedChem', [VEL], open.chemistry],
+      ['advectChem', [VEL], open.chemistry],
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
