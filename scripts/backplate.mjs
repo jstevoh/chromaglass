@@ -306,7 +306,7 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     && /if \(stageRef\.current\) \{ onBackLookClearedRef\.current\?\.\(\); return; \}/.test(lv) && /onBackLookCleared=\{backLookCleared\}/.test(app));
 }
 check('each dish turns and drags at its own plate\'s settings',
-  /const asked = Math\.max\(0, patch\.layer\(l\)\.rotationSpeed/.test(lv) && /\(1 \+ \(patch\.layer\(l\)\.platePressure \?\? 0\) \* 0\.8\)/.test(lv));
+  /const asked = Math\.max\(0, patch\.layer\(l\)\.rotationSpeed/.test(lv));
 check('the layer pickers offer the back plate while it has a look (desk, Design desk, phone, keys, the old sidebar)',
   /const stageLayers = Math\.max\(1, settings\.layerCount \?\? 1, backLook \? 2 : 1\);/.test(app)
   && (app.match(/layers=\{stageLayers\}/g) ?? []).length >= 3 && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)

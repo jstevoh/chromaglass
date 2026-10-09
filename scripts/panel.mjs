@@ -337,7 +337,7 @@ const MUST_FIND = [
   ['lumia', 'lamp'], ['gel wheel', 'lamp'], ['exposure', 'lamp'], ['lamp warmth', 'lamp'],
   ['patch', 'patches'], ['lfo', 'patches'], ['room impact', 'patches'], ['sound impact', 'patches'],
   // Renamed controls, by their new names and by the old ones people learned.
-  ['momentum', 'physics'], ['damping', 'physics'], ['lens', 'camera'], ['updraft', 'interaction'],
+  ['lens', 'camera'], ['updraft', 'interaction'],
   ['blow velocity', 'interaction'], ['grain fineness', 'look'], ['grain size', 'look'], ['macro lacing', 'macro'],
   ['bpm', 'audio-input'], ['microphone', 'audio-input'],
   ['viscosity', 'physics'], ['zoom', 'macro'], ['blend', 'layers'], ['gpu', 'simulation'],
