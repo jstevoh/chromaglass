@@ -335,7 +335,7 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.2,
       vibrationFrequency: 1.0,
       dropHeight: 0.9,
-      beatSqueeze: 0.1,
+      beatSqueeze: 0.8,
       sceneMappings: [
         { source: 'sound', feature: 'kick', setting: 'plateRock', depth: 0.5 },
         { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }

@@ -1032,7 +1032,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   plateRock: 0.45,
   layerScaleVariety: 0.5,
   hueJourney: 3,
-  beatSqueeze: 0.5,
+  beatSqueeze: 0.0,
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,
