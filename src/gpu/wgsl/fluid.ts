@@ -1902,6 +1902,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // Semi-Lagrangian advection. A.a.x is the displacement's sign and scale.
+  advectChem: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var lin: sampler;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
+  let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+  let o = textureSampleLevel(src, lin, pos, 0.0);
+  textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
+}`,
   advect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;

@@ -1132,7 +1132,7 @@ export class WebGPUFluid {
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
     this.chem = pp(this.N, 'rgba16float', 'chem');
-    this.activeMat = pp(this.N, 'r16float', 'activeMat');
+    this.activeMat = pp(this.N, 'r32float', 'activeMat');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
@@ -1727,6 +1727,11 @@ export class WebGPUFluid {
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     // feed and kill in z and w, Du and Dv in x and y
+    // 1. Advect the chemistry using the fluid's velocity field
+    const disp = this.simF[2] * this.L;
+    this.run(pass, 'advectChem', this.chem.write, [this.chem.read, this.vel.read, this.sampler], this.arg('advect chem', [disp, 0, 0, 0]));
+    this.chem.swap();
+
     const args = this.arg('chem rates', [Du, Dv, feed, kill, 0, 0, 0, 0]);
     for (let i = 0; i < iters; i++) {
       this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);

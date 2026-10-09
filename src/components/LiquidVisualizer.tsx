@@ -4799,6 +4799,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
   const videoPourRef = useRef<HTMLVideoElement | null>(null);
+  const videoFlowCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoFlowCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const videoFlowPrevRef = useRef<Uint8ClampedArray | null>(null);
+
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
     const f = filmRef.current;
@@ -7107,6 +7111,175 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
           }
         }
+
+
+        // ── Video Pour (Transparency & Optical Flow) ──
+
+
+        if (videoPourRef.current && !videoPourRef.current.paused && videoPourRef.current.readyState >= 2) {
+
+
+          const v = videoPourRef.current;
+
+
+          const fluid = fluidsRef.current[0];
+
+
+          if (fluid) {
+
+
+            const S = fluid.size;
+
+
+            if (!videoFlowCanvasRef.current) {
+
+
+              const c = document.createElement('canvas');
+
+
+              c.width = S; c.height = S;
+
+
+              videoFlowCanvasRef.current = c;
+
+
+              videoFlowCtxRef.current = c.getContext('2d', { willReadFrequently: true });
+
+
+            }
+
+
+            const ctx = videoFlowCtxRef.current;
+
+
+            if (ctx) {
+
+
+              ctx.drawImage(v, 0, 0, S, S);
+
+
+              const imgData = ctx.getImageData(0, 0, S, S);
+
+
+              const data = imgData.data;
+
+
+              const prev = videoFlowPrevRef.current;
+
+
+              const flowStrength = 0.8;
+
+
+              
+
+
+              for (let y = 1; y < S - 1; y++) {
+
+
+                for (let x = 1; x < S - 1; x++) {
+
+
+                  const i = (y * S + x) * 4;
+
+
+                  const r = data[i], g = data[i+1], b = data[i+2];
+
+
+                  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+
+                  
+
+
+                  // Luma-key transparency: Dark pixels are ignored
+
+
+                  if (lum > 15) {
+
+
+                    const alpha = lum / 255.0;
+
+
+                    fluid.addDensity(x, y, alpha * 0.15, r/255.0, g/255.0, b/255.0);
+
+
+                  }
+
+
+                  
+
+
+                  // Optical Flow Velocity
+
+
+                  if (prev) {
+
+
+                    const prevLum = 0.299 * prev[i] + 0.587 * prev[i+1] + 0.114 * prev[i+2];
+
+
+                    const diff = lum - prevLum;
+
+
+                    if (Math.abs(diff) > 10) {
+
+
+                      const lumX = (0.299 * data[i+4] + 0.587 * data[i+5] + 0.114 * data[i+6]) - 
+
+
+                                   (0.299 * data[i-4] + 0.587 * data[i-3] + 0.114 * data[i-2]);
+
+
+                      const lumY = (0.299 * data[i + S*4] + 0.587 * data[i + S*4 + 1] + 0.114 * data[i + S*4 + 2]) - 
+
+
+                                   (0.299 * data[i - S*4] + 0.587 * data[i - S*4 + 1] + 0.114 * data[i - S*4 + 2]);
+
+
+                      const gradMag2 = lumX * lumX + lumY * lumY;
+
+
+                      if (gradMag2 > 1) {
+
+
+                        // Flow velocity formula: - (dI/dt) * Grad(I) / |Grad(I)|^2
+
+
+                        const vx = -diff * lumX / gradMag2 * flowStrength;
+
+
+                        const vy = -diff * lumY / gradMag2 * flowStrength;
+
+
+                        fluid.addVelocity(x, y, vx, vy);
+
+
+                      }
+
+
+                    }
+
+
+                  }
+
+
+                }
+
+
+              }
+
+
+              videoFlowPrevRef.current = new Uint8ClampedArray(data);
+
+
+            }
+
+
+          }
+
+
+        }
+
 
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it

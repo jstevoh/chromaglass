@@ -8,12 +8,15 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 **Focus:** High-impact WebGPU shaders, fluid dynamics, and rendering algorithms.
 **Current Priority: Fully Coupled Advection-Reaction-Diffusion (Moving Chemistry)**
 *This is the highest-impact visual task, moving the static Gray-Scott reactions into the turbulent flow.*
-1. **Prepare the Data:** Modify `src/gpu/fluid.ts` to expose the chemistry PingPong texture (`this.chem`) to the fluid's velocity field.
-2. **Write the WGSL Advection:** Add an advection pass for the chemistry texture using the fluid's velocity field (`disp`). This can likely reuse the existing semi-Lagrangian advection logic currently used for dye (`bilerpN` or similar).
-3. **Integration:** Run this new advection pass immediately *prior* to the `grayScott` reaction-diffusion step in the pipeline.
-4. **Tuning:** Tune the `feed`, `kill`, and diffusion rates. When Turing patterns are sheared by turbulence, they can explode numerically. Tuning is required to ensure visual stability.
-5. **Future Visual Targets:** 
-   * Real-Time Spectral Subtractive Mixing (subtractive color physics).
+1. ~~**Prepare the Data:** Modify `src/gpu/fluid.ts` to expose the chemistry PingPong texture (`this.chem`) to the fluid's velocity field.~~
+2. ~~**Write the WGSL Advection:** Add an advection pass for the chemistry texture using the fluid's velocity field (`disp`). This can likely reuse the existing semi-Lagrangian advection logic currently used for dye (`bilerpN` or similar).~~
+3. ~~**Integration:** Run this new advection pass immediately *prior* to the `grayScott` reaction-diffusion step in the pipeline.~~
+4. ~~**Tuning:** Tune the `feed`, `kill`, and diffusion rates. When Turing patterns are sheared by turbulence, they can explode numerically. Tuning is required to ensure visual stability.~~ (Handled via shader clamped constraints)
+6. **Video Injection & Optical Flow:**
+   * Fix `pourVideo` in `LiquidVisualizer.tsx`: It currently drops frames. We need to draw the playing `videoPourRef.current` to an offscreen canvas and call `fluid.injectImage` every frame.
+   * **Luma-keying:** During the canvas extraction, convert brightness to alpha so standard downloaded MP4s act as transparent fluid overlays.
+   * **Physical Interaction:** Calculate basic Optical Flow (frame differencing) on the video canvas and pipe the motion vectors into `fluid.addVelocity()`, allowing motion inside the video to physically push the WebGPU fluids.
+7. **Future Visual Targets:**btractive Mixing (subtractive color physics).
    * Fully Dynamic GPU Ferrohydrodynamics (solving Rosensweig instability natively).
 
 ### Claude (UI & Stability Track)
