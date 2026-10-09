@@ -22,6 +22,7 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 ### Claude (UI & Stability Track)
 **Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
 **Current Priority: Bug Cleanup & New Performance UI**
+* Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.
 *The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.

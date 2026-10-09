@@ -3892,7 +3892,6 @@ class FluidSimulation {
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
-      depthDrag: Math.max(0, Math.min(3, 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),

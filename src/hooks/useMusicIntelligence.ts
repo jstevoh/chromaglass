@@ -459,7 +459,6 @@ export function useMusicIntelligence(
       : undefined;
     const params = buildVisualParams(seed, trackState, {
       turbulenceScale: baseSettings.turbulenceScale,
-      blobSurfaceTension: baseSettings.blobSurfaceTension,
       saturationBoost: baseSettings.saturationBoost,
       boundaryContrast: baseSettings.boundaryContrast,
     }, snapshot);
@@ -480,7 +479,6 @@ export function useMusicIntelligence(
     const o: Partial<VisualizerSettings> = {
       turbulenceScale: turb,
       turbulenceDetail: params.turbulenceDetail,
-      blobSurfaceTension: params.blobSurfaceTension,
       saturationBoost: sat,
       boundaryContrast: params.boundaryContrast,
       audioImpact: impact,

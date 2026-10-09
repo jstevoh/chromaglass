@@ -1186,7 +1186,9 @@ export class WebGPUFluid {
     this.curDiv = tex(this.M, R32, 'current divergence');
     this.velForced = tex(this.N, VEL, 'forced velocity');
     this.scratchA = tex(this.N, this.dyeFormat, 'scratch a');
-    this.scratchB = tex(this.N, this.dyeFormat, 'scratch b');
+    this.scratchB = tex(this.N, this.dyeFormat, "scratch b");
+    this.scratchA2 = tex(this.N, this.dyeFormat, "scratch a2");
+    this.scratchB2 = tex(this.N, this.dyeFormat, "scratch b2");
     this.readTarget = tex(this.L, RGBA32, 'readback');
     this.deltaDyeTex = tex(this.N, RGBA32, 'dye delta');
     this.deltaDyeBTex = tex(this.N, RGBA32, 'dye b delta');
@@ -4267,7 +4269,11 @@ export class WebGPUFluid {
     field.swap();
   }
 
-  drain(pull: number, t: number, enc: GPUCommandEncoder): void {
+  drainStep(t: number): void {
+    const pull = Math.pow(t, 0.4) * 4.0;
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    const enc = this.device.createCommandEncoder({ label: "drain" });
     const pass = enc.beginComputePass({ label: 'drain' });
     this.run(pass, 'drainVel', this.vel.write, [], this.arg('drain', [pull, t, 0, 0]));
     this.vel.swap();
