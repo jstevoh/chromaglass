@@ -360,9 +360,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('layerZoom1', 1 + (throw1.zoom - 1) * plateAmt);
     pack.set('layerDrift1', throw1.dx * plateAmt, throw1.dy * plateAmt);
     const bubbles = view.bubbles;
-    pack.setAll('bubbles', view.bubblePack.packed);
-    pack.setAll('bubbleShape', view.bubblePack.shape);
-    pack.set('bubbleCount', bubbles.count);
+    pack.setAll('bubbles', view.bubblePack.packed.length > 160 ? view.bubblePack.packed.subarray(0, 160) : view.bubblePack.packed);
+    pack.setAll('bubbleShape', view.bubblePack.shape.length > 160 ? view.bubblePack.shape.subarray(0, 160) : view.bubblePack.shape);
+    pack.set('bubbleCount', Math.min(40, bubbles.count));
     pack.set('bubbleStrength', bubbles.strength);
   }
   pack.set('postBlur', s.postBlurRadius ?? 0.35);
