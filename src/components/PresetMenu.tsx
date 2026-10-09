@@ -105,7 +105,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                 autoFocus
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
-                placeholder="Name this preset"
+                placeholder="Name this palette"
                 className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40"
                 data-testid="preset-save-name"
               />
@@ -162,7 +162,7 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                     role="menuitem"
                     onClick={() => { onApplyUserPreset?.(p); onClose(); }}
                     className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 py-1.5 text-left ${active ? 'text-white' : 'text-white/75'}`}
-                    title={p.song ? `Made for ${songLabel(p.song)}` : (p.description ?? 'A saved preset')}
+                    title={p.song ? `Made for ${songLabel(p.song)}` : (p.description ?? 'A saved palette')}
                     data-testid={`preset-menu-${p.id}`}
                   >
                     <span className="min-w-0">

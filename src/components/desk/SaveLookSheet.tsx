@@ -36,7 +36,7 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
   };
 
   return (
-    <Sheet title="Save as a new preset" onClose={onClose} width={480} height={360} testId="save-sheet">
+    <Sheet title="Save as a new palette" onClose={onClose} width={480} height={360} testId="save-sheet">
       {/* w-full: the sheet's body is a row, and without it this column took
           only its content's width, the fields 200 px wide in a 480 px sheet. */}
       <div className="flex h-full w-full flex-col gap-4 p-5">

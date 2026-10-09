@@ -1710,6 +1710,13 @@ export default function App() {
     phone alike, and writing over the look you opened is the sheet's second
     button, named for the look it would replace, and the look menu's.
   */
+  const newPalette = () => {
+    setDocId(null);
+    setDocDirty(false);
+    setPinnedPresetId(null);
+    applyPreset('default', DEFAULT_SETTINGS);
+  };
+
   const saveLook = () => setShowSave(true);
   /** Write over the saved look that is open, keeping its name and song. */
   const replaceLook = () => {
