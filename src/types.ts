@@ -327,7 +327,6 @@ export interface SceneMapping {
 }
 
 export interface VisualizerSettings {
-  activeDrive: number;
   // Sound Settings
   sensitivity: number;
   bassBoost: number;
@@ -1031,7 +1030,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,
-  activeDrive: 0.5,                // no print: only the Roy look lays Ben-Day dots
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,

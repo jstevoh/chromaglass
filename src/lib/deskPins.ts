@@ -234,6 +234,10 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'heat' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
+
+  { key: 'chemistryPattern', label: "Pattern (Spots to Labyrinth)", min: 0, max: 1, section: 'lamp' },
+  { key: 'chemistryWidth', label: "Pattern Width", min: 0.1, max: 1, section: 'lamp' },
+
   { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
   /*
     The ceiling is the control's own maximum, which is the only place a
