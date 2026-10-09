@@ -26,7 +26,7 @@ export interface DeskDots {
   perf?: string | null;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onPerformance, onSearch, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onPerformance, onSearch, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
@@ -47,6 +47,8 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
   onPhone?: () => void;
+  /** Start, stop or manage canvas video recording. */
+  onRecord?: () => void;
   /** Start or stop a performance (T). */
   onPerformance?: () => void;
   onSearch: () => void;
@@ -204,7 +206,18 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
             testId="dot-phone"
           />
         )}
-        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} short="Rec" tight={tight} testId="dot-rec" />}
+        {dots.rec && (
+          <StatusDot
+            on
+            tone="live"
+            label={`Rec ${dots.rec}`}
+            short="Rec"
+            tight={tight}
+            onClick={onRecord}
+            title={`Recording canvas video (${dots.rec}). Click to manage recording options or press R to stop.`}
+            testId="dot-rec"
+          />
+        )}
         {/*
           Performances start and stop here, by hand (T). They used to follow
           the song detection, which started late and ran on into the next

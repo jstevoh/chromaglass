@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
+import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
 import { barLine } from './lib/barGrid';
@@ -3026,6 +3027,7 @@ export default function App() {
   }, []);
   // ── Recording ──
   const recorder = useRecorder();
+  const [showRecordPanel, setShowRecordPanel] = useState(false);
   const toggleRecording = useCallback(() => {
     recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
   }, [recorder, audioStream]);
@@ -3864,8 +3866,9 @@ export default function App() {
       { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
-      { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
-      { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'record-video',       name: recorder.recording ? 'Stop canvas video recording' : 'Record canvas video (MP4/WebM)', kind: 'Actions', kbd: 'R', run: toggleRecording },
+      { id: 'record-performance', name: perfLive ? 'Stop performance recording' : 'Record performance (strokes & gestures)', kind: 'Actions', kbd: 'T', run: togglePerformance },
+      { id: 'record-studio',      name: 'Recording studio options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
       { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
@@ -3957,6 +3960,7 @@ export default function App() {
       }
       if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
       if (e.key === 't' || e.key === 'T') { togglePerformance(); return; }
+      if (e.key === 'r' || e.key === 'R') { toggleRecording(); return; }
 
       // The rest are the show's, and only while the desk is up: on the bench
       // Space should not fire a look change at a room.
@@ -3973,7 +3977,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance]);
+  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance, toggleRecording]);
 
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
@@ -5210,6 +5214,23 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* ── Recording Studio Panel (Canvas Video & Performance) ─ */}
+      {showRecordPanel && (
+        <RecordPanel
+          onClose={() => setShowRecordPanel(false)}
+          recorder={recorder}
+          onToggleVideo={toggleRecording}
+          performanceLive={musicIntel.performance.live}
+          perfClock={perfClock}
+          onTogglePerformance={togglePerformance}
+          savedPerformances={musicIntel.performance.saved}
+          replayingPerformanceId={musicIntel.performance.replayingId}
+          onReplayPerformance={musicIntel.replayPerformance}
+          onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
+          onDeletePerformance={musicIntel.deletePerformance}
+        />
+      )}
+
       {/* ── Lyrics Overlay ─────────────────────────────────────── */}
       {musicSettings.enabled && musicSettings.lyricsOverlay && (
         <LyricsOverlay
@@ -5485,6 +5506,10 @@ export default function App() {
           onSound={deskOpen.sound}
           onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
+          videoRecording={recorder.recording}
+          videoSeconds={recorder.seconds}
+          onToggleVideo={toggleRecording}
+          onRecordOptions={() => setShowRecordPanel(true)}
           onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
@@ -5617,6 +5642,10 @@ export default function App() {
           onSound={deskOpen.sound}
           onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
+          videoRecording={recorder.recording}
+          videoSeconds={recorder.seconds}
+          onToggleVideo={toggleRecording}
+          onRecordOptions={() => setShowRecordPanel(true)}
           onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           onSearch={() => setShowPalette(true)}
