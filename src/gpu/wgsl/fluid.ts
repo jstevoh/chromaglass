@@ -1342,6 +1342,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     `A.a.x` is `bubbleClear`: 1 is the physical answer, and lower keeps some
     of the old shading for a look that wants it.
   */
+  airExcludePair: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var src2: texture_2d<f32>;
+@group(0) @binding(4) var air: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(6) var dst2: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(src, p, 0);
+  let v2 = textureLoad(src2, p, 0);
+  let m = max(0.0, 1.0 - A.a.x * textureLoad(air, p, 0).r);
+  textureStore(dst, p, v * m);
+  textureStore(dst2, p, v2 * m);
+}`,
   airExclude: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var air: texture_2d<f32>;
@@ -1915,6 +1930,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let o = textureSampleLevel(src, lin, pos, 0.0);
   textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
 }`,
+  advectPair: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var src2: texture_2d<f32>;
+@group(0) @binding(4) var vel: texture_2d<f32>;
+@group(0) @binding(5) var samp: sampler;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(7) var dst2: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id) - A.a.x * textureSampleLevel(vel, samp, uvOf(id), 0.0).xy;
+  let o = textureSampleLevel(src, samp, uv, 0.0);
+  let o2 = textureSampleLevel(src2, samp, uv, 0.0);
+  textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
+  textureStore(dst2, vec2i(id.xy), select(vec4f(0.0), o2, finite4(o2)));
+}`,
   advect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
@@ -1931,6 +1961,46 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // MacCormack: phi1 + ½(phi0 − phi0b), clamped to the four cells the forward step sampled.
+  macCormackPair: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var src2: texture_2d<f32>;
+@group(0) @binding(4) var scratchA: texture_2d<f32>;
+@group(0) @binding(5) var scratchA2: texture_2d<f32>;
+@group(0) @binding(6) var scratchB: texture_2d<f32>;
+@group(0) @binding(7) var scratchB2: texture_2d<f32>;
+@group(0) @binding(8) var vel: texture_2d<f32>;
+@group(0) @binding(9) var samp: sampler;
+@group(0) @binding(10) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(11) var dst2: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id) - A.a.x * textureSampleLevel(vel, samp, uvOf(id), 0.0).xy;
+  let p = vec2i(id.xy);
+  
+  let o = textureLoad(scratchA, p, 0) + 0.5 * (textureLoad(src, p, 0) - textureLoad(scratchB, p, 0));
+  var r = select(vec4f(0.0), o, finite4(o));
+  if (A.a.y > 0.5) {
+    let s = textureSampleLevel(src, samp, uv, 0.0);
+    let s1 = textureLoad(src, p + vec2i(1, 0), 0); let s2 = textureLoad(src, p - vec2i(1, 0), 0);
+    let s3 = textureLoad(src, p + vec2i(0, 1), 0); let s4 = textureLoad(src, p - vec2i(0, 1), 0);
+    r = clamp(r, min(s, min(min(s1, s2), min(s3, s4))), max(s, max(max(s1, s2), max(s3, s4))));
+    r *= max(0.0, 1.0 - A.a.x * (textureLoad(vel, p + vec2i(1, 0), 0).x - textureLoad(vel, p - vec2i(1, 0), 0).x +
+                                 textureLoad(vel, p + vec2i(0, 1), 0).y - textureLoad(vel, p - vec2i(0, 1), 0).y) * 0.5);
+  }
+  textureStore(dst, p, r);
+  
+  let o2 = textureLoad(scratchA2, p, 0) + 0.5 * (textureLoad(src2, p, 0) - textureLoad(scratchB2, p, 0));
+  var r2 = select(vec4f(0.0), o2, finite4(o2));
+  if (A.a.y > 0.5) {
+    let t = textureSampleLevel(src2, samp, uv, 0.0);
+    let t1 = textureLoad(src2, p + vec2i(1, 0), 0); let t2 = textureLoad(src2, p - vec2i(1, 0), 0);
+    let t3 = textureLoad(src2, p + vec2i(0, 1), 0); let t4 = textureLoad(src2, p - vec2i(0, 1), 0);
+    r2 = clamp(r2, min(t, min(min(t1, t2), min(t3, t4))), max(t, max(max(t1, t2), max(t3, t4))));
+    r2 *= max(0.0, 1.0 - A.a.x * (textureLoad(vel, p + vec2i(1, 0), 0).x - textureLoad(vel, p - vec2i(1, 0), 0).x +
+                                 textureLoad(vel, p + vec2i(0, 1), 0).y - textureLoad(vel, p - vec2i(0, 1), 0).y) * 0.5);
+  }
+  textureStore(dst2, p, r2);
+}`,
   macCormack: `${HEAD}
 @group(0) @binding(2) var phi0: texture_2d<f32>;
 @group(0) @binding(3) var phi1: texture_2d<f32>;
@@ -3653,6 +3723,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     w));
 }`,
 
+  sharpenDyePair: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var src2: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var dst2: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let lap = textureLoad(src, p+vec2i(1,0), 0) + textureLoad(src, p-vec2i(1,0), 0) + textureLoad(src, p+vec2i(0,1), 0) + textureLoad(src, p-vec2i(0,1), 0) - 4.0 * textureLoad(src, p, 0);
+  textureStore(dst, p, max(textureLoad(src, p, 0) - 0.2 * lap, vec4f(0.0)));
+  let lap2 = textureLoad(src2, p+vec2i(1,0), 0) + textureLoad(src2, p-vec2i(1,0), 0) + textureLoad(src2, p+vec2i(0,1), 0) + textureLoad(src2, p-vec2i(0,1), 0) - 4.0 * textureLoad(src2, p, 0);
+  textureStore(dst2, p, max(textureLoad(src2, p, 0) - 0.2 * lap2, vec4f(0.0)));
+}`,
   sharpenDye: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
@@ -3681,6 +3764,29 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, max(clamp(s, min(lo, c), max(hi, c)), vec4f(0.0)));
 }`,
 
+  decayDyePair: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var src2: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var dst2: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  
+  var d = textureLoad(src, p, 0);
+  d *= 1.0 - DYE_DAMP;
+  let ex = max(d.w - MAX_DYE, 0.0);
+  d -= vec4f(d.rgb * (ex / max(d.w, 1e-6)), ex);
+  d.w = max(d.w - DYE_EVAP, 0.0);
+  textureStore(dst, p, max(vec4f(0.0), d));
+  
+  var d2 = textureLoad(src2, p, 0);
+  d2 *= 1.0 - DYE_DAMP;
+  let ex2 = max(d2.w - MAX_DYE, 0.0);
+  d2 -= vec4f(d2.rgb * (ex2 / max(d2.w, 1e-6)), ex2);
+  d2.w = max(d2.w - DYE_EVAP, 0.0);
+  textureStore(dst2, p, max(vec4f(0.0), d2));
+}`,
   decayDye: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
@@ -3775,6 +3881,20 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     A.a.x is s.
   */
+  dampGridPair: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var src2: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var dst2: texture_storage_2d<rgba32float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(src, p, 0);
+  let v2 = textureLoad(src2, p, 0);
+  let step = clamp(1.0 - A.a.x * select(1.0, 0.5, ((p.x ^ p.y) & 1) == 0), 0.0, 1.0);
+  textureStore(dst, p, v * step);
+  textureStore(dst2, p, v2 * step);
+}`,
   dampGrid: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;

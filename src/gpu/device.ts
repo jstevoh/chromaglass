@@ -121,6 +121,9 @@ async function askGpu(): Promise<Gpu | GpuFailure> {
     // The top rung (1024² particles, 128 MiB buffer) and future passes: request
     // storage buffer and buffer binding limits up to what the adapter supports.
     const wantLimits: Record<string, number> = {};
+    if (adapter.limits.maxSampledTexturesPerShaderStage > 16) {
+      wantLimits.maxSampledTexturesPerShaderStage = adapter.limits.maxSampledTexturesPerShaderStage;
+    }
     if (adapter.limits.maxStorageBufferBindingSize) {
       wantLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
     }
