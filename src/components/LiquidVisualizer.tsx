@@ -1378,7 +1378,6 @@ class FluidSimulation {
       }
       
       if (oil <= 0 && soap <= 0 && acid === 0) return;
-      console.log("addMix called!", {oil, soap, acid, name: what.name});
       g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
     };
 
