@@ -3988,8 +3988,13 @@ export default function App() {
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
     video: isVideoPlaying,
+    mic: audioSource !== 'none',
+    wall: isCasting,
     midi: midi.enabled,
-  }), [audioSource, isVideoPlaying, midi.enabled]);
+    phone: remoteLink.status === 'connected',
+    rec: recorder.recording ? String(recorder.seconds) : null,
+    perf: perfClock,
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
 
   /*
     Where each status dot goes.

@@ -15,12 +15,18 @@ import { AlphaBadge } from '../AlphaBadge';
 export type DeskMode = 'perform' | 'design' | 'sequence' | 'sound';
 
 export interface DeskDots {
-  sound: boolean;
-  video: boolean;
+  sound?: boolean;
+  video?: boolean;
+  mic?: boolean;
+  wall?: boolean;
   midi: boolean;
+  phone?: boolean;
+  rec?: string | null;
+  /** The performance being recorded, as its clock ("1:23"), or null. */
+  perf?: string | null;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onMidi, onSearch, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onPerformance, onSearch, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
@@ -37,8 +43,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   */
   onSound?: () => void;
   onVideo?: () => void;
+  onWall?: () => void;
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
+  onPhone?: () => void;
+  /** Start or stop a performance (T). */
+  onPerformance?: () => void;
   onSearch: () => void;
   /** Design's Save and Send to wall; Perform has nothing here. */
   trailing?: ReactNode;
@@ -156,25 +166,62 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       </div>
       <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`}>
         <StatusDot
-          on={dots.sound}
+          on={dots.sound ?? dots.mic ?? false}
           label="Sound" tight={tight}
           onClick={onSound}
-          title={dots.sound ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
+          title={(dots.sound ?? dots.mic) ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
           testId="dot-sound"
         />
         <StatusDot
-          on={dots.video}
+          on={!!dots.video}
           label="Video" tight={tight}
           onClick={onVideo}
           title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
           testId="dot-video"
         />
+        {onWall && (
+          <StatusDot
+            on={!!dots.wall}
+            label="Wall" tight={tight}
+            onClick={onWall}
+            title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
+            testId="dot-wall"
+          />
+        )}
         <StatusDot
           on={dots.midi}
           label={midiName ?? 'MIDI'} short="MIDI" tight={tight}
           onClick={onMidi}
           title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
           testId="dot-midi"
+        />
+        {onPhone && (
+          <StatusDot
+            on={!!dots.phone}
+            label="Phone" tight={tight}
+            onClick={onPhone}
+            title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
+            testId="dot-phone"
+          />
+        )}
+        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} short="Rec" tight={tight} testId="dot-rec" />}
+        {/*
+          Performances start and stop here, by hand (T). They used to follow
+          the song detection, which started late and ran on into the next
+          song; the song that is playing is still attached, on its own.
+          A short word, with the clock in its tooltip: "Performance 0:42"
+          beside it pushed Mic and Wall under the centred mode switch at 1440
+          (npm run qa), and with no word at all nobody could tell what it was.
+        */}
+        <StatusDot
+          on={!!dots.perf}
+          tone="live"
+          label="Perf" tight={tight}
+          onClick={onPerformance}
+          title={dots.perf
+            ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
+            : 'Start recording a performance: what you paint, replayable later at the same moments in the song. Click or press T.'}
+          testId="dot-performance"
         />
         <button
           onClick={onSearch}

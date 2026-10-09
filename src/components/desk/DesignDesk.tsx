@@ -237,7 +237,9 @@ export function DesignDesk(p: DesignDeskProps) {
         midiName={p.midiName}
         onSound={p.onSound}
         onVideo={p.onVideo}
+        onWall={p.onSendToWall}
         onMidi={p.onMidi}
+        onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
           <>
