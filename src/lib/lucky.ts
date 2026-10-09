@@ -171,7 +171,6 @@ export function luckyLook(
     audioImpact: current.audioImpact,
     turbulenceScale: rand() * 0.7,
     turbulenceDetail: 1 + Math.floor(rand() * 4),
-    blobSurfaceTension: rand(),
     boundaryContrast: rand() * 0.7,
     saturationBoost: 1.0 + rand() * 0.8,
     dyeBudget: 0.4 + rand() * 0.6,
@@ -227,7 +226,6 @@ export function luckyLook(
     filmMix: current.filmMix,
     filmKey: current.filmKey,
     glossiness: rand() < 0.8 ? 0 : rand() * 0.4,
-    postBlurRadius: rand() * 0.7,
     // One roll in four goes closeup — a magnified chase is its own happy
     // accident. The zoom decides now, so the roll lands on the zoom and the
     // flag follows it rather than the two disagreeing.

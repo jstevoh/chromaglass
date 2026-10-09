@@ -3675,21 +3675,8 @@ class FluidSimulation {
     // (immiscibility, below). It also set a fingering push, a noise pushing
     // the dye along its own gradient, which grew a grating in every pool
     // and is gone (forcesB in wgsl/fluid.ts, and why).
-    const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
-/*
-      Named `immiscibility` and not `surfaceTension`, which is what it was
-      called until 2026-09-21.
-
-      There was also a *setting* called `surfaceTension`, written by all
-      thirty-two presets, and this local shadowed it well enough that an
-      audit for unread settings counted `p.surfaceTension` as its reads and
-      called it live. It was not: nothing ever read the setting, and the
-      presets' comments for it describe what `blobSurfaceTension` does. The
-      setting is gone; the name goes with it so the next audit cannot be
-      told the same lie.
-    */
-    const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
+    const immiscibility = polarity * 0.064;
 
     let smearX = 0, smearY = 0;
     if (settings.glassSmear > 0.2) {

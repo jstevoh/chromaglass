@@ -45,7 +45,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,        // unhurried, dreamlike pace
       layerCount: 2,
       blendMode: 'screen',       // additive glow — colors brighten where they overlap
-      gooeyEffect: 0.65,         // organic, rounded blob edges
+      gooeyEffect: 0.650,         // organic, rounded blob edges
       rotationSpeed: 0.07,       // the dish's motor; was 0.008 with a stir in the middle (PLAN 22j)
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
@@ -57,17 +57,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.3,           // soft smearing, no harsh edges
       rainDrip: 0.15,            // occasional downward streaks for variety
       viscosity: 'thick',        // heavy, syrupy movement
-      polarity: 0.7,             // colors stay distinct but can gently intermingle
+      polarity: 0.359,             // colors stay distinct but can gently intermingle
       evaporationRate: 0.005,    // colors persist a long time
       airVelocity: 0.04,         // near-still air — no turbulence
       audioImpact: 0.55,         // audible music visibly drives the fluid
       turbulenceScale: 0.5,      // lively multi-scale ripple
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.35,  // colours hold apart loosely
       boundaryContrast: 0.5,     // bright line where dyes meet
       saturationBoost: 1.45,
       glossiness: 0.0,           // flat backlit dye — the projector look
-      postBlurRadius: 0.35,
       secondLamp: 0.2,
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
@@ -86,7 +84,7 @@ export const PRESETS: Preset[] = [
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.500,
       rotationSpeed: 0,
       centerGravity: 0,
       cometSpeed: 1.5,
@@ -96,11 +94,10 @@ export const PRESETS: Preset[] = [
       advection: 0.45,
       automateRate: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
+      polarity: 0.440,
       evaporationRate: 0.008,
       audioImpact: 0.6,
       turbulenceScale: 0.3,
-      blobSurfaceTension: 0.4,
       boundaryContrast: 0.6,
       saturationBoost: 1.5,
       sceneMappings: [
@@ -125,7 +122,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,        // stately cosmic drift
       layerCount: 2,
       blendMode: 'lighter',      // additive light — stars brighten where they overlap
-      gooeyEffect: 0.15,         // low goo — sharper points of light, less blobby
+      gooeyEffect: 0.086,         // low goo — sharper points of light, less blobby
       rotationSpeed: 0.132,      // the dish's motor; was 0.035 with a stir in the middle (PLAN 22j)
       centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
       ledPlatform: true,
@@ -137,17 +134,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.15,          // light smearing — comet-tail streaks
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
-      polarity: 0.25,            // low — colors intermingle freely like nebula gas
+      polarity: 0.081,            // low — colors intermingle freely like nebula gas
       evaporationRate: 0.002,    // stars persist for a very long time
       airVelocity: 0.02,         // near-vacuum — no turbulence
       audioImpact: 0.4,
       turbulenceScale: 0.55,     // strong swirl — spiral arms shear and stretch
       turbulenceDetail: 4,       // fine filament detail down to star-cluster scale
-      blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
       glossiness: 0.0,
-      postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
       ledMode: 'single',
       ledColor: '#03041a',
       ledSpeed: 0.0,
@@ -169,7 +164,7 @@ export const PRESETS: Preset[] = [
       surge: 0.22,
       layerCount: 2,
       blendMode: 'overlay',
-      gooeyEffect: 0.8,
+      gooeyEffect: 0.800,
       rotationSpeed: 0.087,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.8,
       ledPlatform: true,
@@ -183,7 +178,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.8,
       viscosity: 'thick',
-      polarity: 0.8,
+      polarity: 0.500,
       evaporationRate: 0.01,
       airVelocity: 0.05,
       transmission: 0.85,
@@ -203,13 +198,12 @@ export const PRESETS: Preset[] = [
     description: 'High contrast, fast-moving neon fluids over a cyberpunk LED base.',
     settings: {
       globalSpeed: 0.0336,
-      postBlurRadius: 0.1,
       boundaryContrast: 0.7,
       beads: 0.35,
       surge: 0.85,
       layerCount: 2,
       blendMode: 'lighter',
-      gooeyEffect: 0.1,
+      gooeyEffect: 0.029,
       rotationSpeed: 0.287,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
       ledPlatform: true,
@@ -223,7 +217,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.8,
       rainDrip: 0.2,
       viscosity: 'thin',
-      polarity: 0.2,
+      polarity: 0.125,
       evaporationRate: 0.05,
       airVelocity: 0.3,
       chromaticAberration: 0.35,
@@ -245,7 +239,7 @@ export const PRESETS: Preset[] = [
       surge: 0.95,
       layerCount: 2,
       blendMode: 'exclusion',
-      gooeyEffect: 0.3,
+      gooeyEffect: 0.103,
       rotationSpeed: 0.421,      // the dish's motor; was 0.1 with a stir in the middle (PLAN 22j)
       centerGravity: 0.6,
       ledPlatform: true,
@@ -259,7 +253,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.9,
       rainDrip: 0.4,
       viscosity: 'thin',
-      polarity: 0.5,
+      polarity: 0.181,
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
@@ -269,13 +263,11 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.5,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,  // colours barely hold apart
       edgeRelief: 0.65,
       bubbles: 0.17,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces
       saturationBoost: 1.6,      // hyper-saturated
       glossiness: 0.0,
-      postBlurRadius: 0.12,
       gelWheel: 0.55,
       gelSpeed: 0.6,
       ledColor: '#12002c',
@@ -300,7 +292,7 @@ export const PRESETS: Preset[] = [
       surge: 0.9,
       layerCount: 2,
       blendMode: 'lighter',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.600,
       rotationSpeed: 0.146,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.4,
       ledPlatform: false,
@@ -312,7 +304,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.7,
       rainDrip: 0.3,
       viscosity: 'thick',
-      polarity: 0.7,
+      polarity: 0.437,
       evaporationRate: 0.02,
       airVelocity: 0.2,
       dropHeight: 0.9,
@@ -340,7 +332,7 @@ export const PRESETS: Preset[] = [
       surge: 0.55,
       layerCount: 2,
       blendMode: 'lighter',
-      gooeyEffect: 0.3,
+      gooeyEffect: 0.300,
       rotationSpeed: 0.202,      // the dish's motor; was 0.03 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
       ledPlatform: true,
@@ -354,7 +346,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.5,
       rainDrip: 0.6,
       viscosity: 'thin',
-      polarity: 0.6,
+      polarity: 0.375,
       evaporationRate: 0.03,
       airVelocity: 0.1,
       hueJourney: 6,
@@ -376,7 +368,7 @@ export const PRESETS: Preset[] = [
       surge: 0.85,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.7,
+      gooeyEffect: 0.700,
       rotationSpeed: 0.218,      // the dish's motor; was 0.02 with a stir in the middle (PLAN 22j)
       centerGravity: 0.1,
       ledPlatform: true,
@@ -390,7 +382,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.6,
       rainDrip: 0.7,
       viscosity: 'thin',
-      polarity: 0.8,
+      polarity: 0.500,
       // The fire wheel with nothing on it, under music: 0.06 dried the plate
       // faster than the pour filled it, and the pour follows complexity, which
       // read two percent of its range until the analyser was fixed.
@@ -427,7 +419,7 @@ export const PRESETS: Preset[] = [
       surge: 0.9,
       layerCount: 2,
       blendMode: 'multiply',
-      gooeyEffect: 0.15,
+      gooeyEffect: 0.150,
       rotationSpeed: 0.125,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
       ledPlatform: true,
@@ -441,7 +433,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.1,
       viscosity: 'thick',
-      polarity: 0.95,
+      polarity: 0.594,
       evaporationRate: 0.01,
       airVelocity: 0.1,
       ledColor: '#f1ebf5',
@@ -468,7 +460,7 @@ export const PRESETS: Preset[] = [
       surge: 0.2,
       layerCount: 2,
       blendMode: 'lighter',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.600,
       rotationSpeed: 0.085,      // the dish's motor; was 0.008 with a stir in the middle (PLAN 22j)
       centerGravity: 0.05,
       ledPlatform: true,
@@ -482,7 +474,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.4,
       rainDrip: 0.2,
       viscosity: 'thin',
-      polarity: 0.4,
+      polarity: 0.250,
       evaporationRate: 0.008,
       // Curtains, not a sheet: a full plate on the lighter blend was one flat
       // green. With less dye and the thin film read as sky, the ocean lamp
@@ -515,7 +507,7 @@ export const PRESETS: Preset[] = [
       surge: 0.8,
       layerCount: 2,
       blendMode: 'lighter',
-      gooeyEffect: 0.3,
+      gooeyEffect: 0.300,
       rotationSpeed: 0.183,      // the dish's motor; was 0.015 with a stir in the middle (PLAN 22j)
       centerGravity: 0.7,
       ledPlatform: true,
@@ -529,7 +521,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.6,
       rainDrip: 0.05,
       viscosity: 'thin',
-      polarity: 0.3,
+      polarity: 0.187,
       evaporationRate: 0.012,
       airVelocity: 0.35,
       iridescence: 0.25,
@@ -551,7 +543,7 @@ export const PRESETS: Preset[] = [
       surge: 0.25,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.85,
+      gooeyEffect: 0.850,
       rotationSpeed: 0.067,      // the dish's motor; was 0.006 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -565,7 +557,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.15,
       rainDrip: 0.45,
       viscosity: 'thick',
-      polarity: 0.85,
+      polarity: 0.531,
       evaporationRate: 0.005,
       airVelocity: 0.04,
       transmission: 0.3,
@@ -590,7 +582,7 @@ export const PRESETS: Preset[] = [
       surge: 0.8,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.2,
+      gooeyEffect: 0.200,
       rotationSpeed: 0.187,      // the dish's motor; was 0.04 with a stir in the middle (PLAN 22j)
       centerGravity: 0.9,
       ledPlatform: false,
@@ -604,7 +596,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.7,
       rainDrip: 0.3,
       viscosity: 'thin',
-      polarity: 0.65,
+      polarity: 0.406,
       evaporationRate: 0.025,
       airVelocity: 0.25,
       kaleidoscope: 6,
@@ -630,7 +622,7 @@ export const PRESETS: Preset[] = [
       surge: 0.18,
       layerCount: 2,
       blendMode: 'overlay',
-      gooeyEffect: 0.75,
+      gooeyEffect: 0.750,
       rotationSpeed: 0.023,      // the dish's motor; was 0.005 with a stir in the middle (PLAN 22j)
       // Flat: a concave dish slid all three pools into one in the middle. The
       // pools are its areas of the dish now (lib/plateAreas.ts).
@@ -647,7 +639,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.6,
       viscosity: 'thick',
-      polarity: 0.9,
+      polarity: 0.563,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       transmission: 0.55,
@@ -675,7 +667,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.55,
+      gooeyEffect: 0.550,
       rotationSpeed: 0.131,      // the dish's motor; was 0.012 with a stir in the middle (PLAN 22j)
       centerGravity: 0.0,
       ledPlatform: true,
@@ -689,7 +681,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.45,
       rainDrip: 0.55,
       viscosity: 'thick',
-      polarity: 0.75,
+      polarity: 0.469,
       evaporationRate: 0.012,
       airVelocity: 0.12,
       chemistry: 0.7,
@@ -714,7 +706,7 @@ export const PRESETS: Preset[] = [
       surge: 0.85,
       layerCount: 2,
       blendMode: 'lighter',
-      gooeyEffect: 0.05,
+      gooeyEffect: 0.050,
       rotationSpeed: 0.282,      // the dish's motor; was 0.06 with a stir in the middle (PLAN 22j)
       centerGravity: 0.95,
       // Glitter wants a night sky. On the rainbow wheel, with the dye dried
@@ -730,7 +722,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.9,
       rainDrip: 0.15,
       viscosity: 'thin',
-      polarity: 0.15,
+      polarity: 0.094,
       evaporationRate: 0.006,
       dyeBudget: 0.45,
       audioImpact: 0.85,
@@ -761,7 +753,7 @@ export const PRESETS: Preset[] = [
       surge: 0.12,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.500,
       rotationSpeed: 0.0084,     // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.0,
       ledPlatform: false,
@@ -776,13 +768,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.3,
+      polarity: 0.232,
       evaporationRate: 0.06,
       airVelocity: 0.02,
       audioImpact: 0.12,
       turbulenceScale: 0.12,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.7,
       boundaryContrast: 0.15,
       saturationBoost: 1.2,
       dyeBudget: 0.2,          // a nearly clear plate: three veils, in their areas (lib/plateAreas.ts), and dark between (was 0.1, with nothing laid)
@@ -805,7 +796,7 @@ export const PRESETS: Preset[] = [
       surge: 0.3,
       layerCount: 1,
       blendMode: 'multiply',
-      gooeyEffect: 0.4,
+      gooeyEffect: 0.400,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: true,
@@ -820,13 +811,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.15,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.6,
+      polarity: 0.375,
       evaporationRate: 0.05,
       airVelocity: 0.03,
       audioImpact: 0.4,
       turbulenceScale: 0.15,
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.5,
       saturationBoost: 1.0,
       dyeBudget: 0.35,
@@ -848,7 +838,7 @@ export const PRESETS: Preset[] = [
       surge: 0.35,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.7,
+      gooeyEffect: 0.700,
       rotationSpeed: 0.137,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -863,13 +853,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
+      polarity: 0.650,
       evaporationRate: 0.006,
       airVelocity: 0.0,
       audioImpact: 0.3,
       turbulenceScale: 0.1,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.75,
       boundaryContrast: 0.5,
       saturationBoost: 1.3,
       glossiness: 0.15,
@@ -912,7 +901,7 @@ export const PRESETS: Preset[] = [
       surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.000,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: false,
@@ -927,17 +916,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 1.0,
+      polarity: 0.700,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       audioImpact: 0.55,
       turbulenceScale: 0.35,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
       boundaryContrast: 0.9,
       saturationBoost: 1.6,
       glossiness: 0.0,
-      postBlurRadius: 0.0,
       dyeBudget: 1.1,
       edgeRelief: 0.0,
       bubbles: 0.07,
@@ -963,7 +950,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       surge: 0.45,
       blendMode: 'screen',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.514,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: false,
@@ -982,17 +969,15 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.0,
       turbulenceDetail: 2,
       glossiness: 0.0,
-      postBlurRadius: 0.3,
       plateRock: 0.25,
       beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
       layerCount: 1,
-      polarity: 0.6,
+      polarity: 0.510,
       audioImpact: 0.4,
       turbulenceScale: 0.2,
-      blobSurfaceTension: 0.8,
       boundaryContrast: 0.3,
       saturationBoost: 1.25,
       dyeBudget: 0.45,
@@ -1023,7 +1008,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       surge: 0.45,
       blendMode: 'screen',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.514,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: false,
@@ -1042,17 +1027,15 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.0,
       turbulenceDetail: 2,
       glossiness: 0.0,
-      postBlurRadius: 0.3,
       plateRock: 0.25,
       beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
       layerCount: 1,
-      polarity: 0.7,
+      polarity: 0.700,
       audioImpact: 0.45,
       turbulenceScale: 0.12,
-      blobSurfaceTension: 1.0,
       boundaryContrast: 0.2,
       saturationBoost: 1.3,
       dyeBudget: 0.35,
@@ -1083,7 +1066,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       surge: 0.5,
       blendMode: 'screen',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.514,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: false,
@@ -1102,17 +1085,15 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.0,
       turbulenceDetail: 2,
       glossiness: 0.0,
-      postBlurRadius: 0.3,
       plateRock: 0.25,
       beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
       layerCount: 2,
-      polarity: 0.6,
+      polarity: 0.375,
       audioImpact: 0.5,
       turbulenceScale: 0.3,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.5,
       saturationBoost: 1.5,
       dyeBudget: 0.5,
@@ -1157,8 +1138,7 @@ export const PRESETS: Preset[] = [
       surge: 0.45,         // beads visibly travel — the whole point
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.12,         // almost no metaball blur — keeps beads crisp
-      postBlurRadius: 0.1,
+      gooeyEffect: 0.034,         // almost no metaball blur — keeps beads crisp
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: true,
@@ -1173,13 +1153,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.05,
       viscosity: 'thick',
-      polarity: 0.9,             // strong immiscibility — hard color boundaries
+      polarity: 0.596,             // strong immiscibility — hard color boundaries
       evaporationRate: 0.006,
       airVelocity: 0.08,
       audioImpact: 0.5,
       turbulenceScale: 0.45,
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.55,
       bubbles: 0.12,
       layerScaleVariety: 0,
       boundaryContrast: 0.7,
@@ -1214,8 +1193,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.2,
-      postBlurRadius: 0.12,
+      gooeyEffect: 0.069,
       rotationSpeed: 0.156,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.05,
       ledPlatform: true,
@@ -1230,13 +1208,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.85,
+      polarity: 0.595,
       evaporationRate: 0.01,
       airVelocity: 0.05,
       audioImpact: 0.55,
       turbulenceScale: 0.35,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
       bubbles: 0.1,
       layerScaleVariety: 0,
       boundaryContrast: 0.6,
@@ -1274,8 +1251,7 @@ export const PRESETS: Preset[] = [
       surge: 0.6,         // quick — this one rushes
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.08,
-      postBlurRadius: 0.08,
+      gooeyEffect: 0.018,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: true,
@@ -1290,13 +1266,12 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.4,
       rainDrip: 0.2,
       viscosity: 'thin',
-      polarity: 0.95,
+      polarity: 0.344,
       evaporationRate: 0.005,
       airVelocity: 0.2,
       audioImpact: 0.65,
       turbulenceScale: 0.7,
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,
       bubbles: 0.15,
       layerScaleVariety: 0,
       boundaryContrast: 0.8,
@@ -1322,7 +1297,7 @@ export const PRESETS: Preset[] = [
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.000,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: false,
@@ -1337,17 +1312,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 1.0,
+      polarity: 0.625,
       evaporationRate: 0.002,
       airVelocity: 0.0,
       audioImpact: 0.6,
       turbulenceScale: 0.3,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.05,
       saturationBoost: 1.55,
       glossiness: 0.0,
-      postBlurRadius: 0.0,
       dyeBudget: 0.9,
       edgeRelief: 0.05,
       lacing: 0.55,
@@ -1389,7 +1362,7 @@ export const PRESETS: Preset[] = [
       surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.500,
       rotationSpeed: 0.0,
       centerGravity: 0.05,
       granulation: 0.5,
@@ -1401,12 +1374,11 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.7,
+      polarity: 0.437,
       evaporationRate: 0.0025,
       audioImpact: 0.35,           // the music is still there, but it is not the loudest hand
       turbulenceScale: 0.12,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.1,
       saturationBoost: 1.45,
       dyeBudget: 1.0,
@@ -1461,7 +1433,7 @@ export const PRESETS: Preset[] = [
       surge: 0.3,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.45,
+      gooeyEffect: 0.129,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
       ledPlatform: false,
@@ -1476,17 +1448,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.9,               // the colours stay four colours, not one brown one
+      polarity: 0.698,               // the colours stay four colours, not one brown one
       evaporationRate: 0.0015,     // the ground has to last; this is a long, slow dish
       airVelocity: 0.0,
       audioImpact: 0.3,            // the beat is when a drop lands, not a shove of its own
       turbulenceScale: 0.05,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.7,
       boundaryContrast: 0.55,      // a bright line where a colour front meets the ground
       saturationBoost: 1.5,
       glossiness: 0.05,
-      postBlurRadius: 0.1,
       dyeBudget: 1.0,
       edgeRelief: 0.3,
       bubbles: 0.0,
@@ -1519,7 +1489,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.3,
+      gooeyEffect: 0.171,
       rotationSpeed: 0.116,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.08,
       ledPlatform: false,
@@ -1534,17 +1504,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.35,
       rainDrip: 0.0,
       viscosity: 'thin',
-      polarity: 0.5,
+      polarity: 0.200,
       evaporationRate: 0.006,      // a film that is always thinning is always about to go
       airVelocity: 0.05,
       audioImpact: 0.5,
       turbulenceScale: 0.3,        // some vorticity, so the fronts curl instead of ringing
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.2,
       boundaryContrast: 0.7,       // the rim of a hole is the brightest thing in frame
       saturationBoost: 1.35,
       glossiness: 0.2,
-      postBlurRadius: 0.2,
       dyeBudget: 0.5,
       edgeRelief: 0.55,
       bubbles: 0.05,
@@ -1577,7 +1545,7 @@ export const PRESETS: Preset[] = [
       surge: 0.28,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.55,
+      gooeyEffect: 0.393,
       rotationSpeed: 0.109,      // the dish's motor; was 0.006 with a stir in the middle (PLAN 22j)
       centerGravity: 0.0,
       ledPlatform: false,
@@ -1592,17 +1560,15 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.45,            // the smear reads as the drift
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.75,
+      polarity: 0.441,
       evaporationRate: 0.002,
       airVelocity: 0.08,
       audioImpact: 0.4,
       turbulenceScale: 0.18,       // low: a smooth current shows a stuck patch, a rough one hides it
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.45,
       boundaryContrast: 0.35,
       saturationBoost: 1.5,
       glossiness: 0.1,
-      postBlurRadius: 0.25,
       dyeBudget: 0.9,
       edgeRelief: 0.35,
       bubbles: 0.05,
@@ -1641,7 +1607,7 @@ export const PRESETS: Preset[] = [
       surge: 0.35,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.171,
       rotationSpeed: 0.063,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -1660,7 +1626,6 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.3,
       saturationBoost: 1.3,
       glossiness: 0.2,
-      postBlurRadius: 0.12,
       lampHotspot: 0.4,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
@@ -1682,7 +1647,7 @@ export const PRESETS: Preset[] = [
       surge: 0.35,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.171,
       rotationSpeed: 0.038,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -1701,7 +1666,6 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.3,
       saturationBoost: 1.3,
       glossiness: 0.2,
-      postBlurRadius: 0.12,
       lampHotspot: 0.4,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
@@ -1722,7 +1686,7 @@ export const PRESETS: Preset[] = [
       surge: 0.35,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.171,
       rotationSpeed: 0.019,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -1741,7 +1705,6 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.3,
       saturationBoost: 1.3,
       glossiness: 0.2,
-      postBlurRadius: 0.12,
       lampHotspot: 0.4,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
@@ -1761,7 +1724,7 @@ export const PRESETS: Preset[] = [
       surge: 0.35,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.171,
       rotationSpeed: 0.019,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -1780,7 +1743,6 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.3,
       saturationBoost: 1.3,
       glossiness: 0.2,
-      postBlurRadius: 0.12,
       lampHotspot: 0.4,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
@@ -1795,7 +1757,7 @@ export const PRESETS: Preset[] = [
       surge: 0.35,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.55,
+      gooeyEffect: 0.236,
       rotationSpeed: 0.045,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.2,
       ledPlatform: true,
@@ -1810,11 +1772,10 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
+      polarity: 0.500,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
       /*
         The plate's domes read by the white point on each top against the
@@ -1830,7 +1791,6 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.4,
       dyeBudget: 1.0,
       glossiness: 0.2,
-      postBlurRadius: 0.15,
       phaseAmount: 0.9,
       phaseScale: 0.3,
       phaseSharp: 0.75,
@@ -1854,7 +1814,7 @@ export const PRESETS: Preset[] = [
       surge: 0.55,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.6,
+      gooeyEffect: 0.514,
       rotationSpeed: 0.11,       // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: false,
@@ -1869,15 +1829,13 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.3,
       rainDrip: 0.1,
       viscosity: 'thick',
-      polarity: 0.75,
+      polarity: 0.412,
       evaporationRate: 0.004,
       airVelocity: 0.04,
       audioImpact: 0.55,
-      blobSurfaceTension: 0.4,
       boundaryContrast: 0.4,
       saturationBoost: 1.4,
       dyeBudget: 0.8,
-      postBlurRadius: 0.3,
       stock: 0.85,
       stockType: 3,
       stockGrain: 0.6,
@@ -1908,7 +1866,7 @@ export const PRESETS: Preset[] = [
       surge: 0.4,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.214,
       rotationSpeed: 0.123,      // the dish's motor; was 0.012 with a stir in the middle (PLAN 22j)
       centerGravity: 0.1,
       ledPlatform: false,
@@ -1923,16 +1881,14 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.85,
+      polarity: 0.499,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       audioImpact: 0.55,
-      blobSurfaceTension: 0.45,
       boundaryContrast: 0.35,
       saturationBoost: 1.45,
       dyeBudget: 0.9,
       glossiness: 0.25,
-      postBlurRadius: 0.15,
       plateCurve: 0.6,
       plateSpring: 0.35,
       beatSqueeze: 0.0,
@@ -1964,7 +1920,7 @@ export const PRESETS: Preset[] = [
       surge: 0.3,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.5,
+      gooeyEffect: 0.143,
       rotationSpeed: 0.018,      // the dish's motor; was 0.002 with a stir in the middle (PLAN 22j)
       centerGravity: 0.2,
       ledPlatform: true,
@@ -1979,16 +1935,14 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
+      polarity: 0.500,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.2,
       saturationBoost: 1.0,
       dyeBudget: 0.6,
       glossiness: 0.15,
-      postBlurRadius: 0.1,
       phaseAmount: 1,
       phaseScale: 0.4,
       phaseSharp: 0.75,
@@ -2022,7 +1976,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.55,
+      gooeyEffect: 0.189,
       rotationSpeed: 0.033,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
       centerGravity: 0.15,
       ledPlatform: true,
@@ -2037,16 +1991,14 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.2,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.8,
+      polarity: 0.500,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       audioImpact: 0.5,
-      blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
       saturationBoost: 1.35,
       dyeBudget: 1.0,
       glossiness: 0.5,
-      postBlurRadius: 0.12,
       phaseAmount: 0.8,
       phaseScale: 0.3,
       phaseSharp: 0.75,
@@ -2092,7 +2044,7 @@ export const PRESETS: Preset[] = [
       surge: 0.45,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.7,
+      gooeyEffect: 0.200,
       rotationSpeed: 0.0,
       centerGravity: 0.1,
       // The paper: a white light table, as Ferro Maze's.
@@ -2109,13 +2061,12 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       // Two primaries that meet stay two primaries, with a hard seam.
-      polarity: 1.0,
+      polarity: 0.700,
       evaporationRate: 0.003,
       airVelocity: 0.02,
       audioImpact: 0.55,
       turbulenceScale: 0.3,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
       boundaryContrast: 0.0,
       saturationBoost: 1.5,
       colourBody: 0.5,
@@ -2132,7 +2083,6 @@ export const PRESETS: Preset[] = [
       */
       dyeBudget: 0.45,
       glossiness: 0.0,
-      postBlurRadius: 0.1,
       edgeRelief: 0.0,
       bubbles: 0.0,
       beads: 0,

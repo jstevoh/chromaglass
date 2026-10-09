@@ -360,7 +360,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('bubbleCount', Math.min(40, bubbles.count));
     pack.set('bubbleStrength', bubbles.strength);
   }
-  pack.set('postBlur', s.postBlurRadius ?? 0.35);
+  pack.set('postBlur', 0.35);
   // Sampling math follows the texture actually bound; the tuned look
   // (normals, edge lines, macro cells) stays on the logical 192 grid.
   pack.set('gridSize', ctx.grid ?? fluids[0]?.gpu?.N ?? logicalGrid);

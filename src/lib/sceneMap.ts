@@ -110,7 +110,7 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  */
 export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
-  'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'diffusionRate',
+  'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'diffusionRate',
   'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
