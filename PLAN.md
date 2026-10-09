@@ -2370,6 +2370,12 @@ network):
 - Record keeps the whole take in memory until it stops (`src/hooks/useRecorder.ts`).
   That's fine for a song and risky for a set. In Chrome, write to a file as it
   records (File System Access).
+- Shipped: Flexible Canvas Video Recording & Performance Separation (`src/hooks/useRecorder.ts`,
+  `src/components/RecordPanel.tsx`, `src/components/desk/RecordControls.tsx`). Canvas-only video
+  recording with optional audio inclusion toggle, quality presets (Master 30 Mbps, Standard 12 Mbps,
+  Compact 5 Mbps), frame rate (60/30 fps), container selection (Auto, WebM, MP4), and last take tracking.
+  Performance gesture/stroke recording is clearly separated and controlled side-by-side in desk toolbars
+  and a unified recording studio modal (`R` for video, `T` for performance).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
 

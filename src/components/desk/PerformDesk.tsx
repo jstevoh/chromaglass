@@ -7,7 +7,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { PALETTE } from '../../constants';
-import { PerformanceButton } from './PerformanceButton';
+import { RecordControls } from './RecordControls';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
@@ -138,6 +138,10 @@ interface PerformDeskProps {
   onSound: () => void;
   onVideo: () => void;
   onMidi: () => void;
+  videoRecording?: boolean;
+  videoSeconds?: number;
+  onToggleVideo?: () => void;
+  onRecordOptions?: () => void;
   onPerformance: () => void;
   /** The performance being recorded: its clock and the song attached so far. */
   performance: { clock: string; title?: string } | null;
@@ -261,6 +265,7 @@ export function PerformDesk(p: PerformDeskProps) {
         onVideo={p.onVideo}
         onWall={p.onSendToWall}
         onMidi={p.onMidi}
+        onRecord={p.onRecordOptions ?? p.onToggleVideo}
         onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
@@ -506,7 +511,14 @@ export function PerformDesk(p: PerformDeskProps) {
             <span className="truncate text-[16px] font-medium">{live?.name ?? '—'}</span>
             <span className="shrink-0 whitespace-nowrap font-mono text-[12px] text-dim">live · {p.liveFor}</span>
           </span>
-          <PerformanceButton performance={p.performance} onToggle={p.onPerformance} />
+          <RecordControls
+            videoRecording={p.videoRecording ?? false}
+            videoSeconds={p.videoSeconds ?? 0}
+            onToggleVideo={p.onToggleVideo ?? (() => {})}
+            performance={p.performance}
+            onTogglePerformance={p.onPerformance}
+            onOptions={p.onRecordOptions ?? (() => {})}
+          />
           <div className="shrink-0">
           <Segmented
             value={String(p.layer)}
