@@ -205,6 +205,11 @@ export interface GpuStepParams {
    * before copying to GPU buffer, allowing tests to inject corrupted uniform values.
    */
   rawSim?: (simF: Float32Array) => void;
+  clearChemistry?(): void;
+  seedChemistry?(x: number, y: number, radius: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number): void;
+  chem?: any;
 }
 
 
@@ -313,4 +318,9 @@ export interface PlateSolver {
   drainStep(t: number): void;
   clear(): void;
   dispose(): void;
+  clearChemistry?(): void;
+  seedChemistry?(x: number, y: number, radius: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number): void;
+  chem?: any;
 }

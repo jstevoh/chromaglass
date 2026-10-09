@@ -3309,7 +3309,7 @@ export default function App() {
   /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
   const selectDye = (paletteIndex: number) => {
     colourDye(paletteIndex);
-    setActiveTool('dropper');
+    
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
@@ -3386,7 +3386,7 @@ export default function App() {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {
             updateLiquidColor(selectedLiquidId, color);
-            setActiveTool('dropper');
+            
           }
           break;
         }
@@ -3395,7 +3395,6 @@ export default function App() {
           // newer build than the display, or the other way round.
           if (liquidTypesRef.current.some(l => l.id === message.id)) {
             setSelectedLiquidId(message.id);
-            setActiveTool('dropper');
           }
           break;
         case 'action':
@@ -4403,7 +4402,7 @@ export default function App() {
                       return (
                         <button
                           key={liq.id}
-                          onClick={() => { setSelectedLiquidId(liq.id); setActiveTool('dropper'); }}
+                          onClick={() => { setSelectedLiquidId(liq.id); }}
                           title={liq.description}
                           data-testid={`liquid-${liq.id}`}
                           className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
@@ -5530,7 +5529,6 @@ export default function App() {
             const bottle = liquidTypes.find(l => !l.behaviour && l.color.toLowerCase() === hex.toLowerCase());
             if (!bottle) return;
             setSelectedLiquidId(bottle.id);
-            setActiveTool('dropper');
           }}
           plateRef={preview.ref}
           status={{
@@ -5582,10 +5580,10 @@ export default function App() {
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
-          onBottle={(id) => { setSelectedLiquidId(id); setActiveTool('dropper'); }}
+          onBottle={(id) => { setSelectedLiquidId(id); }}
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
-          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); setActiveTool('dropper'); }}
+          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
           palettes={COLOR_HARMONIES.map((h, i) => ({
             name: COLOR_HARMONY_NAMES[i],
             colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),

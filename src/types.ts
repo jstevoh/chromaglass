@@ -704,6 +704,8 @@ export interface VisualizerSettings {
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
   lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye (or over it, by the Mixer's order), no beat, no dye
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
+  chemistryPattern: number;
+  chemistryWidth: number;
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
@@ -1058,6 +1060,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   filmPhysics: 0,           // the rainbow: the film every look was made with
   lumia: 0,
   chemistry: 0,
+  chemistryPattern: 0,
+  chemistryWidth: 0.5,
   gelWheel: 0,
   gelSpeed: 0.5,
   filmMix: 0.7,

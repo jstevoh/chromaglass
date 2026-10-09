@@ -5467,7 +5467,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const laid = keepBack ? fluidsRef.current.slice(0, 1) : fluidsRef.current;
     for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
-    chemRef.current.reset();
+    fluidsRef.current[0]?.gpu?.clearChemistry?.();
     rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
     spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
     // The turntable likewise: a kept back plate keeps its dish turning.
@@ -7001,24 +7001,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
           const lead = fluidsRef.current[0];
           if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
-            const chem = chemRef.current;
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if ((bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
-              chem.seed(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 2 + DICE.chem.float() * 3);
-            }
-            // The dividing regime grows at a pace a show can watch; coral is slower than a set.
-            chem.step(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), 0.042, 0.062);
-            const v = chem.activator;
-            const c = harmonyCycle(harmonyRef.current, time * 0.08);
-            // No floor here, unlike the iteration count above: a frame that
-            // took no step has no time in it to deposit over, and floored it
-            // would lay down half as much again at thirty steps a second.
-            const amount = chemAmt * 0.02 * sixtieths;
-            for (let y = 1; y < GRID_SIZE - 1; y++) {
-              for (let x = 1; x < GRID_SIZE - 1; x++) {
-                const a = v[x + y * GRID_SIZE];
-                if (a > 0.22) lead.addDensity(x, y, amount * (a - 0.22), c.r, c.g, c.b);
+            const g = leadGpu;
+            if (g && g.stepChemistry) {
+              if ((bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
+                g.seedChemistry?.(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 0.01 + DICE.chem.float() * 0.016);
               }
+              // The dividing regime grows at a pace a show can watch; coral is slower than a set.
+              const p = currentSettings.chemistryPattern ?? 0;
+              const feed = 0.03 + p * 0.01;
+              const kill = 0.055 + p * 0.005;
+              const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
+              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w);
+              const c = harmonyCycle(harmonyRef.current, time * 0.08);
+              const amount = chemAmt * 0.02 * sixtieths;
+              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22);
             }
           }
         }
@@ -7710,7 +7707,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               */
               if (!h.seeds) {
                 for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
-                chemRef.current.reset();
+                fluidsRef.current[0]?.gpu?.clearChemistry?.();
                 h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
                   if (i === 0) {

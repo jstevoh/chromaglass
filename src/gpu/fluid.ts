@@ -548,6 +548,8 @@ export class WebGPUFluid {
   private readonly dyeFormat: GPUTextureFormat;
 
   private readonly dye: PingPong;
+  public readonly chem: PingPong;
+  public chemLive = false;
   private readonly liquids0: PingPong;
   private readonly liquids1: PingPong;
   private readonly vel: PingPong;
@@ -1128,6 +1130,7 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
+    this.chem = pp(this.N, 'rgba16float', 'chem');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
@@ -2287,12 +2290,14 @@ export class WebGPUFluid {
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
       if (!bodiesOn) { 
         this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
         this.macCormack(pass, this.liquids0, this.velForced, disp, 'dye'); 
-        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye');
+        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
         return; 
       }
       /*
@@ -2323,6 +2328,7 @@ export class WebGPUFluid {
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
         this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -2334,6 +2340,10 @@ export class WebGPUFluid {
       this.liquids0.swap();
       this.runPressed(pass, 'bodyAdvect', this.liquids1.write, [this.liquids1.read, this.velForced], adv);
       this.liquids1.swap();
+      if (this.chemLive) {
+        this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
+        this.chem.swap();
+      }
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
