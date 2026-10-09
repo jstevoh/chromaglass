@@ -1016,7 +1016,7 @@ export class WebGPUFluid {
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
       ['grayScott', [VEL], open.chemistry],
-      ['addReagent', [VEL], open.chemistry],
+      ['addReagent', [VEL], false],
       ['seedChem', [VEL], open.chemistry],
       ['advectChem', [VEL], open.chemistry],
       ['drainVel', [VEL], false],
