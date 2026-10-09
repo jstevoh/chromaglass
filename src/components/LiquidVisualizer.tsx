@@ -762,6 +762,7 @@ export interface LiquidVisualizerHandle {
   render: () => VisualizerRender | null;
   injectImage: (imageData: ImageData) => void;
   pourVideo: (video: HTMLVideoElement) => void;
+  stopPourVideo: () => void;
   /**
    * Pour words into the lead plate: each row drawn at the biggest size its
    * share of the box allows, in `colour` (default: the look's brightest dye;
@@ -1348,8 +1349,11 @@ class FluidSimulation {
         const r = Math.max(1.5, radius) / L;
         g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
       }
-      if (what?.reagent && g.addReagent) {
-        g.addReagent(cx / L, cy / L, Math.max(1.5, radius) / L, what.reagent * amount, currentSettings.chemistryPattern ?? 0);
+      if (('active' in what) && (g as any).addActive) {
+        (g as any).addActive(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.active as number) * amount);
+      }
+      if (('reagent' in what) && g.addReagent) {
+        g.addReagent(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.reagent as number) * amount, s.chemistryPattern ?? 0);
       }
       if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
@@ -4794,6 +4798,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The mark: a still over the finished frame, uploaded once and then left alone. */
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
+  const videoPourRef = useRef<HTMLVideoElement | null>(null);
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
     const f = filmRef.current;
@@ -5655,14 +5660,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (fluid) fluid.injectImage(imageData);
     },
     pourVideo: (video: HTMLVideoElement) => {
-      // Pour video onto the GPU fluid directly
-      const fluid = fluidsRef.current[activeLayerRef.current];
-      if (fluid && fluid.gpu) {
-        const gpuFluid = fluid.gpu as unknown as { pourImage: (src: HTMLVideoElement, box: number[]) => void };
-        if (gpuFluid.pourImage) {
-          // Map video into the central visible region, just like injectImage
-          gpuFluid.pourImage(video, [0.19, 0.31, 0.81, 0.69]);
-        }
+      if (videoPourRef.current) {
+        videoPourRef.current.pause();
+      }
+      videoPourRef.current = video;
+      video.play();
+    },
+    stopPourVideo: () => {
+      if (videoPourRef.current) {
+        videoPourRef.current.pause();
+        videoPourRef.current = null;
       }
     },
     pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {

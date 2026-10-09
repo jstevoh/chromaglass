@@ -74,6 +74,8 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
 }
 
 interface SettingsPanelProps {
+  onPourVideo?: (file: File) => void;
+  onStopPourVideo?: () => void;
   settings: VisualizerSettings;
   /**
    * Song detection, the master switch: whether the app listens for which song
@@ -342,7 +344,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -1893,7 +1895,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 }}
               >
                 <span className="text-[12px] font-medium">{v.title}</span>
-                <span className="text-[10px] text-white/40">Load</span>
+                <div className="flex gap-3">
+                  <span className="text-[10px] text-white/40 hover:text-white px-1" onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const res = await fetch(v.src);
+                      const blob = await res.blob();
+                      if (onPourVideo) onPourVideo(new File([blob], v.title, { type: 'video/webm' }));
+                    } catch (e) { console.error('Failed to load demo video', e); }
+                  }}>Pour as Dye</span>
+                  <span className="text-[10px] text-white/40 hover:text-white px-1">Load Film</span>
+                </div>
               </button>
             ))}
           </div>

@@ -549,6 +549,7 @@ export class WebGPUFluid {
 
   private readonly dye: PingPong;
   public readonly chem: PingPong;
+  public readonly activeMat: PingPong;
   public chemLive = false;
   private readonly liquids0: PingPong;
   private readonly liquids1: PingPong;
@@ -1131,6 +1132,7 @@ export class WebGPUFluid {
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
     this.chem = pp(this.N, 'rgba16float', 'chem');
+    this.activeMat = pp(this.N, 'r16float', 'activeMat');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
