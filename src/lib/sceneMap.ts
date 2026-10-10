@@ -110,11 +110,12 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  */
 export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
-  'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'diffusionRate',
+  'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
   'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
-  'plateCurve', 'plateSpring', // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
+  'plateCurve', 'plateSpring', 'depthDrag',
+  // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
   'thinGap', 'gapThickness',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
   'vorticityConfinement', 'oilTension', 'oilBodies', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
@@ -133,8 +134,9 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // own population, so the amount is that plate's. How far their colour is
   // trusted is read by the render pass, which sees one picture.
   'particles',
-  'polarity', 'rainDrip', 'rotationSpeed', 'sharpness', 'turbulenceDetail',
-  'turbulenceScale', ]);
+  'platePressure', 'polarity', 'rainDrip', 'rotationSpeed', 'sharpness', 'turbulenceDetail',
+  'turbulenceScale', 'vibrationFrequency',
+]);
 
 /** Everything a patch can be plugged into on one side. */
 export interface PatchContext {

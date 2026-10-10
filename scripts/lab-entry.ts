@@ -1,4 +1,3 @@
-import { fillPlateUniforms, PlateView } from '../src/gpu/plateUniforms';
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
@@ -8,7 +7,7 @@ import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
-
+import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
 import { speciesOf } from '../src/lib/liquidProps';
@@ -36,7 +35,7 @@ export const BASE: GpuStepParams = {
   magnetStrength: 0, magnetSeconds: 1 / 60, plateCurve: 0, depthDrag: 0, gapSpring: 0.02, gapMemory: 0,
   platePressure: 0.4, vibIntensity: 0, vibFrequency: 0, drip: 0, smearX: 0, smearY: 0,
   air: 0, evapFactor: 1, time: 0, currentDamp: 0.98, currentBuoy: 0, rockX: 0, rockY: 0, currentGrav: 0,
-  meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4, cometX: 0, cometY: 0,
+  meanDensity: 0, maxCurrent: 0.01, particles: 0, particleLife: 4,
 } as GpuStepParams;
 
 /** Numbers as IEEE half floats, for writing an rgba16float texture. */
@@ -190,7 +189,7 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
     l.hands = null; l.breath = null;
   },
@@ -239,7 +238,7 @@ const api = {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
       l.solver.step(p, flushed && k === 0);
-      l.magnets = [];
+      l.magnets = magnetsOnPlate(p);
       l.cellClock = advanceCellClock(l.cellClock, stepDisplacement(p.dt, p.advection, l.N));
     }
     await l.solver['device'].queue.onSubmittedWorkDone();
@@ -578,7 +577,6 @@ const api = {
         rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
-        audio: { pitchClass: 0, brightness: 0, beatPhase: 0 },
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
         mark: cam.mark ? { aspect: mw / Math.max(1, mh) } : null,
         film: cam.film ? { kind: 'file', video: { readyState: 4, videoWidth: fw, videoHeight: fh } } : { kind: 'none', video: null },
@@ -592,7 +590,7 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    const layer = { dye: l.solver['dye'].read, dyeB: l.solver['dyeB'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
+    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a

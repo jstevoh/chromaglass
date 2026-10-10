@@ -25,7 +25,6 @@ struct Splat {
   a: vec4f,
   // What it deposits: the dye's absorbance (lib/dye.ts) × amount in rgb, density in a.
   b: vec4f,
-  b2: vec4f,
   // vx, vy, temperature, and the change in the plate gap.
   c: vec4f,
   // The dye multiplier at the centre (1 leaves it alone), the falloff
@@ -74,9 +73,8 @@ export const SPLAT_KERNELS: Record<string, string> = {
   splatDeltas: `${SPLAT_STRUCT}
 @group(0) @binding(1) var<storage, read> splats: array<Splat>;
 @group(0) @binding(2) var dye: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(3) var dyeB: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(4) var vel: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(5) var mul: texture_storage_2d<r32float, write>;
+@group(0) @binding(3) var vel: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(4) var mul: texture_storage_2d<r32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
   // The cell's place on the logical grid, where every radius is measured.

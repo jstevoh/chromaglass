@@ -32,8 +32,8 @@ export const TEMPO_REF = 0.0011;
  * the dye per unit of it (advection), times the camera's zoom (a closeup
  * magnifies every motion by its zoom).
  */
-export function lookSpeed(s: Pick<VisualizerSettings, 'globalSpeed' | 'airVelocity' | 'automateRate' | 'advection' | 'macroMode' | 'macroZoom'>): number {
-  let d = 0.05 + 0.4 * 0.02 + (s.airVelocity ?? 0) * 0.01 + (s.automateRate ?? 0) * 0.01;
+export function lookSpeed(s: Pick<VisualizerSettings, 'globalSpeed' | 'platePressure' | 'airVelocity' | 'automateRate' | 'advection' | 'macroMode' | 'macroZoom'>): number {
+  let d = 0.05 + (s.platePressure ?? 0) * 0.02 + (s.airVelocity ?? 0) * 0.01 + (s.automateRate ?? 0) * 0.01;
   let m = (Number.isFinite(s.globalSpeed) ? s.globalSpeed : 0.05) / 0.05;
   if (m < 1) m *= m;
   d *= m;

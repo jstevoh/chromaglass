@@ -20,6 +20,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'bubbleShape', type: 'vec4f', count: 40, note: 'stretch axis × magnitude, wobble amplitude, wobble phase' },
   { name: 'bubbles', type: 'vec4f', count: 40, note: 'x, y, r (fluid uv) and opacity' },
   { name: 'lamp', type: 'vec4f' },
+  { name: 'magnets', type: 'vec4f', count: 4, note: 'the magnets under the glass as the lead plate was stepped: x, y (fluid uv), height, strength; strength 0 is none' },
   { name: 'lamp2', type: 'vec4f' },
   { name: 'markRect', type: 'vec4f', note: 'where it sits: centre xy, half-size xy, all in screen uv' },
   /*
@@ -30,7 +31,6 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'mixGrade', type: 'vec4f', count: 6, note: 'the LED ring, the front plate, the back plate, the film, the gel wheel, the lumia' },
   { name: 'markGrade', type: 'vec4f', note: 'the logo' },
   { name: 'mixLevel', type: 'vec4f', note: 'the LED ring, the front plate, the back plate, and the logo while it is under something' },
-  { name: 'chemistry', type: 'f32', note: 'Amount of Turing pattern / Liesegang chemistry' },
   { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of seven, 0 the bottom' },
   { name: 'mixPos2', type: 'vec4f', note: 'the rows of the gel wheel, the lumia and the front plate (everything under it is the lamp), and the top row' },
   { name: 'mixBlend', type: 'vec4f', note: 'the blends of the LED ring, the gel wheel, the lumia and the film: 0 own, 1 screen, 2 add, 3 multiply, 4 key' },
@@ -140,9 +140,6 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
-  { name: 'pitchClass', type: 'f32', note: 'musical key (0-11) for true synesthesia color mapping' },
-  { name: 'brightness', type: 'f32', note: 'spectral centroid (0-1) for viscosity/turbulence mapping' },
-  { name: 'beatPhase', type: 'f32', note: 'continuous phase (0-1) tracking the BPM for synced LFOs' },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

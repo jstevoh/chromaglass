@@ -13,7 +13,7 @@
 import { dyeAbsorbances } from '../lib/dye';
 
 /** Floats per record; four vec4s (see `Splat` in wgsl/splat.ts). */
-export const SPLAT_FLOATS = 20;
+export const SPLAT_FLOATS = 16;
 
 export type Falloff = 'flat' | 'linear' | 'squared' | 'gaussian';
 
@@ -72,17 +72,13 @@ export class SplatList {
     const amount = o.amount ?? 0;
     const [r, g, b] = o.colour ?? [1, 1, 1];
     d[i] = x; d[i + 1] = y; d[i + 2] = radius; d[i + 3] = kind;
-        const [ar, ag, ab, a3, a4, a5] = dyeAbsorbances(r, g, b);
+    const [ar, ag, ab] = dyeAbsorbances(r, g, b);
     d[i + 4] = amount * ar;
     d[i + 5] = amount * ag;
     d[i + 6] = amount * ab;
     d[i + 7] = amount;
-    d[i + 8] = amount * a3;
-    d[i + 9] = amount * a4;
-    d[i + 10] = amount * a5;
-    d[i + 11] = 0;
-    d[i + 12] = o.vx ?? 0; d[i + 13] = o.vy ?? 0; d[i + 14] = o.temp ?? 0; d[i + 15] = o.gap ?? 0;
-    d[i + 16] = o.mul ?? 1; d[i + 17] = FALLOFF[o.falloff ?? 'flat']; d[i + 18] = ex; d[i + 19] = ey;
+    d[i + 8] = o.vx ?? 0; d[i + 9] = o.vy ?? 0; d[i + 10] = o.temp ?? 0; d[i + 11] = o.gap ?? 0;
+    d[i + 12] = o.mul ?? 1; d[i + 13] = FALLOFF[o.falloff ?? 'flat']; d[i + 14] = ex; d[i + 15] = ey;
     this.n++;
     return this;
   }

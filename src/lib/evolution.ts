@@ -134,6 +134,7 @@ export interface MusicVisualParams {
   harmonyIndex: number;
   turbulenceScale: number;
   turbulenceDetail: number;
+  blobSurfaceTension: number;
   saturationBoost: number;
   boundaryContrast: number;
   densityBias: number;
@@ -146,7 +147,7 @@ export interface MusicVisualParams {
 export function buildVisualParams(
   seed: TrackSeed,
   state: TrackEvolutionState | null,
-  base: { turbulenceScale: number; saturationBoost: number; boundaryContrast: number },
+  base: { turbulenceScale: number; blobSurfaceTension: number; saturationBoost: number; boundaryContrast: number },
   snapshot?: Record<string, number>,
 ): MusicVisualParams {
   if (snapshot) {
@@ -154,7 +155,8 @@ export function buildVisualParams(
       harmonyIndex: snapshot.harmonyIndex ?? seed.harmonyIndex,
       turbulenceScale: snapshot.turbulenceScale ?? base.turbulenceScale,
       turbulenceDetail: snapshot.turbulenceDetail ?? 3,
-            saturationBoost: snapshot.saturationBoost ?? base.saturationBoost,
+      blobSurfaceTension: snapshot.blobSurfaceTension ?? base.blobSurfaceTension,
+      saturationBoost: snapshot.saturationBoost ?? base.saturationBoost,
       boundaryContrast: snapshot.boundaryContrast ?? base.boundaryContrast,
       densityBias: snapshot.densityBias ?? seed.densityBias,
     };
@@ -166,7 +168,8 @@ export function buildVisualParams(
     harmonyIndex,
     turbulenceScale: clamp01(base.turbulenceScale + seed.turbulenceOffset + complexity * 0.25),
     turbulenceDetail: complexity > 0.6 ? 4 : 3,
-        saturationBoost: Math.max(0.5, Math.min(2, base.saturationBoost + seed.saturationOffset)),
+    blobSurfaceTension: clamp01(base.blobSurfaceTension + seed.tensionOffset),
+    saturationBoost: Math.max(0.5, Math.min(2, base.saturationBoost + seed.saturationOffset)),
     boundaryContrast: clamp01(base.boundaryContrast + complexity * 0.15),
     densityBias: seed.densityBias,
   };
@@ -180,7 +183,8 @@ export function paramsToSnapshot(p: MusicVisualParams): Record<string, number> {
     harmonyIndex: p.harmonyIndex,
     turbulenceScale: p.turbulenceScale,
     turbulenceDetail: p.turbulenceDetail,
-        saturationBoost: p.saturationBoost,
+    blobSurfaceTension: p.blobSurfaceTension,
+    saturationBoost: p.saturationBoost,
     boundaryContrast: p.boundaryContrast,
     densityBias: p.densityBias,
   };

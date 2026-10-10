@@ -26,7 +26,6 @@ import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 interface LayerTargets {
   size: number;
   dye: GPUTexture;
-  dyeB: GPUTexture;
   vel: GPUTexture;
   derived: GPUTexture;
 }
@@ -188,19 +187,18 @@ export class WebGPUPlate {
   private ensureLayers(count: number, size: number): void {
     while (this.layers.length > count) {
       const l = this.layers.pop()!;
-      for (const t of [l.dye, l.dyeB, l.vel, l.derived]) this.disposer.release(t);
+      for (const t of [l.dye, l.vel, l.derived]) this.disposer.release(t);
     }
     for (let i = 0; i < count; i++) {
       const have = this.layers[i];
       if (have && have.size === size) continue;
-      if (have) for (const t of [have.dye, have.dyeB, have.vel, have.derived]) this.disposer.release(t);
+      if (have) for (const t of [have.dye, have.vel, have.derived]) this.disposer.release(t);
       const tex = (label: string, format: GPUTextureFormat, usage: number) => this.disposer.track(this.device.createTexture({
         label: `${label} ${i}`, size: [size, size], format, usage,
       }));
       this.layers[i] = {
         size,
         dye: tex('packed dye', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
-        dyeB: tex('packed dye b', 'rgba8unorm', GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
         vel: tex('packed velocity', PACKED_VEL_FORMAT, GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING),
         // COPY_SRC so npm run derive can read where the slopes were found.
         derived: tex('derived', 'rgba16float', GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC),
@@ -258,8 +256,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture;
-  dyeB: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -369,8 +366,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture;
-  dyeB: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -401,8 +397,7 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
-    fields: { dye: GPUTexture;
-  dyeB: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,

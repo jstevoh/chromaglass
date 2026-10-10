@@ -337,7 +337,7 @@ const MUST_FIND = [
   ['lumia', 'lamp'], ['gel wheel', 'lamp'], ['exposure', 'lamp'], ['lamp warmth', 'lamp'],
   ['patch', 'patches'], ['lfo', 'patches'], ['room impact', 'patches'], ['sound impact', 'patches'],
   // Renamed controls, by their new names and by the old ones people learned.
-  ['lens', 'camera'], ['updraft', 'interaction'],
+  ['momentum', 'physics'], ['damping', 'physics'], ['lens', 'camera'], ['updraft', 'interaction'],
   ['blow velocity', 'interaction'], ['grain fineness', 'look'], ['grain size', 'look'], ['macro lacing', 'macro'],
   ['bpm', 'audio-input'], ['microphone', 'audio-input'],
   ['viscosity', 'physics'], ['zoom', 'macro'], ['blend', 'layers'], ['gpu', 'simulation'],
@@ -949,7 +949,9 @@ check('and one action has one name',
 */
 const RENAMED = {
   camera: 'Lens', layerCount: 'Layers', kaleidoSpin: 'Kaleido Spin', kaleidoZoom: 'Kaleido Zoom',
-  macroZoom: 'Macro Zoom', macroLacing: 'Macro Lacing', grainScale: 'Grain Fineness', airVelocity: 'Updraft', };
+  macroZoom: 'Macro Zoom', macroLacing: 'Macro Lacing', damping: 'Momentum',
+  grainScale: 'Grain Fineness', airVelocity: 'Updraft', vibrationFrequency: 'Vibration',
+};
 const misnamed = Object.entries(RENAMED).filter(([k, name]) =>
   sliders.find(s => s.key === k)?.label !== name || PIN_RANGE.get(k)?.label !== name);
 check('a renamed control has its new name on the sheet and on every desk, fader and stage',
@@ -1100,7 +1102,6 @@ check('and neither starts over the limit',
   const KNOWN = new Set([
     // Set by the zoom, which is the control; the flag rides along.
     'macroMode', 'macroZoom',
-    'depthDrag',
     // The paper backdrop's two colours: a look's, chosen with the dyes.
     'paperA', 'paperB',
     // The mixer's order: its rows' arrows and the four raise pads, which are

@@ -1042,6 +1042,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="grainScale"
         />
         <Slider
+          label="Blob Surface Tension"
+          value={settings.blobSurfaceTension}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ blobSurfaceTension: v })}
+          settingKey="blobSurfaceTension"
+        />
+        <Slider
           label="Dye Budget"
           value={settings.dyeBudget ?? 0.85}
           min={0.1}
@@ -1142,6 +1151,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ glossiness: v })}
           settingKey="glossiness"
+        />
+        <Slider
+          label="Post Blur"
+          value={settings.postBlurRadius}
+          min={0}
+          max={1.5}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ postBlurRadius: v })}
+          settingKey="postBlurRadius"
         />
       </section>
 
@@ -2667,6 +2685,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className={SECTION_TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
+        <Slider
+          label="Plate Pressure"
+          value={settings.platePressure}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ platePressure: v })}
+          settingKey="platePressure"
+        />
         {/*
           The two glasses themselves.
 
@@ -2957,6 +2984,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ plateCurve: v })}
           settingKey="plateCurve"
         />
+        <Slider
+          label="Depth Drag"
+          value={settings.depthDrag ?? 0}
+          min={0}
+          max={3}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ depthDrag: v })}
+          settingKey="depthDrag"
+        />
         {/*
           The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
           two stops, as Layers is, so a MIDI button and a desk can hold it
@@ -3083,6 +3119,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ airVelocity: v })}
           settingKey="airVelocity"
         />
+        <Slider
+          label="Vibration"
+          value={settings.vibrationFrequency}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ vibrationFrequency: v })}
+          settingKey="vibrationFrequency"
+        />
         {/* How far a dropped liquid falls before it meets the plate: at 0 it is
             laid on; higher, it lands — pressing the film into a ring, pushing
             the liquid round it outward, and throwing satellite droplets. Works
@@ -3145,6 +3190,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.1}
           onChange={(v: number) => onUpdate({ advection: v })}
           settingKey="advection"
+        />
+        {/*
+          "Momentum", not "Damping (Friction)": this is how much velocity
+          survives each step, so up means more of the motion is kept — less
+          friction, the opposite of what the old label promised.
+        */}
+        <Slider
+          label="Momentum"
+          value={settings.damping}
+          min={0.8}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ damping: v })}
+          settingKey="damping"
         />
       </section>
 

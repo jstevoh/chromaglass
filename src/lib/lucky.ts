@@ -126,10 +126,11 @@ export function luckyLook(
       remembered number, so it cannot drift again without saying so.
     */
     globalSpeed: 0.005 + rand() * 0.0202,
-    audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() }, glassSmear: rand(), rainDrip: rand(),
+    audioMappings: { velocity: randomFeature(), density: randomFeature(), color: randomFeature(), rotation: randomFeature() },
+    platePressure: rand(), glassSmear: rand(), rainDrip: rand(),
     viscosity: rand() > 0.5 ? 'thick' : 'thin', polarity: rand(),
     evaporationRate: rand() * 0.05,
-    airVelocity: rand() * 0.5,
+    airVelocity: rand() * 0.5, vibrationFrequency: rand(),
     layerCount: rand() > 0.5 ? 2 : 1,
     blendMode: blendModes[Math.floor(rand() * blendModes.length)],
     gooeyEffect: rand(),
@@ -166,11 +167,13 @@ export function luckyLook(
       both sharper and a whole pass cheaper.
     */
     diffusionRate: rand() < 0.25 ? 0 : rand() * DIFFUSION_CEILING,
-    buoyancy: rand(), advection: rand() * 0.8 + 0.2, heatDecay: rand() * 0.1 + 0.9,
+    buoyancy: rand(), advection: rand() * 0.8 + 0.2,
+    damping: rand() * 0.1 + 0.9, heatDecay: rand() * 0.1 + 0.9,
     automateRate: rand() * 0.2,
     audioImpact: current.audioImpact,
     turbulenceScale: rand() * 0.7,
     turbulenceDetail: 1 + Math.floor(rand() * 4),
+    blobSurfaceTension: rand(),
     boundaryContrast: rand() * 0.7,
     saturationBoost: 1.0 + rand() * 0.8,
     dyeBudget: 0.4 + rand() * 0.6,
@@ -226,6 +229,7 @@ export function luckyLook(
     filmMix: current.filmMix,
     filmKey: current.filmKey,
     glossiness: rand() < 0.8 ? 0 : rand() * 0.4,
+    postBlurRadius: rand() * 0.7,
     // One roll in four goes closeup — a magnified chase is its own happy
     // accident. The zoom decides now, so the roll lands on the zoom and the
     // flag follows it rather than the two disagreeing.

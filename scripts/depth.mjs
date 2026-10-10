@@ -88,7 +88,7 @@ try {
     };
     setTimeout(sample, 250);
   });
-  page.on('console', msg => console.log('BROWSER:', msg.text())); await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
 
   /*

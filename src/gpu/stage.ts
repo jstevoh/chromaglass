@@ -58,7 +58,7 @@ export class WebGPUStage {
       gpu.device.destroy();
       return { failure: 'no-webgpu', detail: 'the canvas refused a webgpu context' };
     }
-    const s = new WebGPUStage(gpu, canvas, context); if (typeof window !== "undefined") { console.error("SETTING __cgGrabWebGpu"); (window as any).__cgGrabWebGpu = () => s.grabFrame(); } return s;
+    return new WebGPUStage(gpu, canvas, context);
   }
 
   get device(): GPUDevice { return this.gpu.device; }

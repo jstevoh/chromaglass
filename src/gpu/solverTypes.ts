@@ -32,6 +32,7 @@ export interface GpuStepParams {
   advection: number;
   /** Interface sharpening, 0 = off. Counteracts the solver's own numerical diffusion. */
   sharpness: number;
+  damping: number;
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
@@ -62,12 +63,12 @@ export interface GpuStepParams {
     there.
   */
   magnetRadius?: number;
-  extraMagnets?: readonly { x: number; y: number }[];
   /**
     The other fingers holding a magnet on a touch screen, up to three, in
     plate coordinates; each at this magnet's height and strength. Only read
     while this one is on.
   */
+  extraMagnets?: readonly { x: number; y: number }[];
   /**
     Seconds of real time this step stands for, as the magnet counts it. The
     flow moves by `dt × advection`, which a slow look keeps tiny on purpose;
@@ -122,8 +123,8 @@ export interface GpuStepParams {
   /** Liesegang rings: precipitate bands behind a diffusing front. */
   liesegang?: number;
   plateCurve: number;
-  depthDrag: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
+  depthDrag: number;
   /**
    * The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): over 0.5, the
    * flow between the glasses has the gap's drag and a variable-mobility
@@ -151,6 +152,7 @@ export interface GpuStepParams {
   /** How much of a press's squeeze survives into the next step. */
   gapMemory: number;
   /** How hard the hand is on the glass: scales the press's push on the flow. */
+  platePressure: number;
   vibIntensity: number;
   vibFrequency: number;
   drip: number;         // rainDrip (0 = off)
@@ -304,7 +306,7 @@ export interface PlateSolver {
    * the air's stress on the surface in pascals, for the next step only
    * (PLAN 15g; lib/breath.ts, hsBody).
    */
-  applyDeltas(dyeAdd: Float32Array, dyeAddB: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null): void;
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;

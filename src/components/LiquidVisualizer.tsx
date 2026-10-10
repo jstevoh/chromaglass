@@ -947,9 +947,6 @@ class FluidSimulation {
   densityR: Float32Array;
   densityG: Float32Array;
   densityB: Float32Array;
-  density3: Float32Array;
-  density4: Float32Array;
-  density5: Float32Array;
 
   vx: Float32Array;
   vy: Float32Array;
@@ -1143,8 +1140,7 @@ class FluidSimulation {
   get stepCount(): number { return this.stepIndex; }
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
-  private dyeAdd: Float32Array;
-  dyeAddB: Float32Array;     // interleaved upload buffers
+  private dyeAdd: Float32Array;     // interleaved upload buffers
   private velAdd: Float32Array;
   /** The fingers in the liquid this step on a thin gap (lib/handSolid.ts), made when one first touches it. */
   private hands: Float32Array | null = null;
@@ -1400,9 +1396,6 @@ class FluidSimulation {
     this.densityR = new Float32Array(GRID_AREA);
     this.densityG = new Float32Array(GRID_AREA);
     this.densityB = new Float32Array(GRID_AREA);
-    this.density3 = new Float32Array(GRID_AREA);
-    this.density4 = new Float32Array(GRID_AREA);
-    this.density5 = new Float32Array(GRID_AREA);
 
     this.vx = new Float32Array(GRID_AREA);
     this.vy = new Float32Array(GRID_AREA);
@@ -1418,7 +1411,6 @@ class FluidSimulation {
 
     this.mul = new Float32Array(GRID_AREA).fill(1);
     this.dyeAdd = new Float32Array(GRID_AREA * 4);
-    this.dyeAddB = new Float32Array(GRID_AREA * 4);
     this.velAdd = new Float32Array(GRID_AREA * 4);
     this.rbDensity = new Float32Array(GRID_AREA);
     this.rbVx = new Float32Array(GRID_AREA);
@@ -1604,16 +1596,15 @@ class FluidSimulation {
 
   private flushDeltas(dt: number) {
     const gpu = this.gpu!;
-    const da = this.dyeAdd, dab = this.dyeAddB, va = this.velAdd;
+    const da = this.dyeAdd, va = this.velAdd;
     for (let i = 0; i < GRID_AREA; i++) {
       const i4 = i * 4;
       da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
-      dab[i4] = this.density3[i]; dab[i4 + 1] = this.density4[i]; dab[i4 + 2] = this.density5[i]; dab[i4 + 3] = this.density[i];
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
-    gpu.applyDeltas(da, this.dyeAddB, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null);
+    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null);
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0); this.density3.fill(0); this.density4.fill(0); this.density5.fill(0);
+    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
@@ -1919,13 +1910,10 @@ class FluidSimulation {
     // At render time: channel = exp(-densityChannel / density)
     // This gives r1^w1 * r2^w2 weighted mixing — physically correct subtractive colorimetry.
     // The absorbance is a real dye's, never a perfect filter's (lib/dye.ts).
-        const [ar, ag, ab, a3, a4, a5] = dyeAbsorbances(r, g, b);
+    const [ar, ag, ab] = dyeAbsorbances(r, g, b);
     this.densityR[index] += amount * ar;
     this.densityG[index] += amount * ag;
     this.densityB[index] += amount * ab;
-    this.density3[index] += amount * a3;
-    this.density4[index] += amount * a4;
-    this.density5[index] += amount * a5;
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
@@ -2049,7 +2037,7 @@ class FluidSimulation {
     this.liquid.clear();
     this.gpu?.clear();
     if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0); this.density3.fill(0); this.density4.fill(0); this.density5.fill(0);
+    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
@@ -3203,19 +3191,13 @@ class FluidSimulation {
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     switch (style) {
       case 'spray': {
-        const sprayR = Math.round((12 + energy * 8) * k);
-        for (let ddy = -sprayR; ddy <= sprayR; ddy++) {
-          for (let ddx = -sprayR; ddx <= sprayR; ddx++) {
-            const dd = Math.sqrt(ddx*ddx + ddy*ddy);
-            if (dd > sprayR) continue;
-            const px = Math.floor(x + ddx);
-            const py = Math.floor(y + ddy);
-            if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
-            const noise = this.rng.float();
-            if (noise > 0.4) continue;
-            const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * (1 - noise);
-            this.addDensity(px, py, amount * w, r, g, b);
-          }
+        const sprayR = (8 + energy * 5) * k;
+        const count = 8 + Math.floor(energy * 8);
+        for (let p = 0; p < count; p++) {
+          const a = this.rng.angle(), d = this.rng.float() * sprayR;
+          const px = Math.floor(x + Math.cos(a) * d), py = Math.floor(y + Math.sin(a) * d);
+          if (px < 1 || px >= S - 1 || py < 1 || py >= S - 1) continue;
+          this.addDensity(px, py, amount * (1 - d / sprayR) * 0.25, r, g, b);
         }
         break;
       }
@@ -3375,7 +3357,7 @@ class FluidSimulation {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
-    dynamicSpeed += 0.4 * 0.02;
+    dynamicSpeed += settings.platePressure * 0.02;
     dynamicSpeed += settings.airVelocity * 0.01;
     dynamicSpeed += settings.automateRate * 0.01;
 
@@ -3541,8 +3523,8 @@ class FluidSimulation {
     this.fvy.set(this.vy);
     let densSum = 0, colR = 0, colG = 0, colB = 0;
     for (let i = 0; i < GRID_AREA; i++) {
-      this.vx[i] *= 0.99;
-      this.vy[i] *= 0.99;
+      this.vx[i] *= p.damping;
+      this.vy[i] *= p.damping;
       const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
       if (speedSq > 0.000004) {
         const factor = 0.002 / Math.sqrt(speedSq);
@@ -3608,8 +3590,7 @@ class FluidSimulation {
 
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
-    let visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
-    let diff = settings.diffusionRate;
+    const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
 
     // Momentum diffuses at a viscosity derived from the plate's thickness
     // setting — not at the dye's diffusivity, which is a different quantity.
@@ -3670,7 +3651,7 @@ class FluidSimulation {
       number (both solvers halve it).
     */
     {
-      const vf = Math.max(0, Math.min(1, 0));
+      const vf = Math.max(0, Math.min(1, settings.vibrationFrequency ?? 0));
       if (vf > 0.005) {
         const energy = audioData ? Math.min(1, audioData.energy) : 0;
         vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
@@ -3682,8 +3663,21 @@ class FluidSimulation {
     // (immiscibility, below). It also set a fingering push, a noise pushing
     // the dye along its own gradient, which grew a grating in every pool
     // and is gone (forcesB in wgsl/fluid.ts, and why).
+    const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
     const polarity = settings.polarity || 0;
-    const immiscibility = polarity * 0.064;
+/*
+      Named `immiscibility` and not `surfaceTension`, which is what it was
+      called until 2026-09-21.
+
+      There was also a *setting* called `surfaceTension`, written by all
+      thirty-two presets, and this local shadowed it well enough that an
+      audit for unread settings counted `p.surfaceTension` as its reads and
+      called it live. It was not: nothing ever read the setting, and the
+      presets' comments for it describe what `blobSurfaceTension` does. The
+      setting is gone; the name goes with it so the next audit cannot be
+      told the same lie.
+    */
+    const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
 
     let smearX = 0, smearY = 0;
     if (settings.glassSmear > 0.2) {
@@ -3817,7 +3811,7 @@ class FluidSimulation {
         there is nothing to tune it against, so it is not a slider yet.
       */
       bubbleClear: 1,
-      diff,
+      diff: settings.diffusionRate,
       buoyancy: settings.buoyancy,
       gravity: (settings.centerGravity || 0) * 0.05,
       tiltX: this.tiltX, tiltY: this.tiltY,
@@ -3831,6 +3825,7 @@ class FluidSimulation {
       // three-quarters of the way up, short of where a bright rim appears along
       // boundaries and thin dye goes blocky.
       sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
+      damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, immiscibility,
       /*
@@ -3915,6 +3910,7 @@ class FluidSimulation {
       */
       gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
+      platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -3923,7 +3919,7 @@ class FluidSimulation {
       // The lasting current. Damping is its drag per step — the first thing that
       // control has ever visibly done — and the cap keeps a step's travel under
       // ¾ of a cell whatever the Speed and Advection.
-      currentDamp: Math.max(0.8, Math.min(0.995, 0.99)),
+      currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
       rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
       rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
@@ -4446,12 +4442,6 @@ interface FrameView {
   /** The lead plate's dye travel, which the closeup's cells slide and breathe on. */
   cellClock: number;
 
-  /** Audio features passed to the GPU for true synesthesia color and fluid physics mapping. */
-  audio: {
-    pitchClass: number;
-    brightness: number;
-    beatPhase: number;
-  };
   // What the show worked out this frame and the renderer only spends.
   /** Where each plate has turned to. */
   rotations: number[];
@@ -6513,14 +6503,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const t = magnetWalkRef.current;
           mx = (look.magnetX ?? 0.5) + 0.34 * walk * Math.sin(t * 0.9);
           my = (look.magnetY ?? 0.5) + 0.28 * walk * Math.sin(t * 1.3 + 1.1);
-
-          // Audio-Reactive Ferrofluid (Rosensweig Instability spikes)
-          if (ms > 0 && isActiveRef.current && currentAudioData) {
-            const energy = Math.min(1, currentAudioData.energy);
-            const env = mazeKickRef.current.env ?? 0;
-            // The magnetic field pulses violently with the kick and energy, causing spikes to jump
-            ms = Math.min(1.0, ms * (0.4 + 0.4 * energy + 0.8 * env));
-          }
         }
         /*
           The magnet's size (Magnet Size, lib/magnetSize.ts): held or set
@@ -6661,7 +6643,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // Dynamic speed — settings only, never audio energy (prevents clock-driven jumps)
         let dynamicSpeed = 0.05;
-        dynamicSpeed += 0.4 * 0.02;
+        dynamicSpeed += currentSettings.platePressure * 0.02;
         dynamicSpeed += currentSettings.airVelocity * 0.01;
         dynamicSpeed += currentSettings.automateRate * 0.01;
         let speedMultiplier = currentSettings.globalSpeed / 0.05;
@@ -7427,31 +7409,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // the dye spreads out in a ring, the rhythm plate worked by hand.
                 const fg = currentSettings.fingering ?? 0;
                 const pa = 0.004 * k;
-                const prR = 30;
-                af.applySquish(x, y, prR, pa, fg, true);
+                af.applySquish(x, y, 30, pa, fg, true);
                 af.applySquish(x, y, 18, pa, fg);
                 af.applySquish(x, y, 8, pa, fg);
                 // And the liquid goes where a squeezed film sends it.
-                af.squeezeOut(x, y, prR * GRID_SCALE, pa);
-
-                // The Photoscope (European School): Shearing/Twisting!
-                // Twisting one slide against another tears the film into cellular structures.
-                // We add a strong rotational velocity field within the press radius.
-                const twistR = prR * GRID_SCALE;
-                const twistAmount = 40.0 * pa * kSoft;
-                for (let ddy = -twistR; ddy <= twistR; ddy++) {
-                  for (let ddx = -twistR; ddx <= twistR; ddx++) {
-                    const dd = Math.sqrt(ddx*ddx + ddy*ddy);
-                    if (dd > twistR || dd < 0.1) continue;
-                    const px = Math.floor(x + ddx);
-                    const py = Math.floor(y + ddy);
-                    if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
-                    // Rotational velocity: (-dy, dx) normalized, stronger towards the center
-                    const w = Math.pow(1 - dd/twistR, 2) * twistAmount;
-                    af.addVelocity(px, py, -(ddy / dd) * w, (ddx / dd) * w);
-                  }
-                }
-                
+                af.squeezeOut(x, y, 30 * GRID_SCALE, pa);
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
@@ -7543,24 +7505,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 10 * GRID_SCALE, 0.25);
 
               } else if (tool === 'spray') {
-                // Spray paint: soft continuous gaussian-like spray with noise
-                const sprayR = Math.round(16 * GRID_SCALE * kSoft);
+                // Wide cone of fine mist — many small random particles in a radius
+                const sprayR = 10 * GRID_SCALE * kSoft;
                 const tint = bottleDye(liq) * poured.dose;
-                for (let ddy = -sprayR; ddy <= sprayR; ddy++) {
-                  for (let ddx = -sprayR; ddx <= sprayR; ddx++) {
-                    const dd = Math.sqrt(ddx*ddx + ddy*ddy);
-                    if (dd > sprayR) continue;
-                    const px = Math.floor(x + ddx);
-                    const py = Math.floor(y + ddy);
-                    if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
-                    const noise = DICE.hands.float();
-                    if (noise > 0.4) continue; // stippling effect
-                    const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * k * (1 - noise);
-                    af.addDensity(px, py, w * tint, rgb.r, rgb.g, rgb.b);
-                    if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
-                  }
+                for (let p = 0; p < 12; p++) {
+                  const angle = DICE.hands.angle();
+                  const dist = DICE.hands.float() * sprayR;
+                  const px = Math.floor(x + Math.cos(angle) * dist);
+                  const py = Math.floor(y + Math.sin(angle) * dist);
+                  if (px < 1 || px >= GRID_SIZE - 1 || py < 1 || py >= GRID_SIZE - 1) continue;
+                  const w = (1 - dist / sprayR) * 0.4 * k;
+                  af.addDensity(px, py, w * tint, rgb.r, rgb.g, rgb.b);
+                  if (heat > 0) af.addTemp(px, py, heat * w * 0.3);
+                  // The liquid too, at the first point of the mist a step: one
+                  // deposit a step, as a held Dropper makes (see layBottle).
+                  if (p === 0) layBottle(af, px, py, bottleReach(liq, 1.5 * GRID_SCALE), liq, 1 - dist / sprayR);
                 }
-                layBottle(af, x, y, bottleReach(liq, 4 * GRID_SCALE), liq, 0.5);
 
               } else if (tool === 'splatter') {
                 // Fling droplets outward from cursor — random sizes, random directions
@@ -8107,14 +8067,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               const impact = currentSettings.audioImpact ?? 0.45;
               if (impact > 0.01 && currentAudioData.volume > 3) {
-                // True Synesthesia: Map the musical key (pitchClass 0-11) directly to the harmony's color cycle!
-                const pitchClass = currentAudioData?.features?.pitchClass ?? 0;
-                // Normalize pitchClass (0-11) to a full circle (0 - 2PI)
-                const pitchAngle = (pitchClass / 12.0) * Math.PI * 2;
-                
                 // Each audio feature carries a different color from the harmony,
-                // offset by the true musical pitch so chords paint distinct colors!
-                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.1 + pitchAngle + colorMod * Math.PI + off);
+                // so bass, mids and swells paint distinguishable hues.
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.3 + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -8722,7 +8677,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const motor = lookMotor(motorRate, motorWay, musicSpeed, dirMod);
             const bed = (currentSettings.viscosity === 'thin' ? 0.8 : 1.7)
-              * (1 + (0.4) * 0.8);
+              * (1 + (patch.layer(l).platePressure ?? 0) * 0.8);
             /*
               The range was measured and widened. At (0.15 + drag*3) a flicked
               plate lost three-quarters of its speed in 2s at the slowest
@@ -9166,13 +9121,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           filmGain: filmGainRef.current,
           mark: markRef.current,
           film: filmRef.current,
-          audio: { 
-            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0, 
-            brightness: audioDataRef.current?.features?.brightness ?? 0, 
-            beatPhase: beatClockRef.current?.period > 0 
-                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
-                : 0 
-          },
           beadMask,
           outputCfg: rendering ? DEFAULT_OUTPUT : outputCfgRef.current,
           postForce: postForceRef.current,
@@ -10010,7 +9958,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       with compiles while the starting frame is up and the first step finds
       it waiting; the rest compiles behind the show.
     */
-    void WebGPUStage.start(canvas).then(async (s) => { 
+    void WebGPUStage.start(canvas).then(async (s) => {
       if (cancelled || isGpuFailure(s)) return s;
       // `?prepare=0` opens the show the old way, every pipeline built on the
       // frame that first needs it: `npm run startup`'s control, so a run
@@ -10065,7 +10013,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         setGpuFailure(s);
         return;
       }
-      console.error("stage = s!"); stage = s;
+      stage = s;
       const bornAt = performance.now();
       /*
         A device that has held for five seconds is a recovery that worked, and
@@ -10148,7 +10096,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         camera = null;
         projector = null;
         probe = null;
-        console.error("stage = null at line " + "line"); stage = null;
+        stage = null;
         flashRef.current.reset();
         flashGainRef.current = 1;
         glLostRef.current = true;
@@ -10192,7 +10140,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
         maxTexture: s.device.limits.maxTextureDimension2D,
         resize: () => { size(); },
-        
         attachSolver(fluid, wantRes) {
           if (wantRes <= 0) {
             if (fluid.gpu) fluid.detachGpu(false);
@@ -11187,8 +11134,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       chain = null;
       platePass?.dispose();
       platePass = null;
-      console.error("DISPOSING STAGE! glEpoch=", "glEpoch=", glEpoch, "noise=", !!noise2D); stage?.dispose();
-      console.error("stage = null at line " + "line"); stage = null;
+      stage?.dispose();
+      stage = null;
     };
     /*
       What legitimately rebuilds the GL context, and nothing else.

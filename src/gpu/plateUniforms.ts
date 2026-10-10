@@ -88,8 +88,6 @@ export interface PlateView {
     kind: 'none' | 'file' | 'camera' | 'window';
     video: { readyState: number; videoWidth: number; videoHeight: number } | null;
   };
-  /** Audio features passed from the frame clock. */
-  audio: { pitchClass: number; brightness: number; beatPhase: number; };
 }
 
 /**
@@ -300,6 +298,11 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     const lamp = view.lamp;
     pack.set('lamp', lamp.x, lamp.y, 0.55, clamp01(s.lampHotspot ?? 0));
     pack.set('lamp2', lamp.x2, lamp.y2, 0.45, clamp01(s.secondLamp ?? 0));
+    const mags = new Array<number>(16).fill(0);
+    (view.magnets ?? []).slice(0, 4).forEach((m, k) => {
+      mags[k * 4] = m.x; mags[k * 4 + 1] = m.y; mags[k * 4 + 2] = Math.max(0.02, m.height); mags[k * 4 + 3] = Math.max(0, m.strength);
+    });
+    pack.set('magnets', ...mags);
     pack.set('lightPlay', clamp01(s.lightPlay ?? 0));
     pack.set('iridescence', clamp01(s.iridescence ?? 0));
   }
@@ -362,7 +365,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('bubbleCount', Math.min(40, bubbles.count));
     pack.set('bubbleStrength', bubbles.strength);
   }
-  pack.set('postBlur', 0.35);
+  pack.set('postBlur', s.postBlurRadius ?? 0.35);
   // Sampling math follows the texture actually bound; the tuned look
   // (normals, edge lines, macro cells) stays on the logical 192 grid.
   pack.set('gridSize', ctx.grid ?? fluids[0]?.gpu?.N ?? logicalGrid);
@@ -382,16 +385,6 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('cellClock', view.cellClock);
   pack.set('filmLevel', view.filmLevel);
   pack.set('filmGain', clamp(view.filmGain, 0.5, 12));
-  
-  if (view.audio) {
-    pack.set('pitchClass', view.audio.pitchClass);
-    pack.set('brightness', view.audio.brightness);
-    pack.set('beatPhase', view.audio.beatPhase);
-  } else {
-    pack.set('pitchClass', 0);
-    pack.set('brightness', 0);
-    pack.set('beatPhase', 0);
-  }
 
   /*
     Dye carried by particles (H1).

@@ -200,7 +200,7 @@ page.on('console', m => {
   if (m.type() !== 'error') return;
   const at = m.location()?.url ?? '';
   if (/Failed to load resource/i.test(m.text()) && /^https?:/.test(at) && !at.startsWith(`http://localhost:${PORT}/`)) return;
-  process.stderr.write(`\n[BROWSER LOG] ${m.text()}\n`); note(m.text());
+  note(m.text());
 });
 page.on('pageerror', e => note(`uncaught: ${e.message}`));
 
@@ -482,8 +482,7 @@ try {
     const read = await page.evaluate(() => window.__cgFrame(32, 18));
     const note = await lastFrameRead(page);
     const lit = read ? read.filter((_, i) => i % 4 === 0).filter((v, i) => Math.max(v, read[i * 4 + 1], read[i * 4 + 2]) > 8).length / (read.length / 4) : 0;
-    console.log("type of __cgGrabWebGpu is", await page.evaluate(() => typeof window.__cgGrabWebGpu));
-  check('the plate can be photographed',
+    check('the plate can be photographed',
       !!read && (note?.scaled ?? 0) > 0.01 && note?.via === 'grabFrame',
       note ? `${note.via}${note.size ? ` ${note.size[0]}×${note.size[1]}` : ''}, ` +
         `${note.lit !== undefined ? `${(note.lit * 100).toFixed(0)}% lit, ` : ''}` +

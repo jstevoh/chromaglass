@@ -345,7 +345,7 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
-  var rawAlpha = raw.a; // we assume rawB.a is identical
+  var rawAlpha = raw.a;
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
 
   let totalDensity = decodeDensity(rawAlpha);
@@ -407,13 +407,13 @@ fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
 fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
-  let cC = decodeFluid(t, fuv, f32(0.0), false);
+  let cC = decodeFluid(t, fuv, 0.0, false);
   if (cC.a < 0.03) { return 0.0; }
   let e = (3.0 / U.logicalGrid) * 0.55;
-  let cR = decodeFluid(t, fuv + vec2f(e, 0.0), f32(0.0), false);
-  let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), f32(0.0), false);
-  let cT = decodeFluid(t, fuv + vec2f(0.0, e), f32(0.0), false);
-  let cB = decodeFluid(t, fuv + vec2f(0.0, -e), f32(0.0), false);
+  let cR = decodeFluid(t, fuv + vec2f(e, 0.0), 0.0, false);
+  let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
+  let cT = decodeFluid(t, fuv + vec2f(0.0, e), 0.0, false);
+  let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
   let maskX = min(cR.a, cL.a);
   let maskY = min(cT.a, cB.a);
   let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
@@ -929,16 +929,11 @@ fn macroWarpOffset(fuv: vec2f) -> vec2f {
   if (U.macroEdge < 0.005) { return vec2f(0.0); }
   let f = U.logicalGrid * 0.85;
   let t = vec2f(U.time * 0.012, U.time * -0.009);
-  var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
-  w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
-  
-  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat
-  let beatPulse = sin(U.beatPhase * 3.14159265);
-  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.4);
-  
+  var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - 0.5;
+  w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
   // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
   // plate-wide frame is noise, and on a bead it is the silhouette.
-  return w * (pulseEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / U.logicalGrid);
+  return w * (U.macroEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / U.logicalGrid);
 }
 
 fn macroWarp(fuv: vec2f) -> vec2f { return fuv + macroWarpOffset(fuv); }
@@ -979,7 +974,9 @@ fn decodeFluidRaw(raw: vec4f) -> vec4f {
 fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32) -> vec4f {
   if (dof < 0.02) { return decodeFluid(t, fuv, blurFluid, useBlur); }
   let r = dof * 0.022 / (1.5 * U.camZoom);
-  let raw = (tex2(t, fuv) + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0)) + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
+  let raw = (tex2(t, fuv)
+           + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0))
+           + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
   return decodeFluidRaw(raw);
 }
 
@@ -1276,7 +1273,7 @@ fn blendRow(c: vec3f, s: vec3f, a: f32, mode: i32) -> vec3f { return blendRowKey
 */
 fn markLayer(color: vec3f, uvScreen: vec2f, level: f32, markTex: texture_2d<f32>) -> vec3f {
   if (level <= 0.001) { return color; }
-  let m = (uvScreen - U.markRect.xy) / max(U.markRect.zw, vec2f(1e-4)) * 0.5 + vec2f(0.5);
+  let m = (uvScreen - U.markRect.xy) / max(U.markRect.zw, vec2f(1e-4)) * 0.5 + 0.5;
   if (m.x > 0.0 && m.x < 1.0 && m.y > 0.0 && m.y < 1.0) {
     let mark = tex2(markTex, vec2f(m.x, 1.0 - m.y));
     return blendRow(color, gradeMix(mark.rgb, U.markGrade), mark.a * level, mixBlendOf(U.markBlend));
@@ -1665,7 +1662,6 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   var raw: vec4f;
   if (dof < 0.02) {
     raw = textureBicubic(t, fuv);
-
     if (useBlur) { raw.a = blurAlpha(t, fuv, blurFluid); }
   } else {
     let r = dof * 0.022 / (1.5 * U.camZoom);
@@ -2101,14 +2097,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let wedge = 6.28318530718 / U.kaleido;
     var a = modf2(ang, wedge);
     if (a > wedge * 0.5) { a = wedge - a; }
-    
-    // BPM-Synced LFOs: Smoothly pulse the kaleidoscope rotation and zoom with the beat phase!
-    let beatPulse = sin(U.beatPhase * 3.14159265);
-    a += U.kaleidoPhase + (beatPulse * wedge * 0.15); // Slight rhythmic rotation
-    
-    let breathingZoom = U.kaleidoZoom * (1.0 - beatPulse * 0.1); // Rhythmic zoom
-    c = vec2f(cos(a), sin(a)) * rad * breathingZoom;
-    uv = clamp(c / vec2f(aspect, 1.0) + vec2f(0.5), vec2f(0.001), vec2f(0.999));
+    a += U.kaleidoPhase;
+    c = vec2f(cos(a), sin(a)) * rad * U.kaleidoZoom;
+    uv = clamp(c / vec2f(aspect, 1.0) + 0.5, vec2f(0.001), vec2f(0.999));
   }
 
   var dof = 0.0;
@@ -2683,14 +2674,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
       outColor = chemOnGround(outColor, mix(outColor, col, U.bzShow * 0.85), col, U.bzShow * 0.85);
-    }
-    // Turing Print: chemistry as a stark, opaque precipitate (black on white)
-    if (U.chemistry > 0.001 && (view.bzu > 0.0005 || view.bz > 0.0005)) {
-      // activator (bzu) creates stark black precipitate
-      let chemVal = smoothstep(0.2, 0.6, view.bzu);
-      let precipitate = vec3f(0.05, 0.05, 0.08); // stark black
-      let w = chemVal * clamp(U.chemistry, 0.0, 1.0) * 0.95;
-      outColor = chemOnGround(outColor, mix(outColor, precipitate, w), precipitate, w);
     }
     // Liesegang's precipitate: brick-red bands (silver chromate) in the gel.
     if (U.liesShow > 0.001) {
@@ -3282,7 +3265,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.finishInMain == 1) { result.color = finishFrame(outColor, uvScreen, fragGl, markTex); }
   else if (U.finishInMain == 2) { result.color = ditherOut(outColor, fragGl); }
   else { result.color = vec4f(outColor, 1.0); }
-  result.aux = vec4f(clamp(auxN, vec2f(-1.0), vec2f(1.0)) * 0.5 + vec2f(0.5), auxH, auxB);
+  result.aux = vec4f(clamp(auxN, vec2f(-1.0), vec2f(1.0)) * 0.5 + 0.5, auxH, auxB);
   return result;
 }
 `;

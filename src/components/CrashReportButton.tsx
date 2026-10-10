@@ -48,8 +48,6 @@ export function CrashReportButton({ floating = false }: {
 
   useEffect(() => crashLog.subscribe((e) => {
     if (e.level !== 'fatal') return;
-    console.error("FATAL ERROR CAUGHT BY CRASH CHIP:", e.msg);
-
     setFatal(e);
     setChip(true);
   }), []);

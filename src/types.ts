@@ -372,6 +372,7 @@ export interface VisualizerSettings {
   audioMappings: AudioMappings;
   
   // Squish Plate
+  platePressure: number;
   /*
     The two glasses, and how they sit together (2026-09-21).
 
@@ -386,7 +387,6 @@ export interface VisualizerSettings {
     most of why pressing did not feel like much.
   */
   plateCurve: number;
-  depthDrag: number;
   plateSpring: number;
   /*
     How hard the gap resists the flow through it (F).
@@ -420,6 +420,7 @@ export interface VisualizerSettings {
     leave off, because `plateCurve` is zero in all thirty-two presets and the
     dome is opt-in regardless. Turn it up with the plate shape.
   */
+  depthDrag: number;
   /*
     The plate as a Hele-Shaw cell (PLAN §18a, src/gpu/wgsl/thinGap.ts).
 
@@ -560,6 +561,7 @@ export interface VisualizerSettings {
   
   // Manual/Interaction
   airVelocity: number;
+  vibrationFrequency: number;
   dropHeight?: number;        // how far a dropped liquid falls: 0 lays it on the plate, 1 splashes
   
   // Mixer
@@ -636,6 +638,7 @@ export interface VisualizerSettings {
   diffusionRate: number;
   buoyancy: number;
   advection: number;
+  damping: number;
   heatDecay: number;
 
   /** Constant directional pull on heavy dye (0-1), simulating a steady tilt or wind for comet effects. */
@@ -684,6 +687,7 @@ export interface VisualizerSettings {
   // Light Show Look (rendering)
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
+  blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
   boundaryContrast: number;   // bright edge-line strength where two dye colors meet
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
@@ -828,6 +832,7 @@ export interface VisualizerSettings {
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
   glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
+  postBlurRadius: number;     // final gooey blur radius multiplier
 
   // Macro Closeup — magnified camera that chases a single bead of liquid
   macroMode: boolean;         // enable the tracking macro camera + micro-detail pass
@@ -910,6 +915,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     color: 'treble',
     rotation: 'none',
   },
+  platePressure: 0.4,       // glass plate squeeze — drives radial spreading
   /*
     Flat, which is what it was before this existed.
 
@@ -959,6 +965,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   polarity: 0.5,            // moderate immiscibility — colors stay distinct at boundaries
   evaporationRate: 0.003,   // very slow evaporation — colors persist
   airVelocity: 0.0,
+  vibrationFrequency: 0.0,
   dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
@@ -1004,6 +1011,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   diffusionRate: 0.0002,    // moderate diffusion — blobs spread naturally
   buoyancy: 0.45,
   advection: 0.45,
+  damping: 0.97,
   heatDecay: 0.98,
   cometSpeed: 0.0,
   cometAngle: 0.0,
@@ -1017,6 +1025,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   audioImpact: 0.6,
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
+  blobSurfaceTension: 0.3,  // colours hold apart loosely
   boundaryContrast: 0.45,   // bright interface line between dye colors
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
@@ -1101,6 +1110,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   ledFade: 2, gelFade: 2, lumiaFade: 2, frontFade: 2, backFade: 2, filmFade: 2, markFade: 2,
   exposure: 0,
   glossiness: 0.0,          // flat, evenly-lit matte dye — no glass-sphere highlights
+  postBlurRadius: 0.35,     // much lower than legacy blur — keeps fine structure
   macroMode: false,         // off by default — the plate-wide light show is the base look
   // 1 is the whole plate, and the zoom is what takes you in: the camera picks
   // a bead somewhere past 1 and the closeup's own exposure, depth of field and
