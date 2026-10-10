@@ -258,6 +258,8 @@ export interface PhoneStageProps {
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void };
   onHide: () => void;
   onFullLayout: () => void;
+  /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
+  onPlayScreen?: () => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -994,6 +996,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
+            {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
@@ -1001,6 +1004,7 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
+            {p.onPlayScreen && ' Play screen is the simple one: the plate, the dyes and three hands.'}
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
           </PanelGuard>

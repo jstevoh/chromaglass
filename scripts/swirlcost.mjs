@@ -172,7 +172,7 @@ try {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     for (const look of LOOKS) {
-      await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${look}${engineQuery()}`, { waitUntil: 'load' });
+      await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${look}&play=0${engineQuery()}`, { waitUntil: 'load' });
       await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && !!window.chromaglassDebug().webgpu?.swirl, null, { timeout: 60_000 });
       // A plate that draws, not one still building its shaders (flick.mjs says why).
       const from = Date.now();

@@ -46,7 +46,8 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { launchChromium } from './chromium.mjs';
 import { coveredControls, legibility } from './layoutProbe.mjs';
-import { wantsPhoneLayout, tiltReading } from '../src/lib/phone.ts';
+import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
+import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
 
 const PORT = Number(process.env.PHONE_PORT ?? 4183);
 const HEADED = process.argv.includes('--head');
@@ -70,6 +71,28 @@ const check = (name, ok, detail = '') => {
   check('?phone gives a laptop the phone layout', wantsPhoneLayout({ ...phone, coarse: false, width: 1440, height: 900, query: '?phone' }));
   check('?phone=0 gives a phone the full one', !wantsPhoneLayout({ ...phone, query: '?phone=0' }));
   check('and "Full layout" does for the visit', !wantsPhoneLayout({ ...phone, sessionOff: true }));
+  check('/play is the phone\'s screen on a laptop', wantsPhoneLayout({ ...phone, coarse: false, width: 1440, height: 900, path: '/play' }));
+  check('and on an iPad', wantsPhoneLayout({ ...phone, width: 820, height: 1180, path: '/play/' }));
+  check('a page that only ends in "play" is not /play', !wantsPhoneLayout({ ...phone, coarse: false, width: 1440, height: 900, path: '/display' }));
+
+  // Which of the phone's two screens (lib/phone.ts phoneScreen).
+  check('a phone opens on Play', phoneScreen({ query: '', path: '/' }) === 'play');
+  check('the full layout, once chosen, is what it opens on', phoneScreen({ query: '', path: '/', stored: 'stage' }) === 'stage');
+  check('and Play again once chosen back', phoneScreen({ query: '', path: '/', stored: 'play' }) === 'play');
+  check('/play is Play whatever was chosen', phoneScreen({ query: '', path: '/play', stored: 'stage' }) === 'play');
+  check('?play=0 is the full layout, ?play is Play', phoneScreen({ query: '?play=0', path: '/play' }) === 'stage' && phoneScreen({ query: '?play', path: '/', stored: 'stage' }) === 'play');
+
+  // Play's hands (lib/playGesture.ts): the hint over the tray, held to its words.
+  const f = (travel, ms) => ({ travel, ms });
+  check('Play: a tap drops', playHand('dropper', 'dropper', [f(2, 120)]) === 'dropper');
+  check('a drag streaks', playHand('dropper', 'dropper', [f(DRAG_PX, 200)]) === 'streak');
+  check('two fingers blow', playHand('dropper', 'dropper', [f(0, 30), f(0, 0)]) === 'blow');
+  check('a still hold presses', playHand('dropper', 'dropper', [f(3, HOLD_MS)]) === 'press' && playHand('dropper', 'dropper', [f(3, HOLD_MS - 50)]) === 'dropper');
+  check('a press that drifts stays a press', playHand('dropper', 'press', [f(60, 900)]) === 'press');
+  check('one of two blowing fingers lifted still blows', playHand('dropper', 'blow', [f(0, 400)]) === 'blow');
+  check('a second finger on a streak blows', playHand('dropper', 'streak', [f(80, 400), f(0, 0)]) === 'blow');
+  check('every finger off is a dropper again', playHand('dropper', 'press', []) === 'dropper');
+  check('Blow or Press on the tray is that hand for every touch', playHand('blow', 'dropper', [f(80, 900)]) === 'blow' && playHand('press', 'dropper', [f(0, 30), f(0, 0)]) === 'press');
 
   const level = { beta: 45, gamma: 0 };
   const at = (beta, gamma, angle = 0) => tiltReading({ beta, gamma }, level, angle);
@@ -112,7 +135,7 @@ process.on('exit', stopServer);
 
 // The plate's resolution changes no layout and the fingers are read in grid
 // cells, so a small canvas costs nothing and saves the software renderer.
-const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;
+const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`;
 const browser = await launchChromium(chromium, { headless: !HEADED });
 
 // Every page error, kept so a check can ask whether one came during its gesture.
@@ -959,6 +982,161 @@ try {
       await tap(page, 'phone-full-layout');
       await page.waitForTimeout(500);
       check('"Full layout" puts the laptop\'s layout up instead', !(await visible(page, 'phone-stage')) && (await visible(page, 'liquid-water')));
+    }
+    await ctx.close();
+  }
+
+  // ── Play: the screen a phone opens on (PhonePlay.tsx) ────────────
+  /*
+    The rest of this file opens the full phone layout with `play=0`; here a
+    phone is opened as a person opens it, with nothing chosen, and must land
+    on Play. The tablet is `/play` on an iPad, which otherwise keeps its full
+    layout (asked above, purely).
+  */
+  const PLAY_URL = URL.replace('&play=0', '');
+  const playPage = async (width, height, path = '/') => {
+    const ctx = await browser.newContext({ viewport: { width, height }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(60_000);
+    page.on('pageerror', (e) => { pageErrors.push(e.message); console.log('  [pageerror]', e.message.slice(0, 200)); });
+    await page.goto(PLAY_URL.replace('/?', `${path}?`), { waitUntil: 'load' });
+    for (let i = 0; i < 40 && !(await page.getByTestId('play-screen').count()) && !(await page.getByTestId('phone-stage').count()); i++) await page.waitForTimeout(250);
+    await page.waitForTimeout(800);
+    return { ctx, page };
+  };
+  for (const [label, w, h, path, tablet] of [['Play, portrait', 390, 844, '/', false], ['Play, landscape', 844, 390, '/', false], ['Play on an iPad', 820, 1180, '/play', true]]) {
+    const { ctx, page } = await playPage(w, h, path);
+    const up = await visible(page, 'play-screen');
+    check(`${label} ${w}×${h}: a phone opens on Play`, up && (await page.getByTestId('phone-stage').count()) === 0 && (await page.getByTestId('liquid-water').count()) === 0);
+    if (!up) { await ctx.close(); continue; }
+    await shot(page, `${label.replace(/[ ,]+/g, '-')}-tray`);
+
+    // The tray at the design's sizes: dyes 40 (56 on a tablet), hands 52 (72), the top's targets 48.
+    const dyeBoxes = await page.getByTestId('play-dye').evaluateAll(els => els.map(e => { const r = e.getBoundingClientRect(); return { w: r.width, h: r.height, x: r.x, y: r.y }; }));
+    const handIds = ['play-tool-dropper', 'play-tool-blow', 'play-tool-press', 'play-all-controls'];
+    const hands = await Promise.all(handIds.map(id => box(page, id)));
+    const top = await Promise.all(['play-look', 'play-shuffle'].map(id => box(page, id)));
+    const onScreen = (b) => b && b.x >= 0 && b.y >= 0 && b.x + b.width <= w + 0.5 && b.y + b.height <= h + 0.5;
+    const dyeH = tablet ? 56 : 40, handH = tablet ? 72 : 52;
+    check(`${label}: eight dyes, each ${dyeH} tall and on screen`, dyeBoxes.length === 8 && dyeBoxes.every(b => b.h >= dyeH - 0.5 && b.w >= 30 && b.x >= 0 && b.x + b.w <= w + 0.5 && b.y + b.h <= h + 0.5),
+      dyeBoxes.map(b => `${Math.round(b.w)}×${Math.round(b.h)}`).join(' '));
+    check(`${label}: Drop, Blow, Press and All controls ${handH} tall and on screen`, hands.every(b => onScreen(b) && b.height >= handH - 0.5),
+      hands.map((b, i) => b ? `${handIds[i]} ${Math.round(b.width)}×${Math.round(b.height)}` : `${handIds[i]} missing`).join(', '));
+    check(`${label}: the look and Shuffle are 48 px targets at the top`, top.every(b => onScreen(b) && b.height >= 48 && b.width >= 48),
+      top.map(b => b ? `${Math.round(b.width)}×${Math.round(b.height)}` : 'missing').join(', '));
+    // The plate, not the chrome: the tray and the top's pills, against the screen.
+    const chrome = await page.evaluate(() => ['play-tray', 'play-look', 'play-shuffle', 'play-record', 'play-hint']
+      .map(id => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect()).filter(Boolean)
+      .reduce((a, r) => a + r.width * r.height, 0));
+    const share = 1 - chrome / (w * h);
+    const want = w > h ? 0.5 : 0.7;
+    check(`${label}: ${Math.round(want * 100)}% or more of the screen is the plate with the tray up`, share >= want, `${Math.round(share * 100)}%`);
+    const covered = await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"]' });
+    check(`${label}: nothing covers a control`, covered.length === 0, covered.slice(0, 4).join('; '));
+    const leg = await legibility(page);
+    check(`${label}: nothing is too small or faint to read`, leg.tiny.length === 0 && leg.small.length === 0 && leg.faint.length === 0,
+      [...leg.tiny, ...leg.small, ...leg.faint].slice(0, 5).join(', '));
+
+    // A dye picked is the bottle's colour: read back from the app, through the ring.
+    const dyes = page.getByTestId('play-dye');
+    await dyes.nth(5).tap(); await page.waitForTimeout(250);
+    const picked = await dyes.evaluateAll(els => els.findIndex(e => e.getAttribute('aria-checked') === 'true'));
+    check(`${label}: a dye tapped is the dye the plate pours`, picked === 5, `ring on dye ${picked}`);
+    await tap(page, 'play-tool-blow');
+    check(`${label}: a hand tapped is the one picked`, (await page.getByTestId('play-tool-blow').getAttribute('aria-pressed')) === 'true'
+      && (await page.getByTestId('play-tool-dropper').getAttribute('aria-pressed')) === 'false');
+    await tap(page, 'play-tool-dropper');
+
+    if (label === 'Play, portrait') {
+      check('Play: the gesture hint is over the tray on a first visit', await visible(page, 'play-hint'));
+      // The sheet: from the handle, six sliders in 44 rows, the looks, the two chips, the three buttons.
+      await tap(page, 'play-handle');
+      const sheetUp = await visible(page, 'play-sheet');
+      check('Play: the handle brings the sheet up, and the tray goes', sheetUp && !(await visible(page, 'play-tray')));
+      await shot(page, 'Play-portrait-sheet');
+      const sliders = ['speed', 'turbulence', 'swirl', 'soap', 'zoom', 'evolve'].map(k => `play-slider-${k}`);
+      const sb = await Promise.all(sliders.map(id => box(page, id)));
+      check('Play: six sliders, each a 44 row on screen', sb.every(b => onScreen(b) && b.height >= 43.5), sb.map((b, i) => b ? `${sliders[i]} ${Math.round(b.height)}` : `${sliders[i]} missing`).join(', '));
+      const rest = ['play-looks', 'play-follow', 'play-wander', 'play-sheet-shuffle', 'play-clear', 'play-share', 'play-save'];
+      const rb = await Promise.all(rest.map(id => box(page, id)));
+      check('Play: the looks, the two chips, the three buttons and Save are on screen without a scroll', rb.every(b => onScreen(b)),
+        rb.map((b, i) => (onScreen(b) ? null : rest[i])).filter(Boolean).join(', ') || `${rest.length} of them`);
+      const sCovered = await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"]' });
+      check('Play: nothing covers a control on the sheet', sCovered.length === 0, sCovered.slice(0, 4).join('; '));
+      // A slider moves the setting it names: the value printed is the app's.
+      const speedText = () => page.getByTestId('play-slider-speed').locator('span').last().textContent();
+      const before = await speedText();
+      const track = await page.getByTestId('play-slider-speed').locator('input').boundingBox();
+      await page.touchscreen.tap(track.x + track.width * 0.9, track.y + track.height / 2);
+      await page.waitForTimeout(300);
+      const after = await speedText();
+      check('Play: Speed moved is the plate\'s speed', before !== after && Number(after) > Number(before), `${before} → ${after}`);
+      check('Play: and the look is marked edited', await visible(page, 'play-edited'));
+      // A look from the strip comes in, named on the pill.
+      // One that is not up already, or the pill would read right with nothing done.
+      const other = page.locator('[data-testid="play-look-tile"][aria-pressed="false"]').nth(1);
+      const name = (await other.locator('span').last().textContent())?.trim();
+      await other.tap(); await page.waitForTimeout(2500);
+      const pill = (await page.getByTestId('play-look').textContent())?.trim();
+      check('Play: a look tapped in the strip is the look up', !!name && pill?.startsWith(name), `${name} / ${pill}`);
+      const w0 = await page.getByTestId('play-wander').getAttribute('aria-pressed');
+      await tap(page, 'play-wander');
+      check('Play: Wander on its own turns Evolve on and off', (await page.getByTestId('play-wander').getAttribute('aria-pressed')) !== w0);
+      await tap(page, 'play-handle');
+      check('Play: and the handle puts the sheet away', !(await visible(page, 'play-sheet')) && (await visible(page, 'play-tray')));
+
+      // All controls, and back, remembered on the phone.
+      await tap(page, 'play-all-controls');
+      check('Play: All controls is the full phone layout', (await visible(page, 'phone-stage')) && !(await visible(page, 'play-screen')));
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForTimeout(1500);
+      check('and it is what the phone opens on next', await visible(page, 'phone-stage'));
+      await tap(page, 'phone-open-more');
+      await tap(page, 'phone-play-screen');
+      check('and its More sheet brings Play back', await visible(page, 'play-screen'));
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForTimeout(1500);
+      check('which is then what it opens on', await visible(page, 'play-screen'));
+
+      /*
+        The touch picks the hand (lib/playGesture.ts), read from the tool the
+        plate's loop holds, so it needs the plate running: as the fingers
+        below, not asked where there is no WebGPU.
+      */
+      const running = await page.evaluate(() => !document.querySelector('[data-testid="needs-webgpu"]') && typeof window.chromaglassDebug?.()?.tool === 'function');
+      if (!running) {
+        if (NEED_GPU) check('Play: the plate runs, so its hands can be asked about', false, 'no WebGPU here, and PHONE_GPU asked for it');
+        else console.log(' --   the plate has no WebGPU here: Play\'s hands are not asked (PHONE_GPU=1 on the Mac shard asks them)');
+      } else {
+        const cdp = await ctx.newCDPSession(page);
+        const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
+        const tool = () => page.evaluate(() => window.chromaglassDebug().tool());
+        const A = { x: 150, y: 360 }, B = { x: 250, y: 420 };
+        await touch('touchStart', [A]); await page.waitForTimeout(150);
+        const tapTool = await tool();
+        await page.waitForTimeout(HOLD_MS + 250);
+        const holdTool = await tool();
+        await touch('touchEnd', []); await page.waitForTimeout(150);
+        const restTool = await tool();
+        check('Play: a finger down drops, held still it presses, and lifted it is a dropper again',
+          tapTool === 'dropper' && holdTool === 'press' && restTool === 'dropper', `${tapTool} → ${holdTool} → ${restTool}`);
+        await touch('touchStart', [A]); await page.waitForTimeout(60);
+        for (let i = 1; i <= 6; i++) { await touch('touchMove', [{ x: A.x + i * 10, y: A.y }]); await page.waitForTimeout(30); }
+        const dragTool = await tool();
+        await touch('touchEnd', []); await page.waitForTimeout(150);
+        check('Play: a drag streaks', dragTool === 'streak', dragTool);
+        await touch('touchStart', [A, { ...B, id: 1 }]); await page.waitForTimeout(150);
+        const twoTool = await tool();
+        await touch('touchEnd', []); await page.waitForTimeout(150);
+        check('Play: two fingers blow', twoTool === 'blow', twoTool);
+        await tap(page, 'play-tool-press');
+        await touch('touchStart', [A]); await page.waitForTimeout(60);
+        for (let i = 1; i <= 6; i++) { await touch('touchMove', [{ x: A.x + i * 10, y: A.y }]); await page.waitForTimeout(30); }
+        const pressDrag = await tool();
+        await touch('touchEnd', []); await page.waitForTimeout(150);
+        check('Play: with Press on the tray a drag is still a press', pressDrag === 'press', pressDrag);
+        await tap(page, 'play-tool-dropper');
+      }
     }
     await ctx.close();
   }

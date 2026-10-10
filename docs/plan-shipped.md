@@ -1096,6 +1096,38 @@ one list kept both, and a stored array read as an empty layout). `panel` 180/180
 `desk`, `saves` 33/33, `phone` 292/292, `remotemix`, `rowfade`, `backplate`, `intro`
 12/12 unchanged in what they assert.
 
+#### 8-play. Play: the phone's listening screen (2026-10-10)
+
+`src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`
+(new); `src/lib/phone.ts` (`phoneScreen`, `/play`), `PhoneStage.tsx` (Play screen in More),
+`App.tsx`. Check: `npm run phone`'s Play part.
+
+Desk v2 shipped with the phone unchanged, and the owner asked for the phone and tablet
+versions. The design's screens 3a and 3b are Play, "a standalone phone app for casual use",
+for the buyers the owner wants beside the VJs: someone with a record on at home. The phone
+layout before it (PhoneStage, #173) is a performer's, sixteen buttons in a performer's words.
+So a phone now opens on Play: the plate edge to edge, the look's name with Shuffle and
+Record over it, and a glass tray of eight dyes and Drop, Blow and Press. The tray's handle
+pulls up the sheet: Speed, Turbulence, Swirl, Soap, Zoom and Evolve as touch sliders (44
+rows, the desk's travel and Speed's curve), the looks as tiles to swipe, Follow the music
+(the microphone, with Sound Drive brought to the middle on a look that has none, 8-play-d)
+and Wander on its own (Evolve), then Shuffle, Clear plate and Share clip (the phone's share
+sheet with the take as a file, or a download). Save is at the top while the sheet is up.
+All controls on the tray is the full phone layout; Play screen in its More sheet comes
+back, and the choice is kept on the phone. `/play` is Play on anything, which is how an iPad
+gets it, at the design system's iPad sizes (dyes 56, hands 72); `?play=0` is the full layout,
+which the checks written against it now open.
+
+With Drop on the tray the touch picks its own hand, as the hint over the tray says on the
+first three visits: a tap drops, a drag streaks, two fingers blow, a still hold (450 ms)
+presses. Each is a tool the plate already has with its own physics; the reading only picks
+which, and a touch keeps the hand it became until every finger is off.
+
+Measured: `npm run phone` 292 → 350 (all green in a cloud session; the hands' four, read
+from the tool the plate's loop holds, need the plate and run under `PW_WEBGPU=1` and on the
+Mac shard). `layout` 58/58, `applink` 48/48 (Play here now lands on Play, and the Laptop
+remote is reached through All controls, 8-play-a), `saves` 33/33.
+
 ### 9. Ferrofluid after the references
 
 **9a. The edge, and two looks, shipped in #161.** The ferrofluid ends on a sharp,

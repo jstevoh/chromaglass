@@ -41,7 +41,7 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
 3. **New UI Implementation:** Implement the new UI layer as specified by the owner, ensuring it correctly binds to `LiquidVisualizer.tsx` without disrupting the WebGPU context.
-   *Desk v2 (the owner's design, 2026-10-10) shipped as §8-v2: one desk, three layouts. Next: §8-play, then §8-draw, each a thread.*
+   *Desk v2 (the owner's design, 2026-10-10) shipped as §8-v2: one desk, three layouts. §8-play (Play, the phone's listening screen) shipped next; §8-draw is in its own thread.*
 
 ---
 
@@ -290,7 +290,10 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - ~~**QA-1** The plate pulses each time a control is pressed or a tool is picked.~~ #277
   live (the microphone heard the click; onsets gated in a gesture's moment).
 - ~~**QA-2** The mouse pointer shows on the show screen.~~ #271 live.
-- **QA-19** Interacting with settings switches to and maximizes the performance window. Desk, wall.
+- ~~**QA-19** Interacting with settings switches to and maximizes the performance window.~~
+  Main's 5b81f3c removed the auto-fill on the next click (`useCastSession.ts`); the
+  open #323 edits the same listener and is superseded (review pass, 2026-10-10).
+  What follows is the report as it was. Desk, wall.
   When the additional window that is used for performances is showing and not maximized,
   interacting with settings to change something automatically switches focus to the
   additional window and maximizes it. The performer needs to be able to use the settings
@@ -951,9 +954,26 @@ panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-
 
 Open from Desk v2, each its own thread (the UI lane):
 
-- **8-play** (M) The Play route of the design (`/play`, the README's second screen): the
-  set list and the rides at a size a hand finds in the dark, for a show run from the
-  laptop with no controller. Its phone version is the PhoneStage it already has.
+- ~~**8-play** (M) Play, the design's screens 3a and 3b: a phone's own screen for
+  someone listening, not performing (the plate edge to edge, eight dyes, Drop · Blow ·
+  Press, six sliders, the looks, Follow the music, Share clip). A phone opens on it;
+  `/play` is it on an iPad or a laptop~~ (shipped; story in `docs/plan-shipped.md` §8;
+  check `npm run phone`'s Play part).
+- **8-play-a** (S) The iPhone app's Laptop remote from Play. Play here lands on Play,
+  and the way back to the remote is All controls › More › Laptop remote, two taps
+  deeper than it was. Draw (8-draw) is the remote's new face; once it ships, Play's
+  tray gains a "Draw on the wall" entry in the app only. *Measure:* `npm run applink`
+  from Play.
+- **8-play-b** (S) Play's looks strip draws each look as its two-colour swatch, as the
+  cue lists do; the design's tiles are pictures of the look. The proposal below
+  (pictures, not swatches) gives Play the most, since the strip is all it has.
+- **8-play-c** (S) Play keeps the app's settings, not its own. The design's README has
+  Play keep "its own `VisualizerSettings`", which only matters once the same browser is
+  also a desk; today a phone is one or the other. Revisit with 8b's offline Preview.
+- **8-play-d** (S) Follow the music brings a look's Sound Drive to 0.5 when the look
+  has none, so the chip never reads on and does nothing. A look built to ignore sound
+  (a still photograph) then moves with it; whether such looks should say so on the chip
+  instead is the owner's call on a phone.
 - **8-draw** (M) Draw: the phone or iPad as a full drawing pad over the plate (the
   design's third screen), every tool and the dye under the finger. It goes through
   `performGesture` like every other hand; the phone's own Draw sheet is the same screen.

@@ -51,7 +51,7 @@ await new Promise((resolve, reject) => {
 const stopServer = () => { try { process.kill(-server.pid, 'SIGTERM'); } catch { server.kill('SIGTERM'); } };
 process.on('exit', stopServer);
 
-const URL = `http://localhost:${PORT}/?look=classic&dpr=0.35`;
+const URL = `http://localhost:${PORT}/?look=classic&dpr=0.35&play=0`;
 const browser = await launchChromium(chromium, { headless: !HEADED });
 
 const pageErrors = [];

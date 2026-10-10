@@ -36,15 +36,59 @@ export function wantsPhoneLayout(env: {
   width: number;
   height: number;
   sessionOff?: boolean;
+  /** The page's path: `/play` is the Play screen on whatever opened it. */
+  path?: string;
 }): boolean {
   const q = new URLSearchParams(env.query);
   if (q.has('phone')) return q.get('phone') !== '0' && q.get('phone') !== 'false';
+  if (env.path && isPlayPath(env.path)) return true;
   if (env.sessionOff) return false;
   return env.coarse && Math.min(env.width, env.height) < PHONE_SHORT_SIDE;
 }
 
 /** The session flag "Full layout" sets. */
 export const PHONE_OFF_KEY = 'chromaglass-phone-off';
+
+/**
+ * Which of the phone's two screens: Play, or every control.
+ *
+ * The phone layout (PhoneStage) was built so "you can use all modes": ten
+ * tools, six sheets, the mixer, the sequencer, the bottles. That is a
+ * performer's phone. The owner wants people who are not performers too,
+ * someone with a stereo who wants the plate going while they listen, and to
+ * them the first screen was a wall of sixteen buttons in jargon (Splat,
+ * Streak, Magnet, Mix). Desk v2's design (the owner's, 2026-10-10, screens
+ * 3a and 3b) answers that with Play: the plate edge to edge, eight dyes and
+ * three hands under the thumb, six sliders, the looks and a clip to share a
+ * swipe up, and nothing else.
+ *
+ * So a phone opens on Play, and "All controls" on its tray opens the full
+ * phone layout, remembered on this phone (not for the visit only, as Full
+ * layout is: someone who went for every control will want them next time,
+ * and Play's own button in the More sheet brings Play back the same way).
+ * `/play` is Play on anything, a laptop or an iPad included, which is how a
+ * tablet gets it: an iPad keeps the full layout it is laid out for, and
+ * someone who wants the listening screen there opens `/play`. `?play=0`
+ * and `?play` force the choice (the harness: the checks written against the
+ * full phone layout open it with `play=0`).
+ */
+export type PhoneScreen = 'play' | 'stage';
+
+/** Where the phone's choice of screen is kept, on this phone. */
+export const PHONE_SCREEN_KEY = 'chromaglass-phone-screen';
+
+/** `/play`, with or without a trailing slash, under whatever base the site is served from. */
+export function isPlayPath(path: string): boolean {
+  return /(^|\/)play\/?$/.test(path);
+}
+
+export function phoneScreen(env: { query: string; path: string; stored?: string | null }): PhoneScreen {
+  const q = new URLSearchParams(env.query);
+  if (q.has('play')) return q.get('play') === '0' || q.get('play') === 'false' ? 'stage' : 'play';
+  if (isPlayPath(env.path)) return 'play';
+  if (env.stored === 'stage' || env.stored === 'play') return env.stored;
+  return 'play';
+}
 
 /** Below this lean from level the plate lies flat: a hand is never still. */
 export const TILT_DEAD_DEG = 5;

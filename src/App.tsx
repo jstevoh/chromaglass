@@ -53,7 +53,8 @@ import { BenchOverlay } from './components/BenchOverlay';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
-import { wantsPhoneLayout, PHONE_OFF_KEY } from './lib/phone';
+import { PhonePlay } from './components/phone/PhonePlay';
+import { wantsPhoneLayout, PHONE_OFF_KEY, phoneScreen, PHONE_SCREEN_KEY, type PhoneScreen } from './lib/phone';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
@@ -2085,9 +2086,26 @@ export default function App() {
       width: window.innerWidth,
       height: window.innerHeight,
       sessionOff,
+      path: window.location.pathname,
     });
   };
   const [phone, setPhone] = useState(readPhone);
+  /*
+    Which of the phone's two screens (lib/phone.ts phoneScreen): Play, the
+    listening screen a phone opens on, or every control. Kept on this phone
+    when changed from either, so the screen someone went to is the one they
+    come back to.
+  */
+  const [phoneScreenUp, setPhoneScreenUp] = useState<PhoneScreen>(() => {
+    if (typeof window === 'undefined') return 'play';
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(PHONE_SCREEN_KEY); } catch { /* private */ }
+    return phoneScreen({ query: window.location.search, path: window.location.pathname, stored });
+  });
+  const choosePhoneScreen = (to: PhoneScreen) => {
+    try { localStorage.setItem(PHONE_SCREEN_KEY, to); } catch { /* private: this visit only */ }
+    setPhoneScreenUp(to);
+  };
   useEffect(() => {
     const onResize = () => setPhone(readPhone());
     window.addEventListener('resize', onResize);
@@ -4370,7 +4388,7 @@ export default function App() {
       {isCasting && windowFullscreen === false && overlaysVisible && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-100/90 backdrop-blur-xl shadow-2xl" data-testid="projector-fill">
           <Projector size={13} /> The projector window still has its title bar
-          <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
+          <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar).">fill its screen</button>
         </div>
       )}
       {/*
@@ -4991,8 +5009,47 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
+      {phone && showControls && phoneScreenUp === 'play' && (
+        <PanelGuard name="Play">
+        <PhonePlay
+          lookName={activePresetName ?? (fading > 0 ? allPresets.find(p => p.id === pinnedPresetId)?.name ?? null : null) ?? pinnedLookName ?? 'Untitled'}
+          edited={!activePresetName && fading <= 0 && !!pinnedLookName}
+          looks={phoneLooks}
+          activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+          onLook={(id) => goLookNow(id)}
+          onShuffle={triggerLucky}
+          onSave={() => saveCurrentPreset(docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look', '', false)}
+          dyes={DROPPER_COLORS.slice(0, 8)}
+          dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
+          onDye={(hex) => updateLiquidColor(selectedLiquidId, hex)}
+          onTool={setActiveTool}
+          settings={settings}
+          onSetting={updateSettings}
+          onZoom={pinchZoom}
+          listening={audioSource !== 'none'}
+          deaf={earDeaf}
+          onListen={(on) => {
+            /*
+              Following the music is listening to the room (the stereo, for
+              the person this screen is for) and letting it move the plate. A
+              look whose Sound Drive is at zero would hear it and do nothing,
+              which reads as a broken switch, so it is brought to the middle;
+              any look with a drive of its own keeps it.
+            */
+            if (on && (settings.audioImpact ?? 0) < 0.05) updateSettings({ audioImpact: 0.5 });
+            void handleSourceChange(on ? 'microphone' : 'none');
+          }}
+          wandering={isAutomated}
+          onWander={setIsAutomated}
+          onClear={() => setClearTrigger(n => n + 1)}
+          recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
+          onAllControls={() => choosePhoneScreen('stage')}
+        />
+        </PanelGuard>
+      )}
       {phone && showControls && (
         <>
+          {phoneScreenUp === 'stage' && (
           <PanelGuard name="The phone controls">
           <PhoneStage
             // Mid-fade the settings are between two looks and match neither,
@@ -5114,8 +5171,10 @@ export default function App() {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
               setPhone(false);
             }}
+            onPlayScreen={() => choosePhoneScreen('play')}
           />
           </PanelGuard>
+          )}
           {/* The song-file picker the Sound sheet reaches for; on the laptop it
               lives in the overlay's audio column, which a phone does not draw. */}
           <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
