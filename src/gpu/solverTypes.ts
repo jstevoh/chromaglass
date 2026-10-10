@@ -208,9 +208,13 @@ export interface GpuStepParams {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number): void;
   chem?: any;
+  /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
+  chemLive?: boolean;
+  /** Turing Reagent has been poured since then: the reaction runs on it without Chemistry. */
+  reagentLive?: boolean;
 }
 
 
@@ -322,7 +326,11 @@ export interface PlateSolver {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number): void;
   chem?: any;
+  /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
+  chemLive?: boolean;
+  /** Turing Reagent has been poured since then: the reaction runs on it without Chemistry. */
+  reagentLive?: boolean;
 }

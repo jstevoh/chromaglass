@@ -98,6 +98,13 @@ for (const id of CLEAR) {
   check('Ferrofluid is black by default', isNatural(b) && Math.max(t.rgb.r, t.rgb.g, t.rgb.b) < 0.15, fmt(t.rgb));
 }
 {
+  // CIMA's feed, the Turing reaction's: iodine's straw, the blue taken and red and green near clear.
+  const b = bottle('reagent');
+  const t = pourTint(b);
+  check('Turing Reagent pours a pale straw by default', isNatural(b) && t.dose === 1 && t.rgb.r > 0.9 && t.rgb.g > 0.85 && t.rgb.b < 0.75 && t.rgb.b > 0.5 && t.rgb.r - t.rgb.b > 0.25,
+    `${fmt(t.rgb)}: iodine's straw, not the hot pink it poured`);
+}
+{
   const b = bottle('milk');
   const t = pourTint(b);
   check('Milk is laid as a white body: it scatters', isNatural(b) && !isClearLiquid(b) && t.dose === 1 && Math.min(t.rgb.r, t.rgb.g, t.rgb.b) > 0.99 && (b.behaviour?.scatter ?? 0) > 0,

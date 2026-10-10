@@ -3841,6 +3841,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     if (c.b > 0.0) {
       c.a = mix(c.a, A.b.x, A.a.w * f / c.b);
     }
+    /*
+      The poured liquid is the substrate solution, so it brings u with it,
+      and a trace of the autocatalyst at its heart, the speck every real
+      Turing dish starts from: u = 1, v = 0 is a steady state that never
+      breaks by itself, and before this a pour on a look without Chemistry
+      grew nothing until a random seed happened to land in it.
+    */
+    c.r = max(c.r, min(1.0, f * 1.5));
+    c.g = max(c.g, 0.5 * max(0.0, 1.0 - d / (0.35 * A.a.z)));
   }
   textureStore(dst, p, c);
 }`,
@@ -3860,7 +3869,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     vn = max(vn, 0.5 + 0.5 * (1.0 - d / A.a.z));
     un = min(un, 0.5);
   }
-  textureStore(dst, p, vec4f(un, vn, 0.0, 0.0));
+  // The reagent (b) and the pattern baked into it (a) are the liquid's, not
+  // the seed's: a seed wrote zeros there across the whole plate, so every
+  // seed, which the show lays at random every few seconds, wiped every pour
+  // of Turing Reagent and the reaction starved.
+  textureStore(dst, p, vec4f(un, vn, c.b, c.a));
 }`,
 
   grayScott: `${HEAD}
@@ -3880,14 +3893,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
         + textureLoad(src, p + vec2i(0, 1), 0)
         - 4.0 * c;
   let uvv = c.r * c.g * c.g;
-    let reagent = c.b;
-  let pattern_val = c.a;
-  
-  let target_feed = 0.03 + pattern_val * 0.01;
-  let target_kill = 0.055 + pattern_val * 0.005;
-  
-  let feed = mix(0.0, target_feed, reagent);
-  let kill = mix(0.06, target_kill, reagent);
+  /*
+    Where the feed comes from. Gray–Scott's u is a substrate topped up from a
+    reservoir at rate F; with no reservoir it is used up and nothing grows.
+    The reservoir is the reagent: b, where Turing Reagent was poured, and
+    A.b.x everywhere, the bath a look with Chemistry on stands its plate in
+    (Boyle's platen, wet with the reagents before anything is drawn). Before,
+    only b counted, so the looks with Chemistry on, which pour no reagent,
+    fed nothing and grew nothing (the lab: 3.6 units of dye over two seconds
+    of Sensual Laboratory, an empty plate).
+
+    The pattern is the poured reagent's own (a, baked in by addReagent) in
+    proportion to its share of the reservoir, and the look's (A.a.z and A.a.w,
+    its Pattern knob's feed and kill) for the rest.
+  */
+  let reagent = max(c.b, A.b.x);
+  let own = c.b / max(reagent, 1e-4);
+  let target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
+  let target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
+  /*
+    The supply saturates at a third of full reagent. Scaling F and k straight
+    with the reagent put a tap of it (0.3 to 0.6 where it lands) at F 0.018,
+    k 0.058, which is Pearson's dead region: the seed died where it was
+    poured (the lab, five pours on a look without Chemistry: one faint blot).
+  */
+  let supply = min(1.0, reagent / 0.3);
+  let feed = target_feed * supply;
+  let kill = mix(0.06, target_kill, supply);
 
   let un = c.r + A.a.x * l.r - uvv + feed * (1.0 - c.r);
   let vn = c.g + A.a.y * l.g + uvv - (feed + kill) * c.g;
