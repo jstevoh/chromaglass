@@ -359,7 +359,7 @@ function song() {
     let prev = null, frames = 0, differ = 0, firstDiff = '';
     for (let i = 0; i < 60 * SECONDS; i++, frames++) {
       const end = Math.round((i * SR) / 60);
-      const db = emu.frame(pcm, end, 1 / 60);
+      const { bins: db } = emu.frame(pcm, end, 1 / 60);
       // Uneven frame times, as a live loop has.
       const dt = i === 0 ? 0 : Math.min(0.25, [0.0161, 0.0172, 0.0334, 0.0166][i % 4]);
       const wave = waveBytes(pcm, end, emu.fftSize, new Uint8Array(bins));

@@ -93,7 +93,7 @@ function listen(pcm, fps, feed, jitterMs = 0, seed = 0x9e3779b9) {
     const t = i / fps + (jitterMs ? (late.float() * jitterMs) / 1000 : 0);
     const end = Math.round(t * SR);
     // The node smooths once a read, whatever the gap between reads.
-    const db = an.frame(pcm, end, 1 / 60);
+    const { bins: db } = an.frame(pcm, end, 1 / 60);
     const reading = features.update({ bins: db, scale: 'db', sampleRate: SR, fftSize: an.fftSize }, t);
     const dt = t - last; last = t;
     const win = levels.calibrate(db, dt, true);
@@ -136,7 +136,7 @@ function listenApart(pcm, fps, feed, jitterMs, seed, kicksFor) {
   const reads = Math.floor((pcm.length / SR) * 60);
   for (let i = 1; i < reads; i++) {
     const t = i / 60;
-    const db = an.frame(pcm, Math.round(t * SR), 1 / 60);
+    const { bins: db } = an.frame(pcm, Math.round(t * SR), 1 / 60);
     latest = features.update({ bins: db, scale: 'db', sampleRate: SR, fftSize: an.fftSize }, t);
     // The ear's own kick onsets, every reading, before any loop reads them.
     if (latest.onsets.kick.hit) onsets.push({ t, predicted: false });
