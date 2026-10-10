@@ -455,8 +455,9 @@ try {
 
     The look's magnet is put first in the far corner from where the hand
     will be, so a magnet gone home cannot pass by landing near the hand:
-    the drag above ends wherever the pointer mapping puts 0.85 across, which
-    read 0.43,0.58 in a cloud session, 0.1 from the middle. And the check
+    the hand presses wherever the pointer mapping puts 0.85 across, which
+    read 0.43,0.58 in a cloud session, 0.1 from the middle, and 0.30,0.30
+    on one Mac run. And the check
     first asks that the solver really has the magnet in that corner, so a
     settings write that never reached it cannot pass either. Then the hand
     presses the magnet down there, holds it, lets go, and two seconds on the
@@ -495,7 +496,16 @@ try {
     && Math.abs(m.height - m.lookHeight) < 1e-3
     && m.radius !== null && Math.abs(m.radius - 0.05 * (sized ? m.k : 1)) < 1e-4;
   await page.mouse.move(...at(0.85));
-  const probe = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  /*
+    Where the hand will press, asked of the pointer's mapping (plateAt). It
+    was asked of magnetHand, which is where the hand last held the magnet:
+    a hover does not move it. With the drag ending near 0.75 across that was
+    close enough; with the drag laid out on the plate it ended at 0.57,0.73,
+    the corner was put at 0.1,0.1 against it, the press landed at 0.30,0.30,
+    0.28 from that corner, and "let go of, it stays" failed on its own
+    "away > 0.3" (the Mac, #349's second run).
+  */
+  const probe = await page.evaluate(([x, y]) => window.chromaglassDebug().plateAt?.(x, y) ?? null, at(0.85));
   const corner = { x: (probe?.x ?? 0.5) > 0.5 ? 0.1 : 0.9, y: (probe?.y ?? 0.5) > 0.5 ? 0.1 : 0.9 };
   await page.evaluate((c) => Object.assign(window.chromaglassDebug().settings, { magnetX: c.x, magnetY: c.y }), corner);
   await page.waitForTimeout(1000);

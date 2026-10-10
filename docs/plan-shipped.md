@@ -2450,7 +2450,11 @@ it and whether the canvas is what is there, and the way runs from a point at lea
 0.25 of the middle that is furthest off the middle row, 0.3 to 0.45 long, with the canvas
 under the whole line. Off the rim on purpose: a first planned way that ended 0.33 out
 dragged the pool half over the rim, the drag itself passed (0.07 from the hand, 0.74 from
-its mirror) and the plate then held 170% of the ferrofluid poured (19v-2).
+its mirror) and the plate then held 170% of the ferrofluid poured (19v-2). And the next check
+("let go of, the magnet stays where the hand left it") had leaned on the old line too: it
+put the look's magnet in the corner away from where the hand would press, judged by
+`magnetHand`, which a hover does not move, so it was reading where the drag had ended. With
+the drag elsewhere the corner landed 0.28 from the press; it now asks `plateAt`.
 The check also asks that the hand really ended more than 0.15 off that row (its mirror over
 0.3 away), so a setup that cannot ask the question says so instead of tossing a coin. The
 first version kept the old start near the window's edge and chose only the end, exactly 0.4
