@@ -89,6 +89,8 @@ function useFullscreen() {
 function StageMirror({ source }: { source: HTMLCanvasElement }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gone, setGone] = useState(false);
+  /** For `?debug`: frames painted, times gone dark, times taken back by a reloaded show. */
+  const statsRef = useRef({ paints: 0, darkened: 0, reattached: 0 });
   const isFullscreen = useFullscreen();
   // This window *is* the projector. Nothing it does is worth a screensaver.
   useWakeLock(true);
@@ -100,12 +102,18 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
     if (!ctx) return;
     const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CAST_CHANNEL) : null;
     let lastW = 0, lastH = 0;
+    const stats = statsRef.current;
     // Tell the show window how many pixels this screen has, so it renders
     // that many; again whenever the window moves, resizes or goes fullscreen.
-    const announce = () => {
+    const announce = (again = false) => {
       const dpr = window.devicePixelRatio || 1;
       const w = Math.max(1, Math.round(window.innerWidth * dpr));
       const h = Math.max(1, Math.round(window.innerHeight * dpr));
+      if (again && w === lastW && h === lastH) {
+        // The same size to a show that has never heard it: a reloaded one.
+        bc?.postMessage({ type: 'stage', width: w, height: h } satisfies CastMessage);
+        return;
+      }
       if (w !== lastW || h !== lastH) {
         canvas.width = w; canvas.height = h;
         /*
@@ -132,9 +140,10 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
         bc?.postMessage({ type: 'stage', width: w, height: h } satisfies CastMessage);
       }
     };
+    const resized = () => announce();
     announce();
-    window.addEventListener('resize', announce);
-    document.addEventListener('fullscreenchange', announce);
+    window.addEventListener('resize', resized);
+    document.addEventListener('fullscreenchange', resized);
     /*
       The show pushes; this window does not pull (docs/webgpu-plan.md, P3).
 
@@ -150,9 +159,30 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
       which is how the show knows how many pixels to render.
     */
     const opener = window.opener as (Window & { __chromaglassMirror?: unknown }) | null;
+    /*
+      Dark while there is no show to mirror.
+
+      A reload of the show used to leave this window holding its last frame
+      for good (S15): a still picture on the wall, which reads to a room as
+      the show having frozen, and to the operator as nothing at all. While
+      the show is away the wall fades to black, the projector's own "off",
+      and the first frame of the show that comes back fades it up again. The
+      fade is the canvas's opacity over the black page, so it costs no draw
+      and holds whatever was last painted until it is under black.
+    */
+    let dark = false;
+    canvas.style.transition = 'opacity 0.4s linear';
+    const goDark = (on: boolean) => {
+      if (dark === on) return;
+      dark = on;
+      canvas.style.opacity = on ? '0' : '1';
+      if (on) stats.darkened++;
+    };
     const paint = (frame: HTMLCanvasElement) => {
       const sw = frame.width, sh = frame.height;
       if (sw === 0 || sh === 0 || lastW === 0 || lastH === 0) return;
+      stats.paints++;
+      if (dark) goDark(false);
       const s = Math.min(lastW / sw, lastH / sh);
       const dw = Math.round(sw * s), dh = Math.round(sh * s);
       const dx = (lastW - dw) >> 1, dy = (lastH - dh) >> 1;
@@ -194,12 +224,61 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
     };
     tick = requestAnimationFrame(ask);
 
-    // The show window closing is the one thing this window still has to
-    // notice for itself, and twice a second is often enough to say so.
+    /*
+      The show window closing, and the show window reloading: the two things
+      this window has to notice for itself.
+
+      A close makes the opener `closed`. A reload does not: it is the same
+      window with a new page in it, and what says so is that the page has no
+      `paint` of ours on it any more (the old page also takes it away as it
+      goes, so the wall darkens at once rather than at the next look). Then
+      this window puts `paint` back on the new page, which is what makes its
+      frames arrive here, and asks the new page to take it as its projector
+      (`__chromaglassWallBack`, useCastSession), which gives the show its
+      `isCasting`, its poll and its channel back. Then the stage again, which
+      the new page needs to render this screen's pixels and has never heard.
+      From then on it asks on every turn of the watch, not only until it is
+      answered: the hook is there only once the new page's app has mounted,
+      and a hold the show dropped while this window stayed up is taken back
+      the same way.
+
+      Only an empty hook is taken. One that is someone else's function is
+      another projector window the show opened since, and two windows each
+      putting theirs back four times a second would take turns at the frames.
+
+      Every quarter of a second rather than every half: the reattach is the
+      second a wall stands dark after a reload, and reading a property costs
+      nothing.
+    */
+    /*
+      Asking starts with the first reload this window sees. A window the show
+      opened itself is held already; one a harness opened by hand
+      (`npm run wall`, `npm run showcursor`) was never the show's to hold, and
+      taken on its first ask it would have the show render at its size and
+      feed it the cast state, which those checks do not measure for.
+    */
+    let asking = false;
     const watch = window.setInterval(() => {
-      const o = window.opener as Window | null;
-      if (!o || o.closed) setGone(true);
-    }, 500);
+      const o = window.opener as (Window & { __chromaglassMirror?: unknown; __chromaglassWallBack?: (w: Window) => 'taken' | 'held' | false }) | null;
+      if (!o || o.closed) { setGone(true); goDark(false); return; }
+      let theirs: unknown;
+      // Another origin's page in the show window: no show to mirror.
+      try { theirs = o.__chromaglassMirror; } catch { goDark(true); return; }
+      if (theirs !== paint) {
+        goDark(true);
+        if (theirs !== undefined) return;                             // another wall has the show
+        try { o.__chromaglassMirror = paint; } catch { return; }
+        asking = true;
+      }
+      if (!asking) return;
+      let back: ((w: Window) => 'taken' | 'held' | false) | undefined;
+      try { back = o.__chromaglassWallBack; } catch { return; }
+      if (typeof back !== 'function') return;                         // the new page's app is not up yet
+      if (back(window) === 'taken') {
+        stats.reattached++;
+        announce(true);
+      }
+    }, 250);
 
     return () => {
       cancelAnimationFrame(tick);
@@ -208,15 +287,27 @@ function StageMirror({ source }: { source: HTMLCanvasElement }) {
         const o = window.opener as (Window & { __chromaglassMirror?: unknown }) | null;
         if (o && !o.closed && o.__chromaglassMirror === paint) o.__chromaglassMirror = undefined;
       } catch { /* the show window is gone */ }
-      window.removeEventListener('resize', announce);
-      document.removeEventListener('fullscreenchange', announce);
+      window.removeEventListener('resize', resized);
+      document.removeEventListener('fullscreenchange', resized);
       bc?.close();
     };
   }, [source]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassCast?: unknown }).chromaglassCast = () => ({ mode: 'mirror', linked: !gone, stage: { width: canvasRef.current?.width, height: canvasRef.current?.height }, source: { width: source.width, height: source.height } });
+      (window as unknown as { chromaglassCast?: unknown }).chromaglassCast = () => {
+        // The show's canvas of the moment: after a reload it is not the one this window opened on.
+        let now: HTMLCanvasElement | null = null;
+        try { now = (window.opener as Window | null)?.document?.querySelector<HTMLCanvasElement>('#liquid-canvas') ?? null; } catch { /* gone */ }
+        const c = canvasRef.current;
+        return {
+          mode: 'mirror', linked: !gone,
+          stage: { width: c?.width, height: c?.height },
+          source: { width: (now ?? source).width, height: (now ?? source).height },
+          dark: c?.style.opacity === '0',
+          ...statsRef.current,
+        };
+      };
     }
   }, [gone, source]);
 

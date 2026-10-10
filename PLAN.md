@@ -118,8 +118,10 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **1.11** **13-recmem** (B, M): Record streams to disk; a set-length take cannot run out of memory.
 - **1.12** **14i-guard, then 14r, then S21** (C, S then M then M): the flash guard in linear light,
   by quarter-wall and the red rule; then the watchdog and a Rescue Go.
-- **1.13** **S15** (B, M): a reload re-attaches the wall and resumes the set; needs 0.12's `?cast`
-  harness. **S7** (E, M): an hour in CI, nightly.
+- **1.13** ~~**S15** wall half~~ (shipped 2026-10-10): a reload re-attaches the wall, dark meanwhile (`npm run rewall`).
+  **S15-b** (B, M): the reloaded show resumes the set (its place, the stage, the armed look,
+  the tempo, the Mixer's takes) from `sessionStorage`, with "resumed at …" on the desk and the
+  phone; today it opens on the opening look, and the wall cuts to it. **S7** (E, M): an hour in CI, nightly.
 
 ### Wave 2. The owner's judging queue (the owner's lane, beside the code)
 
@@ -4424,6 +4426,10 @@ bill changes it: more Mac runners at once (19g).
   `evolution`, `fingerprint`, `lyrics`, `musicDb`, `castProtocol` or `videoSense`
   (followed through every harness's imports with esbuild's metafile), and none opens
   `?cast`, so `CastDisplay` has no check (S15 in `docs/stability-plan.md` needs one).
+  **Partly done:** `npm run rewall` (S15's wall half) opens the projector window from the
+  show and asks its mirror; a receiver (`?cast` with no opener) is still unchecked, and
+  rewall's "frames reach the wall again" line runs in Measure, where no frames are drawn,
+  so it prints rather than asks until a Mac shard runs it.
 
 - ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
   own next frame on a runner whose two windows are handed different refreshes~~ **Done:**
@@ -4627,6 +4633,22 @@ like day (`npm run macqueue -- --hours 24` for the time).
   readback taken off a plate that was rebuilt). The next red should print the plate's
   turn and the solver's step and clear counts across the window. Too big for the
   2026-10-05 bundle of small fixes; left open here.
+  **Instrumented 2026-10-10.** The two reds' logs (jobs 111540991031 and
+  111236251946) were read again: both fingers at (45, 110) and (345, 110) px, 0.0 cells
+  from where they were picked, 69 and 89 readbacks, every other line of the phone check
+  green; the PLAN's "different heights" is the dish's resting angle (the two pixels are
+  300 px apart along a row, 45 cells apart on a dish turned about 150° or 210°), not a
+  fault. No line in either job printed the app's rung. The red line now prints, before,
+  while held and after: the engine and grid, which plate the hands lay on
+  (`hands().layer`; Classic has two and the dye check reads plate 0), the clears and
+  drains the loop took (`hands().clears`/`.drains`), each plate's solver (a number per
+  solver object, so a rebuild shows) with its steps and readbacks, and every plate's gain.
+  Leads, for when it next goes red: the other plate (gain on plate 1), a clear or drain in
+  the window, or a governor move: `releaseGpu` rebuilds the dye from `gpu.readback()`,
+  the last readback that *landed*, so every step laid since it is lost, and a solver
+  that never landed one is put back to its seed (`restoreSeed`) whole. That last is a
+  show bug on its own if it reads so (a grid move drops the last readback's worth of
+  dye); a GPU carry of the dye, as `handOver` carries the ferrofluid, would end it.
 
 ### 19i. A green Mac result carries across a merge of main
 **Shipped**: When the new head's tree differs from the tree of the PR's last green Mac run only in files main changed (disjoint from the PR's own site files), or only in files that never reach a Mac shard, the shards are skipped with the verdict "carried" (annotated on What the change reaches), and the deploy gate follows that chain back to the run that passed. 14 selftest cases in `reach.mjs` and deploy gate history verified.
