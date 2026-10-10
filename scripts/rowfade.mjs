@@ -594,8 +594,9 @@ check('a song\'s glide and a sequence stage\'s writes stop a take on the levels 
 check('a new look forgets where its gel and lumia were taken out from; a render leaves no button lit; the bars are counted at fadeTempo',
   /rowFades\.forget\(\['gel', 'lumia'\]\)/.test(app) && (prepare.match(/setRowFading\(\{\}\)/g) ?? []).length === 2 && /fadeTempo\(tempoRef\.current\?\.bpm/.test(app));
 const mounts = {
-  'the Perform desk': /<MixerPanel [^>]*onFade=\{p\.takes\?\.onFade\}/.test(src('src/components/desk/PerformDesk.tsx'))
-    && /<MixerPanel [^>]*fading=\{p\.takes\?\.fading\}/.test(src('src/components/desk/PerformDesk.tsx')) && /takes=\{mixTakes\}/.test(app),
+  // Both of the desk's mixers: the docked sheet over the rides and the Mixer panel.
+  'the desk': (src('src/components/desk/DeskPanels.tsx').match(/<MixerPanel [^>]*onFade=\{p\.takes\?\.onFade\}/g) ?? []).length === 2
+    && (src('src/components/desk/DeskPanels.tsx').match(/<MixerPanel [^>]*fading=\{p\.takes\?\.fading\}/g) ?? []).length === 2 && /takes=\{mixTakes\}/.test(app),
   'Settings': /onFade=\{mixTakes\?\.onFade\}/.test(src('src/components/SettingsPanel.tsx'))
     && /fading=\{mixTakes\?\.fading\}/.test(src('src/components/SettingsPanel.tsx')) && /mixTakes=\{mixTakes\}/.test(app),
   'the phone': /onFade=\{p\.mixer\.takes\?\.onFade\}/.test(src('src/components/phone/PhoneStage.tsx'))

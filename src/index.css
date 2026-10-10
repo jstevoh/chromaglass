@@ -84,6 +84,13 @@
   --duration-fade: 200ms;
 }
 
+/* Desk v2 (the owner's design, 2026-10-10): panels, knobs, the deck. */
+@theme {
+  --color-ring:         rgba(255,255,255,.12); /* knob track */
+  --color-ring-hover:   rgba(255,255,255,.20);
+  --color-float-border: rgba(255,255,255,.12); /* a floating panel's edge */
+}
+
 /* Sizing rules (not tokens, but contractual):
    desktop control height   32px (toolbar) · 36px (segmented, tools) · 40px (buttons) · 48px (primary Go, list rows)
    touch control height     48px min; Go/Blackout 56–64px; slider handle 32px
@@ -266,6 +273,14 @@
    soft ring: the desks' rides at a settings scale. --fill is set inline. */
 .set-range { -webkit-appearance: none; appearance: none; background: transparent; height: 18px; width: 100%; cursor: pointer; }
 .set-range:disabled { cursor: not-allowed; }
+/*
+  A settings section drawn as a desk panel is held to the desk's rules, and
+  the first of them is that nothing you can grab is under 24px on its short
+  side (`npm run layout`): the sheet's 18px rail and the 22px ⓘ were fine in
+  a sheet you read sitting down, not on a desk you reach across in the dark.
+*/
+[data-testid^="settings-embed-"] .set-range { height: 24px; }
+[data-testid^="settings-embed-"] [data-info="toggle"] { min-height: 24px; min-width: 24px; }
 .set-range::-webkit-slider-runnable-track {
   height: 4px; border-radius: 2px;
   background: linear-gradient(to right,

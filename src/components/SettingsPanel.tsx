@@ -172,6 +172,19 @@ interface SettingsPanelProps {
   onProjectorMode?: (m: 'ask' | 'auto' | 'off') => void;
   projectorName?: string | null;
   onClose: () => void;
+  /**
+   * One section alone, as a desk panel draws it (Desk v2): no sheet, no rail,
+   * no search, no title (the panel's header has it), and no other section
+   * rendered at all.
+   */
+  embed?: string | null;
+  /**
+   * The Stage sheet (⌘,): the room and the machine only, the sections in the
+   * `stage` category. Nothing in it saves into a look.
+   */
+  scope?: 'all' | 'stage';
+  /** On a desk panel, where a link to another section goes: the sheet, at that section. */
+  onGoTo?: (id: string) => void;
 }
 
 /** What the room can be read for, in the order they are worth reaching for. */
@@ -344,7 +357,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -355,13 +368,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /** `?debug` puts the frame's cost split under the engine readout. */
   const showFrameSplit = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).has('debug');
+  /*
+    Polled only where the readout is drawn: the Simulation section, which an
+    embedded panel draws only when it is that panel. Every section docked on
+    the desk is its own SettingsPanel, and each polled the engine once a
+    second for a reading it never showed: on the Mac runner, where the plate
+    draws and every reading is a new object, the Gig desk's Patches panel
+    alone committed once a second on top of the App's clock (`npm run
+    renders`: 2.0 commits/s against 1.0 renders/s on the Perform desk with
+    no sound). In a cloud session the reading is null each time and the set
+    is dropped, which is why it passed there.
+  */
+  const drawsEngine = !embed || embed === 'simulation';
   useEffect(() => {
-    if (!getLiveEngineStatus) return;
+    if (!getLiveEngineStatus || !drawsEngine) return;
     const tick = () => { setLive(getLiveEngineStatus() ?? null); };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [getLiveEngineStatus]);
+  }, [getLiveEngineStatus, drawsEngine]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
   /**
    * Which section is in the pane.
@@ -374,7 +399,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
    * is a list of places and one place at a time, and it has been for thirty
    * years, because that is the shape that lets you find a thing twice.
    */
-  const [section, setSection] = useState<string>(focusSection ?? FIRST_SECTION);
+  /** Whether this shell draws a section at all: one in a panel, the Stage ones in the Stage sheet, every one in the sheet. */
+  const keep = (id: string): boolean => embed ? id === embed
+    : scope === 'stage' ? SECTION_BY_ID.get(id)?.category === 'stage'
+    : true;
+  const firstSection = scope === 'stage' ? (SETTINGS_SECTIONS.find(x => x.category === 'stage')?.id ?? FIRST_SECTION) : FIRST_SECTION;
+  const [section, setSection] = useState<string>(focusSection && keep(focusSection) ? focusSection : firstSection);
   useEffect(() => { if (focusSection) setSection(focusSection); }, [focusSection]);
 
   /** Typing here searches every section, whichever one is in the pane. */
@@ -391,6 +421,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
    * searches for.
    */
   const shown = (id: string): boolean => {
+    if (embed) return id === embed;
     const sec = SECTION_BY_ID.get(id);
     if (q) return !!sec && sectionMatches(sec, q);
     return section === id;
@@ -432,10 +463,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
    * press the name is the other half. `from` keeps each copy's test id its
    * own, because every section is in the page at once.
    */
+  /*
+    On a desk panel the section is the only one drawn, so a link to another
+    goes where that one is: the sheet, opened at it (`onGoTo`). It is a
+    24px target there, inline in the sentence, which is the desk's rule.
+  */
   const goTo = (id: string, from: string) => (
     <button
-      onClick={() => { setSection(id); setQuery(''); }}
-      className="font-medium text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white"
+      onClick={() => { if (embed && onGoTo) { onGoTo(id); return; } setSection(id); setQuery(''); }}
+      className={`font-medium text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white ${embed ? 'inline-flex min-h-6 items-center' : ''}`}
       data-testid={`goto-${id}-from-${from}`}
     >
       {SECTION_BY_ID.get(id)?.name ?? id}
@@ -449,9 +485,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   const railGroups = useMemo(() => SETTINGS_CATEGORIES
     .map(cat => ({
       ...cat,
-      rows: SETTINGS_SECTIONS.filter(sec => sec.category === cat.id && (!q || sectionMatches(sec, q))),
+      rows: SETTINGS_SECTIONS.filter(sec => sec.category === cat.id && keep(sec.id) && (!q || sectionMatches(sec, q))),
     }))
-    .filter(g => g.rows.length > 0), [q]);
+    .filter(g => g.rows.length > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [q, scope]);
+  /*
+    A section in a panel is narrow, and the sheet's card (its border, its
+    24 px padding, its two-column grid from 768 px of *window*) is drawn for a
+    1000 px sheet. In a panel the section is its controls, one column.
+  */
+  const CARD = embed ? 'block' : SECTION_CARD;
+  const GRID = embed ? '' : SECTION_GRID;
+  const TITLE = embed ? 'hidden' : SECTION_TITLE;
 
   /*
     A sheet, not a drawer.
@@ -462,96 +508,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     sheet is centred, 720 wide, and fills the screen on a phone, so one shell
     serves every size the app runs at.
   */
-  return (
-    <Sheet title="Settings" onClose={onClose} width={1000} height={860} testId="settings-panel">
-      <PinContext.Provider value={pins ?? null}>
-      {/*
-        A rail and a pane, and the sheet is wider than the other two to hold
-        them. Settings is the one sheet with ninety controls in it; the others
-        ask one question each and stay at the handoff's 720.
-
-        On a phone the rail becomes a strip across the top: 1000px of sheet on
-        a 390px screen is the sheet's own `max-w-full`, and a 216px column
-        taken out of that leaves nothing to put a slider in.
-      */}
-      <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
-
-        {/* ── Where you are ─────────────────────────────────── */}
-        <nav
-          className="flex max-h-[38%] shrink-0 gap-1 overflow-x-auto overflow-y-auto border-b border-white/10 bg-black/20 p-2 sm:max-h-none sm:w-[220px] sm:flex-col sm:border-b-0 sm:border-r sm:px-3 sm:py-3"
-          aria-label="Settings sections"
-          data-testid="settings-rail"
-        >
-          {railGroups.length === 0 && (
-            <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
-          )}
-          {railGroups.map(group => (
-            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
-              <div className="hidden px-3 pb-1.5 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:block" title={group.hint}>
-                {group.name}
-              </div>
-              <div className="flex gap-0.5 sm:flex-col">
-                {group.rows.map(row => (
-                  <button
-                    key={row.id}
-                    onClick={() => { setSection(row.id); setQuery(''); }}
-                    aria-current={!q && section === row.id ? 'page' : undefined}
-                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:whitespace-normal ${
-                      !q && section === row.id
-                        ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
-                        : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
-                    }`}
-                    data-testid={`settings-nav-${row.id}`}
-                  >
-                    {row.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        {/* ── What is in it ─────────────────────────────────── */}
-        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-7 py-6">
-
-      {/*
-        A box to type into.
-
-        Seventeen sections and ninety controls is past what anyone browses, and
-        a rail alone does not fix that: it tells you where things are once you
-        know what they are called. A search is the answer to "where is the
-        thing that turns the camera on", and it searches what each section is
-        *about* rather than only what it is called — "video", "people" and
-        "crowd" all find The Room, none of which is in its heading. While a
-        query is in the box the rail narrows to the hits and the pane shows all
-        of them at once, which is what a result list is.
-      */}
-      <div className="relative mb-5">
-        <input
-          type="search"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search every setting — try “camera”, “people”, “keystone”"
-          aria-label="Search settings"
-          data-testid="settings-search"
-          className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-[13px] text-white/90 outline-none transition-colors placeholder:text-white/30 focus:border-accent-border focus:bg-white/[0.05]"
-        />
-        {q && (
-          <button
-            onClick={() => setQuery('')}
-            aria-label="Clear the search"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[12px] text-white/40 hover:text-white"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      {q && visibleCount === 0 && (
-        <p className="mb-6 text-[12px] text-white/40" data-testid="settings-no-match">
-          Nothing here matches “{query}”.
-        </p>
-      )}
-
+  /*
+    The sections, drawn once and placed in one of three shells: the sheet
+    (every section, one at a time, with the rail and the search), the Stage
+    sheet (the room and the machine only), or a desk panel (one section, no
+    chrome: the panel's own header names it). A section not in the shell is
+    not rendered at all, not merely hidden, so a desk panel and the sheet never
+    put the same control, under the same test id, on the page twice; the desk
+    shows a panel's section only while no sheet is open.
+  */
+  const sections = (
+    <>
       {/* The presets live on the title, not here. One menu opened from the
           plate's own name is where a projectionist already looks for them,
           and it carries saving and loading too; a second copy buried in a
@@ -564,8 +531,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         which is where nobody reaching for the house lights in a dark room looks,
         and the sheet opened on the microphone's sensitivity. It opens here now.
       */}
-      <section id="settings-master" className={`${SECTION_CARD} ${shown('master') ? SECTION_GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="master">
-        <h3 className={SECTION_TITLE}>
+      {keep('master') && (
+      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="master">
+        <h3 className={TITLE}>
           <Lightbulb size={12} /> Master
         </h3>
         {/* The house lights */}
@@ -578,7 +546,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ dimmer: v })}
           settingKey="dimmer"
         />
-        {onBlackout && (
+        {/* Not on a desk panel: the desk's header has Blackout, in every layout. */}
+        {onBlackout && !embed && (
           <button
             onClick={onBlackout}
             className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
@@ -629,6 +598,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="tempoSync"
         />
       </section>
+      )}
 
       {/*
         The mixer (lib/mixer.ts, docs/rig-plan.md R7): the same panel the
@@ -637,8 +607,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         panel` reads that list as this section's, since there is no literal
         slider here to read.
       */}
-      <section id="settings-mixer" className={`${SECTION_CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
-        <h3 className={SECTION_TITLE}>
+      {keep('mixer') && (
+      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
+        <h3 className={TITLE}>
           <SlidersVertical size={12} /> Mixer
         </h3>
         <MixerPanel
@@ -653,10 +624,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           testId="settings-mixer-panel"
         />
       </section>
+      )}
 
       {/* Sound Section */}
-      <section id="settings-audio-input" className={`${SECTION_CARD} ${shown('audio-input') ? SECTION_GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
-        <h3 className={SECTION_TITLE}>
+      {keep('audio-input') && (
+      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
+        <h3 className={TITLE}>
           <Activity size={12} /> Audio Input
         </h3>
         <Slider
@@ -725,10 +698,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <span className="text-[13px] font-medium text-text">Auto Calibrate</span>
           <button
             onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
-            className={`w-10 h-5 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
+            className={`w-11 h-6 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
             title="Learn this room's noise floor and dynamics, and drive the visuals from where the music sits between them"
           >
-            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            <div className={`w-5 h-5 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
           </button>
         </div>
         {/* The beat, ahead of the microphone */}
@@ -841,11 +814,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               role="switch"
               aria-checked={!!songDetection}
               onClick={() => onSongDetection(!songDetection)}
-              className={`h-5 w-9 shrink-0 rounded-full relative transition-colors ${songDetection ? 'bg-white' : 'bg-white/20'}`}
+              className={`h-6 w-11 shrink-0 rounded-full relative transition-colors ${songDetection ? 'bg-white' : 'bg-white/20'}`}
               title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
               data-testid="song-detection-toggle"
             >
-              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${songDetection ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              <div className={`w-5 h-5 rounded-full bg-black absolute top-0.5 transition-transform ${songDetection ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
             </button>
           </div>
         )}
@@ -903,10 +876,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </div>
         )}
       </section>
+      )}
 
       {/* Sound Mappings Section */}
-      <section id="settings-audio-mappings" className={`${SECTION_CARD} ${shown('audio-mappings') ? SECTION_GRID : 'hidden'} ${focusSection === 'audio-mappings' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-mappings">
-        <h3 className={SECTION_TITLE}>
+      {keep('audio-mappings') && (
+      <section id="settings-audio-mappings" className={`${CARD} ${shown('audio-mappings') ? GRID : 'hidden'} ${focusSection === 'audio-mappings' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-mappings">
+        <h3 className={TITLE}>
           <Activity size={12} /> Sound Mappings
         </h3>
 
@@ -961,10 +936,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           Any sound feature onto any other control is a patch, in {goTo('patches', 'sound')}.
         </p>
       </section>
+      )}
 
       {/* Light Show Look Section */}
-      <section id="settings-look" className={`${SECTION_CARD} ${shown('look') ? SECTION_GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
-        <h3 className={SECTION_TITLE}>
+      {keep('look') && (
+      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
+        <h3 className={TITLE}>
           <Palette size={12} /> Light Show Look
         </h3>
         <Slider
@@ -1162,10 +1139,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="postBlurRadius"
         />
       </section>
+      )}
 
       {/* Show Section */}
-      <section id="settings-show" className={`${SECTION_CARD} ${shown('show') ? SECTION_GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">
-        <h3 className={SECTION_TITLE}>
+      {keep('show') && (
+      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">
+        <h3 className={TITLE}>
           <Clapperboard size={12} /> Show
         </h3>
         <Info>
@@ -1276,10 +1255,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           Each layer its own dish, spread apart on a black screen the way two or three projectors overlap: the lead plate large and right of centre, the second smaller at the left.
         </Info>
       </section>
+      )}
 
       {/* Camera Section */}
-      <section id="settings-camera" className={`${SECTION_CARD} ${shown('camera') ? SECTION_GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
-        <h3 className={SECTION_TITLE}>
+      {keep('camera') && (
+      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
+        <h3 className={TITLE}>
           <Aperture size={12} /> Camera
         </h3>
         <Info>
@@ -1356,10 +1337,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="filmPhysics"
         />
       </section>
+      )}
 
       {/* Film stock — what the whole show is photographed on (F1). */}
-      <section id="settings-stock" className={`${SECTION_CARD} ${shown('stock') ? SECTION_GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="look" data-section="stock">
-        <h3 className={SECTION_TITLE}>
+      {keep('stock') && (
+      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="look" data-section="stock">
+        <h3 className={TITLE}>
           <Film size={12} /> Film Stock
         </h3>
         <Info>
@@ -1434,6 +1417,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="stockGate"
         />
       </section>
+      )}
 
 
       {/*
@@ -1445,8 +1429,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         to play it. Folds, how fast the rig turns, and how much plate feeds
         each wedge, together, and all three on the MIDI list.
       */}
-      <section id="settings-kaleidoscope" className={`${SECTION_CARD} ${shown('kaleidoscope') ? SECTION_GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="kaleidoscope">
-        <h3 className={SECTION_TITLE}>
+      {keep('kaleidoscope') && (
+      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="kaleidoscope">
+        <h3 className={TITLE}>
           <Aperture size={12} /> Kaleidoscope
         </h3>
         <Info>
@@ -1494,10 +1479,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           disabled={Math.round(settings.kaleidoscope ?? 0) < 2 && 'needs a fold count above Off'}
         />
       </section>
+      )}
 
       {/* Lamp & Light Section */}
-      <section id="settings-lamp" className={`${SECTION_CARD} ${shown('lamp') ? SECTION_GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="lamp">
-        <h3 className={SECTION_TITLE}>
+      {keep('lamp') && (
+      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="lamp">
+        <h3 className={TITLE}>
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
         <Info>
@@ -1665,10 +1652,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="exposure"
         />
       </section>
+      )}
 
       {/* The Room Section */}
-      <section id="settings-room" className={`${SECTION_CARD} ${shown('room') ? SECTION_GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
-        <h3 className={SECTION_TITLE}>
+      {keep('room') && (
+      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+        <h3 className={TITLE}>
           <Camera size={12} /> The Room
         </h3>
         <Info>
@@ -1791,6 +1780,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <span className="text-white/70">Room Drive</span> is how hard what happens in front of the lens stirs the lead plate: an arm swept across the room sweeps the dye the same way. Aim it at the floor or the crowd rather than at the screen: a camera that can see the projection makes the plate drive itself, and while that settles rather than running away, what it settles into is a plate being stirred by nothing in particular. <span className="text-white/70">Hands</span> puts each person on the glass: standing still is a palm pressed on the plate, walking is a puff of air the way they are going, and arriving drops their own dye — one of the preset's, picked by who they are, so the same dancer stays the same colour all set. <span className="text-white/70">Deadzone</span> is how much movement counts as someone rather than as the room breathing; <span className="text-white/70">Smoothing</span> how long the liquid remembers a gesture. <span className="text-white/70">Hold people</span> finds the figures in the frame and keeps hold of each one, which is what lets a person carry a dye; turning it off is cheaper. <span className="text-white/70">Flip Camera</span> for a camera facing the room, so a hand moved left moves the dye left.
         </Info>
       </section>
+      )}
 
       {/*
         Film
@@ -1801,8 +1791,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         made that section the longest on the rail. A reel, a camera on a real
         dish or another window, how it shows, and what it does to the liquid.
       */}
-      <section id="settings-film" className={`${SECTION_CARD} ${shown('film') ? SECTION_GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
-        <h3 className={SECTION_TITLE}>
+      {keep('film') && (
+      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
+        <h3 className={TITLE}>
           <Video size={12} /> Video
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
@@ -1969,6 +1960,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </Info>
         )}
       </section>
+      )}
 
       {/*
         Patches
@@ -1983,8 +1975,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         while the shapes had none on screen at all. The bay and every master
         over it are one place now, after the sources it reads.
       */}
-      <section id="settings-patches" className={`${SECTION_CARD} ${shown('patches') ? SECTION_GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="patches">
-        <h3 className={SECTION_TITLE}>
+      {keep('patches') && (
+      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="patches">
+        <h3 className={TITLE}>
           <Cable size={12} /> Patches
         </h3>
         <Info>
@@ -2191,6 +2184,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           Each source has one master over every patch that reads it, so a whole source can be pulled down on one fader without touching the patches themselves: the room out of a quiet song, the film under the band, the sound off while the reel carries it. <span className="text-white/70">Film Impact</span> starts at zero, so a look saved before the film could ride anything does exactly what it did.
         </Info>
       </section>
+      )}
 
       {/* ── Controller ───────────────────────────────────── */}
       {/*
@@ -2208,8 +2202,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         right map as one button. Everything past that (learn, banks, bindings,
         the picture) is still the panel, one click away.
       */}
-      <section id="settings-midi" className={`${SECTION_CARD} ${shown('midi') ? SECTION_GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="midi">
-        <h3 className={SECTION_TITLE}>
+      {keep('midi') && (
+      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="midi">
+        <h3 className={TITLE}>
           <Sliders size={12} /> Controller
         </h3>
         {!midi ? (
@@ -2349,6 +2344,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </>
         )}
       </section>
+      )}
 
       {/*
         Wall
@@ -2359,8 +2355,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         effects that shared it are under Lamp & Light, and the film projector
         is an input of its own.
       */}
-      <section id="settings-projectors" className={`${SECTION_CARD} ${shown('projectors') ? SECTION_GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="projectors">
-        <h3 className={SECTION_TITLE}>
+      {keep('projectors') && (
+      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="projectors">
+        <h3 className={TITLE}>
           <Projector size={12} /> Wall
         </h3>
         {onProjectorMode && (
@@ -2387,14 +2384,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <OutputPanel output={output} onChange={onOutput} onReset={onOutputReset} wakeLock={wakeLock} />
         )}
       </section>
+      )}
 
       {/* Mapping Section */}
-      <section id="settings-mapping" className={`${SECTION_CARD} ${shown('mapping') ? SECTION_GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="mapping">
-        <h3 className={SECTION_TITLE}>
+      {keep('mapping') && (
+      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="mapping">
+        <h3 className={TITLE}>
           <Shapes size={12} /> Mapping
         </h3>
         {output && onOutput && <MappingPanel output={output} onChange={onOutput} />}
       </section>
+      )}
 
       {/* Simulation Section */}
       {/*
@@ -2406,8 +2406,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         whoever is paying for the room: it dissolves in about four seconds.
         This one sits over the top and stays put for three hours.
       */}
-      <section id="settings-mark" className={`${SECTION_CARD} ${shown('mark') ? SECTION_GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="stage" data-section="mark">
-        <h3 className={SECTION_TITLE}>
+      {keep('mark') && (
+      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="stage" data-section="mark">
+        <h3 className={TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
         <div className="flex gap-2 mb-5">
@@ -2451,9 +2452,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           dimmer, so a blackout leaves the mark on the wall. Its own opacity is the control for taking it off.
         </Info>
       </section>
+      )}
 
-      <section id="settings-simulation" className={`${SECTION_CARD} ${shown('simulation') ? SECTION_GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="simulation">
-        <h3 className={SECTION_TITLE}>
+      {keep('simulation') && (
+      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="simulation">
+        <h3 className={TITLE}>
           <Zap size={12} /> Simulation
         </h3>
         <div className="flex flex-col gap-2 mb-3">
@@ -2526,10 +2529,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </Info>
         </div>
       </section>
+      )}
 
       {/* Macro Closeup Section */}
-      <section id="settings-macro" className={`${SECTION_CARD} ${shown('macro') ? SECTION_GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="macro">
-        <h3 className={SECTION_TITLE}>
+      {keep('macro') && (
+      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="macro">
+        <h3 className={TITLE}>
           <Microscope size={12} /> Macro Closeup
         </h3>
         {/*
@@ -2688,10 +2693,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </>
         )}
       </section>
+      )}
 
       {/* Squish Plate Section */}
-      <section id="settings-squish" className={`${SECTION_CARD} ${shown('squish') ? SECTION_GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="squish">
-        <h3 className={SECTION_TITLE}>
+      {keep('squish') && (
+      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="squish">
+        <h3 className={TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
         <Slider
@@ -3081,10 +3088,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="polarity"
         />
       </section>
+      )}
 
       {/* Heat Slide Section */}
-      <section id="settings-heat" className={`${SECTION_CARD} ${shown('heat') ? SECTION_GRID : 'hidden'} ${focusSection === 'heat' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="heat">
-        <h3 className={SECTION_TITLE}>
+      {keep('heat') && (
+      <section id="settings-heat" className={`${CARD} ${shown('heat') ? GRID : 'hidden'} ${focusSection === 'heat' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="heat">
+        <h3 className={TITLE}>
           <Thermometer size={12} /> Heat Slide
         </h3>
         {/* Heat Intensity and Boiling Point were here: nothing in either solver
@@ -3110,10 +3119,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="heatDecay"
         />
       </section>
+      )}
 
       {/* Manual Interaction Section */}
-      <section id="settings-interaction" className={`${SECTION_CARD} ${shown('interaction') ? SECTION_GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
-        <h3 className={SECTION_TITLE}>
+      {keep('interaction') && (
+      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
+        <h3 className={TITLE}>
           <Wind size={12} /> Manual Interaction
         </h3>
         {/* "Updraft", not "Blow Velocity": it is a constant draught over the
@@ -3151,18 +3162,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="dropHeight"
         />
       </section>
+      )}
 
       {/* Liquids anyone can make, load from a file and save to one (lib/liquidFile.ts). */}
-      <section id="settings-liquids" className={`${SECTION_CARD} ${shown('liquids') ? SECTION_GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="liquids">
-        <h3 className={SECTION_TITLE}>
+      {keep('liquids') && (
+      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="liquids">
+        <h3 className={TITLE}>
           <FlaskConical size={12} /> Liquids
         </h3>
         {liquids ? <LiquidDesigner {...liquids} /> : <div className="text-[12px] opacity-35">The shelf is not available here.</div>}
       </section>
+      )}
 
       {/* Fluid Physics Section */}
-      <section id="settings-physics" className={`${SECTION_CARD} ${shown('physics') ? SECTION_GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="physics">
-        <h3 className={SECTION_TITLE}>
+      {keep('physics') && (
+      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="physics">
+        <h3 className={TITLE}>
           <Zap size={12} /> Fluid Physics
         </h3>
         {/*
@@ -3215,10 +3230,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="damping"
         />
       </section>
+      )}
 
       {/* Automation Section */}
-      <section id="settings-automation" className={`${SECTION_CARD} ${shown('automation') ? SECTION_GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
-        <h3 className={SECTION_TITLE}>
+      {keep('automation') && (
+      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
+        <h3 className={TITLE}>
           <Hourglass size={12} /> Automation
         </h3>
         <Slider
@@ -3279,10 +3296,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           />
         </div>
       </section>
+      )}
 
       {/* Mixer Section */}
-      <section id="settings-layers" className={`${SECTION_CARD} ${shown('layers') ? SECTION_GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
-        <h3 className={SECTION_TITLE}>
+      {keep('layers') && (
+      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
+        <h3 className={TITLE}>
           <Layers size={12} /> Plates &amp; LED
         </h3>
         <Slider
@@ -3582,6 +3601,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </select>
         </div>
       </section>
+      )}
 
       {/*
         The panel used to be one long scroll and this was its footer: one line
@@ -3592,6 +3612,113 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         which is worse than no line at all, so it has gone rather than been
         repeated seventeen times or guarded by a condition.
       */}
+    </>
+  );
+
+  if (embed) {
+    return (
+      <PinContext.Provider value={null}>
+        <div className="min-w-0 pt-1" data-testid={`settings-embed-${embed}`}>{sections}</div>
+      </PinContext.Provider>
+    );
+  }
+
+  return (
+    <Sheet title={scope === 'stage' ? 'Stage' : 'Settings'} onClose={onClose} width={scope === 'stage' ? 720 : 1000} height={scope === 'stage' ? 520 : 860} testId={scope === 'stage' ? 'stage-sheet' : 'settings-panel'}>
+      <PinContext.Provider value={pins ?? null}>
+      {/*
+        A rail and a pane, and the sheet is wider than the other two to hold
+        them. Settings is the one sheet with ninety controls in it; the others
+        ask one question each and stay at the handoff's 720.
+
+        On a phone the rail becomes a strip across the top: 1000px of sheet on
+        a 390px screen is the sheet's own `max-w-full`, and a 216px column
+        taken out of that leaves nothing to put a slider in.
+      */}
+      <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
+
+        {/* ── Where you are ─────────────────────────────────── */}
+        <nav
+          className="flex max-h-[38%] shrink-0 gap-1 overflow-x-auto overflow-y-auto border-b border-white/10 bg-black/20 p-2 sm:max-h-none sm:w-[220px] sm:flex-col sm:border-b-0 sm:border-r sm:px-3 sm:py-3"
+          aria-label="Settings sections"
+          data-testid="settings-rail"
+        >
+          {railGroups.length === 0 && (
+            <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
+          )}
+          {railGroups.map(group => (
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
+              <div className="hidden px-3 pb-1.5 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:block" title={group.hint}>
+                {group.name}
+              </div>
+              <div className="flex gap-0.5 sm:flex-col">
+                {group.rows.map(row => (
+                  <button
+                    key={row.id}
+                    onClick={() => { setSection(row.id); setQuery(''); }}
+                    aria-current={!q && section === row.id ? 'page' : undefined}
+                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:whitespace-normal ${
+                      !q && section === row.id
+                        ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
+                        : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
+                    }`}
+                    data-testid={`settings-nav-${row.id}`}
+                  >
+                    {row.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* ── What is in it ─────────────────────────────────── */}
+        <div ref={paneRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-hide px-7 py-6">
+
+      {/*
+        A box to type into.
+
+        Seventeen sections and ninety controls is past what anyone browses, and
+        a rail alone does not fix that: it tells you where things are once you
+        know what they are called. A search is the answer to "where is the
+        thing that turns the camera on", and it searches what each section is
+        *about* rather than only what it is called — "video", "people" and
+        "crowd" all find The Room, none of which is in its heading. While a
+        query is in the box the rail narrows to the hits and the pane shows all
+        of them at once, which is what a result list is.
+      */}
+      <div className="relative mb-5">
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search every setting — try “camera”, “people”, “keystone”"
+          aria-label="Search settings"
+          data-testid="settings-search"
+          className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-[13px] text-white/90 outline-none transition-colors placeholder:text-white/30 focus:border-accent-border focus:bg-white/[0.05]"
+        />
+        {q && (
+          <button
+            onClick={() => setQuery('')}
+            aria-label="Clear the search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[12px] text-white/40 hover:text-white"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {q && visibleCount === 0 && (
+        <p className="mb-6 text-[12px] text-white/40" data-testid="settings-no-match">
+          Nothing here matches “{query}”.
+        </p>
+      )}
+
+      {sections}
+      {scope === 'stage' && (
+        <p className="mt-2 text-[12px] text-dim" data-testid="stage-sheet-rule">
+          The room and the machine: nothing here saves into a look.
+        </p>
+      )}
         </div>
       </div>
       </PinContext.Provider>

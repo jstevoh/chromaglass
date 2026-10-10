@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
 import { flushSync } from 'react-dom';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useSongRender } from './hooks/useSongRender';
@@ -16,18 +16,20 @@ import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
-import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
+import { Desk } from './components/desk/Desk';
+import { DEFAULT_RIDES } from './components/desk/DeskPanels';
+import type { Cue, SetAction, SetItemAction, ControlKind } from './components/desk/deskProps';
+import { useDeskLayouts } from './hooks/useDeskLayout';
+import { LAYOUT_OF_MODE } from './lib/deskLayout';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
 import { driftLook } from './lib/drift';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
-import { DesignDesk } from './components/desk/DesignDesk';
 import { SoundPanel } from './components/SoundPanel';
 import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
-import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
@@ -532,10 +534,28 @@ export default function App() {
    * see is the desk. Nothing is taken away; it is a different arrangement of
    * the same controls, and the toggle is one click.
    */
-  const [deskMode, setDeskMode] = useState<'design' | 'perform'>(() => {
-    try { return localStorage.getItem(DESK_MODE_KEY) === 'perform' ? 'perform' : 'design'; } catch { return 'design'; }
+  const [deskMode, setDeskMode] = useState<'design' | 'perform' | 'loadin'>(() => {
+    try {
+      const m = localStorage.getItem(DESK_MODE_KEY);
+      return m === 'perform' || m === 'loadin' ? m : 'design';
+    } catch { return 'design'; }
   });
   useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
+  /*
+    Desk v2: the two desks are one, and Design, Perform and the new Load-in
+    are its three layouts, Build, Gig and Load-in (lib/deskLayout.ts). The
+    stored mode keeps the old words, so a laptop that was left on Perform
+    opens on Gig. Each layout remembers where its panels were.
+  */
+  const deskLayouts = useDeskLayouts();
+  const layoutName = LAYOUT_OF_MODE(deskMode);
+  const deskLayout = deskLayouts.layouts[layoutName];
+  const { update: updateLayout, reset: resetLayout } = deskLayouts;
+  // Stable, so the desk's drag and key listeners are not rebuilt on every render the sound causes.
+  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(layoutName, change), [updateLayout, layoutName]);
+  const onDeskReset = useCallback(() => resetLayout(layoutName), [resetLayout, layoutName]);
+  /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
+  const [showStage, setShowStage] = useState(false);
   /*
     What is out on each surface.
 
@@ -2095,7 +2115,15 @@ export default function App() {
   }, []);
   // A phone is never a desk, whatever its width turned sideways.
   const performing = deskMode === 'perform' && roomForDesk && !phone;
-  const designing = deskMode === 'design' && roomForDesk && !phone;
+  /*
+    "Designing" was the Design desk being up. It is now the plate in Preview,
+    which is what it always meant to the show: while a look is being built
+    the sequencer is held, a song's show does not take the plate over and a
+    new song does not change the look under the hand. Build ships in
+    Preview, so the bench behaves as it did; Gig and Load-in ship Live, and
+    either can be put in Preview from the plate bar.
+  */
+  const designing = deskLayout.plateMode === 'preview' && roomForDesk && !phone;
 
   /*
     Below that width neither desk lays out, and the floating overlay UI — the
@@ -2218,6 +2246,18 @@ export default function App() {
   const ccFor = useCallback((key: keyof VisualizerSettings): number | null => {
     const b = midiRef.current?.map.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);
     return b && b.source.kind === 'cc' ? b.source.number : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /*
+    And what it is learned to: an endless encoder draws as a knob, anything
+    with a stop as a slider (the design's rule, so the desk looks like the
+    controller). A binding only says absolute or relative, so an absolute pot
+    reads as a fader until profiles name their kinds (PLAN.md §8).
+  */
+  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null => {
+    const b = midiRef.current?.map.bindings.find(x => x.target.kind === 'setting' && x.target.key === key) as { mode?: string; source: { kind: string } } | undefined;
+    if (!b || b.source.kind !== 'cc') return null;
+    return b.mode === 'relative' ? 'encoder' : 'fader';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -3913,8 +3953,10 @@ export default function App() {
       { id: 'open-seq',      name: 'Stage sequences', kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
       { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
-      { id: 'open-design',   name: deskMode === 'perform' ? 'Design mode' : 'Perform mode', kind: 'Open',
+      { id: 'open-design',   name: deskMode === 'perform' ? 'Build layout' : 'Gig layout', kind: 'Open',
         run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
+      { id: 'open-loadin',   name: 'Load-in layout', kind: 'Open', run: () => setDeskMode('loadin') },
+      { id: 'open-stage',    name: 'Stage: the room and the machine', kind: 'Open', run: () => { setShowStage(true); setShowSettings(false); } },
     ];
 
     return [...looks, ...doing, ...opening, ...sections];
@@ -3948,7 +3990,8 @@ export default function App() {
         saveLook();
         return;
       }
-      if (designing && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      // ⌘⏎ is Send to wall, which every layout's plate bar carries now.
+      if (deskUp && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         void startCast('window');
         return;
@@ -3972,7 +4015,9 @@ export default function App() {
 
       // The rest are the show's, and only while the desk is up: on the bench
       // Space should not fire a look change at a room.
-      if (!performing) return;
+      // Nor with the plate in Preview: the bar says "not on wall", so a key
+      // that sends a look to the room would make it a lie.
+      if (!performing || designing) return;
       if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
       if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
       // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
@@ -4074,6 +4119,77 @@ export default function App() {
     });
     return unprovide;
   }, []);
+
+  /*
+    The settings, drawn three ways from one list of props: the sheet (every
+    section), a panel on the desk (one section, `embed`), and the Stage
+    sheet (the room and the machine, `scope="stage"`). One list, so a
+    control cannot be wired one way in the sheet and another on the desk.
+  */
+  const settingsPanel = (over: Partial<ComponentProps<typeof SettingsPanel>> & { onClose: () => void }) => (
+    <SettingsPanel
+      mixTakes={mixTakes}
+      backLook={backLookName}
+      songDetection={musicSettings.enabled}
+      onSongDetection={(on) => updateMusicSettings({ enabled: on })}
+      settings={settings}
+      onUpdate={updateSettings}
+      calibration={audioData?.calibration ?? null}
+      onRecalibrate={() => setCalibrateNonce(n => n + 1)}
+      onFlickPlate={flickPlate}
+      engineStatus={engineStatus}
+      getLiveEngineStatus={() => engineStatusRef.current}
+      audioSource={audioSource}
+      onAudioSource={(src) => { void handleSourceChange(src); }}
+      onAudioFile={() => musicInputRef.current?.click()}
+      audioInputs={audioInputs}
+      audioInputId={audioInputId}
+      onAudioInput={chooseAudioInput}
+      blackout={blackout}
+      // Under a desk, Blackout is in the desk's header in every layout, and once on screen is enough.
+      onBlackout={deskUp ? undefined : toggleBlackout}
+      projectorMode={projector.mode}
+      onProjectorMode={projector.setMode}
+      projectorName={projector.projector?.label ?? null}
+      output={output}
+      onOutput={setOutput}
+      onOutputReset={resetOutput}
+      wakeLock={wakeLock}
+      tempo={tempoLabel}
+      onTap={tapTempo}
+      onTempoClear={clearTempo}
+      onTempoBpm={setTempoBpm}
+      midiClocked={midi.clocked}
+      timecode={timecode ? formatTimecode(timecode) : null}
+      focusSection={settingsSection}
+      liquids={{ shelf: liquidTypes, onShelve: shelveLiquids, onRemove: removeLiquid, onPick: setSelectedLiquidId }}
+      /*
+        The panel can put any of its controls on either desk, so it needs
+        to know what is already on them. One list per surface, shared with
+        the desks themselves, so a chip's filled state and the strip it
+        refers to cannot disagree.
+      */
+      pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
+      midi={midi}
+      onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
+      sceneOn={sceneOn}
+      onSceneToggle={toggleScene}
+      sceneState={scene.state}
+      sceneDevices={scene.devices}
+      sceneDeviceId={sceneDeviceId}
+      onSceneDevice={chooseSceneDevice}
+      scenePreviewRef={scenePreviewRef}
+      filmSource={filmSource}
+      onFilmFile={loadFilm}
+      onFilmCamera={startFilmCamera}
+      onFilmWindow={startFilmWindow}
+      onFilmClear={clearFilm}
+      markLoaded={markLoaded}
+      onMarkFile={loadMark}
+      onMarkClear={clearMark}
+      {...over}
+    />
+  );
 
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
@@ -5064,67 +5180,7 @@ export default function App() {
       <AnimatePresence>
         {showSettings && (
           <PanelGuard name="Settings" onClose={() => { setShowSettings(false); setSettingsSection(null); }}>
-          <SettingsPanel
-            mixTakes={mixTakes}
-            backLook={backLookName}
-            songDetection={musicSettings.enabled}
-            onSongDetection={(on) => updateMusicSettings({ enabled: on })}
-            settings={settings}
-            onUpdate={updateSettings}
-            calibration={audioData?.calibration ?? null}
-            onRecalibrate={() => setCalibrateNonce(n => n + 1)}
-            onFlickPlate={flickPlate}
-            engineStatus={engineStatus}
-            getLiveEngineStatus={() => engineStatusRef.current}
-            audioSource={audioSource}
-            onAudioSource={(src) => { void handleSourceChange(src); }}
-            onAudioFile={() => musicInputRef.current?.click()}
-            audioInputs={audioInputs}
-            audioInputId={audioInputId}
-            onAudioInput={chooseAudioInput}
-            blackout={blackout}
-            onBlackout={toggleBlackout}
-            projectorMode={projector.mode}
-            onProjectorMode={projector.setMode}
-            projectorName={projector.projector?.label ?? null}
-            output={output}
-            onOutput={setOutput}
-            onOutputReset={resetOutput}
-            wakeLock={wakeLock}
-            tempo={tempoLabel}
-            onTap={tapTempo}
-            onTempoClear={clearTempo}
-            onTempoBpm={setTempoBpm}
-            midiClocked={midi.clocked}
-            timecode={timecode ? formatTimecode(timecode) : null}
-            focusSection={settingsSection}
-            liquids={{ shelf: liquidTypes, onShelve: shelveLiquids, onRemove: removeLiquid, onPick: setSelectedLiquidId }}
-            /*
-              The panel can put any of its controls on either desk, so it needs
-              to know what is already on them. One list per surface, shared with
-              the desks themselves, so a chip's filled state and the strip it
-              refers to cannot disagree.
-            */
-            pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
-            midi={midi}
-            onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
-            sceneOn={sceneOn}
-            onSceneToggle={toggleScene}
-            sceneState={scene.state}
-            sceneDevices={scene.devices}
-            sceneDeviceId={sceneDeviceId}
-            onSceneDevice={chooseSceneDevice}
-            scenePreviewRef={scenePreviewRef}
-            filmSource={filmSource}
-            onFilmFile={loadFilm}
-            onFilmCamera={startFilmCamera}
-            onFilmWindow={startFilmWindow}
-            onFilmClear={clearFilm}
-            markLoaded={markLoaded}
-            onMarkFile={loadMark}
-            onMarkClear={clearMark}
-            onClose={() => { setShowSettings(false); setSettingsSection(null); }}
-          />
+          {settingsPanel({ onClose: () => { setShowSettings(false); setSettingsSection(null); } })}
           </PanelGuard>
         )}
       </AnimatePresence>
@@ -5505,31 +5561,97 @@ export default function App() {
         toolbar, which is how Sound Drive ended up on screen twice; a control
         that exists in two places is a control you cannot trust mid-set.
       */}
-      {performing && overlaysVisible && (
-        <PanelGuard name="The Perform desk" onClose={() => setDeskMode('design')} closeLabel="Open the Design desk">
-        <PerformDesk
+      {/*
+        One desk, three layouts (Desk v2). Build is what the Design desk was
+        (the bottles, dyes, tools and recipe round a plate in Preview), Gig
+        what the Perform desk was (the cue list and the rides round the wall's
+        picture), and Load-in the room and the machine. Every settings section
+        can be a panel in any of them.
+      */}
+      {deskUp && overlaysVisible && (
+        <PanelGuard name="The desk" onClose={() => deskLayouts.reset(layoutName)} closeLabel="Put this layout back as it shipped">
+        <Desk
+          layoutName={layoutName}
+          layout={deskLayout}
+          onLayout={onDeskLayout}
+          onResetLayout={onDeskReset}
+          renderSection={(id) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} })}
+          sheetOpen={showSettings || showStage}
+          onOpenSection={openSettingsAt}
+          onStage={() => { setShowStage(true); setShowSettings(false); setShowHelp(false); }}
+          onRelayout={preview.remeasure}
+          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : deskMode}
+          onMode={(m) => {
+            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
+            setShowSound(false);
+            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
+            setShowSongs(false);
+            setShowSequencer(false);
+            setDeskMode(m);
+          }}
+          dots={deskDots}
+          midiName={midi.activeInputName ?? null}
+          onSound={deskOpen.sound}
+          onVideo={deskOpen.video}
+          onMidi={deskOpen.midi}
+          onSearch={() => setShowPalette(true)}
+          onOpenSettings={openAllSettings}
+          showCrumb={
+            <>
+              <span className="text-muted">Show</span>
+              <span className="text-faint">/</span>
+              <span>{liveLookName ?? 'Untitled'}</span>
+            </>
+          }
+          status={{
+            audio: deskAudioLine,
+            engine: engineStatus?.label ?? '',
+            sequence: sequencer.status.running
+              ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
+              : null,
+            phone: remoteLink.status === 'connected',
+            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+          }}
+          onBlackout={toggleBlackout}
+          blackout={blackout}
+          plateRef={preview.ref}
+          liveName={liveLookName}
+          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
+          lookName={docName}
+          edited={docDirty}
+          dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
           onSave={saveLook}
-          dirty={docDirty}
-          onOpenSettings={openAllSettings}
-          automated={isAutomated}
-          onAutomate={setIsAutomated}
+          onSaveOver={docId ? replaceLook : undefined}
+          onNew={newLook}
+          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
+          openLookId={docId}
+          onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
+          onDeleteSaved={deleteSavedLook}
+          videoRecording={recorder.recording}
+          videoSeconds={recorder.seconds}
+          onToggleVideo={toggleRecording}
+          onRecordOptions={() => setShowRecordPanel(true)}
+          onPerformance={togglePerformance}
+          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
+          layer={activeLayer}
+          layers={stageLayers}
+          onLayer={setActiveLayer}
+          // Two: the compositor draws the lead plate and one behind it, and a
+          // third was simulated in full — a whole solver's GPU time — and never shown.
+          onAddLayer={addLayer}
+          onRemoveLayer={removeLayer}
+          layerHeld={backLookName}
+          layerReport={layerReport}
           cues={cues}
           setName={setList.name}
           savedSets={savedSets.map(x => x.name)}
           onAddToSet={() => setAddingToSet(true)}
-          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
-          cuedLook={cued && !cued.item ? { id: cued.id, name: cued.name } : null}
-          liveLookId={activePresetId}
-          onCueSaved={cueLook}
-          onSendSaved={(id) => goLookNow(id)}
-          onAddSavedToSet={(id) => addToSet('saved', id)}
           onSetAction={onSetAction}
           onItemAction={onItemAction}
           songNow={currentSong ? songLabel(currentSong) : null}
           liveId={setActive ? liveItemId : activePresetId}
           nextId={setActive ? (cued?.item ?? null) : (cued?.id ?? null)}
-          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
           onCue={cueAny}
           onCueNow={(id) => {
             if (!setActive) { goLookNow(id); return; }
@@ -5542,95 +5664,31 @@ export default function App() {
           backLook={backLookName}
           onBackFollowsFront={backFollowsFront}
           onBack={previousLook.current ? revertLook : null}
-          onBlackout={toggleBlackout}
-          blackout={blackout}
           fade={fadeSeconds}
           onFade={setFadeSeconds}
-          settings={settings}
-          onSetting={updateSettings}
-          hasFilm={filmSource !== 'none'}
-          hasMark={markLoaded}
-          takes={mixTakes}
-          ccFor={ccFor}
-          rideKeys={rideKeys}
-          onRideKeys={setRideKeys}
-          midiName={midi.activeInputName ?? null}
-          onSound={deskOpen.sound}
-          onVideo={deskOpen.video}
-          onMidi={deskOpen.midi}
-          videoRecording={recorder.recording}
-          videoSeconds={recorder.seconds}
-          onToggleVideo={toggleRecording}
-          onRecordOptions={() => setShowRecordPanel(true)}
-          onPerformance={togglePerformance}
-          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
-          layer={activeLayer}
-          layers={stageLayers}
-          onLayer={setActiveLayer}
-          tool={activeTool}
-          onTool={(t) => setActiveTool(t as typeof activeTool)}
-          toolAmount={toolAmount}
-          onToolAmount={(v) => setToolAmount(activeTool, v)}
-          amountOf={(t: string) => toolAmounts[t] ?? 1}
-          onAmountFor={setToolAmount}
-          magnetSize={settings.magnetSize ?? 0.5}
-          onMagnetSize={(v) => updateSettings({ magnetSize: v })}
-          dyes={trayDyes}
-          dye={selectedLiquid?.color ?? null}
-          onDye={(hex) => {
-            const bottle = liquidTypes.find(l => !l.behaviour && l.color.toLowerCase() === hex.toLowerCase());
-            if (!bottle) return;
-            setSelectedLiquidId(bottle.id);
-          }}
-          plateRef={preview.ref}
-          status={{
-            audio: deskAudioLine,
-            engine: engineStatus?.label ?? '',
-            sequence: sequencer.status.running
-              ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
-              : null,
-            phone: remoteLink.status === 'connected',
-            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
-          }}
-          dots={deskDots}
-          onSearch={() => setShowPalette(true)}
-          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'perform'}
-          onMode={(m) => {
-            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
-            setShowSound(false);
-            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
-            setShowSongs(false);
-            setShowSequencer(false);
-            setDeskMode(m);
-          }}
-          breadcrumb={
-            <>
-              <span className="text-muted">Show</span>
-              <span className="text-faint">/</span>
-              <span>{liveLookName ?? 'Untitled'}</span>
-            </>
-          }
+          cuedLook={cued && !cued.item ? { id: cued.id, name: cued.name } : null}
+          liveLookId={activePresetId}
+          onCueSaved={cueLook}
+          onSendSaved={(id) => goLookNow(id)}
+          onAddSavedToSet={(id) => addToSet('saved', id)}
           onFreeze={() => setIsActive(v => !v)}
           frozen={!isActive}
           onDrain={() => setDrainTrigger(v => v + 1)}
-        />
-        </PanelGuard>
-      )}
-
-      {/* ── The bench ──────────────────────────────────────────── */}
-      {/*
-        Design is the same three columns holding the other half of the job:
-        what a look is made of rather than when it goes out. Its plate is a
-        preview and says "not on wall", because the most expensive mistake in
-        this app is building a look on what you think is a rehearsal and
-        finding out a room was watching.
-      */}
-      {designing && overlaysVisible && (
-        <PanelGuard name="The Design desk" onClose={() => setDeskMode('perform')} closeLabel="Open the Perform desk">
-        <DesignDesk
-          onOpenSettings={openAllSettings}
+          settings={settings}
+          onSetting={updateSettings}
           automated={isAutomated}
           onAutomate={setIsAutomated}
+          ccFor={ccFor}
+          kindFor={kindFor}
+          rideKeys={rideKeys}
+          onRideKeys={setRideKeys}
+          recipeKeys={recipeKeys}
+          onRecipeKeys={setRecipeKeys}
+          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
+          randomiseArmed={luckyArmed}
+          hasFilm={filmSource !== 'none'}
+          hasMark={markLoaded}
+          takes={mixTakes}
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
@@ -5654,56 +5712,14 @@ export default function App() {
           onAmountFor={setToolAmount}
           magnetSize={settings.magnetSize ?? 0.5}
           onMagnetSize={(v) => updateSettings({ magnetSize: v })}
-          layer={activeLayer}
-          layers={stageLayers}
-          onLayer={setActiveLayer}
-          // Two: the compositor draws the lead plate and one behind it, and a
-          // third was simulated in full — a whole solver's GPU time — and never shown.
-          onAddLayer={addLayer}
-          onRemoveLayer={removeLayer}
-          layerHeld={backLookName}
-          layerReport={layerReport}
-          settings={settings}
-          onSetting={updateSettings}
-          recipeKeys={recipeKeys}
-          onRecipeKeys={setRecipeKeys}
-          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
-          randomiseArmed={luckyArmed}
-          plateRef={preview.ref}
-          lookName={docName}
-          edited={docDirty}
-          onSave={saveLook}
-          onSaveOver={docId ? replaceLook : undefined}
-          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
-          openLookId={docId}
-          onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
-          onDeleteSaved={deleteSavedLook}
-          onNew={newLook}
-          dirty={docDirty}
-          onSendToWall={() => { void startCast('window'); }}
-          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'design'}
-          onMode={(m) => {
-            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
-            setShowSound(false);
-            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
-            setShowSongs(false);
-            setShowSequencer(false);
-            setDeskMode(m);
-          }}
-          dots={deskDots}
-          midiName={midi.activeInputName ?? null}
-          onSound={deskOpen.sound}
-          onVideo={deskOpen.video}
-          onMidi={deskOpen.midi}
-          videoRecording={recorder.recording}
-          videoSeconds={recorder.seconds}
-          onToggleVideo={toggleRecording}
-          onRecordOptions={() => setShowRecordPanel(true)}
-          onPerformance={togglePerformance}
-          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
-          onSearch={() => setShowPalette(true)}
-          status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />
+        </PanelGuard>
+      )}
+
+      {/* ── Stage (⌘,) ─────────────────────────────────────────── */}
+      {showStage && deskUp && (
+        <PanelGuard name="Stage" onClose={() => setShowStage(false)}>
+          {settingsPanel({ scope: 'stage', focusSection: null, onClose: () => setShowStage(false) })}
         </PanelGuard>
       )}
 

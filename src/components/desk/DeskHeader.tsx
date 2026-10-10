@@ -12,7 +12,13 @@ import { AlphaBadge } from '../AlphaBadge';
  * show the same truth in the same place.
  */
 
-export type DeskMode = 'perform' | 'design' | 'sequence' | 'sound';
+/*
+  The switch's values are the old desks' names, so everything that still asks
+  which desk is up (`deskMode` in App, the checks that click
+  `mode-segmented-perform`) keeps its meaning: `design` is the Build layout,
+  `perform` is Gig, and `loadin` is new.
+*/
+export type DeskMode = 'perform' | 'design' | 'loadin' | 'sequence' | 'sound';
 
 export interface DeskDots {
   sound?: boolean;
@@ -26,7 +32,7 @@ export interface DeskDots {
   perf?: string | null;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onPerformance, onSearch, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onPerformance, onSearch, leading, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
@@ -52,7 +58,9 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   /** Start or stop a performance (T). */
   onPerformance?: () => void;
   onSearch: () => void;
-  /** Design's Save and Send to wall; Perform has nothing here. */
+  /** Before the dots: the desk's + Panel. */
+  leading?: ReactNode;
+  /** After the search chip: Blackout, the one action the header carries in every layout. */
   trailing?: ReactNode;
 }) {
   /*
@@ -109,7 +117,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       centre off true again. The sides can now give way, and the breadcrumb
       truncates instead.
     */
-    <header ref={headerRef} className="relative col-span-3 flex items-center justify-between gap-4 border-b border-border px-4">
+    <header ref={headerRef} className="relative col-[1/-1] flex items-center justify-between gap-4 border-b border-border px-4">
       <div className="flex min-w-0 max-w-[30%] items-center gap-2 text-[13px] font-medium">
         {/*
           The name where there is room for it, the mark alone where there is
@@ -157,16 +165,25 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div ref={switchRef} className="pointer-events-auto">
+          {/*
+            The layouts of the one desk, then the two screens of their own
+            (Desk v2). Sound stays, after Sequence: it is the only way to the
+            music player and the drone, and the design's switch has no other
+            door to them.
+          */}
           <Segmented
             value={mode}
-            options={[['perform', 'Perform'], ['design', 'Design'], ['sound', 'Sound']] as const}
+            options={[['design', 'Build'], ['perform', 'Gig'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']] as const}
             onChange={onMode}
             height={32}
+            divideBefore="sequence"
+            tight
             testId="mode-segmented"
           />
         </div>
       </div>
       <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`}>
+        {leading}
         <StatusDot
           on={dots.sound ?? dots.mic ?? false}
           label="Sound" tight={tight}

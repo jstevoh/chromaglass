@@ -1049,6 +1049,53 @@ follows a source at a depth through the patch bay (`sceneMap.ts`), and an action
 on a source's onset, on the predicted beat once the clock is locked (64 ms ahead of the
 heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a toggle.
 
+#### 8-v2. Desk v2: one desk, three layouts (2026-10-10)
+
+`src/components/desk/Desk.tsx`, `DeskPanels.tsx`, `PanelBrowser.tsx` (new),
+`src/lib/deskLayout.ts`, `src/hooks/useDeskLayout.ts` (new), `src/components/ui`
+(`Knob`, `PanelFrame`), `SettingsPanel.tsx` (`embed`, `scope="stage"`), `App.tsx`;
+`PerformDesk.tsx` and `DesignDesk.tsx` removed. Checks: `npm run desklayout` (new),
+`npm run layout` (extended).
+
+The owner's design (a design project, handed over as a zip) replaced the two
+fixed desks with one desk whose cells are filled from a layout. Every settings section
+is a panel under its own id, beside the desk's own panels (cues, rides, recipe,
+bottles, dyes, tools, the phone link). A panel docks in the left or right column or the
+deck under the plate, floats over the plate, folds to its header or closes; its grip
+drags it between them. Build (the Design desk's job), Gig (the Perform desk's) and
+Load-in (new: the controller, the sound, the wall and its mapping) are three shipped
+layouts; each remembers where its panels were, stored only once it differs from the
+shipped one, the rides' lesson. ⌘1/2/3 switch them, ⌘P opens the panel browser (the
+sheet's search, by what a section is about), ⌘, the Stage sheet (the room and the
+machine), ⌥D folds the deck, Tab hides the floating panels.
+
+What was kept, and why:
+
+- **Preview is the old Design desk's hold.** The plate bar's Live | Preview replaces the
+  Perform/Design split. `designing` in App is now "the plate in Preview", so the
+  sequencer, a song's show and a new song's look hold off while a look is built, as on
+  the bench. Build ships in Preview (the design drew it Live) so the bench behaves as it
+  did; a true offline copy is 8b.
+- **The old ids.** The root is `design-desk` in Build and `perform-desk` in Gig, the header
+  still says `design`/`perform` underneath, and every control kept its test id, so
+  `qa`, `saves`, `bubbles` and the rest find what they found.
+- **Knobs are real range inputs**, drawn over. An encoder or nothing learned gets a knob,
+  a fader a slider (the design's rule). The rides stay sliders.
+- **A section on a desk is held to the desk's rules.** Drawing them as panels found what
+  the sheet never had measured: a 4 px rail on the Wall's masks and gain, two 20 px
+  switches in Audio Input, a 22 px ⓘ and inline links. Each is 24 px now, and `layout`
+  docks every panel there is and measures it.
+- **One control, once.** Blackout moved to the header in every layout (the sheet's copy
+  is gone under a desk); the recipe leaves Evolve and All settings to the rides when
+  both are out.
+
+Measured: `npm run layout` 39 → 58 checks, all green, at 1440/1280/1024 and phone
+widths, with all 33 panels docked at once (511 controls) each drawing its body; `npm run desklayout`
+40/40 (it found two real faults in `sanitizeLayout` on its first run: a panel twice in
+one list kept both, and a stored array read as an empty layout). `panel` 180/180,
+`desk`, `saves` 33/33, `phone` 292/292, `remotemix`, `rowfade`, `backplate`, `intro`
+12/12 unchanged in what they assert.
+
 ### 9. Ferrofluid after the references
 
 **9a. The edge, and two looks, shipped in #161.** The ferrofluid ends on a sharp,

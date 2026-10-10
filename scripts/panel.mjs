@@ -36,7 +36,8 @@ import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { SettingRide } from '../src/lib/ride.ts';
-import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
+import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
+import { SHIPPED } from '../src/lib/deskLayout.ts';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
@@ -298,10 +299,20 @@ check('and neither does a sequence stage',
     mid.map(m => `${m.kaleidoscope}/${m.layerCount}`).join(' '));
 }
 // And a desk strip takes the step, so a pinned Layers cannot write 1.4.
-const performSrc = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
-const designSrc = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
-check('and a desk strip lands on a step too',
-  /step=\{spec\.step\}/.test(performSrc) && /step=\{spec\.step\}/.test(designSrc));
+// Since Desk v2 one control draws every strip, as a slider (learned to a
+// fader) or a knob (an encoder, or nothing): both of them take the step,
+// and the knob lands on it rather than between.
+const deskPanelsSrc = readFileSync(join(root, 'src/components/desk/DeskPanels.tsx'), 'utf8');
+const uiSrc = readFileSync(join(root, 'src/components/ui/index.tsx'), 'utf8');
+{
+  const control = deskPanelsSrc.slice(deskPanelsSrc.indexOf('function DeskControl'), deskPanelsSrc.indexOf('function ControlGrid'));
+  const knob = uiSrc.slice(uiSrc.indexOf('export function Knob'));
+  check('and a desk strip lands on a step too',
+    control.length > 0 && (control.match(/step=\{spec\.step\}/g) ?? []).length === 2
+    && /<Knob[\s\S]*step=\{spec\.step\}/.test(control) && /<Slider[\s\S]*step=\{spec\.step\}/.test(control)
+    && /Math\.round\(\(v - min\) \/ step\) \* step/.test(knob),
+    `${(control.match(/step=\{spec\.step\}/g) ?? []).length} of the slider and the knob`);
+}
 
 // ── The map ─────────────────────────────────────────────────────────
 const badSection = PINNABLE.filter(s => !SECTION_BY_ID.has(s.section));
@@ -976,23 +987,30 @@ check('no section carries another section\'s footnote',
   dimmer the desk called 100% all shipped together. There is one now, and the
   check reads it there and confirms the copies are gone.
 */
-const perform = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
-const design = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
+// The two desks became one (Desk v2): its panels are in DeskPanels, its frame in Desk.
+const deskSrc = readFileSync(join(root, 'src/components/desk/Desk.tsx'), 'utf8');
 const readout = readFileSync(join(root, 'src/lib/readout.ts'), 'utf8');
 check('a value reads the same way wherever it is shown',
   /export function readSetting/.test(readout)
-  && !/const READS/.test(perform) && !/const READS/.test(design));
-check('and every ride is a share of its travel unless it has a unit',
-  /macroZoom:  v => `\$\{v\.toFixed\(2\)\}×`/.test(readout)
-  && !/globalSpeed:/.test(readout)
-  && /readSetting\(String\(key\), v, spec\.min, spec\.max\)/.test(perform)
-  && /readSetting\(String\(key\), v, spec\.min, spec\.max\)/.test(design));
+  && !/const READS/.test(deskPanelsSrc) && !/const READS/.test(deskSrc));
+{
+  // Every strip on the desk (rides, the recipe, a section's knobs) is one
+  // DeskControl, so the question is asked once, and asked there.
+  const control = deskPanelsSrc.slice(deskPanelsSrc.indexOf('function DeskControl'), deskPanelsSrc.indexOf('function ControlGrid'));
+  const ownReads = (deskPanelsSrc.match(/readSetting\(/g) ?? []).length;
+  check('and every ride is a share of its travel unless it has a unit',
+    /macroZoom:  v => `\$\{v\.toFixed\(2\)\}×`/.test(readout)
+    && !/globalSpeed:/.test(readout)
+    && /readSetting\(String\(key\), v, spec\.min, spec\.max\)/.test(control)
+    && ownReads === 1,
+    `${ownReads} readSetting call${ownReads === 1 ? '' : 's'} in the desk's panels`);
+}
 check('and the settings panel asks the same question',
   /readSetting\(String\(settingKey \?\? ''\), safeValue, min, max\)/.test(panel));
 
 // A line telling you where to go, where a button could take you.
 check('the no-controller line goes there instead of naming the route',
-  /data-testid="no-controller-hint"/.test(perform) && !/Settings → MIDI to learn one/.test(perform));
+  /data-testid="no-controller-hint"/.test(deskPanelsSrc) && !/Settings → MIDI to learn one/.test(deskPanelsSrc));
 
 // ── A document, and a desk that is not a performance ────────────────
 /*
@@ -1359,8 +1377,9 @@ check('and neither starts over the limit',
   nothing in the engine that no desk can reach.
 */
 {
-  const design = readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8');
-  const perform = readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8');
+  // One desk since Desk v2: the Tools panel is the one list of tools, and
+  // Build and Gig (the old Design and Perform) both ship with it out.
+  const desk = readFileSync(join(root, 'src/components/desk/DeskPanels.tsx'), 'utf8');
   const shared = readFileSync(join(root, 'src/components/desk/tools.ts'), 'utf8');
   // The list itself, wherever it lives: a desk's own `TOOLS = [...]`, or the
   // shared `DESK_TOOLS` both desks now take theirs from.
@@ -1369,15 +1388,17 @@ check('and neither starts over the limit',
     if (m) return [...m[1].matchAll(/\['([a-z]+)'/g)].map(x => x[1]);
     return /const TOOLS = DESK_TOOLS;/.test(src) ? toolsOf(shared) : [];
   };
-  const onDesks = new Set([...toolsOf(design), ...toolsOf(perform)]);
+  const onDesks = new Set(toolsOf(desk));
   const sharedTools = toolsOf(shared);
   // The owner's call: the same tools on both desks, so a look poured and
   // sprayed on the bench can be touched up the same way once it is live.
   // Checked as the same list, not as "both have enough" — the drift this
-  // stops is one desk quietly carrying fewer.
+  // stops is one desk quietly carrying fewer. With one desk, "both" is the
+  // two layouts that are the old desks: each ships with the Tools panel out.
+  const shippedWithTools = ['build', 'gig'].filter(n => [...SHIPPED[n].left, ...SHIPPED[n].right, ...SHIPPED[n].deck].includes('tools'));
   check('both desks offer the same tools',
-    sharedTools.length > 0 && toolsOf(design).join() === sharedTools.join() && toolsOf(perform).join() === sharedTools.join(),
-    `design ${toolsOf(design).length}, perform ${toolsOf(perform).length}, shared ${sharedTools.length}`);
+    sharedTools.length > 0 && toolsOf(desk).join() === sharedTools.join() && shippedWithTools.length === 2,
+    `desk ${toolsOf(desk).length}, shared ${sharedTools.length}, out in ${shippedWithTools.join(' and ') || 'neither layout'}`);
   // What `performGesture` actually knows: its own switch, plus the dropper it
   // falls back to. A tool absent from here is a tool that silently drops dye.
   const gesture = panel0.slice(panel0.indexOf('const performGesture ='));
@@ -1396,7 +1417,7 @@ check('and neither starts over the limit',
     desks now share one list (checked above), but the invariant stays written
     against the bench.
   */
-  const onDesign = new Set(toolsOf(design));
+  const onDesign = new Set(toolsOf(desk));
   check('the Design desk offers every tool the engine acts on',
     [...handled].every(t => onDesign.has(t) || t === 'drop'),
     [...handled].filter(t => !onDesign.has(t) && t !== 'drop').join(', ') || `${onDesign.size} on the bench`);
@@ -1584,20 +1605,26 @@ check('and neither starts over the limit',
     const body = src.slice(from, i + 1);
     return [...body.matchAll(/testId="([a-z0-9-]+)"/g)].map(m => m[1]).sort();
   };
-  const perform = trailingOf(readFileSync(join(root, 'src/components/desk/PerformDesk.tsx'), 'utf8'));
-  const design = trailingOf(readFileSync(join(root, 'src/components/desk/DesignDesk.tsx'), 'utf8'));
+  /*
+    Desk v2 has one desk, and its plate actions moved from the header's slot
+    to the plate's own bar, which every layout draws. So "the same on both"
+    is now: Send to wall and Save are in that bar, each once, and nothing in
+    the bar depends on which layout is up. The header's slot holds Blackout,
+    which is the same on every layout for the same reason.
+  */
+  const src = readFileSync(join(root, 'src/components/desk/Desk.tsx'), 'utf8');
+  const barAt = src.indexOf('The plate bar.');
+  const bar = barAt < 0 ? '' : src.slice(barAt, src.indexOf('data-testid="desk-preview"', barAt));
+  const header = trailingOf(src);
+  const inBar = ['send-to-wall', 'save-look'].filter(t => (bar.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1
+    && (src.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1);
   check('both desks put actions on the top bar at all',
-    perform !== null && design !== null,
-    `perform ${perform ? perform.length : 'none'}, design ${design ? design.length : 'none'}`);
-  if (perform && design) {
-    const onlyDesign = design.filter(t => !perform.includes(t));
-    const onlyPerform = perform.filter(t => !design.includes(t));
-    check('and they are the same actions on both',
-      onlyDesign.length === 0 && onlyPerform.length === 0,
-      onlyDesign.length || onlyPerform.length
-        ? `${onlyDesign.map(t => 'design only: ' + t).concat(onlyPerform.map(t => 'perform only: ' + t)).join(', ')}`
-        : perform.join(', '));
-  }
+    inBar.length === 2 && header !== null && header.includes('blackout-button'),
+    `plate bar: ${inBar.join(', ') || 'none'}; header: ${header ? header.join(', ') : 'none'}`);
+  check('and they are the same actions on both',
+    bar.length > 0 && bar.indexOf('<Segmented') >= 0 && !/layoutName ===? ?'(build|gig|loadin)' &&[^\n]*(send-to-wall|save-look)/.test(bar)
+    && !/\{p\.layoutName/.test(bar.slice(bar.indexOf('<Segmented'))),
+    'one plate bar, drawn by every layout');
 }
 
 // ── Every command the code tells you to run, exists ─────────────────
