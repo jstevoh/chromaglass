@@ -588,7 +588,7 @@ const instruments = () => {
  * heartbeats, lead-plate steps and grid (depth.mjs's timeline). Then, if
  * given looks, each of them in turn.
  */
-async function open(query, looks) {
+async function open(query, looks, quick = false) {
   const cache = coldCache();
   const browser = await launchChromium(chromium);
   try {
@@ -617,7 +617,7 @@ async function open(query, looks) {
       measures is whether the lists hold everything a show can ask for once
       they have been built, not a race between a look change and the builds.
     */
-    const behind = query.includes('prepare=0') ? null : await page.evaluate(async () => {
+    const behind = query.includes('prepare=0') || quick ? null : await page.evaluate(async () => {
       const t0 = performance.now();
       const later = () => {
         const all = window.chromaglassDebug?.()?.pipelines?.()?.prepares ?? [];
@@ -643,7 +643,7 @@ async function open(query, looks) {
       const until = Math.max(least, first == null ? 0 : first + past, behindEnd == null ? 0 : behindEnd + 1000, performance.now());
       while (performance.now() < until) await new Promise((r) => setTimeout(r, 100));
       return until;
-    }, [WATCH_S * 1000, WATCH_AFTER_STEP_S * 1000, behind ? behind.at + behind.ms : null]);
+    }, quick ? [12000, 3000, null] : [WATCH_S * 1000, WATCH_AFTER_STEP_S * 1000, behind ? behind.at + behind.ms : null]);
 
     /*
       The longest stretch of each, from its first to now, within the watch.
@@ -1321,6 +1321,31 @@ async function instrumentsControl() {
   } finally {
     await browser.close().catch(() => {});
   }
+}
+
+/*
+  EXPERIMENT (to be removed): STARTUP_TRIALS=n opens the show n times in
+  each of STARTUP_VARIANTS (queries split on '|', '' as shipped), each on a
+  cold cache and read to three seconds past its first step, and prints how
+  long the GPU took to give the device and the longest wait for a frame,
+  then stops. Nothing judged.
+*/
+if (process.env.STARTUP_TRIALS) {
+  const variants = (process.env.STARTUP_VARIANTS ?? '').split('|');
+  const got = new Map(variants.map((v) => [v, []]));
+  const med = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : NaN; };
+  for (let n = 0; n < Number(process.env.STARTUP_TRIALS); n++) {
+    for (const v of variants) {
+      const o = await open(v, [], true);
+      const { frames } = frameStops(o);
+      const intro = o.intro ?? {};
+      got.get(v).push({ gap: frames.gap, whole: frames.whole });
+      console.log(`  trial ${n + 1} ${v || '(as shipped)'}: check 4's frame gap ${say(frames)} (whole ${frames.whole.toFixed(2)} s); ${milestones(o)}; intro still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never' : (e / 1000).toFixed(2)}`).join(', ') || 'never'}`);
+    }
+  }
+  for (const [v, rs] of got) console.log(`  ${v || '(as shipped)'}: check 4's frame gap median ${med(rs.map((r) => r.gap)).toFixed(2)} s, worst ${Math.max(...rs.map((r) => r.gap)).toFixed(2)} s over ${rs.length}: ${rs.map((r) => r.gap.toFixed(2)).join(', ')}`);
+  server.kill();
+  process.exit(0);
 }
 
 try {

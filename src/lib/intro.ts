@@ -171,6 +171,8 @@ export function introStill(): Promise<void> {
 
 /** And moving again. */
 export function introMove(): void {
+  // EXPERIMENT (startup trials): ?introstill=boot holds it from the first paint to here.
+  document.documentElement.classList.remove('cg-hold');
   const el = node();
   if (!el?.classList.contains('cg-still')) return;
   el.classList.remove('cg-still');
