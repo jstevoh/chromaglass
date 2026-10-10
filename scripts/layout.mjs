@@ -1007,7 +1007,9 @@ try {
         return { bad, panels, controls };
       });
       panelsSeen += r.panels; controlsSeen += r.controls;
-      if (r.panels === 0) out.push(`${run.w}×${run.h} ${run.label}: no panels`);
+      // A layout handed to the desk is the one it drew, all of it: a desk that dropped panels from it would otherwise pass on what was left.
+      const asked = run.layout ? run.layout.left.length + run.layout.right.length + run.layout.deck.length + run.layout.floating.length : 1;
+      if (run.layout ? r.panels !== asked : r.panels === 0) out.push(`${run.w}×${run.h} ${run.label}: ${r.panels} panels drawn${run.layout ? ` of ${asked}` : ''}`);
       if (r.bad.length) out.push(`${run.w}×${run.h} ${run.label}: ${r.bad.slice(0, 4).join(', ')}${r.bad.length > 4 ? ` +${r.bad.length - 4}` : ''}`);
       // The palette list opens where it can be read to its end, wherever its button is.
       if (run.name === 'gig' && !run.layout) {
@@ -1020,7 +1022,7 @@ try {
             if (!m) return 'did not open';
             const r = m.getBoundingClientRect();
             if (r.top < 0 || r.bottom > innerHeight + 1 || r.left < 0 || r.right > innerWidth + 1) return `${Math.round(r.top)}–${Math.round(r.bottom)} in ${innerHeight}`;
-            const last = m.querySelector('button:last-of-type');
+            const last = [...m.querySelectorAll('button')].pop();
             last?.scrollIntoView({ block: 'nearest' });
             const lr = last?.getBoundingClientRect();
             const hit = lr && document.elementFromPoint(lr.left + lr.width / 2, lr.top + lr.height / 2);
