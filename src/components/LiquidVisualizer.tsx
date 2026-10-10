@@ -33,6 +33,7 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
+import { padPictureSender, tapPadPicture } from '../lib/padPicture';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
@@ -841,6 +842,14 @@ export interface LiquidVisualizerHandle {
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
   applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => void;
+  /**
+   * A point on the wall (the drawn picture, normalised, y up) as the plate's
+   * point under it, through the camera: the plate is wider than the wall,
+   * turns with the dish and is magnified by the closeup. `turned` false
+   * leaves the dish's turn out, for a hand on the dish (Spin reads its
+   * angle as the room sees it). The point itself, until the canvas is up.
+   */
+  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -5268,6 +5277,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmGainRef = useRef(4.5);
 
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
+  const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean) => { x: number; y: number }) | null>(null);
   /**
    * A gesture from any hand, applied to the plate.
    *
@@ -6120,6 +6130,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     applyGesture: (g) => performGesture(g),
+    wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
   }));
 
   // Outside a render: a harness's `pour` between frames reads the ref too.
@@ -9291,6 +9302,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (mirror) {
           try { mirror(canvas); } catch { /* the projector window went away mid-frame */ }
         }
+        // The remote's Draw, for the same reason and in the same place: a
+        // small copy of this frame while a pad is asking (lib/padPicture.ts).
+        tapPadPicture(canvas);
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
@@ -9461,6 +9475,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         Evolve had begun would have carried on into the film.
       */
       rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      /*
+        The cover glass rides the rock (PLAN 27a-1) and is integrated frame
+        to frame the same way: a pendulum on its film, its slide dragging
+        the liquid. Left out of this list when it shipped, a render began
+        with the glass still swinging wherever the live show had left it,
+        and the same seed twice drew different films (render-app's "the
+        same seed twice", on main's deploy of 10-10: the plate's centre
+        velocity -0.05 against 4.50 by the first frame).
+      */
+      coverRef.current = { x: 0, y: 0, vx: 0, vy: 0 };
       lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
       gelAngleRef.current = 0;
       kaleidoPhaseRef.current = 0;
@@ -9704,6 +9728,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // under `?debug`.
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
+        /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
+        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via } : null; })(),
+        /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
+        wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /**
@@ -10867,16 +10895,29 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
     drawnRectRef.current = drawnRect;
     /*
+      A point on the wall (the canvas, normalised, y up) as a point on the
+      plate, through the same camera as this screen's own pointer: the
+      remote's pad sends the wall's points (PLAN 8-draw-a), and the wall is
+      the middle of a plate half again as wide, turned and magnified. A
+      DOMRect the canvas's own size stands for the screen's box; only its
+      proportions are read.
+    */
+    wallPointRef.current = (u, v, layer, turned) => {
+      const rect = new DOMRect(0, 0, Math.max(1, canvas.width), Math.max(1, canvas.height));
+      const p = fluidPointAt(u * rect.width, (1 - v) * rect.height, rect, layer, turned);
+      return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
+    };
+    /*
       Where a pointer is, in the plate's cells, not rounded: the Spin tool
       reads a hand's angle round the middle from it, and a pointer rounded to
       a cell is an angle rounded to a sixtieth of a radian at a third of the
       plate out, which at sixty readings a second is a turn a second of noise.
     */
-    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect) => {
+    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect, layer = activeLayerRef.current, turned = true) => {
       const cxp = clientX - rect.left - rect.width / 2;
       const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
       const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
-      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const angle = turned ? rotationAnglesRef.current[layer] || 0 : 0;
       const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
       const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
       // Mirror the shader's camera transform so the brush lands under the
@@ -10887,7 +10928,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const spread = Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0)) * (1 - macroAmountOf(settingsRef.current));
       if (spread > 0.001) {
         // The layers are spread into dishes: this layer's dish is its whole plate.
-        const layer = activeLayerRef.current;
         const aspect = rect.width / Math.max(1, rect.height);
         const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
         const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
@@ -10902,7 +10942,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
       // The second layer is viewed through its own zoom and drift.
       const view = layer1ViewRef.current;
-      if (activeLayerRef.current === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
+      if (layer === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
         fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
         fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
       }

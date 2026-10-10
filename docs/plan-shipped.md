@@ -1126,6 +1126,47 @@ Measured (cloud): `draw` 76/76 (phone, phone on its side, iPad both ways, wrong 
 `applink` 49/49, `remotemix` 17/17. Pictures: the project's draw-8 folder.
 
 
+
+#### 8-draw-a. The wall under Draw's pad, and touches that land under the finger (2026-10-10)
+
+`src/lib/padPicture.ts` (new), `DrawScreen.tsx`, `RemoteControl.tsx`, `App.tsx`,
+`LiquidVisualizer.tsx` (the frame task's tap and `wallToPlate`), `remoteProtocol.ts`.
+Check: `npm run drawwall` (new; Measure's browser part) and `drawwall -- --app` (the
+Mac's tools shard).
+
+Reported: Draw's frame was black, so a hand drew blind on the phone. The laptop now
+sends what it drew: in the frame task (the only place a presented WebGPU canvas can be
+read; the projector window is drawn the same way), a copy as wide as the pad's frame
+(160–480 px) is encoded as a JPEG in a worker and sent over the relay, at most 15 a
+second, one encode in flight. Not the canvas's `toBlob`: Chromium runs it in the page's
+idle time, and the Mac's show, drawing every frame, got 2 pictures a second from it. Not a WebRTC video track: that needs signalling through
+the relay, ICE on a show network that may not route between two Wi-Fi clients, and a
+decoder that buffers, which is latency a hand feels. Nothing is sent until a remote on
+Draw asks; it renews a three-second lease every second, so a phone that locks or leaves
+Draw stops the pictures without saying goodbye, and the relay stays stateless. The pad
+paints each picture by hand on a canvas (no React render per picture), latest-wins,
+dims it when pictures stop for 2 s, hides it while unlinked, and takes its shape.
+
+Found while building it: the pad's touches were the plate's points, and the wall shows
+the middle of a plate half again as wide (1/1.5 of it across a 16:9 wall, 0.375 of it
+up), turned with the dish. A touch at the frame's top went to plate y = 1, off the wall,
+and on a turned dish (Classic's was about 110° round in the cloud probe) a touch away
+from the middle landed round from the finger. Pad
+messages now carry `wall: true` and the laptop maps them through its own pointer's
+camera (`wallToPlate`: overscan, the dish's turn, the closeup, layer 2's view); a stroke
+maps both ends, a pen's lean is turned and keeps its length, and Spin leaves the dish's
+turn out (it reads the hand's angle as the room sees it). Without the flag (OSC, an
+older remote) the point is the plate's, as before.
+
+Measured (cloud): `drawwall` 16/16 (15.0 pictures/s, 6.2 kB each on a textured 4:3
+test card; quarters the right way up; frame 333×250 = 4:3); controls: a lease that never
+lapses fails "stops sending" (161 → 176), a frame that ignores the picture's shape fails
+"4:3" (444×250). `draw` 76/76, `phone` 351, `layout` 58, `applink` 49, `remotemix` 17,
+`panel` 180. On the Mac (`drawwall --app`): the pad's picture is the plate's colour
+(159,53,82 against grabFrame's 159,53,82); on a dish turned a radian, four drops from
+the pad changed the finger's cell by 287 (median cell 4, drift 5, centre 0.69,0.58 for
+0.69,0.58); the same point without the dish's turn changed it by 11 (it landed at
+0.56,0.82), and the old plate point by 3.
 #### 8-play. Play: the phone's listening screen (2026-10-10)
 
 `src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`

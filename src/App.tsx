@@ -25,6 +25,7 @@ import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from 
 import { luckyLook } from './lib/lucky';
 import { driftLook } from './lib/drift';
 import { unhandled } from './lib/unhandled';
+import { PadPictureSender, setPadPictureSender } from './lib/padPicture';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
 import { SoundPanel } from './components/SoundPanel';
 import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
@@ -3428,6 +3429,35 @@ export default function App() {
     }, 50);
   };
 
+  /*
+    A pad's point on the wall, as the plate's (PLAN 8-draw-a): the remote's
+    Draw sends where the finger is on the picture it shows, and the plate
+    under that is through the camera (`wallToPlate`). A point without `wall`
+    is the plate's already (OSC, an older remote). A stroke maps both its
+    ends, so it shrinks with the plate as a mouse's does; a lean is only a
+    direction in the room, so it is turned and keeps its length and angle.
+  */
+  const onWall = (wall: unknown, x: number, y: number, layer: number, dx?: number, dy?: number,
+                  vec: 'stroke' | 'lean' = 'stroke', turned = true) => {
+    const v = visualizerRef.current;
+    if (wall !== true || !v) return { x, y, dx, dy };
+    const p = v.wallToPlate(x, y, layer, turned);
+    if (dx === undefined || dy === undefined) return { x: p.x, y: p.y, dx, dy };
+    if (vec === 'stroke') {
+      const q = v.wallToPlate(x - dx, y - dy, layer, turned);
+      return { x: p.x, y: p.y, dx: p.x - q.x, dy: p.y - q.y };
+    }
+    /*
+      A pen's lean is a direction in the room, not wall units: a 45° lean
+      drawn as wall units on a 16:9 wall would come out at 29°. So it is
+      only turned, by the angle the camera turns a step to the right through.
+    */
+    const r = v.wallToPlate(x + 0.01, y, layer, turned);
+    const a = Math.atan2(r.y - p.y, r.x - p.x);
+    return { x: p.x, y: p.y, dx: dx * Math.cos(a) - dy * Math.sin(a), dy: dx * Math.sin(a) + dy * Math.cos(a) };
+  };
+  const padPictureRef = useRef<PadPictureSender | null>(null);
+
   const remoteLink = useRemoteLink({
     role: 'display',
     state: remoteState,
@@ -3505,7 +3535,8 @@ export default function App() {
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
           const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'blow', x, y, layer, amount, dx, dy });
+          // A pen's lean is a direction, not a stroke: turned with the dish, its length kept.
+          visualizerRef.current?.applyGesture({ tool: 'blow', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'lean') });
           break;
         }
         case 'drop': {
@@ -3517,7 +3548,7 @@ export default function App() {
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const color = typeof message.color === 'string' ? message.color : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'drop', x, y, layer, amount, ...laidColour(selectedLiquid, color) });
+          visualizerRef.current?.applyGesture({ tool: 'drop', ...onWall(message.wall, x, y, layer), layer, amount, ...laidColour(selectedLiquid, color) });
           break;
         }
         case 'press': {
@@ -3525,7 +3556,7 @@ export default function App() {
           const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'press', x, y, layer, amount });
+          visualizerRef.current?.applyGesture({ tool: 'press', ...onWall(message.wall, x, y, layer), layer, amount });
           break;
         }
         case 'finger': {
@@ -3535,7 +3566,7 @@ export default function App() {
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
           const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'finger', x, y, layer, amount, dx, dy });
+          visualizerRef.current?.applyGesture({ tool: 'finger', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'stroke') });
           break;
         }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
@@ -3545,9 +3576,14 @@ export default function App() {
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'spin', x, y, layer, amount, id });
+          // Untouched by the dish's turn: Spin reads the hand's angle as the room sees it.
+          visualizerRef.current?.applyGesture({ tool: 'spin', ...onWall(message.wall, x, y, layer, undefined, undefined, 'stroke', false), layer, amount, id });
           break;
         }
+        // A remote on Draw asking for the wall (lib/padPicture.ts).
+        case 'pad-picture':
+          padPictureRef.current?.want(message.width);
+          break;
         case 'tilt': {
           const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
           const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
@@ -3573,6 +3609,7 @@ export default function App() {
         case 'state':
         case 'lights':
         case 'cast':
+        case 'picture':
           break;
         default: unhandled('a message from the phone', message);
       }
@@ -3580,6 +3617,15 @@ export default function App() {
   });
 
   runActionRef.current = runAction;
+
+  // The wall for a remote's Draw: one sender while the link is up, fed by the frame task.
+  const remoteSend = remoteLink.send;
+  useEffect(() => {
+    const sender = new PadPictureSender(remoteSend);
+    padPictureRef.current = sender;
+    setPadPictureSender(sender);
+    return () => { if (padPictureRef.current === sender) padPictureRef.current = null; setPadPictureSender(null); };
+  }, [remoteSend]);
 
   // ── Songs: the runtime ──────────────────────────────────────────
   /** A setting walked to a value over some seconds, the way a hand turns a knob. One walk per setting. */

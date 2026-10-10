@@ -55,6 +55,7 @@
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
     "saves": "npm run build && node scripts/saves.mjs",
     "draw": "npm run build && node --experimental-strip-types scripts/draw.mjs",
+    "drawwall": "npm run build && node --experimental-strip-types scripts/drawwall.mjs",
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
     "ios": "npm run build && npx cap sync ios && npx cap open ios",
     "check": "node scripts/check.mjs",

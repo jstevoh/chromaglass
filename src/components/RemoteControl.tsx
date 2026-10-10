@@ -7,6 +7,7 @@ import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
+import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
@@ -151,9 +152,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const draggingRef = useRef<Set<keyof VisualizerSettings>>(new Set());
   const [localValues, setLocalValues] = useState<Partial<VisualizerSettings>>({});
 
+  /** Draw's painter for the wall's picture, when Draw is up: handed each one without a render here. */
+  const pictureSink = useRef<((m: PadPictureMessage) => void) | null>(null);
   const { status, send } = useRemoteLink({
     role: 'controller',
     onMessage: (message) => {
+      if (message.type === 'picture') { pictureSink.current?.(message); return; }
       if (message.type !== 'state') return;
       setState(message.state);
       setLocalValues((prev) => {
@@ -294,8 +298,27 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const [padTouchCount, setPadTouchCount] = useState(0);
   /** Each held press's last pressure, so a finger held still can keep pressing. */
   const padPressAmount = useRef(new Map<number, number>());
+  /*
+    The wall under the pad (PLAN 8-draw-a, lib/padPicture.ts): while Draw is
+    up, linked and on screen, ask the laptop for its picture every second, as
+    wide as the frame it fills. A phone that locks or leaves Draw just stops
+    asking, and the laptop stops sending three seconds later.
+  */
+  useEffect(() => {
+    if (view !== 'draw' || !connected) return;
+    const ask = () => {
+      if (document.visibilityState !== 'visible') return;
+      const w = wallRef.current?.getBoundingClientRect().width ?? 0;
+      send({ type: 'pad-picture', width: Math.round(w) });
+    };
+    ask();
+    const timer = setInterval(ask, PAD_PICTURE_RENEW_MS);
+    document.addEventListener('visibilitychange', ask);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', ask); };
+  }, [view, connected, send]);
   const padPoint = (e: ReactPointerEvent) => {
-    // Draw maps a touch into the wall's 16:9 box; Controls' pad is the wall stretched to the pad.
+    // Draw maps a touch into the wall's box; Controls' pad is the wall stretched to the pad.
+    // Either way the point is the wall's (`wall: true` on the message), which the laptop maps onto the plate.
     const r = (wallRef.current ?? padRef.current)!.getBoundingClientRect();
     // Normalised, y up — the plate's own coordinates.
     return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) };
@@ -303,11 +326,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const padSend = (kind: PadTool, e: ReactPointerEvent, p: { x: number; y: number },
                    from?: { x: number; y: number }) => {
     const amount = Math.max(0.05, Math.min(1, pressureOf(e) * padAmount));
-    if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
-    else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount }); }
+    if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, wall: true, layer: padLayer, amount, color: padColor ?? undefined });
+    else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, wall: true, layer: padLayer, amount }); }
     // A finger on the dish (PLAN §22): it turns under the finger, and the
     // finger held still keeps sending (below), because a still hand is a brake.
-    else if (kind === 'spin') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: e.pointerId }); }
+    else if (kind === 'spin') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'spin', x: p.x, y: p.y, wall: true, layer: padLayer, amount, id: e.pointerId }); }
     else if (kind === 'finger') {
       // A finger mixes by moving, so the stroke's own direction is the whole
       // gesture: where the touch was last, against where it is now. A tap
@@ -315,9 +338,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       if (!from) return;
       const dx = p.x - from.x, dy = p.y - from.y;
       if (dx === 0 && dy === 0) return;
-      send({ type: 'finger', x: p.x, y: p.y, layer: padLayer, amount, dx, dy });
+      send({ type: 'finger', x: p.x, y: p.y, wall: true, layer: padLayer, amount, dx, dy });
     }
-    else { const t = tiltOf(e); send({ type: 'blow', x: p.x, y: p.y, layer: padLayer, amount, ...(t ?? {}) }); }
+    else { const t = tiltOf(e); send({ type: 'blow', x: p.x, y: p.y, wall: true, layer: padLayer, amount, ...(t ?? {}) }); }
   };
   const onPadDown = (e: ReactPointerEvent) => {
     if (!connected) return;
@@ -373,8 +396,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         const p = padTouches.current.get(pid);
         if (!p || now - (padLastSend.current.get(pid) ?? 0) < 50) continue;
         padLastSend.current.set(pid, now);
-        if (padTool === 'spin') send({ type: 'spin', x: p.x, y: p.y, layer: padLayer, amount, id: pid });
-        else send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount });
+        if (padTool === 'spin') send({ type: 'spin', x: p.x, y: p.y, wall: true, layer: padLayer, amount, id: pid });
+        else send({ type: 'press', x: p.x, y: p.y, wall: true, layer: padLayer, amount });
       }
     }, 50);
     return () => window.clearInterval(id);
@@ -617,6 +640,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         amount={padAmount}
         setAmount={(v) => setPadAmount(Math.max(DRAW_AMOUNT_MIN, Math.min(DRAW_AMOUNT_MAX, v)))}
         wallRef={wallRef}
+        pictureSink={pictureSink}
         onPadDown={onPadDown}
         onPadMove={onPadMove}
         onPadUp={onPadUp}

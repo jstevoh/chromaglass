@@ -1237,3 +1237,16 @@ white lamp, every stripe about the same width. Then stir it with a hand or a Blo
   Looks sheet moves it; say where you would set it;
 - On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
   grows where it grew. Better, or did the bigger coral suit those looks?
+
+## 47. Draw shows the wall, and lands under the finger (PLAN 8-draw-a)
+
+With the show server running (`npm run show`) and the projector up, open the remote on a
+phone and an iPad (Draw is the screen it opens on).
+
+1. The frame shows the wall, moving, within a blink of the projector: drop with one
+   finger and the colour appears under it on the pad as it does on the wall.
+2. Drop near each corner of the frame and on the edges: the colour lands under the
+   finger on the wall too, with the dish turning (Classic) and with the closeup in.
+3. Lock the phone for ten seconds and unlock it: the picture comes back on its own.
+4. Say if the lag reads as a delay under the finger; if it does, the size or the rate
+   (`lib/padPicture.ts`) is the trade to revisit.
