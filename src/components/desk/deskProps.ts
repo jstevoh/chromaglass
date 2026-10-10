@@ -140,6 +140,8 @@ export interface DeskProps {
   ccFor: (key: keyof VisualizerSettings) => number | null;
   /** Whether a control's CC is a fader or an encoder: a fader draws as a slider. */
   kindFor: (key: keyof VisualizerSettings) => ControlKind | null;
+  /** The look's own value of a setting, where a double-click on its knob or slider puts it back (8c). */
+  lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
   rideKeys: (keyof VisualizerSettings)[];
   onRideKeys: (keys: (keyof VisualizerSettings)[]) => void;
   recipeKeys: (keyof VisualizerSettings)[];

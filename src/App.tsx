@@ -30,7 +30,7 @@ import { SoundPanel } from './components/SoundPanel';
 import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
-import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -71,9 +71,10 @@ import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
-import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
+import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, wallTestOn, type OutputConfig, type WallTest } from './lib/outputConfig';
 import { TempoSource, bpmOf } from './lib/tempo';
-import type { MidiAction, SoundBinding } from './lib/midi';
+import type { MidiAction, MidiMap, SoundBinding } from './lib/midi';
+import { controlKindOf } from './lib/midi';
 import { runTrigger } from './lib/soundLearn';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -269,6 +270,25 @@ export default function App() {
   // live in a section of their own with their own Clear, and a Reset pressed
   // over there should not quietly throw away an evening's corner-dragging here.
   const resetOutput = useCallback(() => setOutput(prev => ({ ...DEFAULT_OUTPUT, surfaces: prev.surfaces })), [setOutput]);
+  /*
+    The wall test (Desk v2, PLAN.md 8e): Load-in's test pattern and Identify.
+    Beside the output config, never in it: that config is stored, and a show
+    that opened on last night's test pattern would put a grid on the wall in
+    front of the room. Laid onto the config only for the plate (`shownOutput`),
+    which draws it in the projector's pass, through the same pin and masks as
+    the show. Identify ends itself: once its three seconds are up the test is
+    dropped, so the pass it needed is dropped with it when nothing else does.
+  */
+  const [wallTest, setWallTest] = useState<WallTest>({ pattern: false, identifyUntil: 0 });
+  useEffect(() => {
+    const left = wallTest.identifyUntil - Date.now();
+    if (left <= 0) return;
+    const t = window.setTimeout(() => setWallTest(w => ({ ...w, identifyUntil: 0 })), left + 50);
+    return () => window.clearTimeout(t);
+  }, [wallTest.identifyUntil]);
+  const shownOutput = useMemo<OutputConfig>(
+    () => (wallTestOn(wallTest) ? { ...output, test: wallTest } : output),
+    [output, wallTest]);
 
   // ── Where the tempo comes from ──────────────────────────────────
   // The microphone, unless something better is offering: a MIDI clock from
@@ -2202,6 +2222,23 @@ export default function App() {
     return pinnedLookName ?? 'Untitled look';
   }, [docId, userPresets.presets, pinnedLookName]);
 
+  /*
+    The look's own values, for a knob's double-click (PLAN.md 8c): the
+    document's when there is one, the built-in it started from when not, and
+    a bare look for an empty plate. Through `lookOf`, so a value is what
+    sending that look gives, base included. A rig setting (the dimmer, the
+    room's sound, the mixer) is no look's, so it has no value to go back to.
+  */
+  const lookValues = useMemo(() => {
+    const own = docId ? userPresets.presets.find(p => p.id === docId)?.settings
+      : pinnedPresetId ? allPresets.find(p => p.id === pinnedPresetId)?.settings : undefined;
+    return lookOf(own ?? {});
+  }, [docId, userPresets.presets, pinnedPresetId, allPresets]);
+  const lookValueOf = useCallback((key: keyof VisualizerSettings): number | undefined => {
+    const v = lookValues[key];
+    return typeof v === 'number' ? v : undefined;
+  }, [lookValues]);
+
   /**
    * The cue list: the looks, in order, each carrying two of its own dyes so a
    * row is recognisable without reading it. The live one is what is on the
@@ -2256,7 +2293,9 @@ export default function App() {
    * than a reorder: the hook's inputs depend on half the app.
    */
   const midiRef = useRef<{
-    map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] };
+    map: MidiMap;
+    /** The port it is playing from, for the controller's profile (which CCs are knobs). */
+    activeInputName: string | null;
     /** The shift layer, so a pad can step it — the actions run above the hook too. */
     stepBank: (dir: 1 | -1) => void;
   } | null>(null);
@@ -2268,17 +2307,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /*
-    And what it is learned to: an endless encoder draws as a knob, anything
-    with a stop as a slider (the design's rule, so the desk looks like the
-    controller). A binding only says absolute or relative, so an absolute pot
-    reads as a fader until profiles name their kinds (PLAN.md §8).
+    And what it is learned to: a knob draws as a knob, a fader as a slider
+    (the design's rule, so the desk looks like the controller). A binding
+    only says absolute or relative, so the controller's profile names which
+    of its CCs turn (`controlKindOf`, PLAN.md 8d).
   */
-  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null => {
-    const b = midiRef.current?.map.bindings.find(x => x.target.kind === 'setting' && x.target.key === key) as { mode?: string; source: { kind: string } } | undefined;
-    if (!b || b.source.kind !== 'cc') return null;
-    return b.mode === 'relative' ? 'encoder' : 'fader';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null =>
+    controlKindOf(midiRef.current?.map, key, midiRef.current?.activeInputName),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  []);
 
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
@@ -2824,8 +2861,12 @@ export default function App() {
     presetId: activePresetId,
     presetSeq,
     harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
-    output,
-  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
+    // With the wall test on it (8e), so a receiver that draws its own plate
+    // (a Chromecast, a second machine) shows the pattern and the numbers as
+    // the HDMI wall does. Identify's end is a clock time, so a receiver whose
+    // clock is a second off flashes a second more or less.
+    output: shownOutput,
+  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
   /**
    * The mark, kept as a data URL so it can be sent to a receiver.
@@ -4174,6 +4215,8 @@ export default function App() {
       onOutput={setOutput}
       onOutputReset={resetOutput}
       wakeLock={wakeLock}
+      wallTest={wallTest}
+      onWallTest={setWallTest}
       tempo={tempoLabel}
       onTap={tapTempo}
       onTempoClear={clearTempo}
@@ -4226,7 +4269,7 @@ export default function App() {
         sceneRef={scene.reading}
         filmSenseRef={filmSense.reading}
         frame={preview.frame}
-        output={output}
+        output={shownOutput}
         tempoRef={tempoRef}
         soundBindings={midi.map.sound}
         onSoundTrigger={runSoundTrigger}
@@ -5026,6 +5069,7 @@ export default function App() {
           onTool={setActiveTool}
           settings={settings}
           onSetting={updateSettings}
+          lookValueOf={lookValueOf}
           onZoom={pinchZoom}
           listening={audioSource !== 'none'}
           deaf={earDeaf}
@@ -5741,6 +5785,7 @@ export default function App() {
           onAutomate={setIsAutomated}
           ccFor={ccFor}
           kindFor={kindFor}
+          lookValueOf={lookValueOf}
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           recipeKeys={recipeKeys}

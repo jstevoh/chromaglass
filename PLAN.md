@@ -995,22 +995,33 @@ Open from Desk v2, each its own thread (the UI lane):
   the plate on the wall. The design means an offline copy: a second solver, or the
   back plate, drawn on the desk and not on the wall, until Send to wall. *Measure:* a
   look changed in Preview leaves the projector window's frame unchanged (`wall`, Mac).
-- **8c** (S) Knobs turn the design's way too: a circular drag round the knob as well as up
-  and down, and a double-click goes back to the look's own value. The knob takes a
-  `resetTo` for it, but the look's value is not handed to the desk yet, so a
-  double-click does nothing.
-- **8d** (S) A control's kind from the controller's profile. A binding only says absolute
-  or relative, so an absolute pot on an APC draws as a slider (a fader); the profiles
-  (`midi.ts`) know which CCs are knobs. *Measure:* `npm run desk` with the APC40 map.
-- **8e** (S) Load-in's Wall panel gains the design's test pattern and Identify (each
-  projector flashes its number), and Output's Gain and Gamma as knobs.
-- **8f** (S) A QR code on the Phone · iPad panel for the link (`relayInfo()`), drawn
-  without a library.
+- ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
+  the look's own value (a double tap on Play's sliders)~~ (shipped; story in
+  `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
+- ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
+  XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
+- ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
+  as knobs~~ (shipped; checks `npm run wallpattern`, `npm run map`, `npm run layout`).
+  - **8e-1** (S) The wall test from the phone. The remote has no Load-in at all (no
+    corner pin, no masks), so the test pattern and Identify are on the laptop only. A
+    `wall-test` action in the remote protocol (App, MIDI too) would let someone at the
+    wall walk the corners with the pattern up. After 8-draw-a lands, which is in
+    `RemoteControl.tsx` now.
+  - **8e-2** (S) The design's Load-in plate bar reads "Live | Test pattern" with
+    Identify beside it. Today the bar is the same in every layout (`npm run panel`, "the
+    same actions on both"), so the switch is in the Wall panel, which Load-in opens by
+    default. Moving it to the bar means deciding with the owner whether the bar may
+    differ by layout.
+- ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
+  `npm run qr`, `npm run layout`).
 - **8g** (M) A panel popped out to a second display (`window.open`), for a laptop and a
   monitor at a gig.
-- **8h** (S) The header at 1024 is full: five tabs, + Panel (its word hidden below
-  1280), the dots, search and Blackout. A sixth thing on it needs the dots folded into
-  one; `npm run layout`'s cover pass at 1024 is the measure.
+- ~~**8h** The header at 1024: its dots fold into one Status button when they do not
+  fit~~ (shipped; check `npm run layout`).
+  - **8h-1** (S) Folded, the Status button's one dot is green while anything is
+    connected, so a wall that drops while the sound is up still reads green until the
+    button is opened. A dot per input inside the button (no words) costs about 40 px,
+    which 1024 has (73 px spare folded); the owner's call on a laptop.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's

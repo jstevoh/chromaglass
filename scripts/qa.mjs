@@ -2227,9 +2227,9 @@ try {
       // reported as "these dots need to be labeled. I don't know what goes
       // to what." They move under their dots instead now.
       if (w >= 1024) {
-        const { all, bare } = await statusDots(page);
+        const { all, bare, folded } = await statusDots(page);
         check(`every status dot is labelled at ${w}px`, all > 0 && bare.length === 0,
-          bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word`);
+          bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word${folded ? ', in the opened Status fold' : ''}`);
       }
     }
     await page.setViewportSize({ width: 1600, height: 900 });

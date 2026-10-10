@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
+import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -296,9 +297,11 @@ export interface SliderProps extends Keyed {
   testId?: string;
   /** The setting a controller moves to reach this, so its CC lights when one does. */
   midiKey?: string | null;
+  /** Where a double-click puts it back to: the look's own value (PLAN.md 8c), as a knob does. */
+  resetTo?: number;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -357,6 +360,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           onChange(handValueAt(raw, min, max, curve));
         }}
         aria-label={label}
+        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
         className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
         style={{ '--fill': `${pct}%` } as CSSProperties}
       />
@@ -450,7 +454,12 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   };
   const at = travel(value);
   const [drag, setDrag] = useState<{ fine: boolean } | null>(null);
-  const grab = useRef<{ y: number; t: number; id: number } | null>(null);
+  /*
+    A drag is relative to where it began: `t` is the travel then. On the cap
+    it is a vertical drag from `y`; on the ring (`ring`) it follows the hand
+    round from `at`, the hand's last place from the centre (lib/knobDrag.ts).
+  */
+  const grab = useRef<{ y: number; t: number; id: number; ring: boolean; at: [number, number]; cx: number; cy: number } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const hit = useMidiTouch(midiKey ?? null);
 
@@ -499,6 +508,12 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           <line x1="20" y1="15" x2="20" y2="10" stroke="#fff" strokeWidth="2" strokeLinecap="round"
             transform={`rotate(${-135 + 270 * at} 20 20)`} />
         </svg>
+        {/*
+          touch-none: on an iPad the browser would take a finger's drag as a
+          page pan and cancel the pointer, so neither the ring nor the cap
+          would turn (Gain and Gamma are knobs in the Settings sheet's Wall
+          section, which a tablet opens).
+        */}
         <input
           ref={inputRef}
           type="range"
@@ -518,22 +533,35 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
             e.preventDefault();
             e.currentTarget.focus();
             e.currentTarget.setPointerCapture(e.pointerId);
-            grab.current = { y: e.clientY, t: at, id: e.pointerId };
+            const r = e.currentTarget.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            const from: [number, number] = [e.clientX - cx, e.clientY - cy];
+            grab.current = { y: e.clientY, t: at, id: e.pointerId, ring: onRing(from[0], from[1], r.width / 2), at: from, cx, cy };
             setDrag({ fine: e.altKey });
           }}
           onPointerMove={e => {
             const g = grab.current;
             if (!g || g.id !== e.pointerId) return;
             const fine = e.altKey;
-            const dy = g.y - e.clientY;
+            const here: [number, number] = [e.clientX - g.cx, e.clientY - g.cy];
             // Re-anchored when ⌥ changes, so going fine does not jump the knob.
-            if (fine !== drag?.fine) { grab.current = { y: e.clientY, t: travel(value), id: e.pointerId }; setDrag({ fine }); return; }
-            onChange(valueAt(g.t + dy * 0.005 * (fine ? 0.1 : 1)));
+            if (fine !== drag?.fine) { grab.current = { ...g, y: e.clientY, t: travel(value), at: here }; setDrag({ fine }); return; }
+            const scale = fine ? 0.1 : 1;
+            if (g.ring) {
+              // Round the ring: each step's turn added to the travel, held in
+              // range so a hand that goes past the stop and comes back finds
+              // the knob where it left it rather than a turn behind.
+              const t = Math.max(0, Math.min(1, g.t + ringTravel(g.at, here) * scale));
+              grab.current = { ...g, t, at: here };
+              onChange(valueAt(t));
+              return;
+            }
+            onChange(valueAt(g.t + (g.y - e.clientY) * KNOB_PX * scale));
           }}
           onPointerUp={e => { if (grab.current?.id === e.pointerId) { grab.current = null; setDrag(null); } }}
           onPointerCancel={() => { grab.current = null; setDrag(null); }}
           onDoubleClick={() => { if (resetTo !== undefined && !disabled) onChange(resetTo); }}
-          className="absolute inset-0 h-full w-full cursor-ns-resize appearance-none rounded-full opacity-0"
+          className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
       </span>
       {drag ? (
