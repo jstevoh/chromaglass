@@ -164,6 +164,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run desklayout
 
+      # The Phone · iPad panel's QR code (PLAN 8f), read back module by module:
+      # the format and version words, every Reed-Solomon block, the bytes.
+      - name: The phone link's QR code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run qr
+
       # The spinning dish's CPU half: the liquid's lag behind the glass, Auto
       # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22).
       - name: The turntable
@@ -856,6 +862,14 @@ jobs:
       - name: The liquids carried onto a new grid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run regrid
+      # The wall's test pattern and Identify (PLAN.md 8e), drawn in the
+      # projector's own pass: off is the plain pass byte for byte, on it is a
+      # grid, cross, circle, border and numbered corners that follow the pin,
+      # the flip and the mask. In the open shard: the plate shard is near its
+      # timeout.
+      - name: The wall's test pattern
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run wallpattern
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import type { VisualizerSettings } from '../../types';
 
@@ -22,7 +22,19 @@ import type { VisualizerSettings } from '../../types';
   solid surfaces' grey, which vanished against a dark plate. Set as the
   variable the track's gradient already reads, so the CSS stays one rule.
 */
-export function TouchSlider({ label, value, min, max, setting, onChange, display, glass, testId }: {
+/*
+  A double tap goes back to the look's own value (`resetTo`, PLAN.md 8c): the
+  desk's knobs do it on a double-click, and on a phone every knob is one of
+  these (the design: "never on touch"). Read from two lifts of a finger close
+  in time and place, not the browser's dblclick, which a touch on a range
+  input does not reliably send. Each tap moves the thumb first, as any touch
+  on the track does; the second lift then puts the value back, so where the
+  thumb was tapped does not matter.
+*/
+const DOUBLE_TAP_MS = 320;
+const DOUBLE_TAP_PX = 24;
+
+export function TouchSlider({ label, value, min, max, setting, onChange, display, glass, testId, resetTo }: {
   label: string;
   value: number; min: number; max: number;
   /** The setting it rides, for its curve. */
@@ -31,12 +43,27 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
   display: string;
   glass?: boolean;
   testId?: string;
+  /** Where a double tap puts it back: the look's own value. */
+  resetTo?: number;
 }) {
+  const lastTap = useRef<{ t: number; x: number } | null>(null);
   const curve = setting ? curveOf(setting) : 1;
   const at = Math.max(0, Math.min(1, travelOf(value, min, max, curve)));
   const style = { '--fill': `${at * 100}%`, ...(glass ? { '--color-track': 'rgba(255,255,255,.14)' } : {}) } as CSSProperties;
   return (
-    <div className="flex h-11 items-center gap-3" data-testid={testId}>
+    <div
+      className="flex h-11 items-center gap-3"
+      data-testid={testId}
+      onPointerUp={resetTo === undefined ? undefined : e => {
+        const last = lastTap.current;
+        if (last && e.timeStamp - last.t < DOUBLE_TAP_MS && Math.abs(e.clientX - last.x) < DOUBLE_TAP_PX) {
+          lastTap.current = null;
+          onChange(resetTo);
+          return;
+        }
+        lastTap.current = { t: e.timeStamp, x: e.clientX };
+      }}
+    >
       <span className="w-[84px] shrink-0 truncate text-[14px] font-medium text-text-2">{label}</span>
       <input
         type="range"

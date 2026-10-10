@@ -1237,3 +1237,21 @@ white lamp, every stripe about the same width. Then stir it with a hand or a Blo
   Looks sheet moves it; say where you would set it;
 - On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
   grows where it grew. Better, or did the bigger coral suit those looks?
+
+## 47. The test pattern and Identify on a real wall (PLAN 8e)
+
+With the projector up, open Load-in and switch **Test pattern** on in the Wall panel:
+
+- Is the grid square and the circle round once the corners are dragged right? The grid is
+  kept square by the shape of the projected quad, so a keystone shows as cells that are not;
+- Are the lines bright and thin enough to drag a corner against from where the audience
+  will stand, and are the corner numbers (1 to 4, clockwise from the top left, as the
+  corner handles are) readable from there?
+- With shapes in Mapping, does each carry its own number in its middle, and does
+  **Identify** flash every number clearly enough to find the shape called 3?
+- With **Rear** on, the pattern is mirrored with the show (it is drawn as the picture is).
+  Is that the way round you want it, standing behind the screen?
+
+And the header at 1024 (PLAN 8h): with the window that narrow the dots fold into one
+**Status** button. Is one dot (green while anything is connected, red while recording)
+enough, or should the button carry a dot per input (PLAN 8h-1)?

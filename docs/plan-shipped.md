@@ -1161,6 +1161,64 @@ not run, and the Mac shard requires them). `saves` 33 → 38 (Play's Save), `lay
 `applink` 48/48 (Play here now lands on Play, and the Laptop remote is reached through All
 controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
 
+#### 8c, 8d, 8e, 8f, 8h. The rest of Desk v2's small pieces (2026-10-10)
+
+`src/lib/knobDrag.ts`, `src/lib/qr.ts`, `scripts/qr.mjs`, `scripts/wallpattern.mjs` (new);
+`ui/index.tsx` (Knob, Slider), `ui/TouchSlider.tsx`, `desk/DeskPanels.tsx`, `desk/DeskHeader.tsx`,
+`OutputPanel.tsx`, `lib/midi.ts` (`controlKindOf`), `lib/outputConfig.ts` (`WallTest`),
+`gpu/output.ts` and `gpu/wgsl/output.ts` (the wall test), `App.tsx`, `PhonePlay.tsx`.
+
+- **8c** A knob takes hold where the hand does: on its cap it is the vertical drag it was
+  (0.5% of the range a pixel); on its ring it follows the hand round, a full 270° sweep
+  being its whole travel. The two disagree about the same motion (up on the ring's right
+  side is anticlockwise), so the knob decides once, at the hold. A double-click puts a knob
+  or a desk slider back to the look's own value (`lookOf` of the open document, or of the
+  built-in it came from); a rig setting such as the dimmer has none and stays. On a phone
+  every knob is a touch slider, so Play's five setting sliders take a double tap instead.
+- **8d** The desk drew every absolute CC as a fader, because a binding only says absolute or
+  relative. `controlKindOf` names which CCs turn on the boards the factory maps are for (the
+  APC40's device and track knobs and its two encoders, the Launch Control XL's three rows,
+  the nanoKONTROL2's eight), from the map's device or else the port; an unknown board keeps
+  today's rule.
+- **8e** Load-in's Wall panel (and the Stage sheet's) has a Test pattern switch and Identify,
+  and Output gain and Gamma as 56 px knobs. The pattern is drawn in the projector's own pass,
+  so it goes through the same corner pin, flip and blanking as the show: per quad a grid kept
+  square by the quad's shape on the wall, both diagonals, a circle 0.8 of the height across,
+  a white border, the corners numbered 1 to 4 clockwise from the top left as the pin's
+  handles are, and the quad's number in the middle (a mapped shape's place in the Mapping
+  list). Identify flashes each quad's number, half the height tall, for three seconds over
+  whatever is up. Neither is ever stored with the output config (a show reopened on a test
+  pattern would put a grid in front of the room); App keeps it beside the config and lays it
+  on for the plate and the cast state, so a receiver drawing its own plate shows it too.
+  The design puts the switch in Load-in's plate bar; the bar is one bar in every layout
+  (`npm run panel`), so that is 8e-2.
+- **8f** The Phone · iPad panel draws its link as a QR code: an encoder written here (byte
+  mode, level M, versions 1–10, the eight masks scored by the standard's penalty rules),
+  drawn as one SVG path in whole pixels per module, black on white with its quiet zone.
+- **8h** The header at 1024 measured 342 px of cluster against 337 of room right of the
+  centred switch, so the Sound dot sat 5 px under it. The header now has three measured
+  levels: the dots' words beside them, under them (12 px from the switch, as before), and
+  folded into one Status button (only when the cluster actually reaches the switch), whose
+  dot is red while recording and green while anything is connected, and which opens every
+  dot as it was. At 1024 the folded cluster is 73 px clear. Where the dots unfold depends on the
+  fonts: 1280 keeps every dot in sight in a cloud session, CI's Linux runner folds there and
+  unfolds by 1440, so the check finds the width rather than assuming it.
+
+Measured (cloud): `desk` 27 → 40 (8c's ring arithmetic, 8d's four boards and an unknown one
+as the control); `qr` 13/13 new (every symbol read back from its modules: format and
+version words against their BCH codes, every Reed–Solomon block's syndromes zero, the bytes;
+three flipped modules make 35 syndromes non-zero, the control), and all eight cases decoded
+by OpenCV's reader in the session; `wallpattern` 20/20 new under `PW_WEBGPU=1` (on CI's open shard) (off is the
+pass byte for byte; on, the grid, cross, border, circle and corner digits where they should
+be, following a pulled pin, swapped by a flip, under a mask, one number per mapped shape,
+Identify over the show, ungraded); `map` 44 → 47 (a config saved with the pattern up is stored without it); `layout` 58 → 68 (a knob turned round its
+ring 0.113 → 0.779, a cap drag sideways leaves it, a double-click back to the look's 0.313;
+the Wall panel's four controls and the pattern never stored; the QR drawn module for module;
+the header clear of the switch at 1024 with a seventh dot in it, folding and unfolding where
+the dots fit, and a take's Rec dot folding a full header and unfolding it when the take stops; the "every status dot is labelled" check opens the fold and counts the five dots inside
+it, not the one button); `phone` 369/369 with Play's double tap back to the look's speed; `panel` 180/180; `wgsl`;
+`desklayout` 40/40.
+
 ### 9. Ferrofluid after the references
 
 **9a. The edge, and two looks, shipped in #161.** The ferrofluid ends on a sharp,

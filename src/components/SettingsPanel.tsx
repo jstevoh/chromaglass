@@ -12,7 +12,7 @@ import { Info } from './Info';
 import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
-import type { OutputConfig } from '../lib/outputConfig';
+import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -144,6 +144,9 @@ interface SettingsPanelProps {
   onOutputReset?: () => void;
   /** Whether this machine is keeping its screen awake, and whether it can. */
   wakeLock?: { supported: boolean; held: boolean };
+  /** The wall test (PLAN.md 8e): Load-in's test pattern and Identify, for the Wall section. */
+  wallTest?: WallTest;
+  onWallTest?: (t: WallTest) => void;
   /**
    * Open showing this section. This is what the command palette's per-section
    * rows use, so "the room" typed into ⌘K lands on the room rather than on the
@@ -357,7 +360,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -2381,7 +2384,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           </div>
         )}
         {output && onOutput && onOutputReset && (
-          <OutputPanel output={output} onChange={onOutput} onReset={onOutputReset} wakeLock={wakeLock} />
+          <OutputPanel output={output} onChange={onOutput} onReset={onOutputReset} wakeLock={wakeLock} test={wallTest} onTest={onWallTest} />
         )}
       </section>
       )}

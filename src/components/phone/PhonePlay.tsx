@@ -85,6 +85,8 @@ export interface PhonePlayProps {
   onTool: (t: PhoneTool) => void;
   settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom' | 'macroMode'>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
+  /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
+  lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
   onZoom: (z: number) => void;
   listening: boolean;
   deaf: boolean;
@@ -395,18 +397,18 @@ export function PhonePlay(p: PhonePlayProps) {
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 landscape:grid landscape:grid-cols-2 landscape:content-start landscape:gap-x-6">
               <div>
               <TouchSlider glass label="Speed" setting="globalSpeed" min={0} max={0.3} value={s.globalSpeed ?? 0}
-                display={(s.globalSpeed ?? 0) < 0.1 ? (s.globalSpeed ?? 0).toFixed(3) : (s.globalSpeed ?? 0).toFixed(2)} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
+                display={(s.globalSpeed ?? 0) < 0.1 ? (s.globalSpeed ?? 0).toFixed(3) : (s.globalSpeed ?? 0).toFixed(2)} resetTo={p.lookValueOf?.('globalSpeed')} onChange={v => p.onSetting({ globalSpeed: v })} testId="play-slider-speed" />
               <TouchSlider glass label="Turbulence" setting="turbulenceScale" min={0} max={1} value={s.turbulenceScale ?? 0}
-                display={pct(s.turbulenceScale ?? 0)} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
+                display={pct(s.turbulenceScale ?? 0)} resetTo={p.lookValueOf?.('turbulenceScale')} onChange={v => p.onSetting({ turbulenceScale: v })} testId="play-slider-turbulence" />
               <TouchSlider glass label="Swirl" setting="vorticityConfinement" min={0} max={1} value={s.vorticityConfinement ?? 0}
-                display={pct(s.vorticityConfinement ?? 0)} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
+                display={pct(s.vorticityConfinement ?? 0)} resetTo={p.lookValueOf?.('vorticityConfinement')} onChange={v => p.onSetting({ vorticityConfinement: v })} testId="play-slider-swirl" />
               <TouchSlider glass label="Soap" setting="surfactantFlow" min={0} max={1} value={s.surfactantFlow ?? 0}
-                display={pct(s.surfactantFlow ?? 0)} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
+                display={pct(s.surfactantFlow ?? 0)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
               {/* To 8×, not the pinch's 16: past 8 a phone's plate is a few cells across, and the slider's travel is better spent below. */}
               <TouchSlider glass label="Zoom" min={1} max={8} value={Math.min(8, zoom)}
                 display={`${zoom.toFixed(1)}×`} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
               <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={1} value={s.automateRate ?? 0}
-                display={pct(s.automateRate ?? 0)} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
+                display={pct(s.automateRate ?? 0)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
               </div>
               <div className="min-w-0">
 

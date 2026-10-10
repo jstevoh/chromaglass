@@ -1073,6 +1073,16 @@ try {
       const after = await speedText();
       check('Play: Speed moved is the plate\'s speed', before !== after && Number(after) > Number(before), `${before} → ${after}`);
       check('Play: and the look is marked edited', await visible(page, 'play-edited'));
+      // A double tap puts it back where the look has it (8c: the desk's
+      // double-click, on a phone where every knob is a slider). Tapped at a
+      // third of the way, so the first tap moves it and the second must undo
+      // that as well as the move above.
+      await page.touchscreen.tap(track.x + track.width * 0.3, track.y + track.height / 2);
+      await page.waitForTimeout(60);
+      await page.touchscreen.tap(track.x + track.width * 0.3, track.y + track.height / 2);
+      await page.waitForTimeout(400);
+      const reset = await speedText();
+      check('Play: a double tap on Speed puts it back to the look\'s own speed', reset === before && after !== before, `${before} → ${after} → ${reset}`);
       // A look from the strip comes in, named on the pill.
       // One that is not up already, or the pill would read right with nothing done.
       const other = page.locator('[data-testid="play-look-tile"][aria-pressed="false"]').nth(1);
