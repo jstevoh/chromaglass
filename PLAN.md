@@ -1014,8 +1014,21 @@ Open from Desk v2, each its own thread (the UI lane):
     differ by layout.
 - ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
   `npm run qr`, `npm run layout`).
-- **8g** (M) A panel popped out to a second display (`window.open`), for a laptop and a
-  monitor at a gig.
+- ~~**8g** A panel in a window of its own, for a laptop and a monitor at a gig~~ (shipped;
+  check `npm run layout`).
+  - **8g-1** (S) The keys in a panel's window. ⌘1–3, ⌘P, Tab and the show's keys (Go,
+    Blackout, R) are listened for on the desk's window, so with the focus in a panel's
+    own window they do nothing. Forwarding them (or listening on both) wants a look at
+    which keys a panel's text fields must keep. Esc too: the Mixer sheet in a panel's
+    window closes on Esc pressed on the laptop, not in its own window.
+  - **8g-2** (S) A panel's window after a reload. A browser will not open a window
+    without a click, so a reload brings every panel back to the desk; a "Reopen the
+    windows" button in the header after a reload would put them back in one click.
+  - **8g-3** (S) A panel out in its window whose place goes. A layout switched to one
+    without the panel, or the panel's guard closing it after an error, leaves it in its
+    window with no away card, and Bring it back then puts it nowhere: it should dock it
+    in the deck. And the desk itself going (the laptop's window narrowed under 1024, a
+    phone-sized window) still closes every panel window; the clean screen does not.
 - ~~**8h** The header at 1024: its dots fold into one Status button when they do not
   fit~~ (shipped; check `npm run layout`).
   - **8h-1** (S) Folded, the Status button's one dot is green while anything is

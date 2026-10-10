@@ -808,6 +808,109 @@ try {
     const wide = await cluster();
     check('at 1440 the dots are not folded', wide.fold !== '2', `level ${wide.fold}`);
   }
+  {
+    /*
+      8g: a panel in a window of its own, for a second display. The window is
+      the desk's own React tree portalled into a blank window, so what is
+      asked is that it is the same panel and not a picture of one:
+       - it opens from the panel's header, with the page's styles in it (an
+         unstyled copy has a transparent background: the stylesheets were not
+         carried over) and its own knobs, while its place on the desk says it
+         is away and holds none of them;
+       - a knob turned in the window is the desk's value: closed as the system
+         would close it, the panel is back on the desk reading what the window
+         set (a copy with its own state would read the old value);
+       - with windows blocked, the button floats the panel instead of doing
+         nothing.
+    */
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await clickOn('mode-segmented-design');
+    await settle(900);
+    const id = await page.evaluate(() => [...document.querySelectorAll('[data-testid="desk-deck"] [data-panel]')]
+      .find(el => el.querySelector('[data-knob] input[type="range"]'))?.getAttribute('data-panel'));
+    if (!id) {
+      check('a panel with a knob in the deck to open in its own window', false, 'none');
+    } else {
+      const knobIn = (pg) => pg.locator(`[data-panel="${id}"] [data-knob] input[type="range"]`).first();
+      const span = await knobIn(page).evaluate(el => Number(el.max) - Number(el.min) || 1);
+      const before = await knobIn(page).evaluate(el => Number(el.value));
+      const deskBg = await page.evaluate((id) => getComputedStyle(document.querySelector(`[data-panel="${id}"]`)).backgroundColor, id);
+      let win = null;
+      try {
+        [win] = await Promise.all([page.waitForEvent('popup', { timeout: 6000 }), clickOn(`panel-${id}-popout`)]);
+        await win.waitForSelector(`[data-panel="${id}"][data-popped="true"] [data-knob]`, { timeout: 6000 });
+      } catch { /* reported below */ }
+      const there = win ? await win.evaluate((id) => {
+        const el = document.querySelector(`[data-panel="${id}"]`);
+        const r = el.getBoundingClientRect();
+        return { bg: getComputedStyle(el).backgroundColor, w: Math.round(r.width), h: Math.round(r.height), knobs: el.querySelectorAll('[data-knob]').length };
+      }, id) : null;
+      const away = await page.evaluate((id) => ({
+        card: !!document.querySelector(`[data-testid="panel-${id}-away"]`),
+        knobs: document.querySelectorAll(`[data-panel="${id}"] [data-knob]`).length,
+      }), id);
+      check('a panel opens in its own window, styled as on the desk and with its knobs, and its place on the desk says it is away',
+        !!there && there.knobs > 0 && there.bg === deskBg && !/rgba\(0, 0, 0, 0\)|transparent/.test(there.bg) && there.h > 100 && away.card && away.knobs === 0,
+        there ? `${there.knobs} knobs, ${there.w}×${there.h}, background ${there.bg} (desk ${deskBg}); on the desk ${away.card ? 'the away card' : 'no card'}, ${away.knobs} knobs` : 'no window');
+      /*
+        Clean screen on the laptop (Actions, "Clean screen") hides the desk.
+        It used to unmount it, and the desk going closed its windows: the
+        mixer on the second display went with it, at the moment it matters
+        most (found in review). The window must stay up through it, with its
+        panel, and Esc brings the desk back with the away card in its place.
+      */
+      let clean = null;
+      if (win) {
+        // ⌘K, "Clean screen", Enter: typed, as `qa` does, since the list shows only the top rows until then.
+        await page.keyboard.press('Control+k');
+        await settle(500);
+        await page.evaluate(() => {
+          const input = document.querySelector('[data-testid="palette-input"]');
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Clean screen');
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.focus();
+        });
+        await settle(500);
+        await page.keyboard.press('Enter');
+        await settle(900);
+        const deskGone = await page.locator('[data-desk="v2"]').count() === 0;
+        const kept = !win.isClosed() && await win.locator(`[data-panel="${id}"] [data-knob]`).count() > 0;
+        await page.keyboard.press('Escape');
+        await settle(900);
+        const cardBack = await page.locator(`[data-testid="panel-${id}-away"]`).count() > 0;
+        clean = { deskGone, kept, cardBack };
+      }
+      check('a clean screen on the laptop leaves the panel up in its own window, and Esc brings the desk back with the panel still out',
+        !!clean && clean.deskGone && clean.kept && clean.cardBack,
+        clean ? `desk ${clean.deskGone ? 'hidden' : 'still drawn'}, window ${clean.kept ? 'kept with its panel' : 'gone'}, card ${clean.cardBack ? 'back' : 'missing'}` : 'no window');
+      let turned = before, back = NaN, cardAfter = true;
+      if (win && !win.isClosed()) {
+        const kb = await knobIn(win).boundingBox();
+        await win.mouse.move(kb.x + kb.width / 2, kb.y + kb.height / 2);
+        await win.mouse.down();
+        await win.mouse.move(kb.x + kb.width / 2, kb.y + kb.height / 2 + (before - Number(await knobIn(win).getAttribute('min')) > span / 2 ? 50 : -50), { steps: 8 });
+        await win.mouse.up();
+        await settle(300);
+        turned = await knobIn(win).evaluate(el => Number(el.value));
+        await win.close();
+        await settle(1500);
+        back = await knobIn(page).evaluate(el => Number(el.value)).catch(() => NaN);
+        cardAfter = await page.locator(`[data-testid="panel-${id}-away"]`).count() > 0;
+      }
+      check('a knob turned in the window is the desk\'s own: with the window closed the panel is back on the desk reading what the window set',
+        Math.abs(turned - before) / span > 0.1 && Math.abs(back - turned) < 1e-9 && !cardAfter,
+        `${before.toFixed(3)} → ${turned.toFixed(3)} in the window → ${Number.isNaN(back) ? 'not back' : back.toFixed(3)} on the desk`);
+      // Back to the look's own value, for whatever is asked after this.
+      await knobIn(page).dblclick().catch(() => {});
+      await page.evaluate(() => { window.__cgOpen = window.open; window.open = () => null; });
+      await clickOn(`panel-${id}-popout`);
+      await settle(600);
+      const floated = await page.locator(`[data-testid="floating-${id}"]`).count();
+      await page.evaluate(() => { window.open = window.__cgOpen; });
+      if (floated) { await clickOn(`panel-${id}-dock`); await settle(600); }
+      check('with windows blocked, the button floats the panel rather than doing nothing', floated === 1, floated ? 'floated' : 'nothing happened');
+    }
+  }
 
   // ── Small screens ──────────────────────────────────────────────
   await page.setViewportSize({ width: 420, height: 820 });

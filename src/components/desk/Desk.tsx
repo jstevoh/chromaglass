@@ -6,6 +6,7 @@ import { RecordControls } from './RecordControls';
 import { DeskHeader } from './DeskHeader';
 import { LEFT_WIDTH, PanelBody, RIDES_WIDTH, panelMeta } from './DeskPanels';
 import { PanelBrowser } from './PanelBrowser';
+import { PanelWindow, openPanelWindow } from './PanelWindow';
 import {
   LAYOUT_LABEL, PANEL_BY_ID, closePanel, collapseAll, dockPanel, floatPanel, openPanel, openPanels,
   placeFloating, raiseFloating, toggleCollapsed, whereIs,
@@ -63,6 +64,44 @@ export function Desk(p: DeskProps) {
   const [gesture, setGesture] = useState<{ id: string; x: number; y: number; w: number; h: number } | null>(null);
   const browserButton = useRef<HTMLButtonElement | null>(null);
 
+  // ── Panels in their own windows (PLAN.md 8g) ────────────────────────
+  /*
+    Beside the layout, never in it: the panel keeps its place on the desk,
+    where a card says it is out and brings it back, and a reload (which has no
+    window to put it in) finds it where it always was. Switching layouts
+    leaves it in its window: the second display is the point.
+  */
+  const [popped, setPopped] = useState<Record<string, Window>>({});
+  const poppedRef = useRef(popped);
+  poppedRef.current = popped;
+  const popOut = (id: string) => {
+    const spec = PANEL_BY_ID.get(id);
+    if (!spec) return;
+    // At about the size it is drawn now, the header included.
+    const r = document.querySelector(`[data-panel="${CSS.escape(id)}"]`)?.getBoundingClientRect();
+    const win = openPanelWindow(id, spec.name, { w: (r?.width ?? 400) + 16, h: Math.max(r?.height ?? 0, 480) + 16 });
+    // Blocked (a browser set to refuse windows): floated instead, which is
+    // still off the desk's grid, rather than a click that does nothing.
+    if (!win) { set(x => floatPanel(x, id)); return; }
+    setPopped(m => ({ ...m, [id]: win }));
+  };
+  const popIn = (id: string) => {
+    const win = poppedRef.current[id];
+    if (win && !win.closed) win.close();
+    setPopped(m => {
+      if (!(id in m)) return m;
+      const { [id]: _gone, ...rest } = m;
+      return rest;
+    });
+  };
+  // The desk going (another view, the page closing) takes its windows with it:
+  // a panel window left behind holds controls that no longer drive anything.
+  useEffect(() => {
+    const closeAll = () => Object.values(poppedRef.current).forEach(w => { if (!w.closed) w.close(); });
+    window.addEventListener('pagehide', closeAll);
+    return () => { window.removeEventListener('pagehide', closeAll); closeAll(); };
+  }, []);
+
   const openBrowser = useCallback(() => {
     const r = browserButton.current?.getBoundingClientRect();
     setBrowser(b => (b ? null : { top: (r?.bottom ?? 48) + 6, right: Math.max(8, window.innerWidth - (r?.right ?? window.innerWidth - 8)) }));
@@ -81,11 +120,12 @@ export function Desk(p: DeskProps) {
     which re-renders whenever the sound does, and an effect keyed on them took
     the listener off and put it back nearly every frame.
   */
-  const latest = useRef({ onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length });
-  latest.current = { onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length };
+  const latest = useRef({ onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length, bare: !!p.bare });
+  latest.current = { onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length, bare: !!p.bare };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = latest.current;
+      if (k.bare) return;
       const t = e.target as HTMLElement | null;
       const mod = e.metaKey || e.ctrlKey;
       // The ⌘ keys work from a text field, as App's ⌘K and ⌘S do: the panel
@@ -196,10 +236,36 @@ export function Desk(p: DeskProps) {
   };
 
   // ── One panel ───────────────────────────────────────────────────────
-  const frame = (id: string, opts: { floating?: boolean; className?: string; style?: React.CSSProperties } = {}): ReactNode => {
+  const frame = (id: string, opts: { floating?: boolean; popped?: boolean; className?: string; style?: React.CSSProperties } = {}): ReactNode => {
     const spec = PANEL_BY_ID.get(id);
     if (!spec) return null;
     const collapsed = l.collapsed.includes(id);
+    if (popped[id] && !opts.popped) {
+      // Its place on the desk while it is out: what it is, where, and the way back.
+      return (
+        <PanelFrame
+          key={id}
+          id={id}
+          title={spec.name}
+          floating={opts.floating}
+          collapsed={false}
+          className={opts.className}
+          style={opts.style}
+          onFloat={() => set(x => floatPanel(x, id))}
+          onDock={() => set(x => dockPanel(x, id, 'deck'))}
+          onClose={() => { popIn(id); set(x => closePanel(x, id)); }}
+          onGripDown={startDrag(id)}
+          onHeaderDown={opts.floating ? startFloatGesture(id, 'move') : undefined}
+          onResizeDown={opts.floating ? startFloatGesture(id, 'resize') : undefined}
+          onTitleMenu={(e) => { e.preventDefault(); setMenu({ id, x: e.clientX, y: e.clientY }); }}
+        >
+          <div className="flex flex-1 flex-col items-start justify-center gap-2 py-2" data-testid={`panel-${id}-away`}>
+            <span className="text-[13px] text-muted">In its own window.</span>
+            <Button height={32} onClick={() => popIn(id)} testId={`panel-${id}-bring-back`}>Bring it back</Button>
+          </div>
+        </PanelFrame>
+      );
+    }
     return (
       <PanelFrame
         key={id}
@@ -212,12 +278,15 @@ export function Desk(p: DeskProps) {
         style={opts.style}
         onFloat={() => set(x => floatPanel(x, id))}
         onDock={() => set(x => dockPanel(x, id, 'deck'))}
+        onPopOut={() => popOut(id)}
+        popped={opts.popped}
+        onPopIn={() => popIn(id)}
         onCollapse={() => set(x => toggleCollapsed(x, id))}
         onClose={() => set(x => closePanel(x, id))}
         onGripDown={startDrag(id)}
         onHeaderDown={opts.floating ? startFloatGesture(id, 'move') : undefined}
         onResizeDown={opts.floating ? startFloatGesture(id, 'resize') : undefined}
-        onTitleMenu={(e) => { e.preventDefault(); setMenu({ id, x: e.clientX, y: e.clientY }); }}
+        onTitleMenu={opts.popped ? undefined : (e) => { e.preventDefault(); setMenu({ id, x: e.clientX, y: e.clientY }); }}
       >
         {/* Its own guard: one panel that throws is a card in its place, not the end of the desk. */}
         <PanelGuard name={spec.name} inline onClose={() => set(x => closePanel(x, id))}>
@@ -250,6 +319,15 @@ export function Desk(p: DeskProps) {
   const live = l.plateMode === 'live';
   const plateName = p.layoutName === 'gig' ? (p.liveName ?? '—') : (p.lookName ?? 'Untitled');
   const nPanels = openPanels(l).length;
+
+  const windows = Object.entries(popped).map(([id, win]) => (
+    <PanelWindow key={id} win={win} onGone={() => popIn(id)}>
+      {frame(id, { popped: true, className: 'min-h-0 flex-1' })}
+    </PanelWindow>
+  ));
+  // Clean screen on the laptop: the desk is not drawn, but its panels' own
+  // windows stay up on the other display (see `bare` in deskProps).
+  if (p.bare) return <>{windows}</>;
 
   return (
     <div
@@ -467,10 +545,13 @@ export function Desk(p: DeskProps) {
         </>,
         document.body,
       )}
+      {windows}
       {menu && createPortal(
         <PanelMenu
           at={menu}
           layout={l}
+          popped={!!popped[menu.id]}
+          onPopOut={() => { popOut(menu.id); setMenu(null); }}
           onClose={() => setMenu(null)}
           act={(change) => { set(change); setMenu(null); }}
           onReset={() => { p.onResetLayout(); setMenu(null); }}
@@ -493,9 +574,11 @@ export function Desk(p: DeskProps) {
 }
 
 /** Right-click a panel's title: where it goes, folding them all, and the layout back as it shipped. */
-function PanelMenu({ at, layout, act, onReset, onClose }: {
+function PanelMenu({ at, layout, popped, onPopOut, act, onReset, onClose }: {
   at: { id: string; x: number; y: number };
   layout: DeskLayout;
+  popped: boolean;
+  onPopOut: () => void;
   act: (change: (l: DeskLayout) => DeskLayout) => void;
   onReset: () => void;
   onClose: () => void;
@@ -504,6 +587,7 @@ function PanelMenu({ at, layout, act, onReset, onClose }: {
   const where = whereIs(layout, id);
   const allFolded = openPanels(layout).every(x => layout.collapsed.includes(x));
   const rows: [string, () => void, string][] = [
+    ...(popped ? [] : [['Open in its own window', onPopOut, 'popout']] as [string, () => void, string][]),
     ...(where === 'float' ? [] : [['Float', () => act(x => floatPanel(x, id)), 'float']] as [string, () => void, string][]),
     ...(where === 'left' ? [] : [['Move to the left column', () => act(x => dockPanel(x, id, 'left')), 'left']] as [string, () => void, string][]),
     ...(where === 'right' ? [] : [['Move to the right column', () => act(x => dockPanel(x, id, 'right')), 'right']] as [string, () => void, string][]),
