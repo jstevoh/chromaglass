@@ -5434,6 +5434,14 @@ Steps:
     on a look with the bath the first seeds die before the bath fills the plate (a third
     of a second); a cleared dish under a bath should start at u = 1. And the reaction's
     rim row writes (1, 0, 0, 0), which wipes poured reagent at the edge.
+  - **26d-5, open: half floats where the GPU cannot filter full ones.** The reaction's
+    field is in full floats where the dye is (the first Metal run found the stripe 14%
+    wider at 512² than at 256²: half floats round the substrate's last refill away, and
+    the Mac rounds them toward zero; the story in `docs/plan-shipped.md` §26). A GPU
+    without `float32-filterable` (many Android phones) keeps half floats, so its
+    substrate stops 0.3–0.5% short and its stripe is a little wider. Storing the substrate's
+    deficit 1 − u instead of u would give half floats their fine steps where u is near
+    1, on every GPU and at half the bandwidth, and would make a cleared dish full (26d-4).
 - **26-colour-a. The relief #327 described: not doing.** #327's message described the
   pattern's gradient as a bump on the plate's normal; the code never reached main (its
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take

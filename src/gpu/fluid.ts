@@ -1027,9 +1027,9 @@ export class WebGPUFluid {
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
-      ['grayScott', [VEL], open.chemistry],
-      ['addReagent', [VEL], false],
-      ['seedChem', [VEL], open.chemistry],
+      ['grayScott', [dye], open.chemistry],
+      ['addReagent', [dye], false],
+      ['seedChem', [dye], open.chemistry],
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
@@ -1146,7 +1146,24 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
-    this.chem = pp(this.N, 'rgba16float', 'chem');
+    /*
+      The reaction's field in the dye's format: full floats wherever the GPU
+      can filter them (every Mac, and SwiftShader). It was half floats, and a
+      half float's step just under 1 is 1/2048: the substrate's refill, feed ×
+      (1 − u) a step, falls under that step before the dish is full, so the
+      stored u stopped rising there. How far short depends on how the GPU
+      rounds a stored half float: SwiftShader rounds to nearest and stopped
+      0.003 to 0.005 short (measured); the Mac's, by the widths it drew,
+      rounds toward zero and drops every step under 1/2048, so it stops about
+      twice as far short. The pattern's wavelength follows the substrate, so CI's
+      Mac drew the labyrinth's stripe 3.08%, 3.35% and 3.51% of the plate at
+      256², 384² and 512², 14% apart, where SwiftShader drew 3.06%, 3.12% and
+      3.19%; the lab, rounding toward zero by hand, drew the Mac's widths to
+      the hundredth. In full floats the dish fills to within 5e-6 of its
+      reservoir, as the arithmetic says it should (`npm run turing`, line 1).
+      A GPU that cannot filter full floats keeps half floats (PLAN 26d-5).
+    */
+    this.chem = pp(this.N, this.dyeFormat, 'chem');
     this.activeMat = pp(this.N, 'r32float', 'activeMat');
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
@@ -3466,9 +3483,10 @@ export class WebGPUFluid {
 
   /** The mix or the reactions, read back whole (RGBA per texel). For checks. */
   async readChemistry(which: 'mix' | 'rxn' | 'lies' | 'chem'): Promise<{ n: number; data: Float32Array } | null> {
-    if (which === 'chem') return this.readHalf(this.chem);
-    const pp = which === 'mix' ? this.mix : which === 'rxn' ? this.rxn : this.lies;
+    const pp = which === 'chem' ? this.chem : which === 'mix' ? this.mix : which === 'rxn' ? this.rxn : this.lies;
     if (!pp) return null;
+    // The reaction's field is in the dye's format: half floats on a GPU that cannot filter full ones.
+    if (pp.format !== RGBA32) return this.readHalf(pp);
     const n = pp.size[0];
     const row = Math.ceil((n * 16) / 256) * 256;
     const buf = this.device.createBuffer({ label: `read ${which}`, size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -3484,7 +3502,7 @@ export class WebGPUFluid {
     buf.destroy();
     return { n, data: out };
   }
-  /** An rgba16float field read back whole as floats (the Gray–Scott field), for checks. */
+  /** An rgba16float field read back whole as floats (the Gray–Scott field where it is half floats), for checks. */
   private async readHalf(pp: PingPong): Promise<{ n: number; data: Float32Array }> {
     const n = pp.size[0];
     const row = Math.ceil((n * 8) / 256) * 256;

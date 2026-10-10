@@ -2659,3 +2659,17 @@ pattern half the size they showed, where it grew.
 `npm run turing` measures all of it; its five controls (the logical-grid read, the
 second carry, diffusion in cells, the print off, a reaction fed everywhere) each turn
 their line red.
+
+The first Metal run found one more: the stripe widened with the rung on the Mac's GPU,
+3.08%, 3.35% and 3.51% of the plate at 256², 384² and 512² (14% apart, against the
+check's 10%), where SwiftShader drew 3.06%, 3.12% and 3.19%. The reaction's field was in
+half floats, whose step just under 1 is 1/2048, so the substrate's last refill (feed ×
+(1 − u) a step) rounded away while the dish was still short; the Mac rounds a stored half
+float toward zero and dropped more of it than SwiftShader, which rounds to nearest. The
+lab, rounding the stored field toward zero by hand on SwiftShader, drew 3.08%, 3.35% and
+3.52%: the Mac's widths. The field is now in the dye's format (full floats wherever the
+GPU can filter them), and `npm run turing` asks first that the dish under the bath fills
+to within 0.001 of its reservoir: half floats left it 0.0039, 0.0029 and 0.0051 short on
+the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% and
+3.15%). Half floats stay on a GPU that cannot filter
+full ones (26d-5).

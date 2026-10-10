@@ -21,13 +21,29 @@
  *     width of one on 512². Lines 1 and 2: the wavelength, by FFT, holds
  *     within 10% at 256², 384² and 512², and again after a stir.
  *
+ * And one CI found (the first Metal run of this check): the stripe widened
+ * with the rung on the Mac's GPU, 3.08%, 3.35% and 3.51% of the plate, where
+ * SwiftShader drew 3.06%, 3.12% and 3.19%. The field was stored in half
+ * floats, and a half float's step near 1 is 1/2048: the substrate's refill,
+ * feed × (1 − u) a step, falls under it before the dish is full, and the
+ * substrate stops rising there. SwiftShader rounds a stored half float to
+ * nearest and left the dish 0.003 to 0.005 short (line 1, measured); the
+ * Mac's GPU, by the widths it drew, rounds toward zero, which drops every
+ * step under 1/2048 and stops about twice as far short. The lab, rounding
+ * the stored field toward zero by hand on SwiftShader, drew 3.08%, 3.35% and
+ * 3.52%: the Mac's widths to the hundredth. The field is now in
+ * full floats, where the dye is (rgba32float wherever the GPU can filter
+ * it). Line 1's first part asks for that the way the feature needs it: the
+ * dish under the bath fills to its reservoir, which no half float can.
+ *
  * And what the print is (depositChem): starch's blue-black complex with the
  * activator, in equilibrium with it, so the plate shows the pattern as it
  * stands and nothing piles up (line 5), sharp enough to read as black and
  * white (line 4), in the places the reaction is fed and nowhere else (line 3).
  *
  * Lines:
- *   1. the wavelength at 256², 384² and 512² within 10% of each other (the
+ *   1. the dish, under the bath with nothing seeded, fills with substrate to
+ *      within 0.001 of its reservoir (u = 1) on every rung; then the wavelength at 256², 384² and 512² within 10% of each other (the
  *      widest over the narrowest), and on the plate at all (between 1.5%
  *      and 6% of its width: neither noise nor one blob)
  *   2. a stir carries the reaction with the colour (a pour of reagent and a
@@ -64,6 +80,7 @@ const FEED = 0.04, KILL = 0.06, DU = 0.16, DV = 0.08, T = 3000, SEEDS = 60;
 const RUNGS = [256, 384, 512];
 const WIDTH_SPREAD = 1.10, STIR_HELD = 0.10, MOVED = 0.5, SWIRL = 0.3, CARRIED = 0.15;
 const MID_MOST = 0.20, SIDE_LEAST = 0.20, WHERE = 0.7, BUILDS = 0.03;
+const FILLED = 0.001;
 
 /** In-place radix-2 FFT of one row. */
 function fft(re, im) {
@@ -133,7 +150,7 @@ const pct = (x) => `${(x * 100).toFixed(2)}%`;
 const { page, close } = await openLab();
 try {
   // ── 1. The same stripe on every rung ────────────────────────────────
-  const widths = {};
+  const widths = {}, shorts = {};
   for (const N of RUNGS) {
     const v = await page.evaluate(async ({ N, FEED, KILL, DU, DV, T, SEEDS }) => {
       await lab.create(N);
@@ -142,13 +159,20 @@ try {
       // The dish full of substrate first (u = 1 under the bath), then the seeds.
       g.chemLive = true;
       for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+      // How far short of its reservoir the substrate is (exactly: e^-12, 6e-6).
+      const full = await g.readChemistry('chem');
+      let short = 0;
+      for (let i = 0; i < full.n * full.n; i++) short += 1 - full.data[i * 4];
       for (let k = 0; k < SEEDS; k++) g.seedChemistry(0.1 + rnd() * 0.8, 0.1 + rnd() * 0.8, 0.012);
       for (let t = 0; t < T; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
       const f = await g.readChemistry('chem');
-      return Array.from({ length: f.n * f.n }, (_, i) => f.data[i * 4 + 1]);
+      return { short: short / (full.n * full.n), v: Array.from({ length: f.n * f.n }, (_, i) => f.data[i * 4 + 1]) };
     }, { N, FEED, KILL, DU, DV, T, SEEDS });
-    widths[N] = wavelength(v, N);
+    widths[N] = wavelength(v.v, N);
+    shorts[N] = v.short;
   }
+  check('the dish fills to its reservoir', RUNGS.every((N) => shorts[N] < FILLED),
+    `substrate short of it by ${RUNGS.map((N) => `${N}² ${shorts[N].toExponential(1)}`).join(', ')} (under ${FILLED}; half floats stop 0.003 or more short)`);
   const ws = RUNGS.map((N) => widths[N]);
   const spread = Math.max(...ws) / Math.min(...ws);
   check('the stripe is one width on every rung', spread <= WIDTH_SPREAD,
