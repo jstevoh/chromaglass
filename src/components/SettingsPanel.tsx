@@ -368,13 +368,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /** `?debug` puts the frame's cost split under the engine readout. */
   const showFrameSplit = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).has('debug');
+  /*
+    Polled only where the readout is drawn: the Simulation section, which an
+    embedded panel draws only when it is that panel. Every section docked on
+    the desk is its own SettingsPanel, and each polled the engine once a
+    second for a reading it never showed: on the Mac runner, where the plate
+    draws and every reading is a new object, the Gig desk's Patches panel
+    alone committed once a second on top of the App's clock (`npm run
+    renders`: 2.0 commits/s against 1.0 renders/s on the Perform desk with
+    no sound). In a cloud session the reading is null each time and the set
+    is dropped, which is why it passed there.
+  */
+  const drawsEngine = !embed || embed === 'simulation';
   useEffect(() => {
-    if (!getLiveEngineStatus) return;
+    if (!getLiveEngineStatus || !drawsEngine) return;
     const tick = () => { setLive(getLiveEngineStatus() ?? null); };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [getLiveEngineStatus]);
+  }, [getLiveEngineStatus, drawsEngine]);
   const blendModes: BlendMode[] = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'];
   /**
    * Which section is in the pane.
