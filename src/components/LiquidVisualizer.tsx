@@ -9458,9 +9458,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         it; its phase decides which way the next kick throws it. The gel
         wheel and the kaleidoscope turn by accumulating, the film exposure
         and the closeup slew toward what they read, and a finger stroke
-        Evolve had begun would have carried on into the film.
+        Evolve had begun would have carried on into the film. The cover glass
+        (PLAN 27a-1) is the rock's partner: it slides on its film with the
+        speed the live show's last sway gave it and drags the liquid with that
+        speed, so a render that kept it began with the liquid already carried
+        one way, and two renders of one seed differed from the first frame.
       */
       rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      coverRef.current = { x: 0, y: 0, vx: 0, vy: 0 };
       lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
       gelAngleRef.current = 0;
       kaleidoPhaseRef.current = 0;

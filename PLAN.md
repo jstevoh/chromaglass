@@ -5568,7 +5568,11 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     thicker, each the way the glass went (gain 0.88–0.96 of half its slide, lagged by
     the film's drag time; correlation 1.00). The glass rests at R_c sinθ, swings at
     1.5 Hz on the default oil and creeps back without swinging in glycerine. A phone
-    held tipped slides it too.
+    held tipped slides it too. The render's start (`resetPlateClocks`, LiquidVisualizer.tsx) did not put the
+    glass back at rest with the rock, so a render began with the live show's slide still
+    dragging the liquid and two renders of one seed differed from the first frame (main's
+    deploy after #328: `render-app` 240 of 240 frames different); it is reset with the rock
+    now.
     - **27a-2, open.** Read Plate Rock on the Mac's `controls` run with the glass, on
       the even looks above, against a drift floor held still across runs (each look's
       own drift rose on #305 with the stronger kicks, so its ratios are not like for
@@ -5580,7 +5584,11 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       drew 11 frames a second in its second window (33 frames against the 45 floor; the
       first window drew 20.6, and the ear read every frame). #336 and #337 passed it the
       same day; the PR merged on the owner's word without a re-run. If it shows again,
-      measure the phone's frame time with and without the cover glass's step.
+      measure the phone's frame time with and without the cover glass's step. It showed
+      again on main's deploy after #328, #336 and #337 (laptop and phone, 18–20 then
+      11–12 frames a second, the ear reading every frame); the cover's step is a few
+      numbers on the CPU and adds no pass on the GPU, so measure the runner's own speed
+      on that run too before blaming the step.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
