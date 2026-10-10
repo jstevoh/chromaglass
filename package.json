@@ -52,6 +52,7 @@
     "layout": "npm run build && node --experimental-strip-types scripts/layout.mjs",
     "draftwall": "npm run build && node scripts/draftwall.mjs",
     "showcursor": "npm run build && node scripts/showcursor.mjs",
+    "rewall": "npm run build && node scripts/rewall.mjs",
     "inputpick": "node scripts/inputpick.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
     "saves": "npm run build && node scripts/saves.mjs",
