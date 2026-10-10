@@ -49,6 +49,9 @@
  *   5. A pool of ferrofluid and a drop of oil under the same wind are
  *      carried along by the flow alone, each at least half as far as the
  *      colour, none of either made or lost (0.5%).
+ *   6. The Amount's range (PLAN.md QA-20): a gentle breath (Amount 0.25, a
+ *      sixteenth of the stress) moves the pool under a tenth of what the
+ *      default does, a gale (Amount 2.5) at least three times as far.
  *
  * The old push is run and printed as the before, as `npm run fingerflow`
  * prints the Finger's.
@@ -71,7 +74,7 @@ try {
     'push' (blowDirected's velocity, the before) or 'none'; `sign` the way
     it goes along x; `liquid` what is in the pool besides the colour.
   */
-  const stroke = (wind, sign, liquid) => page.evaluate(async ({ wind, sign, liquid }) => {
+  const stroke = (wind, sign, liquid, share = 1) => page.evaluate(async ({ wind, sign, liquid, share }) => {
     const N = 384, L = 192;
     const look = lab.look('classic').settings;
     const DT = look.globalSpeed * 0.2;
@@ -104,7 +107,7 @@ try {
     let laid = 0;
     for (let k = 0; k < 90; k++) {
       if (k % 3 === 0) hx += sign * 0.16 * L / 30;
-      if (wind === 'air') { if (lab.breath(hx, hy, R, sign, 0) > 0) laid++; }
+      if (wind === 'air') { if (lab.breath(hx, hy, R, sign, 0, share) > 0) laid++; }
       else if (wind === 'push') {
         // blowDirected's velocity, as it laid it (the mouse's strength, its swirl).
         const v = new Array(L * L * 4).fill(0), r = Math.round(R), st = lab.BLOW_STRENGTH;
@@ -123,7 +126,7 @@ try {
     await lab.step(30, over);
     const t1 = await read();
     return { t0, t1, laid };
-  }, { wind, sign, liquid });
+  }, { wind, sign, liquid, share });
 
   /*
     A breath held in one place, blowing along +x, on a fresh plate of clear
@@ -180,10 +183,12 @@ try {
     const m = got[name] = await held(th, press);
     console.log(`  ${name} (Thickness ${th}, gap ${(m.h * 1000).toFixed(2)} mm${press ? `, the press alone ${(m.still * 1000).toFixed(3)} mm/s` : ''}): ${(m.blowing * 1000).toFixed(2)} mm/s under the breath against τh/2μ ${(m.theory * 1000).toFixed(2)} (${(m.blowing / m.theory).toFixed(2)} of it); ${(m.after * 1000).toFixed(3)} mm/s half a second after it stopped, drag time ${m.tau.toFixed(3)} s (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
-  for (const [name, wind, sign, liquid] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil']]) {
+  // The Amount's range (6): a gentle breath at Amount 0.25 and a gale at 2.5, share Amount².
+  for (const [name, wind, sign, liquid, share] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil'],
+    ['gentle', 'air', 1, 'none', 0.0625], ['gale', 'air', 1, 'none', 6.25]]) {
     if (!want(name)) continue;
     const t = Date.now();
-    const m = got[name] = await stroke(wind, sign, liquid);
+    const m = got[name] = await stroke(wind, sign, liquid, share);
     console.log(`  ${name}: colour ${m.t0.dye.toFixed(1)} → ${m.t1.dye.toFixed(1)} (${pc(m.t1.dye / m.t0.dye - 1)}), its middle ${pc((m.t1.cx - m.t0.cx) * sign)} of the plate the wind's way${liquid !== 'none' ? `; the ${liquid} ${pc((m.t1.fx - m.t0.fx) * sign)}, ${pc(m.t1.mass / m.t0.mass - 1)} of it made or lost` : ''}${wind === 'air' ? `; breath laid on ${m.laid} of 90 steps` : ''} (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
   console.log('');
@@ -237,6 +242,24 @@ try {
     check('a pool of ferrofluid and a drop of oil under the same wind are carried along by the flow, none made or lost',
       need('ferro', 'oil', 'right') && moved('ferro') >= 0.5 * along('right') && moved('oil') >= 0.5 * along('right') && kept('ferro') && kept('oil'),
       need('ferro', 'oil', 'right') ? `the ferrofluid ${pc(moved('ferro'))} (${pc(got.ferro.t1.mass / got.ferro.t0.mass - 1)} made or lost), the oil ${pc(moved('oil'))} (${pc(got.oil.t1.mass / got.oil.t0.mass - 1)}), against the colour's ${pc(along('right'))}` : 'not run');
+  }
+  // 6.
+  {
+    /*
+      The Amount is the breath's speed against a firm one's, so its stress,
+      and the flow it drives, goes as its square (PLAN.md QA-20). Measured
+      in software along this stroke: Amount 0.05 moved the pool 0.003% of
+      the plate, 0.25 0.085%, 1 2.72%, 2.5 14.6% and 5 16.5% (the stroke is
+      16% long: past 2.5 the colour goes with the hand, and what 5 adds is
+      speed, the flow four times 2.5's). So a gentle breath has to move the
+      pool under a tenth of what a firm one does, and a gale at least three
+      times as far, the colour kept to 0.5% in both.
+    */
+    const off = (k) => got[k].t1.dye / got[k].t0.dye - 1;
+    check('the Amount runs from a breath that barely moves the colour to a gale that takes it with the hand',
+      need('gentle', 'gale', 'right') && along('right') >= 0.005 && along('gentle') < 0.1 * along('right') && along('gale') >= 3 * along('right') &&
+        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('gale')) < 0.005,
+      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate; colour ${pc(off('gentle'))}, ${pc(off('gale'))}` : 'not run');
   }
 } finally {
   await close();
