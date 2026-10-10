@@ -929,11 +929,16 @@ fn macroWarpOffset(fuv: vec2f) -> vec2f {
   if (U.macroEdge < 0.005) { return vec2f(0.0); }
   let f = U.logicalGrid * 0.85;
   let t = vec2f(U.time * 0.012, U.time * -0.009);
-  var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - 0.5;
-  w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - 0.5) * 0.45;
+  var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
+  w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
+  
+  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat
+  let beatPulse = sin(U.beatPhase * 3.14159265);
+  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.4);
+  
   // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
   // plate-wide frame is noise, and on a bead it is the silhouette.
-  return w * (U.macroEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / U.logicalGrid);
+  return w * (pulseEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / U.logicalGrid);
 }
 
 fn macroWarp(fuv: vec2f) -> vec2f { return fuv + macroWarpOffset(fuv); }
@@ -2097,9 +2102,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let wedge = 6.28318530718 / U.kaleido;
     var a = modf2(ang, wedge);
     if (a > wedge * 0.5) { a = wedge - a; }
-    a += U.kaleidoPhase;
-    c = vec2f(cos(a), sin(a)) * rad * U.kaleidoZoom;
-    uv = clamp(c / vec2f(aspect, 1.0) + 0.5, vec2f(0.001), vec2f(0.999));
+    
+    // BPM-Synced LFOs: Smoothly pulse the kaleidoscope rotation and zoom with the beat phase!
+    let beatPulse = sin(U.beatPhase * 3.14159265);
+    a += U.kaleidoPhase + (beatPulse * wedge * 0.15); // Slight rhythmic rotation
+    
+    let breathingZoom = U.kaleidoZoom * (1.0 - beatPulse * 0.1); // Rhythmic zoom
+    c = vec2f(cos(a), sin(a)) * rad * breathingZoom;
+    uv = clamp(c / vec2f(aspect, 1.0) + vec2f(0.5), vec2f(0.001), vec2f(0.999));
   }
 
   var dof = 0.0;

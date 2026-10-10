@@ -101,8 +101,8 @@ function hear(pcm, sr, hand = () => false) {
   const frames = Math.floor((pcm.length / sr) * 60);
   for (let i = 1; i < frames; i++) {
     const t = i / 60;
-    const { bins: db } = an.frame(pcm, Math.round(t * sr), 1 / 60);
-    const r = features.update({ bins: db, scale: 'db', sampleRate: sr, fftSize: an.fftSize }, t, hand(t));
+    const { bins: db, timeDomainData: td } = an.frame(pcm, Math.round(t * sr), 1 / 60);
+    const r = features.update({ bins: db, timeDomainData: td, scale: 'db', sampleRate: sr, fftSize: an.fftSize }, t, hand(t));
     for (const n of SOURCE_NAMES) if (r.onsets[n].hit) hits[n].push(t);
     // The plate's own reading of a kick (LiquidVisualizer): the onset's time changing.
     const at = r.onsets.kick.at;
