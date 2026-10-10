@@ -976,20 +976,28 @@ Open from Desk v2, each its own thread (the UI lane):
   instead is the owner's call on a phone.
 - ~~**8-draw** Draw: the phone or iPad as the wall's pad~~ (shipped; story in
   `docs/plan-shipped.md` §8; check `npm run draw`). Found along the way:
-  - **8-draw-a** (M) The wall under the pad. Draw's frame is black: the remote gets
-    the laptop's state, not its frames, so a hand draws blind on the phone and looks
-    up at the wall. The relay already carries a mirror (`role: 'mirror'`, the cast);
-    a small, slow copy of it under the frame would show where the colour is.
-    *Measure:* frames reach the remote's frame at a rate and size the relay holds.
+  - ~~**8-draw-a** The wall under the pad~~ (shipped; story in `docs/plan-shipped.md`
+    §8-draw-a; check `npm run drawwall`, and `-- --app` on the Mac). Found along the way:
+    - **8-draw-a-1** (S) The picture is the canvas after the output pass, so a wall
+      corner-pinned or masked in Output shows warped on the pad, while a touch is mapped
+      through the camera only. With Output's corners at their defaults (most rooms) the
+      two agree. *Measure:* `drawwall --app` with corners moved.
+    - **8-draw-a-2** (S) Every remote gets the pictures once one asks: the relay keeps no
+      state, so a tablet left on Controls as the Gig remote is sent 100–400 kB/s it does
+      not paint. A relay that routes `picture` only to sockets that sent `pad-picture`
+      in the last 3 s would stop that. *Measure:* bytes to a Controls remote.
+    - **8-draw-a-3** (S) OSC's `/blow`, `/drop`, `/press` still take the plate's point,
+      not the wall's, so a TouchOSC pad has the old pad's fault (only its middle lands
+      under the finger). A `/wall/...` form, or a flag argument, as the remote's `wall`.
   - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
     tools only); they are in Controls. A bottle tile on the phone, or a long press on
     Drop for the bottle list, would put soap on the plate from Draw.
   - **8-draw-c** (S) Blackout's hold-to-snap. The display has one blackout, a toggle
     that fades over 1.1 s, so Draw's hold is a fade both ways. A snap needs a
     `blackout-snap` action the display honours at once (protocol, App, MIDI).
-  - **8-draw-d** (S) The wall's real shape. Draw assumes 16:9 (the design's label);
-    a wall mapped to 4:3 or a dome is another frame. The state could carry the
-    output's aspect. And the design's dashed "+" (an image as dye) has no message yet.
+  - **8-draw-d** (S) The wall's real shape: the frame now takes the laptop's picture's
+    shape (8-draw-a), so a 4:3 wall is a 4:3 frame; before the first picture, and with
+    an older laptop, it is still 16:9. A dome is another frame. And the design's dashed "+" (an image as dye) has no message yet.
 - **8b** (M) A true Preview. Preview holds the sequencer, a song's show and a new song's
   look (`designing` in App, as the Design desk did), but the plate being built is still
   the plate on the wall. The design means an offline copy: a second solver, or the

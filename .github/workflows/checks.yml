@@ -480,6 +480,13 @@ jobs:
       - name: The remote's Draw screen
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/draw.mjs
+      # The wall under Draw's pad (scripts/drawwall.mjs, PLAN.md 8-draw-a): a
+      # stand-in laptop running the real picture sender on a painted 4:3
+      # canvas. Asked for only on Draw, painted the right way up at 8 a second
+      # or more, the frame in the wall's shape, and dimmed when it stops.
+      - name: The wall under Draw's pad
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/drawwall.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
       # second more than the ear tells it (ten), and the plate still hears a
@@ -1000,6 +1007,14 @@ jobs:
       - name: Every tool lays the bottle
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/bottles.mjs
+      # And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md
+      # 8-draw-a): the laptop's own frames reach the pad, the plate's colour,
+      # and a drop near the wall's corner lands under the finger, where the
+      # plate's point (the old pad) does not. About a minute.
+      - name: Draw shows the wall and lands under the finger
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        timeout-minutes: 4
+        run: node --experimental-strip-types scripts/drawwall.mjs --app
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.
