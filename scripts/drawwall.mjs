@@ -133,12 +133,14 @@ try {
     const bundle = (await build({ entryPoints: ['src/lib/padPicture.ts'], bundle: true, format: 'iife', globalName: 'PP', write: false, logLevel: 'silent' })).outputFiles[0].text;
     const wall = await (await browser.newContext({ viewport: { width: 400, height: 300 } })).newPage();
     wall.on('pageerror', e => errors.push(`wall: ${e.message}`));
-    await wall.goto('about:blank');
+    // On the show server's own origin, as the laptop's page is: from about:blank
+    // (an opaque origin) CI's Chromium never opened the socket at all.
+    await wall.goto(`${BASE}/remote-info.json`);
     await wall.addScriptTag({ content: bundle });
     await wall.evaluate(({ url, key }) => {
       const c = document.createElement('canvas');
       c.width = 960; c.height = 720;   // 4:3
-      document.body.append(c);
+      (document.body ?? document.documentElement).append(c);
       const ctx = c.getContext('2d');
       // Four quarters, and a texture over them so the JPEG is a picture's size, not a flat one's.
       const paint = (t) => {
@@ -167,7 +169,7 @@ try {
       };
       const loop = (t) => { if (window.__drawing) { paint(t); sender.tap(c); } requestAnimationFrame(loop); };
       requestAnimationFrame(loop);
-    }, { url: `ws://127.0.0.1:${PORT}/remote-ws`, key: KEY });
+    }, { url: `ws://localhost:${PORT}/remote-ws`, key: KEY });
     for (let t = 0; t < 10_000 && (await wall.evaluate(() => window.__ws.readyState)) !== 1; t += 200) await wait(200);
     check('the stand-in laptop is on the relay', (await wall.evaluate(() => window.__ws.readyState)) === 1);
     await wait(1500);
