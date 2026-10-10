@@ -1005,7 +1005,6 @@ export const PRESETS: Preset[] = [
       plateRock: 0.5,
       beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
-      hueJourney: 0,
       lightPlay: 0.15,
       lampHotspot: 0.1,
       iridescence: 0,
@@ -2270,7 +2269,6 @@ export const PRESETS: Preset[] = [
       plateRock: 0.4,
       beatSqueeze: 0.0,
       layerScaleVariety: 0,
-      hueJourney: 0,
       // Zoomed in it is still a print: the closeup's paint cells, lacing,
       // domes and ragged silhouette would each be outlined in black.
       macroCells: 0,
@@ -2279,6 +2277,125 @@ export const PRESETS: Preset[] = [
       macroEdgeDetail: 0,
       macroRelief: 0,
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
+    }
+  },
+  {
+    id: 'lava-lamp',
+    name: 'Lava Lamp',
+    description: 'The plate stood upright over a warm lamp: coloured wax heavier than the liquid round it sinks in mushroom-headed plumes, is warmed where it pools at the bottom, and rises again.',
+    settings: {
+      /*
+        A look for physics that shipped with no look to show it (PLAN.md 28a).
+        Stand the plate up (Plate Upright) and gravity acts in it; give the
+        dye weight (Dye Weight, solutalBuoyancy) and a band of it over clear
+        liquid is a Rayleigh–Taylor instability: it falls in fingers that roll
+        up into mushroom heads, the lab's 192² plate after 400 steps showing
+        a dozen of them from two rows of drops. The solver keeps a lamp under
+        the plate where it leaves the frame (LAMP_HEAT in gpu/fluid.ts), so
+        what pools there is warmed, rises, cools and sinks again: the cycle a
+        lava lamp runs on, rather than a dish that settles. Heat diffusing
+        faster than the dye (doubleDiffusion, as heat does in water) narrows
+        the plumes toward salt fingers. Lit from behind like the real lamp.
+      */
+      plateUpright: 1,
+      solutalBuoyancy: 0.6,
+      doubleDiffusion: 0.5,
+      tiltDirection: 180,
+      heatDecay: 0.995,
+      lampGround: 1,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#ffe6bf',
+      ledSpeed: 0.0,
+      globalSpeed: 0.0105,
+      surge: 0.3,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.6,
+      rotationSpeed: 0,          // a lamp does not turn: down has to stay down the screen
+      centerGravity: 0,
+      diffusionRate: 0,
+      buoyancy: 0.3,
+      advection: 0.4,
+      damping: 0.988,
+      automateRate: 0.06,        // a little new wax now and then; the plumes are the show
+      platePressure: 0.1,
+      glassSmear: 0.15,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.8,
+      evaporationRate: 0.004,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.35,
+      turbulenceScale: 0.2,
+      blobSurfaceTension: 0.5,
+      boundaryContrast: 0.4,
+      saturationBoost: 1.3,
+      glossiness: 0.15,
+      plateRock: 0.1,
+      beatSqueeze: 0.0,
+      dyeBudget: 0.6,
+      bubbles: 0,
+      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
+    }
+  },
+  {
+    id: 'turing-print',
+    name: 'Turing Print',
+    description: 'A reaction that prints: two reagents diffusing at different speeds settle into stripes of one width, black on the white lamp, and the stir drags them into whorls that heal behind it.',
+    settings: {
+      /*
+        PLAN.md 26d, the look the owner asked for after the reaction-diffusion
+        VJ pack. The reaction is Gray–Scott carried by the flow (26a, the
+        `chemistry` setting); Pattern (26b, chemistryPattern) is pushed along
+        Pearson's map into the labyrinth, and the precipitate is drawn as dark
+        ink on a white lamp, so it reads black and white the way an opaque
+        product in a clear gel does. The ink's colours are the Ink palette for
+        now; the "Palette for ferro and Turing Print" work tunes them.
+      */
+      chemistry: 1,
+      chemistryPattern: 0.85,
+      chemistryWidth: 0.4,
+      lampGround: 1,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#f6f3ea',
+      ledSpeed: 0.0,
+      globalSpeed: 0.0105,
+      surge: 0.25,
+      layerCount: 1,
+      blendMode: 'multiply',
+      gooeyEffect: 0.3,
+      rotationSpeed: 0.03,       // slow enough that the stripes heal behind the drag
+      centerGravity: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.2,
+      advection: 0.35,
+      damping: 0.985,
+      heatDecay: 0.985,
+      automateRate: 0.02,        // the reaction lays the ink; drops would only blot it
+      platePressure: 0.15,
+      glassSmear: 0.1,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.6,
+      evaporationRate: 0.03,
+      airVelocity: 0.03,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.35,
+      turbulenceScale: 0.15,
+      blobSurfaceTension: 0.4,
+      boundaryContrast: 0.5,
+      saturationBoost: 1.0,
+      glossiness: 0.0,
+      dyeBudget: 0.4,
+      edgeRelief: 0.5,
+      bubbles: 0,
+      plateRock: 0.2,
+      beatSqueeze: 0.0,
+      exposure: 0.75,
+      audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
     }
   },
 ];

@@ -89,6 +89,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
+  'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
+  'turing-print':       [14, 22],             // graphite and midnight: an ink, not a colour (the palette work tunes it)
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
@@ -155,6 +157,8 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
   'ferro-maze':         ['pour'],
   'ferro-paint':        ['drop', 'pour'],
+  'lava-lamp':          ['pour', 'drop'],         // wax poured in, a drop now and then to start a plume
+  'turing-print':       ['drop'],                 // the reagent is dropped; the reaction does the rest
   'roy':                ['pour', 'drop'],         // big flat shapes, and a drop now and then to break one
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
@@ -257,6 +261,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'ferro-paint':        ['water', 'oil', 'water'],
   // Poster, 1969's pair: two dyes that hold their own edge and refuse to
   // blend into a third, so a shape stays one ink with a line round it.
+  'lava-lamp':          ['glycerine', 'water'],
+  'turing-print':       ['reagent', 'water'],
   'roy':                ['milk', 'ink'],
   'home-movie':         ['water', 'water', 'soap'],
   // Oil that rounds into bodies, as a clock-glass dish is laid; syrup finds
