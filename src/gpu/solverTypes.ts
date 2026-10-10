@@ -68,7 +68,6 @@ export interface GpuStepParams {
     plate coordinates; each at this magnet's height and strength. Only read
     while this one is on.
   */
-  extraMagnets?: readonly { x: number; y: number }[];
   /**
     Seconds of real time this step stands for, as the magnet counts it. The
     flow moves by `dt × advection`, which a slow look keeps tiny on purpose;
