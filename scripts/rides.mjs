@@ -325,7 +325,7 @@ try {
         the glass says the liquid should be (in cells), and how much its
         pixels changed against `base`'s at the same step.
       */
-      const run = async (glass, { cover = true, t = DEF, turb = 0, heavy = false, base = null } = {}) => {
+      const run = async (glass, { cover = true, t = DEF, turb = 0, heavy = false, base = null, cost = false } = {}) => {
         await lab.create(N, N); lay(heavy);
         const mean = meanOf(await dyeA());
         await lab.step(2, { ...app(N, mean), gapThickness: t });
@@ -333,9 +333,16 @@ try {
         for (let k = 0; k < 120; k++) {
           const g = glass ? glass[k] : [0, 0, 0, 0, 0, 0];
           await lab.step(1, { ...app(N, mean), gapThickness: t, turbScale: turb, rockX: g[0], rockY: g[1], coverX: cover ? g[2] : 0, coverY: cover ? g[3] : 0 });
-          // The carries' substeps this step, and the glass's drift taken out of them in whole cells (fluid.ts, driftCells).
-          const c = await lab.carry();
-          o.subs += c.n / 120; o.most = Math.max(o.most, c.n); o.drift = Math.max(o.drift, Math.abs(c.drift[0]), Math.abs(c.drift[1]));
+          /*
+            The carries' substeps this step, and the glass's drift taken out
+            of them (fluid.ts, driftCells), for 5c: only on the runs it reads,
+            since each read waits for the step, and on the Mac's slowest
+            runners the plate shard has run into its twenty minutes.
+          */
+          if (cost) {
+            const c = await lab.carry();
+            o.subs += c.n / 120; o.most = Math.max(o.most, c.n); o.drift = Math.max(o.drift, Math.abs(c.drift[0]), Math.abs(c.drift[1]));
+          }
           if (k % 3 !== 2) continue;
           const a = await reds();
           o.at.push(where(a, o.at.length ? o.at[o.at.length - 1] : [0, 0])); o.pred.push(cover ? [g[4] * N, g[5] * N] : [0, 0]);
@@ -369,7 +376,7 @@ try {
         });
         return { cells: far, said, gain: pp > 0 ? mp / pp : 0, corr: pp > 0 && mm > 0 ? mp / Math.sqrt(pp * mm) : 0, amp, read: read / o.at.length, moved: o.moved, subs: o.subs, most: o.most, drift: o.drift };
       };
-      const still = await run(null), stillThick = await run(null, { t: THICK }), stillHeavy = await run(null, { heavy: true });
+      const still = await run(null, { cost: true }), stillThick = await run(null, { t: THICK }), stillHeavy = await run(null, { heavy: true });
       res.stillSubs = { subs: still.subs, most: still.most };
       const go = async (glass, opts = {}) => {
         const base = opts.t === THICK ? stillThick : opts.heavy ? stillHeavy : still;
@@ -377,8 +384,8 @@ try {
       };
       res.evenTilt = await go(glasses.full, { cover: false });
       res.heavyTilt = await go(glasses.full, { cover: false, heavy: true });
-      res.evenFull = await go(glasses.full);
-      res.evenDefault = await go(glasses.def);
+      res.evenFull = await go(glasses.full, { cost: true });
+      res.evenDefault = await go(glasses.def, { cost: true });
       res.evenLow = await go(glasses.low);
       res.evenThick = await go(glasses.thick, { t: THICK });
       res.evenStir = await go(null, { turb: stirs['a look\'s 0.3'] });
