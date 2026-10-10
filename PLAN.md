@@ -4749,6 +4749,16 @@ URL from 19p, or the live site with its query), what to look at and what would b
 grouped so one sitting covers one area, gates first. The owner's verdicts go back as one
 commit. *Size:* S.
 
+### 19u. Nothing reaches main without the checks
+
+2026-10-10: a commit pushed straight to `main` (d8697cd, the plate hearing pitch, brightness
+and the beat) passed an `audio` field that `FrameView` did not declare, so `npm run lint`
+went red on main and its deploy could not publish; behind it, `npm run backplate` was red
+too (its source-grep for the music's colour read the old speed through the harmony). Every
+open PR inherited both until #332 carried the fixes. *Fix:* a branch rule on `main` that
+requires the `Measure` checks before anything lands, for both tools' sessions; until then, a
+session pushing to `main` runs `npm run lint` and the node harnesses first. *Size:* S.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
