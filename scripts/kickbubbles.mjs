@@ -106,7 +106,7 @@ try {
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     // A browser that has never chosen a source, so the first gesture starts
     // the band, exactly as on a first visit. Nothing about the sound is written.
-    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
     await page.waitForTimeout(6000);
     await page.evaluate((impact) => window.chromaglassSettings(impact === null ? { bubbles: 1 } : { audioImpact: impact, bubbles: 1 }), c.impact);

@@ -157,12 +157,23 @@ const part = async (name, fn) => {
 };
 const workers = (page) => page.evaluate(() => navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then((r) => r.length) : 0);
 const RELAY = `http://127.0.0.1:${RELAY_PORT}`;
+/*
+  Play here goes to the app's own start, and a phone starts on Play
+  (PhonePlay.tsx, lib/phone.ts phoneScreen) unless the full layout was the
+  last one chosen there. Either is the show; the Laptop remote is in the full
+  layout's More sheet, reached from Play's All controls.
+*/
+const showUp = async (page) => (await visible(page, 'play-screen')) || (await visible(page, 'phone-stage'));
+const toAllControls = async (page) => {
+  if (await visible(page, 'play-screen')) await page.getByTestId('play-all-controls').tap();
+  await until(page, () => visible(page, 'phone-stage'), 5000);
+};
 
 // First use: nothing remembered. More › Laptop remote asks, and Play here
 // from the form goes back.
 await part('first use', async () => {
   const { ctx, page, sockets } = await phone({ app: true });
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await until(page, () => visible(page, 'phone-stage'), 20_000);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
@@ -175,7 +186,7 @@ await part('first use', async () => {
   check('and opens no socket to its own origin', sockets.length === 0, sockets.join(', '));
   await page.getByTestId('app-play-here').first().tap();
   await page.waitForURL((u) => !u.search.includes('remote'));
-  check('Play here on the form goes back to the show', await until(page, () => visible(page, 'phone-stage'), 20_000), page.url());
+  check('Play here on the form goes back to the show', await until(page, () => showUp(page), 20_000), page.url());
   // A worker's registration lands after load; give it the time it takes on the website below.
   await page.waitForTimeout(1500);
   check('the app registers no service worker', (await workers(page)) === 0);
@@ -223,7 +234,8 @@ await part('linked', async () => {
   // Modes: back to the show, then back to the laptop from More.
   await page.getByTestId('app-play-here').first().tap();
   await page.waitForURL((u) => !u.search.includes('remote'));
-  check('Play here goes back to the show', await until(page, () => visible(page, 'phone-stage'), 20_000), page.url());
+  check('Play here goes back to the show', await until(page, () => showUp(page), 20_000), page.url());
+  await toAllControls(page);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
   await page.getByTestId('phone-laptop-remote').tap();
@@ -238,9 +250,9 @@ await part('linked', async () => {
 // out, and pasting the new Phone line has to win over the remembered key.
 await part('wrong key', async () => {
   const { ctx, page } = await phone({ app: true });
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await page.evaluate((relay) => localStorage.setItem('chromaglass-laptop', JSON.stringify({ relay, key: '0000' })), RELAY);
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await until(page, () => visible(page, 'phone-stage'), 20_000);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
@@ -288,7 +300,7 @@ await part('only the app follows ?relay=', async () => {
 // The website, unchanged.
 await part('the website', async () => {
   const { ctx, page } = await phone({ app: false });
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await until(page, () => visible(page, 'phone-stage'), 20_000);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-sheet-more'), 5000);
