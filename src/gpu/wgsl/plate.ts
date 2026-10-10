@@ -1045,12 +1045,12 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     fineRim = max(h0.rim, h1.rim) * gap * seeFine;
     cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap * seeFine;
 
-    let dark = col * 0.03;
     let ring = mix(col, vec3f(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
-
-    // Cell cores are holes in the film, not a tint over it: darken them the
-    // whole way rather than scaling the darkening down with the patch mask.
-    col = mix(col, dark, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
+    // Cell cores are fluid lenses, not black holes! Instead of darkening them,
+    // we make them slightly deeper and richer in color, while preserving the
+    // specular rim. They act like oil bubbles revealing the paint underneath.
+    let coreLens = mix(col, col * vec3f(0.8, 0.9, 1.2), 0.5);
+    col = mix(col, coreLens, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
     col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
   }
 
