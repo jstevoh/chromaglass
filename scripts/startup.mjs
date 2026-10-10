@@ -1348,7 +1348,7 @@ try {
     quarter-second row it was seen in; the intro's own leaving is exact.
   */
   const intro = o.intro ?? {};
-  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}; held still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never let go' : `${(e / 1000).toFixed(2)} s`}`).join(', ') || 'never'} (while the opening's render pipelines compiled)`);
+  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}; held still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never let go' : `${(e / 1000).toFixed(2)} s`}`).join(', ') || 'never'} (from the first paint until the opening's render pipelines were built)`);
   const p = o.prepared;
   const b = o.behind;
   check('the show opens and the plate is stepping',

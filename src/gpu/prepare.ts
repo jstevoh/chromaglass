@@ -345,6 +345,12 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
  * frame or two), so the last moving frame is not left queued behind the
  * first compile; `go` lets it move again. Asked only in the opening, and
  * only while the intro is up (`introStill`).
+ *
+ * That caught the render compiles and not what comes before them: on a
+ * cold Mac the GPU process is as busy starting the device, and the intro
+ * moving through that stopped the frames as long (`lib/intro.ts` has the
+ * runs). So the intro now starts still, from the first paint, and the
+ * opening's `still` finds it so; `go` here is still what lets it move.
  */
 export interface Quiet {
   still(): Promise<void>;
