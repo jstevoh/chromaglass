@@ -928,13 +928,14 @@ const MACRO = /* wgsl */ `
 fn macroWarpOffset(fuv: vec2f) -> vec2f {
   if (U.macroEdge < 0.005) { return vec2f(0.0); }
   let f = U.logicalGrid * 0.85;
-  let t = vec2f(U.time * 0.012, U.time * -0.009);
+  let t = vec2f(U.time * 0.003, U.time * -0.002);
   var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
   w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
   
   // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat
   let beatPulse = sin(U.beatPhase * 3.14159265);
-  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.4);
+  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.15); // reduced from 0.4 to 0.15 so it vibrates less
+
   
   // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
   // plate-wide frame is noise, and on a bead it is the silhouette.
@@ -1078,28 +1079,30 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     let tilt = cellSlope * k * 1.6 + vec2f(0.0, lace * 0.6);
     // The grid normal is a gentle slope over many sim cells; scaled up it
     // becomes the dome of the bead, which is what carries the large-scale
-    // sense of volume under the cell detail.
-    let n = normalize(vec3f(gridNormal.xy * 3.2 - tilt * r3, 1.0));
+    // sense of volume under the cell detail. Increased strength for more 3D look.
+    let n = normalize(vec3f(gridNormal.xy * 5.0 - tilt * r3 * 2.2, 1.0));
 
     let L = lampDir(fuv, U.lamp);
     let H = normalize(L + vec3f(0.0, 0.0, 1.0));
     let diff = max(0.0, dot(n, L));
-    let spec = pow(max(0.0, dot(n, H)), 46.0);
-    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
+    // Tighter, brighter specular highlight for wetter look
+    let spec = pow(max(0.0, dot(n, H)), 120.0);
+    // Stronger fresnel on the edges
+    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.5);
     // Recessed cores and grooves sit in their own shadow.
-    let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
+    let ao = 1.0 - clamp(core * k * 0.65 + fineCore * k * 0.35 + lace * 0.5, 0.0, 1.0) * 0.55;
 
     // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
     // without darkening it overall.
     col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
-    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 0.7;    // wet highlight on the domes
-    col += col * fres * r3 * paint * 0.35;                      // bright refracting edge
+    col += vec3f(1.0, 0.98, 0.95) * spec * r3 * paint * 1.5;    // wet highlight on the domes
+    col += col * fres * r3 * paint * 0.5;                      // bright refracting edge
   }
 
   // ── Dome shading — thickness across the bead as a whole ─────────
   if (U.macroDepth > 0.005) {
     let belly = smoothstep(0.05, 0.45, alpha);
-    col *= mix(1.0, 0.74 + 0.42 * belly, U.macroDepth * 0.8);
+    col *= mix(1.0, 0.65 + 0.45 * belly, U.macroDepth * 0.9);
   }
 
   // Ink pooled in a cell core is opaque — let it read as true black rather
