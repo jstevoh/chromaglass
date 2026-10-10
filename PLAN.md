@@ -5546,6 +5546,11 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     - **27a-3, open.** Glass Smear's own noise speed is laid × dt and then read × disp
       again (the 2026-10-06 audit), so at a slow look's Speed it moves the plate about
       a ten-thousandth a second; lay it in m/s as the cover's slide is.
+    - **27a-4, open.** On #328's Mac run, `npm run renders` on the phone with the band
+      drew 11 frames a second in its second window (33 frames against the 45 floor; the
+      first window drew 20.6, and the ear read every frame). #336 and #337 passed it the
+      same day; the PR merged on the owner's word without a re-run. If it shows again,
+      measure the phone's frame time with and without the cover glass's step.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
