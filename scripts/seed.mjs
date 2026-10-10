@@ -440,7 +440,7 @@ for (const [name, run, say] of libs) {
 if (process.argv.includes('--lab')) {
   const { openLab } = await import('./lab.mjs');
   /*
-    A plate laid the way `boiling-point` lays one — forty blobs, a dye and a
+    A plate laid the way Boiling Point laid one (retired in PLAN.md 28a; its seed is still in seedPreset) — forty blobs, a dye and a
     size each from the plate's stream — with a seeded field of bubbles on it,
     stepped by the GPU solver and drawn by the plate shader. The node half
     decides every number; the page only runs the GPU. Twice on one seed must

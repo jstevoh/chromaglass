@@ -5401,7 +5401,7 @@ Steps:
   somewhere: the reaction runs only where its liquid was poured (a bottle on the shelf),
   and two pours with different feeds make two patterns that meet. A shape, a word or
   the camera can lay the reagent, as images already pour (`injectImage`).
-- **26d. The look: "Turing Print"** (name open). A clear liquid, a white lamp, the
+- **26d. The look: "Turing Print"** (**look added**, #330, 28a; its ink colours and the reaction growing are #331; the 512² rung below is open). A clear liquid, a white lamp, the
   product drawn as an opaque precipitate: black on white, inverted by the lamp. Its edge
   goes through the plate's own reconstruction (Catmull-Rom and `fwidth`), so the stripes
   need no FXAA pass; at 256² a 12-pixel stripe is two cells, so it wants the 512² rung or
@@ -5516,14 +5516,55 @@ current presets, create new ones, and dump ones that aren't doing anything inter
 anymore." Most of the 42 looks were tuned before the lamp ground (18b), each liquid's
 own properties and colour (18d, 18d-12), the GPU reaction carried by the flow (§26),
 standing domes (9t), Blow's air (15g), the controls sweep (§27) and layers on every
-look (#273). The ferrofluid and Turing palettes belong to the "Palette for ferro and
-Turing Print" work and are built on here once it merges.
+look (#273). The ferrofluid and Turing shader palettes are the "Palette for ferro and
+Turing Print" work (#331), which also made the reaction grow at all.
 
-- **28a. Keep, improve, new, drop.** Judge every look on the Mac gallery (`gallery`
-  label) against what it is named for; retune the ones that miss, add looks for the new
-  physics that no look shows, retire the ones that duplicate another. A retired id maps
-  to the look that replaced it, so a saved preset, a set list or a MIDI map that names
-  it still loads.
+- **28a. Keep, improve, new, retire** (**shipped**, #330). Judged on the Mac gallery of
+  main (`gallery` label, 2026-10-10, `/mnt/project-files/presets-28/before/`):
+  - *Named "Preset palettes"* in the menus, the desks, the phone's sheet (its tab says
+    Presets, for width), the remote, the MIDI surface and the guide (the owner's pick).
+  - *Retired*, each id mapped to its nearest look in `RETIRED_PRESETS` (src/presets.ts),
+    so a set list, MIDI pad, sequence stage, song show or `?look=` link naming it plays
+    the replacement (`findPreset`; `npm run plate`): Sunny Side Up → Colorful Cosmos (the
+    same soft static pink), Boiling Point → Aurora Borealis (the same greens and pace),
+    Glycerine Drift → Classic (one flat blue-to-magenta gradient). Saved presets keep
+    their own copy and are untouched.
+  - *Improved*: Cyberpunk Neon and Timbre Shifter drew a conic rainbow through every
+    clear patch (the LED platform's `cyberpunk` and `rainbow` modes: a colour picker
+    under the glass); Fillmore East and Clock Glass were nearly black on the lamp (luma
+    0.06 and 0.08, Dye Budget 0.9 filling the dish: 18b-8) and now run at 0.5; Jellyfish
+    Bloom sat two bells on an empty plate and Cell Bloom drained by 40 s (more drops,
+    slower evaporation).
+  - *New*: **Lava Lamp**, the first look to stand the plate up (Plate Upright, Dye
+    Weight, Double Diffusion: Rayleigh–Taylor plumes warmed back up by the lamp the
+    solver keeps under the plate), and **Turing Print** (26d: the reaction at Pattern
+    0.85 on a white lamp in graphite and midnight). Lava Lamp needed the mix force
+    waited for at opening (`Opening.gravity`; `npm run startup` on Metal caught it).
+- **28b. Colour palettes for the lamp** (**shipped**, #330). Pastel Glow and Galaxy each
+  carried White and Icy Blue, which are 0 and 26 (CIELAB ΔE) from the white lamp, so on
+  a lamp look half their dyes poured invisibly; Lavender replaced White in both. Added,
+  after the 17 so a saved lock keeps its index: Overhead (yellow, magenta, teal,
+  ultramarine: the subtractive dishes), Ink (graphite, midnight, crimson, coffee: the
+  reactions' precipitates), Pantry (the liquids' own colours) and Lava. `npm run plate`
+  holds every palette to three of four colours 40 or more from black and from white
+  (before: Pastel Glow and Galaxy 4/2). A track's music picks among 21 now, so a song
+  identified before may land on a different palette once.
+- **28c. Open from 28a.**
+  - The retired looks' cases in `seedPreset` (LiquidVisualizer.tsx) are dead; delete
+    them when lane G is free (#307 held it), and drop the file's exemption in `npm run
+    plate`'s retired-id walk.
+  - Still flat on the Mac and not retuned here: Oil Wheel (motion 0.003, a dark brown
+    disc; 18b-8 lists it), Deep Ocean (three bands), Bass Drop (one red: its Squeeze only
+    shows with a kick). Crowd Plate is
+    a camera look and photographs static without one.
+  - The gallery's 8 s frame came back empty on Classic ("no grabFrame"): the first look
+    is photographed before the page can grab a frame.
+  - Neon Coral Reef draws a smooth rainbow ramp across one blob (its dyes' hue walk over
+    a single body); judge after #331 makes its coral grow.
+  - More new looks the physics allows and none shows: salt fingers on their own
+    (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
+    into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
+    18d-12a: the automation pours colourless).
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
