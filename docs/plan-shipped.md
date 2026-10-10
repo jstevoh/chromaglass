@@ -1138,8 +1138,10 @@ Reported: Draw's frame was black, so a hand drew blind on the phone. The laptop 
 sends what it drew: in the frame task (the only place a presented WebGPU canvas can be
 read; the projector window is drawn the same way), a copy as wide as the pad's frame
 (160–480 px) is encoded as a JPEG in a worker and sent over the relay, at most 15 a
-second, one encode in flight. Not the canvas's `toBlob`: Chromium runs it in the page's
-idle time, and the Mac's show, drawing every frame, got 2 pictures a second from it. Not a WebRTC video track: that needs signalling through
+second, up to three in flight. Not the canvas's `toBlob`: Chromium runs it in the page's
+idle time, and the Mac's show, drawing every frame, got 2 pictures a second from it. Not one
+in flight: each round trip (bitmap, worker, answer) waits for gaps between the show's frames,
+and one at a time came to 4.3 a second at 18 frames. Not a WebRTC video track: that needs signalling through
 the relay, ICE on a show network that may not route between two Wi-Fi clients, and a
 decoder that buffers, which is latency a hand feels. Nothing is sent until a remote on
 Draw asks; it renews a three-second lease every second, so a phone that locks or leaves

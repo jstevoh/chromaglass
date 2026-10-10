@@ -25,7 +25,8 @@
  *                       sending inside the lease's three seconds
  *   the picture         lands in the frame, painted: each quarter's colour
  *                       in its own quarter (the right way up, not mirrored),
- *                       at least 8 a second, under 60 kB each
+ *                       at least 8 a second, under 60 kB each, and still
+ *                       8 on a page busy 70 ms of every frame
  *   the wall's shape    the frame takes the picture's 4:3, says "wall 4:3",
  *                       and a touch at its middle is 0.5, 0.5 and its corner
  *                       the corner, every pad message marked `wall`
@@ -167,7 +168,14 @@ try {
         window.__heard[m.type] = (window.__heard[m.type] ?? 0) + 1;
         if (m.type === 'pad-picture') { window.__asked.push({ width: m.width, at: performance.now() }); sender.want(m.width); }
       };
-      const loop = (t) => { if (window.__drawing) { paint(t); sender.tap(c); } requestAnimationFrame(loop); };
+      // `__hold`: milliseconds of the page's thread taken each frame, as the
+      // real plate's frame takes it (the Mac's show draws 18 a second).
+      window.__hold = 0;
+      const loop = (t) => {
+        if (window.__drawing) { paint(t); sender.tap(c); }
+        for (const end = performance.now() + window.__hold; performance.now() < end;);
+        requestAnimationFrame(loop);
+      };
       requestAnimationFrame(loop);
     }, { url: `ws://localhost:${PORT}/remote-ws`, key: KEY });
     for (let t = 0; t < 10_000 && (await wall.evaluate(() => window.__ws.readyState)) !== 1; t += 200) await wait(200);
@@ -196,6 +204,24 @@ try {
     await page.waitForTimeout(3000);
     const rate = ((await framesOf(page)) - f0) / 3;
     check('the picture lands in the frame, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s`);
+    /*
+      And on a busy page. The cloud's stand-in draws in a millisecond, and the
+      Mac's show takes most of every frame: there one picture in flight came
+      to 4.3 a second at 18 frames (CI, f70cf59), each round trip (the
+      bitmap, the post to the worker, its answer) waiting for gaps between
+      frames. Held 70 ms of every frame, the stand-in's page draws 14 a
+      second, and one picture in flight takes two of them: 7.0 a second,
+      red. Three in flight take one every frame: 13.7.
+    */
+    await wall.evaluate(() => { window.__hold = 70; });
+    await page.waitForTimeout(500);
+    const g0 = await framesOf(page);
+    const r0 = await wall.evaluate(() => { window.__fr = 0; const n = () => { window.__fr++; if (window.__hold) requestAnimationFrame(n); }; requestAnimationFrame(n); return 0; });
+    await page.waitForTimeout(3000);
+    const busy = ((await framesOf(page)) - g0) / 3;
+    const fps = (await wall.evaluate(() => window.__fr)) / 3 + r0;
+    await wall.evaluate(() => { window.__hold = 0; });
+    check('and on a page drawing 14 frames a second, still at least 8', busy >= 8 && fps < 16, `${busy.toFixed(1)}/s at ${fps.toFixed(1)} frames/s`);
     const { sent, bytes, via } = await wall.evaluate(() => ({ sent: window.__sender.sent, bytes: window.__sender.bytes, via: window.__sender.via }));
     // Off the page's idle time: toBlob there gave the Mac's busy show 2 a second.
     check('encoded in a worker', via === 'worker', via);
@@ -260,10 +286,24 @@ try {
     await display.evaluate((c) => window.chromaglassSettings?.(c), CALM);
     const d = await phone();
     const { page } = d;
-    const f0 = await framesOf(page);
+    /*
+      The rate is the steady one, counted from the first picture painted,
+      and how soon that first one comes is its own check: counted from the
+      link, the window held the first ask's round trip and the worker's
+      start, and the two were one number that said neither. The display's
+      own frames a second are printed beside it: the pictures cannot come
+      faster than the frames they are taken from.
+    */
+    const linked = Date.now();
+    while (!((await framesOf(page)) > 0) && Date.now() - linked < 10_000) await page.waitForTimeout(50);
+    const first = (Date.now() - linked) / 1000;
+    check('the first picture reaches Draw within 2 s of the link', first <= 2, `${first.toFixed(2)} s`);
+    const shown = async () => ({ f: await framesOf(page), d: await display.evaluate(() => window.chromaglassDebug?.()?.frames ?? 0) });
+    const a = await shown();
     await page.waitForTimeout(3000);
-    const rate = ((await framesOf(page)) - f0) / 3;
-    check('the laptop\'s own frames reach Draw, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s`);
+    const b = await shown();
+    const rate = (b.f - a.f) / 3;
+    check('the laptop\'s own frames reach Draw, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s, the display drawing ${((b.d - a.d) / 3).toFixed(1)} frames/s`);
     const pad = await display.evaluate(() => window.chromaglassDebug?.()?.padPicture);
     check('each under 60 kB', pad && pad.sent > 0 && pad.bytes / pad.sent < 60_000, JSON.stringify(pad));
     const mean = (grid) => [0, 1, 2].map(i => grid.reduce((s, c) => s + c[i], 0) / grid.length);

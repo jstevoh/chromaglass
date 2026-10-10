@@ -68,8 +68,11 @@ export function isPadPicture(m: { src?: unknown; aspect?: unknown }): boolean {
  */
 export class PadPictureSender {
   private leases: { width: number; until: number }[] = [];
-  private busy = false;
+  /** Pictures taken and not yet answered: seq → when taken. */
+  private inflight = new Map<number, number>();
   private seq = 0;
+  /** The newest picture sent; an older one answered after it is dropped. */
+  private last = 0;
   private small: HTMLCanvasElement | null = null;
   /** Pictures sent, and the bytes they came to, for `chromaglassDebug().padPicture`. */
   sent = 0;
@@ -103,11 +106,23 @@ export class PadPictureSender {
    * the last" took every other one, 9 a second; against a due time with
    * half a frame of slack it takes 15 when the frames allow, and every
    * frame when they come slower than that.
+   *
+   * Up to three in flight, not one. With one, the Mac's show (CI, the app
+   * at 18 frames a second, the encode already in a worker) sent 4.3 a
+   * second: a picture's round trip is a bitmap promise, a post to the
+   * worker and its answer, and each of those waits for a gap between the
+   * page's frames, so it took three or four frames however fast the worker
+   * was. The pace is the due time's; the round trip only delays each
+   * picture by those frames, which a hand does not feel at a fifteenth of
+   * a second. Answers can come back out of order; one older than a picture
+   * already sent is dropped.
    */
   tap(canvas: HTMLCanvasElement): void {
     const t = this.now();
-    if (this.busy && t - this.since > 2000) this.busy = false;   // an encode that never answered
-    if (this.busy || t < this.due - 8) return;
+    // An encode that never answered in two seconds is given up on, so it
+    // cannot hold a place in flight until a reload.
+    for (const [s, at] of this.inflight) if (t - at > 2000) { this.inflight.delete(s); this.waiting.delete(s); }
+    if (this.inflight.size >= IN_FLIGHT || t < this.due - 8) return;
     const live = this.leases.filter(l => l.until > t);
     if (live.length === 0 || canvas.width === 0 || canvas.height === 0) return;
     // The widest frame asking: the iPad's, when a phone and an iPad both are.
@@ -127,13 +142,12 @@ export class PadPictureSender {
       return;   // a canvas that cannot be read this frame; the next one will be
     }
     this.due = Math.max(this.due + 1000 / PAD_PICTURE_FPS, t);
-    this.busy = true;
-    this.since = t;
     const seq = ++this.seq;
+    this.inflight.set(seq, t);
     const done = (src: string | null, size: number) => {
-      if (seq !== this.seq) return;   // answered after the watchdog gave up on it
-      this.busy = false;
-      if (!src) return;
+      if (!this.inflight.delete(seq)) return;   // answered after the watchdog gave up on it
+      if (!src || seq < this.last) return;
+      this.last = seq;
       this.sent++;
       this.bytes += size;
       this.send({ type: 'picture', src, w, h, aspect, seq });
@@ -143,22 +157,24 @@ export class PadPictureSender {
       (CI, the app at 18 frames a second) that came to 2 pictures a second:
       Chromium runs a canvas's `toBlob` in the page's idle time, and a page
       drawing a plate every frame has next to none. A worker has all of
-      its own. `createImageBitmap` copies the small picture out now; the
-      worker draws it on its own canvas and encodes there. Without workers
-      or OffscreenCanvas, `toBlob` as before.
+      its own. `createImageBitmap` copies the small picture out now (the
+      copy is taken when it is called, so the next frame may draw over
+      `small` while this one is still on its way); the worker draws it on
+      its own canvas and encodes there. Without workers or OffscreenCanvas,
+      `toBlob` as before, which also takes its copy when called.
     */
     const worker = this.encoder();
     if (worker) {
       createImageBitmap(small).then((bmp) => {
-        if (seq !== this.seq) { bmp.close(); return; }
-        this.waiting = { seq, done };
+        if (!this.inflight.has(seq) || this.worker !== worker) { bmp.close(); done(null, 0); return; }
+        this.waiting.set(seq, done);
         worker.postMessage({ bmp, quality: QUALITY, seq }, [bmp]);
       }, () => done(null, 0));
       return;
     }
     // `toBlob` can throw (an encoder that fails, a canvas that is not
-    // origin-clean): then nothing is in flight, and a stuck `busy` would end
-    // the pictures until a reload.
+    // origin-clean): then nothing is in flight, and a place held would
+    // narrow the pictures until the watchdog freed it.
     try { small.toBlob((blob) => {
       if (!blob) { done(null, 0); return; }
       const reader = new FileReader();
@@ -168,9 +184,9 @@ export class PadPictureSender {
   }
 
   private due = -Infinity;
-  private since = 0;
   private worker: Worker | null | undefined;
-  private waiting: { seq: number; done: (src: string | null, size: number) => void } | null = null;
+  /** The worker's answers still awaited: seq → what to do with it. */
+  private waiting = new Map<number, (src: string | null, size: number) => void>();
 
   /** Where the pictures are encoded: 'worker', or 'toBlob' where a worker cannot (for the checks). */
   get via(): 'worker' | 'toBlob' | 'none' { return this.worker ? 'worker' : this.worker === null ? 'toBlob' : 'none'; }
@@ -184,14 +200,20 @@ export class PadPictureSender {
       const url = URL.createObjectURL(new Blob([ENCODER], { type: 'text/javascript' }));
       const w = new Worker(url);
       URL.revokeObjectURL(url);
-      // Only the answer to the picture asked for: one the watchdog gave up on is dropped.
+      // Only answers still awaited: one the watchdog gave up on is dropped.
       w.onmessage = (e: MessageEvent<{ seq: number; src: string | null; size: number }>) => {
-        const wait = this.waiting;
-        if (!wait || wait.seq !== e.data.seq) return;
-        this.waiting = null;
-        wait.done(e.data.src, e.data.size);
+        const done = this.waiting.get(e.data.seq);
+        if (!done) return;
+        this.waiting.delete(e.data.seq);
+        done(e.data.src, e.data.size);
       };
-      w.onerror = () => { const wait = this.waiting; this.waiting = null; wait?.done(null, 0); this.worker = null; };
+      // A worker that fails is not asked again: the pictures go by `toBlob`.
+      w.onerror = () => {
+        const all = [...this.waiting.values()];
+        this.waiting.clear();
+        this.worker = null;
+        for (const done of all) done(null, 0);
+      };
       this.worker = w;
     } catch {
       this.worker = null;
@@ -199,6 +221,9 @@ export class PadPictureSender {
     return this.worker;
   }
 }
+
+/** Pictures taken and not yet sent, at most. */
+const IN_FLIGHT = 3;
 
 /** The worker: a bitmap in, a JPEG data URL out. */
 const ENCODER = `
