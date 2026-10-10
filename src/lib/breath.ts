@@ -107,3 +107,79 @@ export function layBreath(out: Float32Array, L: number, x: number, y: number, r:
   }
   return cells;
 }
+
+/*
+  How much air the breath pulls into the liquid (PLAN.md QA-20).
+
+  What was reported: "At its lowest settings it still blows a ton of ink and
+  creates a lot of bubbles." The moving wind's stress already went with the
+  Amount squared (layBreath's share), but the wind's bubbles did not go with
+  it at all: two were spawned on every sixth step of a moving Blow whatever
+  the Amount, ten spawns a second at the app's 60 steps, so the gentlest
+  breath the dial allows filled the plate with air as fast as a firm one,
+  and each bubble pumps the colour out from under its footprint (the squeeze
+  every bubble lays, LiquidVisualizer's bubble step). That was the ink.
+
+  What air blown over a liquid does. A breath drags the surface along (the
+  stress above) and, past a speed, tears it: the surface stays whole while
+  the air's dynamic pressure is under what gravity and surface tension hold
+  a wave down with, and breaks into splashes and entrained air above it.
+  The ratio is the blowing number, N_B = ρ_air U² / (2 √(ρ g σ)) (Subagyo,
+  Brooks, Coley and Irons, ISIJ International 43, 2003, for a gas jet on a
+  liquid bath; the same threshold as the Kelvin-Helmholtz instability's
+  least speed for air over water, about 6.6 m/s), and air is taken in only
+  past N_B = 1. For the plate's oil (σ about 0.03 N/m, ρ 1000) that is
+  √(ρgσ) ≈ 17 Pa against ½ρ_air U², so the surface tears at 5.4 m/s: a
+  breath over the dish gentler than about two thirds of a firm one (the
+  default's 8 m/s) ripples the colour and lays no bubbles at all, a firm
+  one lays them as it always did, and a gale lays more the harder it goes.
+
+  The rate of air taken in past the threshold is drawn here as growing with
+  how far past it the breath is, N_B − 1, set to the old ten spawns a second
+  at the default Amount so a firm breath looks as it did; how fast the
+  entrained volume really grows with N_B (Subagyo's droplets go as about
+  N_B^3.2) is not a number for a dish of oil, and the plate's own limit on
+  how much of it air may cover (bubbles.ts, spawn) is what bounds a gale.
+  And it is a rate a second, not a count a step: a 120-step runner blew twice
+  the air of a 60-step one.
+
+  The Amount is the breath's speed against a firm breath's (the stress goes
+  as its square, which is why the hands pass share = Amount²): so a straw's
+  breath, a volume a second through the straw, goes as the speed, √share.
+*/
+export const PLATE_LIQUID_DENSITY = 1000;
+export const PLATE_SURFACE_TENSION = 0.03;
+const GRAVITY = 9.81;
+
+/** The breath's speed at the surface, m/s, at `share` of a default breath's stress (the stress goes as U²). */
+export const breathSpeed = (share: number): number => BREATH_SPEED * Math.sqrt(Math.max(0, share));
+
+/** The blowing number of a breath at `speed` m/s on the plate's liquid: past 1 the surface tears and takes air in. */
+export const blowingNumber = (speed: number): number =>
+  AIR_DENSITY * speed * speed / (2 * Math.sqrt(PLATE_LIQUID_DENSITY * GRAVITY * PLATE_SURFACE_TENSION));
+
+/** The speed at which a breath starts to take air into the liquid (N_B = 1), about 5.4 m/s. */
+export const AIR_TAKEN_FROM = Math.sqrt(2 * Math.sqrt(PLATE_LIQUID_DENSITY * GRAVITY * PLATE_SURFACE_TENSION) / AIR_DENSITY);
+
+/** How much air the breath takes in at `share`, against a default breath's: 0 below the tearing speed, 1 at the default. */
+export function airTaken(share: number): number {
+  const n = blowingNumber(breathSpeed(share));
+  return Math.max(0, n - 1) / (blowingNumber(BREATH_SPEED) - 1);
+}
+
+/** Spawns a second of the moving wind's bubbles at a default breath (each spawn two bubbles): what every sixth step at 60 gave. */
+export const WIND_SPAWNS_PER_SECOND = 10;
+
+/**
+ * How many spawns of air to lay this step, `expected` on average, with `u`
+ * a draw in [0, 1): the whole spawns, and the rest by chance, so a gale past
+ * one a step lays several and a breath under it lays one some steps.
+ */
+export function spawnsOf(expected: number, u: number): number {
+  if (!(expected > 0)) return 0;
+  const n = Math.floor(expected);
+  return n + (u < expected - n ? 1 : 0);
+}
+
+/** A straw's breath, the volume a second it blows against a default breath's: the speed, √share. */
+export const strawFlow = (share: number): number => Math.sqrt(Math.max(0, share));
