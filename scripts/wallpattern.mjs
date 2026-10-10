@@ -48,6 +48,16 @@ const GREY = [[0.3, 0.3, 0.3], [0.3, 0.3, 0.3]];
 const pictures = { wall: GREY };
 const SKEW = [0.12, 0.08, 0.9, 0.15, 0.82, 0.92, 0.18, 0.85];
 const FAR = 4e12; // an Identify that is still running for as long as the check takes
+/*
+  Identify pulses (0.7 + 0.3 cos of its time left, a period of half a
+  second), so a frame is a moment of the pulse. The first version of this
+  check rendered at whatever moment the lab got to it: it passed in the cloud
+  and read 0 lit pixels on CI's Mac, which landed near the pulse's dimmest,
+  where white at 0.4 over the grey is 148 against a bar of 160. The clock is
+  pinned instead: 3 s left is a whole number of periods (the brightest), and
+  2.75 s left is half a period off (the dimmest), and both are asked.
+*/
+const PEAK = FAR - 3000, TROUGH = FAR - 2750;
 const on = { pattern: true, identifyUntil: 0 };
 const base = { maskFeather: 0 };
 const CASES = {
@@ -62,7 +72,8 @@ const CASES = {
     { corners: [0, 0, 0.5, 0, 0.5, 1, 0, 1], src: [0, 0, 0.5, 1], enabled: true, opacity: 1, feather: 0 },
     { corners: [0.5, 0, 1, 0, 1, 1, 0.5, 1], src: [0.5, 0, 0.5, 1], enabled: true, opacity: 1, feather: 0 },
   ] }],
-  identify: [{ ...base, test: { pattern: false, identifyUntil: FAR } }],
+  identify: [{ ...base, now: PEAK, test: { pattern: false, identifyUntil: FAR } }],
+  identifyDim: [{ ...base, now: TROUGH, test: { pattern: false, identifyUntil: FAR } }],
 };
 
 const lab = await openLab();
@@ -175,6 +186,20 @@ const GREY8 = 0.3 * 255;
   const away = Math.max(...[[20, 20], [S - 20, S - 20], [20, S - 20]].map(([x, y]) => Math.abs(lum(img, x, y) - lum(shots.plain, x, y))));
   check('Identify lights the quad\'s number large in the middle', bar > 200, `${bar} lit pixels`);
   check('and leaves the show alone away from it', away <= 1, `largest change ${away.toFixed(1)}`);
+  // At the pulse's dimmest it still shows over the show (white at 0.4 lifts the grey by
+  // about 70), and it is dimmer than at its brightest: the flash moves.
+  const dim = shots.identifyDim;
+  let shows = 0, sumPeak = 0, sumDim = 0, n = 0;
+  for (let y = Math.round(S * 0.3); y < Math.round(S * 0.7); y++) {
+    for (let x = Math.round(S * 0.5); x < Math.round(S * 0.7); x++) {
+      if (lum(img, x, y) < 160) continue;
+      n++; sumPeak += lum(img, x, y); sumDim += lum(dim, x, y);
+      if (lum(dim, x, y) - lum(shots.plain, x, y) >= 40) shows++;
+    }
+  }
+  check('and at the pulse\'s dimmest the number still shows, dimmer than at its brightest',
+    n > 200 && shows > n * 0.9 && sumPeak / n > sumDim / n + 30,
+    n ? `${shows} of ${n} of its pixels lifted by 40 or more; brightest ${(sumPeak / n).toFixed(0)}, dimmest ${(sumDim / n).toFixed(0)}` : 'no number at its brightest');
 }
 
 // The pattern is a known level: the grade does not reach it.

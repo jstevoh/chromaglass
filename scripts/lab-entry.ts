@@ -472,7 +472,9 @@ const api = {
     const conf = normalizeOutput(cfg);
     const test = (cfg as { test?: OutputConfig['test'] } | null)?.test;
     if (test) conf.test = test;
-    const quads = fillOutputUniforms(out.pack, conf, size, size);
+    // And a pinned clock, when the check gives one, so Identify's pulse is read at a known moment.
+    const now = (cfg as { now?: number } | null)?.now;
+    const quads = fillOutputUniforms(out.pack, conf, size, size, now ?? Date.now());
     const enc = device.createCommandEncoder();
     const ramp = (view: GPUTextureView, [a, b, axis]: [number[], number[], 'y'?]) => {
       const v = (c: number[]) => `vec3f(${c.map(x => x.toFixed(6)).join(', ')})`;

@@ -38,7 +38,7 @@ export const BLEND_INDEX: Record<SurfaceBlend, number> = { over: 0, add: 1 };
  * flat has no matrix and is skipped rather than divided by, which is why the
  * count comes back rather than being the number of surfaces.
  */
-export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: number, height: number): number {
+export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: number, height: number, now = Date.now()): number {
   pack.set('mask', cfg.maskTop, cfg.maskRight, cfg.maskBottom, cfg.maskLeft);
   pack.set('flip', cfg.flipX ? -1 : 1, cfg.flipY ? -1 : 1);
   pack.set('resolution', width, height);
@@ -52,7 +52,10 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     as a flash on a wall seen from across a room.
   */
   const test = cfg.test;
-  const left = test ? test.identifyUntil - Date.now() : 0;
+  // `now` is the caller's clock, the wall clock unless a check pins it: the
+  // flash's brightness is a moment of its pulse, and a check reading whatever
+  // moment its frame landed on read 0.4 on CI's Mac and 1 in the cloud.
+  const left = test ? test.identifyUntil - now : 0;
   pack.set('test', test?.pattern ? 1 : 0, left > 0 ? 0.7 + 0.3 * Math.cos((left / 500) * Math.PI * 2) : 0, 0, 0);
 
   let n = 0;
