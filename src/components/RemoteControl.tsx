@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, Minimize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
+import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
@@ -17,6 +17,7 @@ import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
+import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -26,7 +27,11 @@ import { AppModeBar, LaptopLinkForm } from './LaptopLink';
  * most, the projectionist's pad, the sequencer, presets. On an iPad it is two:
  * the pad fills the left half as a plate you work with your fingers or a pen
  * (pressure sets how much dye, tilt sets which way the air blows), and the
- * dials and presets sit on the right. The pad can also take the whole screen.
+ * dials and presets sit on the right.
+ *
+ * Both open on Draw (DrawScreen.tsx, PLAN §8-draw): the pad as the whole
+ * screen, which is what most hands pick a phone up to do. This page is its
+ * Controls.
  */
 
 /**
@@ -132,6 +137,9 @@ export default function RemoteRoot() {
   if (inApp && !relayFromUrl()) return <LaptopLinkForm />;
   return <RemoteControl inApp={inApp} />;
 }
+
+/** Which screen this device opens on (Draw or Controls), kept on the device. */
+const REMOTE_VIEW_KEY = 'chromaglass-remote-view';
 
 function RemoteControl({ inApp }: { inApp: boolean }) {
   const [state, setState] = useState<RemoteState | null>(null);
@@ -257,10 +265,28 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   // presses (more dye) and leans (which way the air goes). Each device holds
   // one layer, so two tablets are two projectionists on two plates.
   const [padLayer, setPadLayer] = useState(0);
-  const [padTool, setPadTool] = useState<'blow' | 'drop' | 'press' | 'finger' | 'spin'>('blow');
+  // Drop first, as Draw shows it: the first thing a hand does on a pad it has just picked up is put colour down.
+  const [padTool, setPadTool] = useState<PadTool>('drop');
   const [padColor, setPadColor] = useState<string | null>(null);
   const [padLiquid, setPadLiquid] = useState<string>('water');
-  const [padFull, setPadFull] = useState(false);
+  /*
+    Which screen: Draw, the default, or these Controls. Remembered on the
+    device, so the tablet someone set up as the Gig remote (transport, cues,
+    mixer) opens as that again after a reload or a lost link (S15), rather
+    than on a pad they then have to leave mid-song.
+  */
+  const [view, setView] = useState<'draw' | 'controls'>(() => {
+    try { return localStorage.getItem(REMOTE_VIEW_KEY) === 'controls' ? 'controls' : 'draw'; } catch { return 'draw'; }
+  });
+  useEffect(() => { try { localStorage.setItem(REMOTE_VIEW_KEY, view); } catch { /* private mode */ } }, [view]);
+  /*
+    Draw's Amount, a multiple of how much a touch lays (1× is today's). The
+    display reads a pad's amount as 0.05–1 with 0.5 for a finger, and doubles
+    it (performGesture's `amt`), so 0.1×–2× is that whole range for a finger
+    and nothing past it: above 2× a finger would only be clamped.
+  */
+  const [padAmount, setPadAmount] = useState(1);
+  const wallRef = useRef<HTMLDivElement>(null);
   const [penSeen, setPenSeen] = useState(false);
   const padRef = useRef<HTMLDivElement>(null);
   const padLastSend = useRef(new Map<number, number>());
@@ -269,13 +295,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   /** Each held press's last pressure, so a finger held still can keep pressing. */
   const padPressAmount = useRef(new Map<number, number>());
   const padPoint = (e: ReactPointerEvent) => {
-    const r = padRef.current!.getBoundingClientRect();
+    // Draw maps a touch into the wall's 16:9 box; Controls' pad is the wall stretched to the pad.
+    const r = (wallRef.current ?? padRef.current)!.getBoundingClientRect();
     // Normalised, y up — the plate's own coordinates.
     return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) };
   };
-  const padSend = (kind: 'blow' | 'drop' | 'press' | 'finger' | 'spin', e: ReactPointerEvent, p: { x: number; y: number },
+  const padSend = (kind: PadTool, e: ReactPointerEvent, p: { x: number; y: number },
                    from?: { x: number; y: number }) => {
-    const amount = pressureOf(e);
+    const amount = Math.max(0.05, Math.min(1, pressureOf(e) * padAmount));
     if (kind === 'drop') send({ type: 'drop', x: p.x, y: p.y, layer: padLayer, amount, color: padColor ?? undefined });
     else if (kind === 'press') { padPressAmount.current.set(e.pointerId, amount); send({ type: 'press', x: p.x, y: p.y, layer: padLayer, amount }); }
     // A finger on the dish (PLAN §22): it turns under the finger, and the
@@ -361,20 +388,35 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   */
   const chooseLiquid = (id: string) => { setPadLiquid(id); setPadColor(null); send({ type: 'liquid', id }); setPadTool('drop'); };
   const padBottle = DEFAULT_LIQUID_TYPES.find(l => l.id === padLiquid);
-  const toggleFull = async () => {
-    const next = !padFull;
-    setPadFull(next);
+  /*
+    Into Draw from a tap, which is the one moment a browser lets a page go
+    full screen (opening on Draw cannot ask; the fixed layout covers the
+    page either way), and out again for Controls.
+  */
+  /*
+    A finger down when the screen changes never sends its pointerup: the pad
+    it was on is gone. Left in, a held press kept pressing every 50 ms with
+    no end and the count read one touch, so the switch lets go of them all.
+  */
+  const letGo = () => {
+    padTouches.current.clear();
+    padPressAmount.current.clear();
+    padLastSend.current.clear();
+    setPadTouchCount(0);
+  };
+  const openDraw = async () => {
+    letGo();
+    setView('draw');
     try {
       const el = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
-      if (next && el.requestFullscreen && !document.fullscreenElement) await el.requestFullscreen();
-      else if (!next && document.fullscreenElement) await document.exitFullscreen();
+      if (el.requestFullscreen && !document.fullscreenElement) await el.requestFullscreen();
     } catch { /* iPhone Safari has no fullscreen; the fixed layout is enough */ }
   };
-  useEffect(() => {
-    const onChange = () => { if (!document.fullscreenElement) setPadFull(false); };
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+  const openControls = async () => {
+    letGo();
+    setView('controls');
+    try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
+  };
 
   // ── Tilt ─────────────────────────────────────────────────────────
   // The phone's orientation rocks the laptop's plate. iOS asks permission
@@ -407,11 +449,18 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   };
 
   const layerCount = Math.max(1, Math.min(5, settings?.layerCount ?? 1));
+  /*
+    The laptop down to fewer plates than the one this device was on: back to
+    the last it has. Clamping only the label showed L1 while every touch went
+    on carrying layer 1, which the display drops (no fluid there), so the pad
+    drew nothing (`npm run draw`, "back to plate 1").
+  */
+  useEffect(() => { if (padLayer > layerCount - 1) setPadLayer(layerCount - 1); }, [padLayer, layerCount]);
 
   const padSurface = (
     <div
       ref={padRef}
-      className={`relative w-full select-none rounded-xl border border-dashed ${padFull ? 'h-full' : 'aspect-video md:aspect-[4/3] md:min-h-[360px]'} ${connected ? 'border-white/25 bg-black/40' : 'border-white/10 bg-black/20'}`}
+      className={`relative w-full select-none rounded-xl border border-dashed aspect-video md:aspect-[4/3] md:min-h-[360px] ${connected ? 'border-white/25 bg-black/40' : 'border-white/10 bg-black/20'}`}
       style={{ touchAction: 'none' }}
       onPointerDown={onPadDown}
       onPointerMove={onPadMove}
@@ -536,24 +585,44 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     </>
   );
 
-  if (padFull) {
+  if (view === 'draw') {
+    const look = state?.activePresetId ? presetGroups.flatMap(g => g.presets).find(pr => pr.id === state.activePresetId)?.name : null;
     return (
-      <div
-        className="fixed inset-0 z-50 flex flex-col bg-[#0a0a0a] text-white"
-        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none' }}
-        data-testid="remote-pad-full"
-      >
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
-            {connected ? <Wifi size={12} /> : <WifiOff size={12} />} {connected ? 'Linked' : 'Offline'}
-          </span>
-          <button onClick={toggleFull} className="flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest" data-testid="remote-pad-exit">
-            <Minimize2 size={13} /> Controls
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 px-3">{padSurface}</div>
-        <div className="px-3 pb-2">{padControls}</div>
-      </div>
+      <DrawScreen
+        connected={connected}
+        waiting={status === 'denied'
+          ? (inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key: open the address the show server printed, key included')
+          : status === 'connecting' ? 'Finding laptop' : 'Offline: is the show open on the laptop, on this network?'}
+        /*
+          In the app the way out of a wrong key or a laptop that is not there
+          is Change laptop, which lives in Controls' app bar; a remote that
+          opens on Draw would otherwise make the fix two screens away from
+          the words that ask for it (`npm run applink`, "wrong key").
+        */
+        waitingAction={inApp && !connected ? (
+          <a href="/?remote=1" className="rounded-full border border-white/20 px-4 py-2 text-[13px] font-medium text-text" data-testid="app-change-laptop">Change laptop</a>
+        ) : null}
+        state={state}
+        lookName={look ?? 'Your look'}
+        tool={padTool}
+        setTool={setPadTool}
+        color={padColor}
+        chooseColor={chooseColor}
+        liquid={padLiquid}
+        chooseLiquid={chooseLiquid}
+        layer={Math.min(padLayer, layerCount - 1)}
+        setLayer={setPadLayer}
+        layerCount={layerCount}
+        touchCount={padTouchCount}
+        amount={padAmount}
+        setAmount={(v) => setPadAmount(Math.max(DRAW_AMOUNT_MIN, Math.min(DRAW_AMOUNT_MAX, v)))}
+        wallRef={wallRef}
+        onPadDown={onPadDown}
+        onPadMove={onPadMove}
+        onPadUp={onPadUp}
+        action={action}
+        onControls={openControls}
+      />
     );
   }
 
@@ -605,8 +674,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-white/40" />}
               </span>
-              <button onClick={toggleFull} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60" title="The pad alone, full screen" data-testid="remote-pad-fullscreen">
-                <Maximize2 size={12} /> Full
+              <button onClick={openDraw} className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/60" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+                <Maximize2 size={12} /> Draw
               </button>
             </div>
             {padSurface}

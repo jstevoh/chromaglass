@@ -145,7 +145,10 @@ const until = async (page, fn, ms = 10_000) => {
   return false;
 };
 const visible = (page, id) => page.getByTestId(id).first().isVisible().catch(() => false);
-const linked = (page) => page.locator('header').getByText('Linked', { exact: true }).isVisible().catch(() => false);
+// Linked on either of the remote's screens: Controls' header says so in words,
+// Draw (the one it opens on, PLAN §8-draw) marks its root.
+const linked = async (page) => (await page.locator('[data-testid="remote-draw"][data-linked="true"]').count()) > 0
+  || page.locator('header').getByText('Linked', { exact: true }).isVisible().catch(() => false);
 
 // Each part runs on its own: a wait that times out is that part's FAIL, and
 // the parts after it still run and report.
@@ -206,12 +209,16 @@ await part('linked', async () => {
   check('the remote says Linked', await until(page, () => linked(page)));
   check('the laptop heard a controller join', controllersSeen > before, `${controllersSeen - before} joined`);
   check('its socket went to the laptop, not the app\'s origin', sockets.some((s) => s.startsWith(`ws://127.0.0.1:${RELAY_PORT}/`)) && !sockets.some((s) => s.includes(`:${APP_PORT}`)), sockets.join(', '));
-  check('the app bar is there', await visible(page, 'app-mode-bar'));
+  check('the remote opens on Draw', await visible(page, 'remote-draw'));
   const n = heard.length;
-  await page.getByTestId('remote-blackout').last().tap();
+  await page.getByTestId('draw-blackout').tap();
   await until(page, async () => heard.length > n, 5000);
   const got = heard.slice(n);
   check('a button on the remote arrives at the laptop', got.some((m) => m.type === 'action' && m.action === 'blackout-toggle'), JSON.stringify(got).slice(0, 160));
+  // The app's two modes are in Controls, one tap from Draw, and the remote
+  // remembers it was left there, so Change laptop below comes back to them.
+  await page.getByTestId('draw-controls').tap();
+  check('the app bar is there, in Controls', await until(page, () => visible(page, 'app-mode-bar'), 5000));
 
   await page.getByTestId('app-change-laptop').tap();
   await until(page, () => visible(page, 'laptop-link'));
