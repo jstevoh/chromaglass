@@ -33,7 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { dyeAbsorbances } from '../lib/dye';
@@ -128,6 +128,19 @@ const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRe
 export const CARRY_COURANT = 0.4;
 export const CARRY_SUBSTEPS = 33;
 const CARRY_PAIRS = (CARRY_SUBSTEPS - 1) / 2;
+/*
+  The most whole cells a step the glass's drift is taken out of the carries
+  by (driftCells): driftShift gathers that many cells into the one against
+  the wall. Full Plate Rock drifts the film 5 cells a step on 384²; past 8
+  what is left rides as flow, in substeps.
+*/
+const DRIFT_MOST = 8;
+/*
+  And the least, in cells a step, worth taking out: below it the drift costs
+  the carries nothing (a fifth of a cell is half their 0.4), and taking it
+  out would cost every carried field a pass.
+*/
+const DRIFT_LEAST = 0.2;
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
 /*
@@ -462,7 +475,7 @@ const LIQUID_DENSITY = 1000;
   for glycerine.
 */
 export function thinGapViscosity(thickness: number): number {
-  return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
+  return thicknessViscosity(thickness);   // lib/turntable.ts, where the cover glass reads it too
 }
 /** The drag time ρh²/12μ, in seconds, at the plate's rest gap, for a Thickness. */
 export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
@@ -616,6 +629,8 @@ export class WebGPUFluid {
   private readonly divMean: GPUBuffer;
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
+  /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
+  private readonly velRide: GPUTexture;
   private readonly scratchA: GPUTexture;
   private readonly scratchB: GPUTexture;
   private readonly readTarget: GPUTexture;
@@ -728,6 +743,56 @@ export class WebGPUFluid {
   private carryMost: GPUBuffer | null = null;
   private carryInd: GPUBuffer | null = null;
   private carrySub: GPUBuffer | null = null;
+  /*
+    The glass's drift (PLAN 27a-1, 27a-4). A glass sliding over the film
+    (Plate Rock's cover, Glass Smear) drags the whole of it toward half its
+    speed, so the liquid goes across the plate together, a few cells a step:
+    1.3, 2.8 and 5.0 on a 384² solver at Plate Rock 0.2, 0.45 and full with
+    the band playing. The carries take as many substeps as their fastest
+    face needs (carryPlan, CARRY_COURANT), so that drift alone asked for
+    four, eight and thirteen of every carry where a rock without the glass
+    asked for one, and with the band on the Mac the plate drew 10 to 21
+    frames a second against 26 to 32 (`npm run renders` on main's deploy of
+    10-10, which is why #340 took the glass out).
+
+    A drift the whole plate shares is no reason to cut the step up: the
+    substeps are there for flow that varies from cell to cell, where a carry
+    that oversteps a face piles or tears what it carries. So the carries
+    ride the flow less the drift (velRide, driftOff in wgsl/fluid.ts), the
+    flow as seen from a frame going with the film, and take only the
+    substeps what is left asks for; then each carried field is moved with
+    the drift (driftShift): its whole cells by a shift, which is exact, and
+    the fraction left, under half a cell, by one step of the carries' own
+    limited flux. The two make one carry split in two, with the splitting's
+    error the change across the flow's own variations over the drift's few
+    cells: none on an even drift, and small beside the carry's own limiter
+    where the flow round a press or a finger varies.
+
+    The drift is the liquid's own speed under the glass, not the glass's:
+    in the film the liquid comes up to the glass's pull in the drag time
+    ρh²/12μ (hsPrep's implicit drag), so glassFlow follows the pull the same
+    way, at the rest gap. Read against the lab's plate in the middle of the
+    dish it is within 0.03 of a cell a step. It only decides which frame
+    the carries work in: whatever it misses (the flow round a press, a
+    thicker poured liquid, the tilt's own flow of heavy colour) is in the
+    residual, which the plan carries in as many substeps as it needs, so a
+    wrong guess costs substeps and never accuracy.
+
+    Measured in the lab (an uneven plate of forty pools, the app's rock and
+    kicks, 60 steps on the app's 384²): the carries took 1.00, 1.03 and
+    2.17 substeps a step at Plate Rock 0.2, 0.45 and full with the glass,
+    where in the frame they rode before they took 4.1, 8.0 and 12.2, and a
+    plate held still 1.00. What is left at full is the colour the drift
+    piles against the grid's wall where the rim meets it (carryCourant,
+    PLAN 27a-6).
+  */
+  /** The film's speed under the sliding glass, in the flow's units (the drag time's lag on hsPrep's glass pull). */
+  private glassFlow: [number, number] = [0, 0];
+  /** This step's drift in cells, whole and the fraction left (driftShift), and whether the carries ride velRide this step. */
+  private driftCells: [number, number, number, number] = [0, 0, 0, 0];
+  /** The same before it is rounded, cells a step: for a check. */
+  private glassCells: [number, number] = [0, 0];
+  private riding = false;
   /** The ferrofluid's substeps on a thin gap (phasePlan): one indirect dispatch each, and the share 1/m and m. */
   private phaseInd: GPUBuffer | null = null;
   private phaseSub: GPUBuffer | null = null;
@@ -1061,6 +1126,8 @@ export class WebGPUFluid {
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
+      // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
+      for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
     } else {
       /*
         And the other way: the old plate's projections, its velocity's
@@ -1209,6 +1276,7 @@ export class WebGPUFluid {
     this.divMean = this.disposer.track(device.createBuffer({ label: 'divergence mean', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.curDiv = tex(this.M, R32, 'current divergence');
     this.velForced = tex(this.N, VEL, 'forced velocity');
+    this.velRide = tex(this.N, VEL, 'velocity ridden');
     this.scratchA = tex(this.N, this.dyeFormat, 'scratch a');
     this.scratchB = tex(this.N, this.dyeFormat, 'scratch b');
     this.readTarget = tex(this.L, RGBA32, 'readback');
@@ -1303,10 +1371,11 @@ export class WebGPUFluid {
   private runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
-    const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}`;
+    const ride = this.ride();
+    const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
+      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -1332,11 +1401,12 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}`;
+    const ride = this.ride();
+    const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
       const gap = this.ensurePhaseGap();
-      group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, this.velForced, this.phase.write, this.press, this.squeeze.read, gap,
+      group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, ride, this.phase.write, this.press, this.squeeze.read, gap,
         thin ? this.hsP! : gap, thin ? this.hsMob! : gap, this.ensureStand()]);
       this.groups.set(key, group);
     }
@@ -1373,10 +1443,10 @@ export class WebGPUFluid {
     const there = this.phase.read, back = this.phase.write;
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
       const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
-      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}`;
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, this.velForced, back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, this.ride(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
@@ -1461,6 +1531,7 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.glassFlow = [0, 0];
     for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
@@ -1822,6 +1893,8 @@ export class WebGPUFluid {
   /** One solver step. Call applyDeltas first when there is anything to add. */
   step(p: GpuStepParams, deltasApplied: boolean): void {
     const N = this.N;
+    // Set by the thin gap's stage, when the glass drifts the film (driftCells).
+    this.riding = false;
     const disp = stepDisplacement(p.dt, p.advection, N);
     // The hands laid for this step, and for no other (applyDeltas).
     const hands = this.handLive ? this.handTex : null;
@@ -2274,6 +2347,13 @@ export class WebGPUFluid {
         this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
         this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+        // Less the glass's drift for the carries, when it has one (driftCells).
+        const [wx, wy, fx, fy] = this.driftCells;
+        this.riding = (wx !== 0 || wy !== 0 || fx !== 0 || fy !== 0) && this.driftIsReady();
+        if (this.riding) {
+          const toVel = 1 / Math.max(disp * N, 1e-9);
+          this.run(pass, 'driftOff', this.velRide, [this.velForced], this.arg('drift off', [(wx + fx) * toVel, (wy + fy) * toVel, 0, 0]));
+        }
       });
     } else {
       stage('project 1', (pass) => this.project(pass));
@@ -2412,6 +2492,8 @@ export class WebGPUFluid {
             this.chem.swap();
           }
         }
+        this.shiftCarried(pass, this.dye);
+        if (this.chemLive) this.shiftCarried(pass, this.chem);
         return;
       }
       if (!bodiesOn && thin) {
@@ -2586,6 +2668,8 @@ export class WebGPUFluid {
         this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read, stand], grid);
         this.phase.swap();
       }
+      // The rest of the way with the glass's drift (driftCells), as the colour went.
+      this.shiftCarried(pass, this.phase, volume ? 'volume' : 'amount');
       this.runPhaseGapSeen(pass);
       for (let k = 0; k < PHASE_RELAX; k++) {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read, stand], none);
@@ -4043,6 +4127,7 @@ export class WebGPUFluid {
         // And the oil's (carryPlan), which only a look with the mix asks for.
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
+        for (const [key, code] of WebGPUFluid.driftBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
       })();
     }
     return this.hsBuilding;
@@ -4131,6 +4216,43 @@ export class WebGPUFluid {
     return this.hsPrev;
   }
 
+  /** The flow the thin carries ride: the forced flow, less the glass's drift when it has one (driftCells). */
+  private ride(): GPUTexture {
+    return this.riding ? this.velRide : this.velForced;
+  }
+
+  /**
+   * A carried field moved the rest of the way with the glass's drift, in
+   * cells (driftShift), after its carry rode the flow less the drift.
+   * Nothing when there is none.
+   */
+  private shiftCarried(pass: GPUComputePassEncoder, field: PingPong, what: 'amount' | 'mix' | 'volume' = 'amount'): void {
+    if (!this.riding) return;
+    const mode = what === 'mix' ? 1 : what === 'volume' ? 2 : 0;
+    this.run(pass, 'driftShift', field.write, [field.read, this.squeeze.read], this.arg(`drift shift ${what}`, [...this.driftCells, mode, 0, 0, 0]));
+    field.swap();
+  }
+
+  /*
+    The drift's two kernels in every format a carried field comes in (the
+    colour's, the poured liquids' half floats, the mix's and the species'
+    full floats, the ferrofluid's one channel), built behind the show
+    (prepare, prepareThinGap) and never on a frame: until they are ready the
+    carries ride the whole flow in substeps, as they did, so the first kick
+    that slides the glass does not stop the frame to compile them.
+  */
+  private static driftBuilds(dye: GPUTextureFormat): [string, string][] {
+    return [
+      [`driftOff:${VEL}`, kernel('driftOff', VEL)],
+      ...[...new Set([dye, 'rgba16float', RGBA32, R32] as GPUTextureFormat[])].map((f): [string, string] => [`driftShift:${f}`, kernel('driftShift', f)]),
+    ];
+  }
+  private driftReady = false;
+  private driftIsReady(): boolean {
+    if (!this.driftReady) this.driftReady = WebGPUFluid.driftBuilds(this.dyeFormat).every(([key, code]) => this.pipelines.hasCompute(key, code));
+    return this.driftReady;
+  }
+
   /**
    * How many substeps this step's carries take on a thin gap, decided on the
    * GPU (carryCourant, carryPlan in wgsl/fluid.ts): after the velocity the
@@ -4138,8 +4260,9 @@ export class WebGPUFluid {
    */
   private planCarry(pass: GPUComputePassEncoder, disp: number): void {
     this.ensureThinGap();
-    this.hsRun(pass, 'carryCourant', `carryCourant:${this.velForced.label}:${this.squeeze.read.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
-      [this.velForced, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!]);
+    const ride = this.ride();
+    this.hsRun(pass, 'carryCourant', `carryCourant:${ride.label}:${this.squeeze.read.label}`, this.arg('carry courant', [0, 0, 0, 0, 0, disp, 1, REST_GAP]),
+      [ride, this.hsP!, this.carryMost!, this.squeeze.read, this.hsMob!]);
     this.hsRun(pass, 'carryPlan', 'carryPlan', this.arg('carry plan', [CARRY_COURANT, CARRY_SUBSTEPS, Math.ceil(this.N / 8), CARRY_PAIRS]),
       [this.carryMost!, this.carryInd!, this.carrySub!], 1);
   }
@@ -4156,11 +4279,12 @@ export class WebGPUFluid {
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
     if (!pipe) return;
+    const ride = this.ride();
     const group = (src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
-      const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}`;
+      const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}:${ride.label}`;
       let g = this.groups.get(key);
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, args, src, this.velForced, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : [])]);
+        g = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : [])]);
         this.groups.set(key, g);
       }
       return g;
@@ -4178,14 +4302,19 @@ export class WebGPUFluid {
       pass.setBindGroup(0, back);
       pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
     }
+    // And the rest of the way with the glass's drift.
+    this.shiftCarried(pass, field, name === 'mixAdvect' ? 'mix' : 'amount');
+    if (also) this.shiftCarried(pass, also);
   }
 
   /**
    * How many substeps the last thin step's carries took, and the Courant
-   * number that asked for them: for a check. Null off a thin gap.
+   * number that asked for them, and the whole cells of the glass's drift
+   * taken out of them (driftCells): for a check. Null off a thin gap.
    */
-  async readCarry(): Promise<{ n: number; courant: number } | null> {
+  async readCarry(): Promise<{ n: number; courant: number; drift: [number, number]; glass: [number, number] } | null> {
     if (!this.carrySub) return null;
+    const drift: [number, number] = this.riding ? [this.driftCells[0] + this.driftCells[2], this.driftCells[1] + this.driftCells[3]] : [0, 0];
     const buf = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read carry' });
     enc.copyBufferToBuffer(this.carrySub, 0, buf, 0, 16);
@@ -4194,7 +4323,7 @@ export class WebGPUFluid {
     const f = new Float32Array(buf.getMappedRange().slice(0));
     buf.unmap();
     buf.destroy();
-    return { n: f[1], courant: f[2] };
+    return { n: f[1], courant: f[2], drift, glass: [this.glassCells[0], this.glassCells[1]] };
   }
 
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
@@ -4238,13 +4367,36 @@ export class WebGPUFluid {
       taken at half smearX, so the liquid, colour and all, goes at a quarter
       (0.25): a look's smear moves its colour as fast as it did, and now
       moves the liquid it is in with it.
+
+      Plate Rock's cover glass is the same glass moving (PLAN 27a-1,
+      lib/plateRock.ts): its slide, in m/s, in the flow's units (seconds
+      over the plate's width and disp, as the breath's), and the liquid
+      dragged toward half of it.
     */
+    const toFlow = seconds / (PLATE_METRES * Math.max(disp, 1e-9));
+    // A slide that is not a number is none: glassFlow keeps what it is given, and the plate would keep the NaN.
+    const slide = (v: number | undefined) => (Number.isFinite(v) ? v as number : 0);
+    const glassX = 0.25 * p.smearX + 0.5 * slide(p.coverX) * toFlow;
+    const glassY = 0.25 * p.smearY + 0.5 * slide(p.coverY) * toFlow;
+    /*
+      And how far that pull carries the film this step, for the carries to
+      take out (driftCells, and why): hsPrep's drag, u = (u + kΔt·glass) /
+      (1 + kΔt), at the rest gap, in whole cells a step.
+    */
+    const kdt = 12 * nu / (PLATE_METRES * PLATE_METRES * REST_GAP * REST_GAP) * seconds;
+    this.glassFlow = [(this.glassFlow[0] + kdt * glassX) / (1 + kdt), (this.glassFlow[1] + kdt * glassY) / (1 + kdt)];
+    this.glassCells = [this.glassFlow[0] * disp * this.N, this.glassFlow[1] * disp * this.N];
+    const whole = (c: number) => Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, Math.round(c)));
+    const [wx, wy] = [whole(this.glassCells[0]), whole(this.glassCells[1])];
+    const frac = (c: number, w: number) => Math.max(-0.5, Math.min(0.5, c - w));
+    const on = Math.max(Math.abs(this.glassCells[0]), Math.abs(this.glassCells[1])) >= DRIFT_LEAST;
+    this.driftCells = on ? [wx, wy, frac(this.glassCells[0], wx), frac(this.glassCells[1], wy)] : [0, 0, 0, 0];
     const hand = hands ?? this.blankPhase();
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}`,
       this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
-        NU_REF / nu, 0.25 * p.smearX, 0.25 * p.smearY]),
+        NU_REF / nu, glassX, glassY]),
       [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);

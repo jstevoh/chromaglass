@@ -169,6 +169,9 @@ export interface GpuStepParams {
   currentBuoy: number;      // heat rising: × the temperature field
   rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
   rockY: number;
+  /** The cover glass's slide over the film, m/s (lib/plateRock.ts): on a thin gap the liquid is dragged toward half of it, as by Glass Smear. */
+  coverX?: number;
+  coverY?: number;
   currentGrav: number;      // a concave dish, × (density − mean): heavy dye pools in the middle
   meanDensity: number;
   maxCurrent: number;       // a speed that moves the dye at most ~¾ of a cell a step
