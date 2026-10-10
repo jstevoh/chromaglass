@@ -1161,6 +1161,66 @@ not run, and the Mac shard requires them). `saves` 33 → 38 (Play's Save), `lay
 `applink` 48/48 (Play here now lands on Play, and the Laptop remote is reached through All
 controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
 
+#### 8b. Preview builds on a copy (2026-10-10)
+
+`App.tsx` (`drafting`, `wallLook`, `sendDraftToWall`, `wallRef`), `LiquidVisualizer.tsx`
+(`draft`, `hidden`), `desk/Desk.tsx` and `deskProps.ts` (`onOpenWall`), `scripts/draftwall.mjs` (new).
+
+What was wrong: Preview held the sequencer, a song's show and a new song's look, but the
+plate being built was the plate on the wall. The projector window is painted from the
+show's one canvas (`__chromaglassMirror`, in the frame task), so every slider tried while
+choosing the next look was on the wall as it was tried, under a plate bar that said
+"preview · not on wall".
+
+What it does now: while Preview is on and a wall is up (the projector window, a cast
+receiver or a network display), App mounts a second visualizer, `draft`, in the desk's
+preview. The first carries on drawing the wall, hidden from the desk (`visibility`, so it
+keeps its size and its frames), with the look it had when Preview took the desk off it.
+The desk edits go to the copy without each call knowing: `visualizerRef` is the copy then,
+and the show's calls (the music's harmony and triggers, the sequencer, a song's show, the
+remote's hands, the projector's size, the render) go through `wallRef`. The room's
+settings (the dimmer, the mixer, the logo's and the film's levels, `RIG_KEYS`) still reach
+the wall from the desk, and so does the music. The desk's clears, seeds and drains do not.
+A receiver that draws its own plate is sent the wall's look too.
+
+Send to wall (⌘⏎) hands the copy's look to the wall as a Go does: the dyes and pours
+adopted, the colours handed over, the settings faded over the Go's fade. With no wall up,
+Send to wall opens the projector window as before, and the header's Wall dot always does.
+Live puts the desk back on the wall's look, counters and all, so switching to Live never
+changes what the room sees; the copy's unsaved changes are dropped. The wall closing
+mid-Preview takes the copy down, and the desk carries on from the copy's look on the one
+engine.
+
+Why a whole second engine and not a third plate in the first: the frame loop walks every
+plate it holds (tilt, stir, evolve, pours, the hands), so a draft plate there would be
+moved with the live ones and drawn into the wall's frame. A second engine is its own
+device, solvers and passes; it leaves alone what is the show's (the projector's paint
+hook and frame asks, the debug hooks, the crash log's providers and heartbeat, the
+recorder's `#liquid-canvas`). With no wall up Preview stays one engine, so a Build session
+on a laptop pays for one solver, not two.
+
+The pre-push review found the edges, all fixed and measured: in the render where Preview
+ends the copy is gone before the desk is put back, and the wall's engine and a receiver
+were handed the copy's plates and counters for that one render (a plate dropped in front
+of the room; a receiver kept the copy's look). The wall's engine and a receiver now follow
+`wallLook` while it is held, not `drafting`. Live in the middle of a Send's fade landed
+halfway; it lands on the look being sent. The copy is composed at the wall's shape
+(`setStage`), the palette lock and the mark reach both engines, a film goes to the wall,
+the desk's Spin to the copy, Live puts back the saved look that was open and the wall's
+back plate, and a built-in's id is never handed a null contract (the plate tables are
+module constants both engines read).
+
+Measured: `npm run draftwall` 20/20 (new; Measure's browser part, and the Mac's open
+shard with `--frames`, where the line on what the projector window draws from must see
+frames). It reads every plate count and clear an engine was handed and every state sent to
+a receiver (`handed` on the debug hook, `sent` on the cast hook), because a value handed
+for one render is gone before a poll can see it. Controls: the wall's engine handed the
+desk's settings fails "and not the wall's engine" and "across the fade" (16/18); the wall
+following `drafting` instead of `wallLook` fails "nor for a render" (plates 1/2/1/2, clears
+2/0/2/0); the clear line's own control is in the run (with one engine the same clear
+reaches the wall, 0 → 1). `layout` 72/72, `phone` 352/352, `panel` 180/180, `desk` 40/40,
+`desklayout` 40/40. Found along the way: 8b-1 to 8b-5.
+
 #### 8g. A panel in a window of its own (2026-10-10)
 
 `desk/PanelWindow.tsx` (new), `desk/Desk.tsx`, `ui/index.tsx` (`PanelFrame`), `desk/DeskPanels.tsx`.

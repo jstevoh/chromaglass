@@ -83,6 +83,12 @@ export interface DeskProps {
   edited: boolean;
   dirty: boolean;
   onSendToWall: () => void;
+  /**
+   * Opens the projector window, for the header's Wall dot. Send to wall did
+   * that too until Preview had a copy to send (PLAN.md 8b); the dot still
+   * means the window, whatever the plate bar's button now does.
+   */
+  onOpenWall?: () => void;
   onSave: () => void;
   onSaveOver?: () => void;
   onNew: () => void;

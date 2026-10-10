@@ -425,6 +425,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+      # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
+      # scripts/draftwall.mjs): which engine each settings change reaches,
+      # what a receiver is sent, Send to wall, Live and the wall closing. Its
+      # line on what the projector window is painted from needs frames, so it
+      # runs again on the Mac's open shard, where it has them.
+      - name: Preview's copy
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/draftwall.mjs
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping
@@ -870,6 +878,11 @@ jobs:
       - name: The wall's test pattern
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run wallpattern
+      # Preview's copy again (see Measure's), here with frames: the projector
+      # window is painted from the wall's canvas and never the copy's.
+      - name: Preview's copy, with frames
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/draftwall.mjs --frames
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu

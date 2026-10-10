@@ -50,6 +50,7 @@
     "holdjump": "esbuild scripts/holdjump.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/holdjump.mjs && node node_modules/.cache/holdjump.mjs",
     "qa": "npm run build && node scripts/qa.mjs",
     "layout": "npm run build && node --experimental-strip-types scripts/layout.mjs",
+    "draftwall": "npm run build && node scripts/draftwall.mjs",
     "showcursor": "npm run build && node scripts/showcursor.mjs",
     "inputpick": "node scripts/inputpick.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",

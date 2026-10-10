@@ -990,11 +990,35 @@ Open from Desk v2, each its own thread (the UI lane):
   - **8-draw-d** (S) The wall's real shape. Draw assumes 16:9 (the design's label);
     a wall mapped to 4:3 or a dome is another frame. The state could carry the
     output's aspect. And the design's dashed "+" (an image as dye) has no message yet.
-- **8b** (M) A true Preview. Preview holds the sequencer, a song's show and a new song's
-  look (`designing` in App, as the Design desk did), but the plate being built is still
-  the plate on the wall. The design means an offline copy: a second solver, or the
-  back plate, drawn on the desk and not on the wall, until Send to wall. *Measure:* a
-  look changed in Preview leaves the projector window's frame unchanged (`wall`, Mac).
+- ~~**8b** A true Preview: with a wall up, the desk builds on a copy the wall does not
+  see until Send to wall~~ (shipped; story in `docs/plan-shipped.md` §8; check
+  `npm run draftwall`). Found along the way:
+  - **8b-1** (S) The copy and the wall draw from the same dice. The plate's random
+    streams (`DICE` in LiquidVisualizer, `lib/rng.ts`) are module constants, so the
+    copy's pours take draws the wall's would have, and laying a look on the copy re-keys
+    the wall's streams. The wall stays random, but not the run it would have been: a
+    render or a reproduced report must not be made with Preview's copy up. Per-engine
+    streams would fix it (`DICE` into the component, `doseLiquid` handed its stream).
+  - **8b-2** (S) The drift waits for Send to wall. The drift (`lib/drift.ts`) wanders
+    the desk's settings, which in Preview are the copy's, so the wall's look stands
+    still under the music until it is sent. The music's own overrides and the room
+    still move it. The drift could wander the wall's look as well.
+  - **8b-3** (S) The copy's plate when the wall closes mid-Preview. The desk carries
+    on, on the wall's engine, from the copy's look by its id (`adoptPreset`): the
+    copy's poured plate goes with it, and dyes changed on the copy and not saved fall
+    back to the look's own.
+  - **8b-4** (S) What else in Preview goes to the copy. The phone's Play sliders, a
+    MIDI fader, and a Go, Back or Next look from the remote or a MIDI pad write the
+    desk's settings, so in Preview they move the copy, not the wall (the keyboard's Go
+    is held in Preview). A back-plate look (Send back, 16a) goes to the copy, and Live
+    puts the wall's back back. Right for a hand at the desk, perhaps not for a phone at
+    the wall: a remote's Go could go to the wall, or be held as the keyboard's is. The
+    film and the mark are the room's and go to the wall (the mark to the copy too); a
+    film is not seen in the copy.
+  - **8b-5** (S) The projector window's pixels. `draftwall --frames` (Mac) shows the
+    window is painted from the wall's canvas and never the copy's, and which settings
+    each engine was handed; a picture of the window against a look changed in Preview
+    would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
 - ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
   the look's own value (a double tap on Play's sliders)~~ (shipped; story in
   `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
