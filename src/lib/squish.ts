@@ -481,3 +481,97 @@ export class KickRelease {
 
   forget(): void { this.list = []; }
 }
+
+/*
+  Sound Drive's bass, as the glass (PLAN 27e).
+
+  What was reported: "Generally I don't feel like music is having as much
+  impact on the visuals as I would like." Sound Drive's two pushes were the
+  bass burst (a radial velocity laid every step while the bass is up, a
+  ring of pushes 36 cells across) and the kick ring's outward kick (14
+  cells pushed out along the ring). On a thin gap, every look since #248,
+  both do nothing: a push straight out from a point is a gradient, and in a
+  liquid that cannot be squeezed into less room a gradient is what the
+  projection takes out, the seventh time this codebase has found that
+  (LiquidVisualizer's finger, "every tool leaves the plate at an idle
+  plate's speed"). Measured in the lab on forty pools of colour, the dye's
+  change against the same plate left alone over two seconds (`npm run
+  musicforce`): the burst held through it at a bass of 0.8 and the default
+  Sound Drive moved 0.006 of the plate's colour, the kick ring four times
+  0.008, a look's own stir (Turbulence 0.3 with the band) 0.86, one Beat
+  Squeeze kick 0.65.
+
+  Liquid can only be pushed out from a point under a cover glass by giving
+  it somewhere to go: more liquid poured in there (a source, which a drop
+  is, PLAN 18c) or less room there (the glass pressed). A source adds
+  volume that never leaves except over the rim, so with the band playing a
+  burst's worth every step it would flush the plate out over the rim in a
+  minute, Classic's ferrofluid ring with it. The glass pressed and let up
+  is what a projectionist's hand does with the bass line (the kick's quick
+  press is Beat Squeeze's), and it gives back what it took. So the bass is
+  the hand on the glass: pressed as deep as the bass is loud, over a palm
+  where the burst was, followed step by step, let up as the bass falls and
+  all the way when the music stops. The glass moves the liquid only while
+  it is moving (squeezeUpdate: the flow is the gap's rate), so the plate
+  breathes out as the bass comes in and back as it goes, and holds still
+  under a steady one, as a plate under a still hand does.
+
+  `bassPressDepth` is the depth for the route's level (0–1, the burst's
+  reading: it pushed above 0.25) and Sound Drive: BASS_PRESS at a full
+  bass and Sound Drive 0.45, the burst's "1×", up to half again at 0.68
+  and over. In the lab at the default Sound Drive (0.6), a bass going
+  between 0.8 and 0.3 each second moves 0.25 of the plate's colour as it
+  comes in and gives back all but 0.04 as it goes (`npm run musicforce`).
+*/
+export const BASS_PRESS = 0.004;
+/** The bass's depth for the velocity route's level (0–1) and Sound Drive (`impact`): see above. */
+export function bassPressDepth(level01: number, impact: number): number {
+  const over = Math.max(0, Math.min(1, ((Number.isFinite(level01) ? level01 : 0) - 0.25) / 0.75));
+  return BASS_PRESS * over * Math.min(1.5, Math.max(0, Number.isFinite(impact) ? impact : 0) / 0.45);
+}
+
+/**
+ * The hand on the glass that follows the bass: `follow` each solver step
+ * with where, how wide and how deep, and it presses or lets up by the
+ * difference, so what is down is always the depth asked. Moved (an area
+ * look's bass going to its next area) it gives everything back where it was
+ * before pressing the new place, so nothing is left pressed behind it.
+ * Changes under `BASS_STEP` of BASS_PRESS wait for a larger one (the
+ * analyser's smoothing makes most steps' change tiny, and each write is a
+ * palm's worth of cells), so the glass is never more than that from the
+ * depth asked. In the press's bowl, no Fingering: a hand riding a bass line
+ * is not opening fingers.
+ */
+export const BASS_STEP = 0.03;
+export class BassPress {
+  private at: { x: number; y: number; r: number; thin: boolean } | null = null;
+  /** The depth the glass is down now, each disc's amount as `squishDisc` takes it. */
+  depth = 0;
+
+  follow(S: number, x: number, y: number, radius: number, depth: number, thin: boolean, cell: SquishCell): void {
+    const want = Number.isFinite(depth) && depth > 0 ? depth : 0;
+    x = Math.round(x); y = Math.round(y); radius = Math.max(1, Math.round(radius));
+    const moved = this.at !== null && (this.at.x !== x || this.at.y !== y || this.at.r !== radius);
+    if (moved || (want === 0 && this.depth > 0)) this.letGo(S, thin, cell);
+    const d = want - this.depth;
+    if (d === 0 || Math.abs(d) < BASS_STEP * BASS_PRESS) return;
+    squishDisc(S, x, y, radius, d, 0, 'press', 0, cell, thin);
+    this.depth = want;
+    this.at = want > 0 ? { x, y, r: radius, thin } : null;
+  }
+
+  /**
+   * Give back everything pressed, where it was pressed and in the shape it
+   * was pressed in (a bowl on a thin gap), whatever `thin` says now: a look
+   * that turns Thin Gap off mid-show would otherwise give a flat disc back
+   * for a bowl, leaving the middle pressed and lifting the rim.
+   */
+  letGo(S: number, _thin: boolean, cell: SquishCell): void {
+    if (this.at && this.depth > 0) squishDisc(S, this.at.x, this.at.y, this.at.r, -this.depth, 0, 'press', 0, cell, this.at.thin);
+    this.depth = 0;
+    this.at = null;
+  }
+
+  /** Drop it without laying anything: the plate it pressed was cleared. */
+  forget(): void { this.depth = 0; this.at = null; }
+}

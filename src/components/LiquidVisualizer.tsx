@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { layFinger } from '../lib/handSolid';
-import { layBreath } from '../lib/breath';
+import { layBreath, airTaken, spawnsOf, strawFlow, WIND_SPAWNS_PER_SECOND } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -47,7 +47,7 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
-import { ChemistryField } from '../lib/chemistry';
+import { ChemistryField, TURING_PRODUCT } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
@@ -57,7 +57,8 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, type Presser, type Stroke } from '../lib/squish';
+import { levels01 } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -1071,10 +1072,12 @@ class FluidSimulation {
    * Public for `npm run squeeze`, which reads how many release steps it laid.
    */
   readonly kickRelease = new KickRelease();
+  /** Sound Drive's bass, as a hand on the glass (lib/squish.ts `BassPress`, PLAN 27e). */
+  readonly bassPress = new BassPress();
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.bassPress.forget(); this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -2050,7 +2053,7 @@ class FluidSimulation {
     if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
-    this.pressLift.forget(); this.kickRelease.forget(); this.lastLift = null;
+    this.pressLift.forget(); this.kickRelease.forget(); this.bassPress.forget(); this.lastLift = null;
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
@@ -2704,6 +2707,8 @@ class FluidSimulation {
       // not a seed of blobs. (Wilfred's lumia did too, until the owner found
       // it underwhelming; it is laid by its areas now, above.)
       case 'sensual-laboratory':
+      // So does Turing Print: its colour is the reaction's alone (depositChem).
+      case 'turing-print':
       // Ferro Maze is ink on a white light table: the ferrofluid is the
       // picture, poured with the look (layPhase), and the glass stays clear.
       case 'ferro-maze':
@@ -2809,6 +2814,17 @@ class FluidSimulation {
     y = Math.round(y);
     KICK_RADII.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
     this.kickRelease.kick(x, y, KICK_RADII.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+  }
+
+  /**
+   * Sound Drive's bass on a thin gap (PLAN 27e): the glass held `depth` down
+   * over a disc of `radius` cells about (x, y), followed each step and let up
+   * as the bass falls (depth 0 lets it all go). Off a thin gap it lets go of
+   * anything it held: there the bass burst pushes as it always has.
+   */
+  pressBass(x: number, y: number, radius: number, depth: number): void {
+    if (!this.thinGap) { if (this.bassPress.depth > 0) this.bassPress.letGo(this.size, false, this.squishCell); return; }
+    this.bassPress.follow(this.size, x, y, radius, depth, true, this.squishCell);
   }
 
   /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
@@ -4479,6 +4495,14 @@ interface FrameView {
   mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
   film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
   /**
+   * What the plate hears this frame: the pitch class and brightness from the
+   * audio features, and where the frame sits between two beats (0..1, 0 with
+   * no beat clock). The plate's uniforms read it as `PlateView.audio`
+   * (gpu/plateUniforms.ts), which is where the shader's `pitchClass`,
+   * `brightness` and `beatPhase` come from.
+   */
+  audio: { pitchClass: number; brightness: number; beatPhase: number };
+  /**
    * The oil beads' mask, on the frames the beads moved and it was redrawn —
    * null on every other frame, and whenever the beads are off. The show
    * decides when it changes so that both engines upload the same picture on
@@ -4491,7 +4515,6 @@ interface FrameView {
   postTest: PostTest | null;
   fxFrame: number;
   fxSeed: number;
-  audio: { pitchClass: number; brightness: number; beatPhase: number };
 }
 
 /**
@@ -5318,8 +5341,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
           af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
-          bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+        // The air it tears in, as the mouse's (lib/breath.ts, airTaken): 0.15 a message at the default, none from a gentle breath.
+        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
+          const taken = airTaken(amt);
+          const n = taken > 0 ? spawnsOf(0.15 * taken, DICE.hands.float()) : 0;
+          if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
         }
         break;
       case 'drop': {
@@ -7034,13 +7060,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // place and deposits dye where it is active; the flow then carries the
         // dye off while the pattern keeps growing underneath.
         {
+          /*
+            Two ways in. A look with Chemistry on stands its whole plate in
+            the reagent (the bath, grayScott) and seeds it at random; a pour
+            of Turing Reagent feeds the reaction where it landed, on any
+            look, and seeds itself (addReagent). Before, only the first ran
+            the reaction, so the bottle did nothing on a look without
+            Chemistry, and the first fed nothing, so neither grew.
+          */
           const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
           const lead = fluidsRef.current[0];
-          if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
+          const poured = !!leadGpu?.reagentLive;
+          if ((chemAmt > 0 || poured) && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const g = leadGpu;
             if (g && g.stepChemistry) {
-              if (!(g as any).chemLive || (bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
+              if (chemAmt > 0 && (!g.chemLive || (bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004)) {
                 g.seedChemistry?.(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 0.01 + DICE.chem.float() * 0.016);
               }
               // The dividing regime grows at a pace a show can watch; coral is slower than a set.
@@ -7048,10 +7083,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const feed = 0.03 + p * 0.01;
               const kill = 0.055 + p * 0.005;
               const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
-              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w);
-              const c = harmonyCycle(harmonyRef.current, time * 0.08);
-              const amount = chemAmt * 0.02 * sixtieths;
-              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22);
+              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0);
+              // The look's palette where the look grows it; the reagent's own product where only a pour does.
+              // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
+              const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
+              const amount = (chemAmt > 0 ? chemAmt : 0.6) * 0.02 * sixtieths;
+              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22, print, chemAmt > 0 ? 1 : 0);
             }
           }
         }
@@ -7496,7 +7534,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   step and a fresh reading of the dye.
                 */
                 if (activeLayerRef.current === 0 && held && primary) {
-                  bubblesRef.current.blow(x, y, simStepS, k);
+                  // A volume a second through the straw, as the breath's speed (lib/breath.ts, strawFlow), not its stress.
+                  bubblesRef.current.blow(x, y, simStepS, strawFlow(k));
                   blowStepsRef.current.straw++;
                   // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
                   if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
@@ -7529,8 +7568,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (carried > 0) blowStepsRef.current.carries++;
                   // On a thin gap the moving wind is air on the film and carries nothing by hand (PLAN.md §15g).
                   if (af.lastBlowAired) blowStepsRef.current.aired++;
-                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
-                    bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                  /*
+                    The air the breath tears into the liquid: none below the
+                    speed the surface holds against (a gentle breath), as
+                    often as it always was at the default, more in a gale,
+                    and so many a second, not a count every sixth step
+                    whatever the Amount (PLAN.md QA-20; lib/breath.ts,
+                    airTaken, has the physics and the numbers).
+                  */
+                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
+                    const taken = airTaken(k);
+                    const n = taken > 0 ? spawnsOf(WIND_SPAWNS_PER_SECOND * taken * simStepS, DICE.hands.float()) : 0;
+                    if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
                   }
                 }
 
@@ -8094,6 +8143,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
 
             // ── Audio input to fluid ──────────────────────────────
+            // Where Sound Drive's bass holds the glass this step (PLAN 27e); null lets it up.
+            let bassPressAt: { x: number; y: number; r: number; depth: number } | null = null;
             if (currentAudioData && currentSettings.audioMappings) {
               const densityMod = getAudioValue(currentAudioData, currentSettings.audioMappings.density as AudioFeatureKey);
               const colorMod   = getAudioValue(currentAudioData, currentSettings.audioMappings.color as AudioFeatureKey);
@@ -8121,10 +8172,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
                 if (activeFluid) {
-                  const bass01   = Math.min(1, currentAudioData.bass   / 70);
-                  const treble01 = Math.min(1, currentAudioData.treble / 70);
-                  const energy01 = Math.min(1, currentAudioData.energy / 70);
-                  const mid01    = Math.min(1, currentAudioData.mid    / 70);
+                  // Energy is 0–1 already; over 70 it never reached the swell's gate (levels01).
+                  const { bass: bass01, treble: treble01, energy: energy01, mid: mid01 } = levels01(currentAudioData);
 
                   // audioImpact (0–1) controls visual punch; auto mode adds extra multiplier
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
@@ -8172,8 +8221,25 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     activeFluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
                   }
 
-                  // A hit on the velocity route: radial burst — scales with impact + auto mode
-                  if (vel01 > 0.25) {
+                  /*
+                    The velocity route: on a thin gap, the hand on the glass
+                    following it (lib/squish.ts BassPress, PLAN 27e). The burst
+                    below pushed straight out from a point, which on a thin gap
+                    the projection takes out whole (0.006 of the plate's colour
+                    moved in two seconds of a held bass, in the lab); a palm
+                    pressed as deep as the bass is loud squeezes the liquid out
+                    from under it and lets it back as the bass falls. As wide as
+                    the burst reached at the burst's own 1×, half again wider
+                    (a palm's bowl, which is shallow at its edge), and no wider
+                    than an area look's bass area.
+                  */
+                  bassPressAt = {
+                    x: bassX, y: bassY,
+                    r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
+                    depth: bassPressDepth(vel01, currentSettings.audioImpact ?? 0.45),
+                  };
+                  // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
+                  if (vel01 > 0.25 && !activeFluid.thinGap) {
                     // In an area, no wider than the area: the push is that well's, not the plate's.
                     const burstR = Math.round(Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity,
                       18 * GRID_SCALE * Math.max(0.4, impactMul)));
@@ -8270,16 +8336,39 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     }
                   }
 
-                  // Energy: roaming swell wandering naturally across the canvas
+                  /*
+                    Energy: roaming swell in a third hue, wandering across the
+                    canvas. It read the energy over 70 and never once poured
+                    until PLAN 27e (levels01). On an area look it roams its own
+                    area in turn, in that area's dye, as the mid's stream and
+                    the treble's sparks do, so the music stays in the areas.
+                  */
                   if (energy01 > 0.15) {
-                    const swellCol = colFor(2.6);
-                    const ex = Math.floor(centerX + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * GRID_SIZE * 0.28);
-                    const ey = Math.floor(centerY + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * GRID_SIZE * 0.28);
+                    const swellArea = musicAreas ? areaForBand(musicAreas, 'mid', turn + 2) : null;
+                    const swellAt = swellArea ? areaCentre(swellArea, GRID_SIZE) : { x: centerX, y: centerY };
+                    const swellR = swellArea ? swellArea.r * GRID_SIZE * 0.6 : GRID_SIZE * 0.28;
+                    const swellCol = swellArea ? areaCycle(activeLayerRef.current, swellArea, areaTime + 1.1) : colFor(2.6);
+                    const ex = Math.floor(swellAt.x + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * swellR);
+                    const ey = Math.floor(swellAt.y + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * swellR);
                     activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
               }
             }
+            /*
+              The bass's hand on the glass, on the plate the music plays (the
+              active one), every running step: let up on every other plate,
+              and on this one when the music is quiet, off or Sound Drive is
+              0, so nothing is left pressed when the bass stops. Stopped or
+              draining, the plate does not step, so a held press moves
+              nothing; the first running step after lets it up if the music
+              has gone, and a drain's clear forgets it.
+            */
+            fluidsRef.current.forEach((pl, li) => {
+              if (!pl) return;
+              const on = bassPressAt && li === activeLayerRef.current;
+              pl.pressBass(on ? bassPressAt!.x : 0, on ? bassPressAt!.y : 0, on ? bassPressAt!.r : 1, on ? bassPressAt!.depth : 0);
+            });
           }
 
 

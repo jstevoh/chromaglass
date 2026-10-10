@@ -98,6 +98,9 @@ export function luckyLook(
     // The comic print is the Roy look's and its own control's, and a roll
     // is a new look: rolled from Roy it would still be printed.
     benDay: 0,
+    // Starch in the dish is Turing Print's (PLAN 26d): kept, a roll that turns
+    // Chemistry on would print the rolled look's whole plate black and white.
+    turingPrint: 0,
     // Lamp Ground (PLAN 18b) is kept: a roll is a variation on the look on
     // the plate, and which ground it is seen on is that look's choice.
     // Clear Film (PLAN §20b) is kept as the lamp is: it is liquid on the

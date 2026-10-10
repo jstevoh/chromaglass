@@ -81,6 +81,8 @@ try {
   const remote = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })).newPage();
   remote.on('pageerror', e => errors.push(`remote: ${e.message}`));
   await remote.goto(`${BASE}/?remote=1&key=${KEY}`, { waitUntil: 'networkidle' });
+  // The remote opens on Draw (PLAN §8-draw); the mixer is in its Controls.
+  await remote.getByTestId('draw-controls').tap();
   const P = 'remote-mixer-panel';
   // The remote keeps Blackout and Go in a bar pinned to the bottom of the
   // screen; a control scrolled only just into view sits under it, and a tap

@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VisualizerSettings } from '../types';
-import { PRESETS, type Preset } from '../presets';
+import { PRESETS, livePresetId, type Preset } from '../presets';
 import { lookOf } from '../lib/lookFade';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import {
@@ -165,7 +165,9 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
     const stage: ShowStage | undefined = seq.stages[index];
     if (!stage) return;
     const a = argsRef.current;
-    const preset = stage.presetId ? (a.presets ?? PRESETS).find(p => p.id === stage.presetId) : null;
+    // A stage saved before a look was retired names it by its old id (PLAN.md 28a).
+    const stageLook = stage.presetId ? livePresetId(stage.presetId) : null;
+    const preset = stageLook ? (a.presets ?? PRESETS).find(p => p.id === stageLook) : null;
     if (preset) a.adoptPreset(preset.id);
     // A stage that names a look glides to the whole of it (see LOOK_BASE), with
     // the stage's own settings over it. A stage with no look is a set of

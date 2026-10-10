@@ -123,6 +123,9 @@ const SECTION_OF: Record<string, string> = {
   dishVignette: 'show',
   lumia: 'lamp',
   chemistry: 'lamp',
+  chemistryPattern: 'lamp',
+  chemistryWidth: 'lamp',
+  turingPrint: 'lamp',
   gelWheel: 'lamp',
   beatLead: 'audio-input',
   filmDrive: 'film',
@@ -235,8 +238,6 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
 
-  { key: 'chemistryPattern', label: "Pattern (Spots to Labyrinth)", min: 0, max: 1, section: 'lamp' },
-  { key: 'chemistryWidth', label: "Pattern Width", min: 0.1, max: 1, section: 'lamp' },
 
   { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
   /*

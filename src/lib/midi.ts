@@ -397,7 +397,7 @@ export function targetLabel(t: MidiTarget, presetName?: (id: string) => string |
   switch (t.kind) {
     case 'setting': return SETTING_LABELS[t.key] ?? String(t.key);
     case 'action': return ACTION_LABELS[t.action];
-    case 'preset': return `Preset: ${presetName?.(t.presetId) ?? t.presetId}`;
+    case 'preset': return `Preset palette: ${presetName?.(t.presetId) ?? t.presetId}`;
     case 'dye': return `Dye ${t.paletteIndex + 1}`;
   }
 }
@@ -495,6 +495,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'dishVignette',    label: 'Round Dish',       min: 0, max: 1 },
   { key: 'lumia',           label: 'Lumia',            min: 0, max: 1 },
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
+  // The reaction's own (PLAN §26): Pearson's map, the stripe's width, and the print.
+  { key: 'chemistryPattern', label: 'Pattern (Spots to Labyrinth)', min: 0, max: 1 },
+  { key: 'chemistryWidth',  label: 'Pattern Width',    min: 0.1, max: 1 },
+  { key: 'turingPrint',     label: 'Turing Print',     min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
   // Folds is a stepped choice and rides a fader as one: the sheet's five
@@ -1081,4 +1085,48 @@ export function factoryFor(inputName: string | null | undefined): { id: FactoryM
   if (!inputName) return null;
   const hit = FACTORY_MAPS.find(f => f.match.test(inputName));
   return hit ? { id: hit.id, name: hit.name } : null;
+}
+
+/**
+ * Which CCs on a known controller are turned rather than slid (PLAN.md 8d).
+ *
+ * Desk v2 draws a control as the hardware it is learned to: a fader is a
+ * slider, a knob is a knob. A binding only says absolute or relative, which
+ * tells an endless encoder (relative) from everything else, but a pot with a
+ * stop is absolute too, so the APC40's sixteen knobs and the Launch Control
+ * XL's twenty-four drew as faders on the desk while the hand on them was
+ * turning. The factory maps above know their hardware, so the knobs are
+ * named here, by the CC numbers those maps bind; everything else on these
+ * boards that sends a CC is a fader (the APC40's crossfader too: a long
+ * throw, slid).
+ */
+const KNOB_CCS: Record<FactoryMapId, (s: MidiSource) => boolean> = {
+  // Device knobs 16–23, track knobs 48–55, the tempo (13) and cue level (47) encoders.
+  'apc40-mk2': s => s.channel === 0 && ((s.number >= 16 && s.number <= 23) || (s.number >= 48 && s.number <= 55) || s.number === 13 || s.number === 47),
+  // Eight knobs over eight faders.
+  'nanokontrol2': s => s.number >= 16 && s.number <= 23,
+  // Three rows of eight knobs over eight faders.
+  'launch-control-xl': s => (s.number >= 13 && s.number <= 20) || (s.number >= 29 && s.number <= 36) || (s.number >= 49 && s.number <= 56),
+  // Nine faders and pads; nothing turns.
+  'apc-mini-mk2': () => false,
+  'launchpad': () => false,
+};
+
+/**
+ * How the desk draws the control a setting is learned to: `'fader'` (a
+ * slider) or `'encoder'` (a knob, endless or with a stop), or null when no CC
+ * is learned to it.
+ *
+ * The hardware comes from the map's own device first (a map made from a
+ * factory map keeps its name, and a learn on top of it is on the same board),
+ * then the port it is playing from. An endless encoder is a knob whatever the
+ * board. On a board this does not know, an absolute CC stays a fader, which
+ * is what every CC drew as before profiles named their knobs.
+ */
+export function controlKindOf(map: MidiMap | null | undefined, key: keyof VisualizerSettings, inputName?: string | null): 'fader' | 'encoder' | null {
+  const b = map?.bindings.find(x => x.target.kind === 'setting' && x.target.key === key);
+  if (!b || b.source.kind !== 'cc') return null;
+  if (b.mode === 'relative') return 'encoder';
+  const board = factoryFor(map?.device) ?? factoryFor(inputName);
+  return board && KNOB_CCS[board.id](b.source) ? 'encoder' : 'fader';
 }

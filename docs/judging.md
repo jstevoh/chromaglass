@@ -1222,3 +1222,49 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
 
+
+## 46. Turing Print (PLAN 26d)
+
+Pick **Turing Print** on the Perform desk, then on the phone. With music, give it half a
+minute: labyrinths should grow out from where the reagent drops land, blue-black on the
+white lamp, every stripe about the same width. Then stir it with a hand or a Blow:
+
+- Do the stripes read as a print, black and white, or as soft grey worms? The edge is the
+  chemistry's own, about a fifth of a stripe; say if you want it harder (PLAN 26d-2);
+- After a stir, do the stripes drag into whorls and heal back to their own width within
+  a few seconds?
+- Are the stripes the size you want? Pattern Width on the Design desk or the phone's
+  Looks sheet moves it; say where you would set it;
+- On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
+  grows where it grew. Better, or did the bigger coral suit those looks?
+
+## 47. The test pattern and Identify on a real wall (PLAN 8e)
+
+With the projector up, open Load-in and switch **Test pattern** on in the Wall panel:
+
+- Is the grid square and the circle round once the corners are dragged right? The grid is
+  kept square by the shape of the projected quad, so a keystone shows as cells that are not;
+- Are the lines bright and thin enough to drag a corner against from where the audience
+  will stand, and are the corner numbers (1 to 4, clockwise from the top left, as the
+  corner handles are) readable from there?
+- With shapes in Mapping, does each carry its own number in its middle, and does
+  **Identify** flash every number clearly enough to find the shape called 3?
+- With **Rear** on, the pattern is mirrored with the show (it is drawn as the picture is).
+  Is that the way round you want it, standing behind the screen?
+
+And the header at 1024 (PLAN 8h): with the window that narrow the dots fold into one
+**Status** button. Is one dot (green while anything is connected, red while recording)
+enough, or should the button carry a dot per input (PLAN 8h-1)?
+
+## 48. A panel on a second display (PLAN 8g)
+
+With a monitor beside the laptop, open a panel's own window from its header (the button
+left of float, or right-click the title, **Open in its own window**) and drag the window
+to the monitor:
+
+- Does the panel look as it does on the desk (fonts, colours, knobs), and do its controls
+  move the plate on the laptop at once?
+- With the focus in that window, the show's keys (Go, Blackout, R) do nothing yet (PLAN
+  8g-1). Is that a problem at a gig, or is the window only touched with the mouse?
+- After a reload the panels are back on the desk (a browser will not reopen windows by
+  itself). Is one click to put them back worth adding (PLAN 8g-2)?

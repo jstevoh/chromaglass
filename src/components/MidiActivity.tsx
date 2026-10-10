@@ -4,6 +4,7 @@ import { subscribeAllTouches, type TouchEvent } from '../lib/midiTouch';
 import { ACTION_LABELS, type MidiAction } from '../lib/midi';
 import { PIN_RANGE } from '../lib/deskPins';
 import { PALETTE } from '../constants';
+import { livePresetId } from '../presets';
 
 /**
  * What the controller is doing, in words, without the controls being on screen.
@@ -47,7 +48,7 @@ function labelFor(key: string, presets: { id: string; name: string }[]): { name:
   const id = rest.join(':');
   if (kind === 'setting') return { name: PIN_RANGE.get(id)?.label ?? id };
   if (kind === 'action') return { name: ACTION_LABELS[id as MidiAction] ?? id };
-  if (kind === 'preset') return { name: presets.find(p => p.id === id)?.name ?? id };
+  if (kind === 'preset') return { name: presets.find(p => p.id === livePresetId(id))?.name ?? id };
   if (kind === 'dye') {
     const c = PALETTE[Number(id)];
     return { name: c?.name ?? `Dye ${id}`, swatch: c?.hex };

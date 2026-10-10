@@ -91,7 +91,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — slow luminous blobs, the meditative 1960s look.</>],
           ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
-          ['3. Pick a look', <>Click the name under the ChromaGlass title. Thirty-two presets in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
+          ['3. Pick a preset palette', <>Click the name under the ChromaGlass title. The preset palettes come in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
           ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw (held still on layer 1 it blows a bubble that grows while you hold, its rim breaking into fingers), <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
@@ -309,7 +309,7 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Light show</Em> is dye as light on black — the projected image. <Em>Photograph</Em> is
           a two-pass render with a camera over the plate and lit paper behind it, and it
-          is what the Oil on Water, Colorful Cosmos and Sunny Side Up presets are. <Em>Lens</Em> is
+          is what the Oil on Water and Colorful Cosmos preset palettes are. <Em>Lens</Em> is
           how much of a camera is over either: Focus, Aperture, Bloom, Chromatic Aberration and
           Refraction are its controls, and do nothing with it at zero.
         </P>

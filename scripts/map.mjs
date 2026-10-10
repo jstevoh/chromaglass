@@ -19,7 +19,7 @@
 import {
   IDENTITY_CORNERS, MAX_SURFACES, composeOntoPin, cornerPinMatrix, makeCube, makeSurface,
   normalizeOutput, normalizeSurfaces, outputIsIdentity, pointInQuad, surfaceOutline,
-  DEFAULT_OUTPUT,
+  DEFAULT_OUTPUT, saveOutput,
 } from '../src/lib/outputConfig.ts';
 
 const checks = [];
@@ -151,6 +151,27 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
   check('a plain config still costs nothing', outputIsIdentity(DEFAULT_OUTPUT));
   check('one shape is enough to need the pass',
     !outputIsIdentity({ ...DEFAULT_OUTPUT, surfaces: [makeSurface('rect')] }));
+  // The wall test (8e) is drawn by the pass, so it needs it while it is up,
+  // and not once Identify has run out; and it never comes back in from a
+  // stored or sent config, where it would open a show on a test pattern.
+  check('the test pattern and a running Identify need the pass; one run out does not',
+    !outputIsIdentity({ ...DEFAULT_OUTPUT, test: { pattern: true, identifyUntil: 0 } })
+    && !outputIsIdentity({ ...DEFAULT_OUTPUT, test: { pattern: false, identifyUntil: Date.now() + 10_000 } })
+    && outputIsIdentity({ ...DEFAULT_OUTPUT, test: { pattern: false, identifyUntil: Date.now() - 1 } }));
+  check('a config read back never carries a wall test', normalizeOutput({ ...DEFAULT_OUTPUT, test: { pattern: true, identifyUntil: 0 } }).test === undefined);
+  // And it is never written: saved with the pattern up, what is stored has no test in it
+  // but keeps the rest (the control: the shape saved beside it is there).
+  {
+    const stored = new Map();
+    const was = globalThis.localStorage;
+    globalThis.localStorage = { setItem: (k, v) => stored.set(k, v), getItem: (k) => stored.get(k) ?? null, removeItem: (k) => stored.delete(k) };
+    saveOutput({ ...DEFAULT_OUTPUT, surfaces: [makeSurface('rect')], test: { pattern: true, identifyUntil: Date.now() + 10_000 } });
+    globalThis.localStorage = was;
+    const [text = ''] = [...stored.values()];
+    const back = text ? JSON.parse(text) : {};
+    check('a config saved with the test pattern up is stored without it', !!text && !('test' in back) && back.surfaces?.length === 1,
+      text ? `${text.length} chars, ${back.surfaces?.length ?? 0} shape${'test' in back ? ', test stored' : ''}` : 'nothing stored');
+  }
 }
 
 // ── The made shapes ─────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { ACTION_LABELS, LEARNABLE_SETTINGS, type MidiAction, type MidiTarget } f
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
 import { controlKey, type ControllerSurface as Surface, type SurfaceControl } from '../lib/controllerSurface';
+import { livePresetId } from '../presets';
 
 /**
  * The controller, drawn.
@@ -252,7 +253,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
   const [paper, setPaper] = useState(false);
   const [lit, setLit] = useState<Record<string, number>>({});
   const svgRef = useRef<SVGSVGElement>(null);
-  const presetName = useCallback((id: string) => presets.find(p => p.id === id)?.name, [presets]);
+  const presetName = useCallback((id: string) => presets.find(p => p.id === livePresetId(id))?.name, [presets]);
 
   const byKey = useMemo(() => {
     const m = new Map<string, MidiTarget>();
@@ -529,7 +530,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
             </div>
 
             <div className="max-h-[52vh] overflow-y-auto pr-1 scrollbar-hide">
-              {section('Presets', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
+              {section('Preset palettes', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
               {section('Dyes', PALETTE.map((p, i) => ({ key: `dye-${i}`, label: p.name, swatch: p.hex, target: { kind: 'dye', paletteIndex: i } as MidiTarget })))}
               {section('Actions', (Object.keys(ACTION_LABELS) as MidiAction[]).map(a => ({ key: `action-${a}`, label: ACTION_LABELS[a], target: { kind: 'action', action: a } as MidiTarget })))}
               {section('Controls', LEARNABLE_SETTINGS.map(s => ({ key: `setting-${s.key}`, label: s.label, target: { kind: 'setting', key: s.key, min: s.min, max: s.max } as MidiTarget })))}

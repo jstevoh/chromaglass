@@ -575,3 +575,13 @@ export function holdWhereItIs<T extends { macroCamera?: CameraMode; macroAimX?: 
   const here = centre();
   return here ? { ...patch, macroAimX: here.x, macroAimY: here.y } : patch;
 }
+
+/**
+ * Auto's cut, as the zoom chip and the phone's camera buttons name it (QA-11):
+ * "5s", "2.5s". The same `max(0.5, macroHold ?? 5)` that LiquidVisualizer hands
+ * MacroCamera as `hold`, so the label is the length the camera actually rides
+ * a subject for, not the slider's raw value.
+ */
+export function shotLabel(macroHold: number | undefined): string {
+  return `${+Math.max(0.5, macroHold ?? 5).toFixed(1)}s`;
+}

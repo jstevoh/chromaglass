@@ -282,7 +282,7 @@ async function app() {
       // eslint-disable-next-line no-new-func
       if (src === 'microphone') new Function(`(${room})()`)();
     }, [source, ROOM.toString()]);
-    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.__hands === 'function', null, { timeout: 60_000 });
     // The ranges and thresholds learn the room for a few seconds first.
     await page.waitForTimeout(4000);
