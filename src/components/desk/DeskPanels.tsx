@@ -1,5 +1,6 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
@@ -11,6 +12,7 @@ import { FADE_CHOICES } from '../../lib/lookFade';
 import { PINNABLE, PIN_RANGE, type DeskSpec } from '../../lib/deskPins';
 import { PANEL_BY_ID, whereIs } from '../../lib/deskLayout';
 import { relayInfo, type RelayInfo } from '../../lib/remoteProtocol';
+import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
 import { PickList } from './PickList';
@@ -93,6 +95,7 @@ function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps
         step={spec.step}
         display={display}
         mapping={cc != null ? `CC${cc}` : null}
+        resetTo={p.lookValueOf?.(key)}
         onChange={n => setControl(p, key, n)}
         midiKey={`setting:${String(key)}`}
         testId={testId}
@@ -111,6 +114,7 @@ function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps
       display={display}
       cc={cc}
       white={WHITE.has(String(key))}
+      resetTo={p.lookValueOf?.(key)}
       onChange={n => setControl(p, key, n)}
       midiKey={`setting:${String(key)}`}
       testId={testId}
@@ -375,6 +379,7 @@ export const RIDES_WIDTH = 312;
 export const LEFT_WIDTH = 272;
 
 function RidesBody({ p }: { p: DeskProps }) {
+  const portalBody = usePortalBody();
   const [picking, setPicking] = useState(false);
   const [mixerOpen, setMixerOpen] = useState(false);
   /*
@@ -479,7 +484,7 @@ function RidesBody({ p }: { p: DeskProps }) {
             </PanelGuard>
           </div>
         </Sheet>,
-        document.body,
+        portalBody,
       )}
     </div>
   );
@@ -596,6 +601,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
 }
 
 function DyesBody({ p }: { p: DeskProps }) {
+  const portalBody = usePortalBody();
   const bottle = [...p.dyeBottles, ...p.behaviourBottles].find(l => l.id === p.bottleId);
   const natural = isNatural(bottle);
   const [palettes, setPalettes] = useState<{ top: number; left: number } | null>(null);
@@ -683,7 +689,7 @@ function DyesBody({ p }: { p: DeskProps }) {
             ))}
           </div>
         </>,
-        document.body,
+        portalBody,
       )}
       <div className="flex gap-1.5">
         <button
@@ -856,7 +862,8 @@ function PhoneBody({ p }: { p: DeskProps }) {
         <p className="text-dim">Looking for the show server…</p>
       ) : url ? (
         <>
-          <p className="text-dim">Open this on a phone or an iPad on the same Wi-Fi:</p>
+          <p className="text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
+          <QrCodeImage text={url} />
           <code className="break-all rounded-md bg-elevated px-2 py-1.5 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
           <Button
             height={32}
@@ -872,6 +879,37 @@ function PhoneBody({ p }: { p: DeskProps }) {
         </p>
       )}
     </div>
+  );
+}
+
+/*
+  The link as a QR code (PLAN 8f): the address is sixty-odd characters with a
+  key in it, typed on a phone in a dark room, and a camera reads this instead.
+  Drawn from `lib/qr.ts`, one path of a unit per module, black on white with
+  the standard's four-module quiet zone: a reader needs the light border and
+  the dark-on-light polarity, so it is white in a dark panel on purpose, and
+  sized in whole pixels per module so no module blurs across two.
+*/
+function QrCodeImage({ text }: { text: string }) {
+  const code = useMemo(() => encodeQr(text), [text]);
+  if (!code) return null;
+  const span = code.size + 8;
+  const px = Math.max(2, Math.floor(168 / span)) * span;
+  return (
+    <svg
+      viewBox={`0 0 ${span} ${span}`}
+      width={px}
+      height={px}
+      shapeRendering="crispEdges"
+      className="self-center rounded-sm"
+      role="img"
+      aria-label="QR code of the address"
+      data-testid="phone-link-qr"
+      data-qr-version={code.version}
+    >
+      <rect width={span} height={span} fill="#fff" />
+      <path d={qrPath(code)} fill="#000" />
+    </svg>
   );
 }
 

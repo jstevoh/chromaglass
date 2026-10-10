@@ -140,6 +140,15 @@ export interface DeskProps {
   ccFor: (key: keyof VisualizerSettings) => number | null;
   /** Whether a control's CC is a fader or an encoder: a fader draws as a slider. */
   kindFor: (key: keyof VisualizerSettings) => ControlKind | null;
+  /** The look's own value of a setting, where a double-click on its knob or slider puts it back (8c). */
+  lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
+  /**
+   * The desk is not drawn (the clean screen: the overlays hidden on the
+   * laptop), but kept mounted so the panels in their own windows (PLAN.md 8g)
+   * stay up on the other display. Unmounted, as it was, it closed them, at
+   * the moment a mixer on the second screen matters most.
+   */
+  bare?: boolean;
   rideKeys: (keyof VisualizerSettings)[];
   onRideKeys: (keys: (keyof VisualizerSettings)[]) => void;
   recipeKeys: (keyof VisualizerSettings)[];
