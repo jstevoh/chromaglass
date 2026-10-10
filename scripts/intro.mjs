@@ -30,6 +30,8 @@
  *   8. an app that never arrives: it leaves when the way out appears
  *   9. it holds still while each of the opening's render pipelines
  *      compiles, and moves again once they are done
+ *   9b. and it is still from the page's first frame until then, through
+ *      Chromium starting the GPU
  *
  * And it prints how much of the wait it covered: from the first paint to
  * the plate's first step, the share of that time the intro was up.
@@ -106,7 +108,10 @@ const instruments = () => {
     // Up and not leaving: when it was, and whether anything in it was
     // turning on this frame (a paused animation is not).
     if (on && style.display !== 'none' && !el.classList.contains('cg-out')) {
-      at.moving.push([performance.now(), el.getAnimations({ subtree: true }).some((a) => a.playState === 'running')]);
+      // And how many were paused, and on which frame: still is a paused
+      // animation, not none at all (9b).
+      const anims = el.getAnimations({ subtree: true });
+      at.moving.push([performance.now(), anims.some((a) => a.playState === 'running'), anims.filter((a) => a.playState === 'paused').length, n]);
     }
     // Seen and showing, or there and hidden by the page itself: the remote
     // and a cast must have the second and never the first, on every frame,
@@ -286,6 +291,28 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     overlaps === 0 && renders.length > 0 && during.length > 0 && during.every(([, m]) => !m) && letGo && lastEnd !== null
       && (afterward.some(([, m]) => m) || afterward.length <= 2),
     `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${during.length} frames up during them, ${during.filter(([, m]) => m).length} of them moving; held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the last`);
+  /*
+    And still before them too, from the first frame the page draws. What it
+    guards: on CI's Mac the frames stopped as long while Chromium started the
+    GPU with the intro turning (startup's "no stop in the opening", a median
+    1.73 s on the 119 runs after the intro against 0.53 s on the 57 before;
+    three trials each, 2.13 to 2.35 s turning, 0.85 to 1.18 s still from the
+    first paint: PLAN.md 14v-5). The same reading as 9, from outside the
+    app: no frame with anything of the intro running from the first one to
+    the end of the opening's last render compile, and some frames seen
+    before the first of those compiles was asked, while the GPU was starting
+    (a page that drew none there measured nothing). Read from the page's
+    very first frame, and still meaning its animations paused, at least the
+    four line 2 counts, not absent: a frame with none reported (taken out,
+    or reduced motion) would read as still and prove nothing.
+  */
+  const firstAsk = sorted.length ? sorted[0][0] : null;
+  const early = lastEnd === null ? [] : (at.moving ?? []).filter(([t]) => t <= lastEnd);
+  const beforeAsk = firstAsk === null ? [] : early.filter(([t]) => t < firstAsk);
+  const pausedLeast = early.length ? Math.min(...early.map(([, , p]) => p)) : 0;
+  check('9b. and it is still from the first frame the page draws until then',
+    lastEnd !== null && beforeAsk.length > 0 && early[0][3] === 1 && early.every(([, m, p]) => !m && p >= 4),
+    `${early.length} frames up before the last render compile settled, from frame ${early.length ? early[0][3] : 'none'}, ${early.filter(([, m]) => m).length} of them moving, at least ${pausedLeast} animations paused on each; ${beforeAsk.length} of them before the first was asked (${firstAsk === null ? 'never' : s(firstAsk)}), ${beforeAsk.filter(([, m]) => m).length} moving`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {

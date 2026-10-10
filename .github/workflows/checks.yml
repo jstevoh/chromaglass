@@ -902,17 +902,6 @@ jobs:
       - name: The show opens without stopping
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run startup
-      # EXPERIMENT (to be removed before merging): the opening with the intro
-      # as shipped, without it, without its pools, and held still from the
-      # first paint, each on a cold cache, to say what stops the frames.
-      - name: Startup trials (experiment)
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
-        continue-on-error: true
-        timeout-minutes: 7
-        env:
-          STARTUP_TRIALS: 3
-          STARTUP_VARIANTS: '|&nointro|&introlite|&introstill=boot'
-        run: npm run startup
       # The pigment's grain inside the dye, not at its edge: in every look the
       # grain moves almost no pixel of a dye edge by a fleck's worth (it made
       # the edges a dithered fringe, "very digital"), and the bodies keep it.

@@ -24,8 +24,6 @@
       the first paint so it never flashes there.
     -->
     <script>if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');</script>
-    <!-- EXPERIMENT (startup trials, to be removed): ?nointro, ?introlite, ?introstill=boot -->
-    <script>(function () { var q = location.search, c = document.documentElement.classList; if (/[?&]nointro(=|&|$)/.test(q)) c.add('cg-no-intro'); if (/[?&]introlite(=|&|$)/.test(q)) c.add('cg-lite'); if (/[?&]introstill=boot/.test(q)) c.add('cg-hold'); })();</script>
     <style>
       html, body { background: #000; }
       .cg-no-intro #cg-intro { display: none; }
@@ -35,24 +33,23 @@
       #cg-intro { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: #000; pointer-events: none; container-type: size; transition: opacity 0.9s ease-out; }
       #cg-intro.cg-in-plate { position: absolute; z-index: auto; }
       #cg-intro.cg-out { opacity: 0; }
-      /* Held still while the opening's render pipelines compile (gpu/prepare.ts,
-         Quiet): a moving picture there stopped the page's frames. */
+      /* Held still from the first paint until the opening's render pipelines
+         are built (the markup below starts it with .cg-still; gpu/prepare.ts,
+         Quiet, lets it go): while Chromium starts the GPU and while those
+         compile, a moving picture stopped the page's frames. */
       #cg-intro.cg-still, #cg-intro.cg-still * { animation-play-state: paused !important; }
-      .cg-hold #cg-intro, .cg-hold #cg-intro * { animation-play-state: paused !important; }
-      .cg-lite .cg-oil { display: none; }
       /* Only transform and opacity move, so the compositor runs them on its
          own thread: the page's thread is held for seconds while Chromium
          starts the GPU (npm run startup's "held" line), and anything the page
-         had to step would stop with it. No blend mode on the pools (they
-         were mix-blend-mode: screen): on CI's Mac, with the intro in the
-         page, the GPU device took 1.7 to 2.6 s to be given against 0.04 s
-         before it, and the opening's first compile then stopped the frames
-         outside Chromium's hold (startup's "no stop in the opening", 2.15 to
-         2.82 s). A blended group is drawn through a surface of its own, with
-         the GPU process compiling what composites it as the page first
-         paints; over black, screen and plain alpha differ only where two
-         pools overlap. Inferred from the timings: the Mac's "device asked,
-         given" line says whether this was it. */
+         had to step would stop with it. That is not to say a moving frame is
+         free: the compositor presents it through the GPU process, the one
+         that is starting the GPU and compiling the opening, and it waits
+         there behind them (lib/intro.ts says what was measured, and why it
+         starts still). No blend mode on the pools (they were
+         mix-blend-mode: screen): over black, screen and plain alpha differ
+         only where two pools overlap, and a blended group is a surface of
+         its own for the GPU process to build. Taking it out did not end the
+         stops (PLAN.md 14v-5); starting still did. */
       .cg-oil { position: absolute; left: 50%; top: 50%; width: 78cqmax; height: 78cqmax; margin: -39cqmax 0 0 -39cqmax; border-radius: 50%; opacity: 0.55; will-change: transform; }
       .cg-oil-a { background: radial-gradient(closest-side, #2a7dff 0%, rgba(20,51,201,0.45) 45%, transparent 100%); animation: cg-orbit 23s linear infinite; }
       .cg-oil-b { background: radial-gradient(closest-side, #15c9b4 0%, rgba(10,111,134,0.45) 45%, transparent 100%); animation: cg-orbit 29s linear infinite reverse; animation-delay: -9s; }
@@ -85,7 +82,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <div id="cg-intro" aria-hidden="true">
+    <div id="cg-intro" class="cg-still" aria-hidden="true">
       <div class="cg-oil cg-oil-a"></div>
       <div class="cg-oil cg-oil-b"></div>
       <div class="cg-oil cg-oil-c"></div>

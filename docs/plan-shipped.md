@@ -1478,6 +1478,32 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   and the line red. Its first version held still as each lane took its first render pipeline, which let three lanes ask for three at once (PR #283's first Mac run: a 2.15 s frame gap with `air/air splat` compiling 3.32 s); it now holds still before the lanes start, and line 9 also holds the opening to one render compile at a time (2 of 4 asked while another compiled with the first version). The Mac's `npm run startup` is what says the stop has gone; its intro line prints the stretches held still. This
   answers the open question of whether the swirl freezes: around the display's and
   the derive's compiles it does, and now it does so on purpose, still and not stalled.
+- **Shipped, 14v-5: the intro starts still, and turns once the opening's render
+  pipelines are built** (PR #335, 2026-10-10). What was reported: `npm run
+  startup`'s "no stop in the opening" went red on about half of 10-10's Mac runs,
+  across PRs that never touched the opening (2.17 s, 2.57 s against the 2 s bar), and
+  held up deploys. What was measured: over the open shard's 176 runs from 27 September
+  (`ci-flakes/startup-intro/open-shard-runs.txt` in the project's files), the show's
+  longest wait for a frame was a median 0.53 s (p90 0.78 s) on the 57 runs before the
+  intro merged (#274, 10-04 20:13 UTC) and 1.73 s (p90 2.20 s, 19 of 119 over 2 s) on
+  every run since; the GPU device went from a median 0.09 s to be given to 1.63 s in
+  the same hour. The stops lay inside the device request with the intro turning, or
+  in the first compile after it. Holding it still around the render compiles (14v-4)
+  had caught the second and not the first, and taking out the pools' blend mode
+  neither. PR #335's first push opened the show three times each way on CI's Mac,
+  cold: as shipped 2.35, 2.13, 2.32 s; without the intro 0.47, 0.47, 0.82 s; without
+  its colour pools but turning 1.93, 2.33, 2.17 s; still from the first paint 1.18,
+  0.85, 0.92 s. So it is the motion, not what moves: a turning picture is a new frame
+  every refresh for the compositor to present through the GPU process, which on a
+  cold Mac is busy starting the device and compiling, and each frame waits there.
+  The fix: `index.html` starts `#cg-intro` with `.cg-still`, `installIntro` records
+  the hold from 0, and `Quiet`'s `go` lets it turn once the opening's render
+  pipelines are built, as before. `npm run intro` line 9b holds every frame from the
+  first to the last render compile still, with some seen before the first compile
+  was asked (SwiftShader: 328 frames, none moving, 86 before the first ask at 2.27 s;
+  with the markup's `.cg-still` taken out, 83 of 85 moving before the first ask and
+  the line red). Left: the device still comes 1.4–1.9 s late with the still intro
+  up (14v-6).
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry
