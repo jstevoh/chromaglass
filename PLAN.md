@@ -5652,18 +5652,32 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
   forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
   own stir moves them 0.79).
-  - **27a-1. The cover glass slides as the dish tips (shipped in #328, taken out again
-    by #340; open).** Taken out because on the Mac it halved the frame rate with music
-    playing: `npm run renders` drew 10–21 frames a second on the laptop and 11–15 on the
-    phone against 26–32 before (main's deploy of 10-10 and #340's run; #328's own run
-    showed it too, and #337's run without it passed). Inferred, not yet measured: the
-    glass drags the whole film at half its slide, a uniform drift of a few cells a step,
-    and the carries' substeps (`CARRY_COURANT`, up to 33 a step) follow the fastest face,
-    so every carry ran several times as many substeps. Its glass was also not reset when
-    a render starts (`resetPlateClocks`), so the same seed rendered twice differed
-    (`render-app`). To bring it back: carry the glass's uniform drift without the
-    substeps (an exact shift of the carried fields, or the carries in the glass's own
-    frame), reset `coverRef` with the rock, and show `renders` at its old frame rate.
+  - **27a-1. The cover glass slides as the dish tips (shipped in #328, taken out by
+    #340, back with its drift carried exactly).** #328 put it in and main's deploy of
+    10-10 went red: with the band playing `npm run renders` drew 10–21 frames a second
+    on the laptop and 11–15 on the phone against 26–32 before, and the same seed
+    rendered twice differed (`render-app`). Two causes. The glass was not reset when a
+    render starts (`resetPlateClocks` now resets `coverRef` with the rock). And the
+    glass drags the whole film at half its slide, a drift of a few cells a step, and
+    the carries cut a step into as many substeps as their fastest face needs
+    (`CARRY_COURANT`): measured in the lab on the app's 384² solver, Plate Rock 0.2,
+    0.45 and full asked 4.1, 8.0 and 12.2 substeps a step of every carry against 1.0
+    held still. Now the carries ride the flow less the drift (`driftCells` in
+    fluid.ts, `driftOff`), the flow seen from a frame going with the film, and every
+    carried field (the colour and its species, the oil's colour, the poured liquids,
+    the reaction, the mix, the ferrofluid) is moved with the drift (`driftShift`): its
+    whole cells by a shift, which is exact, the fraction by one step of the carries'
+    own limited flux. The drift is a model of the film's speed (hsPrep's drag lag at
+    the rest gap, within 0.03 of a cell of the lab's plate); what it misses the plan
+    carries in substeps, so a wrong guess costs time and never accuracy. And the
+    dish's rim met the grid's wall at the middle of each side, where about ten cells
+    either way were inside the rim and walled: the glass's flow piled against them at
+    3.4 times the plate's speed and set the substeps itself. The rim is open there now
+    (hsPrep), as it is everywhere else, and the substeps follow the faces inside the
+    rim only (27a-6 says what that leaves). Lab, an uneven plate rocked and kicked as
+    the app does it (384², 60 steps): 1.00, 1.03 and 2.17 substeps a step at 0.2, 0.45
+    and full, against 4.1, 8.0 and 12.2 before. `npm run rides` 5c holds the default
+    at the still plate's substeps (1.00) and full under 2.5.
     What it was: the tilt moves
     colour only where it is heavier than the plate's mean, so on a look whose colour is
     spread evenly a rock moved nothing (the Mac's controls run on #305: Rock visible on
@@ -5691,7 +5705,29 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     - **27a-4. Found: it was the cover glass** (see 27a-1). On #328's Mac run,
       `npm run renders` on the phone with the band drew 11 frames a second; it showed
       again on main's deploy of 10-10 on the laptop and the phone, and #340 took the
-      glass out.
+      glass out. Fixed with 27a-1's return: the drift is a shift, not substeps.
+    - **27a-5, open.** One carry still rides the glass's whole drift in fixed
+      substeps of 0.45 of a cell and so falls behind it: the clear film's holes
+      (`filmAdvect`, wgsl/film.ts), which a sliding glass should carry with the
+      liquid. Give the film `velRide` and `driftShift` as the other carries have. And the CPU fallback solver ignores
+      `coverX`/`coverY` (a phone without WebGPU rocks without the glass).
+    - **27a-6, open (a shortcut, named in 27a-1's PR).** The carries' substeps are
+      now set by the faces inside the dish's rim only (`carryCourant`); past the rim
+      each substep is held to its 0.45 of a cell. Counted, the faces out there set
+      the substeps under the cover glass: the colour carried past the rim piles
+      against the grid's wall (no face through the wall carries anything), heavier
+      than the mean, and the tilt drives the pile on, 1.7 cells a step in the grid's
+      corners where the dish went 0.6. Nothing past the rim is drawn, but it is a
+      reservoir the plate draws back from, and at the four middles of the sides, where
+      the rim meets the wall, the pile reaches into the picture: on an evenly coloured
+      plate under full Plate Rock with the glass the colour in the outermost cells there
+      swings between empty and the plate's cap of 6 a cell, and 13% of the plate's
+      colour is cut off at that cap over two seconds (7% at the default 0.45; lab,
+      192²; 14% at full with the rim's edge walled as it was, so it is the glass's
+      drift into a walled square, as #328 had it, not this PR's opening of the rim).
+      The real fix is to model what is past the rim: liquid that crosses the open rim
+      leaves the film (and the tilt and the body forces do not act where there is no
+      film), rather than a walled square round the dish.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
