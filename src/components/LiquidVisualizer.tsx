@@ -4477,6 +4477,14 @@ interface FrameView {
   mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
   film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
   /**
+   * What the plate hears this frame: the pitch class and brightness from the
+   * audio features, and where the frame sits between two beats (0..1, 0 with
+   * no beat clock). The plate's uniforms read it as `PlateView.audio`
+   * (gpu/plateUniforms.ts), which is where the shader's `pitchClass`,
+   * `brightness` and `beatPhase` come from.
+   */
+  audio: { pitchClass: number; brightness: number; beatPhase: number };
+  /**
    * The oil beads' mask, on the frames the beads moved and it was redrawn —
    * null on every other frame, and whenever the beads are off. The show
    * decides when it changes so that both engines upload the same picture on

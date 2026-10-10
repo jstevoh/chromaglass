@@ -9,7 +9,8 @@
  * it should leave is looked for:
  *
  *   1. errors, rejections and console lines land, with a snapshot, and the
- *      ignore patterns keep the noise out;
+ *      ignore patterns keep the noise out; and a panel that throws (S14) is
+ *      a card and a `panel` line, not a fatal, and comes back on Try again;
  *   2. a report from a page whose device is destroyed still returns, with
  *      `screenshot: null` — the report is for exactly the moment things broke;
  *   3. a device loss is logged, and so is the recovery from it;
@@ -81,6 +82,43 @@ try {
   check('an uncaught throw lands', find(/crash-soak: a throw/)?.source === 'window');
   check('the ignore patterns keep noise out', !find(/ResizeObserver loop/));
   check('the ring is on disk', await page.evaluate(() => (localStorage.getItem('chromaglass-crashlog') ?? '').includes('crash-soak: a console error')));
+
+  // ── 1b. A panel that throws is a card, not the end of the show (S14) ──
+  // Before PanelGuard, Boot was the only boundary: a render error in any panel
+  // unmounted the plate with it and the screen said "could not start". The
+  // fault is armed by name through the guard's own debug hook and aimed at the
+  // crash report button, which is mounted on every layout this check opens at
+  // and which section 4 presses later, so the panel coming back is asserted
+  // twice. Asked first that the panel is mounted: a fault armed at a name no
+  // guard carries would throw nowhere and every line below would pass on an
+  // untouched page.
+  const PANEL = 'The crash report';
+  const before1b = await page.evaluate(() => ({
+    panels: window.chromaglassPanels?.() ?? [],
+    fatals: window.chromaglassDebug().crash.thisLoad().filter((e) => e.level === 'fatal').length,
+    frames: window.chromaglassDebug().webgpu?.frames ?? 0,
+  }));
+  check('the panel to fault is mounted inside a guard', before1b.panels.includes(PANEL), before1b.panels.join(', ') || 'no guards mounted');
+  await page.evaluate((n) => window.chromaglassPanelFault(n), PANEL);
+  const card = await page.locator(`[data-testid="panel-failed"][data-panel="${PANEL}"]`).waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  if (drawing) await page.waitForFunction((f) => (window.chromaglassDebug().webgpu?.frames ?? 0) >= f + 20, before1b.frames, { timeout: 10_000 }).catch(() => {});
+  const after1b = await page.evaluate((n) => ({
+    line: window.chromaglassDebug?.().crash.thisLoad().find((e) => e.source === 'panel' && e.msg.startsWith(`${n} stopped`))?.msg ?? '',
+    fatals: window.chromaglassDebug?.().crash.thisLoad().filter((e) => e.level === 'fatal').length ?? -1,
+    frames: window.chromaglassDebug?.().webgpu?.frames ?? 0,
+    canvas: document.querySelectorAll('canvas').length,
+    button: document.querySelectorAll('[data-testid="crash-report-button"]').length,
+  }), PANEL);
+  check('a panel that throws draws its card, with the button gone', card && after1b.button === 0, `card ${card ? 'up' : 'not up'}, ${after1b.button} buttons`);
+  check('and writes its line to the box', !!after1b.line, after1b.line.split('\n')[0] || 'no panel line');
+  check('and is not a fatal: the plate is still mounted', after1b.fatals === before1b.fatals && after1b.canvas > 0,
+    `${after1b.fatals - before1b.fatals} new fatals, ${after1b.canvas} canvases`);
+  if (drawing) check('and the plate keeps drawing', after1b.frames >= before1b.frames + 20, `${after1b.frames - before1b.frames} frames`);
+  else skip('and the plate keeps drawing', 'no drawing device');
+  await page.evaluate(() => window.chromaglassPanelFault(null));
+  await page.locator('[data-testid="panel-failed"] [data-testid="panel-retry"]').click({ timeout: 5000 }).catch(() => {});
+  const back = await page.locator('[data-testid="crash-report-button"]').waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+  check('Try again brings the panel back once the fault is gone', back && await page.locator('[data-testid="panel-failed"]').count() === 0);
 
   // ── 2. A report always returns ───────────────────────────────────
   const healthy = await page.evaluate(async () => {

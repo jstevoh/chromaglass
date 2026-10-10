@@ -6,6 +6,7 @@ import type { ReactNode, Ref } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
+import { PanelGuard } from '../PanelGuard';
 import { PALETTE } from '../../constants';
 import { RecordControls } from './RecordControls';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
@@ -751,7 +752,10 @@ export function PerformDesk(p: PerformDeskProps) {
         */
         <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={RIDES_WIDTH - 8} height={900} testId="mixer-sheet" docked>
           <div className="min-h-0 w-full overflow-y-auto px-3 py-3">
+            {/* Its own guard (PanelGuard): a Mixer that throws leaves the desk's Go and set list standing. */}
+            <PanelGuard name="The Mixer" inline onClose={() => setMixerOpen(false)}>
             <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} onFade={p.takes?.onFade} fading={p.takes?.fading} backLook={p.onGoBackPlate ? (p.backLook ?? null) : undefined} testId="desk-mixer" />
+            </PanelGuard>
           </div>
         </Sheet>,
         document.body,
