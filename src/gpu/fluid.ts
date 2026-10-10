@@ -2247,7 +2247,7 @@ export class WebGPUFluid {
       // The gap rides along: the plate's depth is a mobility on the flow that
       // carries the dye (F), and this is the field that carries it.
       this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read],
-        this.arg('current grid', [0, this.M, 0, swirlScale]));
+        this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
     // 9. Dye: diffuse, then advect through the forced velocity
@@ -4254,7 +4254,7 @@ export class WebGPUFluid {
     const fwd = this.arg('advect forward', [disp, 0, 0, 0]);
     const back = this.arg('advect back', [-disp, 0, 0, 0]);
     const phi0 = field.read;
-    if (label === 'dye' && this.dyeB) {
+    if (field === this.dye && this.dyeB) {
       this.run(pass, 'advectPair', this.scratchA, [phi0, this.dyeB.read, velTex, this.sampler, this.scratchA2], fwd);
       this.run(pass, 'advectPair', this.scratchB, [this.scratchA, this.scratchA2, velTex, this.sampler, this.scratchB2], back);
       const last = this.arg('advect dye conserving', [disp, 1, 0, 0]);

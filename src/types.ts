@@ -386,6 +386,7 @@ export interface VisualizerSettings {
     most of why pressing did not feel like much.
   */
   plateCurve: number;
+  depthDrag: number;
   plateSpring: number;
   /*
     How hard the gap resists the flow through it (F).
@@ -922,6 +923,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     no measurement yet says it earns its place. So it is a control, off.
   */
   plateCurve: 0,
+  depthDrag: 0,
   thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
   plateSpring: 0.35,        // a press takes about a second to lift

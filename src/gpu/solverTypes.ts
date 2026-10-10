@@ -122,6 +122,7 @@ export interface GpuStepParams {
   /** Liesegang rings: precipitate bands behind a diffusing front. */
   liesegang?: number;
   plateCurve: number;
+  depthDrag: number;
   /** Hele-Shaw wall drag, keyed to how far the gap is from nominal (F). */
   /**
    * The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): over 0.5, the

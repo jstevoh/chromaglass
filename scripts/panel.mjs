@@ -1100,6 +1100,7 @@ check('and neither starts over the limit',
   const KNOWN = new Set([
     // Set by the zoom, which is the control; the flag rides along.
     'macroMode', 'macroZoom',
+    'depthDrag',
     // The paper backdrop's two colours: a look's, chosen with the dyes.
     'paperA', 'paperB',
     // The mixer's order: its rows' arrows and the four raise pads, which are

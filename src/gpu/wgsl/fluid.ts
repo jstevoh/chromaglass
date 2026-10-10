@@ -1934,9 +1934,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var src2: texture_2d<f32>;
 @group(0) @binding(4) var vel: texture_2d<f32>;
-@group(0) @binding(5) var samp: sampler;
-@group(0) @binding(6) var dst: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(7) var dst2: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var dst2: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(7) var samp: sampler;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let uv = uvOf(id) - A.a.x * textureSampleLevel(vel, samp, uvOf(id), 0.0).xy;
@@ -1969,9 +1969,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(6) var scratchB: texture_2d<f32>;
 @group(0) @binding(7) var scratchB2: texture_2d<f32>;
 @group(0) @binding(8) var vel: texture_2d<f32>;
-@group(0) @binding(9) var samp: sampler;
-@group(0) @binding(10) var dst: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(11) var dst2: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(9) var dst2: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(10) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(11) var samp: sampler;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let uv = uvOf(id) - A.a.x * textureSampleLevel(vel, samp, uvOf(id), 0.0).xy;
@@ -3726,8 +3726,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   sharpenDyePair: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var src2: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(5) var dst2: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(4) var dst2: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -3767,8 +3767,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   decayDyePair: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var src2: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(5) var dst2: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(4) var dst2: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -3880,8 +3880,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   dampGridPair: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var src2: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
-@group(0) @binding(5) var dst2: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(4) var dst2: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);

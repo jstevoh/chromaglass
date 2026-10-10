@@ -3611,14 +3611,6 @@ class FluidSimulation {
     let visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
     let diff = settings.diffusionRate;
 
-    // Spectral Viscosity (Brightness -> Fluidity): 
-    // High-pitched, bright sounds make the liquid chaotic and runny. Low sounds make it thick.
-    if (audioData?.features) {
-      const b = Math.max(0, Math.min(1, audioData.features.brightness));
-      visc *= (1.0 - 0.7 * b); // Thins out viscosity by up to 70% for bright sounds
-      diff *= (1.0 + 1.5 * b); // Increases diffusion by up to 150% for bright sounds
-    }
-
     // Momentum diffuses at a viscosity derived from the plate's thickness
     // setting — not at the dye's diffusivity, which is a different quantity.
     // Scaled so the defaults reproduce the near-zero momentum diffusion the
@@ -3901,6 +3893,7 @@ class FluidSimulation {
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
+      depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
