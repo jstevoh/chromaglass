@@ -80,12 +80,7 @@ export function rockSwing(rock: RockSpring, R: number, swayX: number, swayY: num
       dv/dt = g sinθ − (g/R_c) x − v/τ,     τ = m_A h / μ
 
   m_A the cover's mass per area (2 mm of glass, 5 kg/m²), R_c the bowl's
-  radius of curvature (a 20 cm clock glass 3 cm deep: 0.18 m, so the glass
-  swings at about 1.2 Hz on its own, near the 0.9 Hz a hand rocks it at,
-  which is why a projectionist's rock builds; a shallower 2 cm glass, 0.26
-  m, held the cover only where the default Plate Rock already put it against
-  the rim, and the dial's two ends slid the picture alike, 10.5 cells and
-  11.7), and τ the film's shear drag
+  radius of curvature, and τ the film's shear drag
   on it, which the liquid's viscosity sets: 1.4 s on the default light oil
   in the 6 mm middle, so the glass swings a few times before it settles, and
   three hundredths of a second in glycerine, so it creeps. It slides only as
@@ -101,24 +96,45 @@ export type CoverGlass = { x: number; y: number; vx: number; vy: number };
 import { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './turntable';
 /** The cover's mass per area, kg/m²: 2 mm of glass at 2,500 kg/m³. */
 export const COVER_KG_M2 = 5;
-/** The bottom glass's radius of curvature, m: a 20 cm clock glass 3 cm deep. */
-export const BOWL_RADIUS = 0.18;
 /*
-  How far the cover can slide before its rim meets the bottom glass's, m: a
-  14 cm glass pressed into the 20 cm one. At 0.02 the default Plate Rock
-  already drove it to the rim on every kick and the dial's two ends read
-  alike on an evenly coloured plate (lab: 0.405 at 0.45 against 0.471 at
-  full); at 0.03 the default stops short of it.
+  The bottom glass's radius of curvature, m, and how far the cover can slide
+  before its rim meets the bottom glass's: a 20 cm bowl 6½ cm deep (R_c
+  0.11), with a 12 cm cover in it (4 cm each way). The cover swings in it at
+  √(g/R_c), 1.5 Hz, and lightly damped (on the default oil a swing falls to a
+  third in 2.8 s, four swings), so how far a rock drives it is mostly how close the hand's
+  0.9 Hz is to that. In a shallow clock glass it is close and the cover
+  rings out to the rim on any rock at all: a 20 cm glass 3 cm deep (0.18,
+  1.2 Hz) with 3 cm of room drove it there from Plate Rock 0.2 on, and on
+  an evenly coloured plate in the lab (`npm run rides`) 0.2 slid the
+  picture 9.4 cells and the default 0.45 as far, so the dial did nothing
+  past its first fifth. A deeper bowl both holds the cover more firmly
+  (R_c sinθ, two fifths less far for a tilt) and swings it further from the
+  hand, so the dial reaches the rim only near its top: 3.7 cells at 0.2,
+  8.7 at the default, 13.5 at full, each within an eighth of where the
+  glass's slide says the liquid should be. A bowl that deep is a
+  dish for a liquid show rather than a watch glass, which is what the
+  projectionist would pick for a cover that answers the hand.
 */
-export const COVER_ROOM = 0.03;
+export const BOWL_RADIUS = 0.11;
+export const COVER_ROOM = 0.04;
+/*
+  The plate's sinθ as the solver takes it, from the hold's tilt (the swing ×
+  HOLD_TILT, and the phone's) and the rock's swing: the hold × 10 and the
+  rock × CUR_ROCK (fluid.ts takes both; LiquidVisualizer's step). The cover
+  is tipped by the same, and `npm run rides` drives it through this too.
+*/
+export const HOLD_TILT = 0.004;
+export function plateSin(hold: number, swing: number): number {
+  return hold * 10 + swing * CUR_ROCK;
+}
 const G = 9.81;
 /** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (6 mm in the middle). */
 export function coverDrag(thickness: number, density = 1000): number {
   return (density * thicknessViscosity(thickness)) / (COVER_KG_M2 * DISH_REST_GAP * DISH_METRES);
 }
 /**
- * One step of `dt` seconds: the plate tipped by `tiltX`, `tiltY` (sinθ, the
- * swing × CUR_ROCK the solver takes) and the film's drag `drag` (coverDrag).
+ * One step of `dt` seconds: the plate tipped by `tiltX`, `tiltY` (the sinθ
+ * the solver takes, plateSin) and the film's drag `drag` (coverDrag).
  * The drag is taken implicitly, so glycerine's 30 per second is as steady
  * as the oil's 0.7 at any step.
  */

@@ -5527,13 +5527,18 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     spread evenly a rock moved nothing (the Mac's controls run on #305: Rock visible on
     7 of 23 looks, "nothing" on Boiling Point, Crowd Plate, Red Cabbage, Clock Glass).
     The top glass rides on the film in the bottom glass's bowl and slides downhill as
-    the pair tips, a damped pendulum (`stepCover`, lib/plateRock.ts: bowl R_c 0.18 m,
-    2 mm of glass, the film's shear drag ρν/(m_A h) from the look's Thickness, 30 mm of
-    rim room); its slide in m/s joins Glass Smear's glass speed in hsPrep, so the liquid
-    goes at half of it. Lab (`npm run rides`): an evenly coloured checker slid 0.0 cells
-    with the tilt alone, 11.6 at full Plate Rock with the glass and 9.4 at the default;
-    the glass rests at R_c sinθ, swings at 1.17 Hz on the default oil and creeps back
-    without swinging in glycerine. A phone held tipped slides it too.
+    the pair tips, a damped pendulum (`stepCover`, lib/plateRock.ts: a 20 cm bowl 6½ cm
+    deep, R_c 0.11 m, 2 mm of glass, the film's shear drag ρν/(m_A h) from the look's
+    Thickness, 40 mm of rim room); its slide in m/s joins Glass Smear's glass speed in
+    hsPrep, so the liquid goes at half of it. A shallow clock glass (R_c 0.18, 30 mm)
+    rang the cover out to the rim from Plate Rock 0.2 on, and the dial read 9.4 cells at
+    0.2 and at 0.45. Lab (`npm run rides`): an evenly coloured checker slid 0.0 cells
+    with the tilt alone (and changed 0.157 with its red made heavier); with the glass
+    3.7 cells at 0.2, 8.7 at the default, 13.5 at full, and 18.4 in a liquid 7.9 times
+    thicker, each the way the glass went (gain 0.88–0.96 of half its slide, lagged by
+    the film's drag time; correlation 1.00). The glass rests at R_c sinθ, swings at
+    1.5 Hz on the default oil and creeps back without swinging in glycerine. A phone
+    held tipped slides it too.
     - **27a-2, open.** Read Plate Rock on the Mac's `controls` run with the glass, on
       the even looks above, against a drift floor held still across runs (each look's
       own drift rose on #305 with the stronger kicks, so its ratios are not like for

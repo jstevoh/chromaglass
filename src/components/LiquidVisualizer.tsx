@@ -40,7 +40,7 @@ import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFra
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { CUR_ROCK, kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -3949,8 +3949,8 @@ class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
-      rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
+      rockX: plateSin(this.tiltX, this.rockX),
+      rockY: plateSin(this.tiltY, this.rockY),
       coverX: this.coverX,
       coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
@@ -8432,8 +8432,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const ext = externalTiltRef.current;
             const extAge = showNow() * 0.001 - ext.at;
             const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
-            const tiltX = swingX * 0.004 + ext.x * 0.0045 * extK;
-            const tiltY = swingY * 0.004 + ext.y * 0.0045 * extK;
+            const tiltX = swingX * HOLD_TILT + ext.x * 0.0045 * extK;
+            const tiltY = swingY * HOLD_TILT + ext.y * 0.0045 * extK;
             /*
               The plate takes the swing itself (±1–2 at full), scaled by the
               slider; the phone's tilt joins it. On a thin gap that is the
@@ -8449,11 +8449,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               makes a rock show on a look whose colour is spread evenly. Its
               drag is the look's own liquid's: it swings on a light oil and
               creeps on glycerine. It is tipped as the solver's plate is
-              (the step's rockX below: the hold's tilt × 10 and the rock ×
-              CUR_ROCK, sinθ).
+              (plateSin, as the step's rockX below).
             */
             const cover = coverRef.current;
-            stepCover(cover, tiltX * 10 + rockX * CUR_ROCK, tiltY * 10 + rockY * CUR_ROCK,
+            stepCover(cover, plateSin(tiltX, rockX), plateSin(tiltY, rockY),
               coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS);
             for (const fluid of fluidsRef.current) {
               fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
