@@ -1245,6 +1245,34 @@ the dots fit, and a take's Rec dot folding a full header and unfolding it when t
 it, not the one button); `phone` 369/369 with Play's double tap back to the look's speed; `panel` 180/180; `wgsl`;
 `desklayout` 40/40.
 
+**8i, shipped 2026-10-10: fewer panels, each usable at any size.** Three asks from the
+owner in one evening, with screenshots. *No setting alone on a panel*: a knobs panel draws
+the numbers of its section, so Sound Mappings (Sound Drive and four band pickers) was a
+panel of one knob and Heat Slide one of two. Sound Mappings went into Sound (Sound Drive
+first, the bands under "What the sound moves"), where Room Drive and Film Drive already
+sit with their sources; Heat Slide went into Fluid Physics beside Heat Spread and
+Buoyancy. `MERGED_SECTIONS` in `settingsMap.ts` sends the old ids on: a saved layout
+naming them opens the merged panel in the same place (`sanitizeLayout`), and
+`openSettingsAt` follows them. Build's deck has Sound where Sound Mappings was. MIDI maps
+and presets name settings, not sections, so nothing in them moved. *Fade and Go
+smaller*: the strip under the cue list went from 140px to 68px (a fade row that fills the
+column, so 8s no longer ran past it, and a 36px Go); Back and Freeze are off it, and
+stay on ⌫ and F, ⌘K, and their MIDI actions. *Panels as windows resize*: the frame
+clips its rounded corners, and the Dyes body did not scroll, so on Gig's 236px deck
+Palette, Image and Video were out of reach; and the palette list opened below its button
+whatever was there. Every panel body now scrolls (never sideways), the swatch grid fits
+as many 28px swatches a row as there is room for, the palette list opens over its button
+when there is no room under it and is never taller than the window, and the Sound
+section's source switch and the Video section's source buttons narrow or wrap to a
+312px panel. Measured: `desklayout` 40/45 on main → 45/45 (no knobs panel under three,
+the old ids landing on the merged panels, never twice); `layout`'s new reach check
+(every control in every panel, scrolled into view only by what a hand can scroll, then
+hit with a pointer: the three shipped layouts at 1024, 1280, 1440, 1920 and an iPad's
+1180, every panel in the deck, in a column and floating) is red on main (Gig's Dyes
+panel: Image and Video out of reach, and the palette list 667–1087px in a 700px window;
+Load-in's Sound: Band cut off) and 4,162 controls in 255 panels over 23 desks reachable
+after. `layout` 72 → 73. It takes the run from about one minute to under three.
+
 ### 9. Ferrofluid after the references
 
 **9a. The edge, and two looks, shipped in #161.** The ferrofluid ends on a sharp,

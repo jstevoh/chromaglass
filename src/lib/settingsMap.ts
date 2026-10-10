@@ -59,10 +59,16 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'mixer', name: 'Mixer', category: 'live',
     terms: 'mixer video mixer stack order layers layer order bring forward send back led ring platform film video logo mark front plate back plate brightness contrast saturation hue grade proc amp colour correction opacity level' },
+  /*
+    Sound Mappings is in here now: Sound Drive and the four bands' wiring.
+    On the desk it was a panel holding one knob (Sound Drive; its four
+    pickers are not numbers, so they were behind "All of…"), and the owner
+    asked for no setting to sit alone on a panel (2026-10-10). It goes with
+    the sound it reads, the way Room Drive is in The Room and Film Drive in
+    Video. `MERGED_SECTIONS` below sends its old id here.
+  */
   { id: 'audio-input', name: 'Sound', category: 'inputs',
-    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song' },
-  { id: 'audio-mappings', name: 'Sound Mappings', category: 'inputs',
-    terms: 'sound bass mid treble energy timbre map drive reactive band velocity density colour color rotation' },
+    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation' },
   { id: 'room', name: 'The Room', category: 'inputs',
     terms: 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror flip presence drive' },
   /*
@@ -130,13 +136,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
 
   { id: 'squish', name: 'Squish Plate', category: 'plate',
     terms: 'plate pressure squeeze film hele-shaw gap thickness viscosity thick thin smear drip rain' },
-  { id: 'heat', name: 'Heat Slide', category: 'plate',
-    terms: 'temperature buoyancy convection lamp warmth slide' },
   // The old names of Momentum, Updraft and Vibration stay findable, as Grain
   // Fineness's does under Light Show Look: someone who learned them as
   // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
+  // And Heat Slide, which was two knobs on a panel of its own (Evaporation
+  // Rate, Heat Decay): the heat they set is the heat Heat Spread spreads and
+  // Buoyancy lifts, which were already here.
   { id: 'physics', name: 'Fluid Physics', category: 'plate',
-    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction' },
+    terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction heat slide temperature buoyancy convection evaporation' },
   // The bottles themselves: design one, load one from a file, save them.
   { id: 'liquids', name: 'Liquids', category: 'plate',
     terms: 'liquid liquids bottle bottles shelf custom design make create own import upload load export save file json ferrofluid magnetic oil water soap polarity weight' },
@@ -175,6 +182,20 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];
+
+/**
+ * Sections that were folded into another, by their old id.
+ *
+ * An id outlives its section: a saved desk layout names it as a panel, a
+ * deep link or `openSettingsAt` call may still ask for it. Each lands on the
+ * section that now holds its controls (`resolveSection`), so a layout saved
+ * with Sound Mappings on its deck opens with Sound there instead.
+ */
+export const MERGED_SECTIONS: Record<string, string> = {
+  'audio-mappings': 'audio-input',
+  heat: 'physics',
+};
+export const resolveSection = (id: string): string => MERGED_SECTIONS[id] ?? id;
 
 export const SECTION_NAME = new Map(SETTINGS_SECTIONS.map(s => [s.id, s.name]));
 export const SECTION_BY_ID = new Map(SETTINGS_SECTIONS.map(s => [s.id, s]));
