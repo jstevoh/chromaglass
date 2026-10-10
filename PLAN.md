@@ -5508,6 +5508,23 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   that read weakest and make each the thing it stands for.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
+## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
+
+The owner, 2026-10-10: "Let's refactor the presets (now called preset palettes) as well
+as the color palettes to account for all the new work that we've done. Improve the
+current presets, create new ones, and dump ones that aren't doing anything interesting
+anymore." Most of the 42 looks were tuned before the lamp ground (18b), each liquid's
+own properties and colour (18d, 18d-12), the GPU reaction carried by the flow (§26),
+standing domes (9t), Blow's air (15g), the controls sweep (§27) and layers on every
+look (#273). The ferrofluid and Turing palettes belong to the "Palette for ferro and
+Turing Print" work and are built on here once it merges.
+
+- **28a. Keep, improve, new, drop.** Judge every look on the Mac gallery (`gallery`
+  label) against what it is named for; retune the ones that miss, add looks for the new
+  physics that no look shows, retire the ones that duplicate another. A retired id maps
+  to the look that replaced it, so a saved preset, a set list or a MIDI map that names
+  it still loads.
+
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
