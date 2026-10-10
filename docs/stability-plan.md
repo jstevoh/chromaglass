@@ -132,7 +132,7 @@ Ranked by what they cost a show.
 Ranked, as above, by what they cost a show. Each says whether it was measured (headless
 Chromium, the day it was found) or read in the code.
 
-14. **S14 — A panel that throws takes the plate with it.**
+14. **S14 — A panel that throws takes the plate with it.** (*Shipped*)
     - *Read in the code.* `Boot` (`src/main.tsx`) is the only error boundary, and
       `LiquidVisualizer` sits in the same tree as every desk, sheet and phone component
       (`App.tsx`). A render error in any of them unmounts the plate: the device is
@@ -144,6 +144,21 @@ Chromium, the day it was found) or read in the code.
     panel failed" card and writes the error to the black box, with the plate outside all
     of them. **Measure:** a `?debug` hook that makes one panel throw; `npm run crash`
     finds its line, the frames go on, and the card is drawn.
+
+    *Shipped (2026-10-10):* `src/components/PanelGuard.tsx` wraps every panel, sheet,
+    desk and the phone's controls in `App.tsx`, and inline round the Perform desk's
+    Mixer and each of the phone's sheets, so a sheet that throws leaves the phone's
+    dock and a Mixer that throws leaves the desk's Go. The card names the panel, says
+    the show carries on, and offers Try again and Close (a desk's Close opens the
+    other desk). The black box gets an `error` line from source `panel` with the
+    component stack. `?debug` adds `chromaglassPanelFault(name)` and
+    `chromaglassPanels()`, kept off `chromaglassDebug` so the guards are tested without
+    the plate's state. `npm run crash` §1b faults the crash report button: card up,
+    the line written, 0 new fatals, the canvas still mounted, frames advancing where
+    a GPU draws, and Try again brings the button back. Control: with the guard
+    rethrowing (main's behaviour), 1 new fatal and 0 canvases. Not covered: an error
+    in `App` itself or in `LiquidVisualizer` still reaches `Boot`; the plate's own
+    recovery is S16–S21.
 15. **S15 — A reload mid-show loses the set and strands the wall.**
     - *Measured.* The projector window sets `opener.__chromaglassMirror = paint` once
       (`CastDisplay.tsx`), and its watch asks only whether the opener is `closed`, which
