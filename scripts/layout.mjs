@@ -697,9 +697,18 @@ try {
       right of the centred switch, so the Sound dot sat under it. Now the dots
       fold into one Status button when they do not fit. Asked of every
       layout: at 1024 the cluster is clear of the switch, and still clear
-      with a seventh thing in it (60 px, a dot's width); at 1280, where the
-      dots fit, that seventh thing folds them, the button opens every dot,
-      and with the thing gone they unfold.
+      with a seventh dot in it (a span as wide as the Video dot with its word
+      under it); at a width where the dots fit with their words under them,
+      something wider than the room left folds them, the button opens every
+      dot, and with it gone they unfold.
+
+      Where the dots fit is found, not assumed. This was asked at 1280 and
+      passed in a cloud session, where the cluster cleared the switch by 6 px
+      there; CI's Linux runner draws the same words wider and folds at 1280,
+      which is the header doing its job on that machine's fonts, not a fault.
+      So the narrowest width from 1280 up, in steps of 40, where the header
+      is at level 1 (the words under the dots) is the one asked at, and the
+      thing added is the room left there plus 8 px, so that it must fold.
     */
     const cluster = () => page.evaluate(() => {
       const el = document.querySelector('[data-testid="header-cluster"]');
@@ -715,19 +724,30 @@ try {
       x.style.cssText = `display:inline-block;width:${w}px;height:8px;flex-shrink:0`;
       document.querySelector('[data-testid="header-cluster"]')?.prepend(x);
     }, [on, w]);
+    /** The narrowest width from 1280 up where the header is at level 1, left set there. */
+    const roomyWidth = async () => {
+      for (let w = 1280; w <= 1720; w += 40) {
+        await page.setViewportSize({ width: w, height: 860 });
+        await settle(700);
+        if ((await cluster()).fold === '1') return { w, found: true };
+      }
+      return { w: 1720, found: false };
+    };
     const rows = [];
     for (const mode of ['design', 'perform', 'loadin']) {
-      await page.setViewportSize({ width: 1024, height: 860 });
       await clickOn(`mode-segmented-${mode}`);
+      const roomy = await roomyWidth();
+      const dotW = await page.evaluate(() => Math.round(document.querySelector('header [data-testid="dot-video"]')?.getBoundingClientRect().width ?? 0));
+      await page.setViewportSize({ width: 1024, height: 860 });
       await settle(900);
       const at1024 = await cluster();
-      await extra(true); await settle(600);
+      await extra(true, dotW); await settle(600);
       const more1024 = await cluster();
       await extra(false);
-      await page.setViewportSize({ width: 1280, height: 860 });
+      await page.setViewportSize({ width: roomy.w, height: 860 });
       await settle(900);
       const at1280 = await cluster();
-      await extra(true); await settle(600);
+      await extra(true, Math.max(0, at1280.gap ?? 0) + 8); await settle(600);
       const more1280 = await cluster();
       let listed = false;
       if (more1280.button) {
@@ -746,14 +766,14 @@ try {
       }
       await extra(false); await settle(900);
       const back1280 = await cluster();
-      rows.push({ mode, at1024, more1024, at1280, more1280, listed, back1280 });
+      rows.push({ mode, roomy, dotW, at1024, more1024, at1280, more1280, listed, back1280 });
     }
-    check('at 1024 the header\'s right side is clear of the centred switch, in every layout, and still clear with a seventh thing in it',
-      rows.every(r => r.at1024.gap >= 0 && r.more1024.gap >= 0 && r.more1024.fold === '2'),
-      rows.map(r => `${r.mode}: ${r.at1024.gap}px (level ${r.at1024.fold}), ${r.more1024.gap}px with one more`).join('; '));
-    check('at 1280 the dots fit; a seventh thing folds them into one Status button clear of the switch, which opens every dot, and they unfold when it goes',
-      rows.every(r => r.at1280.fold !== '2' && r.more1280.fold === '2' && r.more1280.gap >= 0 && r.listed && r.back1280.fold === r.at1280.fold),
-      rows.map(r => `${r.mode}: level ${r.at1280.fold} → ${r.more1280.fold} (${r.more1280.gap}px) → ${r.back1280.fold}${r.listed ? '' : ', not listed'}`).join('; '));
+    check('at 1024 the header\'s right side is clear of the centred switch, in every layout, and still clear with a seventh dot in it',
+      rows.every(r => r.dotW > 10 && r.at1024.gap >= 0 && r.more1024.gap >= 0 && r.more1024.fold === '2'),
+      rows.map(r => `${r.mode}: ${r.at1024.gap}px (level ${r.at1024.fold}), ${r.more1024.gap}px with a ${r.dotW}px dot more`).join('; '));
+    check('where the dots fit, something wider than the room left folds them into one Status button clear of the switch, which opens every dot, and they unfold when it goes',
+      rows.every(r => r.roomy.found && r.at1280.fold === '1' && r.more1280.fold === '2' && r.more1280.gap >= 0 && r.listed && r.back1280.fold === r.at1280.fold),
+      rows.map(r => `${r.mode} at ${r.roomy.w}${r.roomy.found ? '' : ' (never level 1)'}: level ${r.at1280.fold} → ${r.more1280.fold} (${r.more1280.gap}px) → ${r.back1280.fold}${r.listed ? '' : ', not listed'}`).join('; '));
     /*
       And a real dot, which is the harder case: folded, the dots are inside
       the Status button, so a dot going away changes nothing the header's
@@ -765,9 +785,8 @@ try {
       thing that changes is the dot.
     */
     {
-      await page.setViewportSize({ width: 1280, height: 860 });
       await clickOn('mode-segmented-perform');
-      await settle(900);
+      const roomy = await roomyWidth();
       const base = await cluster();
       await extra(true, Math.max(0, (base.gap ?? 0) - 12)); await settle(600);
       const full = await cluster();
@@ -781,8 +800,8 @@ try {
       const stopped = await cluster(), stillRec = await recording();
       await extra(false); await settle(600);
       check('a take\'s Rec dot folds a full header and the take stopping unfolds it again',
-        full.fold !== '2' && wasRec && taking.fold === '2' && !stillRec && stopped.fold === full.fold,
-        `level ${full.fold} (${full.gap}px) → ${wasRec ? 'recording' : 'not recording'}, level ${taking.fold} → ${stillRec ? 'still recording' : 'stopped'}, level ${stopped.fold}`);
+        roomy.found && full.fold !== '2' && wasRec && taking.fold === '2' && !stillRec && stopped.fold === full.fold,
+        `at ${roomy.w}: level ${full.fold} (${full.gap}px) → ${wasRec ? 'recording' : 'not recording'}, level ${taking.fold} → ${stillRec ? 'still recording' : 'stopped'}, level ${stopped.fold}`);
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await settle(800);

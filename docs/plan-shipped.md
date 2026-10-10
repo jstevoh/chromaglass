@@ -1200,7 +1200,9 @@ controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
   levels: the dots' words beside them, under them (12 px from the switch, as before), and
   folded into one Status button (only when the cluster actually reaches the switch), whose
   dot is red while recording and green while anything is connected, and which opens every
-  dot as it was. At 1024 the folded cluster is 73 px clear; 1280 keeps every dot in sight.
+  dot as it was. At 1024 the folded cluster is 73 px clear. Where the dots unfold depends on the
+  fonts: 1280 keeps every dot in sight in a cloud session, CI's Linux runner folds there and
+  unfolds by 1440, so the check finds the width rather than assuming it.
 
 Measured (cloud): `desk` 27 → 40 (8c's ring arithmetic, 8d's four boards and an unknown one
 as the control); `qr` 13/13 new (every symbol read back from its modules: format and
@@ -1212,8 +1214,8 @@ be, following a pulled pin, swapped by a flip, under a mask, one number per mapp
 Identify over the show, ungraded); `map` 44 → 47 (a config saved with the pattern up is stored without it); `layout` 58 → 68 (a knob turned round its
 ring 0.113 → 0.779, a cap drag sideways leaves it, a double-click back to the look's 0.313;
 the Wall panel's four controls and the pattern never stored; the QR drawn module for module;
-the header clear of the switch at 1024 with a seventh thing in it, folding and unfolding at
-1280, and a take's Rec dot folding a full header and unfolding it when the take stops; the "every status dot is labelled" check opens the fold and counts the five dots inside
+the header clear of the switch at 1024 with a seventh dot in it, folding and unfolding where
+the dots fit, and a take's Rec dot folding a full header and unfolding it when the take stops; the "every status dot is labelled" check opens the fold and counts the five dots inside
 it, not the one button); `phone` 369/369 with Play's double tap back to the look's speed; `panel` 180/180; `wgsl`;
 `desklayout` 40/40.
 
