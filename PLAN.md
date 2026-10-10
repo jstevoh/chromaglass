@@ -4780,14 +4780,7 @@ grouped so one sitting covers one area, gates first. The owner's verdicts go bac
 commit. *Size:* S.
 
 ### 19u. Nothing reaches main without the checks
-
-2026-10-10: a commit pushed straight to `main` (d8697cd, the plate hearing pitch, brightness
-and the beat) passed an `audio` field that `FrameView` did not declare, so `npm run lint`
-went red on main and its deploy could not publish; behind it, `npm run backplate` was red
-too (its source-grep for the music's colour read the old speed through the harmony). Every
-open PR inherited both until #332 carried the fixes. *Fix:* a branch rule on `main` that
-requires the `Measure` checks before anything lands, for both tools' sessions; until then, a
-session pushing to `main` runs `npm run lint` and the node harnesses first. *Size:* S.
+**Shipped** (2026-10-10, a branch ruleset on `main`, not code): nothing lands on `main` without a pull request and green `Measure` and `WebGPU (macOS)`, and the admin's bypass works only on a pull request, never on a push. The ruleset, why those two checks, and what is left are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ## 20. Lace and holes: a pale film torn open over colour
 

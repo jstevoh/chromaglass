@@ -2306,6 +2306,45 @@ open PRs (#267, #280, #281) each add a check to open. The phone's fingers moved 
 open about 14 minutes, show about 15, both from the step times of the intro PR's green run.
 Nothing on show needs a cold shader cache, which is why the fingers ran after `startup`.
 
+### 19u. Nothing reaches main without the checks
+
+**Shipped** 2026-10-10 as a GitHub branch ruleset on `main` (ruleset 24848041), not code.
+On 2026-10-10 a commit pushed straight to `main` (d8697cd, the plate hearing pitch,
+brightness and the beat) passed an `audio` field that `FrameView` did not declare, so
+`npm run lint` went red on main and its deploy could not publish. Behind it,
+`npm run backplate` was red too. Every open PR inherited both until #332 carried the fixes.
+
+A cloud session could not create the rule. Its GitHub access reports admin on the repo, but
+the session's network proxy refuses writes to the rulesets API ("Write access to this GitHub
+API path is not permitted through this proxy", HTTP 403). The owner's other tool created it
+with the owner's own login, from the rule a session wrote out.
+
+What it enforces, read back from the API:
+
+- **A pull request for everything**, with 0 approvals, so sessions still merge their own.
+  A push straight to `main` is refused, and so is a force-push.
+- **`Measure` and `WebGPU (macOS)` must be green.** These are the two summary jobs in
+  `checks.yml`, and they report on every PR. The per-shard jobs are deliberately not
+  required. On a PR that `reach.mjs` keeps off the Mac (#329, docs only), GitHub reports one
+  skipped check literally named `WebGPU (macOS) · ${{ matrix.shard }}`, and the four
+  `WebGPU (macOS) · open/show/plate/tools` contexts never appear. Requiring them would hold
+  every docs PR forever, and so would renaming a shard. `webgpu-all` is green when every
+  shard is, or when `reach` skipped them all.
+- **Not "up to date with main"**, so a green PR still merges behind main (the owner's
+  choice, 2026-09-28).
+- **The repository admin bypasses only on a pull request** (`bypass_mode: pull_request`).
+  The owner can merge a PR past red checks, but no login can push to `main` directly. That
+  includes the owner's other tool, which pushes with the owner's login, so an "always"
+  bypass would have let it skip the rule.
+
+Left: the ruleset has `require_extra_approval_for_unattributed_changes: true`, a setting with
+no public documentation. If a green, non-draft PR from a session shows as blocked, that
+setting is the first suspect, and the owner turns it off. The two checks are required by
+name with no app attached, so a status from any app named `Measure` would satisfy them.
+Pinning them to GitHub Actions (integration 15368) closes that gap. Deleting `main` is not
+restricted; adding the deletion rule closes that one. The rule a session wrote out is
+`handoff/main-ruleset.json` in the project's shared files.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
