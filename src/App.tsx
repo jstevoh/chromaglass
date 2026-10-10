@@ -38,7 +38,7 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
 import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS, findPreset } from './presets';
+import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
@@ -2187,7 +2187,7 @@ export default function App() {
   const cues = useMemo<Cue[]>(() => {
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
-      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === item.ref);
+      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
       const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
       return {
         id: item.id,
@@ -3764,7 +3764,7 @@ export default function App() {
       activePresetId,
       dyeIndex: selectedDyeIndex,
       presetColor: (id) => {
-        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[id];
+        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[livePresetId(id)];
         const idx = contract?.[0];
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },

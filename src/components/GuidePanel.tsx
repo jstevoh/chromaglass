@@ -309,7 +309,7 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Light show</Em> is dye as light on black — the projected image. <Em>Photograph</Em> is
           a two-pass render with a camera over the plate and lit paper behind it, and it
-          is what the Oil on Water, Colorful Cosmos and Sunny Side Up presets are. <Em>Lens</Em> is
+          is what the Oil on Water and Colorful Cosmos preset palettes are. <Em>Lens</Em> is
           how much of a camera is over either: Focus, Aperture, Bloom, Chromatic Aberration and
           Refraction are its controls, and do nothing with it at zero.
         </P>

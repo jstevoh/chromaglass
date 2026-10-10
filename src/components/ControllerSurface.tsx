@@ -5,6 +5,7 @@ import { ACTION_LABELS, LEARNABLE_SETTINGS, type MidiAction, type MidiTarget } f
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
 import { controlKey, type ControllerSurface as Surface, type SurfaceControl } from '../lib/controllerSurface';
+import { livePresetId } from '../presets';
 
 /**
  * The controller, drawn.
@@ -252,7 +253,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
   const [paper, setPaper] = useState(false);
   const [lit, setLit] = useState<Record<string, number>>({});
   const svgRef = useRef<SVGSVGElement>(null);
-  const presetName = useCallback((id: string) => presets.find(p => p.id === id)?.name, [presets]);
+  const presetName = useCallback((id: string) => presets.find(p => p.id === livePresetId(id))?.name, [presets]);
 
   const byKey = useMemo(() => {
     const m = new Map<string, MidiTarget>();

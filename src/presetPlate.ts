@@ -196,8 +196,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'bass-drop':          ['water', 'soap'],
   // This one is about colour and rotation; the plate should stay out of it.
   'timbre-shifter':     ['water'],
-  // A film breaking open is what boiling looks like from above, and alcohol
-  // is the liquid that answers the heat.
   'microscopic-chaos':  ['oil', 'silicone'],
   // Curtains have to drape rather than blow away: body, not tension.
   'aurora-borealis':    ['water', 'glycerine'],
@@ -227,7 +225,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'oil-on-water':       ['oil', 'silicone', 'water'],
   // Round drops that stay round for as long as the photograph does.
   'colorful-cosmos':    ['milk', 'oil'],
-  // Interference colour lives on a thin film, and soap is what thins it.
   // Razor edges and lacing on the same bead.
   'macro-bead':         ['silicone', 'milk'],
   // Silicone oil is literally how a pour painter makes cells.
@@ -237,7 +234,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Hands on the glass: every dancer breaks the film a little.
   'crowd-plate':        ['water', 'soap'],
 
-  // ── The three that only exist because the liquids do ─────────────
+  // ── The two that only exist because the liquids do ───────────────
   'milk-marble':        ['milk', 'milk', 'soap'],
   'soap-film':          ['soap', 'water'],
 
@@ -250,10 +247,13 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'magnet-garden':      ['water', 'oil'],
   'ferro-maze':         ['water', 'oil'],
   'ferro-paint':        ['water', 'oil', 'water'],
+  // Wax that is heavier than the liquid round it, and a liquid thick enough
+  // that it falls in plumes rather than drops.
+  'lava-lamp':          ['glycerine', 'water'],
+  // The reagent the reaction feeds on, in clear water.
+  'turing-print':       ['reagent', 'water'],
   // Poster, 1969's pair: two dyes that hold their own edge and refuse to
   // blend into a third, so a shape stays one ink with a line round it.
-  'lava-lamp':          ['glycerine', 'water'],
-  'turing-print':       ['reagent', 'water'],
   'roy':                ['milk', 'ink'],
   'home-movie':         ['water', 'water', 'soap'],
   // Oil that rounds into bodies, as a clock-glass dish is laid; syrup finds
