@@ -178,6 +178,18 @@ Chromium, the day it was found) or read in the code.
     a `?cast` check, which nothing has yet (PLAN.md 19c): reload the show, and the wall
     draws the new show's frames within a second; the resumed show's place and stage are
     the ones before.
+
+    *Shipped, the wall's half (2026-10-10):* the mirror's watch runs four times a second
+    and, finding its `paint` gone from the opener (the old page also deletes it on
+    `pagehide`), fades the wall to black, puts `paint` back on the new page and calls
+    `__chromaglassWallBack` (useCastSession) until the new page's app answers; that gives
+    the show its window, `isCasting`, poll and channel again, and the wall announces its
+    size again. A hook that is some other wall's is left alone, so two windows never take
+    turns at the frames. `npm run rewall` (Measure, browser part): main 2 of 5 (the show
+    not casting, no hook, no size after 3 s; the wall never dark; Send to wall loading the
+    stranded wall again under the reused window name), now 5 of 5, taken back 0.11 to
+    0.16 s after the new page's app is up. Its "frames reach the wall again" line needs a
+    GPU and prints in Measure. Open as S15-b in PLAN.md: the reloaded show resumes the set.
 16. **S16 — A GPU rebuild stops the film.**
     - *Read in the code.* The setup effect's cleanup (`LiquidVisualizer.tsx`) calls
       `stopFilm()`, and the effect runs again on every `glEpoch`: each loss, heal and

@@ -9796,6 +9796,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y, laid: { ...h.laid } })),
           ],
           pinch: pinchRef.current !== null,
+          /*
+            Which plate the hands are laying on, and the clears and drains the
+            loop has taken: what the phone's two-finger Drop prints when the
+            plate it reads holds none of what the hands handed it (PLAN.md
+            19h-2), so a red says whether the dye went to the other plate or
+            was cleared in the window.
+          */
+          layer: activeLayerRef.current,
+          clears: lastClearTrigger.current,
+          drains: lastDrainTrigger.current,
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,

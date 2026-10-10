@@ -2982,6 +2982,8 @@ export default function App() {
         const l = liveDebugRef.current;
         return {
           isCasting: l.isCasting,
+          /** The projector's size as the wall last announced it: what the show renders for (and, after a reload, hears again, S15). */
+          stage: stageRef.current,
           castState: l.castState,
           // The reading the plate hears now, not the last one React was
           // shown: a harness asking what the show hears means the plate.

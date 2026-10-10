@@ -85,6 +85,85 @@ export function useCastSender(
   }, [cleanup]);
 
   /**
+   * Take a projector window as this show's: the one just opened, or one a
+   * reload of this page left open (`adopt`, below).
+   */
+  const hold = useCallback((castWindow: Window) => {
+    windowRef.current = castWindow;
+    openChannel();
+    setIsCasting(true);
+    // Cleared first: opening twice used to leave the previous poll running for
+    // a window nobody holds a reference to any more.
+    if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+    checkIntervalRef.current = setInterval(() => {
+      if (castWindow.closed) { cleanup(); return; }
+      setWindowFullscreen(readWindowFullscreen(castWindow));
+    }, 400);
+  }, [cleanup, openChannel, readWindowFullscreen]);
+
+  /*
+    A reload of the show leaves the wall open (S15, docs/stability-plan.md).
+
+    The projector window belongs to the browser, not to this document: F5,
+    Boot's "clear the cache and reload", `startOver()` after a stale chunk or
+    a crash all replace the show's page and leave the popup standing, with
+    the same `window.opener`, which a reload does not close. What went with
+    the old page was everything that tied the two together: the mirror's
+    `paint` hook on this window, this hook's reference to the popup, its
+    BroadcastChannel and its poll. Measured on main: after `page.reload()` the
+    wall held its last frame forever, said nothing, and the new show's
+    `isCasting` was false, so Send to wall opened a second projector beside
+    the stranded one.
+
+    The popup can find this page (it has `opener`); this page cannot find the
+    popup (a window has no list of the windows it opened, and the old page's
+    reference died with it). So the wall asks: its watch sees its `paint`
+    gone from the opener, puts it back, and calls this to be taken as the
+    show's projector again. Once it has had to, it goes on asking four times
+    a second, so a hold this page dropped while the window stayed up (a
+    receiver's goodbye on the channel clears it too) is taken back at once
+    rather than leaving a lit wall the show thinks is gone. 'taken' is a new
+    hold, which the wall answers with its size; 'held' is this window already;
+    a different one, while the held one is still open, or any window while
+    Chrome is presenting, is refused, and that wall stays dark rather than two
+    projectors taking turns on one hook.
+  */
+  const adopt = useCallback((wall: Window): 'taken' | 'held' | false => {
+    try { if (!wall || wall.closed) return false; } catch { return false; }
+    // Presenting to a Chromecast or a display through Chrome: that is this
+    // show's projector, and a stranded window taken as well would end the
+    // presentation's state when it closed (cleanup clears both).
+    if (connectionRef.current) return false;
+    const live = windowRef.current;
+    if (live && !live.closed) return live === wall ? 'held' : false;
+    hold(wall);
+    // The new page's state, to a mirror that has none of it to need: the same
+    // call a fresh window gets on its hello, so a receiver-shaped wall is
+    // never left on the opening snapshot either.
+    readyRef.current();
+    return 'taken';
+  }, [hold]);
+
+  useEffect(() => {
+    const w = window as unknown as { __chromaglassWallBack?: (wall: Window) => 'taken' | 'held' | false; __chromaglassMirror?: unknown };
+    w.__chromaglassWallBack = adopt;
+    /*
+      And the wall told at once that this page is going, so it goes dark
+      while the next page loads instead of holding the last frame for however
+      long the reload takes. The hook is the wall's to put back (it does,
+      when it finds the new page), so taking it away is the whole message.
+      `pagehide` for the reason the receiver uses it: it fires on a reload
+      and on a closed tab alike.
+    */
+    const going = () => { try { delete w.__chromaglassMirror; } catch { /* nothing to take */ } };
+    window.addEventListener('pagehide', going);
+    return () => {
+      if (w.__chromaglassWallBack === adopt) delete w.__chromaglassWallBack;
+      window.removeEventListener('pagehide', going);
+    };
+  }, [adopt]);
+
+  /**
    * Open the receiver in a window. With the Window Management API and a
    * second screen present, the window is placed on the other screen at its
    * full size — the projector plugged into the laptop, which is what most
@@ -127,16 +206,7 @@ export function useCastSender(
       troubleRef.current?.('Chrome blocked the projector window — allow pop-ups for this site');
       return false;
     }
-    windowRef.current = castWindow;
-    openChannel();
-    setIsCasting(true);
-    // Cleared first: opening twice used to leave the previous poll running for
-    // a window nobody holds a reference to any more.
-    if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
-    checkIntervalRef.current = setInterval(() => {
-      if (castWindow.closed) { cleanup(); return; }
-      setWindowFullscreen(readWindowFullscreen(castWindow));
-    }, 400);
+    hold(castWindow);
     try {
       const w = window as unknown as { getScreenDetails?: () => Promise<{ screens: ScreenLike[]; currentScreen: ScreenLike }> };
       if (w.getScreenDetails) {
@@ -156,7 +226,7 @@ export function useCastSender(
       // Permission refused or no such API: the window stays where it opened.
     }
     return true;
-  }, [cleanup, openChannel, readWindowFullscreen]);
+  }, [hold]);
 
   // (Auto-fill on next click was removed to let users interact with settings while windowed)
 

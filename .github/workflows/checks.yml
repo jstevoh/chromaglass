@@ -508,6 +508,14 @@ jobs:
       - name: No pointer on the show
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/showcursor.mjs
+      # The wall comes back after the show reloads (scripts/rewall.mjs, S15):
+      # the window Send to wall opened is taken back by the reloaded show
+      # within a second, dark while the show was away, and not loaded again
+      # by the next Send to wall. The mirror's hook, not the plate, so no
+      # GPU; on the same dist/.
+      - name: The wall after a reload
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/rewall.mjs
       # Picking an input changes what the show hears at once (scripts/
       # inputpick.mjs, PLAN.md 14s): Chromium's fake devices, Input 1 and then
       # Input 2 picked in the settings, each opened by its id and the earlier
