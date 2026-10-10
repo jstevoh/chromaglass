@@ -1255,3 +1255,16 @@ With the projector up, open Load-in and switch **Test pattern** on in the Wall p
 And the header at 1024 (PLAN 8h): with the window that narrow the dots fold into one
 **Status** button. Is one dot (green while anything is connected, red while recording)
 enough, or should the button carry a dot per input (PLAN 8h-1)?
+
+## 48. A panel on a second display (PLAN 8g)
+
+With a monitor beside the laptop, open a panel's own window from its header (the button
+left of float, or right-click the title, **Open in its own window**) and drag the window
+to the monitor:
+
+- Does the panel look as it does on the desk (fonts, colours, knobs), and do its controls
+  move the plate on the laptop at once?
+- With the focus in that window, the show's keys (Go, Blackout, R) do nothing yet (PLAN
+  8g-1). Is that a problem at a gig, or is the window only touched with the mouse?
+- After a reload the panels are back on the desk (a browser will not reopen windows by
+  itself). Is one click to put them back worth adding (PLAN 8g-2)?

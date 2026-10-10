@@ -1161,6 +1161,32 @@ not run, and the Mac shard requires them). `saves` 33 → 38 (Play's Save), `lay
 `applink` 48/48 (Play here now lands on Play, and the Laptop remote is reached through All
 controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
 
+#### 8g. A panel in a window of its own (2026-10-10)
+
+`desk/PanelWindow.tsx` (new), `desk/Desk.tsx`, `ui/index.tsx` (`PanelFrame`), `desk/DeskPanels.tsx`.
+
+Every panel's header has a fourth button (and its menu a row), Open in its own window: the
+panel moves to a window of its own, sized as it was drawn, for a second display at a gig,
+and its place on the desk becomes a card that says so and brings it back. The window is a
+blank one with the page's stylesheets and theme copied in, and the panel is the desk's own
+React tree portalled into it, not a second copy of the app: every control in it is the
+desk's state, so there is nothing to keep in step and no second solver or sound. The
+window is kept beside the layout, never in it (a reload has no window to put it in), and
+closing it, by its Bring it back button or by the system, puts the panel back where it
+was. The clean screen on the laptop leaves the windows up (the desk is kept mounted, not
+drawn, where it used to be unmounted); the page closing closes them. The Rides' Mixer sheet, the Dyes'
+palette menu and the Tools' options open in the panel's own window (a `PortalBody` context), not on the other
+screen. A browser set to refuse windows floats the panel instead. A phone has no second
+display, and the remote has no panels, so this is the laptop's.
+
+Measured (cloud): `layout` 68 → 72 (a deck panel opens in its own window with its 8 knobs
+and the desk's background, rgb(17, 17, 19), while its place on the desk holds the card and
+no knobs; a clean screen keeps the window and its panel, and Esc brings the desk back with
+the card; a knob turned in the window 0.313 → 0.564 reads 0.564 back on the desk after the
+window is closed; with `window.open` refused it floats). Controls: with the stylesheets not
+copied the first check fails (the window's panel reads rgba(0, 0, 0, 0)); with the desk
+unmounted on a clean screen, as it was, the window is gone and the clean-screen check fails.
+
 #### 8c, 8d, 8e, 8f, 8h. The rest of Desk v2's small pieces (2026-10-10)
 
 `src/lib/knobDrag.ts`, `src/lib/qr.ts`, `scripts/qr.mjs`, `scripts/wallpattern.mjs` (new);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
@@ -378,6 +379,7 @@ export const RIDES_WIDTH = 312;
 export const LEFT_WIDTH = 272;
 
 function RidesBody({ p }: { p: DeskProps }) {
+  const portalBody = usePortalBody();
   const [picking, setPicking] = useState(false);
   const [mixerOpen, setMixerOpen] = useState(false);
   /*
@@ -482,7 +484,7 @@ function RidesBody({ p }: { p: DeskProps }) {
             </PanelGuard>
           </div>
         </Sheet>,
-        document.body,
+        portalBody,
       )}
     </div>
   );
@@ -599,6 +601,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
 }
 
 function DyesBody({ p }: { p: DeskProps }) {
+  const portalBody = usePortalBody();
   const bottle = [...p.dyeBottles, ...p.behaviourBottles].find(l => l.id === p.bottleId);
   const natural = isNatural(bottle);
   const [palettes, setPalettes] = useState<{ top: number; left: number } | null>(null);
@@ -686,7 +689,7 @@ function DyesBody({ p }: { p: DeskProps }) {
             ))}
           </div>
         </>,
-        document.body,
+        portalBody,
       )}
       <div className="flex gap-1.5">
         <button

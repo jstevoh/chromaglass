@@ -587,9 +587,16 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   The buttons are 24 px, the smallest anything clickable on a desk is allowed
   to be (`npm run layout` measures it): the design's 12 px glyphs sit in a
   24 px target.
+
+  A fourth, when the desk offers it, opens the panel in a window of its own
+  for a second display (PLAN.md 8g, desk/PanelWindow.tsx). In that window the
+  panel has nowhere to be dragged, floated or docked, so its header carries
+  only Bring it back (which closes the window and puts it where it was) and
+  the fold.
 */
 export function PanelFrame({
   id, title, meta, floating = false, collapsed = false, children, onFloat, onDock, onCollapse, onClose,
+  onPopOut, popped = false, onPopIn,
   onGripDown, onHeaderDown, onResizeDown, onTitleMenu, style, className = '', bodyClassName = '',
 }: {
   id: string;
@@ -600,6 +607,11 @@ export function PanelFrame({
   children?: ReactNode;
   onFloat?: () => void;
   onDock?: () => void;
+  /** Open it in its own window. */
+  onPopOut?: () => void;
+  /** Drawn in its own window: Bring it back instead of the desk's buttons. */
+  popped?: boolean;
+  onPopIn?: () => void;
   onCollapse?: () => void;
   onClose?: () => void;
   /** Start dragging the panel by its grip (docked: to reorder, re-dock or float it). */
@@ -620,6 +632,7 @@ export function PanelFrame({
       data-testid={`panel-${id}`}
       data-panel={id}
       data-floating={floating ? 'true' : undefined}
+      data-popped={popped ? 'true' : undefined}
       data-collapsed={collapsed ? 'true' : undefined}
     >
       <header
@@ -628,21 +641,32 @@ export function PanelFrame({
         onContextMenu={onTitleMenu}
         data-panel-head
       >
-        <span
-          role="button"
-          aria-label={`Move ${title}`}
-          title="Drag to move"
-          onPointerDown={e => { e.stopPropagation(); onGripDown?.(e); }}
-          className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center text-faint"
-        >
-          <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
-            {[0, 1, 2].map(r => [0, 1].map(c => <circle key={`${r}${c}`} cx={1.5 + c * 5} cy={1.5 + r * 4.5} r="1.2" />))}
-          </svg>
-        </span>
+        {!popped && (
+          <span
+            role="button"
+            aria-label={`Move ${title}`}
+            title="Drag to move"
+            onPointerDown={e => { e.stopPropagation(); onGripDown?.(e); }}
+            className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center text-faint"
+          >
+            <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
+              {[0, 1, 2].map(r => [0, 1].map(c => <circle key={`${r}${c}`} cx={1.5 + c * 5} cy={1.5 + r * 4.5} r="1.2" />))}
+            </svg>
+          </span>
+        )}
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
         {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
         {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
-        {floating ? (
+        {!popped && onPopOut && (
+          <button className={icon} onClick={onPopOut} title="Open it in its own window, for a second display" aria-label={`Open ${title} in its own window`} data-testid={`panel-${id}-popout`}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="1.5" y="3.5" width="7" height="6" rx="0.5" /><path d="M4 1.5h6.5V7" /></svg>
+          </button>
+        )}
+        {popped ? (
+          <button className={icon} onClick={onPopIn} title="Bring it back to the desk (closes this window)" aria-label={`Bring ${title} back`} data-testid={`panel-${id}-popin`}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden><path d="M7 1.5h3.5V11h-9V5" /><path d="M1.5 1.5L6 6M6 2.8V6H2.8" /></svg>
+          </button>
+        ) : floating ? (
           <button className={icon} onClick={onDock} title="Dock it back" aria-label={`Dock ${title}`} data-testid={`panel-${id}-dock`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden><path d="M7 1.5h3.5V11h-9V5" /><path d="M1.5 1.5L6 6M6 2.8V6H2.8" /></svg>
           </button>
@@ -651,14 +675,18 @@ export function PanelFrame({
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden><path d="M5 1.5H1.5V11h9V7" /><path d="M10.5 1.5L6 6M7 1.5h3.5V5" /></svg>
           </button>
         )}
+{onCollapse && (
         <button className={icon} onClick={onCollapse} title={collapsed ? 'Open it' : 'Fold it to its header'} aria-label={collapsed ? `Open ${title}` : `Fold ${title}`} aria-expanded={!collapsed} data-testid={`panel-${id}-collapse`}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d={collapsed ? 'M3 4.5l3 3 3-3' : 'M3 7.5l3-3 3 3'} />
           </svg>
         </button>
-        <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
-        </button>
+        )}
+        {!popped && (
+          <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
+          </button>
+        )}
       </header>
       {!collapsed && <div className={`flex min-h-0 flex-1 flex-col px-3 pb-2.5 ${bodyClassName}`}>{children}</div>}
       {floating && !collapsed && onResizeDown && (

@@ -5673,9 +5673,10 @@ export default function App() {
         picture), and Load-in the room and the machine. Every settings section
         can be a panel in any of them.
       */}
-      {deskUp && overlaysVisible && (
+      {deskUp && (
         <PanelGuard name="The desk" onClose={() => deskLayouts.reset(layoutName)} closeLabel="Put this layout back as it shipped">
         <Desk
+          bare={!overlaysVisible}
           layoutName={layoutName}
           layout={deskLayout}
           onLayout={onDeskLayout}
