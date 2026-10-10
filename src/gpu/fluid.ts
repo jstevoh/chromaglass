@@ -551,6 +551,8 @@ export class WebGPUFluid {
   public readonly chem: PingPong;
   public readonly activeMat: PingPong;
   public chemLive = false;
+  /** Turing Reagent has been poured since the chemistry was last cleared: the reaction runs on it even on a look without Chemistry. */
+  public reagentLive = false;
   private readonly liquids0: PingPong;
   private readonly liquids1: PingPong;
   private readonly vel: PingPong;
@@ -1709,6 +1711,7 @@ export class WebGPUFluid {
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.chemLive = true;
+    this.reagentLive = true;
   }
 
   seedChemistry(x: number, y: number, radius: number): void {
@@ -1724,7 +1727,7 @@ export class WebGPUFluid {
     this.chemLive = true;
   }
 
-  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5): void {
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0): void {
     if (!this.chemLive) return;
     const enc = this.device.createCommandEncoder({ label: 'step chemistry' });
     const pass = enc.beginComputePass({ label: 'step chemistry' });
@@ -1736,7 +1739,8 @@ export class WebGPUFluid {
     this.run(pass, 'advectChem', this.chem.write, [this.chem.read, this.vel.read, this.sampler], this.arg('advect chem', [disp, 0, 0, 0]));
     this.chem.swap();
 
-    const args = this.arg('chem rates', [Du, Dv, feed, kill, 0, 0, 0, 0]);
+    // bath: the reagent the whole plate stands in (grayScott), 0 when only pours feed it.
+    const args = this.arg('chem rates', [Du, Dv, feed, kill, bath, 0, 0, 0]);
     for (let i = 0; i < iters; i++) {
       this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
       this.chem.swap();
@@ -3294,11 +3298,16 @@ export class WebGPUFluid {
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    // Gray–Scott too: it was left out, so a look's coral kept growing, and
+    // depositing, under the next look, in that look's colours.
+    for (const t of [this.chem.a, this.chem.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
+    this.chemLive = false;
+    this.reagentLive = false;
   }
 
   /**

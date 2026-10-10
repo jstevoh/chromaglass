@@ -47,7 +47,7 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
-import { ChemistryField } from '../lib/chemistry';
+import { ChemistryField, TURING_PRODUCT } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
@@ -4448,6 +4448,8 @@ interface FrameView {
   isDarkBlend: boolean;
   /** Plate-uv per unit of the cell clock per unit of solver velocity (lib/detailFlow.ts). */
   flowRate: number;
+  /** This frame's musical reading for the plate's colour (plateUniforms.ts); none reads as silence. */
+  audio?: { pitchClass: number; brightness: number; beatPhase: number };
   /** The lead plate's dye travel, which the closeup's cells slide and breathe on. */
   cellClock: number;
 
@@ -7029,13 +7031,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // place and deposits dye where it is active; the flow then carries the
         // dye off while the pattern keeps growing underneath.
         {
+          /*
+            Two ways in. A look with Chemistry on stands its whole plate in
+            the reagent (the bath, grayScott) and seeds it at random; a pour
+            of Turing Reagent feeds the reaction where it landed, on any
+            look, and seeds itself (addReagent). Before, only the first ran
+            the reaction, so the bottle did nothing on a look without
+            Chemistry, and the first fed nothing, so neither grew.
+          */
           const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
           const lead = fluidsRef.current[0];
-          if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
+          const poured = !!leadGpu?.reagentLive;
+          if ((chemAmt > 0 || poured) && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const g = leadGpu;
             if (g && g.stepChemistry) {
-              if (!(g as any).chemLive || (bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
+              if (chemAmt > 0 && (!g.chemLive || (bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004)) {
                 g.seedChemistry?.(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 0.01 + DICE.chem.float() * 0.016);
               }
               // The dividing regime grows at a pace a show can watch; coral is slower than a set.
@@ -7043,9 +7054,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const feed = 0.03 + p * 0.01;
               const kill = 0.055 + p * 0.005;
               const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
-              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w);
-              const c = harmonyCycle(harmonyRef.current, time * 0.08);
-              const amount = chemAmt * 0.02 * sixtieths;
+              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0);
+              // The look's palette where the look grows it; the reagent's own product where only a pour does.
+              const c = chemAmt > 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
+              const amount = (chemAmt > 0 ? chemAmt : 0.6) * 0.02 * sixtieths;
               g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22);
             }
           }
