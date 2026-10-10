@@ -266,7 +266,14 @@ export function StatusDot({ on, label, short, tone = 'ok', testId, onClick, titl
       onClick={onClick}
       data-testid={testId}
       title={tip}
-      className={`${shape} rounded-md py-1 transition-colors hover:bg-hover ${tight ? 'px-0.5 -mx-0.5' : 'px-1.5 -mx-1.5'}`}
+      /*
+        min-w-6: a dot you can press is a control, and a control is at least
+        24px on a side (`npm run layout`). In the tight header the word under
+        the dot is all the width the button has, and "Perf" at 10px measured
+        23px on CI's Linux fonts and 24px on this session's, so the floor is
+        set on the button rather than left to the font.
+      */
+      className={`${shape} min-w-6 shrink-0 rounded-md py-1 transition-colors hover:bg-hover ${tight ? 'px-0.5 -mx-0.5' : 'px-1.5 -mx-1.5'}`}
     >
       {body}
     </button>

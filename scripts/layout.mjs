@@ -68,6 +68,14 @@ const page = await (await browser.newContext({ viewport: { width: 1440, height: 
 page.setDefaultTimeout(60_000);
 const settle = (ms = 900) => page.waitForTimeout(ms);
 const clickOn = (target) => clickAt(page, target);
+/** The other side of `appears`: a sheet that is still sliding away still takes the clicks under it. */
+const gone = async (testId) => {
+  for (let i = 0; i < 20; i++) {
+    if ((await page.getByTestId(testId).count()) === 0) return true;
+    await settle(300);
+  }
+  return false;
+};
 const appears = async (testId) => {
   for (let i = 0; i < 20; i++) {
     if ((await page.getByTestId(testId).count()) > 0) return true;
@@ -304,6 +312,7 @@ try {
       stage ? `showing ${sections.join(', ') || 'no section'}; rail ${rail.join(', ')}${stray.length ? `; not stage: ${stray}` : ''}${l.tiny.length ? `; tiny ${l.tiny.slice(0, 3).join(', ')}` : ''}` : 'never opened');
     await page.keyboard.press('Escape');
     await settle(600);
+    const stageGone = await gone('stage-sheet');
 
     /*
       Every panel, docked. A settings section was only ever drawn in the
@@ -313,8 +322,18 @@ try {
       the browser lists in Load-in (the one layout that takes the Stage
       panels too) goes into its deck and is measured where it sits.
     */
+    /*
+      Load-in first, and known to be up before its browser is read. One run in
+      six on SwiftShader read Gig's browser instead (27 panels, none of the
+      Stage's): the Stage sheet was still sliding away under a 600ms settle,
+      the click on Load-in landed on its backdrop, and the check stored a
+      Load-in layout of Gig's panels and then measured Gig. So the sheet has
+      to be gone, and the switch has to have put Load-in up, or the check
+      says that is what failed rather than blaming the panels.
+    */
     await clickOn('mode-segmented-loadin');
-    await settle(600);
+    let onLoadin = false;
+    for (let i = 0; i < 20 && !onLoadin; i++) { await settle(300); onLoadin = await layoutIs('loadin'); }
     await clickOn('panel-browser-button');
     await appears('panel-browser');
     const ids = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="panel-browser-row-"]')]
@@ -329,20 +348,26 @@ try {
     // Each panel drew its own body, not just its frame: a section's knobs, the
     // section itself (with that section in it), or the desk panel's own list.
     const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer' };
-    const bodies = await page.evaluate(({ ids, own }) => ids.filter((id) => {
+    // Why each one failed, so a red run says which of three things it was:
+    // the panel never reached the deck, it did and drew no body, or the body
+    // is there and has no height.
+    const bodies = await page.evaluate(({ ids, own }) => ids.map((id) => {
       const panel = document.querySelector(`[data-testid="desk-deck"] [data-testid="panel-${id}"]`);
-      if (!panel) return true;
+      if (!panel) return `${id} (not on the deck)`;
       const body = own[id] ? panel.querySelector(`[data-testid="${own[id]}"]`)
         : panel.querySelector(`[data-testid="section-knobs-${id}"]`) ?? panel.querySelector(`[data-testid="settings-embed-${id}"] [data-section="${id}"]`);
-      return !body || body.getBoundingClientRect().height < 8;
-    }), { ids, own: OWN_BODY });
+      if (!body) return `${id} (no body)`;
+      const h = body.getBoundingClientRect().height;
+      return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
+    }).filter(Boolean), { ids, own: OWN_BODY });
     const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
     // The phone link is words and a URL, and has no control without a relay.
     const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
     await noteIds();
     check('every panel there is, docked, draws its own body, readable and big enough to use',
-      reloaded && ids.length >= 33 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
-      [bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+      stageGone && onLoadin && reloaded && ids.length >= 33 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Load-in never came up', !reloaded && 'not on Load-in after the reload',
+        ids.length < 33 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
         || `${ids.length} panels, ${deck.n} controls`);
     await page.evaluate(() => localStorage.removeItem('chromaglass-desk-layout:loadin'));
     await page.reload({ waitUntil: 'networkidle' });
