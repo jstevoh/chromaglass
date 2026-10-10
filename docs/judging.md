@@ -1268,3 +1268,19 @@ to the monitor:
   8g-1). Is that a problem at a gig, or is the window only touched with the mouse?
 - After a reload the panels are back on the desk (a browser will not reopen windows by
   itself). Is one click to put them back worth adding (PLAN 8g-2)?
+
+## 49. Preview builds on a copy (PLAN 8b)
+
+With the projector window up (or a cast), put the plate bar on **Preview** and change the
+look: pick another, ride a few sliders, clear the plate. The wall should carry on with
+the look it had, while the desk's preview shows the copy. Then press **Send to wall**
+(⌘⏎): the wall should fade to the copy's look over the Go's fade.
+
+- Does the wall stay exactly as it was while you build? The dimmer, the mixer and the
+  music still move it on purpose; nothing else should.
+- Does Send to wall look like a Go, the colours handed over rather than cut?
+- Switch to **Live** with unsent changes: the desk goes back to the wall's look and the
+  changes are dropped. Is that what you want, or should Live send them (PLAN 8b)?
+- The copy is a second engine. Does the laptop keep its frame rate in Preview with a wall
+  up, and does the wall's?
+- The wall's look stands still under the drift until it is sent (PLAN 8b-2). Noticeable?

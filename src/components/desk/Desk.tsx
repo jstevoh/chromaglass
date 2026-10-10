@@ -351,7 +351,7 @@ export function Desk(p: DeskProps) {
         midiName={p.midiName}
         onSound={p.onSound}
         onVideo={p.onVideo}
-        onWall={p.onSendToWall}
+        onWall={p.onOpenWall ?? p.onSendToWall}
         onMidi={p.onMidi}
         onRecord={p.onRecordOptions ?? p.onToggleVideo}
         onPerformance={p.onPerformance}
@@ -415,7 +415,9 @@ export function Desk(p: DeskProps) {
             {/*
               Live | Preview: the whole of the old Perform/Design split.
               Preview holds the sequencer, a song's show and a new song's
-              look off, so a look is not rewritten while it is being built.
+              look off, so a look is not rewritten while it is being built,
+              and with a wall up builds on a copy the wall does not see until
+              Send to wall (PLAN.md 8b).
             */}
             <Segmented
               value={l.plateMode}

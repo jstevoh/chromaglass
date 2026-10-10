@@ -47,7 +47,9 @@ export interface FloatingPanel { id: string; x: number; y: number; w: number; h:
  * get to change the settings. `preview` is building: they hold off, so a look
  * is not rewritten under the hand building it. That hold is what the Design
  * desk was for (`suspended: designing` in App), and Preview is where it lives
- * now. Preview does not yet edit an offline copy of the plate (PLAN.md 8b).
+ * now. With a wall up, Preview also builds on a copy of the plate, a second
+ * engine in the desk's preview, while the wall keeps its look until Send to
+ * wall (PLAN.md 8b; `drafting` in App).
  */
 export type PlateMode = 'live' | 'preview';
 
