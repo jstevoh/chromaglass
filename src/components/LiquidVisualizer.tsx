@@ -4491,6 +4491,7 @@ interface FrameView {
   postTest: PostTest | null;
   fxFrame: number;
   fxSeed: number;
+  audio: { pitchClass: number; brightness: number; beatPhase: number };
 }
 
 /**
