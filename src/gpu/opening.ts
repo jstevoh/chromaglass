@@ -74,6 +74,15 @@ export interface Opening {
   spin: boolean;
   /** The chemistry (Turing patterns). */
   chemistry: boolean;
+  /**
+   * The plate stood up (Plate Upright), or the dye given weight (Dye
+   * Weight): the mix's push on the flow (mixSmooth, mixForce) runs from the
+   * first step, where on every other look it waits for oil or soap to be
+   * poured. Added with Lava Lamp (PLAN.md 28a), the first look to stand
+   * the plate up: `npm run startup` on Metal found it asking for both in
+   * its first steps with no list naming them.
+   */
+  gravity: boolean;
 }
 
 /**
@@ -123,5 +132,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
     spin: lookOpensSpinning(s),
     chemistry: on(s.chemistry),
+    gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
   };
 }

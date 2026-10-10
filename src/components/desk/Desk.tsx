@@ -616,7 +616,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
           ref={button}
           onClick={toggle}
           className="flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-text transition-colors hover:bg-hover"
-          title="New, Save, and your saved presets"
+          title="New, Save, and your saved preset palettes"
           data-testid="doc-menu-button"
         >
           <span className="truncate">{p.lookName ?? 'Untitled'}</span>
@@ -648,7 +648,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
               ))}
               {p.savedLooks.length > 0 && (
                 <div className="border-t border-border py-1" data-testid="doc-saved">
-                  <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your presets</div>
+                  <div className="px-3 pb-1 pt-1.5 text-[11px] text-faint">Your preset palettes</div>
                   <div className="max-h-[50vh] overflow-y-auto">
                     {p.savedLooks.map(sl => (
                       <div key={sl.id} className={`group flex items-center ${sl.id === p.openLookId ? 'bg-active' : 'hover:bg-hover'}`}>

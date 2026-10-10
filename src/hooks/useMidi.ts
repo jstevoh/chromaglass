@@ -14,6 +14,7 @@ import { PALETTE } from '../constants';
 import { touch, touchKey } from '../lib/midiTouch';
 import { downloadText } from '../lib/userPresets';
 import type { VisualizerSettings } from '../types';
+import { livePresetId } from '../presets';
 
 /**
  * The MIDI controller on the desk.
@@ -512,7 +513,9 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
       let level: number | null = null;
       if (t.kind === 'preset') {
         const c = f.presetColor(t.presetId);
-        level = c ? padVelocityFor(c.r, c.g, c.b, f.activePresetId !== t.presetId) : (f.activePresetId === t.presetId ? 3 : 1);
+        // A pad saved before its look was retired lights for the look it now plays (PLAN.md 28a).
+        const live = livePresetId(t.presetId);
+        level = c ? padVelocityFor(c.r, c.g, c.b, f.activePresetId !== live) : (f.activePresetId === live ? 3 : 1);
       } else if (t.kind === 'dye') {
         const c = f.paletteColor(t.paletteIndex);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.dyeIndex !== t.paletteIndex) : 0;
