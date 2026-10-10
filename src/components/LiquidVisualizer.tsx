@@ -4448,8 +4448,6 @@ interface FrameView {
   isDarkBlend: boolean;
   /** Plate-uv per unit of the cell clock per unit of solver velocity (lib/detailFlow.ts). */
   flowRate: number;
-  /** This frame's musical reading for the plate's colour (plateUniforms.ts); none reads as silence. */
-  audio?: { pitchClass: number; brightness: number; beatPhase: number };
   /** The lead plate's dye travel, which the closeup's cells slide and breathe on. */
   cellClock: number;
 
@@ -4478,6 +4476,14 @@ interface FrameView {
   /** The mark laid over the finished frame, and the film projected through it. */
   mark: { source: CanvasImageSource; aspect: number; dirty: boolean } | null;
   film: { video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null };
+  /**
+   * What the plate hears this frame: the pitch class and brightness from the
+   * audio features, and where the frame sits between two beats (0..1, 0 with
+   * no beat clock). The plate's uniforms read it as `PlateView.audio`
+   * (gpu/plateUniforms.ts), which is where the shader's `pitchClass`,
+   * `brightness` and `beatPhase` come from.
+   */
+  audio: { pitchClass: number; brightness: number; beatPhase: number };
   /**
    * The oil beads' mask, on the frames the beads moved and it was redrawn —
    * null on every other frame, and whenever the beads are off. The show

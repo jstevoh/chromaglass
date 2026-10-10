@@ -6,11 +6,13 @@ import {
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video,
+  Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { PanelGuard } from '../PanelGuard';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -141,6 +143,8 @@ export interface PhoneStageProps {
   onZoom: () => void;
   camera: 'hold' | 'follow' | 'auto';
   onCamera: (c: 'hold' | 'follow' | 'auto') => void;
+  /** Auto's cut, "5s" (`shotLabel`, lib/macroCamera.ts), named on its button so it reads apart from Follow (QA-11). */
+  cameraShot?: string;
   // Tilt
   tilt: { supported: boolean; on: boolean; refused: boolean; silent: boolean; onToggle: () => void };
   // Sound
@@ -398,9 +402,12 @@ export function PhoneStage(p: PhoneStageProps) {
                 onClick={() => p.onCamera(c)}
                 aria-pressed={p.camera === c}
                 data-testid={`phone-camera-${c}`}
-                className={`h-10 min-w-[64px] rounded-full px-3 text-[13px] capitalize ${p.camera === c ? 'bg-accent-bg text-accent-text' : 'text-text-2'}`}
+                className={`flex h-10 min-w-[64px] items-center justify-center gap-1.5 rounded-full px-3 text-[13px] capitalize ${p.camera === c ? 'bg-accent-bg text-accent-text' : 'text-text-2'}`}
               >
+                {/* As on the desk's chip (QA-11): Follow is locked on one subject, Auto cuts. */}
+                {c === 'follow' && <Crosshair size={14} aria-hidden />}
                 {c}
+                {c === 'auto' && p.cameraShot && <span className="normal-case opacity-70">· cuts {p.cameraShot}</span>}
               </button>
             ))}
           </div>
@@ -582,6 +589,7 @@ export function PhoneStage(p: PhoneStageProps) {
       {/* ── The sheets ── */}
       {sheet === 'dye' && (
         <PhoneSheet title="Dye" onClose={close} testId="phone-sheet-dye">
+          <PanelGuard name="The Dye sheet" inline onClose={close}>
           {([
             ['Dye', p.liquids.filter(l => !l.behaviour)],
             ['Changes the plate', p.liquids.filter(l => l.behaviour)],
@@ -687,11 +695,13 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'looks' && (
         <PhoneSheet title="Looks" onClose={close} testId="phone-sheet-looks">
+          <PanelGuard name="The Looks sheet" inline onClose={close}>
           <div className={`grid gap-1.5 ${[p.onRevert, p.onSaveLook].filter(Boolean).length === 2 ? 'grid-cols-3' : [p.onRevert, p.onSaveLook].some(Boolean) ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
@@ -761,11 +771,13 @@ export function PhoneStage(p: PhoneStageProps) {
               </div>
             </div>
           ))}
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'sound' && (
         <PhoneSheet title="Sound" onClose={close} testId="phone-sheet-sound">
+          <PanelGuard name="The Sound sheet" inline onClose={close}>
           <p className="mb-3 text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Mic} label="Microphone" on={p.audioSource === 'microphone'} onPress={() => p.onAudioSource(p.audioSource === 'microphone' ? 'none' : 'microphone')} testId="phone-sound-mic" />
@@ -836,11 +848,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
           </div>
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'play' && (
         <PhoneSheet title="Play" onClose={close} testId="phone-sheet-play">
+          <PanelGuard name="The Play sheet" inline onClose={close}>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
             <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
@@ -918,11 +932,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Waves} label="Drain" onPress={() => { p.onDrain(); close(); }} testId="phone-drain" />
             <Tile icon={Trash2} label="Clear" onPress={() => { p.onClear(); close(); }} testId="phone-clear" />
           </div>
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'mix' && (
         <PhoneSheet title="Mixer" onClose={close} testId="phone-sheet-mix">
+          <PanelGuard name="The Mixer sheet" inline onClose={close}>
           <MixerPanel
             settings={p.mixer.settings}
             onSetting={p.mixer.onSetting}
@@ -934,11 +950,13 @@ export function PhoneStage(p: PhoneStageProps) {
             touch
             testId="phone-mixer"
           />
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
+          <PanelGuard name="The More sheet" inline onClose={close}>
           <div className="grid grid-cols-3 gap-1.5">
             {p.recording.supported && (
               <Tile
@@ -963,6 +981,7 @@ export function PhoneStage(p: PhoneStageProps) {
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
+          </PanelGuard>
         </PhoneSheet>
       )}
     </div>

@@ -274,7 +274,6 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     // The music's colour, by its own name rather than by its speed through
     // the harmony: d8697cd turned that speed from 0.3 to 0.1 and added the
     // heard pitch, and the plate the colour is read for is what this asks.
-    // (Ported from #329, c83f3a1.)
     music: /const colFor = \(off: number\) => harmonyCycle\(harmonyOf\(activeLayerRef\.current\), /,
     musicStyles: /const aStyles = stylesOf\(activeLayerRef\.current\);/,
     musicLiquids: /doseLiquid\(activeFluid, liquidsOf\(activeLayerRef\.current\)/,
