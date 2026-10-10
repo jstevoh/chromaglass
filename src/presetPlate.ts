@@ -74,7 +74,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'stardust-collapse':  [15, 23, 10, 17, 21, 7],
   'lumia':              [10, 7, 1],
   'sensual-laboratory': [14, 12],
-  'turing-print':       [14, 12],                // the palette is unused: the print is the indicator's colour (depositChem)
+  'turing-print':       [14, 22],                // graphite and midnight, unused while the print is on: its colour is the indicator's (depositChem)
   'oil-wheel':          [17, 1, 6, 5, 18, 10],
   'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-1969':      [1, 0, 3, 7, 5, 10],
