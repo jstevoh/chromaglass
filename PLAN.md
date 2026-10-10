@@ -5535,10 +5535,14 @@ Turing Print" work (#331), which also made the reaction grow at all.
     their own copy and are untouched.
   - *Improved*: Cyberpunk Neon and Timbre Shifter drew a conic rainbow through every
     clear patch (the LED platform's `cyberpunk` and `rainbow` modes: a colour picker
-    under the glass); Fillmore East and Clock Glass were nearly black on the lamp (luma
-    0.06 and 0.08, Dye Budget 0.9 filling the dish: 18b-8) and now run at 0.5; Jellyfish
-    Bloom sat two bells on an empty plate and Cell Bloom drained by 40 s (more drops,
-    slower evaporation).
+    under the glass); now Cyberpunk is neon on black (luma 0.53 → 0.14 at 40 s, which is
+    the look) and Timbre Shifter a cyan-violet marble (0.30 → 0.61). Jellyfish Bloom sat
+    two bells on an empty plate (flat 0.61 → 0.51) and Cell Bloom drained by 40 s (more
+    drops, slower evaporation: motion 0.015 → 0.057). Fillmore East and Clock Glass run
+    Dye Budget 0.5 instead of 0.9 (18b-8), but the after gallery shows that was not why
+    they are dark: Clock Glass's low luma is the black round its dish, and Fillmore stayed
+    nearly black (0.064 → 0.052; 28c). Before and after at 40 s:
+    `/mnt/project-files/presets-28/pairs/`.
   - *New*: **Lava Lamp**, the first look to stand the plate up (Plate Upright, Dye
     Weight, Double Diffusion: Rayleigh–Taylor plumes warmed back up by the lamp the
     solver keeps under the plate). Turing Print (26d) is its own thread's (#333). It needed the mix force
@@ -5556,6 +5560,9 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - The retired looks' cases in `seedPreset` (LiquidVisualizer.tsx) are dead; delete
     them when lane G is free (#307 held it), and drop the file's exemption in `npm run
     plate`'s retired-id walk.
+  - Fillmore East is nearly black on the Mac (luma 0.05 at 40 s) with Dye Budget at 0.5
+    as at 0.9; find what darkens it (its layers' blend, the lamp's grade) before tuning
+    another setting.
   - Still flat on the Mac and not retuned here: Oil Wheel (motion 0.003, a dark brown
     disc; 18b-8 lists it), Deep Ocean (three bands), Bass Drop (one red: its Squeeze only
     shows with a kick). Crowd Plate is
