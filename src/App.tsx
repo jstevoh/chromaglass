@@ -11,7 +11,7 @@ import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
-import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
+import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
@@ -4332,7 +4332,8 @@ export default function App() {
     two panels over a plate is the state you cannot see the show through.
   */
   const openSettingsAt = useCallback((section: string) => {
-    setSettingsSection(section);
+    // An id from before a section was folded into another opens that one.
+    setSettingsSection(resolveSection(section));
     setShowSettings(true);
     setShowMidi(false);
     setShowSequencer(false);
@@ -6010,7 +6011,6 @@ export default function App() {
           onGoBackPlate={() => goBackPlate()}
           backLook={backLookName}
           onBackFollowsFront={backFollowsFront}
-          onBack={previousLook.current ? revertLook : null}
           fade={fadeSeconds}
           onFade={setFadeSeconds}
           cuedLook={cued && !cued.item ? { id: cued.id, name: cued.name } : null}
@@ -6018,8 +6018,6 @@ export default function App() {
           onCueSaved={cueLook}
           onSendSaved={(id) => goLookNow(id)}
           onAddSavedToSet={(id) => addToSet('saved', id)}
-          onFreeze={() => setIsActive(v => !v)}
-          frozen={!isActive}
           onDrain={() => setDrainTrigger(v => v + 1)}
           settings={settings}
           onSetting={updateSettings}

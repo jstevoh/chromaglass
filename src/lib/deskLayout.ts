@@ -23,7 +23,7 @@
  * drives every operation in node.
  */
 
-import { SETTINGS_SECTIONS, SECTION_BY_ID } from './settingsMap.ts';
+import { SETTINGS_SECTIONS, SECTION_BY_ID, resolveSection } from './settingsMap.ts';
 import { PINNABLE } from './deskPins.ts';
 
 /** The three shipped layouts. Stored under these names. */
@@ -150,13 +150,17 @@ const empty = (): Omit<DeskLayout, 'plateMode'> => ({ left: [], right: [], deck:
   a look is not rewritten while it is being made. Live is one click away on
   the plate bar, and stays chosen for Build once picked.
 
+  Sound sits where Sound Mappings did, which is in it now (`MERGED_SECTIONS`):
+  Sound Drive at its top, the knob this deck had, with the rest of the sound
+  under it rather than one click away.
+
   Gig is the old Perform desk: the set on the left, the rides on the right,
   the dyes, tools and patches under the plate. Load-in is new: the controller
   and the sound on the left, the wall and its mapping on the right, the
   machine and the phone link in the deck.
 */
 export const SHIPPED: Record<LayoutName, DeskLayout> = {
-  build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'camera', 'audio-mappings', 'macro', 'patches'], plateMode: 'preview' },
+  build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
   gig: { ...empty(), left: ['cues'], right: ['rides'], deck: ['dyes', 'tools', 'patches'], plateMode: 'live' },
   loadin: { ...empty(), left: ['midi', 'audio-input'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' },
 };
@@ -268,7 +272,9 @@ export function sameLayout(a: DeskLayout, b: DeskLayout): boolean {
  * panel id this build does not have is dropped, a panel in two places keeps
  * the first, a Stage panel outside Load-in goes back to the Stage sheet, a
  * floating rectangle is clamped to something that can be grabbed, and
- * anything that is not a layout at all is the shipped one.
+ * anything that is not a layout at all is the shipped one. A panel whose
+ * section was folded into another (Sound Mappings, Heat Slide) is the panel
+ * it was folded into, in its place, unless that one is out already.
  */
 export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
   const base = shippedLayout(name);
@@ -278,7 +284,8 @@ export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
   // One pass, so a panel twice in the same list keeps its first place too.
   const ids = (v: unknown): string[] => {
     const out: string[] = [];
-    for (const id of Array.isArray(v) ? v : []) {
+    for (const was of Array.isArray(v) ? v : []) {
+      const id = typeof was === 'string' ? resolveSection(was) : was;
       if (typeof id !== 'string' || !panelAllowed(name, id) || seen.has(id)) continue;
       seen.add(id);
       out.push(id);
@@ -289,11 +296,14 @@ export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
   const left = ids(r.left), right = ids(r.right), deck = ids(r.deck);
   const floating: FloatingPanel[] = [];
   for (const f of Array.isArray(r.floating) ? r.floating : []) {
-    if (!f || typeof f !== 'object' || typeof f.id !== 'string' || !panelAllowed(name, f.id) || seen.has(f.id)) continue;
-    seen.add(f.id);
-    floating.push({ id: f.id, x: num(f.x, 0, 4000, 120), y: num(f.y, 0, 3000, 120), w: num(f.w, 220, 1200, FLOAT_SIZE.w), h: num(f.h, 120, 1200, FLOAT_SIZE.h) });
+    if (!f || typeof f !== 'object' || typeof f.id !== 'string') continue;
+    const id = resolveSection(f.id);
+    if (!panelAllowed(name, id) || seen.has(id)) continue;
+    seen.add(id);
+    floating.push({ id, x: num(f.x, 0, 4000, 120), y: num(f.y, 0, 3000, 120), w: num(f.w, 220, 1200, FLOAT_SIZE.w), h: num(f.h, 120, 1200, FLOAT_SIZE.h) });
   }
-  const collapsed = (Array.isArray(r.collapsed) ? r.collapsed : []).filter((id): id is string => typeof id === 'string' && seen.has(id));
+  const collapsed = [...new Set((Array.isArray(r.collapsed) ? r.collapsed : [])
+    .filter((id): id is string => typeof id === 'string').map(resolveSection).filter(id => seen.has(id)))];
   return {
     left, right, deck, floating, collapsed,
     deckCollapsed: r.deckCollapsed === true,

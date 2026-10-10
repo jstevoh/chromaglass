@@ -341,31 +341,36 @@ function CuesBody({ p }: { p: DeskProps }) {
           )}
         </div>
       )}
-      <div className="shrink-0 border-t border-border p-3">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <span className="text-[13px] text-muted">Fade</span>
+      {/*
+        Fade and Go, as small as they can be and still be hit in the dark: one
+        row of fade times across the column and a Go a finger's height. They
+        were 140px of the column with Back and Freeze under them, which the
+        owner never pressed (2026-10-10: "I don't use them. We can keep the
+        shortcuts though"). Back is still ⌫ and Freeze still F, from the
+        keyboard (App's key handler), ⌘K, and a learned MIDI pad
+        (`action:revert`, `action:play-toggle` in the Controller's map).
+      */}
+      <div className="flex shrink-0 flex-col gap-1.5 border-t border-border px-3 py-2" data-testid="cue-go">
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-[12px] text-muted">Fade</span>
           <Segmented
             value={String(p.fade)}
             options={FADE_CHOICES.map(s => [String(s), s === 0 ? 'cut' : `${s}s`] as const)}
             onChange={v => p.onFade(Number(v))}
-            height={32}
+            height={28}
+            fill
             testId="fade-segmented"
           />
         </div>
         <Button
-          variant="primary" full height={48} kbd="Space"
+          variant="primary" full height={36} kbd="Space"
           onClick={p.onGo}
           disabled={!next}
           midiKey="action:go"
           testId="go-button"
         >
-          {next ? `Go to ${next.name}` : 'Nothing cued'}
+          <span className="min-w-0 truncate">{next ? `Go to ${next.name}` : 'Nothing cued'}</span>
         </Button>
-        {/* Blackout moved to the header (Desk v2): it is on screen in every layout now. */}
-        <div className="mt-2 flex gap-2">
-          <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} midiKey="action:revert" testId="back-button">Back</Button>
-          <Button full height={40} kbd="F" onClick={p.onFreeze} midiKey="action:play-toggle" testId="freeze-button">{p.frozen ? 'Thaw' : 'Freeze'}</Button>
-        </div>
       </div>
     </div>
   );
@@ -604,7 +609,14 @@ function DyesBody({ p }: { p: DeskProps }) {
   const portalBody = usePortalBody();
   const bottle = [...p.dyeBottles, ...p.behaviourBottles].find(l => l.id === p.bottleId);
   const natural = isNatural(bottle);
-  const [palettes, setPalettes] = useState<{ top: number; left: number } | null>(null);
+  /*
+    Where the palette list opens: under its button when there is room, over
+    it when there is not, and never taller than the room it has. It opened
+    under the button whatever was there, so with the Dyes panel low on the
+    screen the list ran off the bottom of the window and most of the palettes
+    could not be reached (the owner, 2026-10-10).
+  */
+  const [palettes, setPalettes] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null);
   const paletteName = p.paletteLock === null ? 'Auto' : (p.palettes[p.paletteLock]?.name ?? 'Auto');
   const paletteColours = p.paletteLock === null ? [] : (p.palettes[p.paletteLock]?.colours ?? []);
   return (
@@ -630,7 +642,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           Natural · {isClearLiquid(bottle) ? 'clear' : 'its own colour'}
         </button>
       )}
-      <div className="grid grid-cols-8 gap-1.5">
+      {/*
+        As many swatches a row as fit at 28px or more: eight across a column,
+        fewer in a panel floated narrow or popped out small, rather than eight
+        squeezed under a fingertip.
+      */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(28px,1fr))] gap-1.5">
         {p.swatches.map((c, i) => (
           <Swatch
             key={c.hex}
@@ -650,7 +667,11 @@ function DyesBody({ p }: { p: DeskProps }) {
         onClick={(e) => {
           if (palettes) { setPalettes(null); return; }
           const r = e.currentTarget.getBoundingClientRect();
-          setPalettes({ top: r.bottom + 4, left: r.left });
+          const below = window.innerHeight - r.bottom - 12, above = r.top - 12;
+          const left = Math.max(8, Math.min(r.left, window.innerWidth - 256 - 8));
+          setPalettes(below >= 320 || below >= above
+            ? { top: r.bottom + 4, left, maxHeight: below }
+            : { bottom: window.innerHeight - r.top + 4, left, maxHeight: above });
         }}
         className="flex h-8 w-full items-center gap-2 rounded-md bg-elevated px-2.5 text-left text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
         title="The colour harmony the music draws from. Auto: the music picks."
@@ -666,7 +687,7 @@ function DyesBody({ p }: { p: DeskProps }) {
       {palettes && createPortal(
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setPalettes(null)} />
-          <div className="fixed z-[61] max-h-[60vh] w-64 overflow-y-auto rounded-md border border-border-strong bg-surface py-1 shadow-2xl" style={palettes} data-testid="palette-menu">
+          <div className="fixed z-[61] w-64 overflow-y-auto rounded-md border border-border-strong bg-surface py-1 shadow-2xl" style={palettes} data-testid="palette-menu">
             <button
               onClick={() => { p.onPalette(null); setPalettes(null); }}
               className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] ${p.paletteLock === null ? 'bg-active text-text' : 'text-text-2 hover:bg-hover'}`}

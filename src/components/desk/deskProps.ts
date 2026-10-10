@@ -126,7 +126,6 @@ export interface DeskProps {
   onGoBackPlate?: () => void;
   backLook?: string | null;
   onBackFollowsFront?: () => void;
-  onBack: (() => void) | null;
   fade: number;
   onFade: (s: number) => void;
   cuedLook: { id: string; name: string } | null;
@@ -134,8 +133,6 @@ export interface DeskProps {
   onCueSaved: (id: string) => void;
   onSendSaved: (id: string) => void;
   onAddSavedToSet: (id: string) => void;
-  onFreeze: () => void;
-  frozen: boolean;
   onDrain: () => void;
 
   // ── Controls: rides, the recipe, the sections' knobs ───────────────

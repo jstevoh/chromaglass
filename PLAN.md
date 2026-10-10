@@ -1085,6 +1085,20 @@ Open from Desk v2, each its own thread (the UI lane):
     button is opened. A dot per input inside the button (no words) costs about 40 px,
     which 1024 has (73 px spare folded); the owner's call on a laptop.
 
+- ~~**8i** Fewer panels, each one usable at any window size: Sound Mappings folded into
+  Sound and Heat Slide into Fluid Physics (no panel holds one or two knobs), Fade and Go
+  in 68px with Back and Freeze left to their keys, and every panel's body scrolls and
+  reflows~~ (shipped; story in `docs/plan-shipped.md` §8; checks `npm run desklayout`
+  and `npm run layout`'s "every control in every panel can be reached").
+  - **8i-1** (S) A panel floated or popped out narrower than 312px. The reach check
+    floats every panel at the size a panel floats at; a hand can drag one down to
+    220px, where the Mixer's and the patch bay's rows have not been measured. Either a
+    minimum width per panel (`deckWidth`) or rows that wrap below it.
+  - **8i-2** (S) Three knobs is the floor now (`npm run desklayout`): Kaleidoscope,
+    Master and Manual Interaction sit on it. Kaleidoscope was split out of Show on
+    purpose (`settingsMap.ts`); the other two are the owner's call if three still reads
+    as too thin on a deck.
+
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
 pick lists). `gallery.yml` already photographs every preset; ship those photographs as
