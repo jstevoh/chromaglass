@@ -473,6 +473,13 @@ jobs:
       - name: The remote's Mixer
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
+      # stand-in laptop on the show server's relay hears every touch, tool,
+      # dye and button a phone and an iPad send, and where a touch lands in
+      # the wall's frame. No GPU; dist/ is the phone step's build.
+      - name: The remote's Draw screen
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/draw.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
       # second more than the ear tells it (ten), and the plate still hears a

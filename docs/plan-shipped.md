@@ -1095,6 +1095,36 @@ widths, with all 33 panels docked at once (511 controls) each drawing its body; 
 one list kept both, and a stored array read as an empty layout). `panel` 180/180,
 `desk`, `saves` 33/33, `phone` 292/292, `remotemix`, `rowfade`, `backplate`, `intro`
 12/12 unchanged in what they assert.
+#### 8-draw. Draw: the phone or iPad as the wall's pad (2026-10-10)
+
+`src/components/DrawScreen.tsx` (new), `RemoteControl.tsx`. Check: `npm run draw` (new,
+in the Measure job's browser part); `applink` and `remotemix` now start on Draw.
+
+The Desk v2 design's #3c (phone) and #3d (iPad). The remote already had the pad as a
+full screen, behind the Projectionist's Full button, with the tools and dyes as chip
+rows under it. Draw makes it the screen the remote opens on, with dyes down one edge,
+the four tools (Drop, Blow, Press, Stir) down the other, and Amount, Lucky, Freeze and
+Blackout along the bottom; the iPad adds the bottle list, a Layer row and Clear. The
+old page is Controls, one tap away, and which of the two a device was left on is kept
+on it, so a tablet set up as the Gig remote opens as that again after a reload.
+
+- **Nothing on the wire changed.** Draw is handed RemoteControl's own pad handlers
+  (the 30 Hz drag, the 60 Hz held press, the press repeats), not a copy of them.
+- **A touch lands in the wall's 16:9 frame**, the largest that fits the pad, and a
+  touch outside it on its edge. The old full pad stretched the wall over the whole
+  screen, so on a portrait phone a circle came out on the wall as a flat ellipse.
+- **Amount** multiplies what a touch lays, 0.1×–2×: the display reads a pad's amount
+  as 0.05–1 with a finger at 0.5, so that is the whole range and nothing past it.
+- **Blackout** is tap to fade (latched) and hold to go dark while held, both through the
+  display's one toggle, which fades over 1.1 s; a true snap is 8-draw-c.
+- **A phone on its side** keeps the phone layout (the short side decides, as
+  `lib/phone.ts` does) with the bottom bar in one row: 316 to 444 px of frame width.
+- In the app, a wrong key or a missing laptop puts Change laptop in the frame, under
+  the words that ask for it.
+
+Measured (cloud): `draw` 76/76 (phone, phone on its side, iPad both ways, wrong key),
+`applink` 49/49, `remotemix` 17/17. Pictures: the project's draw-8 folder.
+
 
 ### 9. Ferrofluid after the references
 

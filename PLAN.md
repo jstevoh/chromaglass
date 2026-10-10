@@ -41,7 +41,7 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
 3. **New UI Implementation:** Implement the new UI layer as specified by the owner, ensuring it correctly binds to `LiquidVisualizer.tsx` without disrupting the WebGPU context.
-   *Desk v2 (the owner's design, 2026-10-10) shipped as §8-v2: one desk, three layouts. Next: §8-play, then §8-draw, each a thread.*
+   *Desk v2 (the owner's design, 2026-10-10) shipped as §8-v2: one desk, three layouts. §8-draw (the remote opens on Draw) shipped; §8-play is its own thread.*
 
 ---
 
@@ -954,9 +954,22 @@ Open from Desk v2, each its own thread (the UI lane):
 - **8-play** (M) The Play route of the design (`/play`, the README's second screen): the
   set list and the rides at a size a hand finds in the dark, for a show run from the
   laptop with no controller. Its phone version is the PhoneStage it already has.
-- **8-draw** (M) Draw: the phone or iPad as a full drawing pad over the plate (the
-  design's third screen), every tool and the dye under the finger. It goes through
-  `performGesture` like every other hand; the phone's own Draw sheet is the same screen.
+- ~~**8-draw** Draw: the phone or iPad as the wall's pad~~ (shipped; story in
+  `docs/plan-shipped.md` §8; check `npm run draw`). Found along the way:
+  - **8-draw-a** (M) The wall under the pad. Draw's frame is black: the remote gets
+    the laptop's state, not its frames, so a hand draws blind on the phone and looks
+    up at the wall. The relay already carries a mirror (`role: 'mirror'`, the cast);
+    a small, slow copy of it under the frame would show where the colour is.
+    *Measure:* frames reach the remote's frame at a rate and size the relay holds.
+  - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
+    tools only); they are in Controls. A bottle tile on the phone, or a long press on
+    Drop for the bottle list, would put soap on the plate from Draw.
+  - **8-draw-c** (S) Blackout's hold-to-snap. The display has one blackout, a toggle
+    that fades over 1.1 s, so Draw's hold is a fade both ways. A snap needs a
+    `blackout-snap` action the display honours at once (protocol, App, MIDI).
+  - **8-draw-d** (S) The wall's real shape. Draw assumes 16:9 (the design's label);
+    a wall mapped to 4:3 or a dome is another frame. The state could carry the
+    output's aspect. And the design's dashed "+" (an image as dye) has no message yet.
 - **8b** (M) A true Preview. Preview holds the sequencer, a song's show and a new song's
   look (`designing` in App, as the Design desk did), but the plate being built is still
   the plate on the wall. The design means an offline copy: a second solver, or the
