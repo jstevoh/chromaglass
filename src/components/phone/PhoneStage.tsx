@@ -218,6 +218,15 @@ export interface PhoneStageProps {
   benDay: number;
   onBenDay: (v: number) => void;
   /**
+   * The reaction (PLAN §26): Pattern along Pearson's map (spots to
+   * labyrinth), the stripe's Width, and Turing Print, starch in the dish so
+   * the pattern prints black on the lamp (26d). On the Looks sheet when it
+   * opens on a look with the reaction running, as Ben-Day is, because they
+   * are the look's own rather than a hand's.
+   */
+  reaction: { on: boolean; pattern: number; width: number; print: number };
+  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint'>>) => void;
+  /**
    * Lamp Ground (PLAN 18b): what the dye is seen on, black or the lamp
    * shining up through it. On the Looks sheet, always: it turns a look
    * over, and a thumb on the phone picks the ground as it picks the look.
@@ -307,6 +316,8 @@ export function PhoneStage(p: PhoneStageProps) {
   // stays for as long as the sheet is up, so taking it to 0 does not take
   // the slider away from under the thumb.
   const [printing, setPrinting] = useState(false);
+  /** As `printing`, for the reaction's three: read when the sheet opens, so a slider taken to 0 stays to be turned back. */
+  const [reacting, setReacting] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
   const close = () => setSheet(null);
   /** Where a look picked in the looks sheet goes: the whole plate, or the back plate alone. */
@@ -319,7 +330,7 @@ export function PhoneStage(p: PhoneStageProps) {
     p.onSaveLook(name);
     setSaveName(null);
   };
-  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') setPrinting(p.benDay > 0.001); setSheet(cur => (cur === s ? null : s)); };
+  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
 
@@ -726,6 +737,17 @@ export function PhoneStage(p: PhoneStageProps) {
               <Slider label="Ben-Day Dots" value={p.benDay} min={0} max={1} step={0.05} onChange={p.onBenDay}
                 display={`${Math.round(p.benDay * 100)}%`} touch testId="phone-ben-day" midiKey="setting:benDay" />
               <p className="-mt-3 text-[12px] leading-snug text-dim">The plate printed as a comic: flat inks, black lines, the pale washes in dots.</p>
+            </div>
+          )}
+          {(reacting || p.reaction.on) && (
+            <div className="mt-3" data-testid="phone-reaction">
+              <Slider label="Pattern" value={p.reaction.pattern} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ chemistryPattern: v })}
+                display={p.reaction.pattern < 0.34 ? 'Spots' : p.reaction.pattern < 0.67 ? 'Worms' : 'Labyrinth'} touch testId="phone-reaction-pattern" midiKey="setting:chemistryPattern" />
+              <Slider label="Pattern Width" value={p.reaction.width} min={0.1} max={1} step={0.01} onChange={(v) => p.onReaction({ chemistryWidth: v })}
+                display={`${Math.round(p.reaction.width * 100)}%`} touch testId="phone-reaction-width" midiKey="setting:chemistryWidth" />
+              <Slider label="Turing Print" value={p.reaction.print} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
+                display={`${Math.round(p.reaction.print * 100)}%`} touch testId="phone-turing-print" midiKey="setting:turingPrint" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp.</p>
             </div>
           )}
           {/* The second projector's look routing (§16a) is temporarily hidden per user request */}

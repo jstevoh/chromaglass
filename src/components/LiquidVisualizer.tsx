@@ -7056,9 +7056,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
               g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0);
               // The look's palette where the look grows it; the reagent's own product where only a pour does.
-              const c = chemAmt > 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
+              // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
+              const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
               const amount = (chemAmt > 0 ? chemAmt : 0.6) * 0.02 * sixtieths;
-              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22);
+              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22, print, chemAmt > 0 ? 1 : 0);
             }
           }
         }

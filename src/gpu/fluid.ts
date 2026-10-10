@@ -302,6 +302,16 @@ const SPIKE_FLOW = 2;
 const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
+/*
+  The grid the reaction's diffusion lengths are given on (stepChemistry): the
+  middle rung, so the coral and the print keep about the size the looks were
+  judged at on the Mac, now on every rung. CHEM_STABLE is the explicit step's
+  D·dt with headroom under its 1/4, and CHEM_MOST caps a frame's substeps,
+  past which the reaction grows more slowly rather than costing more.
+*/
+const CHEM_REF = 384;
+const CHEM_STABLE = 0.2;
+const CHEM_MOST = 24;
 const LIES_GRID = 128;
 const CURRENT_ITERS = 10;
 /*
@@ -1020,7 +1030,6 @@ export class WebGPUFluid {
       ['grayScott', [VEL], open.chemistry],
       ['addReagent', [VEL], false],
       ['seedChem', [VEL], open.chemistry],
-      ['advectChem', [VEL], open.chemistry],
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
@@ -1690,16 +1699,10 @@ export class WebGPUFluid {
   }
 
   /**
-   * Lay down the dye the reaction has grown, in the same breath as the deltas
-   * — before the step, so this frame's flow carries it. `amount` is per cell
-   * per step, `colour` the dye's own colour.
-   *
-   * Nothing calls this now. It was the deposit half of `WebGPUChemistry`, the
-   * GPU twin of `lib/chemistry.ts`, which was never wired in and has gone
-   * (S13); the show grows the reaction on the CPU and lays its dye from there.
+   * A pour of Turing Reagent at (x, y), `radius` in plate units: the reaction's
+   * feed where it lands, its own pattern baked in (26c), and a speck of the
+   * autocatalyst to start from (addReagent's kernel, and why).
    */
-  
-  
   addReagent(x: number, y: number, radius: number, amount: number, pattern_val: number): void {
     const enc = this.device.createCommandEncoder({ label: 'add reagent' });
     const pass = enc.beginComputePass({ label: 'add reagent' });
@@ -1727,21 +1730,45 @@ export class WebGPUFluid {
     this.chemLive = true;
   }
 
+  /**
+   * The reaction's own time: `iters` steps of Gray–Scott's unit time a frame,
+   * with feed and kill, and Du, Dv the diffusion lengths' squares in cells of
+   * the CHEM_REF grid; `bath` is the reagent the whole plate stands in.
+   *
+   * Two things were wrong here, both making the pattern coarser and softer
+   * than its chemistry (PLAN.md 26d, 26-colour-b).
+   *
+   * It was carried twice. The step carries the field with the dye's own
+   * scheme (the same faces, the same substeps: 26a's "one flux pass"), and
+   * this ran a second, semi-Lagrangian carry of a frame's displacement on
+   * top: the stripes moved ahead of the colour they lay, and the bilinear
+   * backtrace blurred them by about a cell every frame, which the reaction
+   * then had to grow back. That carry is gone.
+   *
+   * And its width was in cells, so a stripe was twice as wide on the 256²
+   * rung as on 512². Gray–Scott's wavelength goes as the square root of
+   * D over the reaction's rate, so D here is given on CHEM_REF's grid and
+   * scaled by (N / CHEM_REF)² onto this one: the same stripe on the plate
+   * at every rung (`npm run turing` measures it by FFT). An explicit
+   * five-point step is stable only while D·dt ≤ 1/4, and at 512² the
+   * default width is 0.28 and the Width knob's top 1.1 (it went unstable
+   * there before, the clamp to [0, 1] turning the plate to static), so each
+   * unit of time is cut into as many substeps as D needs. The reaction's
+   * own terms are the same per unit of time at any substep.
+   */
   stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0): void {
     if (!this.chemLive) return;
+    const s = (this.N / CHEM_REF) ** 2;
+    const du = Du * s, dv = Dv * s;
+    const sub = Math.max(1, Math.ceil(Math.max(du, dv) / CHEM_STABLE));
+    const n = Math.min(Math.max(1, iters) * sub, CHEM_MOST);
     const enc = this.device.createCommandEncoder({ label: 'step chemistry' });
     const pass = enc.beginComputePass({ label: 'step chemistry' });
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    // feed and kill in z and w, Du and Dv in x and y
-    // 1. Advect the chemistry using the fluid's velocity field
-    const disp = this.simF[2] * this.L;
-    this.run(pass, 'advectChem', this.chem.write, [this.chem.read, this.vel.read, this.sampler], this.arg('advect chem', [disp, 0, 0, 0]));
-    this.chem.swap();
-
     // bath: the reagent the whole plate stands in (grayScott), 0 when only pours feed it.
-    const args = this.arg('chem rates', [Du, Dv, feed, kill, bath, 0, 0, 0]);
-    for (let i = 0; i < iters; i++) {
+    const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, 0, 0]);
+    for (let i = 0; i < n; i++) {
       this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
       this.chem.swap();
     }
@@ -1749,12 +1776,25 @@ export class WebGPUFluid {
     this.device.queue.submit([enc.finish()]);
   }
 
-  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
-    if (amount <= 0) return;
+  /**
+   * The colour the reaction makes, laid into the dye (`depositChem`).
+   *
+   * With `print` 0 the activator above `threshold` deposits `colour` at
+   * `amount` a frame and the flow carries it off, Boyle's bench, as the coral
+   * looks have always grown. With `print` above 0 the colour is an indicator
+   * in the liquid the reaction runs in, starch with the iodine of a CIMA dish
+   * (26d, Turing Print): the blue-black complex forms and comes apart with
+   * the activator, so the dye where the reaction is fed is the complex's
+   * equilibrium with the field as it stands, `print` its depth, and nothing
+   * piles up. `bath` is the reagent the whole plate stands in, as stepChemistry
+   * takes it, so the print covers what the reaction is fed.
+   */
+  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0): void {
+    if (amount <= 0 && print <= 0) return;
     const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });
-    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, 0, 0, ...log, 0]));
+    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, 0]));
     this.dye.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
@@ -2341,6 +2381,17 @@ export class WebGPUFluid {
           if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, flux);
           else this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
+          /*
+            The reaction rides with the colour it lays (stepChemistry, and
+            why it is carried here and only here). This branch carried the
+            dye alone, so under a Labyrinth the pattern stood still while the
+            print it had made moved off.
+          */
+          if (this.chemLive) {
+            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, flux);
+            else this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], flux);
+            this.chem.swap();
+          }
         }
         return;
       }
@@ -3414,7 +3465,8 @@ export class WebGPUFluid {
   }
 
   /** The mix or the reactions, read back whole (RGBA per texel). For checks. */
-  async readChemistry(which: 'mix' | 'rxn' | 'lies'): Promise<{ n: number; data: Float32Array } | null> {
+  async readChemistry(which: 'mix' | 'rxn' | 'lies' | 'chem'): Promise<{ n: number; data: Float32Array } | null> {
+    if (which === 'chem') return this.readHalf(this.chem);
     const pp = which === 'mix' ? this.mix : which === 'rxn' ? this.rxn : this.lies;
     if (!pp) return null;
     const n = pp.size[0];
@@ -3432,6 +3484,28 @@ export class WebGPUFluid {
     buf.destroy();
     return { n, data: out };
   }
+  /** An rgba16float field read back whole as floats (the Gray–Scott field), for checks. */
+  private async readHalf(pp: PingPong): Promise<{ n: number; data: Float32Array }> {
+    const n = pp.size[0];
+    const row = Math.ceil((n * 8) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read half', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read half' });
+    enc.copyTextureToBuffer({ texture: pp.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Uint16Array(buf.getMappedRange().slice(0));
+    buf.unmap();
+    buf.destroy();
+    const half = (h: number) => {
+      const e = (h >> 10) & 31, m = h & 1023, sign = h & 32768 ? -1 : 1;
+      return sign * (e === 0 ? m * 2 ** -24 : e === 31 ? (m ? NaN : Infinity) : (1 + m / 1024) * 2 ** (e - 15));
+    };
+    const out = new Float32Array(n * n * 4);
+    const stride = row / 2;
+    for (let y = 0; y < n; y++) for (let k = 0; k < n * 4; k++) out[y * n * 4 + k] = half(all[y * stride + k]);
+    return { n, data: out };
+  }
+
 
   setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);

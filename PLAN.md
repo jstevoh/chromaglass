@@ -35,12 +35,8 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
   (the "Refresh preset and colour palettes" work owns those). The ferrofluid's colours
   were left alone: Ferro Paint's amber, teal and coral and the thickness-drawn black and
   brown already match Colored I and II.
-  - **26-colour-a** (open): the "Turing Print" relief that #327 described (the pattern's
-    gradient as a bump on the plate's normal) is not on main (reverted in 8278374), so
-    26d is still open, and a print still shows only as deposited dye.
-  - **26-colour-b** (open): the deposit's threshold (v > 0.22) draws the coral as soft
-    blurred rings on the 256² field; 26d's finer field and the plate's own edge
-    reconstruction would make it a print.
+  - **26-colour-a** (not doing) and **26-colour-b** (fixed): see §26, with 26d's Turing
+    Print.
 *The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
@@ -5394,7 +5390,7 @@ like it. On a projector a pattern reads black and white when what it makes is an
 precipitate in a clear liquid under a white lamp, the way Liesegang's bands already
 print (18b's lamp ground, 18l's absorbers).
 
-What the plate has today, and what is missing:
+What the plate had when this was proposed, and what was missing:
 - **Gray–Scott** (`src/lib/chemistry.ts`, the `chemistry` setting; Sensual Laboratory
   0.85, Neon Coral Reef 0.7) runs on the CPU at the solver's grid with feed and kill fixed
   at 0.042 / 0.062 (`LiquidVisualizer.tsx`, `chem.step`), so it only ever grows coral.
@@ -5406,27 +5402,44 @@ What the plate has today, and what is missing:
   repelling within a surface), and stays the magnet's.
 
 Steps:
-- **26a. Gray–Scott on the GPU, carried by the flow.** A compute field at the dye's
-  grid, advected by the same velocity as the dye (one flux pass), so a stir drags the
-  stripes and they heal back to their own width behind it. This is 18k's "chemistry
-  sits still" fixed, and the coral looks keep their look at today's feed and kill.
-- **26b. The pattern as a control.** One knob along Pearson's map, spots → worms →
-  labyrinth → holes (feed and kill moved together, about 0.03/0.055 to 0.04/0.06), and
-  one for the stripe's width (the diffusion lengths, in plate units so it is the same
-  size at every rung). MIDI-learnable, on both desks and the phone.
-- **26c. Where it grows: the poured liquid is the reagent.** The owner's "grow mask"
-  and "dual patterns" are what happens when the feed comes from a reagent that is
-  somewhere: the reaction runs only where its liquid was poured (a bottle on the shelf),
-  and two pours with different feeds make two patterns that meet. A shape, a word or
-  the camera can lay the reagent, as images already pour (`injectImage`).
-- **26d. The look: "Turing Print"** (name open). A clear liquid, a white lamp, the
-  product drawn as an opaque precipitate: black on white, inverted by the lamp. Its edge
-  goes through the plate's own reconstruction (Catmull-Rom and `fwidth`), so the stripes
-  need no FXAA pass; at 256² a 12-pixel stripe is two cells, so it wants the 512² rung or
-  its own finer field like BZ's. Its phone version with it.
-- **Measure:** a lab check that the stripe width holds within 10% at every rung and
-  after a stir (the pattern's own wavelength, by FFT), that a pour with no reagent grows
-  nothing, and the cost of the field in `npm run stages` (target under 0.3 ms at 512²).
+- **26a. Gray–Scott on the GPU, carried by the flow (shipped, #327; carried once since
+  26d).** Story in `docs/plan-shipped.md` §26.
+- **26b. The pattern as a control (shipped, #327; Width in plate units and the phone
+  version with 26d).** Story in `docs/plan-shipped.md` §26.
+- **26c. Where it grows: the poured liquid is the reagent (shipped in part, #327, #331).**
+  A pour of Turing Reagent feeds and seeds the reaction where it lands on any look, with
+  its own pattern baked in (`npm run turing`: 70% of a pour grows, specks with no reagent
+  nothing).
+  - **26c-1, open.** A shape, a word or the camera laying the reagent, as images already
+    pour (`injectImage`): the owner's "grow mask".
+- **26d. The look: "Turing Print" (shipped).** Story in `docs/plan-shipped.md` §26;
+  the owner's eyes owed (`docs/judging.md` §46).
+  - **26d-1, open: the print's cost at 512².** The reaction takes as many substeps as its
+    diffusion needs (two at 512² and the default width, up to six at Width's top), and
+    the target was under 0.3 ms at 512². Only the Mac can say (`npm run stages`).
+  - **26d-2, open: a harder edge than the chemistry gives?** The print's edge is the
+    starch–iodine binding's own (a Hill curve, n = 6), about a fifth of a stripe wide:
+    soft at a close zoom. The owner's pack is a Karl Sims render through FXAA, harder
+    than a dish. If the owner wants that, it is a choice to make, not physics; the plate
+    could threshold the reconstructed field at screen resolution, as Ben-Day's edge does.
+  - **26d-3, open: other colour in a fed print.** Where the print is fed, its dye is the
+    complex's equilibrium and replaces what was there, so a bottle of colour poured into
+    Turing Print shows only while it moves. Keeping both needs the complex as its own
+    share of the dye (a channel the plate reads), as the oil's colour has one.
+  - **26d-4, open: the dish starts empty of substrate.** The field is cleared to u = 0, so
+    on a look with the bath the first seeds die before the bath fills the plate (a third
+    of a second); a cleared dish under a bath should start at u = 1. And the reaction's
+    rim row writes (1, 0, 0, 0), which wipes poured reagent at the edge.
+- **26-colour-a. The relief #327 described: not doing.** #327's message described the
+  pattern's gradient as a bump on the plate's normal; the code never reached main (its
+  plate shader was not in the diff, and the revert 8278374 had nothing of it to take
+  out). A CIMA print is flat: the complex sits in the gel and does not raise it, so
+  Turing Print draws no relief (Edge Relief 0 in the look).
+- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Three causes: the
+  deposit read the field on the logical grid, so it drew its top-left corner stretched
+  1.3–2.7 times; the field was carried twice a frame, once by a bilinear backtrace that
+  blurred it; its width was in cells. The coral looks (Sensual Laboratory, Neon Coral
+  Reef) now grow a pattern half the size they showed, where it grew.
 
 ## 27. Every control does something you can see
 

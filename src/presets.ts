@@ -895,6 +895,67 @@ export const PRESETS: Preset[] = [
     }
   },
   {
+    /*
+      PLAN.md 26d. The owner's "Mask Reaction Diff" pack, done as the chemistry
+      it imitates: a CIMA dish (Castets, Dulos, Boissonade and De Kepper, 1990)
+      under a white lamp, its gel standing in the reagents (Chemistry 1, the
+      bath) with starch in it (Turing Print 1), so the labyrinth prints as the
+      blue-black starch–iodine complex on clear: black on white, stripes of
+      one width that heal behind a stir. Each pour is more reagent with a speck
+      of the autocatalyst in it, so the pattern grows out from where it lands
+      (26c). No palette: the colour is the indicator's (depositChem).
+    */
+    id: 'turing-print',
+    name: 'Turing Print',
+    description: 'A reaction that prints: the CIMA reaction in a gel with starch, under a white lamp. Labyrinths of one stripe width grow out from each pour in blue-black on clear, and the flow drags them into whorls that heal back.',
+    settings: {
+      lampGround: 1,
+      globalSpeed: 0.0126,
+      surge: 0.2,
+      layerCount: 1,
+      blendMode: 'multiply',
+      gooeyEffect: 0,
+      rotationSpeed: 0.0,
+      centerGravity: 0.0,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#ffffff',
+      ledSpeed: 0.0,
+      diffusionRate: 0.0002,
+      buoyancy: 0.2,
+      advection: 0.4,
+      damping: 0.985,
+      heatDecay: 0.985,
+      automateRate: 0.02,
+      platePressure: 0.15,
+      glassSmear: 0.1,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.5,
+      evaporationRate: 0.0,
+      airVelocity: 0.0,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.4,
+      turbulenceScale: 0.15,
+      turbulenceDetail: 3,
+      blobSurfaceTension: 0.5,
+      boundaryContrast: 0,
+      saturationBoost: 1.0,
+      dyeBudget: 0.35,
+      // A gel print is flat: the complex sits in the gel and does not raise it (PLAN 26-colour-a).
+      edgeRelief: 0,
+      bubbles: 0,
+      plateRock: 0.1,
+      layerScaleVariety: 0,
+      chemistry: 1,
+      chemistryPattern: 1,
+      chemistryWidth: 0.5,
+      turingPrint: 1,
+      exposure: 0.7,
+      audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
+    }
+  },
+  {
     id: 'oil-wheel',
     name: 'Oil Wheel',
     description: 'An Optikinetics wheel warming under a 250 W lamp: yellows, greens and blues turning at half a revolution a minute, cells drifting on convection, no hands on it.',

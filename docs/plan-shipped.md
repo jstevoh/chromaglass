@@ -2612,3 +2612,50 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
   dish's turn carries them round under it, and Cell Size 0.32 → 0.6 so the cells are
   drawn at its zoom.
 
+
+## 26. A reaction that prints: Turing stripes in black and white
+
+### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)
+
+#327 moved the reaction onto a compute field at the dye's grid (`grayScott`, rgba16float:
+u, v, the poured reagent, its pattern) and carried it with the dye's own scheme in the
+step. It also ran a second, semi-Lagrangian carry of a frame's displacement in
+`stepChemistry`, so the stripes ran ahead of the colour they laid (a pour of reagent and
+a pool of dye laid together, stirred: the reagent went 17.7% of the plate to the
+colour's 9.2%) and the bilinear backtrace blurred them a cell a frame. 26d took that
+carry out (8.9% and 9.2%, 0.3% apart, `npm run turing`) and added the field to the
+maze's carry, which had left it standing.
+
+### 26b. The pattern as a control (#327; Width in plate units and the phone with 26d)
+
+Pattern moves feed and kill along Pearson's map, 0.03/0.055 to 0.04/0.06; Width scales
+the diffusion lengths. The lengths were in cells, so a stripe on 256² was twice the
+plate's width of one on 512² (4.64% against 2.37%), and Width's top half drove the
+explicit step past its stability limit (D·dt ≤ 1/4) into static. Now they are given on
+a 384² reference grid and scaled by (N/384)², each unit of time cut into as many
+substeps as D needs: 3.06%, 3.12% and 3.19% at 256², 384² and 512². Pattern, Width and
+Turing Print are MIDI-learnable and on the phone's Looks sheet when a look runs the
+reaction (26b had shipped without the phone).
+
+### 26d. The look: "Turing Print"
+
+A CIMA dish under a white lamp: the gel stands in the reagents (Chemistry 1, the bath)
+with starch in it (`turingPrint`). Starch is what shows a CIMA pattern, and by holding
+the activator back it is what lets one form (Lengyel and Epstein, 1991); the blue-black
+complex forms and comes apart in well under a frame. So with the print on, the deposit
+does not pile colour up for the flow to carry off: it sets the dye, where the reaction
+is fed, to the complex's equilibrium with the activator as it is now, through a Hill
+curve (iodine binds into amylose cooperatively; n = 6, half bound at v = 0.2, the
+labyrinth's median), at a depth that is black on the lamp. Rendered in the lab: 56% dark,
+34% light, 9% in the middle tones; darkness against the activator cell for cell 0.94;
+the dark share 56.47% and 56.49% thirty frames apart.
+
+Found on the way and fixed with it: the deposit read the field as if it were on the
+logical 192² grid (it was, when the reaction ran on the CPU), so it drew the field's
+top-left corner stretched 1.3 to 2.7 times over the plate and away from where it grew
+(the same render's correlation with the field: −0.007). The coral looks now grow a
+pattern half the size they showed, where it grew.
+
+`npm run turing` measures all of it; its five controls (the logical-grid read, the
+second carry, diffusion in cells, the print off, a reaction fed everywhere) each turn
+their line red.

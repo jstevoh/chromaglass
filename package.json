@@ -145,6 +145,7 @@
     "grating": "node scripts/grating.mjs",
     "benday": "node scripts/benday.mjs",
     "grainedge": "node scripts/grainedge.mjs",
+    "turing": "node scripts/turing.mjs",
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
     "colours": "node scripts/colours.mjs",

@@ -1607,6 +1607,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="chemistryWidth"
         />
         <Slider
+          label="↳ Turing Print"
+          value={settings.turingPrint ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turingPrint: v })}
+          settingKey="turingPrint"
+        />
+        <Slider
           label="Gel Wheel"
           value={settings.gelWheel ?? 0}
           min={0}
