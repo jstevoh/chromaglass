@@ -4218,7 +4218,7 @@ export default function App() {
         </div>
       )}
       {musicFile && ((renderOpen && !libraryOpen) || songRender.running) && (
-        <PanelGuard name="The song render" onClose={() => { setRenderOpen(false); songRender.reset(); }}>
+        <PanelGuard name="The song render" onClose={() => { songRender.cancel(); setRenderOpen(false); songRender.reset(); }}>
         <RenderPanel
           songName={musicFile.name}
           songSeconds={musicTime.d}

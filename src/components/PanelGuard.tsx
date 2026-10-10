@@ -102,7 +102,12 @@ function FailedCard({ name, error, inline, onRetry, onClose, closeLabel }: {
 }
 
 interface Props {
-  /** How the card names it to the performer, and how the log and the debug hook name it. */
+  /**
+   * How the card names it to the performer, and how the log and the debug hook
+   * name it. Two guards may share a name only if they can never be up at once
+   * (the crash report's two places, one per layout): the hook would fault both
+   * and their cards would share a slot.
+   */
   name: string;
   children: ReactNode;
   /** Draw the card where the panel was, not pinned to the window (a panel inside another). */
@@ -139,10 +144,13 @@ export class PanelGuard extends Component<Props, { error: unknown }> {
 
   private retry = () => { this.unstack(); this.setState({ error: null }); };
 
-  // The card stays until the parent takes the panel away: clearing the error
-  // first would draw the panel again for the frame before it goes, and a panel
-  // that throws on every render would throw once more on its way out.
-  private close = () => { this.unstack(); this.props.onClose?.(); };
+  // Close puts the panel away and clears the card in the same render. Not
+  // every parent unmounts the guard when its panel closes (the bench overlay is
+  // always mounted and draws nothing without text; the cue bar stays up while
+  // a look is fading back), so a card that waited to be unmounted stayed up
+  // with a Close that did nothing. If the panel throws again with the parent's
+  // state changed, the card comes back, which is the truth.
+  private close = () => { this.unstack(); this.props.onClose?.(); this.setState({ error: null }); };
 
   render() {
     const { error } = this.state;
