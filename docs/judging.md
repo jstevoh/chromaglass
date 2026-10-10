@@ -1222,3 +1222,18 @@ then a thick look (Thickness up), then a ferro look, draw a Blow slowly across a
   or as the tool not working?
 - A Blow held still (not the straw) still does what it did; that is 15g-2.
 
+
+## 46. Turing Print (PLAN 26d)
+
+Pick **Turing Print** on the Perform desk, then on the phone. With music, give it half a
+minute: labyrinths should grow out from where the reagent drops land, blue-black on the
+white lamp, every stripe about the same width. Then stir it with a hand or a Blow:
+
+- Do the stripes read as a print, black and white, or as soft grey worms? The edge is the
+  chemistry's own, about a fifth of a stripe; say if you want it harder (PLAN 26d-2);
+- After a stir, do the stripes drag into whorls and heal back to their own width within
+  a few seconds?
+- Are the stripes the size you want? Pattern Width on the Design desk or the phone's
+  Looks sheet moves it; say where you would set it;
+- On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
+  grows where it grew. Better, or did the bigger coral suit those looks?

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Turing Print
+
+- A new look, **Turing Print**: the CIMA reaction in a gel with starch, under a white
+  lamp. Labyrinths of one stripe width grow out from each drop of reagent, blue-black on
+  clear, and heal back after a stir. Its **Turing Print** control (Design desk, MIDI,
+  remote, phone) prints any look's reaction this way.
+- The reaction's pattern was drawn 1.3–2.7 times its size and away from where it grew,
+  carried twice a frame, and wider on smaller grids. It is now drawn where it is, at one
+  width on every grid (`npm run turing`). The coral on Sensual Laboratory and Neon Coral
+  Reef is half the size it was.
+
 ### Added — an Alpha label beside the name
 
 - ChromaGlass is in alpha, and the app says so: an amber "Alpha" beside the name on

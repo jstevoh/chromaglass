@@ -4975,6 +4975,13 @@ export default function App() {
             onMagnetSize={(v) => updateSettings({ magnetSize: v })}
             benDay={settings.benDay ?? 0}
             onBenDay={(v) => updateSettings({ benDay: v })}
+            reaction={{
+              on: (settings.chemistry ?? 0) > 0.001 || (settings.turingPrint ?? 0) > 0.001,
+              pattern: settings.chemistryPattern ?? 0,
+              width: settings.chemistryWidth ?? 0.5,
+              print: settings.turingPrint ?? 0,
+            }}
+            onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
             clearFilm={settings.clearFilm ?? 0}

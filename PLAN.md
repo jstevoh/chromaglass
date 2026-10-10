@@ -22,7 +22,21 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 ### Claude (UI & Stability Track)
 **Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
 **Current Priority: Bug Cleanup & New Performance UI**
-* Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.
+* ~~Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.~~
+  Done (26-colour, this PR). The chemistry first had to grow at all: on the looks with
+  Chemistry on, the GPU Gray–Scott fed nothing (its feed came only from poured reagent,
+  and every random seed wiped the reagent), so Sensual Laboratory and Neon Coral Reef
+  printed an empty plate (lab: 3.6 units of dye in four seconds, 451.6 after). Now a
+  look's Chemistry is a bath that feeds the whole plate, a pour of Turing Reagent feeds
+  and seeds the reaction where it lands on any look, and the field is cleared with the
+  look's other chemistry. Colours: Turing Reagent pours CIMA's pale straw (`#f5e69e`,
+  was a hot pink `#ff88ff`) and, on a look without Chemistry, its pattern prints in
+  starch–iodine indigo (`TURING_PRODUCT`); a look with Chemistry keeps its own palette
+  (the "Refresh preset and colour palettes" work owns those). The ferrofluid's colours
+  were left alone: Ferro Paint's amber, teal and coral and the thickness-drawn black and
+  brown already match Colored I and II.
+  - **26-colour-a** (not doing) and **26-colour-b** (fixed): see §26, with 26d's Turing
+    Print.
 *The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
@@ -166,7 +180,9 @@ merge conflicts are the shared documents', which 0.6 ends.
 ### Wave 5. Playing it: the instrument
 
 **§27, every control does something you can see** (the owner, 2026-10-05): ~~27a-c Plate
-Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G).
+Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G);
+~~27e Sound Drive's bass as the glass~~ (#307), then **27e-1** the kick's drop, **27e-2** the
+film's measure.
 
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
@@ -5380,7 +5396,7 @@ like it. On a projector a pattern reads black and white when what it makes is an
 precipitate in a clear liquid under a white lamp, the way Liesegang's bands already
 print (18b's lamp ground, 18l's absorbers).
 
-What the plate has today, and what is missing:
+What the plate had when this was proposed, and what was missing:
 - **Gray–Scott** (`src/lib/chemistry.ts`, the `chemistry` setting; Sensual Laboratory
   0.85, Neon Coral Reef 0.7) runs on the CPU at the solver's grid with feed and kill fixed
   at 0.042 / 0.062 (`LiquidVisualizer.tsx`, `chem.step`), so it only ever grows coral.
@@ -5392,27 +5408,52 @@ What the plate has today, and what is missing:
   repelling within a surface), and stays the magnet's.
 
 Steps:
-- **26a. Gray–Scott on the GPU, carried by the flow.** A compute field at the dye's
-  grid, advected by the same velocity as the dye (one flux pass), so a stir drags the
-  stripes and they heal back to their own width behind it. This is 18k's "chemistry
-  sits still" fixed, and the coral looks keep their look at today's feed and kill.
-- **26b. The pattern as a control.** One knob along Pearson's map, spots → worms →
-  labyrinth → holes (feed and kill moved together, about 0.03/0.055 to 0.04/0.06), and
-  one for the stripe's width (the diffusion lengths, in plate units so it is the same
-  size at every rung). MIDI-learnable, on both desks and the phone.
-- **26c. Where it grows: the poured liquid is the reagent.** The owner's "grow mask"
-  and "dual patterns" are what happens when the feed comes from a reagent that is
-  somewhere: the reaction runs only where its liquid was poured (a bottle on the shelf),
-  and two pours with different feeds make two patterns that meet. A shape, a word or
-  the camera can lay the reagent, as images already pour (`injectImage`).
-- **26d. The look: "Turing Print"** (the look is #333; the reaction growing is #331). A clear liquid, a white lamp, the
-  product drawn as an opaque precipitate: black on white, inverted by the lamp. Its edge
-  goes through the plate's own reconstruction (Catmull-Rom and `fwidth`), so the stripes
-  need no FXAA pass; at 256² a 12-pixel stripe is two cells, so it wants the 512² rung or
-  its own finer field like BZ's. Its phone version with it.
-- **Measure:** a lab check that the stripe width holds within 10% at every rung and
-  after a stir (the pattern's own wavelength, by FFT), that a pour with no reagent grows
-  nothing, and the cost of the field in `npm run stages` (target under 0.3 ms at 512²).
+- **26a. Gray–Scott on the GPU, carried by the flow (shipped, #327; carried once since
+  26d).** Story in `docs/plan-shipped.md` §26.
+- **26b. The pattern as a control (shipped, #327; Width in plate units and the phone
+  version with 26d).** Story in `docs/plan-shipped.md` §26.
+- **26c. Where it grows: the poured liquid is the reagent (shipped in part, #327, #331).**
+  A pour of Turing Reagent feeds and seeds the reaction where it lands on any look, with
+  its own pattern baked in (`npm run turing`: 70% of a pour grows, specks with no reagent
+  nothing).
+  - **26c-1, open.** A shape, a word or the camera laying the reagent, as images already
+    pour (`injectImage`): the owner's "grow mask".
+- **26d. The look: "Turing Print" (shipped).** Story in `docs/plan-shipped.md` §26;
+  the owner's eyes owed (`docs/judging.md` §46).
+  - **26d-1, open: the print's cost at 512².** The reaction takes as many substeps as its
+    diffusion needs (two at 512² and the default width, up to six at Width's top), and
+    the target was under 0.3 ms at 512². Only the Mac can say (`npm run stages`).
+  - **26d-2, open: a harder edge than the chemistry gives?** The print's edge is the
+    starch–iodine binding's own (a Hill curve, n = 6), about a fifth of a stripe wide:
+    soft at a close zoom. The owner's pack is a Karl Sims render through FXAA, harder
+    than a dish. If the owner wants that, it is a choice to make, not physics; the plate
+    could threshold the reconstructed field at screen resolution, as Ben-Day's edge does.
+  - **26d-3, open: other colour in a fed print.** Where the print is fed, its dye is the
+    complex's equilibrium and replaces what was there, so a bottle of colour poured into
+    Turing Print shows only while it moves. Keeping both needs the complex as its own
+    share of the dye (a channel the plate reads), as the oil's colour has one.
+  - **26d-4, open: the dish starts empty of substrate.** The field is cleared to u = 0, so
+    on a look with the bath the first seeds die before the bath fills the plate (a third
+    of a second); a cleared dish under a bath should start at u = 1. And the reaction's
+    rim row writes (1, 0, 0, 0), which wipes poured reagent at the edge.
+  - **26d-5, open: half floats where the GPU cannot filter full ones.** The reaction's
+    field is in full floats where the dye is (the first Metal run found the stripe 14%
+    wider at 512² than at 256²: half floats round the substrate's last refill away, and
+    the Mac rounds them toward zero; the story in `docs/plan-shipped.md` §26). A GPU
+    without `float32-filterable` (many Android phones) keeps half floats, so its
+    substrate stops 0.3–0.5% short and its stripe is a little wider. Storing the substrate's
+    deficit 1 − u instead of u would give half floats their fine steps where u is near
+    1, on every GPU and at half the bandwidth, and would make a cleared dish full (26d-4).
+- **26-colour-a. The relief #327 described: not doing.** #327's message described the
+  pattern's gradient as a bump on the plate's normal; the code never reached main (its
+  plate shader was not in the diff, and the revert 8278374 had nothing of it to take
+  out). A CIMA print is flat: the complex sits in the gel and does not raise it, so
+  Turing Print draws no relief (Edge Relief 0 in the look).
+- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Three causes: the
+  deposit read the field on the logical grid, so it drew its top-left corner stretched
+  1.3–2.7 times; the field was carried twice a frame, once by a bilinear backtrace that
+  blurred it; its width was in cells. The coral looks (Sensual Laboratory, Neon Coral
+  Reef) now grow a pattern half the size they showed, where it grew.
 
 ## 27. Every control does something you can see
 
@@ -5501,15 +5542,46 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
     rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
     dials say.
-- **27e. The music should move the picture more (open, its own thread).** The owner,
+- **27e. The music should move the picture more (first part shipped, #307).** The owner,
   2026-10-05: "Generally I don't feel like music is having as much impact on the visuals
-  as I would like." 27a-c make the kick's two rides and the stir answer harder; what the
-  rest of the plate takes from the music (Sound Drive's pours and swells, the bands'
-  routes, the beat clock's accents, the song's shape) has not been measured as a whole.
-  First measure: on `film.yml`'s real songs, how much the picture's motion and colour
-  follow loudness and the kick at beat scale and over 20 s (light-show plan targets r
-  about 0.4 over 20 s), against the same take with the sound off; then pick the routes
-  that read weakest and make each the thing it stands for.
+  as I would like." 27a-c make the kick's two rides and the stir answer harder. Read
+  from the frame loop, the rest of Sound Drive is dye (the centre pulse, the mid's
+  stream, the treble's sparks, the kick's ring, the energy's swell) and two pushes, and
+  on a thin gap (every look since #248) both pushes were nothing: the bass burst (a
+  radial velocity every step while the velocity route is over 0.25) and the kick
+  ring's outward kick push straight out from a point, a gradient, which the projection
+  takes out whole. In the lab on forty pools (`npm run musicforce`), the burst held two
+  seconds at a bass of 0.8 moved 0.006 of the plate's colour; a look's own stir 0.86.
+  And the energy's swell divided the energy (0–1) by 70 as though it were a band, so it
+  never reached its gate of 0.15 on any look.
+  - **Shipped.** The bass is a hand on the glass (`BassPress`, lib/squish.ts): pressed
+    as deep as the velocity route is loud over a palm where the burst was (0.004 a
+    disc at full and Sound Drive 0.45, up to half again), followed each step, let up as
+    the bass falls and all the way when the music stops, moved with an area look's
+    bass. The glass moves the liquid only while it moves, so the plate breathes out as
+    the bass comes in and back as it goes. Lab: 0.30 of the colour moved as a bass of
+    0.8 comes in (the burst 0.006), back to 0.017 once it falls to 0.3; Classic's
+    ferrofluid ring 0.3072 → 0.3069 through three swells; nothing at Sound Drive 0. The
+    swell reads the energy on its own scale (`levels01`, lib/soundLevels.ts) and now
+    pours, on an area look in its areas in turn: every look gains that dye source while
+    the music is loud, which no check measures yet (27e-2's film will). Off a thin gap
+    the burst pushes as before.
+  - **27e-1, open.** The kick ring is still 14 one-cell specks of dye with an outward
+    kick the projection removes (0.008 of the colour over four kicks). A drop that
+    lands is a volume source (PLAN 18c): poured on each kick in the lab, a drop 0.04 of
+    the plate across moved 0.04 a kick and stays, but every drop's volume leaves over
+    the rim, so at a kick a beat it would flush the plate in about three minutes and
+    push Classic's ferrofluid ring out about 0.002 a drop. A drop on the bar's one, or
+    the ring's colour laid where Beat Squeeze's press carries it, without the flush.
+  - **27e-2, open.** The first measure is still owed: on `film.yml`'s real songs, how
+    much the picture's motion and colour follow loudness and the kick at beat scale
+    and over 20 s (light-show plan targets r about 0.4 over 20 s), against the same take
+    with the sound off; and the Mac's `controls` run for Sound Drive before and after
+    this (it read visible on 13 of 20 looks before).
+  - **27e-3, open.** Sound Drive scales none of the kick's forces (Beat Squeeze, Plate
+    Rock) and the stir's music term at most doubles it; Lumia at Sound Drive 0.12 hears
+    almost nothing. Whether one dial should be the music's reach on all of them is a
+    question for the owner once 27e-2 says which reads weakest.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)

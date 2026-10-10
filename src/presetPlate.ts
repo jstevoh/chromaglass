@@ -73,6 +73,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'stardust-collapse':  [15, 23, 10, 17, 21, 7],
   'lumia':              [10, 7, 1],
   'sensual-laboratory': [14, 12],
+  'turing-print':       [14, 22],                // graphite and midnight, unused while the print is on: its colour is the indicator's (depositChem)
   'oil-wheel':          [17, 1, 6, 5, 18, 10],
   'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-1969':      [1, 0, 3, 7, 5, 10],
@@ -132,6 +133,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   // found by `npm run plate`, which is the whole reason it exists.
   'lumia':              ['pour'],                 // nothing on this plate arrives suddenly
   'sensual-laboratory': ['drop', 'spray'],        // a reaction started, then spattered across
+  'turing-print':       ['drop'],                 // each drop of reagent a place a pattern grows from
   'oil-wheel':          ['pour', 'drop'],         // a wheel is filled, not thrown at
   'poster-1969':        ['pour', 'drop'],
   'fillmore-1969':      ['pour', 'drop'],
@@ -216,6 +218,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'lumia':              ['water', 'glycerine', 'soap'],
   // Boyle put reactions on the platen — cells growing, then carried off.
   'sensual-laboratory': ['silicone', 'soap'],
+  // The reagent is what the reaction grows from (26c); water is the dish's own.
+  'turing-print':       ['reagent', 'water'],
   'oil-wheel':          ['oil', 'silicone'],
   // The flat hard-edged poster: two dyes that refuse to blend into a third.
   // This is the look the repel channel was written for.

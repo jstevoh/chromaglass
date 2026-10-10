@@ -176,7 +176,11 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // is. Each writes into the liquid field, and the field goes on acting for as
   // long as the liquid is there — which is the whole difference between soap
   // and a blue dye called Soap.
-  { id: 'reagent', name: 'Turing Reagent', color: '#ff88ff', own: '#ffffff', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
+  // The Turing reaction's own solution, CIMA's: chlorine dioxide, iodine and
+  // malonic acid, a pale straw from the free iodine, which is its colour out
+  // of the box. The pattern it grows prints in starch-iodine indigo
+  // (TURING_PRODUCT, lib/chemistry.ts). It poured a hot pink before.
+  { id: 'reagent', name: 'Turing Reagent', color: '#f5e69e', own: '#f5e69e', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
     behaviour: { reagent: 1, weight: 0.02 } },
   { id: 'soap',      name: 'Soap',      color: '#ffffff', own: '#ffffff',
     description: 'Breaks the film: colour runs away from it and curls into filaments',
@@ -710,6 +714,7 @@ export interface VisualizerSettings {
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
   chemistryPattern: number;
   chemistryWidth: number;
+  turingPrint: number;        // the reaction drawn as starch's blue-black complex with it, in equilibrium, black on the lamp (26d); 0 deposits colour as the coral looks do
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
@@ -1066,6 +1071,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   chemistry: 0,
   chemistryPattern: 0,
   chemistryWidth: 0.5,
+  turingPrint: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
   filmMix: 0.7,
