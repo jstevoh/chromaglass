@@ -928,14 +928,16 @@ const MACRO = /* wgsl */ `
 fn macroWarpOffset(fuv: vec2f) -> vec2f {
   if (U.macroEdge < 0.005) { return vec2f(0.0); }
   let zoom = max(1.0, U.camZoom);
-  let f = U.logicalGrid * 0.85 * zoom;
+  // The frequency of the noise must be tied to the physical plate, not the zoom!
+  // If we multiply by zoom, the noise becomes sub-pixel and aliases into chaotic black holes.
+  let f = U.logicalGrid * 0.85;
   let t = vec2f(U.time * 0.003, U.time * -0.002);
   var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
   w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
   
   // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat
   let beatPulse = sin(U.beatPhase * 3.14159265);
-  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.15); // reduced from 0.4 to 0.15 so it vibrates less
+  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.15);
 
   // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
   // plate-wide frame is noise, and on a bead it is the silhouette.
