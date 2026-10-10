@@ -5816,6 +5816,23 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
+- **28d. The looks watched as shows, and the controls ranked** (the owner, 2026-10-10:
+  "take a look at the visuals, create galleries, watch the streaming shows, and optimize
+  the controls and presets", the shows being "real light show videos from our app").
+  - *Showreel* (in progress): `npm run showreel` renders every look through the app's own
+    Render a song (`window.chromaglassRender`, as `npm run render-app` checks it) to the
+    same minute of a real record, on seed 1, and watches each clip as the film does.
+    `showreel.yml`, by hand or a PR labelled `showreel`, six Mac runners. The song is
+    Funkorama (Kevin MacLeod, CC BY 4.0), downloaded by the workflow and held to its hash:
+    the shipped library is ambient and a light show is judged on a band.
+  - *Before* (the film of 2026-10-07, 41 looks, band in a box): against the real shows'
+    2-3 swells a minute and ~9 colour changes a minute, 18 looks swelled 0.0 a minute and
+    30 changed colour 0.0 a minute; motion followed loudness second by second (r 0.34-0.67
+    on all but Fractal Dream) where the real shows follow it only over sections (r -0.13
+    to 0.22).
+  - Then: a gallery of stills and clips, the controls ranked by how much each visibly
+    changes the plate (`controls.yml`), and a ranked list of looks to fix or retire and
+    controls to bring forward, for the owner to pick; each pick its own PR.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
