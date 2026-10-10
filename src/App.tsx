@@ -5018,7 +5018,8 @@ export default function App() {
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
           onLook={(id) => goLookNow(id)}
           onShuffle={triggerLucky}
-          onSave={() => saveCurrentPreset(docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look', '', false)}
+          onSave={(name) => saveCurrentPreset(name, '', false)}
+          saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           dyes={DROPPER_COLORS.slice(0, 8)}
           dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
           onDye={(hex) => updateLiquidColor(selectedLiquidId, hex)}

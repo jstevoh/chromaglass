@@ -47,6 +47,18 @@ const GLASS_SHEET = 'border border-b-0 border-white/10 bg-[rgba(17,17,19,0.92)] 
 /** How many visits show the gesture hint before the hand is trusted to know it. */
 const HINT_VISITS = 3;
 const HINT_KEY = 'chromaglass-play-hints';
+/*
+  Visits, not mounts: counted once a page load. Counted where Play mounts, two
+  trips to All controls and back used up all three showings in one visit.
+*/
+let hintVisitsThisLoad: number | null = null;
+const hintVisits = () => {
+  if (hintVisitsThisLoad !== null) return hintVisitsThisLoad;
+  let n = 0;
+  try { n = Number(localStorage.getItem(HINT_KEY) ?? 0) || 0; localStorage.setItem(HINT_KEY, String(n + 1)); } catch { /* private: every visit is a first */ }
+  hintVisitsThisLoad = n;
+  return n;
+};
 
 const TRAY_TOOLS: { id: PlayTool; label: string }[] = [
   { id: 'dropper', label: 'Drop' },
@@ -62,7 +74,10 @@ export interface PhonePlayProps {
   activeLookId: string | null;
   onLook: (id: string) => void;
   onShuffle: () => void;
-  onSave?: () => void;
+  /** Save the plate as a new look under a name, asked for every time (QA-18), as the desks' Save. */
+  onSave?: (name: string) => void;
+  /** The name the field starts with. */
+  saveSuggestion?: string;
   dyes: readonly string[];
   dye: string;
   onDye: (hex: string) => void;
@@ -107,11 +122,9 @@ export function PhonePlay(p: PhonePlayProps) {
   const [picked, setPicked] = useState<PlayTool>('dropper');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [hintVisits] = useState(() => {
-    let n = 0;
-    try { n = Number(localStorage.getItem(HINT_KEY) ?? 0) || 0; localStorage.setItem(HINT_KEY, String(n + 1)); } catch { /* private: every visit is a first */ }
-    return n;
-  });
+  /** The name field, while a save is being named; null when it is not. */
+  const [saveName, setSaveName] = useState<string | null>(null);
+  const [visits] = useState(hintVisits);
 
   /*
     The tray's pick is the app's hand as Play opens and whenever it changes:
@@ -121,6 +134,13 @@ export function PhonePlay(p: PhonePlayProps) {
   const onToolRef = useRef(p.onTool);
   onToolRef.current = p.onTool;
   const pickedRef = useRef(picked);
+  /*
+    On a closeup two fingers are the camera (LiquidVisualizer's pinch, from
+    the zoom the look asks for), not a breath: the plate drops both hands and
+    pinches, so handing it Blow there blew nothing.
+  */
+  const pinchesRef = useRef(false);
+  pinchesRef.current = zoomOf(p.settings) > 1.05;
   useEffect(() => { pickedRef.current = picked; onToolRef.current(picked); }, [picked]);
 
   /*
@@ -137,7 +157,7 @@ export function PhonePlay(p: PhonePlayProps) {
     let timer = 0;
     const apply = () => {
       const now = performance.now();
-      const next = playHand(pickedRef.current, hand, [...down.values()].map(f => ({ travel: f.travel, ms: now - f.t0 })));
+      const next = playHand(pickedRef.current, hand, [...down.values()].map(f => ({ travel: f.travel, ms: now - f.t0 })), pinchesRef.current);
       if (next !== hand) { hand = next; onToolRef.current(next); }
     };
     const onStart = (e: TouchEvent) => {
@@ -209,8 +229,9 @@ export function PhonePlay(p: PhonePlayProps) {
       aria-label={sheet ? 'Close the controls' : 'More controls'}
       aria-expanded={sheet}
       data-testid="play-handle"
-      onClick={() => { if (swiped.current) { swiped.current = false; return; } setSheet(v => !v); }}
-      onPointerDown={(e) => { swipe.current = e.clientY; }}
+      onClick={() => { if (swiped.current) { swiped.current = false; return; } setSaveName(null); setSheet(v => !v); }}
+      // A swipe sends no click to clear the flag, so each touch starts it clear.
+      onPointerDown={(e) => { swipe.current = e.clientY; swiped.current = false; }}
       onPointerUp={(e) => {
         const from = swipe.current; swipe.current = null;
         if (from == null || Math.abs(e.clientY - from) < 24) return;
@@ -260,7 +281,14 @@ export function PhonePlay(p: PhonePlayProps) {
 
   const s = p.settings;
   const zoom = zoomOf(s);
-  const showHint = !sheet && !touched && picked === 'dropper' && hintVisits < HINT_VISITS;
+  const showHint = !sheet && !touched && picked === 'dropper' && visits < HINT_VISITS;
+  const saveNamed = () => {
+    const name = saveName?.trim();
+    if (!name || !p.onSave) return;
+    p.onSave(name);
+    setSaveName(null);
+    setSaved(true);
+  };
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex flex-col justify-between" data-testid="play-screen">
@@ -281,7 +309,7 @@ export function PhonePlay(p: PhonePlayProps) {
         <div className="pointer-events-none flex shrink-0 items-center gap-1">
           {sheet ? (
             p.onSave && (
-              <Pill onPress={() => { p.onSave?.(); setSaved(true); }} label="Save this look" testId="play-save">
+              <Pill onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} label="Save this look" testId="play-save" pressed={saveName !== null}>
                 {saved ? 'Saved' : 'Save'}
               </Pill>
             )
@@ -303,7 +331,7 @@ export function PhonePlay(p: PhonePlayProps) {
       <div className="pointer-events-none flex flex-col items-center">
         {showHint && (
           <div className={`mb-2 rounded-full px-3 py-1 text-[12px] text-text-2 ${GLASS_PILL}`} data-testid="play-hint">
-            tap drops · drag streaks · two fingers blow · hold presses
+            {zoom > 1.05 ? 'tap drops · drag streaks · pinch zooms · hold presses' : 'tap drops · drag streaks · two fingers blow · hold presses'}
           </div>
         )}
         {!sheet ? (
@@ -348,6 +376,22 @@ export function PhonePlay(p: PhonePlayProps) {
               buttons: stacked, a phone on its side had the sheet over all of
               the plate and the buttons a scroll below it.
             */}
+            {saveName !== null && (
+              <form className="flex gap-2 px-4 pb-2" onSubmit={(e) => { e.preventDefault(); saveNamed(); }} data-testid="play-save-form">
+                <input
+                  autoFocus
+                  onFocus={e => e.currentTarget.select()}
+                  value={saveName}
+                  onChange={e => setSaveName(e.target.value)}
+                  aria-label="Name for the new look"
+                  // 16 px: under it, iOS zooms the page in on focus.
+                  className="h-12 min-w-0 flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 text-[16px] text-text outline-none focus:border-accent"
+                  data-testid="play-save-name"
+                />
+                <button type="submit" disabled={!saveName.trim()} data-testid="play-save-confirm"
+                  className="h-12 shrink-0 rounded-[14px] bg-primary px-4 text-[15px] font-medium text-on-primary disabled:opacity-40">Save</button>
+              </form>
+            )}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 landscape:grid landscape:grid-cols-2 landscape:content-start landscape:gap-x-6">
               <div>
               <TouchSlider glass label="Speed" setting="globalSpeed" min={0} max={0.3} value={s.globalSpeed ?? 0}

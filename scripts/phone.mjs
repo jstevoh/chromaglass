@@ -92,6 +92,7 @@ const check = (name, ok, detail = '') => {
   check('one of two blowing fingers lifted still blows', playHand('dropper', 'blow', [f(0, 400)]) === 'blow');
   check('a second finger on a streak blows', playHand('dropper', 'streak', [f(80, 400), f(0, 0)]) === 'blow');
   check('every finger off is a dropper again', playHand('dropper', 'press', []) === 'dropper');
+  check('on the closeup two fingers are the camera, not a breath', playHand('dropper', 'dropper', [f(0, 30), f(0, 0)], true) === 'dropper');
   check('Blow or Press on the tray is that hand for every touch', playHand('blow', 'dropper', [f(80, 900)]) === 'blow' && playHand('press', 'dropper', [f(0, 30), f(0, 0)]) === 'press');
 
   const level = { beta: 45, gamma: 0 };
@@ -1111,7 +1112,22 @@ try {
         const cdp = await ctx.newCDPSession(page);
         const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p.x, y: p.y, id: p.id ?? i })) });
         const tool = () => page.evaluate(() => window.chromaglassDebug().tool());
+        const hands = () => page.evaluate(() => window.chromaglassDebug().hands());
         const A = { x: 150, y: 360 }, B = { x: 250, y: 420 };
+        /*
+          The tray's Drop is the plate's hand as Play comes up, whatever the
+          full layout left in it: a Magnet picked there, then Play, is a
+          dropper. Without this, "a tap drops" below would only read the
+          app's default.
+        */
+        await tap(page, 'play-all-controls');
+        await tap(page, 'phone-tool-magnet');
+        const leftWith = await tool();
+        await tap(page, 'phone-open-more');
+        await tap(page, 'phone-play-screen');
+        await page.waitForTimeout(200);
+        const playWith = await tool();
+        check('Play: coming back from the full layout with the Magnet, the hand is Drop', leftWith === 'magnet' && playWith === 'dropper', `${leftWith} → ${playWith}`);
         await touch('touchStart', [A]); await page.waitForTimeout(150);
         const tapTool = await tool();
         await page.waitForTimeout(HOLD_MS + 250);
@@ -1127,8 +1143,20 @@ try {
         check('Play: a drag streaks', dragTool === 'streak', dragTool);
         await touch('touchStart', [A, { ...B, id: 1 }]); await page.waitForTimeout(150);
         const twoTool = await tool();
+        const twoHands = await hands();
         await touch('touchEnd', []); await page.waitForTimeout(150);
-        check('Play: two fingers blow', twoTool === 'blow', twoTool);
+        check('Play: two fingers blow, as two hands on the glass', twoTool === 'blow' && twoHands.hands.length === 2 && !twoHands.pinch,
+          `${twoTool}, ${twoHands.hands.length} hands, pinch ${twoHands.pinch}`);
+        // On the closeup the pair is the camera, and is left to be it.
+        await page.evaluate(() => window.chromaglassSettings({ macroZoom: 3, macroMode: true }));
+        await page.waitForTimeout(400);
+        await touch('touchStart', [A, { ...B, id: 1 }]); await page.waitForTimeout(150);
+        const zoomTool = await tool();
+        const zoomHands = await hands();
+        await touch('touchEnd', []); await page.waitForTimeout(150);
+        check('Play: on the closeup two fingers pinch, and the hand is not turned to Blow', zoomHands.pinch && zoomTool !== 'blow', `pinch ${zoomHands.pinch}, ${zoomTool}`);
+        await page.evaluate(() => window.chromaglassSettings({ macroZoom: 1, macroMode: false }));
+        await page.waitForTimeout(300);
         await tap(page, 'play-tool-press');
         await touch('touchStart', [A]); await page.waitForTimeout(60);
         for (let i = 1; i <= 6; i++) { await touch('touchMove', [{ x: A.x + i * 10, y: A.y }]); await page.waitForTimeout(30); }

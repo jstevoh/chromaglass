@@ -55,13 +55,13 @@ const URL = `http://localhost:${PORT}/?look=classic&dpr=0.35&play=0`;
 const browser = await launchChromium(chromium, { headless: !HEADED });
 
 const pageErrors = [];
-async function open({ width, height, touch = false, deskMode = null, ready }) {
+async function open({ width, height, touch = false, deskMode = null, ready, url = URL }) {
   const ctx = await browser.newContext({ viewport: { width, height }, isMobile: touch, hasTouch: touch });
   if (deskMode) await ctx.addInitScript((m) => { try { if (!sessionStorage.getItem('saves-set')) { localStorage.setItem('chromaglass-desk-mode', m); sessionStorage.setItem('saves-set', '1'); } } catch { /* */ } }, deskMode);
   const page = await ctx.newPage();
   page.setDefaultTimeout(30_000);
   page.on('pageerror', (e) => { pageErrors.push(e.message); console.log('  [pageerror]', e.message.slice(0, 200)); });
-  await page.goto(URL, { waitUntil: 'load' });
+  await page.goto(url, { waitUntil: 'load' });
   await page.getByTestId(ready).first().waitFor({ state: 'visible', timeout: 60_000 });
   await page.waitForTimeout(600);
   return { ctx, page };
@@ -263,6 +263,26 @@ try {
     const list = await stored(page);
     check('phone: it is saved under that name', list?.length === 1 && list[0].name === 'Pocket look', JSON.stringify(list?.map(p => p.name)));
     check('phone: and listed under Yours in the same sheet', await count(page, `phone-look-${list?.[0]?.id}`) === 1);
+    await ctx.close();
+  }
+
+  // ── Play, the screen a phone opens on (PhonePlay.tsx): its Save asks too ──
+  {
+    const { ctx, page } = await open({ width: 390, height: 844, touch: true, ready: 'play-screen', url: URL.replace('&play=0', '') });
+    await page.getByTestId('play-handle').tap();
+    await page.waitForTimeout(250);
+    check('Play: the sheet has a Save', await count(page, 'play-save') === 1);
+    await page.getByTestId('play-save').tap();
+    check('Play: Save asks for a name', await count(page, 'play-save-name') === 1);
+    await page.getByTestId('play-save-name').fill('Sofa look');
+    const field = await page.getByTestId('play-save-name').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+    check('Play: the name field is 16 px, so iOS does not zoom on it', field >= 16, `${field} px`);
+    await page.getByTestId('play-save-confirm').tap();
+    await page.waitForTimeout(300);
+    const list = await stored(page);
+    check('Play: it is saved under that name', list?.length === 1 && list[0].name === 'Sofa look', JSON.stringify(list?.map(p => p.name)));
+    const tiles = await page.getByTestId('play-look-tile').allTextContents();
+    check('Play: and it is in the looks strip', tiles.some(t => t.includes('Sofa look')), `${tiles.length} tiles`);
     await ctx.close();
   }
 

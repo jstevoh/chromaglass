@@ -1121,12 +1121,15 @@ which the checks written against it now open.
 With Drop on the tray the touch picks its own hand, as the hint over the tray says on the
 first three visits: a tap drops, a drag streaks, two fingers blow, a still hold (450 ms)
 presses. Each is a tool the plate already has with its own physics; the reading only picks
-which, and a touch keeps the hand it became until every finger is off.
+which, and a touch keeps the hand it became until every finger is off. On the closeup two
+fingers stay the camera (the plate's pinch), and the hint says "pinch zooms" there. Save
+asks for a name every time, as QA-18 has it everywhere else.
 
-Measured: `npm run phone` 292 → 350 (all green in a cloud session; the hands' four, read
-from the tool the plate's loop holds, need the plate and run under `PW_WEBGPU=1` and on the
-Mac shard). `layout` 58/58, `applink` 48/48 (Play here now lands on Play, and the Laptop
-remote is reached through All controls, 8-play-a), `saves` 33/33.
+Measured: `npm run phone` 292 → 368 under `PW_WEBGPU=1` (the hands' six, read from the
+tool and the hands the plate's loop holds, need the plate; without it they are reported as
+not run, and the Mac shard requires them). `saves` 33 → 38 (Play's Save), `layout` 58/58,
+`applink` 48/48 (Play here now lands on Play, and the Laptop remote is reached through All
+controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
 
 ### 9. Ferrofluid after the references
 

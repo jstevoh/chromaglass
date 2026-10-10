@@ -41,8 +41,9 @@ export function wantsPhoneLayout(env: {
 }): boolean {
   const q = new URLSearchParams(env.query);
   if (q.has('phone')) return q.get('phone') !== '0' && q.get('phone') !== 'false';
-  if (env.path && isPlayPath(env.path)) return true;
+  // Full layout first: chosen on /play it holds for the visit, through a turn of the phone.
   if (env.sessionOff) return false;
+  if (env.path && isPlayPath(env.path)) return true;
   return env.coarse && Math.min(env.width, env.height) < PHONE_SHORT_SIDE;
 }
 

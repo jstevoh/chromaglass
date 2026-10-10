@@ -31,6 +31,11 @@
  * Blow or Press picked on the tray is that hand for every touch, as on the
  * full layout: the reading is only Drop's.
  *
+ * On the closeup two fingers are the camera instead (`pinches`): the plate
+ * reads a pair there as a pinch, zoom and aim, and lets go of both hands, so
+ * a breath handed to it then blows nothing. The hint says "pinch zooms"
+ * there, as the design's notes have it.
+ *
  * Pure, so `npm run phone` holds it to the hint without a plate.
  */
 
@@ -64,10 +69,11 @@ export interface Finger {
  * The hand for the fingers now down, given the hand the touch already is
  * (`was`, 'dropper' when a touch begins) and what the tray has picked.
  */
-export function playHand(picked: PlayTool, was: PlayHand, fingers: readonly Finger[]): PlayHand {
+export function playHand(picked: PlayTool, was: PlayHand, fingers: readonly Finger[], pinches = false): PlayHand {
   if (picked !== 'dropper') return picked;
   if (fingers.length === 0) return 'dropper';
-  if (fingers.length >= 2) return 'blow';
+  // On the closeup two fingers are the camera, and the plate lets go of both hands for it.
+  if (fingers.length >= 2) return pinches ? was : 'blow';
   if (was !== 'dropper') return was;
   const [f] = fingers;
   if (f.travel >= DRAG_PX) return 'streak';
