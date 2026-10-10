@@ -3435,7 +3435,7 @@ export default function App() {
     under that is through the camera (`wallToPlate`). A point without `wall`
     is the plate's already (OSC, an older remote). A stroke maps both its
     ends, so it shrinks with the plate as a mouse's does; a lean is only a
-    direction, so it is turned and keeps its length.
+    direction in the room, so it is turned and keeps its length and angle.
   */
   const onWall = (wall: unknown, x: number, y: number, layer: number, dx?: number, dy?: number,
                   vec: 'stroke' | 'lean' = 'stroke', turned = true) => {
@@ -3443,13 +3443,18 @@ export default function App() {
     if (wall !== true || !v) return { x, y, dx, dy };
     const p = v.wallToPlate(x, y, layer, turned);
     if (dx === undefined || dy === undefined) return { x: p.x, y: p.y, dx, dy };
-    const q = v.wallToPlate(x - dx, y - dy, layer, turned);
-    let mx = p.x - q.x, my = p.y - q.y;
-    if (vec === 'lean') {
-      const was = Math.hypot(dx, dy), now = Math.hypot(mx, my);
-      if (now > 1e-9) { mx *= was / now; my *= was / now; }
+    if (vec === 'stroke') {
+      const q = v.wallToPlate(x - dx, y - dy, layer, turned);
+      return { x: p.x, y: p.y, dx: p.x - q.x, dy: p.y - q.y };
     }
-    return { x: p.x, y: p.y, dx: mx, dy: my };
+    /*
+      A pen's lean is a direction in the room, not wall units: a 45° lean
+      drawn as wall units on a 16:9 wall would come out at 29°. So it is
+      only turned, by the angle the camera turns a step to the right through.
+    */
+    const r = v.wallToPlate(x + 0.01, y, layer, turned);
+    const a = Math.atan2(r.y - p.y, r.x - p.x);
+    return { x: p.x, y: p.y, dx: dx * Math.cos(a) - dy * Math.sin(a), dy: dx * Math.sin(a) + dy * Math.cos(a) };
   };
   const padPictureRef = useRef<PadPictureSender | null>(null);
 

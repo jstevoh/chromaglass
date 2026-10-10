@@ -27,7 +27,10 @@
  * (`pad-picture`) every second; the laptop sends while a lease is under three
  * seconds old, so a phone that locks, leaves Draw or drops off the network
  * stops the pictures within three seconds without anyone saying goodbye, and
- * the relay keeps no state about who wants what (it has none by design).
+ * the relay keeps no state about who wants what (it has none by design). The
+ * cost of that: while any remote asks, the relay hands the pictures to every
+ * linked remote, and one left on Controls drops them unpainted (PLAN
+ * 8-draw-a-2, a relay that routes them only to the askers).
  */
 import type { RemoteMessage } from './remoteProtocol';
 
@@ -120,7 +123,10 @@ export class PadPictureSender {
     this.last = t;
     this.busy = true;
     const seq = ++this.seq;
-    small.toBlob((blob) => {
+    // `toBlob` can throw (an encoder that fails, a canvas that is not
+    // origin-clean): then nothing is in flight, and a stuck `busy` would end
+    // the pictures until a reload.
+    try { small.toBlob((blob) => {
       if (!blob) { this.busy = false; return; }
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -131,7 +137,7 @@ export class PadPictureSender {
         this.send({ type: 'picture', src: reader.result, w, h, aspect, seq });
       };
       reader.readAsDataURL(blob);
-    }, 'image/jpeg', QUALITY);
+    }, 'image/jpeg', QUALITY); } catch { this.busy = false; }
   }
 }
 
@@ -143,5 +149,7 @@ export class PadPictureSender {
 let current: PadPictureSender | null = null;
 export function setPadPictureSender(s: PadPictureSender | null): void { current = s; }
 export function padPictureSender(): PadPictureSender | null { return current; }
-/** Called by the frame task with the canvas it just drew. */
-export function tapPadPicture(canvas: HTMLCanvasElement): void { current?.tap(canvas); }
+/** Called by the frame task with the canvas it just drew. Never throws into it: a pad's picture is not worth a frame. */
+export function tapPadPicture(canvas: HTMLCanvasElement): void {
+  try { current?.tap(canvas); } catch { /* the next frame tries again */ }
+}

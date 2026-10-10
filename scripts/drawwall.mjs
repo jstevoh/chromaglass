@@ -35,10 +35,11 @@
  * With `--app` (needs WebGPU frames: the Mac): the real app is the laptop.
  * The pictures are its frame task's (the only place a WebGPU canvas can be
  * read), not black, and the same colour as the plate photographed by its
- * own `grabFrame`; and a drop from the pad at a point near the wall's corner
- * changes the picture in that cell more than anywhere else. The control:
- * the same drop sent the old way (no `wall`, the plate's point) does not
- * land there, which is the bug the mapping fixes.
+ * own `grabFrame`; and on a dish turned a radian, a drop from the pad off the
+ * middle changes the picture under the finger more than anywhere else. The
+ * controls: the same point mapped without the dish's turn lands elsewhere on
+ * the wall, and sent the old way (no `wall`, the plate's point) it does not
+ * land there either, which is the bug the mapping fixes.
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
@@ -262,41 +263,63 @@ try {
       `pad ${remoteMean.map(v => v.toFixed(0)).join(',')} plate ${plateMean?.map(v => v.toFixed(0)).join(',')}`);
 
     /*
-      Where a drop lands. Four drops at one point a quarter in from the
-      wall's top right corner, and the picture's 8×6 grid read before and
-      after: the cell under the finger must change the most. The control
-      sends the same four as an older remote would (no `wall`), straight
-      onto the relay.
+      Where a drop lands, on a turned dish. The dish is set to a radian round
+      (with CALM it holds there), and four drops go to a point off the
+      middle; the picture's 8×6 grid is read before and after, and the
+      change's centre (the cells over three medians, weighted) must sit on
+      the point, its most changed cell the point's own. Two controls, sent
+      straight onto the relay as an older remote would (no \`wall\`):
+      - the same point through the camera with the dish's turn left out,
+        which is on the wall by construction (same distance from the middle)
+        and must land elsewhere: the turn is part of the mapping;
+      - the point as the plate's own (the old pad), which must not land
+        there either (off the wall, or somewhere else on it).
     */
-    const G = 8, H = 6, U = 0.8, V = 0.75;
+    const G = 8, H = 6, U = 0.6875, V = 0.5833, TURN = 1.0;
+    await display.evaluate((a) => window.chromaglassRotation?.([a, a]), TURN);
+    await display.waitForTimeout(300);
     const cellOf = (u, v) => Math.min(G - 1, Math.floor(u * G)) + Math.min(H - 1, Math.floor((1 - v) * H)) * G;
     const change = (a, b) => a.map((c, i) => Math.abs(c[0] - b[i][0]) + Math.abs(c[1] - b[i][1]) + Math.abs(c[2] - b[i][2]));
     const settle = async () => { await page.waitForTimeout(1500); return gridOf(page, G, H); };
     const judge = (diff) => {
       const want = cellOf(U, V);
       const order = diff.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
-      const sorted = [...diff].sort((a, b) => a - b);
-      return { want, top: order[0][1], at: diff[want], median: sorted[Math.floor(sorted.length / 2)] };
+      const median = [...diff].sort((a, b) => a - b)[Math.floor(diff.length / 2)];
+      let su = 0, sv = 0, sw = 0;
+      diff.forEach((v, i) => {
+        const wgt = Math.max(0, v - 3 * median);
+        su += wgt * ((i % G) + 0.5) / G; sv += wgt * (1 - (Math.floor(i / G) + 0.5) / H); sw += wgt;
+      });
+      const at = sw > 0 ? [su / sw, sv / sw] : null;
+      return { want, top: order[0][1], peak: order[0][0], here: diff[want], median, at, off: at ? Math.hypot(at[0] - U, at[1] - V) : Infinity };
     };
-    const rot = await display.evaluate(() => window.chromaglassDebug?.()?.rotation?.current ?? null);
+    const say = (j) => `cell ${j.want}: ${j.here.toFixed(0)}, most changed ${j.top} (${j.peak.toFixed(0)}), median ${j.median.toFixed(0)}, centre ${j.at ? j.at.map(v => v.toFixed(2)).join(',') : 'none'}`;
     const w = await d.box();
-    // Drift alone, over the same time, for the account.
     const a0 = await settle();
-    const drift = change(a0, await settle());
+    const drift = Math.max(...change(a0, await settle()));
     const b0 = await gridOf(page, G, H);
     for (let i = 0; i < 4; i++) { await d.tapAt(w.x + U * w.width, w.y + (1 - V) * w.height); await page.waitForTimeout(120); }
     const hit = judge(change(b0, await settle()));
-    check('a drop from the pad lands under the finger on the wall', hit.top === hit.want && hit.at > 3 * Math.max(hit.median, Math.max(...drift)),
-      `cell ${hit.want}: ${hit.at.toFixed(0)}, most changed ${hit.top}, median ${hit.median.toFixed(0)}, drift ≤ ${Math.max(...drift).toFixed(0)}, dish at ${JSON.stringify(rot)}`);
+    check('a drop from the pad lands under the finger on a turned dish', hit.top === hit.want && hit.off < 0.1 && hit.peak > 3 * Math.max(hit.median, drift),
+      `${say(hit)}, drift ≤ ${drift.toFixed(0)}`);
     const old = new WebSocket(`ws://127.0.0.1:${PORT}/remote-ws`);
     await new Promise((resolve, reject) => { old.once('open', resolve); old.once('error', reject); });
     old.send(JSON.stringify({ type: 'hello', role: 'controller', key: KEY }));
     await wait(300);
-    const c0 = await gridOf(page, G, H);
-    for (let i = 0; i < 4; i++) { old.send(JSON.stringify({ type: 'drop', x: U, y: V, layer: 0, amount: 0.5 })); await wait(120); }
-    const miss = judge(change(c0, await settle()));
-    check('the control: sent as the plate\'s point (the old pad), it lands elsewhere', miss.at < hit.at / 2,
-      `cell ${miss.want}: ${miss.at.toFixed(0)} against ${hit.at.toFixed(0)} from the pad`);
+    const sendOld = async (x, y) => {
+      const c0 = await gridOf(page, G, H);
+      for (let i = 0; i < 4; i++) { old.send(JSON.stringify({ type: 'drop', x, y, layer: 0, amount: 0.5 })); await wait(120); }
+      return judge(change(c0, await settle()));
+    };
+    const flat = await display.evaluate(([u, v]) => window.chromaglassDebug?.()?.wallToPlate(u, v, 0, false), [U, V]);
+    const unturned = flat ? await sendOld(flat.x, flat.y) : null;
+    check('the control: through the camera without the dish\'s turn, it lands on the wall elsewhere',
+      unturned && unturned.peak > 3 * Math.max(unturned.median, drift) && unturned.top !== unturned.want && unturned.off > 0.15,
+      unturned ? say(unturned) : 'no wallToPlate on the display');
+    const plain = await sendOld(U, V);
+    check('the control: as the plate\'s own point (the old pad), it does not land there', plain.top !== plain.want && plain.off > 0.15, say(plain));
+    const held = await display.evaluate(() => window.chromaglassDebug?.()?.rotation?.current ?? null);
+    check('and the dish held its turn throughout', Array.isArray(held) ? Math.abs(held[0] - TURN) < 0.05 : Math.abs(Number(held) - TURN) < 0.05, JSON.stringify(held));
     old.close();
     await d.ctx.close();
   }
