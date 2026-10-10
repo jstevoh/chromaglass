@@ -22,7 +22,25 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 ### Claude (UI & Stability Track)
 **Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
 **Current Priority: Bug Cleanup & New Performance UI**
-* Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.
+* ~~Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.~~
+  Done (26-colour, this PR). The chemistry first had to grow at all: on the looks with
+  Chemistry on, the GPU Gray–Scott fed nothing (its feed came only from poured reagent,
+  and every random seed wiped the reagent), so Sensual Laboratory and Neon Coral Reef
+  printed an empty plate (lab: 3.6 units of dye in four seconds, 451.6 after). Now a
+  look's Chemistry is a bath that feeds the whole plate, a pour of Turing Reagent feeds
+  and seeds the reaction where it lands on any look, and the field is cleared with the
+  look's other chemistry. Colours: Turing Reagent pours CIMA's pale straw (`#f5e69e`,
+  was a hot pink `#ff88ff`) and, on a look without Chemistry, its pattern prints in
+  starch–iodine indigo (`TURING_PRODUCT`); a look with Chemistry keeps its own palette
+  (the "Refresh preset and colour palettes" work owns those). The ferrofluid's colours
+  were left alone: Ferro Paint's amber, teal and coral and the thickness-drawn black and
+  brown already match Colored I and II.
+  - **26-colour-a** (open): the "Turing Print" relief that #327 described (the pattern's
+    gradient as a bump on the plate's normal) is not on main (reverted in 8278374), so
+    26d is still open, and a print still shows only as deposited dye.
+  - **26-colour-b** (open): the deposit's threshold (v > 0.22) draws the coral as soft
+    blurred rings on the 256² field; 26d's finer field and the plate's own edge
+    reconstruction would make it a print.
 *The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
@@ -87,8 +105,11 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **1.2** **14n** (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks.
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
-- **1.4** **S14** (B, S): an error boundary per panel, desk and phone component, the plate
-  outside them all.
+- **1.4** ~~**S14** (B, S): an error boundary per panel, desk and phone component, the plate
+  outside them all.~~ **Shipped, this PR** (`PanelGuard`; `npm run crash` §1b: the
+  faulted panel is a card and a `panel` line, 0 new fatals, the canvas still mounted, and
+  Try again brings it back; with the guard rethrowing, as main had it, 1 new fatal and 0
+  canvases). Story under S14 in `docs/stability-plan.md`.
 - **1.5** **14s** (B+D, M): Safari's second song, song ID's latch (the input picker **shipped**, `npm run inputpick`).
 - **1.6** **14g** (B, M): a knocked cable brings the input and the projector back.
 - **1.7** **14h** (B+E, M): precache the build, never `startOver()` offline, fonts from the site
@@ -269,9 +290,9 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 1. Seen by the room, or it stops the show.**
 
-- **QA-1** The plate pulses each time a control is pressed or a tool is picked. Desk;
-  the pulse reaches the wall. Thread "Plate pulses on control clicks", no PR yet.
-- **QA-2** The mouse pointer shows on the show screen. Wall, Mac. Draft #271.
+- ~~**QA-1** The plate pulses each time a control is pressed or a tool is picked.~~ #277
+  live (the microphone heard the click; onsets gated in a gesture's moment).
+- ~~**QA-2** The mouse pointer shows on the show screen.~~ #271 live.
 - **QA-19** Interacting with settings switches to and maximizes the performance window. Desk, wall.
   When the additional window that is used for performances is showing and not maximized,
   interacting with settings to change something automatically switches focus to the
@@ -285,8 +306,8 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 - **QA-20** Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
 
-- **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
-  phone. Draft #269 (PLAN 15i).
+- ~~**QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours).~~ #269
+  live (PLAN 15i).
 - ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).
   Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
   top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
@@ -297,8 +318,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-5** Layers: + appears only on one-plate looks and there is no −. Desk, phone.
   **Shipped (#273, §16f)**: + on one layer, − on two, on the desk and the phone's Play
   sheet (a third plate is 16d).
-- **QA-6** The Magnet lays a fixed grid of spikes. Desk, phone. Draft #247 deletes the
-  lattice (9t); thread "Magnet without the grid".
+- ~~**QA-6** The Magnet lays a fixed grid of spikes.~~ #247 live (9t).
 
 - ~~**QA-12**~~ **Fixed, #296**: switching to Hold writes the camera's own centre into the aim (`holdWhereItIs` in `src/lib/macroCamera.ts`, run by App's `updateSettings`, so the desk's chip, the phone's Hold and the Camera menu all get it). `npm run holdjump`: the frame moved 0.299 (from Auto) and 0.197 (from Follow) of the plate in the second after Hold on main, 0.000 now; `npm run phone` asks it in the app on the Mac shard.
 
@@ -331,19 +351,17 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 3. On the wall, it looks wrong.**
 
-- **QA-7** Looks read as pixelated, "very digital", on a laptop. Wall, desk. Draft #267.
-- **QA-8** Sensual Laboratory is washed out by the lamp. Wall. Draft #262 (18b-1).
-- **QA-9** Clock Glass and the ferrofluid looks fall short of their references. Wall.
-  Thread "Clock glass and ferro looks", no PR yet.
-- **QA-10** Velvet Underground, Lumia and Cell Bloom are underwhelming: one area of interest, not
-  several. Wall. Thread "More going on in every look", no PR yet.
+- ~~**QA-7** Looks read as pixelated, "very digital", on a laptop.~~ #267 live (1b–1g open).
+- ~~**QA-8** Sensual Laboratory is washed out by the lamp.~~ #262 live (18b-1).
+- ~~**QA-9** Clock Glass and the ferrofluid looks fall short of their references.~~ #280
+  live for Clock Glass and Ferro Paint; the maze is 9aa.
+- ~~**QA-10** Velvet Underground, Lumia and Cell Bloom are underwhelming: one area of
+  interest, not several.~~ #276 live (25a).
 
-- **QA-13** Fillmore East's dish fills only a small part of the canvas; it should be
-  framed so the whole plate fills it. Wall, desk. Thread "More going on in every look".
+- ~~**QA-13** Fillmore East's dish fills only a small part of the canvas.~~ #276 live
+  (25g: a square frame 44 % lit → 99 %).
 
-- **QA-14** The looks carry too few colours: the owner wants many, with subtle gradients
-  between them, across the presets in general. Wall, desk. Thread "More colour in the
-  looks".
+- ~~**QA-14** The looks carry too few colours.~~ #281 live (18l; 18l-1..7 open).
 
 - ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run royopen` 6/6 (main 1/6). Story in §21 of `docs/plan-shipped.md`.
   Roy, 1963 always opens on a giant black stain over flat red, filling most of
@@ -367,7 +385,11 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   auto-map's magic wand is an ear, since it builds the map by listening. Desk, phone,
   remote. No user-facing text said "AI", "magic" or "smart".
 
-- **QA-11** On the zoom chip, Follow and Auto look like the same thing. They differ in
+- ~~**QA-11**~~ **Fixed, this PR**: Follow wears a crosshair (locked on one subject) and
+  Auto names its cut, "Auto cuts 5s" from Shot Length (`shotLabel`, `src/lib/macroCamera.ts`,
+  the same `max(0.5, macroHold ?? 5)` the camera rides for), on the desk's chip and the
+  phone's camera buttons; the hover titles say "never cuts away" and "then cuts to another".
+  On the zoom chip, Follow and Auto look like the same thing. They differ in
   `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
   without ever cutting away; Auto picks its own subject, rides it for Shot Length (5 s
   by default) and whip-pans to another. Between Auto's cuts both ride one bead, and

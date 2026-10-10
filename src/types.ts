@@ -176,7 +176,11 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // is. Each writes into the liquid field, and the field goes on acting for as
   // long as the liquid is there — which is the whole difference between soap
   // and a blue dye called Soap.
-  { id: 'reagent', name: 'Turing Reagent', color: '#ff88ff', own: '#ffffff', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
+  // The Turing reaction's own solution, CIMA's: chlorine dioxide, iodine and
+  // malonic acid, a pale straw from the free iodine, which is its colour out
+  // of the box. The pattern it grows prints in starch-iodine indigo
+  // (TURING_PRODUCT, lib/chemistry.ts). It poured a hot pink before.
+  { id: 'reagent', name: 'Turing Reagent', color: '#f5e69e', own: '#f5e69e', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
     behaviour: { reagent: 1, weight: 0.02 } },
   { id: 'soap',      name: 'Soap',      color: '#ffffff', own: '#ffffff',
     description: 'Breaks the film: colour runs away from it and curls into filaments',
