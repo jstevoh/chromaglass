@@ -177,6 +177,8 @@ interface SettingsPanelProps {
 /** What the room can be read for, in the order they are worth reaching for. */
 const SCENE_FEATURES: [SceneFeature, string][] = [
   ['motion', 'How busy'],
+  ['motionHighFreq', 'Twitch & Pop (Fast)'],
+  ['motionOverTime', 'Swell (Sustained)'],
   ['crowd', 'How many'],
   ['spread', 'How spread out'],
   ['centroidX', 'Where — across'],

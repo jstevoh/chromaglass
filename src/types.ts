@@ -263,6 +263,10 @@ export type SceneFeature =
   | 'none'
   /** How much is happening, against the room's own recent range. */
   | 'motion'
+  /** Sudden, jerky, or rapidly changing movements (high frequency). */
+  | 'motionHighFreq'
+  /** Steady, sustained movement smoothed over time. */
+  | 'motionOverTime'
   /** How spread out that motion is: one dancer, or the whole floor. */
   | 'spread'
   /** Where the motion is, 0..1 across the frame. */
