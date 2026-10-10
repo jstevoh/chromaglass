@@ -139,6 +139,7 @@
     "airblow": "node scripts/airblow.mjs",
     "forces": "node scripts/forces.mjs",
     "rides": "node scripts/rides.mjs",
+    "musicforce": "node scripts/musicforce.mjs",
     "thick": "node scripts/thick.mjs",
     "flush": "node scripts/flush.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
