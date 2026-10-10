@@ -4,6 +4,7 @@
  * dropper can be light while the press is heavy.
  */
 import { createPortal } from 'react-dom';
+import { usePortalBody } from './portalBody';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../lib/toolAmount';
 
 export function ToolAmount({ tool, value, onChange, className = '' }: {
@@ -65,8 +66,11 @@ export function ToolOptions({ tool, value, onChange, at, onClose, magnetSize, on
   const means = TOOL_AMOUNT_MEANS[tool] ?? 'amount';
   const sized = tool === 'magnet' && magnetSize !== undefined && !!onMagnetSize;
   const W = 280, H = sized ? 210 : 150;
-  const left = Math.max(8, Math.min(at.x, window.innerWidth - W - 8));
-  const top = Math.max(8, Math.min(at.y - H - 8, window.innerHeight - H - 8));
+  // The window it opens in: the page's, or a Tools panel's own (PLAN.md 8g).
+  const body = usePortalBody();
+  const view = body.ownerDocument.defaultView ?? window;
+  const left = Math.max(8, Math.min(at.x, view.innerWidth - W - 8));
+  const top = Math.max(8, Math.min(at.y - H - 8, view.innerHeight - H - 8));
   const fill = ((value - TOOL_AMOUNT.min) / (TOOL_AMOUNT.max - TOOL_AMOUNT.min)) * 100;
   /*
     To the body. Opened from the tool row under the plate, it was drawn
@@ -139,7 +143,7 @@ export function ToolOptions({ tool, value, onChange, at, onClose, magnetSize, on
         </div>
       </div>
     </div>
-    , document.body,
+    , body,
   );
 }
 
