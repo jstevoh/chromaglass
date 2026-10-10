@@ -157,25 +157,33 @@ try {
       window.__drawing = true;
       const sender = new window.PP.PadPictureSender((m) => { window.__sentWidths.push(m.w); ws.send(JSON.stringify(m)); });
       window.__sender = sender;
+      window.__heard = {};
+      window.__ws = ws;
       ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', role: 'display', key }));
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
+        window.__heard[m.type] = (window.__heard[m.type] ?? 0) + 1;
         if (m.type === 'pad-picture') { window.__asked.push({ width: m.width, at: performance.now() }); sender.want(m.width); }
       };
       const loop = (t) => { if (window.__drawing) { paint(t); sender.tap(c); } requestAnimationFrame(loop); };
       requestAnimationFrame(loop);
-    }, { url: `ws://localhost:${PORT}/remote-ws`, key: KEY });
+    }, { url: `ws://127.0.0.1:${PORT}/remote-ws`, key: KEY });
+    for (let t = 0; t < 10_000 && (await wall.evaluate(() => window.__ws.readyState)) !== 1; t += 200) await wait(200);
+    check('the stand-in laptop is on the relay', (await wall.evaluate(() => window.__ws.readyState)) === 1);
     await wait(1500);
     check('nothing is sent before a remote asks', (await wall.evaluate(() => window.__sender.sent)) === 0);
 
     const d = await phone();
     const { page } = d;
     // ── Asks only on Draw ─────────────────────────────────────────────
+    // From the first ask: a slow runner links late, and the gaps are what is judged.
+    for (let t = 0; t < 15_000 && (await wall.evaluate(() => window.__asked.length)) === 0; t += 200) await wait(200);
     await page.waitForTimeout(3200);
     const asked = await wall.evaluate(() => window.__asked);
+    const why = asked.length ? '' : `; the laptop heard ${JSON.stringify(await wall.evaluate(() => window.__heard))}, the remote is ${await page.evaluate(() => document.visibilityState)}, linked ${await page.getByTestId('remote-draw').getAttribute('data-linked')}`;
     const w0 = await d.box();
     const gaps = asked.slice(1).map((a, i) => a.at - asked[i].at);
-    check('on Draw the remote asks every second', asked.length >= 3 && gaps.every(g => g > 700 && g < 1500), `${asked.length} asks, gaps ${gaps.map(g => g.toFixed(0)).join(' ')}`);
+    check('on Draw the remote asks every second', asked.length >= 3 && gaps.every(g => g > 700 && g < 1500), `${asked.length} asks, gaps ${gaps.map(g => g.toFixed(0)).join(' ')}${why}`);
     check('as wide as its frame', asked.length > 0 && Math.abs(asked[asked.length - 1].width - Math.round(w0.width)) <= 1, `${asked.at(-1)?.width} vs ${w0.width.toFixed(0)}`);
     const widths = await wall.evaluate(() => window.__sentWidths);
     // The last: the frame narrowed from 16:9 to the picture's 4:3 on the first one, and asked again.
