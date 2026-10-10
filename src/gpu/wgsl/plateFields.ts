@@ -30,6 +30,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'mixGrade', type: 'vec4f', count: 6, note: 'the LED ring, the front plate, the back plate, the film, the gel wheel, the lumia' },
   { name: 'markGrade', type: 'vec4f', note: 'the logo' },
   { name: 'mixLevel', type: 'vec4f', note: 'the LED ring, the front plate, the back plate, and the logo while it is under something' },
+  { name: 'chemistry', type: 'f32', note: 'Amount of Turing pattern / Liesegang chemistry' },
   { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of seven, 0 the bottom' },
   { name: 'mixPos2', type: 'vec4f', note: 'the rows of the gel wheel, the lumia and the front plate (everything under it is the lamp), and the top row' },
   { name: 'mixBlend', type: 'vec4f', note: 'the blends of the LED ring, the gel wheel, the lumia and the film: 0 own, 1 screen, 2 add, 3 multiply, 4 key' },

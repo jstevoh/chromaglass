@@ -318,7 +318,6 @@ export class WebGPUPlate {
             { binding: 0, resource: { buffer: this.uniformBuffer } },
             { binding: 1, resource: this.sampler },
             { binding: 2, resource: this.layers[i].dye.createView() },
-            { binding: 3, resource: this.layers[i].dyeB.createView() },
           ],
         }));
         pass.draw(6);
