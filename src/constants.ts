@@ -54,23 +54,55 @@ export const COLOR_HARMONIES: number[][] = [
   [10, 5, 11, 0],      // Royal garden: Purple, Emerald, Raspberry, Yellow
   [0, 6, 2, 7],        // Tropical: Yellow, Limpid Green, Hot Pink, Icy Blue
   [9, 10, 4, 5],       // Deep jewel: Cobalt, Purple, Crimson, Emerald
-  [7, 15, 5, 0],       // Pastel glow: Icy Blue, White, Emerald, Yellow
+  [7, 23, 5, 0],       // Pastel glow: Icy Blue, Lavender, Emerald, Yellow (was White; see below)
   [2, 11, 10, 7],      // Magenta dream: Hot Pink, Raspberry, Purple, Icy Blue
   [0, 1, 6, 15],       // Citrus pop: Yellow, Orange, Limpid Green, White
   [8, 3, 0, 10],       // Contrast shock: Blue, Red, Yellow, Purple
   [5, 2, 8, 0],        // Carnival: Emerald, Hot Pink, Blue, Yellow
-  [9, 10, 7, 15],      // Galaxy: Cobalt, Purple, Icy Blue, White
+  [9, 10, 7, 23],      // Galaxy: Cobalt, Purple, Icy Blue, Lavender (was White; see below)
   [16, 21, 17, 7],     // Reef: Teal, Coral, Amber, Icy Blue
   [22, 18, 20, 23],    // Twilight: Midnight, Ultramarine, Magenta, Lavender
   [19, 16, 17, 5],     // Forest: Jade, Teal, Amber, Emerald
   [21, 23, 17, 11],    // Dusk: Coral, Lavender, Amber, Raspberry
+  // The 2026-10-10 four (PLAN.md 28b), appended so a lock saved by its index
+  // still names the palette it did.
+  [0, 20, 16, 18],     // Overhead: Yellow, Magenta, Teal, Ultramarine
+  [14, 22, 4, 13],     // Ink: Graphite, Midnight, Crimson, Coffee
+  [17, 0, 15, 14],     // Pantry: Amber, Yellow, White, Graphite
+  [4, 1, 20, 17],      // Lava: Crimson, Orange, Magenta, Amber
 ];
+
+/*
+  Why those four, and why Pastel Glow and Galaxy lost their white (PLAN.md 28b).
+
+  Eleven looks and every new one since 2026-10-04 draw on the lamp (Lamp
+  Ground, 18b): the dye is a filter over white light, not a glow on black,
+  and a colour shows by how far it is from white rather than from black.
+  A palette picked from the desk or the phone is laid on whatever look is
+  up, so it has to read on both. Measured as the CIELAB distance of each
+  colour from black and from white (`npm run plate`), White is 0 from the
+  lamp (it is clear liquid, which is what it should be) and Icy Blue 26, so
+  Pastel Glow and Galaxy, each carrying both, poured half their dyes
+  invisibly on a lamp look; Lavender, which took White's place in both, is
+  93 from black and 73 from the lamp. Every palette now keeps at least
+  three of its four colours 40 or more from each ground.
+
+  The four added are the colour that came with the physics: Overhead is
+  the subtractive primaries an overhead projector's dishes were mixed from,
+  each a filter that passes two thirds of the lamp, so where two overlap
+  they leave one primary of light (yellow and magenta red, yellow and teal
+  green, magenta and teal blue); Ink is the dark precipitates of the reactions that print
+  on the lamp (Sensual Laboratory, Agate, Turing Print); Pantry the
+  liquids' own colours (syrup, oil, milk, ferrofluid: the Natural swatch,
+  18d-12) as dyes; and Lava the wax colours of Lava Lamp.
+*/
 
 // Display names for COLOR_HARMONIES, index-aligned.
 export const COLOR_HARMONY_NAMES: string[] = [
   'Warm Sunset', 'Cool Ocean', 'Neon Electric', 'Fire & Ice', 'Royal Garden',
   'Tropical', 'Deep Jewel', 'Pastel Glow', 'Magenta Dream', 'Citrus Pop',
   'Contrast Shock', 'Carnival', 'Galaxy', 'Reef', 'Twilight', 'Forest', 'Dusk',
+  'Overhead', 'Ink', 'Pantry', 'Lava',
 ];
 
 /*

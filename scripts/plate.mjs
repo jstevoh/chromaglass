@@ -22,12 +22,12 @@
  * type-stripping cannot tell a type-only import from a value one.
  */
 
-import { PRESETS } from '../src/presets.ts';
+import { PRESETS, RETIRED_PRESETS, findPreset } from '../src/presets.ts';
 import { dyeAbsorbance } from '../src/lib/dye.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR } from '../src/presetPlate.ts';
 import { PRESET_AREAS, plateAreas, areaForBand, areaDye, pointInArea, pickArea } from '../src/lib/plateAreas.ts';
 import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
-import { PALETTE } from '../src/constants.ts';
+import { PALETTE, COLOR_HARMONIES, COLOR_HARMONY_NAMES } from '../src/constants.ts';
 import { BeadField } from '../src/lib/beads.ts';
 import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import fs from 'node:fs';
@@ -453,6 +453,66 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   check('the quiet looks are quieter than the loud ones',
     Math.max(...still.map(surgeOf)) < Math.min(...loud.map(surgeOf)),
     `${still.map(surgeOf).join('/')} against ${loud.map(surgeOf).join('/')}`);
+}
+
+// ── 5b. A retired look still plays, as its replacement (PLAN.md 28a) ───
+{
+  // A set list, a MIDI pad, a sequence's stage, a song show's cue and the
+  // `?look=` link all keep a built-in look by its id and do nothing when it
+  // is missing, so a retired id has to lead somewhere that exists, and no
+  // live look may be in the table (it would be skipped over for another).
+  const dead = Object.entries(RETIRED_PRESETS).filter(([, to]) => !findPreset(to)).map(([from, to]) => `${from}→${to}`);
+  check('every retired look leads to one that exists', dead.length === 0, dead.join(', ') || `${Object.keys(RETIRED_PRESETS).length} retired`);
+  const shadowed = Object.keys(RETIRED_PRESETS).filter(id => ids.includes(id));
+  check('no look that ships is also in the retired table', shadowed.length === 0, shadowed.join(', '));
+  // And nothing in the app or its checks still asks for one by its old id:
+  // the resolver keeps a person's saved show playing, it is not a licence to
+  // leave the app's own built-in sequences and mood lists on the old names.
+  const stale = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const at = `${dir}/${e.name}`;
+      if (e.isDirectory()) walk(at);
+      else if (/\.(ts|tsx|mjs)$/.test(e.name) && !at.endsWith('src/presets.ts')) {
+        const text = fs.readFileSync(at, 'utf8');
+        for (const id of Object.keys(RETIRED_PRESETS)) if (new RegExp(`['"\`]${id}['"\`]`).test(text)) stale.push(`${at}:${id}`);
+      }
+    }
+  };
+  walk('src'); walk('scripts');
+  check('nothing in src/ or scripts/ still names a retired look', stale.length === 0, stale.join(', '));
+  const sample = Object.keys(RETIRED_PRESETS)[0];
+  if (sample) check('a retired id finds its replacement', findPreset(sample)?.id === RETIRED_PRESETS[sample], `${sample} → ${findPreset(sample)?.id}`);
+}
+
+// ── 5c. Every colour palette reads on the lamp and on black (PLAN.md 28b) ──
+{
+  // A palette picked on the desk or the phone (the lock) is laid on whatever
+  // look is up, and since 18b eleven looks and every new one draw on the
+  // lamp, where a dye shows by its distance from white, not from black. So
+  // each palette is asked to keep at least three of its four colours 40 or
+  // more (CIELAB ΔE76) from black and from white. White is 0 from the lamp
+  // and Icy Blue 26: Pastel Glow and Galaxy carried both, half their dyes
+  // invisible on a lamp look, until 28b.
+  const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const lab = ({ r, g, b }) => {
+    const [R, G, B] = [r, g, b].map(lin);
+    const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    const X = f((0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047), Y = f(0.2126 * R + 0.7152 * G + 0.0722 * B), Z = f((0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883);
+    return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+  };
+  const dE = (a, b) => { const A = lab(a), B = lab(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); };
+  const black = { r: 0, g: 0, b: 0 }, white = { r: 1, g: 1, b: 1 };
+  check('a colour palette has a name for each set of colours', COLOR_HARMONY_NAMES.length === COLOR_HARMONIES.length,
+    `${COLOR_HARMONY_NAMES.length} names, ${COLOR_HARMONIES.length} palettes`);
+  const faint = [];
+  COLOR_HARMONIES.forEach((h, i) => {
+    const cs = h.map(k => PALETTE[k]);
+    const onBlack = cs.filter(c => dE(c, black) >= 40).length, onLamp = cs.filter(c => dE(c, white) >= 40).length;
+    if (onBlack < 3 || onLamp < 3 || new Set(h).size !== h.length) faint.push(`${COLOR_HARMONY_NAMES[i]} ${onBlack}/${onLamp}`);
+  });
+  check('every colour palette keeps three of its four colours visible on black and on the lamp', faint.length === 0,
+    faint.join(', ') || `${COLOR_HARMONIES.length} palettes`);
 }
 
 // ── 6. The audit ─────────────────────────────────────────────────────
