@@ -9155,7 +9155,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           rotations: rotationAnglesRef.current,
           harmony: harmonyRef.current,
           lamp: lampRef.current,
-          magnets: [],
+          magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
           gelAngle: gelAngleRef.current,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
@@ -9696,7 +9696,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
          * than with the stage's own hooks, so the phone check can ask it
          * wherever the plate steps, software WebGPU included.
          */
-        magnets: () => [],
+        magnets: () => magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
         hands: () => ({
           hands: [
             ...(isMouseDownRef.current ? [{ ...mousePosRef.current, laid: { ...dropLaidRef.current } }] : []),

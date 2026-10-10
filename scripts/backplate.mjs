@@ -271,7 +271,7 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     evolveLiquid: /doseLiquid\(af, liquidsOf\(li\)/,
     seed: /fluidsRef\.current\.forEach\(\(fluid, li\) => \{[\s\S]{0,200}const styles = stylesOf\(li\);[\s\S]{0,300}harmonyColor\(harmonyOf\(li\)\)[\s\S]{0,400}doseLiquid\(fluid, liquidsOf\(li\)/,
     ambient: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.25/,
-    music: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.3/,
+    music: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), (?:time \* 0\.3|time \* 0\.1 \+ pitchAngle)/,
     musicStyles: /const aStyles = stylesOf\(activeLayerRef\.current\);/,
     musicLiquids: /doseLiquid\(activeFluid, liquidsOf\(activeLayerRef\.current\)/,
     themeMotion: /case 'motion': \{\s*const c = harmonyColor\(harmonyOf\(activeLayerRef\.current\)\);/,

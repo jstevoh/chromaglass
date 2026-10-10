@@ -62,6 +62,7 @@ export interface GpuStepParams {
     there.
   */
   magnetRadius?: number;
+  extraMagnets?: readonly { x: number; y: number }[];
   /**
     The other fingers holding a magnet on a touch screen, up to three, in
     plate coordinates; each at this magnet's height and strength. Only read
