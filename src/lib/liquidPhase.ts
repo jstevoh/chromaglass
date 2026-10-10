@@ -163,6 +163,8 @@ export class LiquidPhase {
   private readonly scratchC: Float32Array;
   /** True while any channel holds anything worth spending a pass on. */
   private live = false;
+  /** True when the solver applies the forces itself, so the CPU skips tracking drops entirely. */
+  gpuNative = false;
   /*
     Which way is downhill, from the plate rather than from here.
 
@@ -333,6 +335,7 @@ export class LiquidPhase {
    */
   deposit(cx: number, cy: number, radius: number, what: LiquidDeposit, amount = 1, seconds?: number): void {
     this.onDeposit?.(cx, cy, radius, what, amount, seconds);
+    if (this.gpuNative) return;
     const s = this.size;
     const r = Math.max(1, radius);
     const r2 = r * r;
@@ -396,7 +399,7 @@ export class LiquidPhase {
    * rather than sliding through it.
    */
   step(vx: Float32Array, vy: Float32Array, disp: number, dt: number): void {
-    if (!this.live) return;
+    if (!this.live || this.gpuNative) return;
     const keep = {
       soap: Math.exp(-dt / DECAY_SECONDS.soap),
       body: Math.exp(-dt / DECAY_SECONDS.body),
@@ -608,7 +611,7 @@ export class LiquidPhase {
     density: Float32Array,
     dt: number,
   ): void {
-    if (!this.live) return;
+    if (!this.live || this.gpuNative) return;
     const s = this.size;
     const clamp = (v: number) => (v < -MAX_FORCE ? -MAX_FORCE : v > MAX_FORCE ? MAX_FORCE : v);
 

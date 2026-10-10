@@ -61,7 +61,7 @@ struct Sim {
   curDamp: f32,
   curBuoy: f32,
   curGrav: f32,
-  spare25: f32,       // the motor's stir until PLAN 22j: the dish drags the liquid now
+  cometX: f32,        // explicit constant flow force for comet effects
   meanD: f32,
   maxCur: f32,
   rock: vec2f,
@@ -81,6 +81,7 @@ struct Sim {
   plateCurve: f32,
   gapSpring: f32,
   gapMemory: f32,
+  cometY: f32,
   // Up the screen, in the plate: the dish is drawn turned, the room is not.
   up: vec2f,
   /*
@@ -456,12 +457,15 @@ export const KERNELS: Record<string, string> = {
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
 @group(0) @binding(4) var mulT: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var liquids0: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
+  let soap = textureLoad(liquids0, p, 0).r;
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
 }`,
 
   // vel.xy += add.xy ; temp (vel.z) += add.z
@@ -495,6 +499,84 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     u = v.xy + dir * max(0.0, s - dot(v.xy, dir));
   }
   textureStore(dst, p, safeVel(vec4f(u, v.z + a.z, 0.0)));
+}`,
+
+  liquidForces: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var liquids1: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let l0 = textureLoad(liquids0, p, 0);
+  let l1 = textureLoad(liquids1, p, 0);
+  
+  let soap = l0.r;
+  let body = l0.g;
+  let repel = l0.b;
+  let heavy = l0.a;
+  let polar = l1.r;
+  
+  if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
+    textureStore(dst, p, safeVel(v));
+    return;
+  }
+  
+  var fx = 0.0;
+  var fy = 0.0;
+  let dt = S.dt;
+  let s = S.n;
+  
+  if (soap > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
+    fx -= gx * A.a.x * dt * s;
+    fy -= gy * A.a.x * dt * s;
+  }
+  
+  if (body > 0.0 && A.a.y == 0.0) {
+    let k = min(0.9, body * A.a.z * dt);
+    fx -= v.x * k;
+    fy -= v.y * k;
+  }
+  
+  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
+    fx += S.rock.x * heavy * A.a.w * dt * s;
+    fy += S.rock.y * heavy * A.a.w * dt * s;
+  }
+  
+  if (polar != 0.0) {
+    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
+    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
+    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
+    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
+    fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
+    fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
+  }
+  
+  if (repel > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).b - textureLoad(liquids0, p - vec2i(1, 0), 0).b) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).b - textureLoad(liquids0, p - vec2i(0, 1), 0).b) * 0.5;
+    let g = sqrt(gx * gx + gy * gy);
+    if (g > 1e-5) {
+      let nx = -gx / g;
+      let ny = -gy / g;
+      let outF = v.x * nx + v.y * ny;
+      if (outF > 0.0) {
+        let k = min(0.9, repel * A.b.y * dt * 60.0);
+        fx -= nx * outF * k;
+        fy -= ny * outF * k;
+      }
+    }
+  }
+  
+  let maxf = A.b.z;
+  fx = clamp(fx, -maxf, maxf);
+  fy = clamp(fy, -maxf, maxf);
+  
+  textureStore(dst, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
 }`,
 
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -2426,6 +2508,40 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
     density, index, the mode; the rim's radius for the rim).
   */
+  liquidSplat0: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  let d = length(uv - A.a.xy) / max(A.a.z, 1e-4);
+  let w = select(0.0, 1.0 - d * d, d < 1.0);
+  let v = textureLoad(src, vec2i(id.xy), 0);
+  if (w <= 0.0) {
+    textureStore(dst, vec2i(id.xy), v);
+    return;
+  }
+  let take = clamp(A.a.w * w, 0.0, 1.0);
+  textureStore(dst, vec2i(id.xy), mix(v, A.b, take));
+}`,
+
+  liquidSplat1: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let uv = uvOf(id);
+  let d = length(uv - A.a.xy) / max(A.a.z, 1e-4);
+  let w = select(0.0, 1.0 - d * d, d < 1.0);
+  let v = textureLoad(src, vec2i(id.xy), 0);
+  if (w <= 0.0) {
+    textureStore(dst, vec2i(id.xy), v);
+    return;
+  }
+  let take = clamp(A.a.w * w, 0.0, 1.0);
+  textureStore(dst, vec2i(id.xy), mix(v, A.b, take));
+}`,
+
   speciesSplat: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
@@ -3688,27 +3804,175 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), acc / f32(n * n));
 }`,
 
+    addReagent: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let uv = uvOf(id);
+  var c = textureLoad(src, p, 0);
+  let d = distance(uv, A.a.xy);
+  if (d <= A.a.z) {
+    let f = 0.5 + 0.5 * (1.0 - d / A.a.z);
+    c.b = min(1.0, c.b + A.a.w * f);
+    // A.b.x is the pattern value to bake in. Blend it based on amount.
+    if (c.b > 0.0) {
+      c.a = mix(c.a, A.b.x, A.a.w * f / c.b);
+    }
+    /*
+      The poured liquid is the substrate solution, so it brings u with it,
+      and a trace of the autocatalyst at its heart, the speck every real
+      Turing dish starts from: u = 1, v = 0 is a steady state that never
+      breaks by itself, and before this a pour on a look without Chemistry
+      grew nothing until a random seed happened to land in it.
+    */
+    c.r = max(c.r, min(1.0, f * 1.5));
+    c.g = max(c.g, 0.5 * max(0.0, 1.0 - d / (0.35 * A.a.z)));
+  }
+  textureStore(dst, p, c);
+}`,
+
+  seedChem: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let c = textureLoad(src, p, 0);
+  let uv = uvOf(id);
+  let d = distance(uv, A.a.xy);
+  var un = c.r;
+  var vn = c.g;
+  if (d <= A.a.z) {
+    vn = max(vn, 0.5 + 0.5 * (1.0 - d / A.a.z));
+    un = min(un, 0.5);
+  }
+  // The reagent (b) and the pattern baked into it (a) are the liquid's, not
+  // the seed's: a seed wrote zeros there across the whole plate, so every
+  // seed, which the show lays at random every few seconds, wiped every pour
+  // of Turing Reagent and the reaction starved.
+  textureStore(dst, p, vec4f(un, vn, c.b, c.a));
+}`,
+
+  grayScott: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  if (p.x == 0 || p.x == i32(S.n) - 1 || p.y == 0 || p.y == i32(S.n) - 1) {
+    textureStore(dst, p, vec4f(1.0, 0.0, 0.0, 0.0));
+    return;
+  }
+  let c = textureLoad(src, p, 0);
+  let l = textureLoad(src, p - vec2i(1, 0), 0)
+        + textureLoad(src, p + vec2i(1, 0), 0)
+        + textureLoad(src, p - vec2i(0, 1), 0)
+        + textureLoad(src, p + vec2i(0, 1), 0)
+        - 4.0 * c;
+  let uvv = c.r * c.g * c.g;
+  /*
+    Where the feed comes from. Gray–Scott's u is a substrate topped up from a
+    reservoir at rate F; with no reservoir it is used up and nothing grows.
+    The reservoir is the reagent: b, where Turing Reagent was poured, and
+    A.b.x everywhere, the bath a look with Chemistry on stands its plate in
+    (Boyle's platen, wet with the reagents before anything is drawn). Before,
+    only b counted, so the looks with Chemistry on, which pour no reagent,
+    fed nothing and grew nothing (the lab: 3.6 units of dye over two seconds
+    of Sensual Laboratory, an empty plate).
+
+    The pattern is the poured reagent's own (a, baked in by addReagent) in
+    proportion to its share of the reservoir, and the look's (A.a.z and A.a.w,
+    its Pattern knob's feed and kill) for the rest.
+  */
+  let reagent = max(c.b, A.b.x);
+  let own = c.b / max(reagent, 1e-4);
+  let target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
+  let target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
+  /*
+    The supply saturates at a third of full reagent. Scaling F and k straight
+    with the reagent put a tap of it (0.3 to 0.6 where it lands) at F 0.018,
+    k 0.058, which is Pearson's dead region: the seed died where it was
+    poured (the lab, five pours on a look without Chemistry: one faint blot).
+  */
+  let supply = min(1.0, reagent / 0.3);
+  let feed = target_feed * supply;
+  let kill = mix(0.06, target_kill, supply);
+
+  // A.b.y is the substep's share of a unit of time (stepChemistry, and why).
+  let dt = A.b.y;
+  let un = c.r + dt * (A.a.x * l.r - uvv + feed * (1.0 - c.r));
+  let vn = c.g + dt * (A.a.y * l.g + uvv - (feed + kill) * c.g);
+  textureStore(dst, p, vec4f(clamp(un, 0.0, 1.0), clamp(vn, 0.0, 1.0), c.b, c.a));
+}`,
+
   /**
-   * Dye laid down by the reaction (`WebGPUFluid.depositChemistry`). The activator is
-   * on the logical grid, so it is read bilinearly, exactly as a CPU delta
-   * would have been; above the threshold it deposits colour the way
-   * `addDensity` does — absorption in rgb, density in a.
+   * Dye laid down by the reaction (`WebGPUFluid.depositChemistry`), absorption
+   * in rgb and density in a, the way `addDensity` lays it.
    *
-   * A.a = (amount, threshold, 0, 0), A.b.rgb = the dye's absorbance (lib/dye.ts).
+   * The field is on the dye's own grid (stepChemistry's PingPong is N²) and
+   * is read texel for texel. It was read bilinearly as if it were on the
+   * logical 192² grid, which it was when the reaction ran on the CPU: on
+   * 256² the deposit drew the field's top-left 192² stretched over the whole
+   * plate, on 512² its top-left 37%, so every pattern was printed 1.3 to 2.7
+   * times its size, and not where its reagent was poured.
+   *
+   * A.a = (amount, threshold, print, bath), A.b.rgb = the colour's
+   * absorbance (lib/dye.ts).
+   *
+   * Print 0: above the threshold the activator deposits A.a.x a frame and
+   * the flow carries it off, the coral looks' bench.
+   *
+   * Print above 0: the colour is starch's complex with the activator, as in
+   * a CIMA dish, where starch is what makes the pattern visible (and, by
+   * holding the activator back, what lets a Turing pattern form at all:
+   * Lengyel and Epstein, 1991). The complex forms and comes apart in well
+   * under a frame, so the dye is set to its equilibrium with the field as
+   * it is now: nothing accumulates and nothing trails. Iodine binds into
+   * the amylose helix cooperatively, so the colour switches on over a
+   * narrow band of the activator, the Hill curve below; its steepness puts
+   * the switch inside a cell or two of a stripe's flank, where the plate's
+   * bicubic reconstruction draws it as a sharp, smooth edge at the
+   * screen's resolution rather than the grid's. Where the reaction is fed
+   * (the bath, or poured reagent) the liquid is the indicator's, and the
+   * print replaces what was there in proportion to the feed and to Turing
+   * Print; elsewhere the dye is left alone.
    */
-  depositChem: `${HEAD}${BILERP_N}
+  depositChem: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var chem: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+const PRINT_K = 0.2;
+const PRINT_HILL = 6.0;
+const PRINT_DENSITY = 1.6;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  var d = textureLoad(dye, vec2i(id.xy), 0);
-  let a = bilerpN(chem, uvOf(id), S.l).g;
-  if (a > A.a.y) {
-    let w = A.a.x * (a - A.a.y);
-    d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
+  let p = vec2i(id.xy);
+  var d = textureLoad(dye, p, 0);
+  let c = textureLoad(chem, p, 0);
+  let a = c.g;
+  if (A.a.z <= 0.0) {
+    if (a > A.a.y) {
+      let w = A.a.x * (a - A.a.y);
+      d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
+    }
+    textureStore(dst, p, d);
+    return;
   }
-  textureStore(dst, vec2i(id.xy), d);
+  let x = pow(max(a, 0.0) / PRINT_K, PRINT_HILL);
+  let bound = x / (1.0 + x);
+  let dens = PRINT_DENSITY * bound;
+  let fed = clamp(max(c.b, A.a.w) / 0.3, 0.0, 1.0);
+  /*
+    Turing Print is how much of the liquid is the indicator's: at 1 the fed
+    plate is the print alone, below it the print is laid over what is there
+    in that share. As a depth instead, its first notch (or a look fading
+    in) replaced every colour on a fed plate with a print 5% deep, nearly
+    clear, at once.
+  */
+  d = mix(d, vec4f(dens * A.b.rgb, dens), fed * min(A.a.z, 1.0));
+  textureStore(dst, p, d);
 }`,
 
   /*

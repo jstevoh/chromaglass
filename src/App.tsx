@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
 import { flushSync } from 'react-dom';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
+import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs } from './lib/macroCamera';
+import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
@@ -15,21 +16,23 @@ import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
-import { PerformDesk, DEFAULT_RIDES, type Cue } from './components/desk/PerformDesk';
+import { Desk } from './components/desk/Desk';
+import { DEFAULT_RIDES } from './components/desk/DeskPanels';
+import type { Cue, SetAction, SetItemAction, ControlKind } from './components/desk/deskProps';
+import { useDeskLayouts } from './hooks/useDeskLayout';
+import { LAYOUT_OF_MODE } from './lib/deskLayout';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
 import { driftLook } from './lib/drift';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
-import { DesignDesk } from './components/desk/DesignDesk';
 import { SoundPanel } from './components/SoundPanel';
 import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
-import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
-import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -37,7 +40,7 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
 import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS } from './presets';
+import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
@@ -50,7 +53,8 @@ import { BenchOverlay } from './components/BenchOverlay';
 import type { EngineStatus } from './lib/platform';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
-import { wantsPhoneLayout, PHONE_OFF_KEY } from './lib/phone';
+import { PhonePlay } from './components/phone/PhonePlay';
+import { wantsPhoneLayout, PHONE_OFF_KEY, phoneScreen, PHONE_SCREEN_KEY, type PhoneScreen } from './lib/phone';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
@@ -67,15 +71,17 @@ import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
-import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
+import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, wallTestOn, type OutputConfig, type WallTest } from './lib/outputConfig';
 import { TempoSource, bpmOf } from './lib/tempo';
-import type { MidiAction, SoundBinding } from './lib/midi';
+import type { MidiAction, MidiMap, SoundBinding } from './lib/midi';
+import { controlKindOf } from './lib/midi';
 import { runTrigger } from './lib/soundLearn';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
+import { exportShowKit, importShowKit, SHOW_KIT_FORMAT } from './lib/showKit';
 import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
@@ -88,6 +94,7 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
+import { PanelGuard } from './components/PanelGuard';
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
@@ -208,7 +215,8 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 export const OPENING_LOOK: string = (() => {
   try {
     const asked = new URLSearchParams(window.location.search).get('look');
-    if (asked && PRESETS.some(p => p.id === asked)) return asked;
+    const named = asked ? findPreset(asked) : undefined;
+    if (named) return named.id;
   } catch { /* no window: the default below */ }
   const pool = PRESETS.filter(p => !p.settings.macroMode);
   return pool.length ? stream('show.opening').pick(pool).id : 'classic';
@@ -262,6 +270,25 @@ export default function App() {
   // live in a section of their own with their own Clear, and a Reset pressed
   // over there should not quietly throw away an evening's corner-dragging here.
   const resetOutput = useCallback(() => setOutput(prev => ({ ...DEFAULT_OUTPUT, surfaces: prev.surfaces })), [setOutput]);
+  /*
+    The wall test (Desk v2, PLAN.md 8e): Load-in's test pattern and Identify.
+    Beside the output config, never in it: that config is stored, and a show
+    that opened on last night's test pattern would put a grid on the wall in
+    front of the room. Laid onto the config only for the plate (`shownOutput`),
+    which draws it in the projector's pass, through the same pin and masks as
+    the show. Identify ends itself: once its three seconds are up the test is
+    dropped, so the pass it needed is dropped with it when nothing else does.
+  */
+  const [wallTest, setWallTest] = useState<WallTest>({ pattern: false, identifyUntil: 0 });
+  useEffect(() => {
+    const left = wallTest.identifyUntil - Date.now();
+    if (left <= 0) return;
+    const t = window.setTimeout(() => setWallTest(w => ({ ...w, identifyUntil: 0 })), left + 50);
+    return () => window.clearTimeout(t);
+  }, [wallTest.identifyUntil]);
+  const shownOutput = useMemo<OutputConfig>(
+    () => (wallTestOn(wallTest) ? { ...output, test: wallTest } : output),
+    [output, wallTest]);
 
   // ── Where the tempo comes from ──────────────────────────────────
   // The microphone, unless something better is offering: a MIDI clock from
@@ -529,10 +556,28 @@ export default function App() {
    * see is the desk. Nothing is taken away; it is a different arrangement of
    * the same controls, and the toggle is one click.
    */
-  const [deskMode, setDeskMode] = useState<'design' | 'perform'>(() => {
-    try { return localStorage.getItem(DESK_MODE_KEY) === 'perform' ? 'perform' : 'design'; } catch { return 'design'; }
+  const [deskMode, setDeskMode] = useState<'design' | 'perform' | 'loadin'>(() => {
+    try {
+      const m = localStorage.getItem(DESK_MODE_KEY);
+      return m === 'perform' || m === 'loadin' ? m : 'design';
+    } catch { return 'design'; }
   });
   useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
+  /*
+    Desk v2: the two desks are one, and Design, Perform and the new Load-in
+    are its three layouts, Build, Gig and Load-in (lib/deskLayout.ts). The
+    stored mode keeps the old words, so a laptop that was left on Perform
+    opens on Gig. Each layout remembers where its panels were.
+  */
+  const deskLayouts = useDeskLayouts();
+  const layoutName = LAYOUT_OF_MODE(deskMode);
+  const deskLayout = deskLayouts.layouts[layoutName];
+  const { update: updateLayout, reset: resetLayout } = deskLayouts;
+  // Stable, so the desk's drag and key listeners are not rebuilt on every render the sound causes.
+  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(layoutName, change), [updateLayout, layoutName]);
+  const onDeskReset = useCallback(() => resetLayout(layoutName), [resetLayout, layoutName]);
+  /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
+  const [showStage, setShowStage] = useState(false);
   /*
     What is out on each surface.
 
@@ -767,6 +812,39 @@ export default function App() {
     };
     img.src = URL.createObjectURL(file);
     // Reset so the same file can be re-selected
+    e.target.value = '';
+  }, []);
+
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const videoFrameRaf = useRef<number | null>(null);
+
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !videoPlayerRef.current) return;
+    videoPlayerRef.current.src = URL.createObjectURL(file);
+    videoPlayerRef.current.play();
+    setIsVideoPlaying(true);
+    
+    const loop = (time: number) => {
+      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
+        visualizerRef.current?.pourVideo(videoPlayerRef.current);
+        videoFrameRaf.current = requestAnimationFrame(loop);
+      } else {
+        setIsVideoPlaying(false);
+      }
+    };
+    
+    videoPlayerRef.current.onplay = () => {
+      setIsVideoPlaying(true);
+      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
+      loop(performance.now());
+    };
+
+    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
+    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
+
     e.target.value = '';
   }, []);
 
@@ -1675,6 +1753,13 @@ export default function App() {
     phone alike, and writing over the look you opened is the sheet's second
     button, named for the look it would replace, and the look menu's.
   */
+  const newPalette = () => {
+    setDocId(null);
+    setDocDirty(false);
+    setPinnedPresetId(null);
+    applyPreset('default', DEFAULT_SETTINGS);
+  };
+
   const saveLook = () => setShowSave(true);
   /** Write over the saved look that is open, keeping its name and song. */
   const replaceLook = () => {
@@ -2021,9 +2106,26 @@ export default function App() {
       width: window.innerWidth,
       height: window.innerHeight,
       sessionOff,
+      path: window.location.pathname,
     });
   };
   const [phone, setPhone] = useState(readPhone);
+  /*
+    Which of the phone's two screens (lib/phone.ts phoneScreen): Play, the
+    listening screen a phone opens on, or every control. Kept on this phone
+    when changed from either, so the screen someone went to is the one they
+    come back to.
+  */
+  const [phoneScreenUp, setPhoneScreenUp] = useState<PhoneScreen>(() => {
+    if (typeof window === 'undefined') return 'play';
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(PHONE_SCREEN_KEY); } catch { /* private */ }
+    return phoneScreen({ query: window.location.search, path: window.location.pathname, stored });
+  });
+  const choosePhoneScreen = (to: PhoneScreen) => {
+    try { localStorage.setItem(PHONE_SCREEN_KEY, to); } catch { /* private: this visit only */ }
+    setPhoneScreenUp(to);
+  };
   useEffect(() => {
     const onResize = () => setPhone(readPhone());
     window.addEventListener('resize', onResize);
@@ -2052,7 +2154,15 @@ export default function App() {
   }, []);
   // A phone is never a desk, whatever its width turned sideways.
   const performing = deskMode === 'perform' && roomForDesk && !phone;
-  const designing = deskMode === 'design' && roomForDesk && !phone;
+  /*
+    "Designing" was the Design desk being up. It is now the plate in Preview,
+    which is what it always meant to the show: while a look is being built
+    the sequencer is held, a song's show does not take the plate over and a
+    new song does not change the look under the hand. Build ships in
+    Preview, so the bench behaves as it did; Gig and Load-in ship Live, and
+    either can be put in Preview from the plate bar.
+  */
+  const designing = deskLayout.plateMode === 'preview' && roomForDesk && !phone;
 
   /*
     Below that width neither desk lays out, and the floating overlay UI — the
@@ -2112,6 +2222,23 @@ export default function App() {
     return pinnedLookName ?? 'Untitled look';
   }, [docId, userPresets.presets, pinnedLookName]);
 
+  /*
+    The look's own values, for a knob's double-click (PLAN.md 8c): the
+    document's when there is one, the built-in it started from when not, and
+    a bare look for an empty plate. Through `lookOf`, so a value is what
+    sending that look gives, base included. A rig setting (the dimmer, the
+    room's sound, the mixer) is no look's, so it has no value to go back to.
+  */
+  const lookValues = useMemo(() => {
+    const own = docId ? userPresets.presets.find(p => p.id === docId)?.settings
+      : pinnedPresetId ? allPresets.find(p => p.id === pinnedPresetId)?.settings : undefined;
+    return lookOf(own ?? {});
+  }, [docId, userPresets.presets, pinnedPresetId, allPresets]);
+  const lookValueOf = useCallback((key: keyof VisualizerSettings): number | undefined => {
+    const v = lookValues[key];
+    return typeof v === 'number' ? v : undefined;
+  }, [lookValues]);
+
   /**
    * The cue list: the looks, in order, each carrying two of its own dyes so a
    * row is recognisable without reading it. The live one is what is on the
@@ -2143,7 +2270,7 @@ export default function App() {
   const cues = useMemo<Cue[]>(() => {
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
-      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === item.ref);
+      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
       const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
       return {
         id: item.id,
@@ -2166,7 +2293,9 @@ export default function App() {
    * than a reorder: the hook's inputs depend on half the app.
    */
   const midiRef = useRef<{
-    map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] };
+    map: MidiMap;
+    /** The port it is playing from, for the controller's profile (which CCs are knobs). */
+    activeInputName: string | null;
     /** The shift layer, so a pad can step it — the actions run above the hook too. */
     stepBank: (dir: 1 | -1) => void;
   } | null>(null);
@@ -2177,6 +2306,16 @@ export default function App() {
     return b && b.source.kind === 'cc' ? b.source.number : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /*
+    And what it is learned to: a knob draws as a knob, a fader as a slider
+    (the design's rule, so the desk looks like the controller). A binding
+    only says absolute or relative, so the controller's profile names which
+    of its CCs turn (`controlKindOf`, PLAN.md 8d).
+  */
+  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null =>
+    controlKindOf(midiRef.current?.map, key, midiRef.current?.activeInputName),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  []);
 
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
@@ -2184,10 +2323,10 @@ export default function App() {
 
   const cueLook = useCallback((presetId: string) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = PRESETS.find(p => p.id === presetId);
+    const built = up ? undefined : findPreset(presetId);
     const settings = up ? up.settings : built?.settings;
     const name = up?.name ?? built?.name ?? presetId;
-    if (settings) setCued({ id: presetId, name, settings });
+    if (settings) setCued({ id: built?.id ?? presetId, name, settings });
   }, []);
 
   /** What a set item will send: its look with its own controls on top, or its sequence. */
@@ -2198,10 +2337,10 @@ export default function App() {
       return seq ? { id: `sequence:${seq.id}`, name: item.name ?? seq.name, settings: {}, sequence: seq.id, ...extra } : null;
     }
     const up = isUserPresetId(item.ref) ? userPresetsRef.current.find(p => p.id === item.ref) : null;
-    const built = PRESETS.find(p => p.id === item.ref);
+    const built = up ? undefined : findPreset(item.ref);
     const base = up ? up.settings : built?.settings;
     if (!base) return null;
-    return { id: item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
+    return { id: built?.id ?? item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
   }, []);
   const cueItem = useCallback((itemId: string) => {
     const item = setListRef.current.items.find(i => i.id === itemId);
@@ -2309,9 +2448,9 @@ export default function App() {
   /** The same, for a look that was never armed — the palette's ⇧⏎. */
   const goLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = PRESETS.find(p => p.id === presetId);
+    const built = up ? undefined : findPreset(presetId);
     const look = up ? { id: presetId, name: up.name, settings: up.settings }
-      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+      : built ? { id: built.id, name: built.name, settings: built.settings } : null;
     if (look) sendLook(look, seconds);
   }, [fadeSeconds, sendLook]);
   goLookNowRef.current = goLookNow;
@@ -2352,9 +2491,9 @@ export default function App() {
   /** The same, for a look picked straight from a list (the phone's looks sheet). */
   const backLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = PRESETS.find(p => p.id === presetId);
+    const built = up ? undefined : findPreset(presetId);
     const look = up ? { id: presetId, name: up.name, settings: up.settings }
-      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+      : built ? { id: built.id, name: built.name, settings: built.settings } : null;
     if (look) sendBack(look, seconds);
   }, [fadeSeconds, sendBack]);
 
@@ -2555,7 +2694,37 @@ export default function App() {
       const list = setListRef.current;
       downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
         writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
-    } else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
+    }     else if (a === 'export-show') {
+      const list = setListRef.current;
+      exportShowKit(list, userPresetsRef.current, sequencer.sequences).then((text: string) => {
+        downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'show'}.chromaglass-show.json`, text);
+      });
+    } else if (a === 'import-show') {
+      const el = document.createElement('input');
+      el.type = 'file';
+      el.accept = '.json';
+      el.onchange = async () => {
+        const file = el.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          await importShowKit(text, (res: any) => {
+            if (res.list) {
+              changeSet(res.list);
+              setLiveItemId(null);
+            }
+            if (res.presets && res.presets.length) { for (const p of res.presets) userPresets.upsert(p); }
+            if (res.sequences && res.sequences.length) { for (const q of res.sequences) sequencer.upsertSequence(q); }
+          });
+          alert('Show kit imported! Reloading the page to apply MIDI map, liquids, and wall configurations.');
+          window.location.reload();
+        } catch (err) {
+          alert('Failed to import show kit: ' + (err instanceof Error ? err.message : String(err)));
+        }
+      };
+      el.click();
+    }
+    else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
     else if (a === 'song-shows') setShowSongs(true);
   }, [changeSet, changeSaved]);
   const onItemAction = useCallback((id: string, a: SetItemAction) => {
@@ -2692,8 +2861,12 @@ export default function App() {
     presetId: activePresetId,
     presetSeq,
     harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
-    output,
-  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
+    // With the wall test on it (8e), so a receiver that draws its own plate
+    // (a Chromecast, a second machine) shows the pattern and the numbers as
+    // the HDMI wall does. Identify's end is a clock time, so a receiver whose
+    // clock is a second off flashes a second more or less.
+    output: shownOutput,
+  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
   /**
    * The mark, kept as a data URL so it can be sent to a receiver.
@@ -2962,6 +3135,7 @@ export default function App() {
   }, []);
   // ── Recording ──
   const recorder = useRecorder();
+  const [showRecordPanel, setShowRecordPanel] = useState(false);
   const toggleRecording = useCallback(() => {
     recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
   }, [recorder, audioStream]);
@@ -3055,7 +3229,7 @@ export default function App() {
       if (up) applyUserPreset(up);
       return;
     }
-    const preset = PRESETS.find(p => p.id === presetId);
+    const preset = findPreset(presetId);
     if (preset) applyPreset(preset.id, preset.settings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -3243,7 +3417,7 @@ export default function App() {
   /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
   const selectDye = (paletteIndex: number) => {
     colourDye(paletteIndex);
-    setActiveTool('dropper');
+    
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
@@ -3320,7 +3494,8 @@ export default function App() {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {
             updateLiquidColor(selectedLiquidId, color);
-            setActiveTool('dropper');
+            
+
           }
           break;
         }
@@ -3329,7 +3504,6 @@ export default function App() {
           // newer build than the display, or the other way round.
           if (liquidTypesRef.current.some(l => l.id === message.id)) {
             setSelectedLiquidId(message.id);
-            setActiveTool('dropper');
           }
           break;
         case 'action':
@@ -3690,7 +3864,7 @@ export default function App() {
       activePresetId,
       dyeIndex: selectedDyeIndex,
       presetColor: (id) => {
-        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[id];
+        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[livePresetId(id)];
         const idx = contract?.[0];
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },
@@ -3777,7 +3951,7 @@ export default function App() {
       return {
         id: `look-${pr.id}`,
         name: pr.name,
-        kind: 'Looks',
+        kind: 'Preset palettes',
         look: true,
         hint: (contract ?? []).map(i => PALETTE[i]?.name ?? '').join(' '),
         swatch: `linear-gradient(135deg, ${a}, ${b})`,
@@ -3801,7 +3975,9 @@ export default function App() {
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
-      { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'record-video',       name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', kbd: 'R', run: toggleRecording },
+      { id: 'record-performance', name: perfLive ? 'Stop performance' : 'Record performance (strokes & gestures)', kind: 'Actions', kbd: 'T', run: togglePerformance },
+      { id: 'record-studio',      name: 'Recording studio options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
       { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
@@ -3838,8 +4014,10 @@ export default function App() {
       { id: 'open-seq',      name: 'Stage sequences', kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
       { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
-      { id: 'open-design',   name: deskMode === 'perform' ? 'Design mode' : 'Perform mode', kind: 'Open',
+      { id: 'open-design',   name: deskMode === 'perform' ? 'Build layout' : 'Gig layout', kind: 'Open',
         run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
+      { id: 'open-loadin',   name: 'Load-in layout', kind: 'Open', run: () => setDeskMode('loadin') },
+      { id: 'open-stage',    name: 'Stage: the room and the machine', kind: 'Open', run: () => { setShowStage(true); setShowSettings(false); } },
     ];
 
     return [...looks, ...doing, ...opening, ...sections];
@@ -3873,7 +4051,8 @@ export default function App() {
         saveLook();
         return;
       }
-      if (designing && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      // ⌘⏎ is Send to wall, which every layout's plate bar carries now.
+      if (deskUp && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         void startCast('window');
         return;
@@ -3893,10 +4072,13 @@ export default function App() {
       }
       if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
       if (e.key === 't' || e.key === 'T') { togglePerformance(); return; }
+      if (e.key === 'r' || e.key === 'R') { toggleRecording(); return; }
 
       // The rest are the show's, and only while the desk is up: on the bench
       // Space should not fire a look change at a room.
-      if (!performing) return;
+      // Nor with the plate in Preview: the bar says "not on wall", so a key
+      // that sends a look to the room would make it a lie.
+      if (!performing || designing) return;
       if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
       if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
       // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
@@ -3909,7 +4091,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance]);
+  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance, toggleRecording]);
 
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
@@ -3922,13 +4104,15 @@ export default function App() {
   const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
 
   const deskDots = useMemo(() => ({
+    sound: audioSource !== 'none',
+    video: isVideoPlaying,
     mic: audioSource !== 'none',
     wall: isCasting,
     midi: midi.enabled,
     phone: remoteLink.status === 'connected',
     rec: recorder.recording ? String(recorder.seconds) : null,
     perf: perfClock,
-  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
 
   /*
     Where each status dot goes.
@@ -3946,13 +4130,9 @@ export default function App() {
     setShowHelp(false);
   }, []);
   const deskOpen = useMemo(() => ({
-    mic: () => openSettingsAt('audio-input'),
-    wall: () => openSettingsAt('projectors'),
+    sound: () => openSettingsAt('audio-input'),
+    video: () => openSettingsAt('film'),
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
-    // The phone has no setting to change — it either found the relay or it did
-    // not — so this goes to the part of the guide that says what it does and
-    // what has to be running for it to connect at all.
-    phone: () => { setHelpFocus('live'); setShowHelp(true); setShowSettings(false); setShowMidi(false); setShowSequencer(false); },
   }), [openSettingsAt]);
 
   /*
@@ -4001,6 +4181,79 @@ export default function App() {
     return unprovide;
   }, []);
 
+  /*
+    The settings, drawn three ways from one list of props: the sheet (every
+    section), a panel on the desk (one section, `embed`), and the Stage
+    sheet (the room and the machine, `scope="stage"`). One list, so a
+    control cannot be wired one way in the sheet and another on the desk.
+  */
+  const settingsPanel = (over: Partial<ComponentProps<typeof SettingsPanel>> & { onClose: () => void }) => (
+    <SettingsPanel
+      mixTakes={mixTakes}
+      backLook={backLookName}
+      songDetection={musicSettings.enabled}
+      onSongDetection={(on) => updateMusicSettings({ enabled: on })}
+      settings={settings}
+      onUpdate={updateSettings}
+      calibration={audioData?.calibration ?? null}
+      onRecalibrate={() => setCalibrateNonce(n => n + 1)}
+      onFlickPlate={flickPlate}
+      engineStatus={engineStatus}
+      getLiveEngineStatus={() => engineStatusRef.current}
+      audioSource={audioSource}
+      onAudioSource={(src) => { void handleSourceChange(src); }}
+      onAudioFile={() => musicInputRef.current?.click()}
+      audioInputs={audioInputs}
+      audioInputId={audioInputId}
+      onAudioInput={chooseAudioInput}
+      blackout={blackout}
+      // Under a desk, Blackout is in the desk's header in every layout, and once on screen is enough.
+      onBlackout={deskUp ? undefined : toggleBlackout}
+      projectorMode={projector.mode}
+      onProjectorMode={projector.setMode}
+      projectorName={projector.projector?.label ?? null}
+      output={output}
+      onOutput={setOutput}
+      onOutputReset={resetOutput}
+      wakeLock={wakeLock}
+      wallTest={wallTest}
+      onWallTest={setWallTest}
+      tempo={tempoLabel}
+      onTap={tapTempo}
+      onTempoClear={clearTempo}
+      onTempoBpm={setTempoBpm}
+      midiClocked={midi.clocked}
+      timecode={timecode ? formatTimecode(timecode) : null}
+      focusSection={settingsSection}
+      liquids={{ shelf: liquidTypes, onShelve: shelveLiquids, onRemove: removeLiquid, onPick: setSelectedLiquidId }}
+      /*
+        The panel can put any of its controls on either desk, so it needs
+        to know what is already on them. One list per surface, shared with
+        the desks themselves, so a chip's filled state and the strip it
+        refers to cannot disagree.
+      */
+      pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
+      midi={midi}
+      onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
+      sceneOn={sceneOn}
+      onSceneToggle={toggleScene}
+      sceneState={scene.state}
+      sceneDevices={scene.devices}
+      sceneDeviceId={sceneDeviceId}
+      onSceneDevice={chooseSceneDevice}
+      scenePreviewRef={scenePreviewRef}
+      filmSource={filmSource}
+      onFilmFile={loadFilm}
+      onFilmCamera={startFilmCamera}
+      onFilmWindow={startFilmWindow}
+      onFilmClear={clearFilm}
+      markLoaded={markLoaded}
+      onMarkFile={loadMark}
+      onMarkClear={clearMark}
+      {...over}
+    />
+  );
+
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
     // height with the browser's bars hidden, which put the dock under them.
@@ -4017,7 +4270,7 @@ export default function App() {
         sceneRef={scene.reading}
         filmSenseRef={filmSense.reading}
         frame={preview.frame}
-        output={output}
+        output={shownOutput}
         tempoRef={tempoRef}
         soundBindings={midi.map.sound}
         onSoundTrigger={runSoundTrigger}
@@ -4144,6 +4397,7 @@ export default function App() {
         </div>
       )}
       {musicFile && ((renderOpen && !libraryOpen) || songRender.running) && (
+        <PanelGuard name="The song render" onClose={() => { songRender.cancel(); setRenderOpen(false); songRender.reset(); }}>
         <RenderPanel
           songName={musicFile.name}
           songSeconds={musicTime.d}
@@ -4157,6 +4411,7 @@ export default function App() {
           onCancel={songRender.cancel}
           onClose={() => { setRenderOpen(false); songRender.reset(); }}
         />
+        </PanelGuard>
       )}
       {projector.projector && !isCasting && overlaysVisible && projector.mode !== 'off' && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 pl-4 pr-2 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="projector-hint">
@@ -4177,7 +4432,7 @@ export default function App() {
       {isCasting && windowFullscreen === false && overlaysVisible && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-100/90 backdrop-blur-xl shadow-2xl" data-testid="projector-fill">
           <Projector size={13} /> The projector window still has its title bar
-          <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar). Any click here does it too.">fill its screen</button>
+          <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar).">fill its screen</button>
         </div>
       )}
       {/*
@@ -4199,17 +4454,24 @@ export default function App() {
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
           <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>
           <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
-          {/* Who moves the camera. Alt-drag on the plate pans it; Alt-click fixes it on a spot. */}
+          {/* Who moves the camera. Alt-drag on the plate pans it; Alt-click fixes it on a spot.
+              Follow and Auto read differently at a glance (QA-11): the owner found them the
+              same thing, because between Auto's cuts both ride one bead and the difference
+              lived only in the hover titles. Follow wears a crosshair, for the one subject it
+              is locked on and never leaves; Auto names its cut, every Shot Length seconds
+              (`macroHold`, the same `max(0.5, … ?? 5)` LiquidVisualizer gives MacroCamera). */}
           <span className="mx-1 h-3 w-px bg-white/20" />
           {([
             ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Random Evolve wanders it slowly.'],
-            ['follow', 'Follow', 'Lock onto the liquid where it is aimed and ride with it. Alt-click on something to follow it.'],
-            ['auto', 'Auto', 'The camera picks its own subjects and cuts between them.'],
+            ['follow', 'Follow', 'Locked on: rides the liquid where it is aimed and never cuts away. Alt-click on something to follow it.'],
+            ['auto', 'Auto', `Picks its own subjects: rides one for Shot Length (${shotLabel(settings.macroHold)}), then cuts to another.`],
           ] as const).map(([mode, label, title]) => (
             <button key={mode} onClick={() => updateSettings({ macroCamera: mode })} title={title}
               aria-pressed={(settings.macroCamera ?? 'hold') === mode} data-testid={`macro-camera-${mode}`}
-              className={`rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              {mode === 'follow' && <Crosshair size={11} aria-hidden />}
               {label}
+              {mode === 'auto' && <span className="font-normal normal-case tracking-normal opacity-70">cuts {shotLabel(settings.macroHold)}</span>}
             </button>
           ))}
         </div>
@@ -4336,7 +4598,7 @@ export default function App() {
                       return (
                         <button
                           key={liq.id}
-                          onClick={() => { setSelectedLiquidId(liq.id); setActiveTool('dropper'); }}
+                          onClick={() => { setSelectedLiquidId(liq.id); }}
                           title={liq.description}
                           data-testid={`liquid-${liq.id}`}
                           className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
@@ -4791,8 +5053,50 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
+      {phone && showControls && phoneScreenUp === 'play' && (
+        <PanelGuard name="Play">
+        <PhonePlay
+          lookName={activePresetName ?? (fading > 0 ? allPresets.find(p => p.id === pinnedPresetId)?.name ?? null : null) ?? pinnedLookName ?? 'Untitled'}
+          edited={!activePresetName && fading <= 0 && !!pinnedLookName}
+          looks={phoneLooks}
+          activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+          onLook={(id) => goLookNow(id)}
+          onShuffle={triggerLucky}
+          onSave={(name) => saveCurrentPreset(name, '', false)}
+          saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
+          dyes={DROPPER_COLORS.slice(0, 8)}
+          dye={liquidTypes.find(t => t.id === selectedLiquidId)?.color ?? DROPPER_COLORS[0]}
+          onDye={(hex) => updateLiquidColor(selectedLiquidId, hex)}
+          onTool={setActiveTool}
+          settings={settings}
+          onSetting={updateSettings}
+          lookValueOf={lookValueOf}
+          onZoom={pinchZoom}
+          listening={audioSource !== 'none'}
+          deaf={earDeaf}
+          onListen={(on) => {
+            /*
+              Following the music is listening to the room (the stereo, for
+              the person this screen is for) and letting it move the plate. A
+              look whose Sound Drive is at zero would hear it and do nothing,
+              which reads as a broken switch, so it is brought to the middle;
+              any look with a drive of its own keeps it.
+            */
+            if (on && (settings.audioImpact ?? 0) < 0.05) updateSettings({ audioImpact: 0.5 });
+            void handleSourceChange(on ? 'microphone' : 'none');
+          }}
+          wandering={isAutomated}
+          onWander={setIsAutomated}
+          onClear={() => setClearTrigger(n => n + 1)}
+          recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
+          onAllControls={() => choosePhoneScreen('stage')}
+        />
+        </PanelGuard>
+      )}
       {phone && showControls && (
         <>
+          {phoneScreenUp === 'stage' && (
+          <PanelGuard name="The phone controls">
           <PhoneStage
             // Mid-fade the settings are between two looks and match neither,
             // so the look is named by where it is going: the name a thumb
@@ -4827,6 +5131,7 @@ export default function App() {
             paletteLock={paletteLock}
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
+            onVideoDye={() => videoInputRef.current?.click()}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -4846,6 +5151,7 @@ export default function App() {
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
             camera={settings.macroCamera ?? 'hold'}
+            cameraShot={shotLabel(settings.macroHold)}
             onCamera={(c) => updateSettings({ macroCamera: c })}
             tilt={{ supported: tilt.supported, on: tilt.on, refused: tilt.refused, silent: tilt.silent, onToggle: () => { void toggleTilt(); } }}
             audioSource={audioSource}
@@ -4888,6 +5194,13 @@ export default function App() {
             onMagnetSize={(v) => updateSettings({ magnetSize: v })}
             benDay={settings.benDay ?? 0}
             onBenDay={(v) => updateSettings({ benDay: v })}
+            reaction={{
+              on: (settings.chemistry ?? 0) > 0.001 || (settings.turingPrint ?? 0) > 0.001,
+              pattern: settings.chemistryPattern ?? 0,
+              width: settings.chemistryWidth ?? 0.5,
+              print: settings.turingPrint ?? 0,
+            }}
+            onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
             clearFilm={settings.clearFilm ?? 0}
@@ -4904,7 +5217,10 @@ export default function App() {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
               setPhone(false);
             }}
+            onPlayScreen={() => choosePhoneScreen('play')}
           />
+          </PanelGuard>
+          )}
           {/* The song-file picker the Sound sheet reaches for; on the laptop it
               lives in the overlay's audio column, which a phone does not draw. */}
           <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
@@ -4920,6 +5236,7 @@ export default function App() {
         {showControls && !showSettings && !isMinimized && !phone && <RunLocallyCard status={engineStatus} />}
       </AnimatePresence>
       <AnimatePresence>
+        <PanelGuard name="The bench" onClose={() => setBench(b => ({ ...b, text: null }))}>
         <BenchOverlay
           running={bench.running}
           done={bench.done}
@@ -4928,6 +5245,7 @@ export default function App() {
           text={bench.text}
           onClose={() => setBench(b => ({ ...b, text: null }))}
         />
+        </PanelGuard>
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
@@ -4967,81 +5285,26 @@ export default function App() {
       {/* ── Settings Panel ─────────────────────────────────────── */}
       <AnimatePresence>
         {showSettings && (
-          <SettingsPanel
-            mixTakes={mixTakes}
-            backLook={backLookName}
-            songDetection={musicSettings.enabled}
-            onSongDetection={(on) => updateMusicSettings({ enabled: on })}
-            settings={settings}
-            onUpdate={updateSettings}
-            calibration={audioData?.calibration ?? null}
-            onRecalibrate={() => setCalibrateNonce(n => n + 1)}
-            onFlickPlate={flickPlate}
-            engineStatus={engineStatus}
-            getLiveEngineStatus={() => engineStatusRef.current}
-            audioSource={audioSource}
-            onAudioSource={(src) => { void handleSourceChange(src); }}
-            onAudioFile={() => musicInputRef.current?.click()}
-            audioInputs={audioInputs}
-            audioInputId={audioInputId}
-            onAudioInput={chooseAudioInput}
-            blackout={blackout}
-            onBlackout={toggleBlackout}
-            projectorMode={projector.mode}
-            onProjectorMode={projector.setMode}
-            projectorName={projector.projector?.label ?? null}
-            output={output}
-            onOutput={setOutput}
-            onOutputReset={resetOutput}
-            wakeLock={wakeLock}
-            tempo={tempoLabel}
-            onTap={tapTempo}
-            onTempoClear={clearTempo}
-            onTempoBpm={setTempoBpm}
-            midiClocked={midi.clocked}
-            timecode={timecode ? formatTimecode(timecode) : null}
-            focusSection={settingsSection}
-            liquids={{ shelf: liquidTypes, onShelve: shelveLiquids, onRemove: removeLiquid, onPick: setSelectedLiquidId }}
-            /*
-              The panel can put any of its controls on either desk, so it needs
-              to know what is already on them. One list per surface, shared with
-              the desks themselves, so a chip's filled state and the strip it
-              refers to cannot disagree.
-            */
-            pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
-            midi={midi}
-            onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
-            sceneOn={sceneOn}
-            onSceneToggle={toggleScene}
-            sceneState={scene.state}
-            sceneDevices={scene.devices}
-            sceneDeviceId={sceneDeviceId}
-            onSceneDevice={chooseSceneDevice}
-            scenePreviewRef={scenePreviewRef}
-            filmSource={filmSource}
-            onFilmFile={loadFilm}
-            onFilmCamera={startFilmCamera}
-            onFilmWindow={startFilmWindow}
-            onFilmClear={clearFilm}
-            markLoaded={markLoaded}
-            onMarkFile={loadMark}
-            onMarkClear={clearMark}
-            onClose={() => { setShowSettings(false); setSettingsSection(null); }}
-          />
+          <PanelGuard name="Settings" onClose={() => { setShowSettings(false); setSettingsSection(null); }}>
+          {settingsPanel({ onClose: () => { setShowSettings(false); setSettingsSection(null); } })}
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── MIDI ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {showActivity && overlaysVisible && (
+          <PanelGuard name="MIDI activity" onClose={() => setShowActivity(false)}>
           <MidiActivity
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
             onHide={() => setShowActivity(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showMidi && (
+          <PanelGuard name="MIDI" onClose={() => setShowMidi(false)}>
           <MidiPanel
             midi={midi}
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
@@ -5049,12 +5312,14 @@ export default function App() {
             onActivity={setShowActivity}
             onClose={() => setShowMidi(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Songs ──────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showSound && (
+          <PanelGuard name="Sound" onClose={() => setShowSound(false)}>
           <SoundPanel
             source={audioSource}
             onSource={(x) => { void handleSourceChange(x); }}
@@ -5076,8 +5341,10 @@ export default function App() {
             onDroneToggle={toggleDrone}
             onClose={() => setShowSound(false)}
           />
+          </PanelGuard>
         )}
         {showSongs && (
+          <PanelGuard name="Songs" onClose={() => setShowSongs(false)}>
           <SongsPanel
             shows={songShows}
             onShows={setSongShows}
@@ -5096,12 +5363,14 @@ export default function App() {
             onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
             onClose={() => setShowSongs(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Show Sequencer ─────────────────────────────────────── */}
       <AnimatePresence>
         {showSequencer && (
+          <PanelGuard name="The sequencer" onClose={() => setShowSequencer(false)}>
           <SequencerPanel
             sequences={sequencer.sequences}
             selectedId={sequencer.selectedId}
@@ -5123,12 +5392,14 @@ export default function App() {
             onBindSong={bindSequenceToSong}
             onClose={() => setShowSequencer(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Track Panel ────────────────────────────────────────── */}
       <AnimatePresence>
         {showTrackPanel && (
+          <PanelGuard name="The track" onClose={() => setShowTrackPanel(false)}>
           <TrackPanel
             state={musicIntel.state}
             musicSettings={musicSettings}
@@ -5144,15 +5415,37 @@ export default function App() {
             onDeletePerformance={musicIntel.deletePerformance}
             onClose={() => setShowTrackPanel(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
+      {/* ── Recording Studio Panel (Canvas Video & Performance) ─ */}
+      {showRecordPanel && (
+        <PanelGuard name="Record" onClose={() => setShowRecordPanel(false)}>
+        <RecordPanel
+          onClose={() => setShowRecordPanel(false)}
+          recorder={recorder}
+          onToggleVideo={toggleRecording}
+          performanceLive={musicIntel.performance.live}
+          perfClock={perfClock}
+          onTogglePerformance={togglePerformance}
+          savedPerformances={musicIntel.performance.saved}
+          replayingPerformanceId={musicIntel.performance.replayingId}
+          onReplayPerformance={musicIntel.replayPerformance}
+          onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
+          onDeletePerformance={musicIntel.deletePerformance}
+        />
+        </PanelGuard>
+      )}
+
       {/* ── Lyrics Overlay ─────────────────────────────────────── */}
       {musicSettings.enabled && musicSettings.lyricsOverlay && (
+        <PanelGuard name="The lyrics">
         <LyricsOverlay
           line={musicIntel.state.line}
           sentiment={musicIntel.state.sectionSentimentValue}
         />
+        </PanelGuard>
       )}
 
       {/* ── What stopping a performance did (lib/performanceTake.ts) ── */}
@@ -5206,7 +5499,7 @@ export default function App() {
           <button
             onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
             className="flex items-center gap-2 mt-0.5 py-1.5 -mx-1 px-1 rounded-lg group"
-            title="Choose a preset"
+            title="Choose a preset palette"
             aria-haspopup="menu"
             aria-expanded={presetMenu === 'title'}
             data-testid="preset-title-button"
@@ -5219,7 +5512,9 @@ export default function App() {
             </span>
           </button>
           {presetMenu === 'title' && (
+            <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
             <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
+            </PanelGuard>
           )}
         </div>
 
@@ -5343,7 +5638,9 @@ export default function App() {
               </div>
             )}
           </div>
+          <PanelGuard name="The crash report">
           <CrashReportButton />
+          </PanelGuard>
           <button
             onClick={() => setShowHelp(!showHelp)}
             className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
@@ -5370,30 +5667,98 @@ export default function App() {
         toolbar, which is how Sound Drive ended up on screen twice; a control
         that exists in two places is a control you cannot trust mid-set.
       */}
-      {performing && overlaysVisible && (
-        <PerformDesk
+      {/*
+        One desk, three layouts (Desk v2). Build is what the Design desk was
+        (the bottles, dyes, tools and recipe round a plate in Preview), Gig
+        what the Perform desk was (the cue list and the rides round the wall's
+        picture), and Load-in the room and the machine. Every settings section
+        can be a panel in any of them.
+      */}
+      {deskUp && (
+        <PanelGuard name="The desk" onClose={() => deskLayouts.reset(layoutName)} closeLabel="Put this layout back as it shipped">
+        <Desk
+          bare={!overlaysVisible}
+          layoutName={layoutName}
+          layout={deskLayout}
+          onLayout={onDeskLayout}
+          onResetLayout={onDeskReset}
+          renderSection={(id) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} })}
+          sheetOpen={showSettings || showStage}
+          onOpenSection={openSettingsAt}
+          onStage={() => { setShowStage(true); setShowSettings(false); setShowHelp(false); }}
+          onRelayout={preview.remeasure}
+          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : deskMode}
+          onMode={(m) => {
+            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
+            setShowSound(false);
+            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
+            setShowSongs(false);
+            setShowSequencer(false);
+            setDeskMode(m);
+          }}
+          dots={deskDots}
+          midiName={midi.activeInputName ?? null}
+          onSound={deskOpen.sound}
+          onVideo={deskOpen.video}
+          onMidi={deskOpen.midi}
+          onSearch={() => setShowPalette(true)}
+          onOpenSettings={openAllSettings}
+          showCrumb={
+            <>
+              <span className="text-muted">Show</span>
+              <span className="text-faint">/</span>
+              <span>{liveLookName ?? 'Untitled'}</span>
+            </>
+          }
+          status={{
+            audio: deskAudioLine,
+            engine: engineStatus?.label ?? '',
+            sequence: sequencer.status.running
+              ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
+              : null,
+            phone: remoteLink.status === 'connected',
+            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+          }}
+          onBlackout={toggleBlackout}
+          blackout={blackout}
+          plateRef={preview.ref}
+          liveName={liveLookName}
+          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
+          lookName={docName}
+          edited={docDirty}
+          dirty={docDirty}
           onSendToWall={() => { void startCast('window'); }}
           onSave={saveLook}
-          dirty={docDirty}
-          onOpenSettings={openAllSettings}
-          automated={isAutomated}
-          onAutomate={setIsAutomated}
+          onSaveOver={docId ? replaceLook : undefined}
+          onNew={newLook}
+          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
+          openLookId={docId}
+          onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
+          onDeleteSaved={deleteSavedLook}
+          videoRecording={recorder.recording}
+          videoSeconds={recorder.seconds}
+          onToggleVideo={toggleRecording}
+          onRecordOptions={() => setShowRecordPanel(true)}
+          onPerformance={togglePerformance}
+          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
+          layer={activeLayer}
+          layers={stageLayers}
+          onLayer={setActiveLayer}
+          // Two: the compositor draws the lead plate and one behind it, and a
+          // third was simulated in full — a whole solver's GPU time — and never shown.
+          onAddLayer={addLayer}
+          onRemoveLayer={removeLayer}
+          layerHeld={backLookName}
+          layerReport={layerReport}
           cues={cues}
           setName={setList.name}
           savedSets={savedSets.map(x => x.name)}
           onAddToSet={() => setAddingToSet(true)}
-          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
-          cuedLook={cued && !cued.item ? { id: cued.id, name: cued.name } : null}
-          liveLookId={activePresetId}
-          onCueSaved={cueLook}
-          onSendSaved={(id) => goLookNow(id)}
-          onAddSavedToSet={(id) => addToSet('saved', id)}
           onSetAction={onSetAction}
           onItemAction={onItemAction}
           songNow={currentSong ? songLabel(currentSong) : null}
           liveId={setActive ? liveItemId : activePresetId}
           nextId={setActive ? (cued?.item ?? null) : (cued?.id ?? null)}
-          liveFor={`${Math.floor(lookFor / 60)}:${String(Math.floor(lookFor % 60)).padStart(2, '0')}`}
           onCue={cueAny}
           onCueNow={(id) => {
             if (!setActive) { goLookNow(id); return; }
@@ -5406,98 +5771,39 @@ export default function App() {
           backLook={backLookName}
           onBackFollowsFront={backFollowsFront}
           onBack={previousLook.current ? revertLook : null}
-          onBlackout={toggleBlackout}
-          blackout={blackout}
           fade={fadeSeconds}
           onFade={setFadeSeconds}
-          settings={settings}
-          onSetting={updateSettings}
-          hasFilm={filmSource !== 'none'}
-          hasMark={markLoaded}
-          takes={mixTakes}
-          ccFor={ccFor}
-          rideKeys={rideKeys}
-          onRideKeys={setRideKeys}
-          midiName={midi.activeInputName ?? null}
-          onMic={deskOpen.mic}
-          onWall={deskOpen.wall}
-          onMidi={deskOpen.midi}
-          onPhone={deskOpen.phone}
-          onPerformance={togglePerformance}
-          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
-          layer={activeLayer}
-          layers={stageLayers}
-          onLayer={setActiveLayer}
-          tool={activeTool}
-          onTool={(t) => setActiveTool(t as typeof activeTool)}
-          toolAmount={toolAmount}
-          onToolAmount={(v) => setToolAmount(activeTool, v)}
-          amountOf={(t: string) => toolAmounts[t] ?? 1}
-          onAmountFor={setToolAmount}
-          magnetSize={settings.magnetSize ?? 0.5}
-          onMagnetSize={(v) => updateSettings({ magnetSize: v })}
-          dyes={trayDyes}
-          dye={selectedLiquid?.color ?? null}
-          onDye={(hex) => {
-            const bottle = liquidTypes.find(l => !l.behaviour && l.color.toLowerCase() === hex.toLowerCase());
-            if (!bottle) return;
-            setSelectedLiquidId(bottle.id);
-            setActiveTool('dropper');
-          }}
-          plateRef={preview.ref}
-          status={{
-            audio: deskAudioLine,
-            engine: engineStatus?.label ?? '',
-            sequence: sequencer.status.running
-              ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
-              : null,
-            phone: remoteLink.status === 'connected',
-            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
-          }}
-          dots={deskDots}
-          onSearch={() => setShowPalette(true)}
-          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'perform'}
-          onMode={(m) => {
-            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
-            setShowSound(false);
-            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
-            setShowSongs(false);
-            setShowSequencer(false);
-            setDeskMode(m);
-          }}
-          breadcrumb={
-            <>
-              <span className="text-muted">Show</span>
-              <span className="text-faint">/</span>
-              <span>{liveLookName ?? 'Untitled'}</span>
-            </>
-          }
+          cuedLook={cued && !cued.item ? { id: cued.id, name: cued.name } : null}
+          liveLookId={activePresetId}
+          onCueSaved={cueLook}
+          onSendSaved={(id) => goLookNow(id)}
+          onAddSavedToSet={(id) => addToSet('saved', id)}
           onFreeze={() => setIsActive(v => !v)}
           frozen={!isActive}
           onDrain={() => setDrainTrigger(v => v + 1)}
-        />
-      )}
-
-      {/* ── The bench ──────────────────────────────────────────── */}
-      {/*
-        Design is the same three columns holding the other half of the job:
-        what a look is made of rather than when it goes out. Its plate is a
-        preview and says "not on wall", because the most expensive mistake in
-        this app is building a look on what you think is a rehearsal and
-        finding out a room was watching.
-      */}
-      {designing && overlaysVisible && (
-        <DesignDesk
-          onOpenSettings={openAllSettings}
+          settings={settings}
+          onSetting={updateSettings}
           automated={isAutomated}
           onAutomate={setIsAutomated}
+          ccFor={ccFor}
+          kindFor={kindFor}
+          lookValueOf={lookValueOf}
+          rideKeys={rideKeys}
+          onRideKeys={setRideKeys}
+          recipeKeys={recipeKeys}
+          onRecipeKeys={setRecipeKeys}
+          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
+          randomiseArmed={luckyArmed}
+          hasFilm={filmSource !== 'none'}
+          hasMark={markLoaded}
+          takes={mixTakes}
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
-          onBottle={(id) => { setSelectedLiquidId(id); setActiveTool('dropper'); }}
+          onBottle={(id) => { setSelectedLiquidId(id); }}
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
-          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); setActiveTool('dropper'); }}
+          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
           palettes={COLOR_HARMONIES.map((h, i) => ({
             name: COLOR_HARMONY_NAMES[i],
             colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
@@ -5505,6 +5811,7 @@ export default function App() {
           paletteLock={paletteLock}
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
+          onVideoDye={() => videoInputRef.current?.click()}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
@@ -5513,68 +5820,35 @@ export default function App() {
           onAmountFor={setToolAmount}
           magnetSize={settings.magnetSize ?? 0.5}
           onMagnetSize={(v) => updateSettings({ magnetSize: v })}
-          layer={activeLayer}
-          layers={stageLayers}
-          onLayer={setActiveLayer}
-          // Two: the compositor draws the lead plate and one behind it, and a
-          // third was simulated in full — a whole solver's GPU time — and never shown.
-          onAddLayer={addLayer}
-          onRemoveLayer={removeLayer}
-          layerHeld={backLookName}
-          layerReport={layerReport}
-          settings={settings}
-          onSetting={updateSettings}
-          recipeKeys={recipeKeys}
-          onRecipeKeys={setRecipeKeys}
-          onRandomise={() => { if (!luckyArmed) { setLuckyArmed(true); return; } setLuckyArmed(false); triggerLucky(); }}
-          randomiseArmed={luckyArmed}
-          plateRef={preview.ref}
-          lookName={docName}
-          edited={docDirty}
-          onSave={saveLook}
-          onSaveOver={docId ? replaceLook : undefined}
-          savedLooks={userPresets.presets.map(u => ({ id: u.id, name: u.name, swatch: swatchOf(u.id) }))}
-          openLookId={docId}
-          onOpenSaved={(id) => { const u = userPresets.presets.find(q => q.id === id); if (u) applyUserPreset(u); }}
-          onDeleteSaved={deleteSavedLook}
-          onNew={newLook}
-          dirty={docDirty}
-          onSendToWall={() => { void startCast('window'); }}
-          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : 'design'}
-          onMode={(m) => {
-            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
-            setShowSound(false);
-            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
-            setShowSongs(false);
-            setShowSequencer(false);
-            setDeskMode(m);
-          }}
-          dots={deskDots}
-          midiName={midi.activeInputName ?? null}
-          onMic={deskOpen.mic}
-          onWall={deskOpen.wall}
-          onMidi={deskOpen.midi}
-          onPhone={deskOpen.phone}
-          onPerformance={togglePerformance}
-          performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
-          onSearch={() => setShowPalette(true)}
-          status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />
+        </PanelGuard>
+      )}
+
+      {/* ── Stage (⌘,) ─────────────────────────────────────────── */}
+      {showStage && deskUp && (
+        <PanelGuard name="Stage" onClose={() => setShowStage(false)}>
+          {settingsPanel({ scope: 'stage', focusSection: null, onClose: () => setShowStage(false) })}
+        </PanelGuard>
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
           in the narrow-screen toolbar, which is not rendered under a desk. */}
       {(deskUp || phone) && (
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
+        </>
       )}
       {/* The crash report, under a desk: its header has no room for a
           button that is idle nearly always, so the chip says when there is
           news and ⌘K opens the sheet. */}
-      {(deskUp || phone) && <CrashReportButton floating />}
+      {(deskUp || phone) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
-      {overlaysVisible && <QuickReportDot />}
+      {overlaysVisible && <PanelGuard name="The report dot"><QuickReportDot /></PanelGuard>}
 
       {addingToSet && (
+        <PanelGuard name="Add to set" onClose={() => setAddingToSet(false)}>
         <AddToSetSheet
           looks={PRESETS.map(p => ({ id: p.id, name: p.name, swatch: swatchOf(p.id), detail: p.description }))}
           saved={userPresets.presets.map(p => ({ id: p.id, name: p.name, swatch: swatchOf(p.id), detail: p.song ? songLabel(p.song) : p.description }))}
@@ -5584,9 +5858,11 @@ export default function App() {
           onImport={importToSet}
           onClose={() => setAddingToSet(false)}
         />
+        </PanelGuard>
       )}
 
       {showSave && (
+        <PanelGuard name="Save" onClose={() => setShowSave(false)}>
         <SaveLookSheet
           suggested={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           replaceName={docId ? docName : null}
@@ -5595,16 +5871,20 @@ export default function App() {
           onSave={saveCurrentPreset}
           onClose={() => setShowSave(false)}
         />
+        </PanelGuard>
       )}
 
       {/* ── ⌘K ─────────────────────────────────────────────────── */}
       {showPalette && (
+        <PanelGuard name="The command palette" onClose={() => setShowPalette(false)}>
         <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
+        </PanelGuard>
       )}
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
         {overlayUp && (cued || fading > 0 || previousLook.current) && (
+          <PanelGuard name="The cue bar" onClose={() => setCued(null)} closeLabel="Clear the cue">
           <CueBar
             cued={cued}
             liveName={liveLookName}
@@ -5615,6 +5895,7 @@ export default function App() {
             onCancel={() => setCued(null)}
             onRevert={previousLook.current ? revertLook : null}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 

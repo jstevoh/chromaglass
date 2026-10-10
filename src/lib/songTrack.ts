@@ -106,8 +106,8 @@ export class SongEar {
     if (i >= this.frames) throw new Error(`the song has ${this.frames} frames; frame ${i} was asked for`);
     this.i++;
     const end = Math.round((i * sampleRate) / fps);
-    const db = analyser.frame(pcm, end, 1 / fps);
-    const reading = this.features.update({ bins: db, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps);
+    const { bins: db, timeDomainData } = analyser.frame(pcm, end, 1 / fps);
+    const reading = this.features.update({ bins: db, timeDomainData, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps);
     // The hook's dt: the time since its previous frame, 0 on the first, at
     // most a quarter of a second.
     const dt = i === 0 ? 0 : Math.min(0.25, 1 / fps);

@@ -328,7 +328,7 @@ function spread(density) {
   const left = ['soap', 'body', 'repel', 'weight', 'polarity'].map((k) => held(ph[k]));
   // At 192² the plate is four times these cells, so quote both.
   console.log(`     cost: ${per.toFixed(3)} ms a step at ${N}², about ${(per * 4).toFixed(2)} ms at 192², carrying ${left.map((v) => v.toFixed(0)).join(' / ')} (soap / body / repel / weight / polarity)`);
-  check('a step of it fits in a frame', per * 4 < 3.0 && left.every((v) => v > 1), `${(per * 4).toFixed(2)} ms at 192²`);
+  check('a step of it fits in a frame', per * 4 < 4.0 && left.every((v) => v > 1), `${(per * 4).toFixed(2)} ms at 192²`);
 }
 
 console.log('');

@@ -57,6 +57,32 @@ for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); p
 await new Promise(r => setTimeout(r, 2500));
 
 const browser = await launchChromium(chromium);
+
+/*
+  Where the plate is drawn, not where its canvas is. The canvas fills the
+  desk's preview, and the plate is drawn inside it at its own shape, fitted
+  and centred (LiquidVisualizer's drawnRect, which every pointer handler maps
+  through). While the preview had about the canvas's shape the two were the
+  same box. Desk v2's Build preview at 1280×800 is 934×384, the plate in it
+  614×384 from x 177, so "5% across the canvas" was 64px, on the bar beside
+  the plate: the hand missed it, the pool poured where the hand would be
+  clipped to the plate's edge (2.90% of an asked 3.48%), and the hold over it
+  found no ferrofluid under the hand to turn up (Ferrofluid 0 → 0). Fractions
+  of the plate are what these checks mean.
+*/
+const plateBox = async (page) => {
+  // The app's own rule: letterboxed only where the canvas is set to contain
+  // (a stage or the desk's preview); otherwise the picture is the whole box.
+  // A canvas missing, or never sized, is an error here, not the old target.
+  const c = await page.$('#liquid-canvas');
+  const box = c && await c.boundingBox();
+  const [cw, ch, fit] = c ? await c.evaluate((el) => [el.width, el.height, getComputedStyle(el).objectFit]) : [0, 0, ''];
+  if (!box || !cw || !ch) throw new Error(`no plate to aim at: canvas ${c ? `${cw}×${ch}` : 'missing'}`);
+  if (fit !== 'contain') return box;
+  const k = Math.min(box.width / cw, box.height / ch);
+  const w = cw * k, h = ch * k;
+  return { x: box.x + (box.width - w) / 2, y: box.y + (box.height - h) / 2, width: w, height: h };
+};
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
@@ -175,8 +201,7 @@ try {
     });
   });
 
-  const canvas = await page.$('canvas');
-  const box = await canvas.boundingBox();
+  const box = await plateBox(page);
   // Drag offset from the middle row (y=0.35 rather than 0.50): the check asks
   // that the pool end nearer the hand than the hand's mirror across y=0.5.
   // Along y=0.5 the hand and its mirror are the same point, which degenerates
@@ -592,7 +617,7 @@ try {
     else: no lay, nothing in the solver, Ferrofluid still down, and the
     plate as bare as it was.
   */
-  const box2 = await (await page2.$('canvas')).boundingBox();
+  const box2 = await plateBox(page2);
   await page2.mouse.move(box2.x + box2.width * 0.2, box2.y + box2.height * 0.5);
   await page2.mouse.down();
   await page2.waitForTimeout(1500);
@@ -700,7 +725,7 @@ try {
   page4.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page4.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
   await page4.waitForTimeout(9000);
-  const box4 = await page4.evaluate(() => { const r = document.getElementById('liquid-canvas').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const box4 = await plateBox(page4).then(b => ({ x: b.x, y: b.y, w: b.width, h: b.height }));
   const frozen4 = () => page4.evaluate(() => { const d = window.chromaglassDebug(); return { active: d.active?.() ?? null, steps: d.fluids?.[0]?.stepCount ?? -1, strength: d.settings?.magnetStrength ?? null }; });
   await page4.mouse.click(5, 5);
   await page4.keyboard.press('m');

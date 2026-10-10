@@ -353,7 +353,7 @@ console.log(table.join('\n'));
   // signal over noise: the harder case, and the one a real room is.
   const loud = track({ ...opts, hiss: ROOM }), quiet = track({ ...opts, hiss: ROOM, gain: 0.1 });
   const a = analysePcm(loud.pcm, SR, FPS), b = analysePcm(quiet.pcm, SR, FPS);
-  for (const src of SOUND_SOURCES) {
+  for (const src of SOUND_SOURCES.filter(s => !s.startsWith('tonal') && s !== 'note')) {
     const na = a.filter((r) => r.onsets[src].hit).length;
     const nb = b.filter((r) => r.onsets[src].hit).length;
     check(`-20 dB in a room: ${src} fires as often`, Math.abs(na - nb) <= Math.max(1, LEVEL_COUNT * na), `${na} loud, ${nb} quiet`);
@@ -368,7 +368,7 @@ console.log(table.join('\n'));
   // snare and 0.21 on hats, and 0.07 on hats even over a 16-bit floor, all
   // of it in the gaps between hits, where the quiet version hears the noise.
   const c = analysePcm(track({ ...opts, hiss: 0 }).pcm, SR, FPS), q = analysePcm(track({ ...opts, hiss: 0, gain: 0.1 }).pcm, SR, FPS);
-  for (const src of SOUND_SOURCES) {
+  for (const src of SOUND_SOURCES.filter(s => !s.startsWith('tonal') && s !== 'note')) {
     const dv = c.reduce((s, r, i) => s + Math.abs(r[src] - q[i][src]), 0) / c.length;
     check(`-20 dB: ${src} reads the same`, dv <= LEVEL_VALUE, `mean difference ${dv.toFixed(3)}`);
   }

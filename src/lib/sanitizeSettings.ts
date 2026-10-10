@@ -4,7 +4,7 @@ import { PIN_RANGE, onStep } from './deskPins.ts';
 const VALID_VISCOSITY = new Set(['thin', 'thick', 'water']);
 const VALID_BLEND_MODE = new Set(['screen', 'normal', 'multiply', 'overlay']);
 const VALID_LED_MODE = new Set(['rainbow', 'solid', 'pulse', 'audio']);
-const VALID_MACRO_CAMERA = new Set(['hold', 'wander', 'cut']);
+const VALID_MACRO_CAMERA = new Set(['hold', 'follow', 'auto']);
 const VALID_ON_NEW_SONG = new Set(['preset', 'none']);
 const VALID_ROW_BLEND = new Set(['own', 'add', 'screen', 'mult', 'over']);
 const VALID_AUDIO_FEATURES = new Set(['volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity', 'none']);
@@ -114,7 +114,9 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
     // Object settings: sceneMappings
     if (key === 'sceneMappings' && Array.isArray(value)) {
       const validMappings = value.filter(m =>
-        m && typeof m === 'object' && typeof m.source === 'string' && typeof m.target === 'string' &&
+        m && typeof m === 'object' &&
+        (m.source === undefined || typeof m.source === 'string') &&
+        typeof m.setting === 'string' &&
         typeof m.depth === 'number' && Number.isFinite(m.depth)
       ).slice(0, 32);
       out.sceneMappings = validMappings;

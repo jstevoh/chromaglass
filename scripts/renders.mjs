@@ -134,7 +134,7 @@ async function open(browser, screen, { source, desk }) {
       onCommitFiberRoot() { window.__commits++; },
     };
   }, { source, desk });
-  await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassCastState === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
   // Past the opening: the first seconds build pipelines, load the look and
   // learn the room, and each of those is a render that happens once.

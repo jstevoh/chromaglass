@@ -94,3 +94,8 @@ export async function deletePerformance(id: string): Promise<void> {
   try { await txRequest(PERFORMANCES, 'readwrite', s => s.delete(id)); }
   catch (e) { console.warn('musicDb.deletePerformance failed', e); }
 }
+
+export async function getAllSongMaps(): Promise<SongMap[]> {
+  try { return await txRequest<SongMap[]>(SONG_MAPS, 'readonly', s => s.getAll()); }
+  catch (e) { console.warn('musicDb.getAllSongMaps failed', e); return []; }
+}

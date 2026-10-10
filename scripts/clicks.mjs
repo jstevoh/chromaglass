@@ -101,8 +101,8 @@ function hear(pcm, sr, hand = () => false) {
   const frames = Math.floor((pcm.length / sr) * 60);
   for (let i = 1; i < frames; i++) {
     const t = i / 60;
-    const db = an.frame(pcm, Math.round(t * sr), 1 / 60);
-    const r = features.update({ bins: db, scale: 'db', sampleRate: sr, fftSize: an.fftSize }, t, hand(t));
+    const { bins: db, timeDomainData: td } = an.frame(pcm, Math.round(t * sr), 1 / 60);
+    const r = features.update({ bins: db, timeDomainData: td, scale: 'db', sampleRate: sr, fftSize: an.fftSize }, t, hand(t));
     for (const n of SOURCE_NAMES) if (r.onsets[n].hit) hits[n].push(t);
     // The plate's own reading of a kick (LiquidVisualizer): the onset's time changing.
     const at = r.onsets.kick.at;
@@ -282,7 +282,7 @@ async function app() {
       // eslint-disable-next-line no-new-func
       if (src === 'microphone') new Function(`(${room})()`)();
     }, [source, ROOM.toString()]);
-    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.__hands === 'function', null, { timeout: 60_000 });
     // The ranges and thresholds learn the room for a few seconds first.
     await page.waitForTimeout(4000);

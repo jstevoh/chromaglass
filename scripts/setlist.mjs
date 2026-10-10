@@ -20,10 +20,10 @@ const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message
 
 {
   const r = readSetListFile(fs.readFileSync('docs/sets/example.chromaglass-setlist.json', 'utf8'), known);
-  check('the example set reads, every item in it', r.list.items.length === 3 && r.warnings.length === 0,
+  check('the example set reads, every item in it', r.list.items.length === 4 && r.warnings.length === 0,
     `${r.list.items.map((i) => i.ref).join(', ')}${r.warnings.length ? `; ${r.warnings.join('; ')}` : ''}`);
-  check('naming looks that ship', r.list.items.every((i) => PRESETS.some((p) => p.id === i.ref)),
-    r.list.items.filter((i) => !PRESETS.some((p) => p.id === i.ref)).map((i) => i.ref).join(', ') || 'all found');
+  check('naming looks that ship', r.list.items.filter((i) => i.type === 'preset').every((i) => PRESETS.some((p) => p.id === i.ref)),
+    r.list.items.filter((i) => i.type === 'preset' && !PRESETS.some((p) => p.id === i.ref)).map((i) => i.ref).join(', ') || 'all found');
   const dark = r.list.items[1];
   check('an item carries its fade, song, controls and strip', dark.fade === 8 && dark.song?.title === 'Dark Star'
     && dark.controls?.globalSpeed === 0.03 && dark.rides?.length === 4 && r.list.items[2].fade === 0);

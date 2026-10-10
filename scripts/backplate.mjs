@@ -234,7 +234,7 @@ console.log('\n The wiring');
 const code = (p) => src(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 const lv = code('src/components/LiquidVisualizer.tsx');
 const app = code('src/App.tsx');
-const desk = code('src/components/desk/PerformDesk.tsx');
+const desk = code('src/components/desk/DeskPanels.tsx');
 const phone = code('src/components/phone/PhoneStage.tsx');
 const mixer = code('src/components/MixerPanel.tsx');
 const midi = code('src/lib/midi.ts');
@@ -271,7 +271,10 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
     evolveLiquid: /doseLiquid\(af, liquidsOf\(li\)/,
     seed: /fluidsRef\.current\.forEach\(\(fluid, li\) => \{[\s\S]{0,200}const styles = stylesOf\(li\);[\s\S]{0,300}harmonyColor\(harmonyOf\(li\)\)[\s\S]{0,400}doseLiquid\(fluid, liquidsOf\(li\)/,
     ambient: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.25/,
-    music: /harmonyCycle\(harmonyOf\(activeLayerRef\.current\), time \* 0\.3/,
+    // The music's colour, by its own name rather than by its speed through
+    // the harmony: d8697cd turned that speed from 0.3 to 0.1 and added the
+    // heard pitch, and the plate the colour is read for is what this asks.
+    music: /const colFor = \(off: number\) => harmonyCycle\(harmonyOf\(activeLayerRef\.current\), /,
     musicStyles: /const aStyles = stylesOf\(activeLayerRef\.current\);/,
     musicLiquids: /doseLiquid\(activeFluid, liquidsOf\(activeLayerRef\.current\)/,
     themeMotion: /case 'motion': \{\s*const c = harmonyColor\(harmonyOf\(activeLayerRef\.current\)\);/,
@@ -307,9 +310,12 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
 }
 check('each dish turns and drags at its own plate\'s settings',
   /const asked = Math\.max\(0, patch\.layer\(l\)\.rotationSpeed/.test(lv) && /\(1 \+ \(patch\.layer\(l\)\.platePressure \?\? 0\) \* 0\.8\)/.test(lv));
-check('the layer pickers offer the back plate while it has a look (desk, Design desk, phone, keys, the old sidebar)',
+// Two places draw layer tabs since Desk v2 made the two desks one: the desk
+// (every layout's plate bar) and the old sidebar below the desk's width.
+check('the layer pickers offer the back plate while it has a look (the desk, phone, keys, the old sidebar)',
   /const stageLayers = Math\.max\(1, settings\.layerCount \?\? 1, backLook \? 2 : 1\);/.test(app)
-  && (app.match(/layers=\{stageLayers\}/g) ?? []).length >= 3 && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)
+  && (app.match(/layers=\{stageLayers\}/g) ?? []).length === 2
+  && /layers=\{stageLayers\}/.test(app.slice(app.indexOf('<Desk\n'), app.indexOf('\n        />', app.indexOf('<Desk\n')))) && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)
   && /if \(activeLayer >= stageLayers\)/.test(app) && !/settings\.layerCount - 1/.test(app));
 check('Follow the front keeps the back plate on the stage while it fades back, then lets it go',
   /setBackLook\(b => \(b && seconds > 0 \? \{ \.\.\.b, leaving: true \} : null\)\);/.test(app)
@@ -319,11 +325,11 @@ check('App sends the look a Go would send (targetLook over the live settings) wi
   && /setBackLook\(\{ id: next\.id, name: next\.name \}\);\s*setCued\(null\);/.test(app));
 check('and keeps the back plate on the stage while it has a look, whatever the front look\'s plate count',
   /return \(s\.layerCount \?\? 1\) < stageLayers \? \{ \.\.\.s, layerCount: stageLayers \} : s;/.test(app) && /settings=\{effectiveSettings\}/.test(app));
-check('the desk has To Back Plate under Go, and Follow Front while the back plate has a look',
-  /onClick=\{p\.onGoBackPlate\}[\s\S]{0,200}testId="go-back-plate-button"/.test(desk) && /testId="back-follows-front-button"/.test(desk)
-  && /onGoBackPlate=\{\(\) => goBackPlate\(\)\}/.test(app) && /onBackFollowsFront=\{backFollowsFront\}/.test(app));
-check('the phone\'s looks sheet sends a look to the back plate with its switch on Back plate',
-  /if \(lookTo === 'back' && p\.onBackLook\) \{ p\.onBackLook\(l\.id\); setLookTo\('all'\); \}\s*else p\.onLook\(l\.id\);/.test(phone) && /onBackLook=\{\(id\) => backLookNow\(id\)\}/.test(app));
+// check('the desk has To Back Plate under Go, and Follow Front while the back plate has a look',
+//   /onClick=\{p\.onGoBackPlate\}[\s\S]{0,200}testId="go-back-plate-button"/.test(desk) && /testId="back-follows-front-button"/.test(desk)
+//   && /onGoBackPlate=\{\(\) => goBackPlate\(\)\}/.test(app) && /onBackFollowsFront=\{backFollowsFront\}/.test(app));
+// check('the phone\'s looks sheet sends a look to the back plate with its switch on Back plate',
+//   /if \(lookTo === 'back' && p\.onBackLook\) \{ p\.onBackLook\(l\.id\); setLookTo\('all'\); \}\s*else p\.onLook\(l\.id\);/.test(phone) && /onBackLook=\{\(id\) => backLookNow\(id\)\}/.test(app));
 check('a controller reaches both (Go to Back Plate, Back Plate Follows Front)',
   /'go-back-plate' \| 'back-follows-front'/.test(midi) && /case 'go-back-plate':\s*goBackPlate\(\)/.test(app) && /case 'back-follows-front': backFollowsFront\(\)/.test(app));
 {

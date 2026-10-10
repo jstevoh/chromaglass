@@ -8,6 +8,7 @@ import {
 } from '../lib/midi';
 import type { MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
+import { livePresetId } from '../presets';
 import { ControllerSurface } from './ControllerSurface';
 import { SURFACES, surfaceFor } from '../lib/controllerSurface';
 
@@ -142,7 +143,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
   const [musicOpen, setMusicOpen] = useState<string | null>(null);
   /** What auto-map decided last time, so the panel can say what it just did. */
   const [autoSaid, setAutoSaid] = useState<string | null>(null);
-  const presetName = (id: string) => presets.find(p => p.id === id)?.name;
+  const presetName = (id: string) => presets.find(p => p.id === livePresetId(id))?.name;
   /** Which map the plugged-in hardware wants, so its chip can say so. */
   const detected = midi.inputs.map(i => factoryFor(i.name)).find(Boolean) ?? null;
 

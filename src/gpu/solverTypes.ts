@@ -27,6 +27,8 @@ export interface GpuStepParams {
   gravity: number;      // centre-gravity strength (already × 0.05)
   tiltX: number;        // plate tilt, applied as a uniform acceleration
   tiltY: number;
+  cometX: number;
+  cometY: number;
   advection: number;
   /** Interface sharpening, 0 = off. Counteracts the solver's own numerical diffusion. */
   sharpness: number;
@@ -203,6 +205,16 @@ export interface GpuStepParams {
    * before copying to GPU buffer, allowing tests to inject corrupted uniform values.
    */
   rawSim?: (simF: Float32Array) => void;
+  clearChemistry?(): void;
+  seedChemistry?(x: number, y: number, radius: number): void;
+  addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number): void;
+  chem?: any;
+  /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
+  chemLive?: boolean;
+  /** Turing Reagent has been poured since then: the reaction runs on it without Chemistry. */
+  reagentLive?: boolean;
 }
 
 
@@ -248,6 +260,7 @@ export interface PlateSolver {
    * Optional because only the WebGPU solver carries a phase field.
    */
   addPhase?(x: number, y: number, radius: number, amount: number): void;
+  addLiquidDrop?(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void;
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
@@ -310,4 +323,14 @@ export interface PlateSolver {
   drainStep(t: number): void;
   clear(): void;
   dispose(): void;
+  clearChemistry?(): void;
+  seedChemistry?(x: number, y: number, radius: number): void;
+  addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number): void;
+  chem?: any;
+  /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
+  chemLive?: boolean;
+  /** Turing Reagent has been poured since then: the reaction runs on it without Chemistry. */
+  reagentLive?: boolean;
 }

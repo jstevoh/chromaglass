@@ -7,7 +7,7 @@
  * kept in this browser because it is the hand's, not the look's.
  */
 
-export const TOOL_AMOUNT = { min: 0.1, max: 3, step: 0.05 } as const;
+export const TOOL_AMOUNT = { min: 0.05, max: 5, step: 0.05 } as const;
 
 /** What the amount is, for each tool, in the words its control shows. */
 export const TOOL_AMOUNT_MEANS: Record<string, string> = {

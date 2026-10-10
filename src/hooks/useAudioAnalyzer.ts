@@ -242,8 +242,9 @@ export function useAudioAnalyzer(
         // window. Reading both in one frame smooths once: the node applies its
         // time constant once per render quantum however many reads there are.
         analyser.getFloatFrequencyData(floatData);
+        analyser.getByteTimeDomainData(timeDomainData);
         const reading = features.update(
-          { bins: floatData, scale: 'db', sampleRate: audioContext.sampleRate, fftSize: analyser.fftSize },
+          { bins: floatData, timeDomainData, scale: 'db', sampleRate: audioContext.sampleRate, fftSize: analyser.fftSize },
           nowSec,
           room && handSounds.covers(nowSec),
         );
@@ -258,7 +259,6 @@ export function useAudioAnalyzer(
         }
 
         analyser.getByteFrequencyData(frequencyData);
-        analyser.getByteTimeDomainData(timeDomainData);
         const raw = levels.levels(frequencyData, timeDomainData, dt, { sensitivity: sens, bassBoost: bBoost, autoCalibrate: autoCal });
         const calibration: RoomCalibration | null = raw.calibration;
 

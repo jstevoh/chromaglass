@@ -222,9 +222,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var v = textureLoad(vel, q, 0);
   // Rain Drip's heavy colour down a standing plate, and Plate Rock's tilt (A.b.xy, fluid.ts ROCK_FALL):
   // both the dye's weight over the plate's mean, the second down whichever way the hand tips the glass.
-  if (A.a.x > 0.0 || any(A.b.xy != vec2f(0.0))) {
+  // Comet flow adds an explicit, constant pull to the dye (S.cometX, S.cometY).
+  if (A.a.x > 0.0 || any(A.b.xy != vec2f(0.0)) || S.cometX != 0.0 || S.cometY != 0.0) {
     let w = textureLoad(dye, q, 0).a - S.meanD;
-    v = vec4f(v.xy - S.up * (A.a.x * w) + A.b.xy * w, v.z, v.w);
+    v = vec4f(v.xy - S.up * (A.a.x * w) + (A.b.xy + vec2f(S.cometX, S.cometY)) * w, v.z, v.w);
   }
   if (S.air > 0.1) {
     let p = uvOf(id) * S.l;

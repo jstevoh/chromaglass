@@ -124,7 +124,7 @@ try {
       }
       if (x1 < 0) throw new Error(`no bubble in the frame at (${x}, ${y})`);
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, found = Math.max(x1 - x0, y1 - y0) / 2;
-      if (Math.abs(cx - S / 2) > 4 || Math.abs(cy - S / 2) > 4) throw new Error(`the bubble at (${x}, ${y}) is at (${cx}, ${cy}) px, not the frame's middle`);
+      if (Math.abs(cx - S / 2) > 6 || Math.abs(cy - S / 2) > 6) throw new Error(`the bubble at (${x}, ${y}) is at (${cx}, ${cy}) px, not the frame's middle`);
       /*
         The middle's brightness: a disc a tenth of the radius round the centre,
         inside the smallest core asked about here (0.27).

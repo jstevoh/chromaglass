@@ -145,7 +145,10 @@ const until = async (page, fn, ms = 10_000) => {
   return false;
 };
 const visible = (page, id) => page.getByTestId(id).first().isVisible().catch(() => false);
-const linked = (page) => page.locator('header').getByText('Linked', { exact: true }).isVisible().catch(() => false);
+// Linked on either of the remote's screens: Controls' header says so in words,
+// Draw (the one it opens on, PLAN §8-draw) marks its root.
+const linked = async (page) => (await page.locator('[data-testid="remote-draw"][data-linked="true"]').count()) > 0
+  || page.locator('header').getByText('Linked', { exact: true }).isVisible().catch(() => false);
 
 // Each part runs on its own: a wait that times out is that part's FAIL, and
 // the parts after it still run and report.
@@ -154,12 +157,23 @@ const part = async (name, fn) => {
 };
 const workers = (page) => page.evaluate(() => navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then((r) => r.length) : 0);
 const RELAY = `http://127.0.0.1:${RELAY_PORT}`;
+/*
+  Play here goes to the app's own start, and a phone starts on Play
+  (PhonePlay.tsx, lib/phone.ts phoneScreen) unless the full layout was the
+  last one chosen there. Either is the show; the Laptop remote is in the full
+  layout's More sheet, reached from Play's All controls.
+*/
+const showUp = async (page) => (await visible(page, 'play-screen')) || (await visible(page, 'phone-stage'));
+const toAllControls = async (page) => {
+  if (await visible(page, 'play-screen')) await page.getByTestId('play-all-controls').tap();
+  await until(page, () => visible(page, 'phone-stage'), 5000);
+};
 
 // First use: nothing remembered. More › Laptop remote asks, and Play here
 // from the form goes back.
 await part('first use', async () => {
   const { ctx, page, sockets } = await phone({ app: true });
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await until(page, () => visible(page, 'phone-stage'), 20_000);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
@@ -172,7 +186,7 @@ await part('first use', async () => {
   check('and opens no socket to its own origin', sockets.length === 0, sockets.join(', '));
   await page.getByTestId('app-play-here').first().tap();
   await page.waitForURL((u) => !u.search.includes('remote'));
-  check('Play here on the form goes back to the show', await until(page, () => visible(page, 'phone-stage'), 20_000), page.url());
+  check('Play here on the form goes back to the show', await until(page, () => showUp(page), 20_000), page.url());
   // A worker's registration lands after load; give it the time it takes on the website below.
   await page.waitForTimeout(1500);
   check('the app registers no service worker', (await workers(page)) === 0);
@@ -195,12 +209,16 @@ await part('linked', async () => {
   check('the remote says Linked', await until(page, () => linked(page)));
   check('the laptop heard a controller join', controllersSeen > before, `${controllersSeen - before} joined`);
   check('its socket went to the laptop, not the app\'s origin', sockets.some((s) => s.startsWith(`ws://127.0.0.1:${RELAY_PORT}/`)) && !sockets.some((s) => s.includes(`:${APP_PORT}`)), sockets.join(', '));
-  check('the app bar is there', await visible(page, 'app-mode-bar'));
+  check('the remote opens on Draw', await visible(page, 'remote-draw'));
   const n = heard.length;
-  await page.getByTestId('remote-blackout').last().tap();
+  await page.getByTestId('draw-blackout').tap();
   await until(page, async () => heard.length > n, 5000);
   const got = heard.slice(n);
   check('a button on the remote arrives at the laptop', got.some((m) => m.type === 'action' && m.action === 'blackout-toggle'), JSON.stringify(got).slice(0, 160));
+  // The app's two modes are in Controls, one tap from Draw, and the remote
+  // remembers it was left there, so Change laptop below comes back to them.
+  await page.getByTestId('draw-controls').tap();
+  check('the app bar is there, in Controls', await until(page, () => visible(page, 'app-mode-bar'), 5000));
 
   await page.getByTestId('app-change-laptop').tap();
   await until(page, () => visible(page, 'laptop-link'));
@@ -216,7 +234,8 @@ await part('linked', async () => {
   // Modes: back to the show, then back to the laptop from More.
   await page.getByTestId('app-play-here').first().tap();
   await page.waitForURL((u) => !u.search.includes('remote'));
-  check('Play here goes back to the show', await until(page, () => visible(page, 'phone-stage'), 20_000), page.url());
+  check('Play here goes back to the show', await until(page, () => showUp(page), 20_000), page.url());
+  await toAllControls(page);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
   await page.getByTestId('phone-laptop-remote').tap();
@@ -231,9 +250,9 @@ await part('linked', async () => {
 // out, and pasting the new Phone line has to win over the remembered key.
 await part('wrong key', async () => {
   const { ctx, page } = await phone({ app: true });
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await page.evaluate((relay) => localStorage.setItem('chromaglass-laptop', JSON.stringify({ relay, key: '0000' })), RELAY);
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await until(page, () => visible(page, 'phone-stage'), 20_000);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-laptop-remote'), 5000);
@@ -281,7 +300,7 @@ await part('only the app follows ?relay=', async () => {
 // The website, unchanged.
 await part('the website', async () => {
   const { ctx, page } = await phone({ app: false });
-  await page.goto(`${APP}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+  await page.goto(`${APP}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await until(page, () => visible(page, 'phone-stage'), 20_000);
   await page.getByTestId('phone-open-more').tap();
   await until(page, () => visible(page, 'phone-sheet-more'), 5000);

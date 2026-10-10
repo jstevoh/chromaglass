@@ -36,7 +36,7 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
   };
 
   return (
-    <Sheet title="Save as a new preset" onClose={onClose} width={480} height={360} testId="save-sheet">
+    <Sheet title="Save as a new palette" onClose={onClose} width={480} height={360} testId="save-sheet">
       {/* w-full: the sheet's body is a row, and without it this column took
           only its content's width, the fields 200 px wide in a 480 px sheet. */}
       <div className="flex h-full w-full flex-col gap-4 p-5">
@@ -74,13 +74,13 @@ export function SaveLookSheet({ suggested, songName, onSave, onClose, replaceNam
         )}
         <div className="mt-auto flex items-center justify-end gap-2">
           {replaceName && onReplace && (
-            <Button height={40} onClick={onReplace} testId="save-replace" title={`Write the current settings over “${replaceName}”, keeping its name`}>
-              <span className="max-w-[180px] truncate">Replace “{replaceName}”</span>
+            <Button height={40} onClick={onReplace} testId="save-replace" title={`Save changes to “${replaceName}”`}>
+              <span className="max-w-[180px] truncate">Save “{replaceName}”</span>
             </Button>
           )}
           <span className="flex-1" />
           <Button height={40} onClick={onClose} testId="save-cancel">Cancel</Button>
-          <Button height={40} variant="primary" onClick={save} testId="save-confirm">Save</Button>
+          <Button height={40} variant="primary" onClick={save} testId="save-confirm">Save As...</Button>
         </div>
       </div>
     </Sheet>

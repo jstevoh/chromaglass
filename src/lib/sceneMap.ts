@@ -26,15 +26,15 @@
  * failure otherwise is a dropdown that offers a choice doing nothing at all.
  */
 
-import { ROOM_STALE_MS } from './roomStir';
-import { getSceneValue, type SceneReading } from './sceneSense';
-import { getAudioValue, type AudioFeatureKey } from '../constants';
-import { SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures';
+import { ROOM_STALE_MS } from './roomStir.ts';
+import { getSceneValue, type SceneReading } from './sceneSense.ts';
+import { getAudioValue, type AudioFeatureKey } from '../constants.ts';
+import { SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
 import type { ModulatorFeature, Modulators } from './modulators';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
-import { PINNABLE, onStep } from './deskPins';
-import { MIX_FADE_KEYS } from './mixer';
+import { PINNABLE, onStep } from './deskPins.ts';
+import { MIX_FADE_KEYS } from './mixer.ts';
 
 /**
  * What a patch may be plugged into.
@@ -110,7 +110,7 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  */
 export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
-  'blobSurfaceTension', 'buoyancy', 'centerGravity', 'damping', 'diffusionRate',
+  'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
   'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.

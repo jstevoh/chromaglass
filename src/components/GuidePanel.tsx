@@ -91,7 +91,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['1. Press Play', <>The plate starts moving. It is seeded with the <Em>Classic Light Show</Em> preset — slow luminous blobs, the meditative 1960s look.</>],
           ['2. Give it sound', <>The quickest is <Em>Band</Em>: a synthesised kick, snare, hats, bass and pad at 122 bpm, played silently into the analyser. No device, so no permission prompt and nothing to ask. <Em>Mic</Em>, <Em>System</Em> and <Em>File</Em> are the real inputs.</>],
-          ['3. Pick a look', <>Click the name under the ChromaGlass title. Thirty-two presets in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
+          ['3. Pick a preset palette', <>Click the name under the ChromaGlass title. The preset palettes come in three groups — Light show, Photograph, Closeup — plus any you have saved.</>],
           ['4. Put a hand on it', <>The <Em>Dropper</Em> adds dye, <Em>Blow</Em> puffs air through a straw (held still on layer 1 it blows a bubble that grows while you hold, its rim breaking into fingers), <Em>Press</Em> holds the top glass down so the film thins and the dye runs out in a ring.</>],
         ]} />
         <H>Your first show, in order</H>
@@ -102,7 +102,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['1. Sound first', <>Pick the input and let <Em>room calibration</Em> settle for a minute (Settings → Inputs → Sound). It learns this room's floor and ceiling, so the plate reacts to where the music sits between them rather than to an absolute level. Skip it and the show is either dead or frantic all night.</>],
           ['2. Then the projector', <>Cast → <Em>Second display</Em>. Do it before you tune anything: the projector announces its resolution and the plate re-renders at it, so a look tuned on the laptop alone can arrive coarser or finer than you expected.</>],
-          ['3. Then the look', <>Build in <Em>Design</Em> (the plate filling the window), where <Em>Load</Em> on a preset row is what you want — it lands on clean glass. Save anything you like: <Em>Save current</Em> keeps the settings, the dyes, the injection styles and the liquids together.</>],
+          ['3. Then the look', <>Build in <Em>Design</Em> (the plate filling the window), where <Em>Load</Em> on a preset row is what you want — it lands on clean glass. Save anything you like: <Em>Save As...</Em> keeps the settings, the dyes, the injection styles and the liquids together.</>],
           ['4. Plan the songs', <>In <Em>Songs</Em> (the desk's third mode), give each song a look — a built-in or one you saved — and say what happens while it plays: the title poured on the first note, a burst every four kicks, in close for each chorus, a drain before the end. Pick them from <Em>Add an action</Em> and change the numbers; keep a list that works as an <Em>action set</Em> for the next song. With <Em>Follow songs</Em> on, a song's show starts when the song is recognised; <Em>Run now</Em> starts it by hand.</>],
           ['5. Switch to Perform', <>Now the plate becomes a preview and the desk gets the room. From here, change looks by <Em>cueing</Em> and pressing Go, never by Load — Load clears the plate, which on a wall is a cut to black.</>],
           ['6. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
@@ -237,7 +237,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Hue Journey', <>Settings → Show. Minutes per step. The set drifts its colours over the length of a set, one dye draining as the next arrives, never a jump. At zero the old behaviour stays: a re-pick every forty-five seconds or so.</>],
           ['Palette lock', <>Pin a harmony and it wins outright — over drains, seeds, auto-rotation and the music. Persists across sessions.</>],
-          ['Save current', <>Writes the look, its dyes, its injection styles and its liquids to your library and to a <C>.chromaglass-preset.json</C> file. Load a friend's the same way.</>],
+          ['Save As...', <>Writes the look, its dyes, its injection styles and its liquids to your library and to a <C>.chromaglass-preset.json</C> file. Load a friend's the same way.</>],
           ['For this song', <>A saved preset can be attached to the track that was playing. It is applied whenever that song is identified again.</>],
         ]} />
         <Note>
@@ -309,7 +309,7 @@ const SECTIONS: Section[] = [
         <P>
           <Em>Light show</Em> is dye as light on black — the projected image. <Em>Photograph</Em> is
           a two-pass render with a camera over the plate and lit paper behind it, and it
-          is what the Oil on Water, Colorful Cosmos and Sunny Side Up presets are. <Em>Lens</Em> is
+          is what the Oil on Water and Colorful Cosmos preset palettes are. <Em>Lens</Em> is
           how much of a camera is over either: Focus, Aperture, Bloom, Chromatic Aberration and
           Refraction are its controls, and do nothing with it at zero.
         </P>

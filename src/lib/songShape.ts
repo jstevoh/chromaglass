@@ -277,7 +277,7 @@ const SILENT_DB = -125;
 
 const KICK = 1;               // index in SOURCE_NAMES
 const LEVEL = 0;
-const TOP_BANDS = [10, 11, 12]; // band6..band8: 1.7–16 kHz
+const TOP_BANDS = [14, 15, 16]; // band6..band8: 1.7–16 kHz
 
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const dbOf = (p: number) => 10 * Math.log10(p + 1e-30);

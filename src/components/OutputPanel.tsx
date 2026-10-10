@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
+import { Knob } from './ui';
 import {
-  DEFAULT_OUTPUT, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
+  DEFAULT_OUTPUT, IDENTIFY_MS, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
-  type OutputConfig, type Surface, type SurfaceBlend, type SurfaceShape, type SurfaceSource,
+  type OutputConfig, type Surface, type SurfaceBlend, type SurfaceShape, type SurfaceSource, type WallTest,
 } from '../lib/outputConfig';
 
 /**
@@ -321,7 +322,10 @@ const Row = ({ label, value, min, max, step, onChange, format }: {
     <input
       type="range" min={min} max={max} step={step} value={value} aria-label={label}
       onChange={e => onChange(parseFloat(e.target.value))}
-      className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-white"
+      // The settings' own rail (index.css): this was a 4px bar, which on a
+      // desk panel is a control you cannot find in the dark (`npm run layout`).
+      className="set-range"
+      style={{ '--fill': `${Math.round(100 * (value - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
     />
   </div>
 );
@@ -341,12 +345,15 @@ const Switch = ({ label, on, onChange, hint, testId }: {
   </button>
 );
 
-export function OutputPanel({ output, onChange, onReset, wakeLock }: {
+export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest }: {
   output: OutputConfig;
   onChange: (next: OutputConfig) => void;
   onReset: () => void;
   /** Whether the screen is being kept awake here, and whether it can be. */
   wakeLock?: { supported: boolean; held: boolean };
+  /** The wall test (PLAN.md 8e): the test pattern, and Identify. Kept beside the config, never in it. */
+  test?: WallTest;
+  onTest?: (t: WallTest) => void;
 }) {
   const set = (patch: Partial<OutputConfig>) => onChange({ ...output, ...patch });
   const aspect = useFrameAspect();
@@ -392,6 +399,32 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
         />
       </div>
 
+      {/*
+        The wall test (Desk v2, PLAN.md 8e): the pattern to line the
+        projector up by, in place of the show, through the corners and the
+        masks below; and Identify, which flashes each projector's and each
+        shape's number on the wall for three seconds. Neither is saved.
+      */}
+      {test && onTest && (
+        <div className="mb-1 flex gap-1.5">
+          <Switch
+            label="Test pattern"
+            on={test.pattern}
+            onChange={v => onTest({ ...test, pattern: v })}
+            hint="A grid, its diagonals and a circle on the wall in place of the show, to line the projector up by"
+            testId="output-test-pattern"
+          />
+          <button
+            onClick={() => onTest({ ...test, identifyUntil: Date.now() + IDENTIFY_MS })}
+            title="Flash each projector's and each shape's number on the wall"
+            data-testid="output-identify"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[13px] font-medium transition-all hover:bg-white/10"
+          >
+            Identify
+          </button>
+        </div>
+      )}
+
       <CornerPad
         value={output.corners}
         onChange={corners => set({ corners })}
@@ -402,7 +435,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
       <div className="mb-3 flex justify-end">
         <button
           onClick={() => set({ corners: [...IDENTITY_CORNERS] as OutputConfig['corners'] })}
-          className="text-[12px] text-white/35 hover:text-white/70"
+          className="min-h-6 rounded-md px-1.5 text-[12px] text-white/60 hover:text-white/80"
           data-testid="corners-square"
         >
           Square the corners
@@ -415,8 +448,18 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
       <Row label="Mask Right"  value={output.maskRight}  min={0} max={0.45} step={0.005} onChange={v => set({ maskRight: v })} />
       <Row label="Mask Edge"   value={output.maskFeather} min={0} max={0.25} step={0.005} onChange={v => set({ maskFeather: v })} />
 
-      <Row label="Output Gain"  value={output.gain}  min={0.2} max={3}   step={0.05} onChange={v => set({ gain: v })}  format={v => `${v.toFixed(2)}x`} />
-      <Row label="Output Gamma" value={output.gamma} min={0.5} max={2.5} step={0.05} onChange={v => set({ gamma: v })} />
+      {/*
+        Gain and Gamma as knobs (the design's Wall pane, PLAN.md 8e): set once
+        for a room, not ridden, which is what the desk draws a knob for. At
+        56, the size the design keeps for Load-in and the Stage sheet. A
+        double-click puts each back at 1, untouched.
+      */}
+      <div className="mb-3 flex gap-3" data-testid="output-grade">
+        <Knob label="Output gain" value={output.gain} min={0.2} max={3} step={0.05} display={`${output.gain.toFixed(2)}×`}
+          onChange={v => set({ gain: v })} resetTo={1} size={56} testId="output-gain" />
+        <Knob label="Gamma" value={output.gamma} min={0.5} max={2.5} step={0.05} display={output.gamma.toFixed(2)}
+          onChange={v => set({ gamma: v })} resetTo={1} size={56} testId="output-gamma" />
+      </div>
 
       <div className="mb-3 mt-1 flex gap-1.5">
         <Switch

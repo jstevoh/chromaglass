@@ -1049,6 +1049,202 @@ follows a source at a depth through the patch bay (`sceneMap.ts`), and an action
 on a source's onset, on the predicted beat once the clock is locked (64 ms ahead of the
 heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a toggle.
 
+#### 8-v2. Desk v2: one desk, three layouts (2026-10-10)
+
+`src/components/desk/Desk.tsx`, `DeskPanels.tsx`, `PanelBrowser.tsx` (new),
+`src/lib/deskLayout.ts`, `src/hooks/useDeskLayout.ts` (new), `src/components/ui`
+(`Knob`, `PanelFrame`), `SettingsPanel.tsx` (`embed`, `scope="stage"`), `App.tsx`;
+`PerformDesk.tsx` and `DesignDesk.tsx` removed. Checks: `npm run desklayout` (new),
+`npm run layout` (extended).
+
+The owner's design (a design project, handed over as a zip) replaced the two
+fixed desks with one desk whose cells are filled from a layout. Every settings section
+is a panel under its own id, beside the desk's own panels (cues, rides, recipe,
+bottles, dyes, tools, the phone link). A panel docks in the left or right column or the
+deck under the plate, floats over the plate, folds to its header or closes; its grip
+drags it between them. Build (the Design desk's job), Gig (the Perform desk's) and
+Load-in (new: the controller, the sound, the wall and its mapping) are three shipped
+layouts; each remembers where its panels were, stored only once it differs from the
+shipped one, the rides' lesson. ⌘1/2/3 switch them, ⌘P opens the panel browser (the
+sheet's search, by what a section is about), ⌘, the Stage sheet (the room and the
+machine), ⌥D folds the deck, Tab hides the floating panels.
+
+What was kept, and why:
+
+- **Preview is the old Design desk's hold.** The plate bar's Live | Preview replaces the
+  Perform/Design split. `designing` in App is now "the plate in Preview", so the
+  sequencer, a song's show and a new song's look hold off while a look is built, as on
+  the bench. Build ships in Preview (the design drew it Live) so the bench behaves as it
+  did; a true offline copy is 8b.
+- **The old ids.** The root is `design-desk` in Build and `perform-desk` in Gig, the header
+  still says `design`/`perform` underneath, and every control kept its test id, so
+  `qa`, `saves`, `bubbles` and the rest find what they found.
+- **Knobs are real range inputs**, drawn over. An encoder or nothing learned gets a knob,
+  a fader a slider (the design's rule). The rides stay sliders.
+- **A section on a desk is held to the desk's rules.** Drawing them as panels found what
+  the sheet never had measured: a 4 px rail on the Wall's masks and gain, two 20 px
+  switches in Audio Input, a 22 px ⓘ and inline links. Each is 24 px now, and `layout`
+  docks every panel there is and measures it.
+- **One control, once.** Blackout moved to the header in every layout (the sheet's copy
+  is gone under a desk); the recipe leaves Evolve and All settings to the rides when
+  both are out.
+
+Measured: `npm run layout` 39 → 58 checks, all green, at 1440/1280/1024 and phone
+widths, with all 33 panels docked at once (511 controls) each drawing its body; `npm run desklayout`
+40/40 (it found two real faults in `sanitizeLayout` on its first run: a panel twice in
+one list kept both, and a stored array read as an empty layout). `panel` 180/180,
+`desk`, `saves` 33/33, `phone` 292/292, `remotemix`, `rowfade`, `backplate`, `intro`
+12/12 unchanged in what they assert.
+#### 8-draw. Draw: the phone or iPad as the wall's pad (2026-10-10)
+
+`src/components/DrawScreen.tsx` (new), `RemoteControl.tsx`. Check: `npm run draw` (new,
+in the Measure job's browser part); `applink` and `remotemix` now start on Draw.
+
+The Desk v2 design's #3c (phone) and #3d (iPad). The remote already had the pad as a
+full screen, behind the Projectionist's Full button, with the tools and dyes as chip
+rows under it. Draw makes it the screen the remote opens on, with dyes down one edge,
+the four tools (Drop, Blow, Press, Stir) down the other, and Amount, Lucky, Freeze and
+Blackout along the bottom; the iPad adds the bottle list, a Layer row and Clear. The
+old page is Controls, one tap away, and which of the two a device was left on is kept
+on it, so a tablet set up as the Gig remote opens as that again after a reload.
+
+- **Nothing on the wire changed.** Draw is handed RemoteControl's own pad handlers
+  (the 30 Hz drag, the 60 Hz held press, the press repeats), not a copy of them.
+- **A touch lands in the wall's 16:9 frame**, the largest that fits the pad, and a
+  touch outside it on its edge. The old full pad stretched the wall over the whole
+  screen, so on a portrait phone a circle came out on the wall as a flat ellipse.
+- **Amount** multiplies what a touch lays, 0.1×–2×: the display reads a pad's amount
+  as 0.05–1 with a finger at 0.5, so that is the whole range and nothing past it.
+- **Blackout** is tap to fade (latched) and hold to go dark while held, both through the
+  display's one toggle, which fades over 1.1 s; a true snap is 8-draw-c.
+- **A phone on its side** keeps the phone layout (the short side decides, as
+  `lib/phone.ts` does) with the bottom bar in one row: 316 to 444 px of frame width.
+- In the app, a wrong key or a missing laptop puts Change laptop in the frame, under
+  the words that ask for it.
+
+Measured (cloud): `draw` 76/76 (phone, phone on its side, iPad both ways, wrong key),
+`applink` 49/49, `remotemix` 17/17. Pictures: the project's draw-8 folder.
+
+
+#### 8-play. Play: the phone's listening screen (2026-10-10)
+
+`src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`
+(new); `src/lib/phone.ts` (`phoneScreen`, `/play`), `PhoneStage.tsx` (Play screen in More),
+`App.tsx`. Check: `npm run phone`'s Play part.
+
+Desk v2 shipped with the phone unchanged, and the owner asked for the phone and tablet
+versions. The design's screens 3a and 3b are Play, "a standalone phone app for casual use",
+for the buyers the owner wants beside the VJs: someone with a record on at home. The phone
+layout before it (PhoneStage, #173) is a performer's, sixteen buttons in a performer's words.
+So a phone now opens on Play: the plate edge to edge, the look's name with Shuffle and
+Record over it, and a glass tray of eight dyes and Drop, Blow and Press. The tray's handle
+pulls up the sheet: Speed, Turbulence, Swirl, Soap, Zoom and Evolve as touch sliders (44
+rows, the desk's travel and Speed's curve), the looks as tiles to swipe, Follow the music
+(the microphone, with Sound Drive brought to the middle on a look that has none, 8-play-d)
+and Wander on its own (Evolve), then Shuffle, Clear plate and Share clip (the phone's share
+sheet with the take as a file, or a download). Save is at the top while the sheet is up.
+All controls on the tray is the full phone layout; Play screen in its More sheet comes
+back, and the choice is kept on the phone. `/play` is Play on anything, which is how an iPad
+gets it, at the design system's iPad sizes (dyes 56, hands 72); `?play=0` is the full layout,
+which the checks written against it now open.
+
+With Drop on the tray the touch picks its own hand, as the hint over the tray says on the
+first three visits: a tap drops, a drag streaks, two fingers blow, a still hold (450 ms)
+presses. Each is a tool the plate already has with its own physics; the reading only picks
+which, and a touch keeps the hand it became until every finger is off. On the closeup two
+fingers stay the camera (the plate's pinch), and the hint says "pinch zooms" there. Save
+asks for a name every time, as QA-18 has it everywhere else.
+
+Measured: `npm run phone` 292 → 368 under `PW_WEBGPU=1` (the hands' six, read from the
+tool and the hands the plate's loop holds, need the plate; without it they are reported as
+not run, and the Mac shard requires them). `saves` 33 → 38 (Play's Save), `layout` 58/58,
+`applink` 48/48 (Play here now lands on Play, and the Laptop remote is reached through All
+controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
+
+#### 8g. A panel in a window of its own (2026-10-10)
+
+`desk/PanelWindow.tsx` (new), `desk/Desk.tsx`, `ui/index.tsx` (`PanelFrame`), `desk/DeskPanels.tsx`.
+
+Every panel's header has a fourth button (and its menu a row), Open in its own window: the
+panel moves to a window of its own, sized as it was drawn, for a second display at a gig,
+and its place on the desk becomes a card that says so and brings it back. The window is a
+blank one with the page's stylesheets and theme copied in, and the panel is the desk's own
+React tree portalled into it, not a second copy of the app: every control in it is the
+desk's state, so there is nothing to keep in step and no second solver or sound. The
+window is kept beside the layout, never in it (a reload has no window to put it in), and
+closing it, by its Bring it back button or by the system, puts the panel back where it
+was. The clean screen on the laptop leaves the windows up (the desk is kept mounted, not
+drawn, where it used to be unmounted); the page closing closes them. The Rides' Mixer sheet, the Dyes'
+palette menu and the Tools' options open in the panel's own window (a `PortalBody` context), not on the other
+screen. A browser set to refuse windows floats the panel instead. A phone has no second
+display, and the remote has no panels, so this is the laptop's.
+
+Measured (cloud): `layout` 68 → 72 (a deck panel opens in its own window with its 8 knobs
+and the desk's background, rgb(17, 17, 19), while its place on the desk holds the card and
+no knobs; a clean screen keeps the window and its panel, and Esc brings the desk back with
+the card; a knob turned in the window 0.313 → 0.564 reads 0.564 back on the desk after the
+window is closed; with `window.open` refused it floats). Controls: with the stylesheets not
+copied the first check fails (the window's panel reads rgba(0, 0, 0, 0)); with the desk
+unmounted on a clean screen, as it was, the window is gone and the clean-screen check fails.
+
+#### 8c, 8d, 8e, 8f, 8h. The rest of Desk v2's small pieces (2026-10-10)
+
+`src/lib/knobDrag.ts`, `src/lib/qr.ts`, `scripts/qr.mjs`, `scripts/wallpattern.mjs` (new);
+`ui/index.tsx` (Knob, Slider), `ui/TouchSlider.tsx`, `desk/DeskPanels.tsx`, `desk/DeskHeader.tsx`,
+`OutputPanel.tsx`, `lib/midi.ts` (`controlKindOf`), `lib/outputConfig.ts` (`WallTest`),
+`gpu/output.ts` and `gpu/wgsl/output.ts` (the wall test), `App.tsx`, `PhonePlay.tsx`.
+
+- **8c** A knob takes hold where the hand does: on its cap it is the vertical drag it was
+  (0.5% of the range a pixel); on its ring it follows the hand round, a full 270° sweep
+  being its whole travel. The two disagree about the same motion (up on the ring's right
+  side is anticlockwise), so the knob decides once, at the hold. A double-click puts a knob
+  or a desk slider back to the look's own value (`lookOf` of the open document, or of the
+  built-in it came from); a rig setting such as the dimmer has none and stays. On a phone
+  every knob is a touch slider, so Play's five setting sliders take a double tap instead.
+- **8d** The desk drew every absolute CC as a fader, because a binding only says absolute or
+  relative. `controlKindOf` names which CCs turn on the boards the factory maps are for (the
+  APC40's device and track knobs and its two encoders, the Launch Control XL's three rows,
+  the nanoKONTROL2's eight), from the map's device or else the port; an unknown board keeps
+  today's rule.
+- **8e** Load-in's Wall panel (and the Stage sheet's) has a Test pattern switch and Identify,
+  and Output gain and Gamma as 56 px knobs. The pattern is drawn in the projector's own pass,
+  so it goes through the same corner pin, flip and blanking as the show: per quad a grid kept
+  square by the quad's shape on the wall, both diagonals, a circle 0.8 of the height across,
+  a white border, the corners numbered 1 to 4 clockwise from the top left as the pin's
+  handles are, and the quad's number in the middle (a mapped shape's place in the Mapping
+  list). Identify flashes each quad's number, half the height tall, for three seconds over
+  whatever is up. Neither is ever stored with the output config (a show reopened on a test
+  pattern would put a grid in front of the room); App keeps it beside the config and lays it
+  on for the plate and the cast state, so a receiver drawing its own plate shows it too.
+  The design puts the switch in Load-in's plate bar; the bar is one bar in every layout
+  (`npm run panel`), so that is 8e-2.
+- **8f** The Phone · iPad panel draws its link as a QR code: an encoder written here (byte
+  mode, level M, versions 1–10, the eight masks scored by the standard's penalty rules),
+  drawn as one SVG path in whole pixels per module, black on white with its quiet zone.
+- **8h** The header at 1024 measured 342 px of cluster against 337 of room right of the
+  centred switch, so the Sound dot sat 5 px under it. The header now has three measured
+  levels: the dots' words beside them, under them (12 px from the switch, as before), and
+  folded into one Status button (only when the cluster actually reaches the switch), whose
+  dot is red while recording and green while anything is connected, and which opens every
+  dot as it was. At 1024 the folded cluster is 73 px clear. Where the dots unfold depends on the
+  fonts: 1280 keeps every dot in sight in a cloud session, CI's Linux runner folds there and
+  unfolds by 1440, so the check finds the width rather than assuming it.
+
+Measured (cloud): `desk` 27 → 40 (8c's ring arithmetic, 8d's four boards and an unknown one
+as the control); `qr` 13/13 new (every symbol read back from its modules: format and
+version words against their BCH codes, every Reed–Solomon block's syndromes zero, the bytes;
+three flipped modules make 35 syndromes non-zero, the control), and all eight cases decoded
+by OpenCV's reader in the session; `wallpattern` 20/20 new under `PW_WEBGPU=1` (on CI's open shard) (off is the
+pass byte for byte; on, the grid, cross, border, circle and corner digits where they should
+be, following a pulled pin, swapped by a flip, under a mask, one number per mapped shape,
+Identify over the show, ungraded); `map` 44 → 47 (a config saved with the pattern up is stored without it); `layout` 58 → 68 (a knob turned round its
+ring 0.113 → 0.779, a cap drag sideways leaves it, a double-click back to the look's 0.313;
+the Wall panel's four controls and the pattern never stored; the QR drawn module for module;
+the header clear of the switch at 1024 with a seventh dot in it, folding and unfolding where
+the dots fit, and a take's Rec dot folding a full header and unfolding it when the take stops; the "every status dot is labelled" check opens the fold and counts the five dots inside
+it, not the one button); `phone` 369/369 with Play's double tap back to the look's speed; `panel` 180/180; `wgsl`;
+`desklayout` 40/40.
+
 ### 9. Ferrofluid after the references
 
 **9a. The edge, and two looks, shipped in #161.** The ferrofluid ends on a sharp,
@@ -1431,6 +1627,32 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   and the line red. Its first version held still as each lane took its first render pipeline, which let three lanes ask for three at once (PR #283's first Mac run: a 2.15 s frame gap with `air/air splat` compiling 3.32 s); it now holds still before the lanes start, and line 9 also holds the opening to one render compile at a time (2 of 4 asked while another compiled with the first version). The Mac's `npm run startup` is what says the stop has gone; its intro line prints the stretches held still. This
   answers the open question of whether the swirl freezes: around the display's and
   the derive's compiles it does, and now it does so on purpose, still and not stalled.
+- **Shipped, 14v-5: the intro starts still, and turns once the opening's render
+  pipelines are built** (PR #335, 2026-10-10). What was reported: `npm run
+  startup`'s "no stop in the opening" went red on about half of 10-10's Mac runs,
+  across PRs that never touched the opening (2.17 s, 2.57 s against the 2 s bar), and
+  held up deploys. What was measured: over the open shard's 176 runs from 27 September
+  (`ci-flakes/startup-intro/open-shard-runs.txt` in the project's files), the show's
+  longest wait for a frame was a median 0.53 s (p90 0.78 s) on the 57 runs before the
+  intro merged (#274, 10-04 20:13 UTC) and 1.73 s (p90 2.20 s, 19 of 119 over 2 s) on
+  every run since; the GPU device went from a median 0.09 s to be given to 1.63 s in
+  the same hour. The stops lay inside the device request with the intro turning, or
+  in the first compile after it. Holding it still around the render compiles (14v-4)
+  had caught the second and not the first, and taking out the pools' blend mode
+  neither. PR #335's first push opened the show three times each way on CI's Mac,
+  cold: as shipped 2.35, 2.13, 2.32 s; without the intro 0.47, 0.47, 0.82 s; without
+  its colour pools but turning 1.93, 2.33, 2.17 s; still from the first paint 1.18,
+  0.85, 0.92 s. So it is the motion, not what moves: a turning picture is a new frame
+  every refresh for the compositor to present through the GPU process, which on a
+  cold Mac is busy starting the device and compiling, and each frame waits there.
+  The fix: `index.html` starts `#cg-intro` with `.cg-still`, `installIntro` records
+  the hold from 0, and `Quiet`'s `go` lets it turn once the opening's render
+  pipelines are built, as before. `npm run intro` line 9b holds every frame from the
+  first to the last render compile still, with some seen before the first compile
+  was asked (SwiftShader: 328 frames, none moving, 86 before the first ask at 2.27 s;
+  with the markup's `.cg-still` taken out, 83 of 85 moving before the first ask and
+  the line red). Left: the device still comes 1.4–1.9 s late with the still intro
+  up (14v-6).
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry
@@ -2168,6 +2390,45 @@ open PRs (#267, #280, #281) each add a check to open. The phone's fingers moved 
 open about 14 minutes, show about 15, both from the step times of the intro PR's green run.
 Nothing on show needs a cold shader cache, which is why the fingers ran after `startup`.
 
+### 19u. Nothing reaches main without the checks
+
+**Shipped** 2026-10-10 as a GitHub branch ruleset on `main` (ruleset 24848041), not code.
+On 2026-10-10 a commit pushed straight to `main` (d8697cd, the plate hearing pitch,
+brightness and the beat) passed an `audio` field that `FrameView` did not declare, so
+`npm run lint` went red on main and its deploy could not publish. Behind it,
+`npm run backplate` was red too. Every open PR inherited both until #332 carried the fixes.
+
+A cloud session could not create the rule. Its GitHub access reports admin on the repo, but
+the session's network proxy refuses writes to the rulesets API ("Write access to this GitHub
+API path is not permitted through this proxy", HTTP 403). The owner's other tool created it
+with the owner's own login, from the rule a session wrote out.
+
+What it enforces, read back from the API:
+
+- **A pull request for everything**, with 0 approvals, so sessions still merge their own.
+  A push straight to `main` is refused, and so is a force-push.
+- **`Measure` and `WebGPU (macOS)` must be green.** These are the two summary jobs in
+  `checks.yml`, and they report on every PR. The per-shard jobs are deliberately not
+  required. On a PR that `reach.mjs` keeps off the Mac (#329, docs only), GitHub reports one
+  skipped check literally named `WebGPU (macOS) · ${{ matrix.shard }}`, and the four
+  `WebGPU (macOS) · open/show/plate/tools` contexts never appear. Requiring them would hold
+  every docs PR forever, and so would renaming a shard. `webgpu-all` is green when every
+  shard is, or when `reach` skipped them all.
+- **Not "up to date with main"**, so a green PR still merges behind main (the owner's
+  choice, 2026-09-28).
+- **The repository admin bypasses only on a pull request** (`bypass_mode: pull_request`).
+  The owner can merge a PR past red checks, but no login can push to `main` directly. That
+  includes the owner's other tool, which pushes with the owner's login, so an "always"
+  bypass would have let it skip the rule.
+
+Left: the ruleset has `require_extra_approval_for_unattributed_changes: true`, a setting with
+no public documentation. If a green, non-draft PR from a session shows as blocked, that
+setting is the first suspect, and the owner turns it off. The two checks are required by
+name with no app attached, so a status from any app named `Measure` would satisfy them.
+Pinning them to GitHub Actions (integration 15368) closes that gap. Deleting `main` is not
+restricted; adding the deletion rule closes that one. The rule a session wrote out is
+`handoff/main-ruleset.json` in the project's shared files.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -2612,3 +2873,64 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
   dish's turn carries them round under it, and Cell Size 0.32 → 0.6 so the cells are
   drawn at its zoom.
 
+
+## 26. A reaction that prints: Turing stripes in black and white
+
+### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)
+
+#327 moved the reaction onto a compute field at the dye's grid (`grayScott`, rgba16float:
+u, v, the poured reagent, its pattern) and carried it with the dye's own scheme in the
+step. It also ran a second, semi-Lagrangian carry of a frame's displacement in
+`stepChemistry`, so the stripes ran ahead of the colour they laid (a pour of reagent and
+a pool of dye laid together, stirred: the reagent went 17.7% of the plate to the
+colour's 9.2%) and the bilinear backtrace blurred them a cell a frame. 26d took that
+carry out (8.9% and 9.2%, 0.3% apart, `npm run turing`) and added the field to the
+maze's carry, which had left it standing.
+
+### 26b. The pattern as a control (#327; Width in plate units and the phone with 26d)
+
+Pattern moves feed and kill along Pearson's map, 0.03/0.055 to 0.04/0.06; Width scales
+the diffusion lengths. The lengths were in cells, so a stripe on 256² was twice the
+plate's width of one on 512² (4.64% against 2.37%), and Width's top half drove the
+explicit step past its stability limit (D·dt ≤ 1/4) into static. Now they are given on
+a 384² reference grid and scaled by (N/384)², each unit of time cut into as many
+substeps as D needs: 3.06%, 3.12% and 3.19% at 256², 384² and 512². Pattern, Width and
+Turing Print are MIDI-learnable and on the phone's Looks sheet when a look runs the
+reaction (26b had shipped without the phone).
+
+### 26d. The look: "Turing Print"
+
+A CIMA dish under a white lamp: the gel stands in the reagents (Chemistry 1, the bath)
+with starch in it (`turingPrint`). Starch is what shows a CIMA pattern, and by holding
+the activator back it is what lets one form (Lengyel and Epstein, 1991); the blue-black
+complex forms and comes apart in well under a frame. So with the print on, the deposit
+does not pile colour up for the flow to carry off: it sets the dye, where the reaction
+is fed, to the complex's equilibrium with the activator as it is now, through a Hill
+curve (iodine binds into amylose cooperatively; n = 6, half bound at v = 0.2, the
+labyrinth's median), at a depth that is black on the lamp. Rendered in the lab: 56% dark,
+34% light, 9% in the middle tones; darkness against the activator cell for cell 0.94;
+the dark share 56.47% and 56.49% thirty frames apart.
+
+Found on the way and fixed with it: the deposit read the field as if it were on the
+logical 192² grid (it was, when the reaction ran on the CPU), so it drew the field's
+top-left corner stretched 1.3 to 2.7 times over the plate and away from where it grew
+(the same render's correlation with the field: −0.007). The coral looks now grow a
+pattern half the size they showed, where it grew.
+
+`npm run turing` measures all of it; its five controls (the logical-grid read, the
+second carry, diffusion in cells, the print off, a reaction fed everywhere) each turn
+their line red.
+
+The first Metal run found one more: the stripe widened with the rung on the Mac's GPU,
+3.08%, 3.35% and 3.51% of the plate at 256², 384² and 512² (14% apart, against the
+check's 10%), where SwiftShader drew 3.06%, 3.12% and 3.19%. The reaction's field was in
+half floats, whose step just under 1 is 1/2048, so the substrate's last refill (feed ×
+(1 − u) a step) rounded away while the dish was still short; the Mac rounds a stored half
+float toward zero and dropped more of it than SwiftShader, which rounds to nearest. The
+lab, rounding the stored field toward zero by hand on SwiftShader, drew 3.08%, 3.35% and
+3.52%: the Mac's widths. The field is now in the dye's format (full floats wherever the
+GPU can filter them), and `npm run turing` asks first that the dish under the bath fills
+to within 0.001 of its reservoir: half floats left it 0.0039, 0.0029 and 0.0051 short on
+the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% and
+3.15%). Half floats stay on a GPU that cannot filter
+full ones (26d-5).

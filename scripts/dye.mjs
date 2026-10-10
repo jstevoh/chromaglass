@@ -2,7 +2,7 @@
 /**
  * Does a dye paint the colour you picked?
  *
- *   npm run dye                 # Sunny Side Up
+ *   npm run dye                 # Colorful Cosmos (the report was on Sunny Side Up, retired into it, PLAN.md 28a)
  *   LOOK=galaxy npm run dye     # any look, by palette search
  *
  * From a user report: "I put red silicone on a yellow background and it came
@@ -55,7 +55,7 @@ import net from 'node:net';
 import { isGpuEngine } from './frame.mjs';
 
 const PORT = 4322;
-const LOOK = process.env.LOOK || 'sunny';
+const LOOK = process.env.LOOK || 'cosmos';
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });

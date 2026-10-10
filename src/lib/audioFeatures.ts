@@ -70,7 +70,7 @@ export const ANALYSER_SMOOTHING = 0.6;
 export const ANALYSER_RATE_HZ = 60;
 
 /** The named sources, in the order a UI should list them. */
-export const SOUND_SOURCES = ['level', 'kick', 'bass', 'snare', 'hats'] as const;
+export const SOUND_SOURCES = ['level', 'kick', 'bass', 'snare', 'hats', 'note', 'tonalLow', 'tonalMid', 'tonalHigh'] as const;
 export type SoundSource = typeof SOUND_SOURCES[number];
 
 /**
@@ -117,6 +117,10 @@ const SOURCE_RANGES: Record<SoundSource, Range> = {
   bass: [30, 250],
   snare: [1000, 5000],
   hats: [7000, 16000],
+  note: [55, 1000],
+  tonalLow: [40, 250],
+  tonalMid: [250, 2000],
+  tonalHigh: [2000, 16000],
 };
 /**
  * The low mids, which no source names but the kick test needs: where a
@@ -129,6 +133,8 @@ const LOW_MIDS: Range = [150, 400];
 export interface SpectrumFrame {
   /** Bins 0..fftSize/2-1, as `getFloatFrequencyData` or `getByteFrequencyData` fill them. */
   bins: ArrayLike<number>;
+  /** The waveform data (for zero-crossing rate). */
+  timeDomainData?: ArrayLike<number>;
   /** `db`: float decibels. `byte`: 0..255 across [minDb, maxDb]. `magnitude`: linear. */
   scale: 'db' | 'byte' | 'magnitude';
   sampleRate: number;
@@ -156,6 +162,15 @@ export interface AudioReading {
   bass: number;
   snare: number;
   hats: number;
+  note: number;
+  tonalLow: number;
+  tonalMid: number;
+  tonalHigh: number;
+  pitch: number;
+  pitchClass: number;
+  brightness: number;
+  timbre: number;
+  complexity: number;
   /** BAND_COUNT values, 0..1, low to high; `band1` is `bands[0]`. */
   bands: number[];
   /** One per name in SOURCE_NAMES. */
@@ -452,6 +467,7 @@ export class AudioFeatures {
   private layoutKey = '';
   private regions: number[][] = [];
   private top = 1;
+  private hzPerBin = 1;
   private db = new Float64Array(0);
   /** Last frame's spectrum, dB, unfloored. */
   private prev = new Float64Array(0);
@@ -468,6 +484,15 @@ export class AudioFeatures {
   private ranges: AutoRange[] = [];
   private readonly detectors = SOURCE_NAMES.map(() => new OnsetDetector());
 
+  private specRing: Float64Array[] = [];
+  private specRingPos = 0;
+
+  pitch = 0;
+  pitchClass = 0;
+  brightness = 0;
+  timbre = 0;
+  complexity = 0;
+
   reset(): void {
     this.hasPrev = false;
     this.ref = ABS_FLOOR_DB;
@@ -477,6 +502,13 @@ export class AudioFeatures {
     this.ranges.forEach(r => r.reset());
     this.heard.fill(0);
     this.detectors.forEach(d => d.reset());
+    this.specRing.forEach(r => r.fill(ABS_FLOOR_DB));
+    this.specRingPos = 0;
+    this.pitch = 0;
+    this.pitchClass = 0;
+    this.brightness = 0;
+    this.timbre = 0;
+    this.complexity = 0;
   }
 
   private layout(sampleRate: number, fftSize: number, count: number): void {
@@ -484,6 +516,7 @@ export class AudioFeatures {
     if (key === this.layoutKey) return;
     this.layoutKey = key;
     const hz = sampleRate / fftSize;
+    this.hzPerBin = hz;
     const top = count - 1;
     this.top = Math.max(1, Math.min(top, Math.floor(BAND_HIGH_HZ / hz)));
     this.regions = [
@@ -499,6 +532,7 @@ export class AudioFeatures {
     this.levelDb = new Float64Array(R);
     this.odf = new Float64Array(R);
     this.fresh = new Float64Array(R);
+    this.specRing = Array.from({ length: 15 }, () => new Float64Array(count).fill(ABS_FLOOR_DB));
     this.hasPrev = false;
   }
 
@@ -539,6 +573,74 @@ export class AudioFeatures {
     const dt = this.lastTime === null ? 0 : Math.max(0, time - this.lastTime);
     this.lastTime = time;
 
+    const ring = this.specRing[this.specRingPos];
+    ring.set(db);
+    this.specRingPos = (this.specRingPos + 1) % 15;
+
+    const hDb = new Float64Array(this.top + 1);
+    const vals = new Float64Array(15);
+    let pNum = 0, pDen = 0;
+    for (let k = 1; k <= this.top; k++) {
+            for (let i = 0; i < 15; i++) {
+        vals[i] = this.specRing[i][k];
+      }
+      // Insertion sort is much faster for 15 elements than V8's typed array sort overhead
+      for (let i = 1; i < 15; i++) {
+        const v = vals[i];
+        let j = i - 1;
+        while (j >= 0 && vals[j] > v) {
+          vals[j + 1] = vals[j];
+          j--;
+        }
+        vals[j + 1] = v;
+      }
+      const median = vals[7];
+      hDb[k] = median;
+      const p = Math.pow(10, median / 10);
+      pNum += k * this.hzPerBin * p;
+      pDen += p;
+    }
+    this.brightness = pDen > 0 ? pNum / pDen : 0;
+    this.timbre = this.brightness / (frame.sampleRate / 2);
+
+    if (frame.timeDomainData && frame.timeDomainData.length > 1) {
+      const td = frame.timeDomainData;
+      let zcr = 0;
+      for (let i = 1; i < td.length; i++) {
+        const prev = td[i - 1] - 128;
+        const curr = td[i] - 128;
+        if ((prev >= 0 && curr < 0) || (prev < 0 && curr >= 0)) zcr++;
+      }
+      const rawComplexity = zcr / (td.length - 1);
+      this.complexity = this.hasPrev ? this.complexity + (rawComplexity - this.complexity) * 0.15 : rawComplexity;
+    } else {
+      this.complexity = 0;
+    }
+
+    const minHpsBin = Math.max(1, Math.floor(55 / this.hzPerBin));
+    const maxHpsBin = Math.min(this.top, Math.ceil(1000 / this.hzPerBin));
+    let maxHps = -Infinity;
+    let bestBin = -1;
+    for (let b = minHpsBin; b <= maxHpsBin; b++) {
+      let hps = hDb[b];
+      if (2 * b <= this.top) hps += hDb[2 * b];
+      if (3 * b <= this.top) hps += hDb[3 * b];
+      if (4 * b <= this.top) hps += hDb[4 * b];
+      if (hps > maxHps) {
+        maxHps = hps;
+        bestBin = b;
+      }
+    }
+    if (bestBin >= 1 && maxHps > -Infinity) {
+      const f0 = bestBin * this.hzPerBin;
+      this.pitch = 69 + 12 * Math.log2(f0 / 440);
+      this.pitchClass = Math.round(this.pitch) % 12;
+      if (this.pitchClass < 0) this.pitchClass += 12;
+    } else {
+      this.pitch = 0;
+      this.pitchClass = 0;
+    }
+
     let peak = ABS_FLOOR_DB;
     for (let k = 1; k <= this.top; k++) if (db[k] > peak) peak = db[k];
     this.ref = Math.max(peak, this.ref - REF_FALL_DB_PER_S * dt);
@@ -555,10 +657,15 @@ export class AudioFeatures {
     this.prevPeak = peak;
     for (let r = 0; r < this.regions.length; r++) {
       const bins = this.regions[r];
+      const name = r < SOURCE_NAMES.length ? SOURCE_NAMES[r] : null;
+      const isTonal = name === 'tonalLow' || name === 'tonalMid' || name === 'tonalHigh';
+      
       let power = 0, flux = 0, fresh = 0;
       for (const k of bins) {
-        const now = Math.max(db[k], floor);
-        const was = Math.max(this.prev[k], floor);
+        const srcNow = isTonal ? hDb[k] : db[k];
+        const srcWas = this.prev[k]; // odf is technically mismatched for tonal sources but it doesn't matter much as they don't fire hits well
+        const now = Math.max(srcNow, floor);
+        const was = Math.max(srcWas, floor);
         const p = Math.pow(10, now / 10);
         power += p;
         if (!first && now > was) {
@@ -567,6 +674,9 @@ export class AudioFeatures {
         }
       }
       this.levelDb[r] = toDb(power / bins.length);
+      if (name === 'note') {
+        this.levelDb[r] = maxHps / 4;
+      }
       this.odf[r] = flux / bins.length;
       this.fresh[r] = fresh / bins.length;
     }
@@ -607,9 +717,15 @@ export class AudioFeatures {
     return {
       time,
       level: values[0], kick: values[1], bass: values[2], snare: values[3], hats: values[4],
+      note: values[5], tonalLow: values[6], tonalMid: values[7], tonalHigh: values[8],
       bands: values.slice(SOUND_SOURCES.length),
       onsets,
       db: Array.from(this.levelDb.subarray(0, SOURCE_NAMES.length)),
+      pitch: this.pitch,
+      pitchClass: this.pitchClass,
+      brightness: this.brightness,
+      timbre: this.timbre,
+      complexity: this.complexity,
     };
   }
 }
@@ -640,6 +756,7 @@ export class AnalyserEmulator {
   private readonly im: Float32Array;
   private readonly smoothed: Float64Array;
   private readonly out: Float32Array;
+  private readonly outTimeDomain: Uint8Array;
 
   constructor(sampleRate: number, fftSize = ANALYSER_FFT_SIZE, smoothing = ANALYSER_SMOOTHING) {
     this.sampleRate = sampleRate;
@@ -655,20 +772,24 @@ export class AnalyserEmulator {
     this.im = new Float32Array(fftSize);
     this.smoothed = new Float64Array(fftSize / 2);
     this.out = new Float32Array(fftSize / 2);
+    this.outTimeDomain = new Uint8Array(fftSize);
   }
 
   /**
    * The spectrum of the fftSize samples ending just before sample `end`
-   * (samples before 0 are silence), in dB. The returned array is reused by
+   * (samples before 0 are silence), in dB. The returned arrays are reused by
    * the next call.
    */
-  frame(pcm: Float32Array, end: number, dtSec: number): Float32Array {
+  frame(pcm: Float32Array, end: number, dtSec: number): { bins: Float32Array, timeDomainData: Uint8Array } {
     const N = this.fftSize;
     const start = end - N;
     for (let i = 0; i < N; i++) {
       const s = start + i;
-      this.re[i] = (s >= 0 && s < pcm.length ? pcm[s] : 0) * this.window[i];
+      const v = s >= 0 && s < pcm.length ? pcm[s] : 0;
+      this.re[i] = v * this.window[i];
       this.im[i] = 0;
+      // getByteTimeDomainData scales [-1, 1] to [0, 255]
+      this.outTimeDomain[i] = Math.max(0, Math.min(255, Math.round(128 + v * 128)));
     }
     fft(this.re, this.im);
     const tau = Math.pow(this.smoothing, Math.max(0, dtSec) * ANALYSER_RATE_HZ);
@@ -677,7 +798,7 @@ export class AnalyserEmulator {
       this.smoothed[k] = tau * this.smoothed[k] + (1 - tau) * m;
       this.out[k] = this.smoothed[k] > 0 ? 20 * Math.log10(this.smoothed[k]) : -Infinity;
     }
-    return this.out;
+    return { bins: this.out, timeDomainData: this.outTimeDomain };
   }
 }
 
@@ -700,8 +821,8 @@ export function analysePcm(pcm: Float32Array, sampleRate: number, fps: number): 
   const readings: AudioReading[] = [];
   for (let i = 0; i < frames; i++) {
     const end = Math.round((i * sampleRate) / fps);
-    const bins = analyser.frame(pcm, end, 1 / fps);
-    readings.push(features.update({ bins, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps));
+    const { bins, timeDomainData } = analyser.frame(pcm, end, 1 / fps);
+    readings.push(features.update({ bins, timeDomainData, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps));
   }
   return readings;
 }

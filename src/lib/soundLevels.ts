@@ -299,3 +299,20 @@ export function waveBytes(pcm: Float32Array, end: number, fftSize: number, out: 
   }
   return out;
 }
+
+/*
+  The bands as the plate's music routes read them, each 0 to 1 (PLAN 27e).
+
+  Bass, mid and treble come from the analyser on a 0–85 scale (a calibrated
+  band's ceiling, above) and the routes have always taken them over 70, so a
+  loud band is full a little before its ceiling. Energy is not on that
+  scale: it is the waveform's RMS, 0 to 1, and calibrated it is held under
+  0.85 (`energy` above). The music's swell (LiquidVisualizer, "Energy:
+  roaming swell") divided it by 70 as well, so the loudest music read 0.012
+  and the swell, gated at 0.15, never once poured on any look since it was
+  written. `npm run musicforce` holds the scale.
+*/
+export function levels01(a: { bass: number; mid: number; treble: number; energy: number }): { bass: number; mid: number; treble: number; energy: number } {
+  const clip = (x: number) => (Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0);
+  return { bass: clip(a.bass / 70), mid: clip(a.mid / 70), treble: clip(a.treble / 70), energy: clip(a.energy) };
+}

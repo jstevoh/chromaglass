@@ -185,7 +185,7 @@ try {
     // unknown look falls back to a random one, and a stalled plate presses
     // nothing while the kicks, counted a frame, go on.
     check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
-      on.squeeze === 0.9 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
+      on.squeeze === 0.1 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
     /*
       At the tapped 150 bpm the clock beats every 400 ms, and still does
@@ -242,8 +242,8 @@ try {
       `${on.kicks} and ${off.kicks} kicks in ${on.seconds.toFixed(0)} and ${off.seconds.toFixed(0)} s, of ${beats(on).toFixed(0)} and ${beats(off).toFixed(0)} tapped beats`);
     /*
       And pressed as deep as a kick at this look's squeeze: each disc
-      kickDepth(0.9, the bass /70 capped at 1, the accent 1 at Accent 0),
-      0.005 × 0.9 × (0.6 + 0.4 × the bass) since PLAN 27b, so the softest
+      kickDepth(0.1, the bass /70 capped at 1, the accent 1 at Accent 0),
+      0.005 × 0.1 × (0.6 + 0.4 × the bass) since PLAN 27b, so the softest
       kick presses 0.0027 at the middle. On a thin gap a disc is a bowl
       (3 × depth × (1 − r²/R²)², squishDisc), whose mean over its own cells
       is the depth itself, and the three nested discs count each cell once
@@ -253,7 +253,7 @@ try {
       close the gap are counted).
     */
     const meanDepth = on.depth / Math.max(1, on.cells);
-    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.9, 0, 1),
+    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.1, 0, 1),
       `${on.cells} cells laid by kicks, ${perKick.toFixed(0)} a kick, ${meanDepth.toFixed(5)} deep a cell`);
     check('while at 0 the kicks go on and press nothing', off.kicks >= 0.75 * beats(off) && off.cells === 0, `${off.kicks} kicks, ${off.cells} cells`);
     /*

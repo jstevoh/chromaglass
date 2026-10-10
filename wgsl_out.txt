@@ -1,0 +1,5 @@
+
+> chromaglass@1.3.0 wgsl
+> node scripts/wgsl.mjs
+
+checked 126 shaders

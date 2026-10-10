@@ -198,7 +198,7 @@ const BAR_WINDOW = 16;
 const TICK_S = 0.25;
 const MIN_BPM = 70, MAX_BPM = 180;
 const PREFER_BPM = 120, PREFER_OCTAVES = 0.9;
-const HARMONY_BANDS = [5, 6, 7, 8];    // reading.db: band1..band4, 40–800 Hz
+const HARMONY_BANDS = [9, 10, 11, 12];    // reading.db: band1..band4, 40–800 Hz
 const KICK = 1;
 const HARMONY_W = 1, SNARE_W = 2, KICK_W = 1, FILL_W = 3;
 const SNARE_FLOOR = 0.08, KICK_FLOOR = 2;

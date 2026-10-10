@@ -158,6 +158,18 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run desk
 
+      # The desk's layouts (Desk v2): what ships, what is stored, and that a
+      # stored layout from an older build cannot break the desk.
+      - name: The desk's layouts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run desklayout
+
+      # The Phone · iPad panel's QR code (PLAN 8f), read back module by module:
+      # the format and version words, every Reed-Solomon block, the bytes.
+      - name: The phone link's QR code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run qr
+
       # The spinning dish's CPU half: the liquid's lag behind the glass, Auto
       # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22).
       - name: The turntable
@@ -306,6 +318,12 @@ jobs:
       - name: The popped bubbles
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run pops
+      # Blow's Amount from a breath that only ripples the colour to a gale (PLAN.md
+      # QA-20): no air taken in below the speed the surface tears at, as much as
+      # ever at the default, more past it, a rate a second; the straw as the breath.
+      - name: Blow's range
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run blowrange
       # Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,
       # each drop its own colour, pressed flat where it touches, a swallowed
       # one kept inside and let go, and at 0 the rings' field to the bit.
@@ -467,6 +485,13 @@ jobs:
       - name: The remote's Mixer
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
+      # stand-in laptop on the show server's relay hears every touch, tool,
+      # dye and button a phone and an iPad send, and where a touch lands in
+      # the wall's frame. No GPU; dist/ is the phone step's build.
+      - name: The remote's Draw screen
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/draw.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
       # second more than the ear tells it (ten), and the plate still hears a
@@ -648,6 +673,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 6
         run: npm run rides
+      # The music's own pushes as forces a thin gap keeps (PLAN 27e): Sound
+      # Drive's bass is a hand on the glass that presses as the bass comes in
+      # and lets up as it goes (the burst it replaces moved nothing), and the
+      # energy's swell reads the energy on its own scale. In the open shard:
+      # the plate shard is near its timeout.
+      - name: The music pushes the plate
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 6
+        run: npm run musicforce
       # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as
@@ -834,6 +868,14 @@ jobs:
       - name: The liquids carried onto a new grid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run regrid
+      # The wall's test pattern and Identify (PLAN.md 8e), drawn in the
+      # projector's own pass: off is the plain pass byte for byte, on it is a
+      # grid, cross, circle, border and numbered corners that follow the pin,
+      # the flip and the mask. In the open shard: the plate shard is near its
+      # timeout.
+      - name: The wall's test pattern
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run wallpattern
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu
@@ -897,6 +939,15 @@ jobs:
       - name: The grain inside the dye, not at its edge
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run grainedge
+      # The Turing pattern (PLAN 26): one stripe width on every rung, carried
+      # with the colour and healed after a stir, grown only where it is fed,
+      # and Turing Print black on white where the reaction is, not piling up.
+      # The lab only; five or six minutes on SwiftShader, so on a Mac rather
+      # than in Measure, and on the show shard, which had the most room under
+      # the job's twenty minutes (13.2 against open's 16.8 on #331's run).
+      - name: The Turing pattern and its print
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        run: npm run turing
       # The show keeps hearing while its window is hidden behind the wall's
       # (scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second
       # window asking for frames as the projector window does, and the level
@@ -916,7 +967,7 @@ jobs:
       # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
       # and its kicks used to drop air near the middle whatever the dial said.
       # On the laptop and the phone at 0, and at the default, where they still
-      # must. About two minutes.
+      # must (listened to for a minute there, for enough chances). About three minutes.
       - name: Audio Impact 0 drops no bubbles
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/kickbubbles.mjs

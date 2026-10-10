@@ -302,6 +302,16 @@ const SPIKE_FLOW = 2;
 const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
+/*
+  The grid the reaction's diffusion lengths are given on (stepChemistry): the
+  middle rung, so the coral and the print keep about the size the looks were
+  judged at on the Mac, now on every rung. CHEM_STABLE is the explicit step's
+  D·dt with headroom under its 1/4, and CHEM_MOST caps a frame's substeps,
+  past which the reaction grows more slowly rather than costing more.
+*/
+const CHEM_REF = 384;
+const CHEM_STABLE = 0.2;
+const CHEM_MOST = 24;
 const LIES_GRID = 128;
 const CURRENT_ITERS = 10;
 /*
@@ -548,6 +558,13 @@ export class WebGPUFluid {
   private readonly dyeFormat: GPUTextureFormat;
 
   private readonly dye: PingPong;
+  public readonly chem: PingPong;
+  public readonly activeMat: PingPong;
+  public chemLive = false;
+  /** Turing Reagent has been poured since the chemistry was last cleared: the reaction runs on it even on a look without Chemistry. */
+  public reagentLive = false;
+  private readonly liquids0: PingPong;
+  private readonly liquids1: PingPong;
   private readonly vel: PingPong;
   private readonly squeeze: PingPong;
   /** The plate shape the gap was last laid at; a change re-seeds it. */
@@ -891,6 +908,7 @@ export class WebGPUFluid {
       ['gapReshape', [RG32], false],
       ['deltaDye', [dye], true],
       ['deltaVel', [VEL], true],
+      ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RG32], true],
       ['scaleDye', [dye], true],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
@@ -936,7 +954,9 @@ export class WebGPUFluid {
         first steps use. Behind the show they are ready some fifteen
         seconds after it opens, as mixForce always has been.
       */
-      ['mixSmooth', [R32], false],
+      // Except on a look that stands the plate up, whose dye's weight runs
+      // the mix force from its first step (Opening.gravity).
+      ['mixSmooth', [R32], open.gravity],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -944,6 +964,8 @@ export class WebGPUFluid {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      ['liquidSplat0', [VEL], false],
+      ['liquidSplat1', [VEL], false],
       /*
         The dye across faces is also how the dye moves wherever the maze
         flows (the advect dye stage), from the maze's first step, so a look
@@ -1003,10 +1025,13 @@ export class WebGPUFluid {
       // drain. None was seen in a look's first steps, the mix's and the
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
-      ['mixForce', [VEL], false],
+      ['mixForce', [VEL], open.gravity],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
-      ['depositChem', [dye], false],
+      ['depositChem', [dye], open.chemistry],
+      ['grayScott', [dye], open.chemistry],
+      ['addReagent', [dye], false],
+      ['seedChem', [dye], open.chemistry],
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
@@ -1073,6 +1098,7 @@ export class WebGPUFluid {
       ...THIN_GAP_KERNELS.map((name): [string, string] => [`${name}:thin`, kernel(name, 'rgba16float')]),
       [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
+      [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
     ];
   }
 
@@ -1122,6 +1148,27 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
+    /*
+      The reaction's field in the dye's format: full floats wherever the GPU
+      can filter them (every Mac, and SwiftShader). It was half floats, and a
+      half float's step just under 1 is 1/2048: the substrate's refill, feed ×
+      (1 − u) a step, falls under that step before the dish is full, so the
+      stored u stopped rising there. How far short depends on how the GPU
+      rounds a stored half float: SwiftShader rounds to nearest and stopped
+      0.003 to 0.005 short (measured); the Mac's, by the widths it drew,
+      rounds toward zero and drops every step under 1/2048, so it stops about
+      twice as far short. The pattern's wavelength follows the substrate, so CI's
+      Mac drew the labyrinth's stripe 3.08%, 3.35% and 3.51% of the plate at
+      256², 384² and 512², 14% apart, where SwiftShader drew 3.06%, 3.12% and
+      3.19%; the lab, rounding toward zero by hand, drew the Mac's widths to
+      the hundredth. In full floats the dish fills to within 5e-6 of its
+      reservoir, as the arithmetic says it should (`npm run turing`, line 1).
+      A GPU that cannot filter full floats keeps half floats (PLAN 26d-5).
+    */
+    this.chem = pp(this.N, this.dyeFormat, 'chem');
+    this.activeMat = pp(this.N, 'r32float', 'activeMat');
+    this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
+    this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
     this.squeeze = pp(this.N, RG32, 'squeeze');
     /*
@@ -1383,11 +1430,11 @@ export class WebGPUFluid {
     const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
-    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
+    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
     f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
-    f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5);
+    f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5); f[33] = fin(p.cometY, 0);
     const gx = fin(p.gravityX, 0), gy = fin(p.gravityY, -1);
     const gl = Math.hypot(gx, gy) || 1;
     f[34] = -gx / gl; f[35] = -gy / gl;
@@ -1415,6 +1462,15 @@ export class WebGPUFluid {
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
+    if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    this.mixLive = false;
+    this.rxnLive = false;
+    this.liesLive = false;
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
@@ -1438,6 +1494,8 @@ export class WebGPUFluid {
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
@@ -1553,8 +1611,9 @@ export class WebGPUFluid {
    * `box` is where it lands, in plate coordinates (0..1). `flipY` is for a
    * source that counts its rows downwards, which a 2D canvas does.
    */
-  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
-    const w = src.width, h = src.height;
+  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement | HTMLVideoElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
+    const w = 'videoWidth' in src ? src.videoWidth : src.width;
+    const h = 'videoHeight' in src ? src.videoHeight : src.height;
     if (!w || !h) return;
     const tex = this.device.createTexture({
       label: 'pour source', size: [w, h], format: 'rgba8unorm',
@@ -1648,29 +1707,113 @@ export class WebGPUFluid {
       this.run(pass, 'bodyLand', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.mix.read], this.arg('none', [0, 0, 0, 0]));
       od.swap();
     }
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
+    this.vel.swap();
+    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
     this.vel.swap();
     this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
   }
 
   /**
-   * Lay down the dye the reaction has grown, in the same breath as the deltas
-   * — before the step, so this frame's flow carries it. `amount` is per cell
-   * per step, `colour` the dye's own colour.
-   *
-   * Nothing calls this now. It was the deposit half of `WebGPUChemistry`, the
-   * GPU twin of `lib/chemistry.ts`, which was never wired in and has gone
-   * (S13); the show grows the reaction on the CPU and lays its dye from there.
+   * A pour of Turing Reagent at (x, y), `radius` in plate units: the reaction's
+   * feed where it lands, its own pattern baked in (26c), and a speck of the
+   * autocatalyst to start from (addReagent's kernel, and why).
    */
-  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
-    if (amount <= 0) return;
+  addReagent(x: number, y: number, radius: number, amount: number, pattern_val: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'add reagent' });
+    const pass = enc.beginComputePass({ label: 'add reagent' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'addReagent', this.chem.write, [this.chem.read],
+      this.arg('reagent splat', [x, y, radius, amount, pattern_val, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+    this.reagentLive = true;
+  }
+
+  seedChemistry(x: number, y: number, radius: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'seed chemistry' });
+    const pass = enc.beginComputePass({ label: 'seed chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'seedChem', this.chem.write, [this.chem.read],
+      this.arg('seedChem splat', [x, y, radius, 0, 0, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  /**
+   * The reaction's own time: `iters` steps of Gray–Scott's unit time a frame,
+   * with feed and kill, and Du, Dv the diffusion lengths' squares in cells of
+   * the CHEM_REF grid; `bath` is the reagent the whole plate stands in.
+   *
+   * Two things were wrong here, both making the pattern coarser and softer
+   * than its chemistry (PLAN.md 26d, 26-colour-b).
+   *
+   * It was carried twice. The step carries the field with the dye's own
+   * scheme (the same faces, the same substeps: 26a's "one flux pass"), and
+   * this ran a second, semi-Lagrangian carry of a frame's displacement on
+   * top: the stripes moved ahead of the colour they lay, and the bilinear
+   * backtrace blurred them by about a cell every frame, which the reaction
+   * then had to grow back. That carry is gone.
+   *
+   * And its width was in cells, so a stripe was twice as wide on the 256²
+   * rung as on 512². Gray–Scott's wavelength goes as the square root of
+   * D over the reaction's rate, so D here is given on CHEM_REF's grid and
+   * scaled by (N / CHEM_REF)² onto this one: the same stripe on the plate
+   * at every rung (`npm run turing` measures it by FFT). An explicit
+   * five-point step is stable only while D·dt ≤ 1/4, and at 512² the
+   * default width is 0.28 and the Width knob's top 1.1 (it went unstable
+   * there before, the clamp to [0, 1] turning the plate to static), so each
+   * unit of time is cut into as many substeps as D needs. The reaction's
+   * own terms are the same per unit of time at any substep.
+   */
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0): void {
+    if (!this.chemLive) return;
+    const s = (this.N / CHEM_REF) ** 2;
+    const du = Du * s, dv = Dv * s;
+    const sub = Math.max(1, Math.ceil(Math.max(du, dv) / CHEM_STABLE));
+    const n = Math.min(Math.max(1, iters) * sub, CHEM_MOST);
+    const enc = this.device.createCommandEncoder({ label: 'step chemistry' });
+    const pass = enc.beginComputePass({ label: 'step chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    // bath: the reagent the whole plate stands in (grayScott), 0 when only pours feed it.
+    const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, 0, 0]);
+    for (let i = 0; i < n; i++) {
+      this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
+      this.chem.swap();
+    }
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
+  /**
+   * The colour the reaction makes, laid into the dye (`depositChem`).
+   *
+   * With `print` 0 the activator above `threshold` deposits `colour` at
+   * `amount` a frame and the flow carries it off, Boyle's bench, as the coral
+   * looks have always grown. With `print` above 0 the colour is an indicator
+   * in the liquid the reaction runs in, starch with the iodine of a CIMA dish
+   * (26d, Turing Print): the blue-black complex forms and comes apart with
+   * the activator, so the dye where the reaction is fed is the complex's
+   * equilibrium with the field as it stands, `print` its depth, and nothing
+   * piles up. `bath` is the reagent the whole plate stands in, as stepChemistry
+   * takes it, so the print covers what the reaction is fed.
+   */
+  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0): void {
+    if (amount <= 0 && print <= 0) return;
     const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });
-    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, 0, 0, ...log, 0]));
+    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, 0]));
     this.dye.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
@@ -2257,15 +2400,35 @@ export class WebGPUFluid {
           if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, flux);
           else this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
+          /*
+            The reaction rides with the colour it lays (stepChemistry, and
+            why it is carried here and only here). This branch carried the
+            dye alone, so under a Labyrinth the pattern stood still while the
+            print it had made moved off.
+          */
+          if (this.chemLive) {
+            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, flux);
+            else this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], flux);
+            this.chem.swap();
+          }
         }
         return;
       }
       if (!bodiesOn && thin) {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
         speciesCarried = !!rider;
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
-      if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
+      if (!bodiesOn) { 
+        this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids0, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye');
+        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
+        return; 
+      }
       /*
         With Oil Bodies, the dye and the oil's share of it cross the same
         faces as the oil does (bodyAdvect, and why). A share left from an
@@ -2292,6 +2455,9 @@ export class WebGPUFluid {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -2299,6 +2465,14 @@ export class WebGPUFluid {
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
       od.swap();
+      this.runPressed(pass, 'bodyAdvect', this.liquids0.write, [this.liquids0.read, this.velForced], adv);
+      this.liquids0.swap();
+      this.runPressed(pass, 'bodyAdvect', this.liquids1.write, [this.liquids1.read, this.velForced], adv);
+      this.liquids1.swap();
+      if (this.chemLive) {
+        this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
+        this.chem.swap();
+      }
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
@@ -3046,6 +3220,27 @@ export class WebGPUFluid {
    * Pour into the mix: oil, surfactant and acidity (+ acid, − base), each an
    * amount in `what`, as a soft disc at (x, y) in plate units.
    */
+  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void {
+    const take = Math.min(1, Math.max(0, amount)) * 0.6;
+    const soap = (what.soap ?? 0) * amount;
+    const body = (what.body ?? 0) * amount;
+    const repel = (what.repel ?? 0) * amount;
+    const weight = what.weight ?? 0;
+    const polar = what.polarity ?? 0;
+    const enc = this.device.createCommandEncoder({ label: 'add liquid drop' });
+    const pass = enc.beginComputePass({ label: 'add liquid drop' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'liquidSplat0', this.liquids0.write, [this.liquids0.read],
+      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, weight]));
+    this.liquids0.swap();
+    this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
+      this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
+    this.liquids1.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
   addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
     const m = this.ensureMix();
     const enc = this.device.createCommandEncoder({ label: 'add mix' });
@@ -3164,6 +3359,8 @@ export class WebGPUFluid {
     const enc = this.device.createCommandEncoder({ label: 'clear chemistry' });
     const pass = enc.beginComputePass();
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
@@ -3171,11 +3368,16 @@ export class WebGPUFluid {
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    // Gray–Scott too: it was left out, so a look's coral kept growing, and
+    // depositing, under the next look, in that look's colours.
+    for (const t of [this.chem.a, this.chem.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
+    this.chemLive = false;
+    this.reagentLive = false;
   }
 
   /**
@@ -3282,9 +3484,11 @@ export class WebGPUFluid {
   }
 
   /** The mix or the reactions, read back whole (RGBA per texel). For checks. */
-  async readChemistry(which: 'mix' | 'rxn' | 'lies'): Promise<{ n: number; data: Float32Array } | null> {
-    const pp = which === 'mix' ? this.mix : which === 'rxn' ? this.rxn : this.lies;
+  async readChemistry(which: 'mix' | 'rxn' | 'lies' | 'chem'): Promise<{ n: number; data: Float32Array } | null> {
+    const pp = which === 'chem' ? this.chem : which === 'mix' ? this.mix : which === 'rxn' ? this.rxn : this.lies;
     if (!pp) return null;
+    // The reaction's field is in the dye's format: half floats on a GPU that cannot filter full ones.
+    if (pp.format !== RGBA32) return this.readHalf(pp);
     const n = pp.size[0];
     const row = Math.ceil((n * 16) / 256) * 256;
     const buf = this.device.createBuffer({ label: `read ${which}`, size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
@@ -3300,6 +3504,28 @@ export class WebGPUFluid {
     buf.destroy();
     return { n, data: out };
   }
+  /** An rgba16float field read back whole as floats (the Gray–Scott field where it is half floats), for checks. */
+  private async readHalf(pp: PingPong): Promise<{ n: number; data: Float32Array }> {
+    const n = pp.size[0];
+    const row = Math.ceil((n * 8) / 256) * 256;
+    const buf = this.device.createBuffer({ label: 'read half', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = this.device.createCommandEncoder({ label: 'read half' });
+    enc.copyTextureToBuffer({ texture: pp.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    this.device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const all = new Uint16Array(buf.getMappedRange().slice(0));
+    buf.unmap();
+    buf.destroy();
+    const half = (h: number) => {
+      const e = (h >> 10) & 31, m = h & 1023, sign = h & 32768 ? -1 : 1;
+      return sign * (e === 0 ? m * 2 ** -24 : e === 31 ? (m ? NaN : Infinity) : (1 + m / 1024) * 2 ** (e - 15));
+    };
+    const out = new Float32Array(n * n * 4);
+    const stride = row / 2;
+    for (let y = 0; y < n; y++) for (let k = 0; k < n * 4; k++) out[y * n * 4 + k] = half(all[y * stride + k]);
+    return { n, data: out };
+  }
+
 
   setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
@@ -4294,8 +4520,9 @@ export class WebGPUFluid {
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species'): Promise<Float32Array> {
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix'): Promise<Float32Array> {
     const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
+      : which === 'mix' ? (this.mixLive ? this.mix?.read : this.blank('rgba'))
       : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba')) : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;
@@ -4350,6 +4577,7 @@ export class WebGPUFluid {
       lies: this.liesLive && this.lies ? this.lies.read : null,
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
+      chem: this.chemLive ? this.chem.read : null,
     };
   }
 

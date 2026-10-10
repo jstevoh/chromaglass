@@ -5,12 +5,14 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save,
+  Laptop, Save, Video,
+  Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { PanelGuard } from '../PanelGuard';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -110,6 +112,7 @@ export interface PhoneStageProps {
   paletteLock: number | null;
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
+  onVideoDye: () => void;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -140,6 +143,8 @@ export interface PhoneStageProps {
   onZoom: () => void;
   camera: 'hold' | 'follow' | 'auto';
   onCamera: (c: 'hold' | 'follow' | 'auto') => void;
+  /** Auto's cut, "5s" (`shotLabel`, lib/macroCamera.ts), named on its button so it reads apart from Follow (QA-11). */
+  cameraShot?: string;
   // Tilt
   tilt: { supported: boolean; on: boolean; refused: boolean; silent: boolean; onToggle: () => void };
   // Sound
@@ -217,6 +222,15 @@ export interface PhoneStageProps {
   benDay: number;
   onBenDay: (v: number) => void;
   /**
+   * The reaction (PLAN §26): Pattern along Pearson's map (spots to
+   * labyrinth), the stripe's Width, and Turing Print, starch in the dish so
+   * the pattern prints black on the lamp (26d). On the Looks sheet when it
+   * opens on a look with the reaction running, as Ben-Day is, because they
+   * are the look's own rather than a hand's.
+   */
+  reaction: { on: boolean; pattern: number; width: number; print: number };
+  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint'>>) => void;
+  /**
    * Lamp Ground (PLAN 18b): what the dye is seen on, black or the lamp
    * shining up through it. On the Looks sheet, always: it turns a look
    * over, and a thumb on the phone picks the ground as it picks the look.
@@ -244,6 +258,8 @@ export interface PhoneStageProps {
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void };
   onHide: () => void;
   onFullLayout: () => void;
+  /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
+  onPlayScreen?: () => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -306,6 +322,8 @@ export function PhoneStage(p: PhoneStageProps) {
   // stays for as long as the sheet is up, so taking it to 0 does not take
   // the slider away from under the thumb.
   const [printing, setPrinting] = useState(false);
+  /** As `printing`, for the reaction's three: read when the sheet opens, so a slider taken to 0 stays to be turned back. */
+  const [reacting, setReacting] = useState(false);
   const [shelfOpen, setShelfOpen] = useState(false);
   const close = () => setSheet(null);
   /** Where a look picked in the looks sheet goes: the whole plate, or the back plate alone. */
@@ -318,7 +336,7 @@ export function PhoneStage(p: PhoneStageProps) {
     p.onSaveLook(name);
     setSaveName(null);
   };
-  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') setPrinting(p.benDay > 0.001); setSheet(cur => (cur === s ? null : s)); };
+  const open = (s: SheetName) => { setAmountOpen(false); setSaveName(null); if (s === 'looks') { setPrinting(p.benDay > 0.001); setReacting(p.reaction.on); } setSheet(cur => (cur === s ? null : s)); };
   const liquid = p.liquids.find(l => l.id === p.selectedLiquidId);
   const zoomed = p.zoom > 1.05;
 
@@ -397,9 +415,12 @@ export function PhoneStage(p: PhoneStageProps) {
                 onClick={() => p.onCamera(c)}
                 aria-pressed={p.camera === c}
                 data-testid={`phone-camera-${c}`}
-                className={`h-10 min-w-[64px] rounded-full px-3 text-[13px] capitalize ${p.camera === c ? 'bg-accent-bg text-accent-text' : 'text-text-2'}`}
+                className={`flex h-10 min-w-[64px] items-center justify-center gap-1.5 rounded-full px-3 text-[13px] capitalize ${p.camera === c ? 'bg-accent-bg text-accent-text' : 'text-text-2'}`}
               >
+                {/* As on the desk's chip (QA-11): Follow is locked on one subject, Auto cuts. */}
+                {c === 'follow' && <Crosshair size={14} aria-hidden />}
                 {c}
+                {c === 'auto' && p.cameraShot && <span className="normal-case opacity-70">· cuts {p.cameraShot}</span>}
               </button>
             ))}
           </div>
@@ -555,7 +576,7 @@ export function PhoneStage(p: PhoneStageProps) {
         </div>
         <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:pt-1 wide-land:w-[264px] wide-land:border-l wide-land:border-t-0 wide-land:pl-1.5 wide-land:pt-0">
           {([
-            ['looks', 'Looks', Palette],
+            ['looks', 'Presets', Palette],
             ['sound', 'Sound', Music],
             ['play', 'Play', Waves],
             ['mix', 'Mix', SlidersVertical],
@@ -581,6 +602,7 @@ export function PhoneStage(p: PhoneStageProps) {
       {/* ── The sheets ── */}
       {sheet === 'dye' && (
         <PhoneSheet title="Dye" onClose={close} testId="phone-sheet-dye">
+          <PanelGuard name="The Dye sheet" inline onClose={close}>
           {([
             ['Dye', p.liquids.filter(l => !l.behaviour)],
             ['Changes the plate', p.liquids.filter(l => l.behaviour)],
@@ -680,11 +702,19 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <ImagePlus size={18} /> A photo as dye
           </button>
+          <button
+            onClick={() => { p.onVideoDye(); close(); }}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2"
+          >
+            <Video size={18} /> A video as dye
+          </button>
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'looks' && (
-        <PhoneSheet title="Looks" onClose={close} testId="phone-sheet-looks">
+        <PhoneSheet title="Preset palettes" onClose={close} testId="phone-sheet-looks">
+          <PanelGuard name="The preset palettes sheet" inline onClose={close}>
           <div className={`grid gap-1.5 ${[p.onRevert, p.onSaveLook].filter(Boolean).length === 2 ? 'grid-cols-3' : [p.onRevert, p.onSaveLook].some(Boolean) ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}
@@ -721,35 +751,18 @@ export function PhoneStage(p: PhoneStageProps) {
               <p className="-mt-3 text-[12px] leading-snug text-dim">The plate printed as a comic: flat inks, black lines, the pale washes in dots.</p>
             </div>
           )}
-          {p.onBackLook && (
-            <div className="mt-3">
-              <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="group" aria-label="Send a look to">
-                {([['all', 'Whole plate'], ['back', 'Back plate']] as const).map(([v, label]) => (
-                  <button
-                    key={v}
-                    onClick={() => setLookTo(v)}
-                    aria-pressed={lookTo === v}
-                    data-testid={`phone-send-to-${v}`}
-                    className={`h-10 rounded-md text-[14px] ${lookTo === v ? 'bg-accent-bg text-accent-text' : 'text-muted active:bg-active'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-1 flex min-h-[40px] items-center justify-between gap-2">
-                <span className="truncate text-[12px] text-dim" data-testid="phone-back-plate-on">Back plate: {p.backLook ?? 'follows the front'}</span>
-                {p.backLook && (
-                  <button
-                    onClick={() => { p.onBackFollowsFront?.(); setLookTo('all'); }}
-                    data-testid="phone-back-follows-front"
-                    className="h-10 shrink-0 rounded-md border border-border px-3 text-[13px] text-text-2 active:bg-active"
-                  >
-                    Follow front
-                  </button>
-                )}
-              </div>
+          {(reacting || p.reaction.on) && (
+            <div className="mt-3" data-testid="phone-reaction">
+              <Slider label="Pattern" value={p.reaction.pattern} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ chemistryPattern: v })}
+                display={p.reaction.pattern < 0.34 ? 'Spots' : p.reaction.pattern < 0.67 ? 'Worms' : 'Labyrinth'} touch testId="phone-reaction-pattern" midiKey="setting:chemistryPattern" />
+              <Slider label="Pattern Width" value={p.reaction.width} min={0.1} max={1} step={0.01} onChange={(v) => p.onReaction({ chemistryWidth: v })}
+                display={`${Math.round(p.reaction.width * 100)}%`} touch testId="phone-reaction-width" midiKey="setting:chemistryWidth" />
+              <Slider label="Turing Print" value={p.reaction.print} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
+                display={`${Math.round(p.reaction.print * 100)}%`} touch testId="phone-turing-print" midiKey="setting:turingPrint" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp.</p>
             </div>
           )}
+          {/* The second projector's look routing (§16a) is temporarily hidden per user request */}
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>
@@ -782,11 +795,13 @@ export function PhoneStage(p: PhoneStageProps) {
               </div>
             </div>
           ))}
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'sound' && (
         <PhoneSheet title="Sound" onClose={close} testId="phone-sheet-sound">
+          <PanelGuard name="The Sound sheet" inline onClose={close}>
           <p className="mb-3 text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Mic} label="Microphone" on={p.audioSource === 'microphone'} onPress={() => p.onAudioSource(p.audioSource === 'microphone' ? 'none' : 'microphone')} testId="phone-sound-mic" />
@@ -857,11 +872,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
           </div>
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'play' && (
         <PhoneSheet title="Play" onClose={close} testId="phone-sheet-play">
+          <PanelGuard name="The Play sheet" inline onClose={close}>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
             <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
@@ -939,11 +956,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Waves} label="Drain" onPress={() => { p.onDrain(); close(); }} testId="phone-drain" />
             <Tile icon={Trash2} label="Clear" onPress={() => { p.onClear(); close(); }} testId="phone-clear" />
           </div>
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'mix' && (
         <PhoneSheet title="Mixer" onClose={close} testId="phone-sheet-mix">
+          <PanelGuard name="The Mixer sheet" inline onClose={close}>
           <MixerPanel
             settings={p.mixer.settings}
             onSetting={p.mixer.onSetting}
@@ -955,11 +974,13 @@ export function PhoneStage(p: PhoneStageProps) {
             touch
             testId="phone-mixer"
           />
+          </PanelGuard>
         </PhoneSheet>
       )}
 
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
+          <PanelGuard name="The More sheet" inline onClose={close}>
           <div className="grid grid-cols-3 gap-1.5">
             {p.recording.supported && (
               <Tile
@@ -975,6 +996,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
+            {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
@@ -982,8 +1004,10 @@ export function PhoneStage(p: PhoneStageProps) {
           </div>
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
+            {p.onPlayScreen && ' Play screen is the simple one: the plate, the dyes and three hands.'}
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
+          </PanelGuard>
         </PhoneSheet>
       )}
     </div>

@@ -123,6 +123,9 @@ const SECTION_OF: Record<string, string> = {
   dishVignette: 'show',
   lumia: 'lamp',
   chemistry: 'lamp',
+  chemistryPattern: 'lamp',
+  chemistryWidth: 'lamp',
+  turingPrint: 'lamp',
   gelWheel: 'lamp',
   beatLead: 'audio-input',
   filmDrive: 'film',
@@ -234,6 +237,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'heat' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
+
+
   { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
   /*
     The ceiling is the control's own maximum, which is the only place a
@@ -274,6 +279,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'spinAudioDepth', label: "Spin From Music", min: 0, max: 1, section: 'layers' },
   { key: 'ledSpeed', label: "LED Rotation Speed", min: 0, max: 2, section: 'layers' },
   { key: 'centerGravity', label: "Center Gravity (Concave)", min: 0, max: 1, section: 'layers' },
+  { key: 'cometSpeed', label: "Comet Flow", min: 0, max: 2, section: 'layers' },
+  { key: 'cometAngle', label: "Flow Direction", min: 0, max: 360, section: 'layers' },
   { key: 'gooeyEffect', label: "Gooey Blending", min: 0, max: 1, section: 'layers' },];
 
 /** Everything that can be pinned to a desk, MIDI's forty first. */

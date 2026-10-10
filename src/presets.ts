@@ -81,6 +81,45 @@ export const PRESETS: Preset[] = [
     }
   },
   {
+    id: 'comet',
+    name: 'Comet River',
+    description: 'A raging torrent that pulls ink off the plate instantly. A single poured point acts as a comet head while the stream rips a tail from it.',
+    settings: {
+      globalSpeed: 0.02,
+      surge: 0.6,
+      layerCount: 2,
+      blendMode: 'screen',
+      gooeyEffect: 0.5,
+      rotationSpeed: 0,
+      centerGravity: 0,
+      cometSpeed: 1.5,
+      cometAngle: 90,
+      ledPlatform: false,
+      buoyancy: 0.2,
+      advection: 0.45,
+      damping: 0.9,
+      automateRate: 0.0,
+      viscosity: 'thick',
+      polarity: 0.8,
+      evaporationRate: 0.008,
+      audioImpact: 0.6,
+      turbulenceScale: 0.3,
+      blobSurfaceTension: 0.4,
+      boundaryContrast: 0.6,
+      saturationBoost: 1.5,
+      sceneMappings: [
+        { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
+        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 45 }
+      ],
+      audioMappings: {
+        velocity: 'bass',
+        density: 'bass',
+        color: 'treble',
+        rotation: 'none',
+      },
+    }
+  },
+  {
     id: 'galaxy',
     name: 'Galaxy',
     description: 'Spiral arms of starlight swirl through the void — galaxies colliding in slow motion.',
@@ -183,7 +222,7 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.1,
       rotationSpeed: 0.287,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
-      ledPlatform: true,
+      ledPlatform: false,  // 28a: its 'cyberpunk' LED wheel drew a conic rainbow through every clear patch, a colour picker under the glass; the neon is the dye's
       ledMode: 'cyberpunk',
       ledSpeed: 0.3,
       diffusionRate: 0.0002,
@@ -256,6 +295,9 @@ export const PRESETS: Preset[] = [
       gelWheel: 0.55,
       gelSpeed: 0.6,
       ledColor: '#12002c',
+      sceneMappings: [
+        { source: 'sound', feature: 'complexity', setting: 'turbulenceScale', depth: 0.25 }
+      ],
       audioMappings: {
         velocity: 'treble',
         density: 'timbre',
@@ -294,6 +336,10 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 1.0,
       dropHeight: 0.9,
       beatSqueeze: 0.8,
+      sceneMappings: [
+        { source: 'sound', feature: 'kick', setting: 'plateRock', depth: 0.5 },
+        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -316,8 +362,8 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.3,
       rotationSpeed: 0.202,      // the dish's motor; was 0.03 with a stir in the middle (PLAN 22j)
       centerGravity: 0.5,
-      ledPlatform: true,
-      ledMode: 'rainbow',
+      ledPlatform: false,  // 28a: the lamp alone, white (the LED under it multiplies the lamp, see mixLamp)
+      ledMode: 'single',  // 28a: a rainbow lamp drew a colour wheel through the clear glass; a white lamp, and the colour is the dye's, following the timbre
       ledSpeed: 0.2,
       diffusionRate: 0.0001,
       buoyancy: 0.7,
@@ -339,53 +385,6 @@ export const PRESETS: Preset[] = [
         density: 'volume',
         color: 'timbre',
         rotation: 'timbre',
-      },
-    }
-  },
-  {
-    id: 'boiling-point',
-    name: 'Boiling Point',
-    description: 'A cauldron at the boil: bubbles rise and break through lime, jade and gold, and the heat churns the whole pot.',
-    settings: {
-      globalSpeed: 0.0294,
-      beads: 0.35,
-      surge: 0.85,
-      layerCount: 2,
-      blendMode: 'screen',
-      gooeyEffect: 0.7,
-      rotationSpeed: 0.218,      // the dish's motor; was 0.02 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.1,
-      ledPlatform: true,
-      ledMode: 'single',
-      ledSpeed: 0.0,
-      diffusionRate: 0.0002,
-      buoyancy: 1.0,
-      advection: 0.8,
-      damping: 0.9,
-      heatDecay: 0.99,
-      automateRate: 0.2,
-      platePressure: 0.5,
-      glassSmear: 0.6,
-      rainDrip: 0.7,
-      viscosity: 'thin',
-      polarity: 0.8,
-      // The fire wheel with nothing on it, under music: 0.06 dried the plate
-      // faster than the pour filled it, and the pour follows complexity, which
-      // read two percent of its range until the analyser was fixed.
-      evaporationRate: 0.008,
-      dyeBudget: 0.9,
-      audioImpact: 0.8,
-      airVelocity: 0.4,
-      vibrationFrequency: 0.7,
-      ledColor: '#0c2206',
-      bubbles: 0.5,
-      dropHeight: 0.7,
-      saturationBoost: 1.4,
-      audioMappings: {
-        velocity: 'energy',
-        density: 'complexity',
-        color: 'treble',
-        rotation: 'complexity',
       },
     }
   },
@@ -426,6 +425,9 @@ export const PRESETS: Preset[] = [
       cells: 0.45,
       saturationBoost: 1.15,
       dyeBudget: 0.55,
+      sceneMappings: [
+        { source: 'sound', feature: 'hats', setting: 'beads', depth: 0.5 }
+      ],
       audioMappings: {
         velocity: 'complexity',
         density: 'energy',
@@ -470,6 +472,10 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.15,
       ledColor: '#020818',
       secondLamp: 0.35,
+      sceneMappings: [
+        { source: 'sound', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
+        { source: 'sound', feature: 'tonalMid', setting: 'hueJourney', depth: 0.5 }
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -539,7 +545,7 @@ export const PRESETS: Preset[] = [
       advection: 0.25,
       damping: 0.988,
       heatDecay: 0.995,
-      automateRate: 0.08,
+      automateRate: 0.16,  // 28a: at 0.08 two bells on an empty navy plate most of the minute (flat 61–70% on the Mac)
       platePressure: 0.25,
       glassSmear: 0.15,
       rainDrip: 0.45,
@@ -838,6 +844,67 @@ export const PRESETS: Preset[] = [
     }
   },
   {
+    /*
+      PLAN.md 26d. The owner's "Mask Reaction Diff" pack, done as the chemistry
+      it imitates: a CIMA dish (Castets, Dulos, Boissonade and De Kepper, 1990)
+      under a white lamp, its gel standing in the reagents (Chemistry 1, the
+      bath) with starch in it (Turing Print 1), so the labyrinth prints as the
+      blue-black starch–iodine complex on clear: black on white, stripes of
+      one width that heal behind a stir. Each pour is more reagent with a speck
+      of the autocatalyst in it, so the pattern grows out from where it lands
+      (26c). No palette: the colour is the indicator's (depositChem).
+    */
+    id: 'turing-print',
+    name: 'Turing Print',
+    description: 'A reaction that prints: the CIMA reaction in a gel with starch, under a white lamp. Labyrinths of one stripe width grow out from each pour in blue-black on clear, and the flow drags them into whorls that heal back.',
+    settings: {
+      lampGround: 1,
+      globalSpeed: 0.0126,
+      surge: 0.2,
+      layerCount: 1,
+      blendMode: 'multiply',
+      gooeyEffect: 0,
+      rotationSpeed: 0.0,
+      centerGravity: 0.0,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#ffffff',
+      ledSpeed: 0.0,
+      diffusionRate: 0.0002,
+      buoyancy: 0.2,
+      advection: 0.4,
+      damping: 0.985,
+      heatDecay: 0.985,
+      automateRate: 0.02,
+      platePressure: 0.15,
+      glassSmear: 0.1,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.5,
+      evaporationRate: 0.0,
+      airVelocity: 0.0,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.4,
+      turbulenceScale: 0.15,
+      turbulenceDetail: 3,
+      blobSurfaceTension: 0.5,
+      boundaryContrast: 0,
+      saturationBoost: 1.0,
+      dyeBudget: 0.35,
+      // A gel print is flat: the complex sits in the gel and does not raise it (PLAN 26-colour-a).
+      edgeRelief: 0,
+      bubbles: 0,
+      plateRock: 0.1,
+      layerScaleVariety: 0,
+      chemistry: 1,
+      chemistryPattern: 1,
+      chemistryWidth: 0.5,
+      turingPrint: 1,
+      exposure: 0.7,
+      audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
+    }
+  },
+  {
     id: 'oil-wheel',
     name: 'Oil Wheel',
     description: 'An Optikinetics wheel warming under a 250 W lamp: yellows, greens and blues turning at half a revolution a minute, cells drifting on convection, no hands on it.',
@@ -887,6 +954,9 @@ export const PRESETS: Preset[] = [
       gelSpeed: 0.25,
       dishVignette: 0.7,
       spinDrag: 0.08,
+      sceneMappings: [
+        { source: 'sound', feature: 'mid', setting: 'rotationSpeed', depth: 0.03 }
+      ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -943,9 +1013,8 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.0,
       bubbles: 0.07,
       plateRock: 0.5,
-      beatSqueeze: 0.7,
+      beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
-      hueJourney: 0,
       lightPlay: 0.15,
       lampHotspot: 0.1,
       iridescence: 0,
@@ -988,7 +1057,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,
       postBlurRadius: 0.3,
       plateRock: 0.25,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
@@ -1051,7 +1120,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,
       postBlurRadius: 0.3,
       plateRock: 0.25,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       renderStyle: 'photo',
       camera: 1,
@@ -1080,70 +1149,6 @@ export const PRESETS: Preset[] = [
       chromaticAberration: 0.4,
       refraction: 0.8,
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
-    }
-  },
-  {
-    id: 'sunny-side-up',
-    name: 'Sunny Side Up',
-    description: 'Thin sheets of oil over a hot orange backdrop, every edge running with interference colour; the polarised-light photograph.',
-    settings: {
-      globalSpeed: 0.0084,
-      surge: 0.5,
-      blendMode: 'screen',
-      gooeyEffect: 0.6,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#000000',
-      ledSpeed: 0.0,
-      diffusionRate: 0.00008,
-      buoyancy: 0.3,
-      advection: 0.5,
-      damping: 0.98,
-      heatDecay: 0.99,
-      automateRate: 0.06,
-      platePressure: 0.3,
-      glassSmear: 0.1,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      evaporationRate: 0.002,
-      airVelocity: 0.0,
-      vibrationFrequency: 0.0,
-      turbulenceDetail: 2,
-      glossiness: 0.0,
-      postBlurRadius: 0.3,
-      plateRock: 0.25,
-      beatSqueeze: 0.3,
-      layerScaleVariety: 0.0,
-      renderStyle: 'photo',
-      camera: 1,
-      layerCount: 2,
-      polarity: 0.6,
-      audioImpact: 0.5,
-      turbulenceScale: 0.3,
-      blobSurfaceTension: 0.5,
-      boundaryContrast: 0.5,
-      saturationBoost: 1.5,
-      dyeBudget: 0.5,
-      edgeRelief: 0.4,
-      bubbles: 0.25,
-      backgroundLoop: 0.6,
-      paperA: '#ffb300',
-      paperB: '#ff3d00',
-      lightPlay: 0.8,
-      lampMotion: 0.5,
-      lampHotspot: 0.4,
-      secondLamp: 0.3,
-      iridescence: 0.9,
-      microDroplets: 0.3,
-      thinFilm: 1.0,
-      focus: 0.4,
-      aperture: 0.4,
-      bloom: 0.3,
-      chromaticAberration: 0.5,
-      refraction: 0.6,
-      audioMappings: { velocity: 'mid', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
   {
@@ -1240,13 +1245,13 @@ export const PRESETS: Preset[] = [
       advection: 0.45,
       damping: 0.99,
       heatDecay: 0.99,
-      automateRate: 0.1,
+      automateRate: 0.14,
       platePressure: 0.45,
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
-      evaporationRate: 0.01,
+      evaporationRate: 0.004,  // 28a: at 0.01 the cells drained to one sliver by 40 s (flat 75% on the Mac)
       airVelocity: 0.05,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
@@ -1259,6 +1264,9 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.55,
       glossiness: 0.18,
       macroSync: 0.35,
+      sceneMappings: [
+        { source: 'sound', feature: 'mid', setting: 'beads', depth: 0.3 }
+      ],
       audioMappings: {
         velocity: 'mid',
         density: 'bass',
@@ -1367,7 +1375,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.55,
       glossiness: 0.0,
       postBlurRadius: 0.0,
-      dyeBudget: 0.9,
+      dyeBudget: 0.5,  // 28a: at 0.9 the dish filled until the lamp barely came through (luma 0.06 on the Mac); 18b-8
       edgeRelief: 0.05,
       lacing: 0.55,
       bubbles: 0.1,
@@ -1381,7 +1389,7 @@ export const PRESETS: Preset[] = [
       dishSpread: 0.0,
       dishVignette: 0.0,
       plateRock: 0.3,
-      beatSqueeze: 0.9,
+      beatSqueeze: 0.1,
       layerScaleVariety: 0.0,
       backgroundLoop: 0.6,
       hueJourney: 4,
@@ -1436,7 +1444,7 @@ export const PRESETS: Preset[] = [
       beads: 0.2,
       fingering: 0.6,              // a palm on the glass lifts into spokes as they move on
       plateRock: 0.2,
-      beatSqueeze: 0.5,
+      beatSqueeze: 0.0,
       lightPlay: 0.35,
       lampMotion: 0.25,
       lampHotspot: 0.5,
@@ -1515,13 +1523,17 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.3,
       bubbles: 0.0,
       plateRock: 0.1,
-      beatSqueeze: 0.25,
+      beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       hueJourney: 0,               // four food colourings, and they stay those four
       lightPlay: 0.2,
       lampHotspot: 0.35,
       iridescence: 0,
       secondLamp: 0,
+      sceneMappings: [
+        { source: 'sound', feature: 'bass', setting: 'beads', depth: 0.2 },
+        { source: 'sound', feature: 'treble', setting: 'airVelocity', depth: 0.02 }
+      ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -1572,7 +1584,7 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
-      beatSqueeze: 0.4,
+      beatSqueeze: 0.0,
       layerScaleVariety: 0.0,
       hueJourney: 7,
       lightPlay: 0.6,
@@ -1581,65 +1593,10 @@ export const PRESETS: Preset[] = [
       iridescence: 0.6,
       thinFilm: 1.0,
       secondLamp: 0,
+      sceneMappings: [
+        { source: 'sound', feature: 'energy', setting: 'beads', depth: 0.15 }
+      ],
       audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
-    }
-  },
-  {
-    id: 'glycerine-drift',
-    name: 'Glycerine Drift',
-    description: 'Bands of deep dye drifting against each other, with thick patches that simply refuse to go along — the plate slides past them and shears.',
-    settings: {
-      // A plate with a real current in it and nothing to stop the current
-      // except the glycerine itself. Damping and advection both run high so
-      // the bands keep moving for minutes; what makes the picture is the
-      // handful of places that do not move with them.
-      globalSpeed: 0.0105,
-      surge: 0.28,
-      layerCount: 2,
-      blendMode: 'screen',
-      gooeyEffect: 0.55,
-      rotationSpeed: 0.109,      // the dish's motor; was 0.006 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#000000',
-      ledSpeed: 0.0,
-      diffusionRate: 0.0001,
-      buoyancy: 0.15,              // sideways, not upward: this is shear, not convection
-      advection: 0.7,
-      damping: 0.992,              // the current has to survive long enough to shear something
-      heatDecay: 0.994,
-      automateRate: 0.1,
-      platePressure: 0.15,
-      glassSmear: 0.45,            // the smear reads as the drift
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.75,
-      evaporationRate: 0.002,
-      airVelocity: 0.08,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.4,
-      turbulenceScale: 0.18,       // low: a smooth current shows a stuck patch, a rough one hides it
-      turbulenceDetail: 2,
-      blobSurfaceTension: 0.45,
-      boundaryContrast: 0.35,
-      saturationBoost: 1.5,
-      glossiness: 0.1,
-      postBlurRadius: 0.25,
-      dyeBudget: 0.9,
-      edgeRelief: 0.35,
-      bubbles: 0.05,
-      plateRock: 0.45,             // the rock is what supplies the current
-      beatSqueeze: 0.3,
-      layerScaleVariety: 0.3,
-      hueJourney: 9,
-      lightPlay: 0.4,
-      lampMotion: 0.35,
-      lampHotspot: 0.4,
-      iridescence: 0.1,
-      secondLamp: 0.25,
-      transmission: 0.8,
-      audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
     }
   },
   // ── Three that show off a part of the app ────────────────────────
@@ -1654,7 +1611,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0126,
       advection: 0.45,
       platePressure: 0.5,
-      beatSqueeze: 0.5,
+      beatSqueeze: 0.0,
       dyeBudget: 0.9,
       oilTension: 0.9,
       // Oil and water as separate bodies, each with its own colour (roadmap §I).
@@ -1701,7 +1658,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0105,
       advection: 0.4,
       platePressure: 0.35,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.0,
       dyeBudget: 0.9,
       phIndicator: 1,
       thicknessOptics: 0.4,
@@ -1745,7 +1702,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       advection: 0.3,
       platePressure: 0.2,
-      beatSqueeze: 0.2,
+      beatSqueeze: 0.0,
       dyeBudget: 0.35,
       bzReaction: 1,
       ledColor: '#fbf6ee',
@@ -1786,7 +1743,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       advection: 0.3,
       platePressure: 0.2,
-      beatSqueeze: 0.2,
+      beatSqueeze: 0.0,
       dyeBudget: 0.5,
       liesegang: 1,
       thicknessOptics: 0.3,
@@ -1875,7 +1832,7 @@ export const PRESETS: Preset[] = [
       magnetStrength: 0.9,
       magnetHeight: 0.3,
       magnetWalk: 0.7,
-      beatSqueeze: 0.4,
+      beatSqueeze: 0.0,
       lampHotspot: 0.4,
       secondLamp: 0.3,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
@@ -1974,13 +1931,13 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.45,
       boundaryContrast: 0.35,
       saturationBoost: 1.45,
-      dyeBudget: 0.9,
+      dyeBudget: 0.5,  // 28a: the purple water stood so deep the lamp barely came through (luma 0.08 on the Mac); 18b-8
       glossiness: 0.25,
       postBlurRadius: 0.15,
       plateCurve: 0.6,
       depthDrag: 1.5,
       plateSpring: 0.35,
-      beatSqueeze: 0.6,
+      beatSqueeze: 0.0,
       transmission: 0.35,
       dishVignette: 0.8,
       lampHotspot: 0.5,
@@ -2021,7 +1978,7 @@ export const PRESETS: Preset[] = [
       advection: 0.35,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.06,
+      automateRate: 0.15,
       platePressure: 0.3,
       glassSmear: 0.1,
       rainDrip: 0.0,
@@ -2051,9 +2008,12 @@ export const PRESETS: Preset[] = [
       magnetStrength: 0.45,
       magnetHeight: 0.4,
       magnetWalk: 0.3,
-      beatSqueeze: 0.3,
+      beatSqueeze: 0.0,
       lampHotspot: 0.0,
       secondLamp: 0.0,
+      sceneMappings: [
+        { source: 'sound', feature: 'bass', setting: 'magnetStrength', depth: 0.4 }
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
@@ -2111,7 +2071,7 @@ export const PRESETS: Preset[] = [
       // value, for the same reasons (npm run maze measures it; on the
       // hosted 512² it is still above the twelve-cell floor).
       mazeDetail: 0.5,
-      beatSqueeze: 0.4,
+      beatSqueeze: 0.0,
       lampHotspot: 0.3,
       secondLamp: 0.2,
       audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
@@ -2195,9 +2155,8 @@ export const PRESETS: Preset[] = [
       secondLamp: 0,
       lampWarmth: 0,
       plateRock: 0.4,
-      beatSqueeze: 0.6,
+      beatSqueeze: 0.0,
       layerScaleVariety: 0,
-      hueJourney: 0,
       // Zoomed in it is still a print: the closeup's paint cells, lacing,
       // domes and ragged silhouette would each be outlined in black.
       macroCells: 0,
@@ -2208,4 +2167,108 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
+  {
+    id: 'lava-lamp',
+    name: 'Lava Lamp',
+    description: 'The plate stood upright over a warm lamp: coloured wax heavier than the liquid round it sinks in mushroom-headed plumes, is warmed where it pools at the bottom, and rises again.',
+    settings: {
+      /*
+        A look for physics that shipped with no look to show it (PLAN.md 28a).
+        Stand the plate up (Plate Upright) and gravity acts in it; give the
+        dye weight (Dye Weight, solutalBuoyancy) and a band of it over clear
+        liquid is a Rayleigh–Taylor instability: it falls in fingers that roll
+        up into mushroom heads, the lab's 192² plate after 400 steps showing
+        a dozen of them from two rows of drops. The solver keeps a lamp under
+        the plate where it leaves the frame (LAMP_HEAT in gpu/fluid.ts), so
+        what pools there is warmed, rises, cools and sinks again: the cycle a
+        lava lamp runs on, rather than a dish that settles. Heat diffusing
+        faster than the dye (doubleDiffusion, as heat does in water) narrows
+        the plumes toward salt fingers. Lit from behind like the real lamp.
+      */
+      plateUpright: 1,
+      solutalBuoyancy: 0.6,
+      doubleDiffusion: 0.5,
+      tiltDirection: 180,
+      heatDecay: 0.995,
+      lampGround: 1,
+      ledPlatform: true,
+      ledMode: 'single',
+      ledColor: '#ffe6bf',
+      ledSpeed: 0.0,
+      globalSpeed: 0.0105,
+      surge: 0.3,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.6,
+      rotationSpeed: 0,          // a lamp does not turn: down has to stay down the screen
+      centerGravity: 0,
+      diffusionRate: 0,
+      buoyancy: 0.3,
+      advection: 0.4,
+      damping: 0.988,
+      automateRate: 0.06,        // a little new wax now and then; the plumes are the show
+      platePressure: 0.1,
+      glassSmear: 0.15,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.8,
+      evaporationRate: 0.004,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.35,
+      turbulenceScale: 0.2,
+      blobSurfaceTension: 0.5,
+      boundaryContrast: 0.4,
+      saturationBoost: 1.3,
+      glossiness: 0.15,
+      plateRock: 0.1,
+      beatSqueeze: 0.0,
+      dyeBudget: 0.6,
+      bubbles: 0,
+      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
+    }
+  },
 ];
+
+/*
+  Retired preset palettes, and the one that took each one's place (PLAN.md 28a).
+
+  A built-in look is named by its id everywhere a show is kept: a set list's
+  items, a MIDI map's pads, a sequence's stages, a song show's cues, the
+  remote's buttons and the `?look=` link. None of those is rewritten when a
+  look goes, and each one quietly does nothing when its id is missing: the
+  cue sends nothing, the pad is dead, and the plate seeds a random harmony
+  because PRESET_CONTRACTS has no dyes for the id. So when the 2026-10-10
+  refresh retired the looks that no longer showed anything their name
+  promised, each id was mapped here to the look nearest in what it did, and
+  every place that turns an id into a look goes through `findPreset`. A
+  saved show made last month still plays; it plays the replacement.
+
+  Saved presets ("Your presets", lib/userPresets.ts) never name a built-in
+  id: each keeps a full copy of its settings, dyes, pours and liquids, so a
+  retired look a person saved keeps looking exactly as it did.
+*/
+export const RETIRED_PRESETS: Readonly<Record<string, string>> = {
+  // Judged on the Mac gallery of 2026-10-10 (PLAN.md 28a):
+  // a soft static pink, the same picture as Colorful Cosmos, its nearest look;
+  'sunny-side-up': 'colorful-cosmos',
+  // green on black, Aurora Borealis's dyes and pace with more splatter;
+  'boiling-point': 'aurora-borealis',
+  // one flat gradient from blue to magenta, the dish too full to show a shape; Classic's nearest.
+  'glycerine-drift': 'classic',
+};
+
+/** A retired id's replacement, followed to the end; any other id unchanged. */
+export function livePresetId(id: string): string {
+  let at = id;
+  // Bounded, so a mistake that maps two ids onto each other cannot hang a cue.
+  for (let i = 0; i < 8 && RETIRED_PRESETS[at] !== undefined; i++) at = RETIRED_PRESETS[at];
+  return at;
+}
+
+/** The built-in look an id names, through a retirement if it was retired. */
+export function findPreset(id: string | null | undefined): Preset | undefined {
+  if (!id) return undefined;
+  const live = livePresetId(id);
+  return PRESETS.find(p => p.id === live);
+}

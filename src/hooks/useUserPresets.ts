@@ -38,14 +38,14 @@ export function useUserPresets() {
    * wanted one, while there was no way at all to save over the look you were
    * already working on. `exportPreset` is the file.
    */
-  const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null, song: SongRef | null = null): UserPreset => {
+  const saveCurrent = useCallback((name: string, description: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null, song: SongRef | null = null, rides: string[] | null = null): UserPreset => {
     const p = makeUserPreset(name, description, settings, contract, injectStyles, liquids, song);
     upsert(p);
     return p;
   }, [upsert]);
 
   /** Save over a look that already exists, keeping its id, name and song. */
-  const saveOver = useCallback((id: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null): UserPreset | null => {
+  const saveOver = useCallback((id: string, settings: VisualizerSettings, contract: number[] | null, injectStyles: string[] | null, liquids: string[] | null = null, rides: string[] | null = null): UserPreset | null => {
     const existing = loadUserPresets().find(p => p.id === id);
     if (!existing) return null;
     // `null` is how the caller says "none"; the stored shape says `undefined`

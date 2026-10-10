@@ -104,3 +104,22 @@ export class ChemistryField {
     }
   }
 }
+
+/*
+  The colour a Turing pattern prints in when it is the poured reagent's own
+  reaction, not a look's (a look with Chemistry on keeps its palette).
+
+  The real Turing reaction in a dish, CIMA and its CDIMA form (Castets, Dulos,
+  Boissonade and De Kepper, 1990; Ouyang and Swinney, 1991), is shown with
+  starch, or polyvinyl alcohol, in the gel: where iodide runs high, triiodide
+  sits in the starch helix, and that complex absorbs broadly round 580–620 nm.
+  It is the blue-black of an iodine test, deep indigo thin and nearly black
+  thick, printed into the pale straw of the free iodine round it (the bottle's
+  own colour, types.ts). The colour below is that indigo at the depth one
+  deposit lays; more of it goes to black on its own, because the dye is
+  absorbance and adds (lib/dye.ts).
+
+  Before, the pattern printed in whatever colour the look's palette cycled
+  to, and the bottle poured a hot pink, '#ff88ff', that no reagent has.
+*/
+export const TURING_PRODUCT = { r: 0.17, g: 0.2, b: 0.46 } as const;

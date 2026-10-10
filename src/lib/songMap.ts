@@ -150,7 +150,6 @@ export async function generateSongMap(
     const timeout = setTimeout(() => { worker.terminate(); resolve(null); }, 120_000);
     worker.onmessage = e => { clearTimeout(timeout); worker.terminate(); resolve(e.data as WorkerResult); };
     worker.onerror = err => { clearTimeout(timeout); worker.terminate(); console.warn('song map worker error', err.message); resolve(null); };
-    // Copy the PCM buffer — transferring would detach the rendered AudioBuffer's data
     worker.postMessage({ pcm: decoded!.pcm.slice(), sampleRate: decoded!.sampleRate });
     // The worker has its copy; ours need not live through the analysis.
     decoded = null;
@@ -188,6 +187,7 @@ export async function generateSongMap(
     frameRate: result.frameRate,
     generatedAt: Date.now(),
   };
+  
   return { map, fingerprint };
 }
 
@@ -213,3 +213,5 @@ export function pitchAt(map: SongMap | null, positionSec: number): number {
   const idx = Math.max(0, Math.min(map.pitchCurve.length - 1, Math.floor(positionSec * map.frameRate)));
   return map.pitchCurve[idx];
 }
+
+
