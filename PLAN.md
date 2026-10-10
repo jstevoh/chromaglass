@@ -5522,17 +5522,25 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
   forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
   own stir moves them 0.79).
-  - **27a-1, open.** On the Mac's controls run on #305 (shards 3–5 of 5, the same looks
-    as the measure above plus deep-ocean) Plate Rock read visible on 7 of 23 looks, 9 of
-    20 before. The run is not a like-for-like floor: each look's own drift with the band
-    rose with the stronger kicks and stir, and Macro Zoom, untouched, fell too (×21.9 to
-    ×5.1 on agate, ×26.2 to ×3.6 on poster-1969). The absolute change at full is about
-    what it was (neon-coral-reef's cast 0.629→0.680 before, 0.649→0.694 after), and the
-    old one was mostly the slow sway draining colour to one side, which 27a took out.
-    The tilt moves colour only where it is heavier than the plate's mean, so on a look
-    whose colour is spread evenly the picture hardly changes. Next: what a hand-rocked
-    dish shows on those looks (the oil and water layers sloshing, the pools running to
-    the low side), and a measure that holds the drift floor still across runs.
+  - **27a-1. The cover glass slides as the dish tips (shipped, #328).** The tilt moves
+    colour only where it is heavier than the plate's mean, so on a look whose colour is
+    spread evenly a rock moved nothing (the Mac's controls run on #305: Rock visible on
+    7 of 23 looks, "nothing" on Boiling Point, Crowd Plate, Red Cabbage, Clock Glass).
+    The top glass rides on the film in the bottom glass's bowl and slides downhill as
+    the pair tips, a damped pendulum (`stepCover`, lib/plateRock.ts: bowl R_c 0.18 m,
+    2 mm of glass, the film's shear drag ρν/(m_A h) from the look's Thickness, 30 mm of
+    rim room); its slide in m/s joins Glass Smear's glass speed in hsPrep, so the liquid
+    goes at half of it. Lab (`npm run rides`): an evenly coloured checker slid 0.0 cells
+    with the tilt alone, 11.6 at full Plate Rock with the glass and 9.4 at the default;
+    the glass rests at R_c sinθ, swings at 1.17 Hz on the default oil and creeps back
+    without swinging in glycerine. A phone held tipped slides it too.
+    - **27a-2, open.** Read Plate Rock on the Mac's `controls` run with the glass, on
+      the even looks above, against a drift floor held still across runs (each look's
+      own drift rose on #305 with the stronger kicks, so its ratios are not like for
+      like).
+    - **27a-3, open.** Glass Smear's own noise speed is laid × dt and then read × disp
+      again (the 2026-10-06 audit), so at a slow look's Speed it moves the plate about
+      a ten-thousandth a second; lay it in m/s as the cover's slide is.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
