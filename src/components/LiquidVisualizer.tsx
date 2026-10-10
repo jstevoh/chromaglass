@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { layFinger } from '../lib/handSolid';
-import { layBreath } from '../lib/breath';
+import { layBreath, airTaken, spawnsOf, strawFlow, WIND_SPAWNS_PER_SECOND } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -118,6 +118,32 @@ interface LiquidVisualizerProps {
    * nothing, which is the whole reason the desk is affordable.
    */
   frame?: { top: number; left: number; width: number; height: number } | null;
+  /**
+   * The desk's own copy of the plate, for Preview (PLAN.md 8b).
+   *
+   * Preview used to be a label: the plate being built was the plate on the
+   * wall, so every slider tried while choosing the next song's look was on
+   * the wall as it was tried. With a wall up, Preview now mounts a second
+   * visualizer, this one, for the desk to build on, and the first carries on
+   * drawing the wall with the look it had. It is a whole engine (its own
+   * device, solvers and passes) rather than a third plate inside the first,
+   * because everything in the frame loop walks every plate it holds: a draft
+   * plate there would be tilted, stirred, poured on and drawn into the wall
+   * with the live ones.
+   *
+   * What a draft leaves alone is what belongs to the one show in the window:
+   * it never paints the projector window (`__chromaglassMirror`), never
+   * answers the projector's frame asks (`__chromaglassFrame`), keeps out of
+   * the debug hooks and the crash log's providers and heartbeat, and its
+   * canvas is not `#liquid-canvas`, which the recorder records.
+   */
+  draft?: boolean;
+  /**
+   * Drawn but not shown: the wall's engine while a draft has the desk's
+   * preview. It keeps rendering (the projector window is painted from its
+   * frames), but takes no space, no pointer and no eye.
+   */
+  hidden?: boolean;
   activeLayer?: number;
   clearTrigger?: number;
   drainTrigger?: number;
@@ -4585,12 +4611,14 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** Fixed for the engine's life (App keys the draft), read by the frame loop's one long effect. */
+  const isDraftRef = useRef(draft);
   /** Where the intro goes once the plate is on the page: just above the canvas, under everything else in the frame. */
   const introSlotRef = useRef<HTMLDivElement>(null);
   const fluidsRef = useRef<FluidSimulation[]>([]);
@@ -4638,6 +4666,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const drainTriggerRef = useRef(drainTrigger);
   const clearTriggerRef = useRef(clearTrigger);
   /*
+    Every plate count and clear count this engine was handed, in order (the
+    last forty of each), for the debug hook. A harness reading the current
+    value misses a value handed for one render and taken back in the next,
+    which is when it does its damage: the plate-count effect drops or lays a
+    plate on it (`npm run draftwall`, PLAN.md 8b).
+  */
+  const handedRef = useRef<{ layers: number[]; clears: number[]; total: { layers: number; clears: number } }>({ layers: [], clears: [], total: { layers: 0, clears: 0 } });
+  /*
     And Seed, which is the reason the other two went unnoticed for so long.
 
     Seed is the same kind of counter, and it worked — but only because it was
@@ -4653,7 +4689,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   */
   const seedCountRef = useRef(seedCount);
   useEffect(() => { drainTriggerRef.current = drainTrigger; }, [drainTrigger]);
-  useEffect(() => { clearTriggerRef.current = clearTrigger; }, [clearTrigger]);
+  useEffect(() => { clearTriggerRef.current = clearTrigger; handedRef.current.clears.push(clearTrigger); handedRef.current.total.clears++; }, [clearTrigger]);
   useEffect(() => { seedCountRef.current = seedCount; }, [seedCount]);
   const drainFrameRef = useRef(0); // >0 means drain animation is running
   /**
@@ -5350,8 +5386,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
           af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
-          bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+        // The air it tears in, as the mouse's (lib/breath.ts, airTaken): 0.15 a message at the default, none from a gentle breath.
+        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
+          const taken = airTaken(amt);
+          const n = taken > 0 ? spawnsOf(0.15 * taken, DICE.hands.float()) : 0;
+          if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
         }
         break;
       case 'drop': {
@@ -6234,6 +6273,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       rotationAnglesRef.current = rotationAnglesRef.current.slice(0, targetCount);
       spinVelRef.current = spinVelRef.current.slice(0, targetCount);
     }
+    handedRef.current.layers.push(targetCount);
+    handedRef.current.total.layers++;
+    if (handedRef.current.layers.length > 40) handedRef.current.layers.shift();
+    if (handedRef.current.clears.length > 40) handedRef.current.clears.shift();
   }, [settings.layerCount]);
 
   /*
@@ -6360,7 +6403,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         try { stage.device.createBuffer({ size: 4, usage: 0 }); } catch { /* some implementations throw instead */ }
       }
       // The heartbeat: a visible tab that stops getting here has stopped.
-      crashLog.beat();
+      if (!isDraftRef.current) crashLog.beat();
       const workStart = performance.now();
       let frameS = 0;
       /** How many solver steps this frame took, for the governor's GPU budget. */
@@ -7539,7 +7582,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   step and a fresh reading of the dye.
                 */
                 if (activeLayerRef.current === 0 && held && primary) {
-                  bubblesRef.current.blow(x, y, simStepS, k);
+                  // A volume a second through the straw, as the breath's speed (lib/breath.ts, strawFlow), not its stress.
+                  bubblesRef.current.blow(x, y, simStepS, strawFlow(k));
                   blowStepsRef.current.straw++;
                   // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
                   if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
@@ -7572,8 +7616,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (carried > 0) blowStepsRef.current.carries++;
                   // On a thin gap the moving wind is air on the film and carries nothing by hand (PLAN.md §15g).
                   if (af.lastBlowAired) blowStepsRef.current.aired++;
-                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
-                    bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                  /*
+                    The air the breath tears into the liquid: none below the
+                    speed the surface holds against (a gentle breath), as
+                    often as it always was at the default, more in a gale,
+                    and so many a second, not a count every sixth step
+                    whatever the Amount (PLAN.md QA-20; lib/breath.ts,
+                    airTaken, has the physics and the numbers).
+                  */
+                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
+                    const taken = airTaken(k);
+                    const n = taken > 0 ? spawnsOf(WIND_SPAWNS_PER_SECOND * taken * simStepS, DICE.hands.float()) : 0;
+                    if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
                   }
                 }
 
@@ -9279,13 +9333,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           canvas is readable on either engine — and the mirror keeps only the
           letterbox and its own size.
         */
-        const mirror = (window as unknown as { __chromaglassMirror?: (c: HTMLCanvasElement) => void }).__chromaglassMirror;
+        const mirror = isDraftRef.current ? undefined : (window as unknown as { __chromaglassMirror?: (c: HTMLCanvasElement) => void }).__chromaglassMirror;
         if (mirror) {
           try { mirror(canvas); } catch { /* the projector window went away mid-frame */ }
         }
         // The remote's Draw, for the same reason and in the same place: a
         // small copy of this frame while a pad is asking (lib/padPicture.ts).
-        tapPadPicture(canvas);
+        // Not Preview's copy: the pad shows the wall, as the projector does.
+        if (!isDraftRef.current) tapPadPicture(canvas);
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
@@ -9669,7 +9724,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       An ask without one (a harness, a projector window from an older build)
       is offered at the time it ran, as before.
     */
-    (window as unknown as { __chromaglassFrame?: (ts?: number) => void }).__chromaglassFrame = (ts?: number) => {
+    const askFrame = (ts?: number) => {
       if (renderingRef.current) return;             // a render is drawing; the wall mirrors its frames
       const now = performance.now();
       if (!drawGate.offer('ask', refreshStamp(ts, now))) return;   // this refresh already has a frame
@@ -9688,6 +9743,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       draw();
     };
+    // A draft's frames are the desk's (PLAN.md 8b): the projector asks the wall's engine.
+    if (!isDraftRef.current) (window as unknown as { __chromaglassFrame?: (ts?: number) => void }).__chromaglassFrame = askFrame;
 
     // ── What `?debug` shows ───────────────────────────────────────────
     // One surface whichever engine is drawing: the show's own state here, and
@@ -9705,6 +9762,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
+        /** The clears this engine has been handed (`clearTrigger`): `npm run draftwall` reads the wall's against the desk's copy (PLAN.md 8b). */
+        clears: clearTriggerRef.current,
+        /** What it was handed, in order: see `handedRef`. */
+        handed: { layers: [...handedRef.current.layers], clears: [...handedRef.current.clears], total: { ...handedRef.current.total } },
         /**
          * The clock the last frame stepped the plate to, in milliseconds on
          * the page's own clock (Date.now, or the render's): what its dish,
@@ -9876,7 +9937,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         gridCap: () => gridCapRef.current,
         ...(renderer?.debug?.() ?? {}),
       });
-    if (new URLSearchParams(window.location.search).has('debug')) {
+    if (!isDraftRef.current && new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = debugState;
       // Turn the plates to given angles (radians), for scripts/mirror.mjs to
       // reproduce a report's plate exactly.
@@ -9885,7 +9946,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       };
     }
     // What every line of the log carries, and the report's larger parts.
-    const unprovide = crashLog.provide('visualizer', () => {
+    const unprovide = isDraftRef.current ? () => {} : crashLog.provide('visualizer', () => {
       const status = engineStatusRef.current;
       const rung = governorRef.current?.rung;
       return {
@@ -9898,7 +9959,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         lost: glLostRef.current,
       };
     });
-    crashLog.provideReport({ debug: debugState });
+    if (!isDraftRef.current) crashLog.provideReport({ debug: debugState });
 
     /**
      * Rebuild the stage from nothing: destroy the device, and the loss
@@ -10198,7 +10259,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       });
       // The report's GPU and its frame. `grabFrame` is the only read that
       // works: a presented WebGPU canvas reads back black.
-      crashLog.provideReport({
+      if (!isDraftRef.current) crashLog.provideReport({
         gpu: () => {
           const l = s.device.limits;
           return {
@@ -10665,7 +10726,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // The same frame, shrunk and read back on this device a frame or
           // two behind, as the probe below reads it; only while a remote is
           // asking. The frame task's canvas tap then leaves it alone.
-          if (frame && padPictureWanted()) {
+          if (frame && !isDraftRef.current && padPictureWanted()) {
             if (padGrab && padGrab.device !== s.device) { padGrab.dispose(); padGrab = null; }
             const grab = padGrab ??= new WebGPUPadGrab(s.device);
             grabPadPicture((w, h) => grab.grab(frame, w, h), frame.width, frame.height);
@@ -11285,8 +11346,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       extraHandsRef.current.clear();
       pinchRef.current = null;
       cancelAnimationFrame(animationFrameId);
-      // And the frame the projector could ask for goes with it.
-      delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
+      // And the frame the projector could ask for goes with it (only ever the wall engine's).
+      if (!isDraftRef.current) delete (window as unknown as { __chromaglassFrame?: () => void }).__chromaglassFrame;
       unprovide();
       if (retryTimer) clearTimeout(retryTimer);
       if (healthyTimer) clearTimeout(healthyTimer);
@@ -11342,8 +11403,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // stays under the sheets (z-50) and the palette (z-80). Unframed it is
       // the whole window with no desk above it, so it stays where it was.
       className={`fixed bg-black overflow-hidden ${frame ? 'z-20 rounded-xl border border-white/10' : 'inset-0 w-full h-full'}`}
-      style={frame ? { top: frame.top, left: frame.left, width: frame.width, height: frame.height } : undefined}
-      data-testid="plate-frame"
+      // Hidden, the wall's engine still draws at its own size: `visibility`
+      // rather than `display: none`, which would measure the box as nothing
+      // and resize the canvas to it (PLAN.md 8b).
+      style={{ ...(frame ? { top: frame.top, left: frame.left, width: frame.width, height: frame.height } : {}), ...(hidden ? { visibility: 'hidden', pointerEvents: 'none' } : {}) }}
+      data-testid={draft ? 'plate-frame-draft' : 'plate-frame'}
+      data-hidden={hidden ? 'true' : undefined}
     >
       <canvas
         ref={canvasRef}
@@ -11355,7 +11420,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Letterboxed whenever the box it is shown in is not the shape it was
         // rendered at — with a projector attached, and in the desk's preview.
         style={staged || frame ? { objectFit: 'contain', objectPosition: 'center' } : undefined}
-        id="liquid-canvas"
+        id={draft ? 'liquid-canvas-draft' : 'liquid-canvas'}
       />
       {/* The intro's place (lib/intro.ts); empty, and so not there at all, once it has gone. */}
       <div ref={introSlotRef} className="absolute inset-0 pointer-events-none empty:hidden" data-testid="intro-slot" />

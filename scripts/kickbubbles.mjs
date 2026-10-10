@@ -17,7 +17,8 @@
  * What is played here is that report, as a visitor meets it: a fresh browser
  * on Classic, the look's Bubbles turned all the way up (so a kick that can
  * release air very likely does, at the old odds 0.45 a kick), and then the
- * first click on the plate, which starts the band. Twenty-five seconds later:
+ * first click on the plate, which starts the band. Twenty-five seconds later
+ * (a minute on the look's own Audio Impact, below):
  *
  *   at 0          the band started, and at least fifteen of its kicks reached
  *                 the bubbles' own decision with room on the plate (counted
@@ -65,10 +66,25 @@ const PHONE = { viewport: { width: 390, height: 844 }, touch: true };
 const CASES = [
   { name: 'laptop, Audio Impact 0', impact: 0, screen: LAPTOP },
   { name: 'phone, Audio Impact 0', impact: 0, screen: PHONE },
-  // Left at the look's own value, not patched: what a visitor plays.
-  { name: "laptop, Classic's own Audio Impact", impact: null, screen: LAPTOP },
+  // Left at the look's own value, not patched: what a visitor plays. Listened to for a minute (below).
+  { name: "laptop, Classic's own Audio Impact", impact: null, screen: LAPTOP, listenMs: 60_000 },
 ];
 const LISTEN_MS = 25_000;
+/*
+  Why Classic is listened to for a minute and not 25 seconds. A chance is a
+  kick that reaches the bubbles' decision with room on the plate (fewer
+  than 17 of the music's own bubbles at Bubbles full), and at Classic's own
+  Audio Impact the kicks fill that room: two to four bubbles on nearly half
+  of them, each lasting 13 to 35 seconds. So after the first dozen chances
+  the next ones wait for a bubble to go, and in 25 seconds the Mac counted
+  12 to 34 chances of the band's 51 kicks, 16 to 22 on most runs, and under
+  the floor of 15 on six of 38 runs between 9 and 10 October (12, 13, 13,
+  14, 14, 14), the ones at 0 never under 23 (they release none, so the room
+  never fills). Those reds were the window, not the bubbles: a run where
+  the share released was 57% of 14 chances is the same plate as one where
+  it was 47% of 17. The floor stays at 15; the window gives it more chances
+  to count, as the bubbles of the first half-minute go and leave room.
+*/
 const CHANCE_FLOOR = 15;
 
 if (!PLATE) {
@@ -116,7 +132,7 @@ try {
     const at = plate ? { x: plate.x + plate.width / 2, y: plate.y + plate.height / 2 } : { x: c.screen.viewport.width / 2, y: c.screen.viewport.height / 3 };
     if (c.screen.touch) await page.touchscreen.tap(at.x, at.y);
     else await page.mouse.click(at.x, at.y);
-    await page.waitForTimeout(LISTEN_MS);
+    await page.waitForTimeout(c.listenMs ?? LISTEN_MS);
     const after = await read(page);
     const kicks = (after.kicks ?? 0) - (before.kicks ?? 0);
     const m0 = before.music ?? {}, m1 = after.music ?? {};

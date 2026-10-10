@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
 import { flushSync } from 'react-dom';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useSongRender } from './hooks/useSongRender';
@@ -31,7 +31,7 @@ import { SoundPanel } from './components/SoundPanel';
 import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
-import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
+import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
 import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -72,9 +72,10 @@ import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
 import { useRecorder } from './hooks/useRecorder';
 import { useProjector } from './hooks/useProjector';
 import { useWakeLock } from './hooks/useWakeLock';
-import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, type OutputConfig } from './lib/outputConfig';
+import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, wallTestOn, type OutputConfig, type WallTest } from './lib/outputConfig';
 import { TempoSource, bpmOf } from './lib/tempo';
-import type { MidiAction, SoundBinding } from './lib/midi';
+import type { MidiAction, MidiMap, SoundBinding } from './lib/midi';
+import { controlKindOf } from './lib/midi';
 import { runTrigger } from './lib/soundLearn';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
@@ -224,6 +225,38 @@ export const OPENING_LOOK: string = (() => {
 
 
 /**
+ * What the wall shows while the desk builds on a copy (PLAN.md 8b): the look
+ * as it was when Preview took the desk off the wall, or as Send to wall last
+ * left it, and the counters the wall's engine had seen, so that the desk's
+ * clears and seeds on the copy are not replayed on the wall.
+ */
+interface WallLook {
+  settings: VisualizerSettings;
+  /** Where a Send to wall's fade is taking `settings`; Live mid-fade puts the desk there, not halfway. */
+  target: VisualizerSettings | null;
+  presetId: string | null;
+  /** The look a cast receiver lays (`activePresetId`, which also names an edited look). */
+  castPresetId: string | null;
+  presetSeq: number;
+  seedCount: number;
+  clearTrigger: number;
+  drainTrigger: number;
+  spinFlick: { seq: number; layer: number } | undefined;
+  /** The back plate's own look on the wall (16a), which a Send back on the copy does not change. */
+  backLook: { id: string; name: string; leaving?: boolean } | null;
+  /** The saved look the desk had open, so Live's Save over writes the look that is open. */
+  docId: string | null;
+  plate: { contract: number[] | null; injectStyles: string[]; liquids: string[] } | null;
+}
+
+/** The room's settings out of a whole set (lib/lookFade's RIG_KEYS): what the desk rides live on the wall even in Preview. */
+function roomOf(s: VisualizerSettings): Partial<VisualizerSettings> {
+  const out: Record<string, unknown> = {};
+  for (const k of RIG_KEYS) out[k] = (s as unknown as Record<string, unknown>)[k];
+  return out as Partial<VisualizerSettings>;
+}
+
+/**
  * What Go will send: a look (built-in or saved) with any controls a set item
  * lays on top, or a stage sequence. `item` is the set item it came from, when
  * it came from one, so the desk can light that row and not every row that
@@ -270,6 +303,25 @@ export default function App() {
   // live in a section of their own with their own Clear, and a Reset pressed
   // over there should not quietly throw away an evening's corner-dragging here.
   const resetOutput = useCallback(() => setOutput(prev => ({ ...DEFAULT_OUTPUT, surfaces: prev.surfaces })), [setOutput]);
+  /*
+    The wall test (Desk v2, PLAN.md 8e): Load-in's test pattern and Identify.
+    Beside the output config, never in it: that config is stored, and a show
+    that opened on last night's test pattern would put a grid on the wall in
+    front of the room. Laid onto the config only for the plate (`shownOutput`),
+    which draws it in the projector's pass, through the same pin and masks as
+    the show. Identify ends itself: once its three seconds are up the test is
+    dropped, so the pass it needed is dropped with it when nothing else does.
+  */
+  const [wallTest, setWallTest] = useState<WallTest>({ pattern: false, identifyUntil: 0 });
+  useEffect(() => {
+    const left = wallTest.identifyUntil - Date.now();
+    if (left <= 0) return;
+    const t = window.setTimeout(() => setWallTest(w => ({ ...w, identifyUntil: 0 })), left + 50);
+    return () => window.clearTimeout(t);
+  }, [wallTest.identifyUntil]);
+  const shownOutput = useMemo<OutputConfig>(
+    () => (wallTestOn(wallTest) ? { ...output, test: wallTest } : output),
+    [output, wallTest]);
 
   // ── Where the tempo comes from ──────────────────────────────────
   // The microphone, unless something better is offering: a MIDI clock from
@@ -375,7 +427,7 @@ export default function App() {
         return settingsRef.current;
       };
     (window as unknown as { chromaglassGovernor?: unknown }).chromaglassGovernor =
-      () => (visualizerRef.current as unknown as { governor?: unknown })?.governor ?? null;
+      () => (wallRef.current as unknown as { governor?: unknown })?.governor ?? null;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
@@ -422,7 +474,7 @@ export default function App() {
       (title: string, artist: string) => showFor(songShowsRef.current, { title, artist });
     (window as unknown as { chromaglassSongStop?: unknown }).chromaglassSongStop = () => songRuntimeRef.current?.stop();
     (window as unknown as { chromaglassPourText?: unknown }).chromaglassPourText =
-      (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => visualizerRef.current?.pourText(rows, opts);
+      (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => wallRef.current?.pourText(rows, opts);
     (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
       (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
   }, []);
@@ -659,7 +711,7 @@ export default function App() {
   const setToastRef = useRef<(m: string) => void>(() => {});
   const { isCasting, startCast, stopCast, send: castSend, windowFullscreen, fillWindow } = useCastSender(
     () => castReadyRef.current(),
-    (size) => { stageRef.current = size; visualizerRef.current?.setStage(size); },
+    (size) => { stageRef.current = size; wallRef.current?.setStage(size); },
     // A blocked popup used to be silent, so Send to wall did visibly nothing
     // and there was no telling that from the feature being broken.
     (message) => setToastRef.current(message),
@@ -749,6 +801,11 @@ export default function App() {
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
+  /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
+  const wallRef = useRef<LiquidVisualizerHandle | null>(null);
+  /** The wall's engine and the desk's copy, once each: for what is the room's on both (the mark, the palette lock). */
+  const bothEngines = (): LiquidVisualizerHandle[] =>
+    [...new Set([wallRef.current, visualizerRef.current])].filter((v): v is LiquidVisualizerHandle => !!v);
   /*
     The song's shape in a word, for the desk's status line and the phone's
     Sound sheet (lib/songShape.ts): "drop", "build 40%", "breakdown", or
@@ -764,7 +821,7 @@ export default function App() {
   const songCueSeqRef = useRef(0);
   useEffect(() => {
     const timer = setInterval(() => {
-      const report = visualizerRef.current?.songShape();
+      const report = wallRef.current?.songShape();
       // Compared against what was last set, for the reason the tempo label is.
       const next = report ? songShapeLine(report.now) : '';
       if (next !== shownShape.current.line) { shownShape.current.line = next; setSongLine(next); }
@@ -879,7 +936,7 @@ export default function App() {
         carries it to a call.
       */
       const drone = startPlateDrone(
-        () => visualizerRef.current?.plateReading(PLATE_PLACES) ?? null,
+        () => wallRef.current?.plateReading(PLATE_PLACES) ?? null,
         droneParams,
       );
       droneRef.current = drone;
@@ -1233,12 +1290,12 @@ export default function App() {
   startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
   const loadFilm = async (file: File) => {
-    await visualizerRef.current?.loadFilmFile(file);
+    await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
   };
   const startFilmCamera = async () => {
     try {
-      await visualizerRef.current?.startFilmCamera();
+      await wallRef.current?.startFilmCamera();
       setFilmSource('camera');
     } catch (err) {
       console.warn('ChromaGlass: camera unavailable for the film projector.', err);
@@ -1260,7 +1317,7 @@ export default function App() {
   */
   const startFilmWindow = async () => {
     try {
-      await visualizerRef.current?.startFilmWindow(
+      await wallRef.current?.startFilmWindow(
         () => setFilmSource('none'),
         () => setToast('That window is coming through black — share the tab instead'),
       );
@@ -1271,7 +1328,7 @@ export default function App() {
     }
   };
   const clearFilm = () => {
-    visualizerRef.current?.clearFilm();
+    wallRef.current?.clearFilm();
     setFilmSource('none');
   };
   // ── The room ────────────────────────────────────────────────────
@@ -1330,7 +1387,7 @@ export default function App() {
     && ((settings.filmDrive ?? 0) > 0 || (settings.filmImpact ?? 0) > 0);
   const filmSense = useFilmSense({
     enabled: filmDriving,
-    getVideo: () => visualizerRef.current?.filmVideoEl() ?? null,
+    getVideo: () => wallRef.current?.filmVideoEl() ?? null,
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
   });
@@ -1469,7 +1526,8 @@ export default function App() {
       if (index == null) localStorage.removeItem('chromaglass-palette-lock');
       else localStorage.setItem('chromaglass-palette-lock', String(index));
     } catch { /* private mode */ }
-    visualizerRef.current?.setHarmonyLock(index == null ? null : COLOR_HARMONIES[index]);
+    // The lock is the room's, like the mark: the wall's engine and, in Preview, the desk's copy (PLAN.md 8b).
+    for (const v of bothEngines()) v.setHarmonyLock(index == null ? null : COLOR_HARMONIES[index]);
   }, []);
   useEffect(() => {
     // Re-assert a persisted lock once the visualizer is mounted
@@ -1501,7 +1559,7 @@ export default function App() {
   // — unless the user has locked a palette themselves.
   useEffect(() => {
     if (musicIntel.harmonyIndex != null && paletteLock == null) {
-      visualizerRef.current?.setHarmony(COLOR_HARMONIES[musicIntel.harmonyIndex]);
+      wallRef.current?.setHarmony(COLOR_HARMONIES[musicIntel.harmonyIndex]);
     }
   }, [musicIntel.harmonyIndex, paletteLock]);
 
@@ -1510,7 +1568,7 @@ export default function App() {
     // Not into a render: the lyric clock is the room's, not the film's.
     if (musicIntel.trigger && !renderHoldRef.current) {
       const energy = audioData ? Math.min(1, audioData.energy) : 0.6;
-      visualizerRef.current?.triggerTheme(musicIntel.trigger.trigger.theme, Math.max(0.35, energy));
+      wallRef.current?.triggerTheme(musicIntel.trigger.trigger.theme, Math.max(0.35, energy));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.trigger?.seq]);
@@ -1525,7 +1583,7 @@ export default function App() {
   useEffect(() => {
     if (musicIntel.gestureFire && !renderHoldRef.current) {
       for (const g of musicIntel.gestureFire.gestures) {
-        visualizerRef.current?.applyGesture(g);
+        wallRef.current?.applyGesture(g);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2160,6 +2218,163 @@ export default function App() {
   // one; without a desk the plate fills the window, as it always has.
   const preview = usePreviewFrame(deskUp);
 
+  /*
+    ── Preview, for real (PLAN.md 8b) ─────────────────────────────────
+
+    Preview held the sequencer, a song's show and a new song's look, but the
+    plate being built was still the plate on the wall: one canvas, which the
+    projector window is painted from, so every slider tried while choosing the
+    next look was on the wall as it was tried. The plate bar said "not on
+    wall" and it was.
+
+    Now, while Preview is on and a wall is up (the projector window, a cast
+    receiver, a network display), the desk builds on a copy: a second engine
+    (`draft` on LiquidVisualizer) drawn in the desk's preview, and the first
+    carries on drawing the wall with the look it had (`wallLook`), hidden from
+    the desk. Send to wall hands the copy's look to the wall across the fade,
+    as a Go does; leaving Preview puts the desk back on the wall's look, so
+    switching to Live never changes what the room sees.
+
+    With no wall up there is nothing to keep the desk off, and Preview stays
+    one engine: a second would cost a whole second solver on every Build
+    session for nothing anyone sees.
+
+    What stays live on the wall through Preview is the room (RIG_KEYS: the
+    dimmer, the mixer, the logo and the film's levels), which the desk still
+    rides, and the music. What waits for Send to wall is the look: its
+    settings, its dyes and pours, and the desk's clears and seeds.
+  */
+  const wallUp = isCasting || mirrorCount > 0;
+  const draftWanted = designing && wallUp;
+  const [wallLook, setWallLook] = useState<WallLook | null>(null);
+  const wallLookRef = useRef(wallLook);
+  wallLookRef.current = wallLook;
+  const drafting = draftWanted && wallLook !== null;
+  /*
+    The wall's engine and a receiver follow `wallLook` for as long as it is
+    held, which is one render longer than the copy is up: in the render where
+    Preview ends the copy is gone but the desk's settings and counters are
+    only put back by the effect after it, and handing them to the wall's
+    engine for that one render dropped or laid plates in front of the room
+    and sent a receiver the copy's look (the pre-push review).
+  */
+  const walled = wallLook !== null;
+  /*
+    The wall's engine, always. `visualizerRef` is the engine the desk edits:
+    the same one outside Preview, the draft inside it. Everything the desk
+    does goes through `visualizerRef` and lands on the draft without each
+    call knowing; what is the show's (the music, the sequencer, the remote,
+    the projector's size) goes through `wallRef`.
+  */
+  const wallEngineRef = useCallback((h: LiquidVisualizerHandle | null) => {
+    wallRef.current = h;
+    if (!drafting) visualizerRef.current = h;
+  }, [drafting]);
+  const wallFadeRef = useRef<ShowIntervalHandle | null>(null);
+  useEffect(() => () => { if (wallFadeRef.current) clearShowInterval(wallFadeRef.current); }, []);
+  useLayoutEffect(() => {
+    if (draftWanted && !wallLookRef.current) {
+      const plate = wallRef.current?.describePlate() ?? null;
+      setWallLook({
+        settings: settingsRef.current, target: null, presetId: pinnedPresetId, castPresetId: activePresetId, presetSeq,
+        seedCount, clearTrigger, drainTrigger, spinFlick, backLook, docId,
+        plate: plate ? { contract: plate.contract, injectStyles: plate.injectStyles, liquids: plate.liquids } : null,
+      });
+    } else if (!draftWanted && wallLookRef.current) {
+      const w = wallLookRef.current;
+      if (wallFadeRef.current) { clearShowInterval(wallFadeRef.current); wallFadeRef.current = null; }
+      /*
+        Either way the counters go back to the ones the wall's engine has
+        seen, so it sees no change: its loop clears and seeds on a count
+        higher than the last, and a clear pressed on the copy was replayed on
+        the wall's plate the moment the copy went.
+      */
+      setSeedCount(w.seedCount);
+      setClearTrigger(w.clearTrigger);
+      setDrainTrigger(w.drainTrigger);
+      setSpinFlick(w.spinFlick);
+      if (!designing) {
+        // Out of Preview with the wall still up: the desk goes back to what
+        // the room is seeing (where a Send's fade was taking it, if one was
+        // under way), and to the saved look that was open.
+        setSettings(prev => ({ ...(w.target ?? w.settings), ...roomOf(prev) }));
+        setPinnedPresetId(w.presetId);
+        setPresetSeq(w.presetSeq);
+        setBackLook(w.backLook);
+        setDocId(w.docId);
+        setDocDirty(false);
+      } else if (pinnedPresetId) {
+        // The wall went away mid-Preview: the wall's engine is the desk's
+        // again and carries on from the copy's look, as a Go would.
+        adoptPreset(pinnedPresetId);
+      }
+      setWallLook(null);
+    }
+    // Only the edge matters; the snapshot reads everything else as it is then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftWanted]);
+  // The copy starts as the wall's look, laid fresh on its own plate.
+  useEffect(() => {
+    if (!drafting) return;
+    const w = wallLookRef.current;
+    const v = visualizerRef.current;
+    // Composed at the wall's shape, letterboxed in the preview as the one engine was.
+    v?.setStage(stageRef.current);
+    if (paletteLock != null) v?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
+    /*
+      A saved look's dyes are handed over; a built-in's come from its own
+      tables. The plate tables are module constants both engines read, and
+      handing a built-in's id a null contract deleted that look's colours for
+      the wall's engine too (applyPreset's `delete PRESET_CONTRACTS[id]`).
+    */
+    const id = w?.presetId ?? OPENING_LOOK;
+    v?.applyPreset(id, w?.plate && isUserPresetId(id) ? w.plate : undefined, lookPhase(settingsRef.current));
+    if (markUrlRef.current) {
+      const img = new window.Image();
+      img.onload = () => visualizerRef.current?.loadMark?.(img, img.naturalWidth, img.naturalHeight);
+      img.src = markUrlRef.current;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drafting]);
+  /** Send to wall, in Preview: the copy's look to the wall, across the fade a Go takes. */
+  const sendDraftToWall = () => {
+    const w = wallLookRef.current;
+    if (!w) return;
+    const raw = visualizerRef.current?.describePlate();
+    const plate = raw ? { contract: raw.contract, injectStyles: raw.injectStyles, liquids: raw.liquids } : null;
+    const to = settingsRef.current;
+    const id = pinnedPresetId ?? w.presetId ?? OPENING_LOOK;
+    wallRef.current?.adoptPreset(id, plate ?? undefined);
+    wallRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(to));
+    const from = w.settings;
+    setWallLook(prev => prev && { ...prev, target: to, presetId: id, castPresetId: activePresetId, presetSeq, plate, docId });
+    if (wallFadeRef.current) clearShowInterval(wallFadeRef.current);
+    const started = showNow();
+    const ms = Math.max(1, fadeSeconds) * 1000;
+    const step = lookFadeStep(false);
+    wallFadeRef.current = showInterval(() => {
+      const t = Math.min(1, (showNow() - started) / ms);
+      setWallLook(prev => prev && { ...prev, settings: step(from, to, t, prev.settings), target: t >= 1 ? null : prev.target });
+      if (t >= 1 && wallFadeRef.current) { clearShowInterval(wallFadeRef.current); wallFadeRef.current = null; }
+    }, 33, 'wall-fade');
+    setToast('Sent to the wall');
+  };
+  /**
+    Send to wall: in Preview with a wall up, the copy's look goes to it; with
+    none, the projector window opens, as before. A ref so ⌘⏎'s listener,
+    bound once, sends whichever is true when the key is pressed.
+  */
+  const sendToWallRef = useRef<() => void>(() => {});
+  sendToWallRef.current = () => { if (drafting) sendDraftToWall(); else void startCast('window'); };
+  /** What the wall's engine draws while the desk has a copy: the wall's look, under the desk's room. */
+  const wallSettings = useMemo(() => {
+    if (!wallLook) return effectiveSettings;
+    const s = { ...wallLook.settings, ...roomOf(effectiveSettings), ...(musicIntel.overrides ?? {}) } as VisualizerSettings;
+    // The wall's own back plate, not one sent on the copy, which would have grown the wall a plate.
+    const layers = Math.max(1, s.layerCount ?? 1, wallLook.backLook ? 2 : 1);
+    return (s.layerCount ?? 1) < layers ? { ...s, layerCount: layers } : s;
+  }, [wallLook, effectiveSettings, musicIntel.overrides]);
+
   /**
    * How long the look on the wall has been up.
    *
@@ -2202,6 +2417,23 @@ export default function App() {
     if (docId) return userPresets.presets.find(p => p.id === docId)?.name ?? 'Untitled look';
     return pinnedLookName ?? 'Untitled look';
   }, [docId, userPresets.presets, pinnedLookName]);
+
+  /*
+    The look's own values, for a knob's double-click (PLAN.md 8c): the
+    document's when there is one, the built-in it started from when not, and
+    a bare look for an empty plate. Through `lookOf`, so a value is what
+    sending that look gives, base included. A rig setting (the dimmer, the
+    room's sound, the mixer) is no look's, so it has no value to go back to.
+  */
+  const lookValues = useMemo(() => {
+    const own = docId ? userPresets.presets.find(p => p.id === docId)?.settings
+      : pinnedPresetId ? allPresets.find(p => p.id === pinnedPresetId)?.settings : undefined;
+    return lookOf(own ?? {});
+  }, [docId, userPresets.presets, pinnedPresetId, allPresets]);
+  const lookValueOf = useCallback((key: keyof VisualizerSettings): number | undefined => {
+    const v = lookValues[key];
+    return typeof v === 'number' ? v : undefined;
+  }, [lookValues]);
 
   /**
    * The cue list: the looks, in order, each carrying two of its own dyes so a
@@ -2257,7 +2489,9 @@ export default function App() {
    * than a reorder: the hook's inputs depend on half the app.
    */
   const midiRef = useRef<{
-    map: { bindings: { source: { kind: string; number: number }; target: { kind: string; key?: string } }[] };
+    map: MidiMap;
+    /** The port it is playing from, for the controller's profile (which CCs are knobs). */
+    activeInputName: string | null;
     /** The shift layer, so a pad can step it — the actions run above the hook too. */
     stepBank: (dir: 1 | -1) => void;
   } | null>(null);
@@ -2269,17 +2503,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /*
-    And what it is learned to: an endless encoder draws as a knob, anything
-    with a stop as a slider (the design's rule, so the desk looks like the
-    controller). A binding only says absolute or relative, so an absolute pot
-    reads as a fader until profiles name their kinds (PLAN.md §8).
+    And what it is learned to: a knob draws as a knob, a fader as a slider
+    (the design's rule, so the desk looks like the controller). A binding
+    only says absolute or relative, so the controller's profile names which
+    of its CCs turn (`controlKindOf`, PLAN.md 8d).
   */
-  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null => {
-    const b = midiRef.current?.map.bindings.find(x => x.target.kind === 'setting' && x.target.key === key) as { mode?: string; source: { kind: string } } | undefined;
-    if (!b || b.source.kind !== 'cc') return null;
-    return b.mode === 'relative' ? 'encoder' : 'fader';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const kindFor = useCallback((key: keyof VisualizerSettings): ControlKind | null =>
+    controlKindOf(midiRef.current?.map, key, midiRef.current?.activeInputName),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  []);
 
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
@@ -2547,7 +2779,7 @@ export default function App() {
     // or the two walks would fight a tick at a time.
     applySettings: (patch) => { handOnLevels(Object.keys(patch)); setSettings(prev => ({ ...prev, ...patch })); },
     adoptPreset,
-    setPaletteWindow: (size, lead) => visualizerRef.current?.setPaletteWindow(size, lead),
+    setPaletteWindow: (size, lead) => wallRef.current?.setPaletteWindow(size, lead),
     sectionLabel: musicIntel.state.section?.label ?? null,
     isActive,
     // Design is not a place a sequence gets to write settings. See the note
@@ -2558,7 +2790,7 @@ export default function App() {
     // A paced stage's scene (lib/scenePacing.ts): the plate's pace and light,
     // and the moments that open its swells, which are the same moves a song
     // show's actions make.
-    pace: (sample) => { const v = visualizerRef.current; if (!v) return false; v.pace(sample); return true; },
+    pace: (sample) => { const v = wallRef.current; if (!v) return false; v.pace(sample); return true; },
     songCue: () => {
       /*
         Only what is new since the last tick, and only what was heard in the
@@ -2568,12 +2800,12 @@ export default function App() {
         `npm run pacing` plays the songs through and checks both rules on, so
         this is the cue it measured.
       */
-      const { cue, seq } = songCueFrom(visualizerRef.current?.songShape(), songCueSeqRef.current);
+      const { cue, seq } = songCueFrom(wallRef.current?.songShape(), songCueSeqRef.current);
       songCueSeqRef.current = seq;
       return cue;
     },
     moment: (kind) => {
-      const v = visualizerRef.current;
+      const v = wallRef.current;
       switch (kind) {
         case 'pour': v?.pour(); break;
         case 'burst': v?.applyGesture({ tool: 'press', x: 0.5, y: 0.5, layer: 0, amount: 1 }); break;
@@ -2814,19 +3046,29 @@ export default function App() {
   }, [songChange?.seq]);
 
   // ── Cast: keep the receiver in step ─────────────────────────────
+  /*
+    A receiver that draws its own plate is the wall too: while the desk builds
+    on a copy (PLAN.md 8b) it is sent the wall's look, not the desk's, and
+    Send to wall moves it with the window's.
+  */
+  const wl = wallLook;
   const castState = useMemo<CastState>(() => ({
-    settings: effectiveSettings,
+    settings: wl ? wallSettings : effectiveSettings,
     isActive,
     isAutomated,
     activeLayer,
-    seedCount,
-    clearTrigger,
-    drainTrigger,
-    presetId: activePresetId,
-    presetSeq,
+    seedCount: wl ? wl.seedCount : seedCount,
+    clearTrigger: wl ? wl.clearTrigger : clearTrigger,
+    drainTrigger: wl ? wl.drainTrigger : drainTrigger,
+    presetId: wl ? wl.castPresetId : activePresetId,
+    presetSeq: wl ? wl.presetSeq : presetSeq,
     harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
-    output,
-  }), [effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, output]);
+    // With the wall test on it (8e), so a receiver that draws its own plate
+    // (a Chromecast, a second machine) shows the pattern and the numbers as
+    // the HDMI wall does. Identify's end is a clock time, so a receiver whose
+    // clock is a second off flashes a second more or less.
+    output: shownOutput,
+  }), [wl, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput]);
   const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
   /**
    * The mark, kept as a data URL so it can be sent to a receiver.
@@ -2886,12 +3128,17 @@ export default function App() {
   const castTriggers = (s: CastState) => `${s.presetSeq}:${s.seedCount}:${s.clearTrigger}:${s.drainTrigger}`;
   // Stable, and reads everything through refs, so the trailing timer can
   // never send a state (or a mirror count) older than the one it was set for.
+  const castSentLogRef = useRef<{ n: number; presetSeq: number; clearTrigger: number; layers: number }[]>([]);
+  const castSentCountRef = useRef(0);
   const sendCastState = useCallback((withMark = false) => {
     if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
     const state = castStateRef.current;
     const send = castSendRef.current;
     castSentAtRef.current = performance.now();
     castSentTriggersRef.current = castTriggers(state);
+    // The last forty sent, for the debug hook (`npm run draftwall` reads every one, not the last).
+    castSentLogRef.current.push({ n: ++castSentCountRef.current, presetSeq: state.presetSeq, clearTrigger: state.clearTrigger, layers: state.settings.layerCount ?? 1 });
+    if (castSentLogRef.current.length > 40) castSentLogRef.current.shift();
     send({ type: 'state', state });
     // The picture only when a receiver is new — on its hello, or when a cast
     // or a mirror starts — because that is the one moment it needs it.
@@ -2913,7 +3160,7 @@ export default function App() {
       const url = String(reader.result ?? '');
       const img = new window.Image();
       img.onload = () => {
-        visualizerRef.current?.loadMark?.(img, img.naturalWidth, img.naturalHeight);
+        for (const v of bothEngines()) v.loadMark?.(img, img.naturalWidth, img.naturalHeight);
         markUrlRef.current = url;
         setMarkLoaded(true);
         castSend({ type: 'mark', dataUrl: url });
@@ -2927,7 +3174,7 @@ export default function App() {
   }, [castSend]);
 
   const clearMark = useCallback(() => {
-    visualizerRef.current?.clearMark?.();
+    for (const v of bothEngines()) v.clearMark?.();
     markUrlRef.current = null;
     setMarkLoaded(false);
     castSend({ type: 'mark', dataUrl: null });
@@ -2984,6 +3231,7 @@ export default function App() {
         return {
           isCasting: l.isCasting,
           castState: l.castState,
+          sent: [...castSentLogRef.current],
           // The reading the plate hears now, not the last one React was
           // shown: a harness asking what the show hears means the plate.
           audio: hearRef.current(),
@@ -3168,7 +3416,8 @@ export default function App() {
     // (never turns it on: a trackpad brush must not become a camera cut).
     const onWheel = (e: WheelEvent) => {
       const t = e.target as HTMLElement | null;
-      if (!t || (t.id !== 'liquid-canvas' && !t.closest?.('#liquid-canvas'))) return;
+      // The desk's copy in Preview is the plate under the hand as much as the wall's (PLAN.md 8b).
+      if (!t || (t.id !== 'liquid-canvas' && t.id !== 'liquid-canvas-draft' && !t.closest?.('#liquid-canvas, #liquid-canvas-draft'))) return;
       // Still never *starts* a closeup: a trackpad brush over the plate must
       // not become a camera move. Once in, the wheel rides it all the way back
       // out to the plate, which is where the old guard would strand it.
@@ -3249,7 +3498,7 @@ export default function App() {
   */
   const rowFadeTimer = useRef<ShowIntervalHandle | null>(null);
   const fadeBpm = (): number => {
-    const bar = visualizerRef.current?.songShape().bar;
+    const bar = wallRef.current?.songShape().bar;
     return fadeTempo(tempoRef.current?.bpm ?? 0, bar?.period ?? 0, bar?.beatConfidence ?? 0);
   };
   /*
@@ -3439,7 +3688,7 @@ export default function App() {
   */
   const onWall = (wall: unknown, x: number, y: number, layer: number, dx?: number, dy?: number,
                   vec: 'stroke' | 'lean' = 'stroke', turned = true) => {
-    const v = visualizerRef.current;
+    const v = wallRef.current;
     if (wall !== true || !v) return { x, y, dx, dy };
     const p = v.wallToPlate(x, y, layer, turned);
     if (dx === undefined || dy === undefined) return { x: p.x, y: p.y, dx, dy };
@@ -3536,7 +3785,7 @@ export default function App() {
           const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
           const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
           // A pen's lean is a direction, not a stroke: turned with the dish, its length kept.
-          visualizerRef.current?.applyGesture({ tool: 'blow', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'lean') });
+          wallRef.current?.applyGesture({ tool: 'blow', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'lean') });
           break;
         }
         case 'drop': {
@@ -3548,7 +3797,7 @@ export default function App() {
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const color = typeof message.color === 'string' ? message.color : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'drop', ...onWall(message.wall, x, y, layer), layer, amount, ...laidColour(selectedLiquid, color) });
+          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(message.wall, x, y, layer), layer, amount, ...laidColour(selectedLiquid, color) });
           break;
         }
         case 'press': {
@@ -3556,7 +3805,7 @@ export default function App() {
           const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'press', ...onWall(message.wall, x, y, layer), layer, amount });
+          wallRef.current?.applyGesture({ tool: 'press', ...onWall(message.wall, x, y, layer), layer, amount });
           break;
         }
         case 'finger': {
@@ -3566,7 +3815,7 @@ export default function App() {
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
           const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
-          visualizerRef.current?.applyGesture({ tool: 'finger', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'stroke') });
+          wallRef.current?.applyGesture({ tool: 'finger', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'stroke') });
           break;
         }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
@@ -3577,7 +3826,7 @@ export default function App() {
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
           // Untouched by the dish's turn: Spin reads the hand's angle as the room sees it.
-          visualizerRef.current?.applyGesture({ tool: 'spin', ...onWall(message.wall, x, y, layer, undefined, undefined, 'stroke', false), layer, amount, id });
+          wallRef.current?.applyGesture({ tool: 'spin', ...onWall(message.wall, x, y, layer, undefined, undefined, 'stroke', false), layer, amount, id });
           break;
         }
         // A remote on Draw asking for the wall (lib/padPicture.ts).
@@ -3587,7 +3836,7 @@ export default function App() {
         case 'tilt': {
           const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
           const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
-          visualizerRef.current?.setExternalTilt(x, y);
+          wallRef.current?.setExternalTilt(x, y);
           break;
         }
         /*
@@ -3655,7 +3904,7 @@ export default function App() {
   /** Do one of a song's actions, through the same moves a pad or a key makes. */
   const performSongAction = useCallback((action: SongAction, show: SongShow) => {
     const a = action.what;
-    const v = visualizerRef.current;
+    const v = wallRef.current;
     switch (a.do) {
       case 'look': goLookNow(a.look.id, a.fade); break;
       case 'drain': runActionRef.current?.('drain'); break;
@@ -3690,7 +3939,7 @@ export default function App() {
     positionSec: musicIntel.state.positionSec,
     songMap: musicIntel.state.songMap,
     isActive,
-    kicks: () => visualizerRef.current?.kicks() ?? 0,
+    kicks: () => wallRef.current?.kicks() ?? 0,
     applyLook: (show, fade) => goLookNow(show.look.id, fade),
     perform: performSongAction,
   });
@@ -3728,7 +3977,7 @@ export default function App() {
     dropped again on the way out, for the reason given where it is done.
   */
   const renderHost = useMemo(() => ({
-    render: () => visualizerRef.current?.render() ?? null,
+    render: () => wallRef.current?.render() ?? null,
     setAudio: (a: AudioData | null) => { renderAudioRef.current = a; setRenderAudio(a); },
     prepare: () => {
       const el = musicElRef.current;
@@ -3841,7 +4090,7 @@ export default function App() {
   useEffect(() => {
     if (remoteLink.status !== 'connected') return;
     const id = setInterval(() => {
-      const layers = visualizerRef.current?.layerReport?.();
+      const layers = wallRef.current?.layerReport?.();
       if (!layers?.length) return;
       // The plate's own brightness, so the room dims when the glass thins
       // rather than sitting at full on an empty plate. Blackout is black.
@@ -3862,7 +4111,7 @@ export default function App() {
       applyPreset: cuePreset,
       selectDye,
       // Every note plays the envelopes, whatever else that pad is for.
-      noteStruck: (velocity) => visualizerRef.current?.fireEnvelopes?.(velocity),
+      noteStruck: (velocity) => wallRef.current?.fireEnvelopes?.(velocity),
     },
     {
       activePresetId,
@@ -4058,7 +4307,7 @@ export default function App() {
       // ⌘⏎ is Send to wall, which every layout's plate bar carries now.
       if (deskUp && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        void startCast('window');
+        sendToWallRef.current();
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -4178,7 +4427,7 @@ export default function App() {
       look: () => ({
         preset: crashStateRef.current.activePresetName,
         settings: crashStateRef.current.settings,
-        plate: visualizerRef.current?.describePlate() ?? null,
+        plate: wallRef.current?.describePlate() ?? null,
         output: crashStateRef.current.output,
       }),
     });
@@ -4220,6 +4469,8 @@ export default function App() {
       onOutput={setOutput}
       onOutputReset={resetOutput}
       wakeLock={wakeLock}
+      wallTest={wallTest}
+      onWallTest={setWallTest}
       tempo={tempoLabel}
       onTap={tapTempo}
       onTempoClear={clearTempo}
@@ -4261,18 +4512,23 @@ export default function App() {
     // height with the browser's bars hidden, which put the dock under them.
     <div className={`relative w-full ${phone ? 'h-[100dvh]' : 'h-screen'} bg-black overflow-hidden font-sans text-white ${overlaysVisible ? '' : 'overlays-hidden'}`}>
       <LiquidVisualizer
-        ref={visualizerRef}
+        ref={wallEngineRef}
         onBackLookCleared={backLookCleared}
-        audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
-        selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
+        audioData={audioData} hear={hear}
+        settings={walled ? wallSettings : effectiveSettings}
+        seedCount={wallLook ? wallLook.seedCount : seedCount} spinFlick={wallLook ? wallLook.spinFlick : spinFlick}
+        selectedLiquid={selectedLiquid} activeLayer={activeLayer}
+        clearTrigger={wallLook ? wallLook.clearTrigger : clearTrigger}
         onAim={aimMacro}
         onPinchZoom={phone ? pinchZoom : undefined}
         toolAmount={toolAmount}
-        drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
+        drainTrigger={wallLook ? wallLook.drainTrigger : drainTrigger}
+        activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
         sceneRef={scene.reading}
         filmSenseRef={filmSense.reading}
         frame={preview.frame}
-        output={output}
+        hidden={drafting}
+        output={shownOutput}
         tempoRef={tempoRef}
         soundBindings={midi.map.sound}
         onSoundTrigger={runSoundTrigger}
@@ -4292,6 +4548,31 @@ export default function App() {
           setEngineStatus(next);
         }}
       />
+      {/*
+        The desk's copy in Preview (PLAN.md 8b; see `drafting`). Keyed so a
+        second Preview starts a fresh engine rather than inheriting the last
+        one's refs. It hears the music and takes the desk's hands, and keeps
+        out of what is the show's: no projector pass (its `output` is the
+        default), no sound triggers or recorded gestures (the wall's engine
+        fires those), no engine status for the header.
+      */}
+      {drafting && (
+        <LiquidVisualizer
+          key="draft"
+          ref={visualizerRef}
+          draft
+          audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
+          selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
+          onAim={aimMacro}
+          toolAmount={toolAmount}
+          drainTrigger={drainTrigger} activeTool={activeTool} isAutomated={isAutomated} isActive={isActive}
+          sceneRef={scene.reading}
+          frame={preview.frame}
+          tempoRef={tempoRef}
+          onMagnetInHand={magnetInHand}
+          onFerrofluidPoured={ferrofluidPoured}
+        />
+      )}
 
       {/*
         A game controller's cursor: a ring over the plate, shown while the
@@ -5072,6 +5353,7 @@ export default function App() {
           onTool={setActiveTool}
           settings={settings}
           onSetting={updateSettings}
+          lookValueOf={lookValueOf}
           onZoom={pinchZoom}
           listening={audioSource !== 'none'}
           deaf={earDeaf}
@@ -5675,9 +5957,10 @@ export default function App() {
         picture), and Load-in the room and the machine. Every settings section
         can be a panel in any of them.
       */}
-      {deskUp && overlaysVisible && (
+      {deskUp && (
         <PanelGuard name="The desk" onClose={() => deskLayouts.reset(layoutName)} closeLabel="Put this layout back as it shipped">
         <Desk
+          bare={!overlaysVisible}
           layoutName={layoutName}
           layout={deskLayout}
           onLayout={onDeskLayout}
@@ -5727,7 +6010,8 @@ export default function App() {
           lookName={docName}
           edited={docDirty}
           dirty={docDirty}
-          onSendToWall={() => { void startCast('window'); }}
+          onSendToWall={() => sendToWallRef.current()}
+          onOpenWall={() => { void startCast('window'); }}
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
           onNew={newLook}
@@ -5787,6 +6071,7 @@ export default function App() {
           onAutomate={setIsAutomated}
           ccFor={ccFor}
           kindFor={kindFor}
+          lookValueOf={lookValueOf}
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           recipeKeys={recipeKeys}

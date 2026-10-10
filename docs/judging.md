@@ -1238,7 +1238,54 @@ white lamp, every stripe about the same width. Then stir it with a hand or a Blo
 - On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
   grows where it grew. Better, or did the bigger coral suit those looks?
 
-## 47. Draw shows the wall, and lands under the finger (PLAN 8-draw-a)
+## 47. The test pattern and Identify on a real wall (PLAN 8e)
+
+With the projector up, open Load-in and switch **Test pattern** on in the Wall panel:
+
+- Is the grid square and the circle round once the corners are dragged right? The grid is
+  kept square by the shape of the projected quad, so a keystone shows as cells that are not;
+- Are the lines bright and thin enough to drag a corner against from where the audience
+  will stand, and are the corner numbers (1 to 4, clockwise from the top left, as the
+  corner handles are) readable from there?
+- With shapes in Mapping, does each carry its own number in its middle, and does
+  **Identify** flash every number clearly enough to find the shape called 3?
+- With **Rear** on, the pattern is mirrored with the show (it is drawn as the picture is).
+  Is that the way round you want it, standing behind the screen?
+
+And the header at 1024 (PLAN 8h): with the window that narrow the dots fold into one
+**Status** button. Is one dot (green while anything is connected, red while recording)
+enough, or should the button carry a dot per input (PLAN 8h-1)?
+
+## 48. A panel on a second display (PLAN 8g)
+
+With a monitor beside the laptop, open a panel's own window from its header (the button
+left of float, or right-click the title, **Open in its own window**) and drag the window
+to the monitor:
+
+- Does the panel look as it does on the desk (fonts, colours, knobs), and do its controls
+  move the plate on the laptop at once?
+- With the focus in that window, the show's keys (Go, Blackout, R) do nothing yet (PLAN
+  8g-1). Is that a problem at a gig, or is the window only touched with the mouse?
+- After a reload the panels are back on the desk (a browser will not reopen windows by
+  itself). Is one click to put them back worth adding (PLAN 8g-2)?
+
+## 49. Preview builds on a copy (PLAN 8b)
+
+With the projector window up (or a cast), put the plate bar on **Preview** and change the
+look: pick another, ride a few sliders, clear the plate. The wall should carry on with
+the look it had, while the desk's preview shows the copy. Then press **Send to wall**
+(⌘⏎): the wall should fade to the copy's look over the Go's fade.
+
+- Does the wall stay exactly as it was while you build? The dimmer, the mixer and the
+  music still move it on purpose; nothing else should.
+- Does Send to wall look like a Go, the colours handed over rather than cut?
+- Switch to **Live** with unsent changes: the desk goes back to the wall's look and the
+  changes are dropped. Is that what you want, or should Live send them (PLAN 8b)?
+- The copy is a second engine. Does the laptop keep its frame rate in Preview with a wall
+  up, and does the wall's?
+- The wall's look stands still under the drift until it is sent (PLAN 8b-2). Noticeable?
+
+## 50. Draw shows the wall, and lands under the finger (PLAN 8-draw-a)
 
 With the show server running (`npm run show`) and the projector up, open the remote on a
 phone and an iPad (Draw is the screen it opens on).

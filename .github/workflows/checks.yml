@@ -164,6 +164,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run desklayout
 
+      # The Phone · iPad panel's QR code (PLAN 8f), read back module by module:
+      # the format and version words, every Reed-Solomon block, the bytes.
+      - name: The phone link's QR code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run qr
+
       # The spinning dish's CPU half: the liquid's lag behind the glass, Auto
       # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22).
       - name: The turntable
@@ -312,6 +318,12 @@ jobs:
       - name: The popped bubbles
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run pops
+      # Blow's Amount from a breath that only ripples the colour to a gale (PLAN.md
+      # QA-20): no air taken in below the speed the surface tears at, as much as
+      # ever at the default, more past it, a rate a second; the straw as the breath.
+      - name: Blow's range
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run blowrange
       # Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,
       # each drop its own colour, pressed flat where it touches, a swallowed
       # one kept inside and let go, and at 0 the rings' field to the bit.
@@ -419,6 +431,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+      # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
+      # scripts/draftwall.mjs): which engine each settings change reaches,
+      # what a receiver is sent, Send to wall, Live and the wall closing. Its
+      # line on what the projector window is painted from needs frames, so it
+      # runs again on the Mac's open shard, where it has them.
+      - name: Preview's copy
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/draftwall.mjs
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping
@@ -866,6 +886,19 @@ jobs:
       - name: The liquids carried onto a new grid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run regrid
+      # The wall's test pattern and Identify (PLAN.md 8e), drawn in the
+      # projector's own pass: off is the plain pass byte for byte, on it is a
+      # grid, cross, circle, border and numbered corners that follow the pin,
+      # the flip and the mask. In the open shard: the plate shard is near its
+      # timeout.
+      - name: The wall's test pattern
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run wallpattern
+      # Preview's copy again (see Measure's), here with frames: the projector
+      # window is painted from the wall's canvas and never the copy's.
+      - name: Preview's copy, with frames
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/draftwall.mjs --frames
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu
@@ -957,7 +990,7 @@ jobs:
       # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
       # and its kicks used to drop air near the middle whatever the dial said.
       # On the laptop and the phone at 0, and at the default, where they still
-      # must. About two minutes.
+      # must (listened to for a minute there, for enough chances). About three minutes.
       - name: Audio Impact 0 drops no bubbles
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/kickbubbles.mjs

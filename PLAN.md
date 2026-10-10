@@ -133,7 +133,7 @@ Judged in this order, because these gate code:
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
   look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
-  ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
+  ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles; its Classic line listens a minute since #346, having counted under its 15 chances on 6 of 38 Mac runs in 25 s).
 - **2.6** ~~**P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).~~
   **Decided by the owner, 2026-10-06: delete.** The deletion is 3.1; 18a-9's and 22d's
@@ -304,7 +304,30 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
-- **QA-20** Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
+- ~~**QA-20** Blow amount isn't sensitive enough.~~ **Fixed, #346**: the moving wind
+  laid two bubbles every sixth step whatever the Amount (ten spawns a second at 60
+  steps, twenty at 120), and each bubble pumps the colour out from under it; the
+  straw's growth had a floor that made every Amount under about a fifth the same
+  breath. Now the wind takes air in only past the speed the surface tears at (the
+  blowing number ρ_air U²/2√(ρgσ) past 1, 5.4 m/s against a firm breath's 8: Amount
+  0.67), as often as before at the default, 6× at Amount 2 and 44× at 5 (the plate's
+  cover limit bounds it), a rate a second; the straw grows as the breath's speed
+  (`lib/breath.ts` airTaken, strawFlow; `npm run blowrange`). The wind's push already
+  went as the Amount squared, and still does (`npm run airblow` line 6: the pool moved 0.003% at Amount 0.05, 0.085% at 0.25, 2.72% at 1, 14.6% at 2.5 and 16.5% at 5 in software, where the colour goes with the hand). What follows is the report as it was:
+  Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
+- **QA-20a** The other tools' Amounts, read the same way: what each lays or moves at
+  0.05, 1 and 5 of its Amount, against what the dial's ends should mean (the Spray's
+  mist, the Press's pressure, the Finger's drag, capped at 0.25 in `fingerDrag`, so its
+  Amount stops doing anything past about 1.7). Found with QA-20; not measured yet.
+- **QA-20b** Blow's push on `npm run tools` (Mac) spreads widely from run to run: on
+  twelve runs of 9 and 10 October the stroke out to the left moved the pool 0.08% to
+  2.62% and the one to the right 0.28% to 2.11%, against the lab's 2.72% and 2.82%
+  (`npm run airblow`); #335's run went red on 0.08% against 0.15% to beat with 44 of 46
+  steps laid as air, on a branch that did not touch Blow. Not QA-20's bubbles: the
+  check runs with Bubbles 0 (`scripts/tools.mjs`, its settings). Neither the way (left
+  read lower on 8 runs, right on 4) nor the steps laid as air (44 to 54 where printed) follows it,
+  so the spread is in what the app does between the pointer's moves and the steps
+  (15g-7 is the same question); the next read is the stroke's breath per step, printed.
 
 - ~~**QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours).~~ #269
   live (PLAN 15i).
@@ -998,27 +1021,75 @@ Open from Desk v2, each its own thread (the UI lane):
   - **8-draw-d** (S) The wall's real shape: the frame now takes the laptop's picture's
     shape (8-draw-a), so a 4:3 wall is a 4:3 frame; before the first picture, and with
     an older laptop, it is still 16:9. A dome is another frame. And the design's dashed "+" (an image as dye) has no message yet.
-- **8b** (M) A true Preview. Preview holds the sequencer, a song's show and a new song's
-  look (`designing` in App, as the Design desk did), but the plate being built is still
-  the plate on the wall. The design means an offline copy: a second solver, or the
-  back plate, drawn on the desk and not on the wall, until Send to wall. *Measure:* a
-  look changed in Preview leaves the projector window's frame unchanged (`wall`, Mac).
-- **8c** (S) Knobs turn the design's way too: a circular drag round the knob as well as up
-  and down, and a double-click goes back to the look's own value. The knob takes a
-  `resetTo` for it, but the look's value is not handed to the desk yet, so a
-  double-click does nothing.
-- **8d** (S) A control's kind from the controller's profile. A binding only says absolute
-  or relative, so an absolute pot on an APC draws as a slider (a fader); the profiles
-  (`midi.ts`) know which CCs are knobs. *Measure:* `npm run desk` with the APC40 map.
-- **8e** (S) Load-in's Wall panel gains the design's test pattern and Identify (each
-  projector flashes its number), and Output's Gain and Gamma as knobs.
-- **8f** (S) A QR code on the Phone · iPad panel for the link (`relayInfo()`), drawn
-  without a library.
-- **8g** (M) A panel popped out to a second display (`window.open`), for a laptop and a
-  monitor at a gig.
-- **8h** (S) The header at 1024 is full: five tabs, + Panel (its word hidden below
-  1280), the dots, search and Blackout. A sixth thing on it needs the dots folded into
-  one; `npm run layout`'s cover pass at 1024 is the measure.
+- ~~**8b** A true Preview: with a wall up, the desk builds on a copy the wall does not
+  see until Send to wall~~ (shipped; story in `docs/plan-shipped.md` §8; check
+  `npm run draftwall`). Found along the way:
+  - **8b-1** (S) The copy and the wall draw from the same dice. The plate's random
+    streams (`DICE` in LiquidVisualizer, `lib/rng.ts`) are module constants, so the
+    copy's pours take draws the wall's would have, and laying a look on the copy re-keys
+    the wall's streams. The wall stays random, but not the run it would have been: a
+    render or a reproduced report must not be made with Preview's copy up. Per-engine
+    streams would fix it (`DICE` into the component, `doseLiquid` handed its stream).
+  - **8b-2** (S) The drift waits for Send to wall. The drift (`lib/drift.ts`) wanders
+    the desk's settings, which in Preview are the copy's, so the wall's look stands
+    still under the music until it is sent. The music's own overrides and the room
+    still move it. The drift could wander the wall's look as well.
+  - **8b-3** (S) The copy's plate when the wall closes mid-Preview. The desk carries
+    on, on the wall's engine, from the copy's look by its id (`adoptPreset`): the
+    copy's poured plate goes with it, and dyes changed on the copy and not saved fall
+    back to the look's own.
+  - **8b-4** (S) What else in Preview goes to the copy. The phone's Play sliders, a
+    MIDI fader, and a Go, Back or Next look from the remote or a MIDI pad write the
+    desk's settings, so in Preview they move the copy, not the wall (the keyboard's Go
+    is held in Preview). A back-plate look (Send back, 16a) goes to the copy, and Live
+    puts the wall's back back. Right for a hand at the desk, perhaps not for a phone at
+    the wall: a remote's Go could go to the wall, or be held as the keyboard's is. The
+    film and the mark are the room's and go to the wall (the mark to the copy too); a
+    film is not seen in the copy.
+  - **8b-5** (S) The projector window's pixels. `draftwall --frames` (Mac) shows the
+    window is painted from the wall's canvas and never the copy's, and which settings
+    each engine was handed; a picture of the window against a look changed in Preview
+    would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
+- ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
+  the look's own value (a double tap on Play's sliders)~~ (shipped; story in
+  `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
+- ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
+  XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
+- ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
+  as knobs~~ (shipped; checks `npm run wallpattern`, `npm run map`, `npm run layout`).
+  - **8e-1** (S) The wall test from the phone. The remote has no Load-in at all (no
+    corner pin, no masks), so the test pattern and Identify are on the laptop only. A
+    `wall-test` action in the remote protocol (App, MIDI too) would let someone at the
+    wall walk the corners with the pattern up. After 8-draw-a lands, which is in
+    `RemoteControl.tsx` now.
+  - **8e-2** (S) The design's Load-in plate bar reads "Live | Test pattern" with
+    Identify beside it. Today the bar is the same in every layout (`npm run panel`, "the
+    same actions on both"), so the switch is in the Wall panel, which Load-in opens by
+    default. Moving it to the bar means deciding with the owner whether the bar may
+    differ by layout.
+- ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
+  `npm run qr`, `npm run layout`).
+- ~~**8g** A panel in a window of its own, for a laptop and a monitor at a gig~~ (shipped;
+  check `npm run layout`).
+  - **8g-1** (S) The keys in a panel's window. ⌘1–3, ⌘P, Tab and the show's keys (Go,
+    Blackout, R) are listened for on the desk's window, so with the focus in a panel's
+    own window they do nothing. Forwarding them (or listening on both) wants a look at
+    which keys a panel's text fields must keep. Esc too: the Mixer sheet in a panel's
+    window closes on Esc pressed on the laptop, not in its own window.
+  - **8g-2** (S) A panel's window after a reload. A browser will not open a window
+    without a click, so a reload brings every panel back to the desk; a "Reopen the
+    windows" button in the header after a reload would put them back in one click.
+  - **8g-3** (S) A panel out in its window whose place goes. A layout switched to one
+    without the panel, or the panel's guard closing it after an error, leaves it in its
+    window with no away card, and Bring it back then puts it nowhere: it should dock it
+    in the deck. And the desk itself going (the laptop's window narrowed under 1024, a
+    phone-sized window) still closes every panel window; the clean screen does not.
+- ~~**8h** The header at 1024: its dots fold into one Status button when they do not
+  fit~~ (shipped; check `npm run layout`).
+  - **8h-1** (S) Folded, the Status button's one dot is green while anything is
+    connected, so a wall that drops while the sound is up still reads green until the
+    button is opened. A dot per input inside the button (no words) costs about 40 px,
+    which 1024 has (73 px spare folded); the owner's call on a laptop.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
