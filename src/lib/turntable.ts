@@ -91,16 +91,6 @@ export function dyeDensityContrast(dyeWeight: number | undefined): number {
   return 0.02 + 0.13 * w;
 }
 
-/**
- * The clear liquid's kinematic viscosity, m²/s, from the Thickness dial (0
- * to 1): water at 0, glycerine at 1, on a log scale (fluid.ts says why;
- * `thinGapViscosity` there is this). Here so a pure module (the cover glass,
- * lib/plateRock.ts) can read it without the GPU solver.
- */
-export function thicknessViscosity(thickness: number): number {
-  return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
-}
-
 /** The drag time h²/12ν, seconds, for a gap in plate widths. */
 export function dragSeconds(nu: number, gap = DISH_REST_GAP): number {
   const h = gap * DISH_METRES;
