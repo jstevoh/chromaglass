@@ -67,6 +67,7 @@ export const installFrameReader = (page) => page.addInitScript(() => {
     const ctx = out.getContext('2d', { willReadFrequently: true });
     const dbg = window.chromaglassDebug?.();
     const grab = dbg?.grabFrame;
+    console.error("dbg=", dbg, "grab=", grab);
     const note = { via: grab ? 'grabFrame' : 'drawImage', engine: dbg?.engine ?? null };
     if (grab) {
       let g = null;
@@ -79,7 +80,7 @@ export const installFrameReader = (page) => page.addInitScript(() => {
         note.declined = (note.declined ?? 0) + 1;
         await new Promise((done) => requestAnimationFrame(done));
       }
-      if (!g) { window.__cgFrameLast = { ...note, got: 'nothing' }; return null; }
+      if (!g) { window.__cgFrameLast = { ...note, got: `nothing. typeof g: ${typeof g}, grab is: ${grab}` }; return null; }
       if (g.painted === false) {
         window.__cgFrameLast = { ...note, got: 'the stage declined to paint every frame asked for' };
         return null;
@@ -133,6 +134,7 @@ export const installFrameReader = (page) => page.addInitScript(() => {
     if (!canvas) { window.__cgFrameLast = { via: 'no canvas' }; return null; }
     const dbg = window.chromaglassDebug?.();
     const grab = dbg?.grabFrame;
+    console.error("dbg=", dbg, "grab=", grab);
     const note = { via: grab ? 'grabFrame' : 'drawImage', engine: dbg?.engine ?? null, slot };
     let image;
     if (grab) {
@@ -163,7 +165,7 @@ export const installFrameReader = (page) => page.addInitScript(() => {
         note.declined = (note.declined ?? 0) + 1;
         await new Promise((done) => requestAnimationFrame(done));
       }
-      if (!g) { window.__cgFrameLast = { ...note, got: 'nothing' }; return null; }
+      if (!g) { window.__cgFrameLast = { ...note, got: `nothing. typeof g: ${typeof g}, grab is: ${grab}` }; return null; }
       if (g.painted === false) {
         window.__cgFrameLast = { ...note, got: 'the stage declined to paint every frame asked for' };
         return null;

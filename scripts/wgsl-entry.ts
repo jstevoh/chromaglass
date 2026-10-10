@@ -15,7 +15,12 @@ const FORMATS: Record<string, string> = {};
     const m = device.createShaderModule({ code, label });
     const info = await m.getCompilationInfo();
     for (const msg of info.messages) {
-      if (msg.type === 'error') out.push(`${label}:${msg.lineNum}:${msg.linePos} ${msg.message}`);
+      if (msg.type === 'error') {
+        out.push(`${label}:${msg.lineNum}:${msg.linePos} ${msg.message}`);
+        out.push('--- CODE DUMP ---');
+        out.push(code);
+        out.push('-----------------');
+      }
     }
   };
   for (const name of Object.keys(KERNELS)) await check(`fluid.${name}`, kernel(name, FORMATS[name] ?? 'rgba16float'));

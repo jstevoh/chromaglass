@@ -3608,7 +3608,16 @@ class FluidSimulation {
 
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
-    const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
+    let visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
+    let diff = settings.diffusionRate;
+
+    // Spectral Viscosity (Brightness -> Fluidity): 
+    // High-pitched, bright sounds make the liquid chaotic and runny. Low sounds make it thick.
+    if (audioData?.features) {
+      const b = Math.max(0, Math.min(1, audioData.features.brightness));
+      visc *= (1.0 - 0.7 * b); // Thins out viscosity by up to 70% for bright sounds
+      diff *= (1.0 + 1.5 * b); // Increases diffusion by up to 150% for bright sounds
+    }
 
     // Momentum diffuses at a viscosity derived from the plate's thickness
     // setting — not at the dye's diffusivity, which is a different quantity.
@@ -3816,7 +3825,7 @@ class FluidSimulation {
         there is nothing to tune it against, so it is not a slider yet.
       */
       bubbleClear: 1,
-      diff: settings.diffusionRate,
+      diff,
       buoyancy: settings.buoyancy,
       gravity: (settings.centerGravity || 0) * 0.05,
       tiltX: this.tiltX, tiltY: this.tiltY,
@@ -4444,6 +4453,12 @@ interface FrameView {
   /** The lead plate's dye travel, which the closeup's cells slide and breathe on. */
   cellClock: number;
 
+  /** Audio features passed to the GPU for true synesthesia color and fluid physics mapping. */
+  audio: {
+    pitchClass: number;
+    brightness: number;
+    beatPhase: number;
+  };
   // What the show worked out this frame and the renderer only spends.
   /** Where each plate has turned to. */
   rotations: number[];
@@ -8099,9 +8114,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
               const impact = currentSettings.audioImpact ?? 0.45;
               if (impact > 0.01 && currentAudioData.volume > 3) {
+                // True Synesthesia: Map the musical key (pitchClass 0-11) directly to the harmony's color cycle!
+                const pitchClass = currentAudioData?.features?.pitchClass ?? 0;
+                // Normalize pitchClass (0-11) to a full circle (0 - 2PI)
+                const pitchAngle = (pitchClass / 12.0) * Math.PI * 2;
+                
                 // Each audio feature carries a different color from the harmony,
-                // so bass, mids and swells paint distinguishable hues.
-                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.3 + colorMod * Math.PI + off);
+                // offset by the true musical pitch so chords paint distinct colors!
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.1 + pitchAngle + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -9153,6 +9173,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           filmGain: filmGainRef.current,
           mark: markRef.current,
           film: filmRef.current,
+          audio: { 
+            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0, 
+            brightness: audioDataRef.current?.features?.brightness ?? 0, 
+            beatPhase: beatClockRef.current?.period > 0 
+                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
+                : 0 
+          },
           beadMask,
           outputCfg: rendering ? DEFAULT_OUTPUT : outputCfgRef.current,
           postForce: postForceRef.current,
@@ -9990,7 +10017,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       with compiles while the starting frame is up and the first step finds
       it waiting; the rest compiles behind the show.
     */
-    void WebGPUStage.start(canvas).then(async (s) => {
+    void WebGPUStage.start(canvas).then(async (s) => { 
       if (cancelled || isGpuFailure(s)) return s;
       // `?prepare=0` opens the show the old way, every pipeline built on the
       // frame that first needs it: `npm run startup`'s control, so a run
@@ -10045,7 +10072,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         setGpuFailure(s);
         return;
       }
-      stage = s;
+      console.error("stage = s!"); stage = s;
       const bornAt = performance.now();
       /*
         A device that has held for five seconds is a recovery that worked, and
@@ -10128,7 +10155,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         camera = null;
         projector = null;
         probe = null;
-        stage = null;
+        console.error("stage = null at line " + "line"); stage = null;
         flashRef.current.reset();
         flashGainRef.current = 1;
         glLostRef.current = true;
@@ -10172,6 +10199,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
         maxTexture: s.device.limits.maxTextureDimension2D,
         resize: () => { size(); },
+        
         attachSolver(fluid, wantRes) {
           if (wantRes <= 0) {
             if (fluid.gpu) fluid.detachGpu(false);
@@ -11166,8 +11194,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       chain = null;
       platePass?.dispose();
       platePass = null;
-      stage?.dispose();
-      stage = null;
+      console.error("DISPOSING STAGE! glEpoch=", "glEpoch=", glEpoch, "noise=", !!noise2D); stage?.dispose();
+      console.error("stage = null at line " + "line"); stage = null;
     };
     /*
       What legitimately rebuilds the GL context, and nothing else.

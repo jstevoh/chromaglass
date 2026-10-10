@@ -589,7 +589,7 @@ export type RenderRecipe = (module: (code: string) => GPUShaderModule) => GPURen
  * their format, and samplers.
  */
 export function layoutFromWgsl(device: GPUDevice, code: string, label?: string, stage = GPUShaderStage.COMPUTE): GPUBindGroupLayout {
-  return device.createBindGroupLayout({ label, entries: layoutEntries(code, stage) });
+  const entries = layoutEntries(code, stage); console.error("LAYOUT " + label + " has " + entries.length + " entries"); return device.createBindGroupLayout({ label, entries });
 }
 
 /** `layoutFromWgsl`'s entries, before they are made a layout. */

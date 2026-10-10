@@ -88,6 +88,8 @@ export interface PlateView {
     kind: 'none' | 'file' | 'camera' | 'window';
     video: { readyState: number; videoWidth: number; videoHeight: number } | null;
   };
+  /** Audio features passed from the frame clock. */
+  audio: { pitchClass: number; brightness: number; beatPhase: number; };
 }
 
 /**
@@ -380,6 +382,16 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('cellClock', view.cellClock);
   pack.set('filmLevel', view.filmLevel);
   pack.set('filmGain', clamp(view.filmGain, 0.5, 12));
+  
+  if (view.audio) {
+    pack.set('pitchClass', view.audio.pitchClass);
+    pack.set('brightness', view.audio.brightness);
+    pack.set('beatPhase', view.audio.beatPhase);
+  } else {
+    pack.set('pitchClass', 0);
+    pack.set('brightness', 0);
+    pack.set('beatPhase', 0);
+  }
 
   /*
     Dye carried by particles (H1).
