@@ -2,9 +2,9 @@ import { useRef, useState } from 'react';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { createPortal } from 'react-dom';
 import type { ReactNode, Ref } from 'react';
-import { ImagePlus, SlidersHorizontal } from 'lucide-react';
+import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, Segmented, Slider, Swatch, Tag, Toggle } from '../ui';
-import { PerformanceButton } from './PerformanceButton';
+import { RecordControls } from './RecordControls';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { readSetting } from '../../lib/readout';
 import { PIN_RANGE } from '../../lib/deskPins';
@@ -46,6 +46,7 @@ export interface DesignDeskProps {
   paletteLock: number | null;
   onPalette: (i: number | null) => void;
   onImageDye: () => void;
+  onVideoDye: () => void;
 
   tool: string;
   onTool: (t: string) => void;
@@ -107,10 +108,13 @@ export interface DesignDeskProps {
   dots: DeskDots;
   midiName: string | null;
   /** The controller panel, from the header's MIDI dot. */
-  onMic: () => void;
-  onWall: () => void;
+  onSound: () => void;
+  onVideo: () => void;
   onMidi: () => void;
-  onPhone: () => void;
+  videoRecording?: boolean;
+  videoSeconds?: number;
+  onToggleVideo?: () => void;
+  onRecordOptions?: () => void;
   onPerformance: () => void;
   /** The performance being recorded: its clock and the song attached so far. */
   performance: { clock: string; title?: string } | null;
@@ -235,10 +239,11 @@ export function DesignDesk(p: DesignDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
-        onMic={p.onMic}
-        onWall={p.onWall}
+        onSound={p.onSound}
+        onVideo={p.onVideo}
+        onWall={p.onSendToWall}
         onMidi={p.onMidi}
-        onPhone={p.onPhone}
+        onRecord={p.onRecordOptions ?? p.onToggleVideo}
         onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
@@ -325,6 +330,13 @@ export function DesignDesk(p: DesignDeskProps) {
           >
             <ImagePlus size={13} className="mr-1.5 inline" /> Image dye…
           </button>
+          <button
+            onClick={p.onVideoDye}
+            className="mt-2 h-9 w-full rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
+            data-testid="video-dye"
+          >
+            <Video size={13} className="mr-1.5 inline" /> Video dye…
+          </button>
         </Group>
 
         <Group title="Palette">
@@ -363,9 +375,16 @@ export function DesignDesk(p: DesignDeskProps) {
         <div className="mb-3 flex h-8 shrink-0 items-center justify-between">
           <span className="flex items-center gap-2">
             <span className="text-[16px] font-medium">{p.lookName ?? 'Untitled'}</span>
-            <span className="font-mono text-[12px] text-dim">not on wall</span>
+            <span className="hidden 2xl:inline font-mono text-[12px] text-dim">not on wall</span>
           </span>
-          <PerformanceButton performance={p.performance} onToggle={p.onPerformance} />
+          <RecordControls
+            videoRecording={p.videoRecording ?? false}
+            videoSeconds={p.videoSeconds ?? 0}
+            onToggleVideo={p.onToggleVideo ?? (() => {})}
+            performance={p.performance}
+            onTogglePerformance={p.onPerformance}
+            onOptions={p.onRecordOptions ?? (() => {})}
+          />
           <span className="flex items-center gap-2">
             {/*
               Each layer says what is on it.
@@ -390,7 +409,7 @@ export function DesignDesk(p: DesignDeskProps) {
                     onClick={() => p.onLayer(i)}
                     style={{ height: 28 }}
                     data-testid={`layer-segmented-${i}`}
-                    className={`inline-flex items-center gap-2 rounded-sm px-3 text-[13px] font-medium transition-colors duration-[120ms] ${
+                    className={`inline-flex items-center gap-1.5 xl:gap-2 rounded-sm px-2 xl:px-3 text-[13px] font-medium transition-colors duration-[120ms] ${
                       p.layer === i ? 'bg-active text-text' : 'text-muted hover:text-text-2'
                     }`}
                     title={rep ? `Layer ${i + 1} — ${Math.round(rep.fill * 100)}% full` : `Layer ${i + 1}`}

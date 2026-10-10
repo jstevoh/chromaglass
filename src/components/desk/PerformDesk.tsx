@@ -7,7 +7,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import { Button, CueRow, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { PALETTE } from '../../constants';
-import { PerformanceButton } from './PerformanceButton';
+import { RecordControls } from './RecordControls';
 import { DeskHeader, type DeskDots, type DeskMode } from './DeskHeader';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
@@ -53,7 +53,7 @@ export interface Cue {
 /** What a set item's menu can do. */
 export type SetItemAction = 'link-song' | 'unlink-song' | 'capture' | 'up' | 'down' | 'remove';
 /** What the set's own menu can do. */
-export type SetAction = 'import' | 'export' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
+export type SetAction = 'import' | 'export' | 'import-show' | 'export-show' | 'clear' | 'song-shows' | 'save' | 'open' | 'delete' | 'rename' | 'new';
 
 /**
  * What the strip starts with: the controls a light show is actually played on.
@@ -135,10 +135,13 @@ interface PerformDeskProps {
   onRideKeys: (keys: (keyof VisualizerSettings)[]) => void;
   midiName: string | null;
   /** The controller panel, from the header's MIDI dot. */
-  onMic: () => void;
-  onWall: () => void;
+  onSound: () => void;
+  onVideo: () => void;
   onMidi: () => void;
-  onPhone: () => void;
+  videoRecording?: boolean;
+  videoSeconds?: number;
+  onToggleVideo?: () => void;
+  onRecordOptions?: () => void;
   onPerformance: () => void;
   /** The performance being recorded: its clock and the song attached so far. */
   performance: { clock: string; title?: string } | null;
@@ -258,10 +261,11 @@ export function PerformDesk(p: PerformDeskProps) {
         onMode={p.onMode}
         dots={p.dots}
         midiName={p.midiName}
-        onMic={p.onMic}
-        onWall={p.onWall}
+        onSound={p.onSound}
+        onVideo={p.onVideo}
+        onWall={p.onSendToWall}
         onMidi={p.onMidi}
-        onPhone={p.onPhone}
+        onRecord={p.onRecordOptions ?? p.onToggleVideo}
         onPerformance={p.onPerformance}
         onSearch={p.onSearch}
         trailing={
@@ -340,6 +344,9 @@ export function PerformDesk(p: PerformDeskProps) {
               <div className="my-1 h-px bg-border" />
               <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
               <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
+              <div className="my-1 h-px bg-border" />
+              <MenuItem onClick={() => setAct('import-show')} testId="set-import-show">Import show kit…</MenuItem>
+              <MenuItem onClick={() => setAct('export-show')} testId="set-export-show">Export show kit</MenuItem>
               <MenuItem onClick={() => setAct('song-shows')} testId="set-song-shows">Song shows…</MenuItem>
             </div>
           )}
@@ -478,41 +485,7 @@ export function PerformDesk(p: PerformDeskProps) {
           >
             {next ? `Go to ${next.name}` : 'Nothing cued'}
           </Button>
-          {/* The second projector's Go (§16a): the same cued look, to the
-              back plate only. Quieter than Go, because Go is the one a hand
-              should find in the dark. The row says what the back plate is on,
-              so an operator can tell a back plate following the front from
-              one that was given a look an hour ago. */}
-          {p.onGoBackPlate && (
-            <div className="mt-2 flex items-center gap-2">
-              <Button
-                full height={36}
-                onClick={p.onGoBackPlate}
-                disabled={!next || next.kind === 'sequence'}
-                midiKey="action:go-back-plate"
-                testId="go-back-plate-button"
-                title={next ? `Send ${next.name} to the back plate only: its liquid and its colours, over the fade` : 'Cue a look first'}
-              >
-                {next ? 'To Back Plate' : 'Back Plate'}
-              </Button>
-              {p.backLook ? (
-                <Button
-                  height={36}
-                  onClick={() => p.onBackFollowsFront?.()}
-                  midiKey="action:back-follows-front"
-                  testId="back-follows-front-button"
-                  title={`The back plate is on ${p.backLook}. Press to have it follow the front again.`}
-                >
-                  Follow Front
-                </Button>
-              ) : null}
-            </div>
-          )}
-          {p.onGoBackPlate && (
-            <p className="mt-1 truncate text-[12px] text-faint" data-testid="back-plate-on">
-              Back plate: {p.backLook ?? 'follows the front'}
-            </p>
-          )}
+          {/* The second projector's Go (§16a) is temporarily hidden per user request */}
           <div className="mt-2 flex gap-2">
             <Button full height={40} kbd="⌫" onClick={() => p.onBack?.()} disabled={!p.onBack} midiKey="action:revert" testId="back-button">Back</Button>
             {/* Inverted while it is on: a blacked-out room is exactly when
@@ -538,7 +511,14 @@ export function PerformDesk(p: PerformDeskProps) {
             <span className="truncate text-[16px] font-medium">{live?.name ?? '—'}</span>
             <span className="shrink-0 whitespace-nowrap font-mono text-[12px] text-dim">live · {p.liveFor}</span>
           </span>
-          <PerformanceButton performance={p.performance} onToggle={p.onPerformance} />
+          <RecordControls
+            videoRecording={p.videoRecording ?? false}
+            videoSeconds={p.videoSeconds ?? 0}
+            onToggleVideo={p.onToggleVideo ?? (() => {})}
+            performance={p.performance}
+            onTogglePerformance={p.onPerformance}
+            onOptions={p.onRecordOptions ?? (() => {})}
+          />
           <div className="shrink-0">
           <Segmented
             value={String(p.layer)}

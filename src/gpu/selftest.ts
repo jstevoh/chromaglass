@@ -24,8 +24,8 @@ export async function kitSelfTest(device: GPUDevice, timestamps: boolean): Promi
   try {
     const N = 16;
     const cache = new PipelineCache(device);
-    const pipe = cache.computePipeline('selftest', STEP);
-    const again = cache.computePipeline('selftest', STEP);
+    const pipe = cache.computePipeline('selftest', STEP)!;
+    const again = cache.computePipeline('selftest', STEP)!;
     const field = new PingPong(device, disposer, [N, N], 'r32float', 'selftest');
     // Start at -1 everywhere, so the first step writes x + 2y.
     device.queue.writeTexture({ texture: field.read }, new Float32Array(N * N).fill(-1), { bytesPerRow: N * 4 }, [N, N]);
@@ -241,7 +241,7 @@ fn residual() {
   q[0] = sum / f32(N * N);
 }`;
 
-    const pipe = (entry: string) => cache.computePipeline(`pressure selftest ${entry}`, SRC, entry);
+    const pipe = (entry: string) => cache.computePipeline(`pressure selftest ${entry}`, SRC, entry)!;
     const group = (pipeline: GPUComputePipeline) => bindGroup(device, pipeline, [divBuf, a, b]);
     const tiles = Math.ceil(N / 8);
 

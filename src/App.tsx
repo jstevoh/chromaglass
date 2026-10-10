@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
+import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
 import { barLine } from './lib/barGrid';
@@ -32,6 +33,7 @@ import { SettingRide } from './lib/ride';
 import { Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
+import { sanitizePatch } from './lib/sanitizeSettings';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
 import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
@@ -75,6 +77,7 @@ import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
+import { exportShowKit, importShowKit, SHOW_KIT_FORMAT } from './lib/showKit';
 import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
@@ -85,6 +88,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
+import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
@@ -289,6 +293,21 @@ export default function App() {
   const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
   const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
   const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
+  /*
+    The tempo source's own reading, for `npm run squeeze` (PLAN 0-tap). That
+    check asked whether the beat clock ran at the tapped period by comparing
+    it with the harness's own stamps of its taps, and the harness stamps a
+    tap a moment before the app does, so a pause between the two went red
+    on a clock that was right. With the source's period to hand, the clock
+    is judged against what it was actually given. Here rather than on
+    `chromaglassDebug()` because the source lives here, and so a check of
+    the tempo does not have to edit the plate.
+  */
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { chromaglassTempo?: unknown }).chromaglassTempo =
+      () => tempoRef.current?.read(performance.now()) ?? null;
+  }, []);
 
   // Load-in is geometry, and geometry can be checked exactly. `npm run wall`
   // drives this to set a corner pin or a mask on a plate that is already
@@ -349,6 +368,8 @@ export default function App() {
         // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
         return settingsRef.current;
       };
+    (window as unknown as { chromaglassGovernor?: unknown }).chromaglassGovernor =
+      () => (visualizerRef.current as unknown as { governor?: unknown })?.governor ?? null;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
@@ -748,6 +769,39 @@ export default function App() {
     };
     img.src = URL.createObjectURL(file);
     // Reset so the same file can be re-selected
+    e.target.value = '';
+  }, []);
+
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const videoFrameRaf = useRef<number | null>(null);
+
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !videoPlayerRef.current) return;
+    videoPlayerRef.current.src = URL.createObjectURL(file);
+    videoPlayerRef.current.play();
+    setIsVideoPlaying(true);
+    
+    const loop = (time: number) => {
+      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
+        visualizerRef.current?.pourVideo(videoPlayerRef.current);
+        videoFrameRaf.current = requestAnimationFrame(loop);
+      } else {
+        setIsVideoPlaying(false);
+      }
+    };
+    
+    videoPlayerRef.current.onplay = () => {
+      setIsVideoPlaying(true);
+      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
+      loop(performance.now());
+    };
+
+    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
+    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
+
     e.target.value = '';
   }, []);
 
@@ -1495,13 +1549,15 @@ export default function App() {
   };
 
   const updateSettings = (patch: Partial<VisualizerSettings>) => {
+    const clean = sanitizePatch(patch);
+    if (Object.keys(clean).length === 0) return;
     /*
       Hold stays where the closeup is (QA-12, reported by the owner as the
       picture jumping when Hold was pressed): see holdWhereItIs. Here rather
       than at the chip, so the desk's chip, the phone's Hold, the Camera menu
       and anything else that sets the mode all get it.
     */
-    const newSettings = holdWhereItIs(patch, settingsRef.current.macroCamera, () => visualizerRef.current?.macroCentre() ?? null);
+    const newSettings = holdWhereItIs(clean, settingsRef.current.macroCamera, () => visualizerRef.current?.macroCentre() ?? null);
     setSettings(prev => ({ ...prev, ...newSettings }));
     setDocDirty(true);
     handOnLevels(Object.keys(newSettings));
@@ -1654,6 +1710,13 @@ export default function App() {
     phone alike, and writing over the look you opened is the sheet's second
     button, named for the look it would replace, and the look menu's.
   */
+  const newPalette = () => {
+    setDocId(null);
+    setDocDirty(false);
+    setPinnedPresetId(null);
+    applyPreset('default', DEFAULT_SETTINGS);
+  };
+
   const saveLook = () => setShowSave(true);
   /** Write over the saved look that is open, keeping its name and song. */
   const replaceLook = () => {
@@ -2534,7 +2597,37 @@ export default function App() {
       const list = setListRef.current;
       downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
         writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
-    } else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
+    }     else if (a === 'export-show') {
+      const list = setListRef.current;
+      exportShowKit(list, userPresetsRef.current, sequencer.sequences).then((text: string) => {
+        downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'show'}.chromaglass-show.json`, text);
+      });
+    } else if (a === 'import-show') {
+      const el = document.createElement('input');
+      el.type = 'file';
+      el.accept = '.json';
+      el.onchange = async () => {
+        const file = el.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          await importShowKit(text, (res: any) => {
+            if (res.list) {
+              changeSet(res.list);
+              setLiveItemId(null);
+            }
+            if (res.presets && res.presets.length) { for (const p of res.presets) userPresets.upsert(p); }
+            if (res.sequences && res.sequences.length) { for (const q of res.sequences) sequencer.upsertSequence(q); }
+          });
+          alert('Show kit imported! Reloading the page to apply MIDI map, liquids, and wall configurations.');
+          window.location.reload();
+        } catch (err) {
+          alert('Failed to import show kit: ' + (err instanceof Error ? err.message : String(err)));
+        }
+      };
+      el.click();
+    }
+    else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
     else if (a === 'song-shows') setShowSongs(true);
   }, [changeSet, changeSaved]);
   const onItemAction = useCallback((id: string, a: SetItemAction) => {
@@ -2941,6 +3034,7 @@ export default function App() {
   }, []);
   // ── Recording ──
   const recorder = useRecorder();
+  const [showRecordPanel, setShowRecordPanel] = useState(false);
   const toggleRecording = useCallback(() => {
     recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
   }, [recorder, audioStream]);
@@ -3222,7 +3316,7 @@ export default function App() {
   /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
   const selectDye = (paletteIndex: number) => {
     colourDye(paletteIndex);
-    setActiveTool('dropper');
+    
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
@@ -3262,7 +3356,9 @@ export default function App() {
   const pendingPatchRef = useRef<Partial<VisualizerSettings> | null>(null);
   const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queuePatch = (partial: Partial<VisualizerSettings>) => {
-    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...partial };
+    const clean = sanitizePatch(partial);
+    if (Object.keys(clean).length === 0) return;
+    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...clean };
     if (patchTimerRef.current) return;
     patchTimerRef.current = setTimeout(() => {
       patchTimerRef.current = null;
@@ -3293,16 +3389,19 @@ export default function App() {
           // Arm, do not apply: `preset` is the destructive one.
           if (message.presetId) cueLook(message.presetId); else setCued(null);
           break;
-        case 'dye':
-          updateLiquidColor(selectedLiquidId, message.color);
-          setActiveTool('dropper');
+        case 'dye': {
+          const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
+          if (color) {
+            updateLiquidColor(selectedLiquidId, color);
+            
+          }
           break;
+        }
         case 'liquid':
           // Only a bottle that is actually on the bench: the pad may be a
           // newer build than the display, or the other way round.
           if (liquidTypesRef.current.some(l => l.id === message.id)) {
             setSelectedLiquidId(message.id);
-            setActiveTool('dropper');
           }
           break;
         case 'action':
@@ -3339,25 +3438,62 @@ export default function App() {
             default: unhandled('an action from the phone', message.action);
           }
           break;
-        case 'blow':
-          visualizerRef.current?.applyGesture({ tool: 'blow', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+        case 'blow': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
+          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'blow', x, y, layer, amount, dx, dy });
           break;
-        case 'drop':
-          visualizerRef.current?.applyGesture({ tool: 'drop', x: message.x, y: message.y, layer: message.layer, amount: message.amount, ...laidColour(selectedLiquid, message.color) });
+        }
+        case 'drop': {
+          if (message.color !== undefined && (typeof message.color !== 'string' || message.color.length > 9)) {
+            break;
+          }
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const color = typeof message.color === 'string' ? message.color : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'drop', x, y, layer, amount, ...laidColour(selectedLiquid, color) });
           break;
-        case 'press':
-          visualizerRef.current?.applyGesture({ tool: 'press', x: message.x, y: message.y, layer: message.layer, amount: message.amount });
+        }
+        case 'press': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'press', x, y, layer, amount });
           break;
-        case 'finger':
-          visualizerRef.current?.applyGesture({ tool: 'finger', x: message.x, y: message.y, layer: message.layer, amount: message.amount, dx: message.dx, dy: message.dy });
+        }
+        case 'finger': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
+          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'finger', x, y, layer, amount, dx, dy });
           break;
+        }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
-        case 'spin':
-          visualizerRef.current?.applyGesture({ tool: 'spin', x: message.x, y: message.y, layer: message.layer, amount: message.amount, id: message.id });
+        case 'spin': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
+          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
+          const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
+          visualizerRef.current?.applyGesture({ tool: 'spin', x, y, layer, amount, id });
           break;
-        case 'tilt':
-          visualizerRef.current?.setExternalTilt(message.x, message.y);
+        }
+        case 'tilt': {
+          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
+          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
+          visualizerRef.current?.setExternalTilt(x, y);
           break;
+        }
         /*
           Not this display's, and each for its own reason. Naming them is the
           point: without these four the switch below cannot ask the compiler
@@ -3737,7 +3873,9 @@ export default function App() {
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
-      { id: 'record',    name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', run: toggleRecording },
+      { id: 'record-video',       name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', kbd: 'R', run: toggleRecording },
+      { id: 'record-performance', name: perfLive ? 'Stop performance' : 'Record performance (strokes & gestures)', kind: 'Actions', kbd: 'T', run: togglePerformance },
+      { id: 'record-studio',      name: 'Recording studio options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
       { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
@@ -3829,6 +3967,7 @@ export default function App() {
       }
       if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
       if (e.key === 't' || e.key === 'T') { togglePerformance(); return; }
+      if (e.key === 'r' || e.key === 'R') { toggleRecording(); return; }
 
       // The rest are the show's, and only while the desk is up: on the bench
       // Space should not fire a look change at a room.
@@ -3845,7 +3984,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance]);
+  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance, toggleRecording]);
 
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
@@ -3858,13 +3997,15 @@ export default function App() {
   const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
 
   const deskDots = useMemo(() => ({
+    sound: audioSource !== 'none',
+    video: isVideoPlaying,
     mic: audioSource !== 'none',
     wall: isCasting,
     midi: midi.enabled,
     phone: remoteLink.status === 'connected',
     rec: recorder.recording ? String(recorder.seconds) : null,
     perf: perfClock,
-  }), [audioSource, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
 
   /*
     Where each status dot goes.
@@ -3882,13 +4023,9 @@ export default function App() {
     setShowHelp(false);
   }, []);
   const deskOpen = useMemo(() => ({
-    mic: () => openSettingsAt('audio-input'),
-    wall: () => openSettingsAt('projectors'),
+    sound: () => openSettingsAt('audio-input'),
+    video: () => openSettingsAt('film'),
     midi: () => { setShowMidi(true); setShowSequencer(false); setShowSettings(false); setShowHelp(false); },
-    // The phone has no setting to change — it either found the relay or it did
-    // not — so this goes to the part of the guide that says what it does and
-    // what has to be running for it to connect at all.
-    phone: () => { setHelpFocus('live'); setShowHelp(true); setShowSettings(false); setShowMidi(false); setShowSequencer(false); },
   }), [openSettingsAt]);
 
   /*
@@ -4272,7 +4409,7 @@ export default function App() {
                       return (
                         <button
                           key={liq.id}
-                          onClick={() => { setSelectedLiquidId(liq.id); setActiveTool('dropper'); }}
+                          onClick={() => { setSelectedLiquidId(liq.id); }}
                           title={liq.description}
                           data-testid={`liquid-${liq.id}`}
                           className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
@@ -4763,6 +4900,7 @@ export default function App() {
             paletteLock={paletteLock}
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
+            onVideoDye={() => videoInputRef.current?.click()}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -5083,6 +5221,23 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* ── Recording Studio Panel (Canvas Video & Performance) ─ */}
+      {showRecordPanel && (
+        <RecordPanel
+          onClose={() => setShowRecordPanel(false)}
+          recorder={recorder}
+          onToggleVideo={toggleRecording}
+          performanceLive={musicIntel.performance.live}
+          perfClock={perfClock}
+          onTogglePerformance={togglePerformance}
+          savedPerformances={musicIntel.performance.saved}
+          replayingPerformanceId={musicIntel.performance.replayingId}
+          onReplayPerformance={musicIntel.replayPerformance}
+          onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
+          onDeletePerformance={musicIntel.deletePerformance}
+        />
+      )}
+
       {/* ── Lyrics Overlay ─────────────────────────────────────── */}
       {musicSettings.enabled && musicSettings.lyricsOverlay && (
         <LyricsOverlay
@@ -5125,9 +5280,18 @@ export default function App() {
             phone: the card shares the row with the button pill, and at 375
             wide 24px tall is what fits — any taller and the image is only
             letterboxed into the same width with empty bands above and below.
+            The Alpha label sits beside the name from 640 up. On a phone it is a
+            tab on the card's top edge instead: beside the name at 420 wide it
+            ran out of the card and under the button pill (`npm run layout`,
+            "covered; over record-button"), and under the name it made the card
+            20px taller, over the bottle rail's heading.
           */}
-          <h1>
+          <span className="absolute -top-2.5 right-3 rounded bg-black sm:hidden">
+            <AlphaBadge />
+          </span>
+          <h1 className="flex items-center gap-2">
             <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
+            <AlphaBadge className="hidden sm:inline-block" />
           </h1>
           {/* The preset's name is the menu: one click from the top of the screen. */}
           <button
@@ -5346,10 +5510,13 @@ export default function App() {
           rideKeys={rideKeys}
           onRideKeys={setRideKeys}
           midiName={midi.activeInputName ?? null}
-          onMic={deskOpen.mic}
-          onWall={deskOpen.wall}
+          onSound={deskOpen.sound}
+          onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
-          onPhone={deskOpen.phone}
+          videoRecording={recorder.recording}
+          videoSeconds={recorder.seconds}
+          onToggleVideo={toggleRecording}
+          onRecordOptions={() => setShowRecordPanel(true)}
           onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
@@ -5369,7 +5536,6 @@ export default function App() {
             const bottle = liquidTypes.find(l => !l.behaviour && l.color.toLowerCase() === hex.toLowerCase());
             if (!bottle) return;
             setSelectedLiquidId(bottle.id);
-            setActiveTool('dropper');
           }}
           plateRef={preview.ref}
           status={{
@@ -5421,10 +5587,10 @@ export default function App() {
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
-          onBottle={(id) => { setSelectedLiquidId(id); setActiveTool('dropper'); }}
+          onBottle={(id) => { setSelectedLiquidId(id); }}
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
-          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); setActiveTool('dropper'); }}
+          onDye={(hex) => { updateLiquidColor(selectedLiquidId, hex); }}
           palettes={COLOR_HARMONIES.map((h, i) => ({
             name: COLOR_HARMONY_NAMES[i],
             colours: h.map(pi => PALETTE[pi]?.hex ?? '#666'),
@@ -5432,6 +5598,7 @@ export default function App() {
           paletteLock={paletteLock}
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
+          onVideoDye={() => videoInputRef.current?.click()}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
@@ -5478,10 +5645,13 @@ export default function App() {
           }}
           dots={deskDots}
           midiName={midi.activeInputName ?? null}
-          onMic={deskOpen.mic}
-          onWall={deskOpen.wall}
+          onSound={deskOpen.sound}
+          onVideo={deskOpen.video}
           onMidi={deskOpen.midi}
-          onPhone={deskOpen.phone}
+          videoRecording={recorder.recording}
+          videoSeconds={recorder.seconds}
+          onToggleVideo={toggleRecording}
+          onRecordOptions={() => setShowRecordPanel(true)}
           onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           onSearch={() => setShowPalette(true)}
@@ -5492,7 +5662,11 @@ export default function App() {
       {/* The file input the bench's Image dye button reaches for. It lives
           in the narrow-screen toolbar, which is not rendered under a desk. */}
       {(deskUp || phone) && (
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+          <video ref={videoPlayerRef} className="hidden" loop muted playsInline />
+        </>
       )}
       {/* The crash report, under a desk: its header has no room for a
           button that is idle nearly always, so the chip says when there is

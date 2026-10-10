@@ -134,7 +134,7 @@ fn bilerp(t: texture_2d<f32>, uv: vec2f, n: f32) -> vec4f {
 export const SEED_WGSL = /* wgsl */ `${HEAD}${BILERP}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let i = id.x;
   if (i >= U.count) { return; }
@@ -181,7 +181,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 export const ADVECT_WGSL = /* wgsl */ `${HEAD}${BILERP}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let i = id.x;
   if (i >= U.count) { return; }

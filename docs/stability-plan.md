@@ -174,7 +174,7 @@ Chromium, the day it was found) or read in the code.
     **Do:** the film belongs to the component, not the GPU effect: stopped on unmount
     only, attached again after a rebuild. **Measure:** `npm run crash`'s forced loss
     with a film playing: the film still draws after the recovery.
-17. **S17 — One pipeline that fails to build takes down the whole step.**
+17. **S17 — One pipeline that fails to build takes down the whole step.** (*Shipped*)
     - *Read in the code.* `prepareCompute` swallows an async build's failure ("built on
       the frame instead", `kit.ts`); `computePipeline` then builds it synchronously and
       caches the invalid pipeline; and the step is one compute pass in one encoder, the
@@ -188,7 +188,7 @@ Chromium, the day it was found) or read in the code.
     plate runs, with the black box naming it. **Measure:** a `?debug` hook that makes one
     named pipeline fail: the plate steps without it, and `npm run crash` reads its line.
     It is next to #212's startup work; take it after that merges.
-18. **S18 — A non-finite number in a carried field stops the dye for good.**
+18. **S18 — A non-finite number in a carried field stops the dye for good.** (*Shipped*)
     - *Read in the code.* The dye and the velocity have had `finite4` and `safeVel`
       since "36864 of 36864 cells NaN" (`wgsl/fluid.ts`). The fields carried from step to
       step have not: the lasting current (`currentForces`), its gradient
@@ -202,9 +202,9 @@ Chromium, the day it was found) or read in the code.
       the gap's spring, …) unchecked, so one non-finite uniform is enough.
 
     **Do:** those stores guarded with `select(0, x, finite)`; `GpuStepParams` sanitised in
-    `writeSim`. **Measure:** a lab check that sets one step's rock to NaN and finds the
-    plate moving again two steps later.
-19. **S19 — Dye Particles at full on a 1024² grid invalidates every step.**
+    `writeSim`. **Measure:** `npm run finite` verifies writeSim sanitises non-finite uniforms
+    and that the plate recovers motion two steps after uniform corruption.
+19. **S19 — Dye Particles at full on a 1024² grid invalidates every step.** (*Shipped*)
     - *Read in the code.* `capacity = grid² × PER_CELL` (4) and `groups = ceil(live /
       64)` (`particles.ts`): at 1024² with Dye Particles at 1.0 that is 65,536
       workgroups, one over the default `maxComputeWorkgroupsPerDimension`, and the
@@ -216,9 +216,11 @@ Chromium, the day it was found) or read in the code.
       default `maxStorageBufferBindingSize`, so any growth in `PER_CELL` or the stride
       breaks it the same way.
 
-    **Do:** a two-dimensional dispatch (or `live` clamped to 65,535 × 64), groups of 256,
-    and the adapter asked for the limits the top rung needs. **Measure:** a lab check at
-    1024² with particles at 1.0: no validation error, and particles that move.
+    **Do:** `GROUP = 256` matching `@workgroup_size(256)` in `wgsl/particles.ts` (16,384 groups
+    for 4,194,304 particles at 1024²), `live` clamped to `65535 * GROUP`, and the device
+    configured with `requiredLimits` requesting the adapter's available `maxStorageBufferBindingSize`
+    and `maxBufferSize`. **Measure:** `npm run particles` verifies 1024² with `particles: 1`:
+    zero validation errors and all 4,194,304 particles live and simulated.
 20. **S20 — Smaller doors.**
     - The out-of-memory error scope is popped only when the solver builds
       (`attachSolver`, `LiquidVisualizer.tsx`). If the constructor throws, the scope

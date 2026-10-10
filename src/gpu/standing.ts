@@ -249,6 +249,7 @@ export class StandingFilm {
     [v[18], v[19]] = this.win();
     this.device.queue.writeBuffer(this.wins, 0, v);
     const pipe = this.pipelines.computePipeline('film:window', STAND_WINDOW);
+    if (!pipe) return;
     pass.setPipeline(pipe);
     pass.setBindGroup(0, this.group(`window:${dst.label}`, pipe, [this.wins, dst]));
     const w = Math.ceil(this.N / 8);
@@ -280,12 +281,14 @@ export class StandingFilm {
     const patch = Math.ceil(this.P / 8);
     const run8 = (name: string, res: (GPUBuffer | GPUTexture)[], size = patch) => {
       const pipe = this.pipelines.computePipeline(`film:${name}`, this.kernels[name]);
+      if (!pipe) return;
       pass.setPipeline(pipe);
       pass.setBindGroup(0, this.group(`${name}:${k}:${res.map((r) => r.label).join(',')}`, pipe, [film, ...res]));
       pass.dispatchWorkgroups(size, size);
     };
     const fft = (cfg: GPUBuffer) => {
       const pipe = this.pipelines.computePipeline('film:filmFft', this.kernels.filmFft);
+      if (!pipe) return;
       pass.setPipeline(pipe);
       pass.setBindGroup(0, this.group(`fft:${k}:${cfg.label}`, pipe, [film, cfg, this.z, this.tot]));
       pass.dispatchWorkgroups(this.P);

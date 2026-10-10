@@ -14,6 +14,7 @@ import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { MixerPanel } from './MixerPanel';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
+import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 
@@ -575,7 +576,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <h1>
             <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-8 w-auto" draggable={false} />
           </h1>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-white/35">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
+          {/* The Alpha label on the line under the name, not beside it: beside
+              it, on a 390 phone it crowded the connection status on the right. */}
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">Remote{state?.trackName ? ` · ${state.trackName}` : ''}</p>
+            <AlphaBadge />
+          </div>
         </div>
         <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
           {connected ? <Wifi size={14} /> : <WifiOff size={14} />}

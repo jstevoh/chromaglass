@@ -234,13 +234,14 @@ export class WebGPUOutput {
     target: GPUTextureView,
     quads: number,
     timestamps?: GPURenderPassTimestampWrites,
-  ): void {
-    if (!this.scene) return;
+  ): boolean {
+    if (!this.scene) return false;
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
     // The format is in the name because the cache is the device's, not this
     // projector's (S4): a second one on another format must not be handed
     // the first one's pipeline.
     const pipeline = this.pipelines.renderPipeline(`output ${this.format}`, outputRecipe(this.device, this.format));
+    if (!pipeline) return false;
     const pass = encoder.beginRenderPass({
       label: 'output',
       colorAttachments: [{ view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
@@ -263,6 +264,7 @@ export class WebGPUOutput {
     }
     pass.end();
     this.drawn = new Set();
+    return true;
   }
 
   /** A source's picture if it was drawn this frame, else the scene (never sampled: no surface asks for it). */

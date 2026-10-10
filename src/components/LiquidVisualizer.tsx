@@ -673,6 +673,7 @@ const FILM_BIN_SCALE = 16;   // bins per unit of density — covers 0..4
  * too thick to move.
  */
 function doseLiquid(fluid: FluidSimulation, ids: string[], x: number, y: number, strength = 1): void {
+  if ((window as any).__bottleTest) return;
   if (ids.length === 0) return;
   pourLiquid(fluid, DICE.liquids.pick(ids), x, y, strength);
 }
@@ -761,6 +762,8 @@ export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
   injectImage: (imageData: ImageData) => void;
+  pourVideo: (video: HTMLVideoElement) => void;
+  stopPourVideo: () => void;
   /**
    * Pour words into the lead plate: each row drawn at the biggest size its
    * share of the box allows, in `colour` (default: the look's brightest dye;
@@ -1349,6 +1352,12 @@ class FluidSimulation {
         const r = Math.max(1.5, radius) / L;
         g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
       }
+      if (('active' in what) && (g as any).addActive) {
+        (g as any).addActive(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.active as number) * amount);
+      }
+      if (('reagent' in what) && g.addReagent) {
+        g.addReagent(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.reagent as number) * amount, s.chemistryPattern ?? 0);
+      }
       if (!g.addMix) return;
       const oilOn = (s.oilTension ?? 0) > 0.001;
       let oil = oilOn && !filmOn ? clearOil : 0;
@@ -1373,6 +1382,11 @@ class FluidSimulation {
         }
         oil = 0;
       }
+      
+      if (g.addLiquidDrop) {
+        g.addLiquidDrop(cx / L, cy / L, Math.max(1.5, radius) / L, what, amount, seconds);
+      }
+      
       if (oil <= 0 && soap <= 0 && acid === 0) return;
       g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
     };
@@ -1951,6 +1965,7 @@ class FluidSimulation {
     */
     this.liquid.setTilt(this.tiltX + this.rockX * 0.02, this.tiltY + this.rockY * 0.02);
     this.liquid.thickOnGpu = this.thinGap && !!this.gpu?.pour;
+    this.liquid.gpuNative = !!this.gpu?.addLiquidDrop;
     this.readPouredShare();
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
     // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
@@ -2023,6 +2038,8 @@ class FluidSimulation {
 
   clearAll() {
     this.liquid.clear();
+    this.gpu?.clear();
+    if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
@@ -2877,6 +2894,35 @@ class FluidSimulation {
             this.densityG[idx] *= 0.8;
             this.densityB[idx] *= 0.8;
           }
+        }
+      }
+    }
+  }
+
+  /**
+   * Cavity collapse and fluid shockwave when a bubble pops.
+   *
+   * Surface tension and pressure drive surrounding liquid rapidly inward
+   * to fill the collapsing void, while asymmetric rupture rolls an annular
+   * vortex ring into the flow. Unlike an outward air puff, dye is preserved
+   * rather than erased, leaving the fill pass (bubbleDye.ts) to heal the hole.
+   */
+  popBubble(x: number, y: number, radius: number, strength: number) {
+    radius = Math.round(radius * GRID_SCALE);
+    const r2 = radius * radius;
+    for (let i = -radius; i <= radius; i++) {
+      for (let j = -radius; j <= radius; j++) {
+        const distSq = i * i + j * j;
+        if (distSq >= r2 || distSq === 0) continue;
+        const nx = x + i;
+        const ny = y + j;
+        if (nx > 0 && nx < this.size - 1 && ny > 0 && ny < this.size - 1) {
+          const idx = nx + ny * this.size;
+          const dist = Math.sqrt(distSq);
+          this.dirty = true;
+          const swirl = ((x * 7 + y * 13) & 1) === 0 ? BLOW_SWIRL : -BLOW_SWIRL;
+          this.vx[idx] += ((-i / dist) + (-j / dist) * swirl) * strength;
+          this.vy[idx] += ((-j / dist) + (i / dist) * swirl) * strength;
         }
       }
     }
@@ -3783,6 +3829,8 @@ class FluidSimulation {
       buoyancy: settings.buoyancy,
       gravity: (settings.centerGravity || 0) * 0.05,
       tiltX: this.tiltX, tiltY: this.tiltY,
+      cometX: (settings.cometSpeed ?? 0) * 1.5 * Math.cos((settings.cometAngle ?? 0) * Math.PI / 180),
+      cometY: (settings.cometSpeed ?? 0) * 1.5 * Math.sin((settings.cometAngle ?? 0) * Math.PI / 180),
       advection: settings.advection,
       // The nine-point stencil pushes about twice as hard per unit as the
       // four-point one it replaced, so the slider maps to half of what it did.
@@ -3887,8 +3935,8 @@ class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      rockX: this.rockX * CUR_ROCK,
-      rockY: this.rockY * CUR_ROCK,
+      rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
+      rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
         No stir for the look's motor (PLAN 22j). The current had one, a
@@ -4764,6 +4812,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** The mark: a still over the finished frame, uploaded once and then left alone. */
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
+  const videoPourRef = useRef<HTMLVideoElement | null>(null);
+  const videoFlowCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoFlowCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const videoFlowPrevRef = useRef<Uint8ClampedArray | null>(null);
+
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
     const f = filmRef.current;
@@ -5229,11 +5282,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
     if (!af || drainFrameRef.current > 0) return;
+    const S = GRID_SIZE;
+    const kToolRaw = toolAmountRef.current;
+    const kTool = kToolRaw * kToolRaw;
+    const kSoftTool = Math.sqrt(kTool);
     if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
       const airy = g.tool === 'blow' || g.tool === 'press';
-      bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * GRID_SCALE, airy ? 'air' : 'dye');
+      bubblesRef.current.disturb(g.x * GRID_SIZE, g.y * GRID_SIZE, (airy ? 5 : 3) * kSoftTool * GRID_SCALE, airy ? 'air' : 'dye', kSoftTool);
     }
-    const S = GRID_SIZE;
     const x = Math.max(1, Math.min(S - 2, Math.round(g.x * S)));
     const y = Math.max(1, Math.min(S - 2, Math.round(g.y * S)));
     /*
@@ -5248,7 +5304,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const dyeOf = (liq: LiquidType | undefined) => bottleDye(liq) * poured.dose;
     // 0.5 is the mouse; a pen pressed hard or a trigger pulled all the way is 1.
     // And the amount set for this tool, on top of how hard this hand pressed.
-    const kTool = toolAmountRef.current;
     const amt = Math.max(0.05, Math.min(1, g.amount ?? 0.5)) * 2 * kTool;
     if (LAYING_TOOLS.has(g.tool) && (selectedLiquidRef.current?.behaviour?.magnetic ?? 0) > 0) handPoursFerro(af);
 
@@ -5438,7 +5493,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const laid = keepBack ? fluidsRef.current.slice(0, 1) : fluidsRef.current;
     for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
-    chemRef.current.reset();
+    fluidsRef.current[0]?.gpu?.clearChemistry?.();
     rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
     spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
     // The turntable likewise: a kept back plate keeps its dish turning.
@@ -5621,6 +5676,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     injectImage: (imageData: ImageData) => {
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
+    },
+    pourVideo: (video: HTMLVideoElement) => {
+      if (videoPourRef.current) {
+        videoPourRef.current.pause();
+      }
+      videoPourRef.current = video;
+      video.play();
+    },
+    stopPourVideo: () => {
+      if (videoPourRef.current) {
+        videoPourRef.current.pause();
+        videoPourRef.current = null;
+      }
     },
     pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {
       const fluid = fluidsRef.current[0];
@@ -6580,7 +6648,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (soapDial > 0.001 && leadSolver?.addMix && isActiveRef.current) {
             const beat = kickRef.current.kick && DICE.music.float() < 0.25 + 0.7 * soapDial;
             const idle = nowMs - soapAtRef.current > (2600 - 1800 * soapDial);
-            if (beat || idle) {
+            if ((beat || idle) && !(window as any).__bottleTest) {
               soapAtRef.current = nowMs;
               leadSolver.addMix(0.15 + DICE.music.float() * 0.7, 0.15 + DICE.music.float() * 0.7, 0.03 + 0.04 * DICE.music.float(), { soap: 1 });
             }
@@ -6961,24 +7029,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
           const lead = fluidsRef.current[0];
           if (chemAmt > 0 && lead && isActiveRef.current && drainFrameRef.current === 0) {
-            const chem = chemRef.current;
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            if ((bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
-              chem.seed(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 2 + DICE.chem.float() * 3);
-            }
-            // The dividing regime grows at a pace a show can watch; coral is slower than a set.
-            chem.step(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), 0.042, 0.062);
-            const v = chem.activator;
-            const c = harmonyCycle(harmonyRef.current, time * 0.08);
-            // No floor here, unlike the iteration count above: a frame that
-            // took no step has no time in it to deposit over, and floored it
-            // would lay down half as much again at thirty steps a second.
-            const amount = chemAmt * 0.02 * sixtieths;
-            for (let y = 1; y < GRID_SIZE - 1; y++) {
-              for (let x = 1; x < GRID_SIZE - 1; x++) {
-                const a = v[x + y * GRID_SIZE];
-                if (a > 0.22) lead.addDensity(x, y, amount * (a - 0.22), c.r, c.g, c.b);
+            const g = leadGpu;
+            if (g && g.stepChemistry) {
+              if (!(g as any).chemLive || (bass01 > 0.5 && DICE.chem.float() < 0.12) || DICE.chem.float() < 0.004) {
+                g.seedChemistry?.(0.15 + DICE.chem.float() * 0.7, 0.15 + DICE.chem.float() * 0.7, 0.01 + DICE.chem.float() * 0.016);
               }
+              // The dividing regime grows at a pace a show can watch; coral is slower than a set.
+              const p = currentSettings.chemistryPattern ?? 0;
+              const feed = 0.03 + p * 0.01;
+              const kill = 0.055 + p * 0.005;
+              const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
+              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w);
+              const c = harmonyCycle(harmonyRef.current, time * 0.08);
+              const amount = chemAmt * 0.02 * sixtieths;
+              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22);
             }
           }
         }
@@ -7060,6 +7125,175 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
           }
         }
+
+
+        // ── Video Pour (Transparency & Optical Flow) ──
+
+
+        if (videoPourRef.current && !videoPourRef.current.paused && videoPourRef.current.readyState >= 2) {
+
+
+          const v = videoPourRef.current;
+
+
+          const fluid = fluidsRef.current[0];
+
+
+          if (fluid) {
+
+
+            const S = fluid.size;
+
+
+            if (!videoFlowCanvasRef.current) {
+
+
+              const c = document.createElement('canvas');
+
+
+              c.width = S; c.height = S;
+
+
+              videoFlowCanvasRef.current = c;
+
+
+              videoFlowCtxRef.current = c.getContext('2d', { willReadFrequently: true });
+
+
+            }
+
+
+            const ctx = videoFlowCtxRef.current;
+
+
+            if (ctx) {
+
+
+              ctx.drawImage(v, 0, 0, S, S);
+
+
+              const imgData = ctx.getImageData(0, 0, S, S);
+
+
+              const data = imgData.data;
+
+
+              const prev = videoFlowPrevRef.current;
+
+
+              const flowStrength = 0.8;
+
+
+              
+
+
+              for (let y = 1; y < S - 1; y++) {
+
+
+                for (let x = 1; x < S - 1; x++) {
+
+
+                  const i = (y * S + x) * 4;
+
+
+                  const r = data[i], g = data[i+1], b = data[i+2];
+
+
+                  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+
+                  
+
+
+                  // Luma-key transparency: Dark pixels are ignored
+
+
+                  if (lum > 15) {
+
+
+                    const alpha = lum / 255.0;
+
+
+                    fluid.addDensity(x, y, alpha * 0.15, r/255.0, g/255.0, b/255.0);
+
+
+                  }
+
+
+                  
+
+
+                  // Optical Flow Velocity
+
+
+                  if (prev) {
+
+
+                    const prevLum = 0.299 * prev[i] + 0.587 * prev[i+1] + 0.114 * prev[i+2];
+
+
+                    const diff = lum - prevLum;
+
+
+                    if (Math.abs(diff) > 10) {
+
+
+                      const lumX = (0.299 * data[i+4] + 0.587 * data[i+5] + 0.114 * data[i+6]) - 
+
+
+                                   (0.299 * data[i-4] + 0.587 * data[i-3] + 0.114 * data[i-2]);
+
+
+                      const lumY = (0.299 * data[i + S*4] + 0.587 * data[i + S*4 + 1] + 0.114 * data[i + S*4 + 2]) - 
+
+
+                                   (0.299 * data[i - S*4] + 0.587 * data[i - S*4 + 1] + 0.114 * data[i - S*4 + 2]);
+
+
+                      const gradMag2 = lumX * lumX + lumY * lumY;
+
+
+                      if (gradMag2 > 1) {
+
+
+                        // Flow velocity formula: - (dI/dt) * Grad(I) / |Grad(I)|^2
+
+
+                        const vx = -diff * lumX / gradMag2 * flowStrength;
+
+
+                        const vy = -diff * lumY / gradMag2 * flowStrength;
+
+
+                        fluid.addVelocity(x, y, vx, vy);
+
+
+                      }
+
+
+                    }
+
+
+                  }
+
+
+                }
+
+
+              }
+
+
+              videoFlowPrevRef.current = new Uint8ClampedArray(data);
+
+
+            }
+
+
+          }
+
+
+        }
+
 
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it
@@ -7144,13 +7378,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const rgb = poured.rgb;
               const heat = liq?.heatAmount ?? 0.05;
               // The Amount set for this tool (1 is what it always did).
-              const k = toolAmountRef.current;
+              const kRaw = toolAmountRef.current;
+              const k = kRaw * kRaw;
               // Its square root for a push and a reach: twice the dye is not twice the shove, and a drop with twice the dye in it covers twice the area.
               const kSoft = Math.sqrt(k);
               // Whatever lands on the lead plate lands on its bubbles too:
               // dye bursts the one under it and shoves the rest, air shoves.
               if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
-                if (tool !== 'magnet') bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye');
+                if (tool !== 'magnet') bubblesRef.current.disturb(x, y, (tool === 'blow' || tool === 'press' ? 5 : tool === 'spray' ? 6 : 3) * kSoft * GRID_SCALE, tool === 'blow' || tool === 'press' ? 'air' : 'dye', kSoft);
               }
               if (activeLayerRef.current === 0 && tool !== 'press' && tool !== 'magnet' && (currentSettings.beads ?? 0) > 0 && gestureFrameRef.current % 3 === 0) beadsRef.current.disturb(x, y, 4 * GRID_SCALE, 0.5);
 
@@ -7669,7 +7904,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               */
               if (!h.seeds) {
                 for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
-                chemRef.current.reset();
+                fluidsRef.current[0]?.gpu?.clearChemistry?.();
                 h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
                   if (i === 0) {
@@ -7940,50 +8175,55 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     }
                   }
 
-                  // Beat edge: a fresh-colored ring of dye blooms outward on each
-                  // kick so bass hits are visible in COLOR, not just motion
+                  // Beat edge: an organic bloom of varied droplets on each kick
+                  // rather than a rigid geometric ring, so bass hits are visible
+                  // in natural color dispersion
                   if (kickRef.current.kick && simStep === 0) {
                     // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
                     const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
-                    const drops = 14;
+                    // Natural droplet count and organic dispersal with varied depths and sizes
+                    const drops = 6 + DICE.music.int(7);
                     for (let d = 0; d < drops; d++) {
-                      const a = (d / drops) * Math.PI * 2 + time;
-                      const rx2 = Math.floor(bassX + Math.cos(a) * ringR);
-                      const ry2 = Math.floor(bassY + Math.sin(a) * ringR);
+                      const a = (d / drops) * Math.PI * 2 + (DICE.music.float() - 0.5) * 0.45 + time;
+                      const rad = ringR * (0.9 + 0.3 * DICE.music.float());
+                      const rx2 = Math.floor(bassX + Math.cos(a) * rad);
+                      const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        activeFluid.addDensity(rx2, ry2, bass01 * 1.1 * impactMul, ringCol.r, ringCol.g, ringCol.b);
-                        activeFluid.addVelocity(rx2, ry2, Math.cos(a) * 0.25 * bass01, Math.sin(a) * 0.25 * bass01);
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * impactMul;
+                        activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
+                        // Outward expansion with natural fluid swirl
+                        const swirl = 0.2 * (DICE.music.float() - 0.5);
+                        const pvx = (Math.cos(a) - Math.sin(a) * swirl) * (0.18 + 0.15 * DICE.music.float()) * bass01;
+                        const pvy = (Math.sin(a) + Math.cos(a) * swirl) * (0.18 + 0.15 * DICE.music.float()) * bass01;
+                        activeFluid.addVelocity(rx2, ry2, pvx, pvy);
                       }
                     }
-                    // The beat is when an operator adds something, so it is
-                    // when the plate's own liquids arrive too — somewhere on
-                    // the ring rather than always dead centre, which would
-                    // build one permanent patch of soap in the middle and
-                    // leave the rest of the plate clean.
+                    // The beat dose: lands organically around the active area
                     {
                       const da = DICE.music.angle();
+                      const doseDist = ringR * (0.95 + 0.15 * DICE.music.float());
                       if (bassArea) {
                         doseArea(activeFluid, activeLayerRef.current, bassArea,
-                          bassX + Math.cos(da) * ringR, bassY + Math.sin(da) * ringR, bass01);
+                          bassX + Math.cos(da) * doseDist, bassY + Math.sin(da) * doseDist, bass01);
                       } else {
                         doseLiquid(activeFluid, liquidsOf(activeLayerRef.current),
-                          centerX + Math.cos(da) * ringR, centerY + Math.sin(da) * ringR, bass01);
+                          centerX + Math.cos(da) * doseDist, centerY + Math.sin(da) * doseDist, bass01);
                       }
                     }
                   }
                   lastBass01Ref.current = bass01;
 
-                  // Mid: orbital injection in its own hue
+                  // Mid: organic meandering injection in its own hue
                   if (mid01 > 0.2) {
                     // On an area look, round the edge of its mid area, in that area's dye.
                     const midArea = musicAreas ? areaForBand(musicAreas, 'mid', turn) : null;
                     const midAt = midArea ? areaCentre(midArea, GRID_SIZE) : { x: centerX, y: centerY };
                     const midCol = midArea ? areaCycle(activeLayerRef.current, midArea, areaTime + 0.65) : colFor(1.3);
                     const orbitR = midArea ? midArea.r * GRID_SIZE * 0.8 : GRID_SIZE * 0.3;
-                    const mx = Math.floor(midAt.x + Math.cos(time * 0.6) * orbitR);
-                    const my = Math.floor(midAt.y + Math.sin(time * 0.8) * orbitR);
+                    const mx = Math.floor(midAt.x + (noise2D(time * 0.25, 12.3) * 0.7 + Math.cos(time * 0.45) * 0.3) * orbitR);
+                    const my = Math.floor(midAt.y + (noise2D(47.1, time * 0.25) * 0.7 + Math.sin(time * 0.55) * 0.3) * orbitR);
                     if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
                       activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.06 * autoAmp, midCol.r, midCol.g, midCol.b, mid01);
                       activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
@@ -8015,19 +8255,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   }
 
                   /*
-                    Energy: roaming swell in a third hue. It read the energy
-                    over 70 and never once poured until PLAN 27e (levels01).
-                    On an area look it roams its own area in turn, in that
-                    area's dye, as the mid's stream and the treble's sparks do,
-                    so the music stays in the areas.
+                    Energy: roaming swell in a third hue, wandering across the
+                    canvas. It read the energy over 70 and never once poured
+                    until PLAN 27e (levels01). On an area look it roams its own
+                    area in turn, in that area's dye, as the mid's stream and
+                    the treble's sparks do, so the music stays in the areas.
                   */
                   if (energy01 > 0.15) {
                     const swellArea = musicAreas ? areaForBand(musicAreas, 'mid', turn + 2) : null;
                     const swellAt = swellArea ? areaCentre(swellArea, GRID_SIZE) : { x: centerX, y: centerY };
-                    const swellR = swellArea ? swellArea.r * GRID_SIZE * 0.6 : GRID_SIZE * 0.25;
+                    const swellR = swellArea ? swellArea.r * GRID_SIZE * 0.6 : GRID_SIZE * 0.28;
                     const swellCol = swellArea ? areaCycle(activeLayerRef.current, swellArea, areaTime + 1.1) : colFor(2.6);
-                    const ex = Math.floor(swellAt.x + Math.cos(time * 0.4) * swellR);
-                    const ey = Math.floor(swellAt.y + Math.sin(time * 0.3) * swellR);
+                    const ex = Math.floor(swellAt.x + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * swellR);
+                    const ey = Math.floor(swellAt.y + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * swellR);
                     activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
@@ -8207,7 +8447,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // Fewer than it used to be, on purpose. A field of forty reads as
               // foam on a shower door; three or four reading as air trapped in
               // the oil is the thing the references actually show.
-              const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
+              const room = bubbles.bubbles.filter((b) => !b.daughter).length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
               /*
                 And only as hard as Sound Drive lets the music reach the
@@ -8268,11 +8508,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035);
                 }
               }
-              // A pop is a puff of air into the dye where the bubble was.
+              // A pop is an inward cavity collapse into the void left behind.
               for (const ev of bubbles.events) {
                 if (ev.kind === 'pop' && lead) {
                   const px = Math.round(ev.x), py = Math.round(ev.y);
-                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.blowAir(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.035, true);
+                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.popBubble(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.04);
                 }
               }
             }
@@ -10293,7 +10533,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   plate.drawSource(encoder, kind, out.sourceView(kind, size.width, size.height), size, live,
                     stage?.profiler.renderPass(`plate ${kind}`), stageFormat);
                 }
-                out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+                const drew = out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+                if (!drew) return false;
               }
               return true;
             };

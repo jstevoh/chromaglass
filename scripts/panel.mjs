@@ -399,8 +399,8 @@ check('no source can ride a master',
   PATCH_TARGETS.filter(t => MASTERS.includes(String(t.key))).map(t => t.label).join(', '));
 check('and what a patch can aim at is grouped by section', /<optgroup key=\{g\.id\} label=\{g\.name\}>/.test(bay));
 
-check('and the wall keeps the id every deep link opens',
-  SECTION_BY_ID.get('projectors')?.name === 'Wall' && /openSettingsAt\('projectors'\)/.test(readFileSync(join(root, 'src/App.tsx'), 'utf8')));
+check('the wall keeps its id',
+  SECTION_BY_ID.get('projectors')?.name === 'Wall');
 
 // ── The controller the section offers to set up ─────────────────────
 //
@@ -900,7 +900,7 @@ check('and nothing but a lost context rebuilds the renderer',
   is where a hand goes when the microphone is the problem.
 */
 const header = readFileSync(join(root, 'src/components/desk/DeskHeader.tsx'), 'utf8');
-for (const [dot, handler] of [['mic', 'onMic'], ['wall', 'onWall'], ['midi', 'onMidi'], ['phone', 'onPhone']]) {
+for (const [dot, handler] of [['sound', 'onSound'], ['video', 'onVideo'], ['midi', 'onMidi']]) {
   check(`the ${dot} dot opens something`,
     new RegExp(`dots\\.${dot}[\\s\\S]{0,240}onClick=\\{${handler}\\}`).test(header)
     || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));

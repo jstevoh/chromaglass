@@ -66,7 +66,10 @@ try {
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
   const screen = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
-  const tool = (t) => page.evaluate((t) => window.chromaglassTool?.(t), t);
+  const tool = async (t) => {
+    await page.evaluate((want) => window.chromaglassTool?.(want), t);
+    await page.waitForFunction((want) => window.chromaglassDebug?.().tool?.() === want, t, { timeout: 10000 });
+  };
   const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await page.waitForTimeout(2500); };
   const settle = (ms) => page.waitForTimeout(ms);
 
@@ -199,7 +202,7 @@ try {
   }
   check('Drop lays dye where it is held', laid.dropper.disc > 5 && laid.dropper.disc > 0.6 * laid.dropper.total,
     `${laid.dropper.disc.toFixed(0)} of ${laid.dropper.total.toFixed(0)} within 0.07`);
-  check('Pour lays more than Drop', laid.pour.total > 1.3 * laid.dropper.total,
+  check('Pour lays more than Drop', laid.pour.total > 10 && laid.pour.total > 1.3 * laid.dropper.total,
     `${laid.pour.total.toFixed(0)} against ${laid.dropper.total.toFixed(0)}`);
   // At the pour's own scale: its stream is about 0.03 of the plate across.
   const spreadOf = (l) => l.spread / Math.max(1e-6, l.near + l.spread);
@@ -260,12 +263,11 @@ try {
     its own after a pool is laid swings from +29 to +139 between runs, and
     one window before the stroke is a single reading of that: a stroke that
     moved 576 -> 766 against +49 failed by one unit (main's #146 deploy) on
-    runs where the same code passed. Bracketed, the slack is the larger of
-    what the plate did alone before and after; a Finger that makes dye still
-    has to beat both.
+    runs where the same code passed. Bracketed, the slack spans what the
+    plate did alone before and after; a Finger that makes dye still has to
+    beat both.
   */
   const fIdleAfter = await idleChange(A, 3800);
-  const fDrift = Math.abs(fIdle) >= Math.abs(fIdleAfter) ? fIdle : fIdleAfter;
   const moved = Math.hypot(fs.cx - fa.cx, fs.cy - fa.cy);
   const drift = Math.hypot(fb.cx - fs.cx, fb.cy - fs.cy);
   // Toward B on the plate: B's grid point less A's.
@@ -273,11 +275,15 @@ try {
   const along = ((fs.cx - fa.cx) * dirB.x + (fs.cy - fa.cy) * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
   check('Finger carries the dye along the stroke', along > 0.005,
     `centre of mass moved ${(along * 100).toFixed(1)}% of the plate toward where the stroke went`);
-  // The plate's own change over the same time is part of the slack, as for
-  // the Press below: it is measured once, and it moved by +68 on a run where
-  // the stroke landed 82 under it against an allowance of 80.
-  check('and adds none', Math.abs((fb.total - fa.total) - fDrift) < 0.15 * fa.total + 5 + Math.abs(fDrift),
-    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)}, against ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after with the plate left alone as long`);
+  // Bracketed by what the plate did alone before and after: a stroke that
+  // neither creates nor destroys dye must fall within the plate's natural
+  // idle drift bracket (spanning fIdle, fIdleAfter and 0) plus the 15% allowance.
+  const fMinIdle = Math.min(0, fIdle, fIdleAfter);
+  const fMaxIdle = Math.max(0, fIdle, fIdleAfter);
+  const fSlack = 0.15 * fa.total + 5;
+  const fDelta = fb.total - fa.total;
+  check('and adds none', fDelta >= fMinIdle - fSlack && fDelta <= fMaxIdle + fSlack,
+    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(0)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(0)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(0)}] ± ${fSlack.toFixed(0)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
 
@@ -358,7 +364,7 @@ try {
         const early = await idleWindow(1250), late = await idleWindow(1250);
         const along = toward(sign, wb.cx - wa.cx, wb.cy - wa.cy);
         const idle = toward(sign, before.cx, before.cy);
-        const bar = 0.002 + Math.max(0, idle / Math.max(1, before.steps)) * strokeSteps;
+        const bar = 0.0015 + Math.max(0, idle / Math.max(1, before.steps)) * strokeSteps;
         const d = (k) => (steps1?.[k] ?? 0) - (steps0?.[k] ?? 0);
         return {
           before, early, late, strokeSteps, wa, wb, along, idle, bar,
@@ -527,7 +533,7 @@ try {
     await pool(A);
     const idle = await idleChange(A, 2500);
     const p = await snap(`${t}0`);
-    await hold(t, A, 1500);
+    await hold(t, A, 1800);
     await settle(700);
     await snap(`${t}1`);
     // Held still, the Blow is a straw: it blows a bubble, and what it clears

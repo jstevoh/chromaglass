@@ -56,6 +56,7 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 
 export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
+  'comet':              [18, 20, 23, 7, 16, 2],
   'galaxy':             [18, 23, 10, 8, 16, 7],
   'deep-ocean':         [16, 19, 7, 9, 22, 18],
   'cyberpunk':          [20, 2, 10, 18, 16, 6],
@@ -114,6 +115,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'classic':            ['drop'],
+  'comet':              ['pour', 'streak'],
   'galaxy':             ['spray', 'streak'],
   'deep-ocean':         ['pour', 'drop'],
   'cyberpunk':          ['streak', 'splatter'],
@@ -180,13 +182,14 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Oil and water with a drop of soap in it now and then: the thing that is
   // being imitated, done the way it was actually done.
   'classic':            ['water', 'water', 'soap'],
+  'comet':              ['syrup', 'glycerine'],
   // Points of light that must not feather at the edge, and are white anyway.
   'galaxy':             ['water', 'milk'],
   // Syrup is heavier than the water it is in, so it goes down the slope
   // while everything else drifts — which is what depth looks like.
   'deep-ocean':         ['water', 'glycerine', 'syrup'],
   // Neon wants hard edges and punched holes, not a soft wash.
-  'cyberpunk':          ['water', 'silicone'],
+  'cyberpunk':          ['water', 'silicone', 'reagent'],
   // A blob that crawls while the oil around it climbs — which is the lamp.
   // Alcohol is lighter than all of it and carries heat, so it is what goes
   // up: the lamp needs something to rise, not only something to sit.
@@ -205,7 +208,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'solar-flare':        ['water', 'soap', 'alcohol'],
   // A bell holds its shape and lags the water it is drifting in.
   'jellyfish-bloom':    ['water', 'milk'],
-  'fractal-dream':      ['water', 'silicone'],
+  'fractal-dream':      ['water', 'silicone', 'reagent'],
   // Three pools apart, one liquid each, poured into its own area of the
   // dish (lib/plateAreas.ts): glycerine that holds, soap the bass breaks
   // open, syrup that settles. Ink was here, and did nothing a pool showed.

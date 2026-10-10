@@ -80,7 +80,119 @@ export const reachesMac = (path) => !NOT_MAC.some((re) => re.test(path));
 const SITE = [/^src\//, /^public\//, /^index\.html$/, /^vite\.config\.[cm]?[jt]s$/, /^tsconfig[^/]*\.json$/, /^package(-lock)?\.json$/, /^firebase\.json$/];
 export const shipsToSite = (path) => SITE.some((re) => re.test(path));
 
-function selftest() {
+/*
+  A green Mac result carries across a merge of main (PLAN.md 19i).
+
+  Measured over 25 merged PRs (#204 to #244, 103 Checks runs): 53 runs started
+  on a push that only merged main in and 8 on a docs-only commit, together 61
+  runs and 2,011 of 3,124 Mac runner-minutes (64 %), on pushes that added none
+  of the PR's own code. They also held 20 of the 29 runs that went red on their
+  first attempt, so most of them measured nothing but the queue and the flakes.
+
+  So when the diff reaches a Mac shard, this asks one more question before the
+  shards queue: does the tree being tested differ from the tree of this PR's
+  last run that passed the Mac only in files the PR does not touch? Each such
+  file then differs because main changed it, and the PR's own code (every file
+  it touches, site or not) is exactly what passed. Stricter than the deploy
+  gate's rule 5, which allows a shared non-site file such as checks.yml: here a
+  file both sides touch, of any kind, runs the Mac, and so does any change the
+  PR made since. What it leaves unmeasured is what rule 5 already accepted for
+  deploys (PLAN.md 19h-3): two changes in different files moving the same
+  picture, which the next run on main with both in it measures.
+
+  Every condition that cannot be shown is "run the Mac", never "carry":
+    - the PR's base is main, and the old run's base is an earlier main
+      (compare: ahead or identical), so the files that moved are main's;
+    - the source is the PR's newest run that ran the Mac shards at all
+      (cancelled runs and runs that skipped or carried are passed over), and
+      it passed all four: a newer Mac run that went red is never stepped over;
+    - its tested commit (the run title's "tests <sha>") can be fetched and is
+      a merge, so its base is its first parent;
+    - every file that differs between the two tested trees either reaches no
+      Mac shard, or is one the PR touches in neither (the merge's blob is its
+      base's blob, then and now).
+
+  `deps` is how the selftest drives it without the network: `api(path)`
+  returns parsed JSON or throws, `git(...args)` returns stdout, and `fetch(sha)`
+  makes a commit available locally.
+*/
+export async function carry({ prNumber, headRef, baseRef, runId, head = 'HEAD' }, deps) {
+  const { api, git, fetch: fetchSha } = deps;
+  const no = (why) => ({ carried: false, why });
+  if (baseRef !== 'main') return no(`the PR's base is ${baseRef || 'unknown'}, not main`);
+  if (!prNumber || !headRef) return no('the PR number or head branch is unknown');
+  let runs;
+  try {
+    runs = (await api(`actions/workflows/checks.yml/runs?event=pull_request&branch=${encodeURIComponent(headRef)}&per_page=50`)).workflow_runs;
+  } catch (e) { return no(`the PR's runs could not be read (${e.message})`); }
+  runs = runs
+    .filter((r) => String(r.id) !== String(runId))
+    .filter((r) => r.head_branch === headRef && (r.pull_requests ?? []).some((p) => p.number === Number(prNumber)))
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  let source = null;
+  for (const r of runs) {
+    if (r.status !== 'completed' || r.conclusion === 'cancelled') continue;
+    let jobs;
+    try { jobs = (await api(`actions/runs/${r.id}/jobs?per_page=100&filter=latest`)).jobs; } catch (e) { return no(`run ${r.id}'s jobs could not be read (${e.message})`); }
+    const shards = jobs.filter((j) => j.name.startsWith('WebGPU (macOS) · ')).map((j) => [j.name.slice('WebGPU (macOS) · '.length), j.conclusion]);
+    const ran = shards.filter(([, c]) => c !== 'skipped');
+    if (ran.length === 0) continue;   // skipped the Mac, or carried: look further back
+    const names = shards.map(([n]) => n).sort().join(',');
+    if (names !== 'open,plate,show,tools' || ran.length !== 4 || ran.some(([, c]) => c !== 'success') || r.conclusion !== 'success') {
+      return no(`the PR's newest Mac run ${r.id} did not pass all four shards (${shards.map(([n, c]) => `${n}=${c}`).join(', ')})`);
+    }
+    source = r;
+    break;
+  }
+  if (!source) return no('the PR has no earlier run that passed the Mac');
+  const tested = /\(tests ([0-9a-f]{40})\)$/.exec(source.display_title ?? '')?.[1];
+  if (!tested) return no(`run ${source.id}'s title names no tested commit`);
+  let oldBase, newBase;
+  try {
+    fetchSha(tested);
+    const parents = git('rev-list', '--parents', '-n', '1', tested).trim().split(' ');
+    if (parents.length !== 3) return no(`${tested.slice(0, 7)}, the commit run ${source.id} tested, is not a merge`);
+    oldBase = parents[1];
+    newBase = git('rev-parse', `${head}^1`).trim();
+  } catch (e) { return no(`the commit run ${source.id} tested could not be read (${String(e.message).split('\n')[0]})`); }
+  try {
+    const cmp = await api(`compare/${oldBase}...${newBase}`);
+    if (cmp.status !== 'ahead' && cmp.status !== 'identical') return no(`run ${source.id}'s base ${oldBase.slice(0, 7)} is ${cmp.status} of main ${newBase.slice(0, 7)}, not an earlier main`);
+  } catch (e) { return no(`main since run ${source.id}'s base could not be compared (${e.message})`); }
+  const blob = (rev, f) => { try { return git('rev-parse', `${rev}:${f}`).trim(); } catch { return 'absent'; } };
+  const files = git('diff', '--name-only', '--no-renames', tested, head).split('\n').filter(Boolean);
+  const mac = files.filter(reachesMac);
+  const own = mac.filter((f) => blob(head, f) !== blob(`${head}^1`, f) || blob(tested, f) !== blob(oldBase, f));
+  if (own.length) return no(`${own.length} of the ${mac.length} files since run ${source.id} that reach a Mac shard are the PR's own, first ${own.slice(0, 3).join(', ')}`);
+  return {
+    carried: true,
+    run: source.id,
+    tested,
+    why: `carried from run ${source.id} (tests ${tested.slice(0, 7)}): ${files.length} files differ, ${mac.length} of them reach a Mac shard and all are main's, none the PR's`,
+  };
+}
+
+// The network and the checkout, for a run in CI. The token is the job's own
+// (the repository's default is read for every scope, which is all this asks);
+// without one, the public API's limit of 60 an hour is shared by every job on
+// the runner's address, and a 403 is "run the Mac".
+function liveDeps() {
+  const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
+  const git = (...a) => execFileSync('git', a, { stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+  return {
+    git,
+    fetch: (sha) => { git('fetch', '--no-tags', '--quiet', '--depth=2', 'origin', sha); },
+    api: async (p) => {
+      const headers = { Accept: 'application/vnd.github+json' };
+      if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
+      const res = await fetch(`https://api.github.com/repos/${repo}/${p}`, { headers, signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`${res.status} on ${p.split('?')[0]}`);
+      return res.json();
+    },
+  };
+}
+
+async function selftest() {
   const cases = [
     ['PLAN.md', false],
     ['CLAUDE.md', false],
@@ -186,7 +298,9 @@ function selftest() {
       execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], {
         cwd: dir,
         stdio: 'pipe',
-        env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out },
+        // No base branch, so carry() answers at once without the network: the
+        // carry is driven by its own cases below, against a mocked API.
+        env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out },
       });
       return fs.readFileSync(out, 'utf8').trim();
     } catch {
@@ -220,7 +334,87 @@ function selftest() {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}${got === want ? '' : ` — got ${got}`}`);
   }
+  bad += await carrySelftest();
   if (bad) process.exit(1);
+}
+
+/*
+  carry() on scratch repositories with GitHub's shape, against a mocked API.
+  Each case builds: main's base B0 (src/a.ts, src/b.ts, scripts/c.mjs,
+  PLAN.md); the PR's head H1 changing src/a.ts; M_old, GitHub's merge of H1
+  into B0, which the mocked earlier run "tests"; then whatever main and the PR
+  do next, and M_new, the merge of the PR's new head into main's new tip, as
+  the run being decided. The controls are the cases that must not carry: one
+  file both sides touch, a PR change since, a newer red Mac run, a base that is
+  not an earlier main, an API that fails, no Mac run at all.
+*/
+async function carrySelftest() {
+  const build = ({ mainChanges, prChanges }) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'carry-'));
+    const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+    const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.appendFileSync(path.join(dir, f), t); };
+    // Main writes at a file's top and the PR at its bottom, six lines apart,
+    // so a file both sides touch still merges cleanly, as it does on GitHub.
+    const prepend = (f, t) => { const p = path.join(dir, f); fs.writeFileSync(p, t + fs.readFileSync(p, 'utf8')); };
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 'reach@example.invalid');
+    git('config', 'user.name', 'reach');
+    for (const f of ['src/a.ts', 'src/b.ts', 'scripts/c.mjs', 'PLAN.md']) write(f, `// ${f}\n\n\n\n\n\n// end\n`);
+    git('add', '-A'); git('commit', '-qm', 'B0');
+    git('checkout', '-qb', 'pr'); write('src/a.ts', 'export const a = 1;\n'); git('commit', '-qam', 'H1');
+    git('checkout', '-qb', 'mold', 'main'); git('merge', '-q', '--no-ff', '-m', 'M_old', 'pr');
+    const mOld = git('rev-parse', 'HEAD').trim();
+    git('checkout', '-q', 'main');
+    for (const f of mainChanges) prepend(f, '// main\n');
+    if (mainChanges.length) git('commit', '-qam', 'B1');
+    git('checkout', '-q', 'pr');
+    for (const f of prChanges) write(f, '// pr again\n');
+    if (prChanges.length) git('commit', '-qam', 'H2');
+    git('checkout', '-qb', 'mnew', 'main'); git('merge', '-q', '--no-ff', '-m', 'M_new', 'pr');
+    return { dir, git, mOld };
+  };
+  const shardJobs = (c) => ({ jobs: ['open', 'plate', 'show', 'tools'].map((n) => ({ name: `WebGPU (macOS) · ${n}`, conclusion: c })) });
+  const skippedJobs = { jobs: [{ name: 'WebGPU (macOS) · ${{ matrix.shard }}', conclusion: 'skipped' }] };
+  const run = (id, t, mOld, conclusion = 'success') => ({ id, head_branch: 'pr', pull_requests: [{ number: 7 }], status: 'completed', conclusion, created_at: t, display_title: `PR (tests ${mOld})` });
+  const decide = async ({ mainChanges = [], prChanges = [], runs, jobs, compare = 'ahead', baseRef = 'main', apiFails = false }) => {
+    const { dir, git, mOld } = build({ mainChanges, prChanges });
+    try {
+      const api = async (p) => {
+        if (apiFails) throw new Error('503');
+        if (p.startsWith('actions/workflows/')) return { workflow_runs: runs(mOld) };
+        const m = /^actions\/runs\/(\d+)\/jobs/.exec(p);
+        if (m) return jobs[m[1]];
+        if (p.startsWith('compare/')) return { status: compare };
+        throw new Error(`unmocked ${p}`);
+      };
+      return (await carry({ prNumber: '7', headRef: 'pr', baseRef, runId: '99' }, { api, git, fetch: () => {} })).carried;
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  const green = { runs: (m) => [run(1, '1', m)], jobs: { 1: shardJobs('success') } };
+  const cases = [
+    [await decide({ ...green, mainChanges: ['src/b.ts'] }), true, 'carry: main changed only a file the PR does not touch'],
+    [await decide({ ...green, mainChanges: ['src/b.ts', 'scripts/c.mjs', 'PLAN.md'] }), true, 'carry: main changed site, script and docs files the PR does not touch'],
+    [await decide({ ...green, prChanges: ['PLAN.md'] }), true, 'carry: the PR\'s new push changed only PLAN.md'],
+    [await decide({ ...green, mainChanges: ['src/a.ts'] }), false, 'no carry: main changed a file the PR touches'],
+    [await decide({ ...green, mainChanges: ['src/b.ts'], prChanges: ['scripts/c.mjs'] }), false, 'no carry: the PR changed a Mac script since the run'],
+    [await decide({ ...green, prChanges: ['src/a.ts'] }), false, 'no carry: the PR changed its own site file since the run'],
+    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(2, '2', m, 'failure'), run(1, '1', m)], jobs: { 1: shardJobs('success'), 2: shardJobs('failure') } }), false, 'no carry: a newer Mac run went red'],
+    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(2, '2', m), run(1, '1', m)], jobs: { 1: shardJobs('success'), 2: skippedJobs } }), true, 'carry: passes over a newer run that skipped the Mac'],
+    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(2, '2', m, 'cancelled'), run(1, '1', m)], jobs: { 1: shardJobs('success') } }), true, 'carry: passes over a cancelled run'],
+    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [run(1, '1', m)], jobs: { 1: skippedJobs } }), false, 'no carry: no earlier run ran the Mac'],
+    [await decide({ ...green, mainChanges: ['src/b.ts'], compare: 'diverged' }), false, 'no carry: the old base is not an earlier main'],
+    [await decide({ ...green, mainChanges: ['src/b.ts'], apiFails: true }), false, 'no carry: the API fails'],
+    [await decide({ ...green, mainChanges: ['src/b.ts'], baseRef: 'feature' }), false, 'no carry: the PR is not against main'],
+    [await decide({ mainChanges: ['src/b.ts'], runs: (m) => [{ ...run(1, '1', m), pull_requests: [{ number: 8 }] }], jobs: { 1: shardJobs('success') } }), false, 'no carry: the green run was another PR\'s'],
+  ];
+  let bad = 0;
+  for (const [got, want, what] of cases) {
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
+  return bad;
 }
 
 if (process.argv.includes('--reaching')) {
@@ -249,9 +443,26 @@ if (process.argv.includes('--reaching')) {
     why = mac
       ? `${reaching.length} of ${files.length} changed files reach a Mac shard, first ${reaching.slice(0, 5).join(', ')}`
       : `none of the ${files.length} changed files reaches a Mac shard: ${files.join(', ')}`;
+    if (mac) {
+      const verdict = await carry({
+        prNumber: process.env.PR_NUMBER,
+        headRef: process.env.GITHUB_HEAD_REF,
+        baseRef: process.env.GITHUB_BASE_REF,
+        runId: process.env.GITHUB_RUN_ID,
+      }, liveDeps());
+      if (verdict.carried) {
+        mac = false;
+        why = `${why}; ${verdict.why}`;
+        // For the deploy gate (deploygate.sh), which reads this job's
+        // annotations to follow a carried run back to the run that passed.
+        console.log(`::notice title=carried::run ${verdict.run} tests ${verdict.tested}`);
+      } else {
+        why = `${why}; not carried: ${verdict.why}`;
+      }
+    }
   }
   console.log(why);
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\n`);
 } else {
-  selftest();
+  await selftest();
 }

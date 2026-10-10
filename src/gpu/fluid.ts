@@ -548,6 +548,11 @@ export class WebGPUFluid {
   private readonly dyeFormat: GPUTextureFormat;
 
   private readonly dye: PingPong;
+  public readonly chem: PingPong;
+  public readonly activeMat: PingPong;
+  public chemLive = false;
+  private readonly liquids0: PingPong;
+  private readonly liquids1: PingPong;
   private readonly vel: PingPong;
   private readonly squeeze: PingPong;
   /** The plate shape the gap was last laid at; a change re-seeds it. */
@@ -891,6 +896,7 @@ export class WebGPUFluid {
       ['gapReshape', [RG32], false],
       ['deltaDye', [dye], true],
       ['deltaVel', [VEL], true],
+      ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RG32], true],
       ['scaleDye', [dye], true],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
@@ -944,6 +950,8 @@ export class WebGPUFluid {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      ['liquidSplat0', [VEL], false],
+      ['liquidSplat1', [VEL], false],
       /*
         The dye across faces is also how the dye moves wherever the maze
         flows (the advect dye stage), from the maze's first step, so a look
@@ -1006,7 +1014,11 @@ export class WebGPUFluid {
       ['mixForce', [VEL], false],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
-      ['depositChem', [dye], false],
+      ['depositChem', [dye], open.chemistry],
+      ['grayScott', [VEL], open.chemistry],
+      ['addReagent', [VEL], false],
+      ['seedChem', [VEL], open.chemistry],
+      ['advectChem', [VEL], open.chemistry],
       ['drainVel', [VEL], false],
     ];
     // The ones asked for by name alone, each with the one format it writes:
@@ -1073,6 +1085,7 @@ export class WebGPUFluid {
       ...THIN_GAP_KERNELS.map((name): [string, string] => [`${name}:thin`, kernel(name, 'rgba16float')]),
       [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
+      [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
     ];
   }
 
@@ -1122,6 +1135,10 @@ export class WebGPUFluid {
     }));
 
     this.dye = pp(this.N, this.dyeFormat, 'dye');
+    this.chem = pp(this.N, 'rgba16float', 'chem');
+    this.activeMat = pp(this.N, 'r32float', 'activeMat');
+    this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
+    this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
     this.squeeze = pp(this.N, RG32, 'squeeze');
     /*
@@ -1205,7 +1222,7 @@ export class WebGPUFluid {
     return buf;
   }
 
-  private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline {
+  private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline | null {
     return this.pipelines.computePipeline(`${name}:${format}`, kernel(name, format));
   }
 
@@ -1219,6 +1236,7 @@ export class WebGPUFluid {
     size = this.N,
   ): void {
     const pipe = this.pipeline(name, dst.format);
+    if (!pipe) return;
     const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => (r instanceof GPUTexture ? r.label : 'sampler')).join(',')}:${args.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1234,6 +1252,7 @@ export class WebGPUFluid {
   /** As run, with the pressure buffer bound after the texture written. */
   private runPressed(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
+    if (!pipe) return;
     const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => r.label).join(',')}:${args.label}:press`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1253,6 +1272,7 @@ export class WebGPUFluid {
    */
   private runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
+    if (!pipe) return;
     const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1280,6 +1300,7 @@ export class WebGPUFluid {
    */
   private runPhaseAdvect(pass: GPUComputePassEncoder, args: GPUBuffer): void {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
+    if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}`;
     let group = this.groups.get(key);
@@ -1304,8 +1325,11 @@ export class WebGPUFluid {
    * the read field whatever the count.
    */
   private runPhasePlanned(pass: GPUComputePassEncoder, least: number, disp: number, stand: GPUTexture): void {
-    const w = Math.ceil(this.N / 8);
     const plan = this.pipeline('phasePlan', R32);
+    const adv = this.pipeline('phaseAdvectPlan', this.phase.write.format);
+    const grid = this.pipeline('phaseGridPlan', this.phase.write.format);
+    if (!plan || !adv || !grid) return;
+    const w = Math.ceil(this.N / 8);
     const planArgs = this.arg('phase plan', [least, CARRY_SUBSTEPS, w, 0]);
     let group = this.groups.get(`phasePlan:${planArgs.label}`);
     if (!group) {
@@ -1315,8 +1339,6 @@ export class WebGPUFluid {
     pass.setPipeline(plan);
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(1);
-    const adv = this.pipeline('phaseAdvectPlan', this.phase.write.format);
-    const grid = this.pipeline('phaseGridPlan', this.phase.write.format);
     const gap = this.ensurePhaseGap();
     const there = this.phase.read, back = this.phase.write;
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
@@ -1346,6 +1368,7 @@ export class WebGPUFluid {
   /** The gap as the phase has now seen it (phaseGapSeen), every step the phase moves, whichever solver. */
   private runPhaseGapSeen(pass: GPUComputePassEncoder): void {
     const pipe = this.pipeline('phaseGapSeen', R32);
+    if (!pipe) return;
     const key = `phaseGapSeen:${this.squeeze.read.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1365,31 +1388,34 @@ export class WebGPUFluid {
 
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
-    f[0] = this.N; f[1] = this.L; f[2] = p.dt; f[3] = p.time; f[4] = disp; f[5] = p.visc;
-    f[6] = p.turbScale; f[7] = p.spin; f[8] = p.immiscibility; f[9] = 0;
-    f[10] = p.vibIntensity; f[11] = p.vibFrequency; f[12] = p.drip; f[13] = p.air;
-    f[14] = p.smearX; f[15] = p.smearY;
+    const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
+    f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
+    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = 0;
+    f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
+    f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
       neither damps nor clamps it: only the heat decays there.
     */
     const thin = this.thinGapOn(p);
-    f[16] = thin ? 1 : p.damping; f[17] = p.heatDecay; f[18] = thin ? 1000 : MAX_SPEED; f[19] = p.evapFactor; f[20] = p.sharpness;
-    i[21] = Math.max(1, Math.min(4, Math.round(p.turbDetail)));
-    f[22] = p.currentDamp; f[23] = p.currentBuoy; f[24] = p.currentGrav; f[25] = 0;   // the motor's stir's slot, empty since PLAN 22j
-    f[26] = p.meanDensity; f[27] = p.maxCurrent;
+    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
+    i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
+    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
+    f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
-    f[28] = thin ? 0 : p.rockX; f[29] = thin ? 0 : p.rockY;
-    f[30] = p.plateCurve; f[31] = p.gapSpring; f[32] = p.gapMemory;
-    const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
-    f[34] = -(p.gravityX ?? 0) / gl; f[35] = -(p.gravityY ?? -1) / gl;
-    const extras = p.magnetStrength > 0.0001 ? p.extraMagnets ?? [] : [];
+    f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
+    f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5); f[33] = fin(p.cometY, 0);
+    const gx = fin(p.gravityX, 0), gy = fin(p.gravityY, -1);
+    const gl = Math.hypot(gx, gy) || 1;
+    f[34] = -gx / gl; f[35] = -gy / gl;
+    const magStrength = fin(p.magnetStrength, 0);
+    const extras = magStrength > 0.0001 ? p.extraMagnets ?? [] : [];
     for (let k = 0; k < 3; k++) {
       const m = extras[k];
-      f[36 + k * 4] = m?.x ?? 0; f[37 + k * 4] = m?.y ?? 0;
-      f[38 + k * 4] = p.magnetHeight; f[39 + k * 4] = m ? p.magnetStrength : 0;
+      f[36 + k * 4] = fin(m?.x, 0); f[37 + k * 4] = fin(m?.y, 0);
+      f[38 + k * 4] = fin(p.magnetHeight, 0.05); f[39 + k * 4] = m ? magStrength : 0;
     }
-    f[48] = p.magnetRadius ?? MAGNET_RADIUS;
+    f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1406,6 +1432,15 @@ export class WebGPUFluid {
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.div, this.divRaw]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
+    if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
+    this.mixLive = false;
+    this.rxnLive = false;
+    this.liesLive = false;
     this.clearBuffer(pass, this.press, 'clear pressure');
     this.clearBuffer(pass, this.spress, 'clear squeeze pressure');
     // At the dome's own shape, not flat: a plate filled flat then sprung
@@ -1429,6 +1464,8 @@ export class WebGPUFluid {
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
@@ -1544,8 +1581,9 @@ export class WebGPUFluid {
    * `box` is where it lands, in plate coordinates (0..1). `flipY` is for a
    * source that counts its rows downwards, which a 2D canvas does.
    */
-  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
-    const w = src.width, h = src.height;
+  pourImage(src: ImageData | ImageBitmap | HTMLCanvasElement | HTMLVideoElement, box: [number, number, number, number], opts: { strength?: number; floor?: number; flipY?: boolean } = {}): void {
+    const w = 'videoWidth' in src ? src.videoWidth : src.width;
+    const h = 'videoHeight' in src ? src.videoHeight : src.height;
     if (!w || !h) return;
     const tex = this.device.createTexture({
       label: 'pour source', size: [w, h], format: 'rgba8unorm',
@@ -1605,6 +1643,7 @@ export class WebGPUFluid {
     cache = true,
   ): void {
     const pipe = this.pipelines.computePipeline(`${name}:${format}`, splatKernel(name, format));
+    if (!pipe) return;
     const label = (r: GPUBuffer | GPUTexture | GPUSampler) => (r instanceof GPUSampler ? 'sampler' : r.label);
     const key = `splat ${name}:${format}:${rest.map(label).join(',')}`;
     let group = cache ? this.groups.get(key) : undefined;
@@ -1638,9 +1677,11 @@ export class WebGPUFluid {
       this.run(pass, 'bodyLand', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.mix.read], this.arg('none', [0, 0, 0, 0]));
       od.swap();
     }
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
     this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
+    this.vel.swap();
+    this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
     this.vel.swap();
     this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
@@ -1655,6 +1696,55 @@ export class WebGPUFluid {
    * GPU twin of `lib/chemistry.ts`, which was never wired in and has gone
    * (S13); the show grows the reaction on the CPU and lays its dye from there.
    */
+  
+  
+  addReagent(x: number, y: number, radius: number, amount: number, pattern_val: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'add reagent' });
+    const pass = enc.beginComputePass({ label: 'add reagent' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'addReagent', this.chem.write, [this.chem.read],
+      this.arg('reagent splat', [x, y, radius, amount, pattern_val, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  seedChemistry(x: number, y: number, radius: number): void {
+    const enc = this.device.createCommandEncoder({ label: 'seed chemistry' });
+    const pass = enc.beginComputePass({ label: 'seed chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'seedChem', this.chem.write, [this.chem.read],
+      this.arg('seedChem splat', [x, y, radius, 0, 0, 0, 0, 0]), this.N);
+    this.chem.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+    this.chemLive = true;
+  }
+
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5): void {
+    if (!this.chemLive) return;
+    const enc = this.device.createCommandEncoder({ label: 'step chemistry' });
+    const pass = enc.beginComputePass({ label: 'step chemistry' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    // feed and kill in z and w, Du and Dv in x and y
+    // 1. Advect the chemistry using the fluid's velocity field
+    const disp = this.simF[2] * this.L;
+    this.run(pass, 'advectChem', this.chem.write, [this.chem.read, this.vel.read, this.sampler], this.arg('advect chem', [disp, 0, 0, 0]));
+    this.chem.swap();
+
+    const args = this.arg('chem rates', [Du, Dv, feed, kill, 0, 0, 0, 0]);
+    for (let i = 0; i < iters; i++) {
+      this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
+      this.chem.swap();
+    }
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
   depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22): void {
     if (amount <= 0) return;
     const log = dyeAbsorbances(...colour);
@@ -1740,6 +1830,10 @@ export class WebGPUFluid {
     if (!this.phaseLive) this.phaseGapPrimed = false;
     this.thinLive = thin;
     this.writeSim(p, disp);
+    if (p.rawSim) {
+      p.rawSim(this.simF);
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    }
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
     /*
@@ -1863,32 +1957,36 @@ export class WebGPUFluid {
         this between steps, it carries on from where the last one left off.
       */
       const rb = this.pipelines.computePipeline('squeezeRedBlack', kernel('squeezeRedBlack', 'r32float'));
-      const half = Math.ceil((this.N * (this.N / 2)) / 64);
-      for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
-        for (const parity of [0, 1]) {
-          const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
-          let group = this.groups.get(key);
-          if (!group) {
-            group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
-            this.groups.set(key, group);
+      if (rb) {
+        const half = Math.ceil((this.N * (this.N / 2)) / 64);
+        for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
+          for (const parity of [0, 1]) {
+            const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
+            let group = this.groups.get(key);
+            if (!group) {
+              group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
+              this.groups.set(key, group);
+            }
+            pass.setPipeline(rb);
+            pass.setBindGroup(0, group);
+            pass.dispatchWorkgroups(half);
           }
-          pass.setPipeline(rb);
-          pass.setBindGroup(0, group);
-          pass.dispatchWorkgroups(half);
         }
       }
 
       const sv = this.pipelines.computePipeline('squeezeVelBuf', kernel('squeezeVelBuf', 'rgba16float'));
-      const svKey = `squeezeVelBuf:${this.vel.write.label}:${this.squeeze.read.label}`;
-      let svGroup = this.groups.get(svKey);
-      if (!svGroup) {
-        svGroup = bindGroup(this.device, sv, [this.sim, none, this.vel.read, this.squeeze.read, this.vel.write, this.spress]);
-        this.groups.set(svKey, svGroup);
+      if (sv) {
+        const svKey = `squeezeVelBuf:${this.vel.write.label}:${this.squeeze.read.label}`;
+        let svGroup = this.groups.get(svKey);
+        if (!svGroup) {
+          svGroup = bindGroup(this.device, sv, [this.sim, none, this.vel.read, this.squeeze.read, this.vel.write, this.spress]);
+          this.groups.set(svKey, svGroup);
+        }
+        pass.setPipeline(sv);
+        pass.setBindGroup(0, svGroup);
+        pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
+        this.vel.swap();
       }
-      pass.setPipeline(sv);
-      pass.setBindGroup(0, svGroup);
-      pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
-      this.vel.swap();
     });
 
     // 3. Viscous diffusion of momentum (xy) and heat (z)
@@ -2245,9 +2343,18 @@ export class WebGPUFluid {
       if (!bodiesOn && thin) {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
         speciesCarried = !!rider;
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
         return;
       }
-      if (!bodiesOn) { this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); return; }
+      if (!bodiesOn) { 
+        this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids0, this.velForced, disp, 'dye'); 
+        this.macCormack(pass, this.liquids1, this.velForced, disp, 'dye');
+        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
+        return; 
+      }
       /*
         With Oil Bodies, the dye and the oil's share of it cross the same
         faces as the oil does (bodyAdvect, and why). A share left from an
@@ -2274,6 +2381,9 @@ export class WebGPUFluid {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
         speciesCarried = !!rider;
         this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -2281,6 +2391,14 @@ export class WebGPUFluid {
       this.dye.swap();
       this.runPressed(pass, 'bodyAdvect', od.write, [od.read, this.velForced], adv);
       od.swap();
+      this.runPressed(pass, 'bodyAdvect', this.liquids0.write, [this.liquids0.read, this.velForced], adv);
+      this.liquids0.swap();
+      this.runPressed(pass, 'bodyAdvect', this.liquids1.write, [this.liquids1.read, this.velForced], adv);
+      this.liquids1.swap();
+      if (this.chemLive) {
+        this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
+        this.chem.swap();
+      }
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
@@ -3028,6 +3146,27 @@ export class WebGPUFluid {
    * Pour into the mix: oil, surfactant and acidity (+ acid, − base), each an
    * amount in `what`, as a soft disc at (x, y) in plate units.
    */
+  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void {
+    const take = Math.min(1, Math.max(0, amount)) * 0.6;
+    const soap = (what.soap ?? 0) * amount;
+    const body = (what.body ?? 0) * amount;
+    const repel = (what.repel ?? 0) * amount;
+    const weight = what.weight ?? 0;
+    const polar = what.polarity ?? 0;
+    const enc = this.device.createCommandEncoder({ label: 'add liquid drop' });
+    const pass = enc.beginComputePass({ label: 'add liquid drop' });
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
+    this.run(pass, 'liquidSplat0', this.liquids0.write, [this.liquids0.read],
+      this.arg('liquid splat 0', [x, y, radius, take, soap, body, repel, weight]));
+    this.liquids0.swap();
+    this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
+      this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
+    this.liquids1.swap();
+    pass.end();
+    this.device.queue.submit([enc.finish()]);
+  }
+
   addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
     const m = this.ensureMix();
     const enc = this.device.createCommandEncoder({ label: 'add mix' });
@@ -3146,6 +3285,8 @@ export class WebGPUFluid {
     const enc = this.device.createCommandEncoder({ label: 'clear chemistry' });
     const pass = enc.beginComputePass();
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
@@ -3505,6 +3646,7 @@ export class WebGPUFluid {
    */
   private clearBuffer(pass: GPUComputePassEncoder, buf: GPUBuffer, key: string): void {
     const pipe = this.pipelines.computePipeline('mgZero', kernel('mgZero', 'r32float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       // The Sim, then the Args, then the buffer: every kernel here takes
@@ -3524,6 +3666,7 @@ export class WebGPUFluid {
   /** Red-black sweeps on level 0, the packed buffer. */
   private smooth0(pass: GPUComputePassEncoder, sweeps: number): void {
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
+    if (!pipe) return;
     const half = Math.ceil((this.N * (this.N / 2)) / 64);
     for (let k = 0; k < sweeps; k++) {
       for (const parity of [0, 1]) {
@@ -3544,6 +3687,7 @@ export class WebGPUFluid {
   /** A one-dimensional dispatch over buffers, its bind group cached under `key`. */
   private dispatchBuf(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count: number): void {
     const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...resources]);
@@ -3557,6 +3701,7 @@ export class WebGPUFluid {
   /** As dispatchBuf, over the grid in 8 × 8 tiles, with no args of its own. */
   private dispatchBuf2(pass: GPUComputePassEncoder, name: string, key: string, resources: (GPUBuffer | GPUTexture)[]): void {
     const pipe = this.pipelines.computePipeline(name, kernel(name, 'r32float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, this.arg('none', [0, 0, 0, 0]), ...resources]);
@@ -3646,16 +3791,18 @@ export class WebGPUFluid {
     }
 
     const grad = this.pipelines.computePipeline('gradientSubtractBuf', kernel('gradientSubtractBuf', 'rgba16float'));
-    const gkey = `gradientSubtractBuf:${this.vel.write.label}`;
-    let ggroup = this.groups.get(gkey);
-    if (!ggroup) {
-      ggroup = bindGroup(this.device, grad, [this.sim, none, this.vel.read, this.vel.write, this.press]);
-      this.groups.set(gkey, ggroup);
+    if (grad) {
+      const gkey = `gradientSubtractBuf:${this.vel.write.label}`;
+      let ggroup = this.groups.get(gkey);
+      if (!ggroup) {
+        ggroup = bindGroup(this.device, grad, [this.sim, none, this.vel.read, this.vel.write, this.press]);
+        this.groups.set(gkey, ggroup);
+      }
+      pass.setPipeline(grad);
+      pass.setBindGroup(0, ggroup);
+      pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
+      this.vel.swap();
     }
-    pass.setPipeline(grad);
-    pass.setBindGroup(0, ggroup);
-    pass.dispatchWorkgroups(Math.ceil(this.N / 8), Math.ceil(this.N / 8));
-    this.vel.swap();
   }
 
   /**
@@ -3905,6 +4052,7 @@ export class WebGPUFluid {
     // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
     const pipe = this.pipeline(kernelName, field.format);
+    if (!pipe) return;
     const group = (src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
       const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}`;
       let g = this.groups.get(key);
@@ -3949,6 +4097,7 @@ export class WebGPUFluid {
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
   private hsRun(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count?: number): void {
     const pipe = this.pipelines.computePipeline(`${name}:thin`, kernel(name, 'rgba16float'));
+    if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...resources]);
@@ -4226,6 +4375,7 @@ export class WebGPUFluid {
 
   private statsRun(pass: GPUComputePassEncoder, name: string, rest: (GPUBuffer | GPUTexture)[], groups: number): void {
     const pipe = this.pipelines.computePipeline(name, STATS_KERNELS[name]);
+    if (!pipe) return;
     // The dye is a ping-pong, so the key has to name the half that is bound:
     // a group cached under the kernel's name alone would go on measuring
     // whichever texture happened to be the read side when it was made.
@@ -4267,8 +4417,9 @@ export class WebGPUFluid {
   get rbVelView(): Float32Array { return this.rbVel; }
 
   /** Read a field straight out, waiting for the GPU. For the parity harness, not the show. */
-  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species'): Promise<Float32Array> {
+  async readField(which: 'dye' | 'vel' | 'grain' | 'oilDye' | 'species' | 'mix'): Promise<Float32Array> {
     const src = which === 'dye' ? this.dye.read : which === 'vel' ? this.velForced : which === 'oilDye' ? this.oilDye?.read
+      : which === 'mix' ? (this.mixLive ? this.mix?.read : this.blank('rgba'))
       : which === 'species' ? (this.speciesLive ? this.species?.read : this.blank('rgba')) : this.grain?.read;
     if (!src) throw new Error(`no ${which} field`);
     this.simF[0] = this.N; this.simF[1] = this.L;
@@ -4323,6 +4474,7 @@ export class WebGPUFluid {
       lies: this.liesLive && this.lies ? this.lies.read : null,
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
+      chem: this.chemLive ? this.chem.read : null,
     };
   }
 

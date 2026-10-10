@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — an Alpha label beside the name
+
+- ChromaGlass is in alpha, and the app says so: an amber "Alpha" beside the name on
+  the Perform and Design desks, as a tab on the top card on a phone or a narrow
+  window, and beside "Remote" on the phone remote. It is never on the plate.
+  `npm run layout` checks it on both desks and at phone width.
+
 ### Changed — more colours in the looks, and the hues between them (PLAN 18l)
 
 - Most looks carry five or six dyes of one family of neighbouring hues, and five

@@ -159,7 +159,11 @@ try {
     return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0;
   }, null, { timeout: 10_000 }).catch(() => {});
   const off = await window_(12000);
-  const clock = await beat();
+  // The clock and the tempo source it is handed, read together. No optional
+  // chaining on the hook: a page without it throws here rather than reading
+  // as "no tempo", which the check below would only report as a red it
+  // could not explain.
+  const { clock, tempo } = await page.evaluate(() => ({ clock: window.chromaglassDebug().beat, tempo: window.chromaglassTempo() }));
   console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
 
   if (errors.length) {
@@ -181,16 +185,49 @@ try {
     // unknown look falls back to a random one, and a stalled plate presses
     // nothing while the kicks, counted a frame, go on.
     check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
-      on.squeeze === 0.9 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
+      on.squeeze === 0.1 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
-    // At the tapped 150 bpm the clock beats every 400 ms (as tapped), and still does
-    // after both windows: tapped, the tempo stays until it is cleared. (Its
-    // confidence is not asked: driven it is set to 1 each frame and then
-    // loses 0.02 on any frame 3 s past the last onset heard, so it reads
-    // 0.98 as often as 1 while the tap is driving perfectly well.)
+    /*
+      At the tapped 150 bpm the clock beats every 400 ms, and still does
+      after both windows: tapped, the tempo stays until it is cleared. (Its
+      confidence is not asked: driven it is set to 1 each frame and then
+      loses 0.02 on any frame 3 s past the last onset heard, so it reads
+      0.98 as often as 1 while the tap is driving perfectly well.)
+
+      Asked as two claims, each on one stopwatch (PLAN 0-tap). It used to be
+      one: the clock's period within 2 ms of the harness's mean tap interval.
+      But the harness stamps a tap in the page just before it calls
+      `chromaglassAction('tap-tempo')`, and the app stamps it again inside
+      `tapTempo`, so a pause between the two (a collection, the first call
+      into `runAction` on a busy runner) lands in one mean and not the
+      other. Both Mac reds read the clock short of the harness: 396.6
+      against 401.4 ms (#195's deploy) and 401.7 against 404.1 (#216's show
+      shard), a first stamp 14.4 and 7.2 ms late spread over three gaps,
+      while the clock, as the code reads, is on the app's own period every
+      frame: the feature worked and the check measured the dispatch.
+
+      First, the feature: the clock runs on the tempo source's own period.
+      `setExternal` copies it every frame with the same clamp, so the two
+      agree exactly; 0.5 ms leaves room only for a heard onset nudging the
+      period between a frame and this read. A tap that never reached the
+      source (no tempo) or a clock that ignores it (the ear's 492 ms, or 0)
+      is red here.
+    */
+    const sourcePeriod = tempo && tempo.source === 'tap' && tempo.period > 0 ? tempo.period : 0;
     check('the tapped beat drives the show\'s clock, the band playing under it',
-      Math.abs(clock.period - tapped) < 2 && Math.abs(tapped - 60000 / 122) > 15,
-      `a beat every ${clock.period.toFixed(1)} ms, tapped ${tapped.toFixed(1)} ms apart (${(60000 / tapped).toFixed(1)} bpm; the band plays 122, 492 ms)`);
+      sourcePeriod > 0 && Math.abs(clock.period - sourcePeriod) <= 0.5 && Math.abs(sourcePeriod - 60000 / 122) > 15,
+      `a beat every ${clock.period.toFixed(1)} ms, the tapped tempo ${sourcePeriod ? sourcePeriod.toFixed(1) + ' ms' : 'not set'} (the band plays 122, 492 ms)`);
+    /*
+      Second, that the taps the app counted are the harness's taps, across
+      the two stopwatches, so here the dispatch is allowed for. 30 ms is
+      six times the worst gap between the two means seen (4.8 ms), and a
+      tap dropped or counted twice moves a mean of three 400 ms gaps by
+      100 ms or more (one dropped leaves 400 and 800, a mean of 600; one
+      counted twice 30 ms late adds a fourth gap, a mean of 300).
+    */
+    check('and the tapped tempo is the one the harness tapped',
+      sourcePeriod > 0 && Math.abs(sourcePeriod - tapped) < 30,
+      `the app's ${sourcePeriod ? sourcePeriod.toFixed(1) : '-'} ms against the harness's ${tapped.toFixed(1)} ms (${(60000 / tapped).toFixed(1)} bpm), over four taps`);
     /*
       And kicks on it, as many as the window has beats (three quarters of
       them, for a frame late enough to carry the clock past a beat). Asked
@@ -205,8 +242,8 @@ try {
       `${on.kicks} and ${off.kicks} kicks in ${on.seconds.toFixed(0)} and ${off.seconds.toFixed(0)} s, of ${beats(on).toFixed(0)} and ${beats(off).toFixed(0)} tapped beats`);
     /*
       And pressed as deep as a kick at this look's squeeze: each disc
-      kickDepth(0.9, the bass /70 capped at 1, the accent 1 at Accent 0),
-      0.005 × 0.9 × (0.6 + 0.4 × the bass) since PLAN 27b, so the softest
+      kickDepth(0.1, the bass /70 capped at 1, the accent 1 at Accent 0),
+      0.005 × 0.1 × (0.6 + 0.4 × the bass) since PLAN 27b, so the softest
       kick presses 0.0027 at the middle. On a thin gap a disc is a bowl
       (3 × depth × (1 − r²/R²)², squishDisc), whose mean over its own cells
       is the depth itself, and the three nested discs count each cell once
@@ -216,7 +253,7 @@ try {
       close the gap are counted).
     */
     const meanDepth = on.depth / Math.max(1, on.cells);
-    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.9, 0, 1),
+    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.1, 0, 1),
       `${on.cells} cells laid by kicks, ${perKick.toFixed(0)} a kick, ${meanDepth.toFixed(5)} deep a cell`);
     check('while at 0 the kicks go on and press nothing', off.kicks >= 0.75 * beats(off) && off.cells === 0, `${off.kicks} kicks, ${off.cells} cells`);
     /*

@@ -70,6 +70,25 @@ try {
     check('where the dye they came from is', Math.hypot(r.px - r.dx, r.py - r.dy) < 0.08,
       `particles at ${at(r.px, r.py)}, dye at ${at(r.dx, r.dy)} (its mirror across the middle is ${at(r.dx, 1 - r.dy)})`);
   }
+
+  const r1024 = await page.evaluate(async () => {
+    await lab.create(1024);
+    const solver = lab.solver();
+    const device = solver.device;
+    device.pushErrorScope('validation');
+    lab.dye(0.5, 0.5, 0.1, [1, 0.5, 0.2], 2);
+    lab.flush();
+    await lab.step(2, { particles: 1, particleLife: 4, damping: 0.9 });
+    const err = await device.popErrorScope();
+    const p = solver.particles;
+    return {
+      error: err ? err.message : null,
+      live: p?.live ?? 0,
+      capacity: p?.capacity ?? 0,
+    };
+  });
+  check('at 1024² with particles at 1.0: no validation error', !r1024.error && r1024.live === 4194304,
+    r1024.error ?? `${r1024.live} of ${r1024.capacity} particles live`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

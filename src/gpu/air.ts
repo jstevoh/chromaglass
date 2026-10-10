@@ -202,7 +202,7 @@ export class WebGPUAir {
       }],
       timestampWrites: timing?.('air splat'),
     });
-    if (this.live > 0) {
+    if (this.live > 0 && pipeline) {
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, bindGroup(this.device, pipeline, [this.uniform, this.buffer, this.fingers]));
       pass.draw(4, this.live);

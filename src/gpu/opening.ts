@@ -72,6 +72,8 @@ export interface Opening {
    * at their first steps, with no list naming it.
    */
   spin: boolean;
+  /** The chemistry (Turing patterns). */
+  chemistry: boolean;
 }
 
 /**
@@ -120,5 +122,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     stock: on(s.stock),
     thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
     spin: lookOpensSpinning(s),
+    chemistry: on(s.chemistry),
   };
 }

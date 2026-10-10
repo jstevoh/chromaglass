@@ -2940,7 +2940,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // liquid right there, a flat slab of air being a window, not a lens.
       let lensUv = fuvBase - p * R * (0.35 + 0.45 * play) * dropCam;
       let lensF = decodeFluid(layer0, lensUv, 0.0, false);
-      let lensCol = onGround(bgColor, lensF, dyeThrough);
+      let lensCol = mix(bgColor, lensF.rgb, lensF.a);
       // And the lamp through the clear gap, carrying the liquid's hue
       // (0.18 toward white: measured, see git history of this block).
       let through = mix(tint, vec3f(1.0), 0.18) * (0.45 + 0.5 * h + 0.55 * ground);

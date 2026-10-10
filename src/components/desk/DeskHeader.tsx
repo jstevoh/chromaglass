@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Segmented, StatusDot } from '../ui';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
+import { AlphaBadge } from '../AlphaBadge';
 
 /**
  * The bar across the top of both desks.
@@ -14,16 +15,18 @@ import { LOCKUP_URL, MARK_URL } from '../../brand';
 export type DeskMode = 'perform' | 'design' | 'sequence' | 'sound';
 
 export interface DeskDots {
-  mic: boolean;
-  wall: boolean;
+  sound?: boolean;
+  video?: boolean;
+  mic?: boolean;
+  wall?: boolean;
   midi: boolean;
-  phone: boolean;
-  rec: string | null;
+  phone?: boolean;
+  rec?: string | null;
   /** The performance being recorded, as its clock ("1:23"), or null. */
-  perf: string | null;
+  perf?: string | null;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, onWall, onMidi, onPhone, onPerformance, onSearch, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onPerformance, onSearch, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
@@ -32,17 +35,20 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
   /*
     Every dot opens the thing it reports on.
 
-    A dot that says "Mic" and cannot be clicked is half a control. It is the
+    A dot that says "Sound" and cannot be clicked is half a control. It is the
     one place on either desk where the state of an input is named, so it is
     where a hand goes when that input is the problem — and "which microphone
     is this?" has an answer the app already knows and a picker that was three
     clicks away through a menu that does not mention sound.
   */
-  onMic?: () => void;
+  onSound?: () => void;
+  onVideo?: () => void;
   onWall?: () => void;
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
   onPhone?: () => void;
+  /** Start, stop or manage canvas video recording. */
+  onRecord?: () => void;
   /** Start or stop a performance (T). */
   onPerformance?: () => void;
   onSearch: () => void;
@@ -113,6 +119,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
         */}
         <img src={LOCKUP_URL} alt="ChromaGlass" className="hidden h-7 w-auto shrink-0 xl:block" draggable={false} />
         <img src={MARK_URL} alt="ChromaGlass" className="h-7 w-7 shrink-0 xl:hidden" draggable={false} />
+        <AlphaBadge />
         <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
         {breadcrumb}
       </div>
@@ -161,19 +168,28 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
       </div>
       <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`}>
         <StatusDot
-          on={dots.mic}
-          label="Mic" tight={tight}
-          onClick={onMic}
-          title={dots.mic ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
-          testId="dot-mic"
+          on={dots.sound ?? dots.mic ?? false}
+          label="Sound" tight={tight}
+          onClick={onSound}
+          title={(dots.sound ?? dots.mic) ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
+          testId="dot-sound"
         />
         <StatusDot
-          on={dots.wall}
-          label="Wall" tight={tight}
-          onClick={onWall}
-          title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
-          testId="dot-wall"
+          on={!!dots.video}
+          label="Video" tight={tight}
+          onClick={onVideo}
+          title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
+          testId="dot-video"
         />
+        {onWall && (
+          <StatusDot
+            on={!!dots.wall}
+            label="Wall" tight={tight}
+            onClick={onWall}
+            title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
+            testId="dot-wall"
+          />
+        )}
         <StatusDot
           on={dots.midi}
           label={midiName ?? 'MIDI'} short="MIDI" tight={tight}
@@ -181,14 +197,27 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onMic, on
           title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
           testId="dot-midi"
         />
-        <StatusDot
-          on={dots.phone}
-          label="Phone" tight={tight}
-          onClick={onPhone}
-          title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
-          testId="dot-phone"
-        />
-        {dots.rec && <StatusDot on tone="live" label={`Rec ${dots.rec}`} short="Rec" tight={tight} testId="dot-rec" />}
+        {onPhone && (
+          <StatusDot
+            on={!!dots.phone}
+            label="Phone" tight={tight}
+            onClick={onPhone}
+            title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
+            testId="dot-phone"
+          />
+        )}
+        {dots.rec && (
+          <StatusDot
+            on
+            tone="live"
+            label={`Rec ${dots.rec}`}
+            short="Rec"
+            tight={tight}
+            onClick={onRecord}
+            title={`Recording canvas video (${dots.rec}). Click to manage recording options or press R to stop.`}
+            testId="dot-rec"
+          />
+        )}
         {/*
           Performances start and stop here, by hand (T). They used to follow
           the song detection, which started late and ran on into the next

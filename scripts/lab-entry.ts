@@ -66,7 +66,17 @@ const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) throw new Error('no adapter');
-    const device = await adapter.requestDevice({ requiredFeatures: adapter.features.has('float32-filterable') ? ['float32-filterable'] : [] });
+    const wantLimits: Record<string, number> = {};
+    if (adapter.limits.maxStorageBufferBindingSize) {
+      wantLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
+    }
+    if (adapter.limits.maxBufferSize) {
+      wantLimits.maxBufferSize = adapter.limits.maxBufferSize;
+    }
+    const device = await adapter.requestDevice({
+      requiredFeatures: adapter.features.has('float32-filterable') ? ['float32-filterable'] : [],
+      requiredLimits: wantLimits,
+    });
     device.lost.then((i) => console.log('device lost', i.message));
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });

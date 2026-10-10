@@ -5,7 +5,7 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save,
+  Laptop, Save, Video,
 } from 'lucide-react';
 import { Slider } from '../ui';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -110,6 +110,7 @@ export interface PhoneStageProps {
   paletteLock: number | null;
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
+  onVideoDye: () => void;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -680,6 +681,12 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <ImagePlus size={18} /> A photo as dye
           </button>
+          <button
+            onClick={() => { p.onVideoDye(); close(); }}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-border bg-elevated text-[14px] text-text-2"
+          >
+            <Video size={18} /> A video as dye
+          </button>
         </PhoneSheet>
       )}
 
@@ -721,35 +728,7 @@ export function PhoneStage(p: PhoneStageProps) {
               <p className="-mt-3 text-[12px] leading-snug text-dim">The plate printed as a comic: flat inks, black lines, the pale washes in dots.</p>
             </div>
           )}
-          {p.onBackLook && (
-            <div className="mt-3">
-              <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="group" aria-label="Send a look to">
-                {([['all', 'Whole plate'], ['back', 'Back plate']] as const).map(([v, label]) => (
-                  <button
-                    key={v}
-                    onClick={() => setLookTo(v)}
-                    aria-pressed={lookTo === v}
-                    data-testid={`phone-send-to-${v}`}
-                    className={`h-10 rounded-md text-[14px] ${lookTo === v ? 'bg-accent-bg text-accent-text' : 'text-muted active:bg-active'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-1 flex min-h-[40px] items-center justify-between gap-2">
-                <span className="truncate text-[12px] text-dim" data-testid="phone-back-plate-on">Back plate: {p.backLook ?? 'follows the front'}</span>
-                {p.backLook && (
-                  <button
-                    onClick={() => { p.onBackFollowsFront?.(); setLookTo('all'); }}
-                    data-testid="phone-back-follows-front"
-                    className="h-10 shrink-0 rounded-md border border-border px-3 text-[13px] text-text-2 active:bg-active"
-                  >
-                    Follow front
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {/* The second projector's look routing (§16a) is temporarily hidden per user request */}
           {groups.map(g => (
             <div key={g}>
               <SectionLabel>{g}</SectionLabel>

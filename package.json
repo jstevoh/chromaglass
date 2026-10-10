@@ -126,6 +126,7 @@
     "filmtable": "node scripts/filmtable.mjs",
     "filmlook": "node scripts/filmlook.mjs",
     "particles": "node scripts/particles.mjs",
+    "finite": "node scripts/finite.mjs",
     "derive": "node scripts/derive.mjs",
     "straw": "node scripts/straw.mjs",
     "lift": "node scripts/lift.mjs",
@@ -189,6 +190,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
+    "canvas": "^3.2.3",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.0",

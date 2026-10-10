@@ -81,10 +81,19 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 2
+      # Since PLAN.md 19i a diff that does reach a Mac shard is asked once
+      # more: if it differs from this PR's last run that passed the Mac only in
+      # files the PR does not touch (main's, merged in) or files no Mac shard
+      # reads, that run's result is carried and the shards are skipped. The
+      # job leaves a "carried" notice naming the run, which the deploy gate
+      # follows back to it. The earlier runs are read with this job's token
+      # (the repository's default is read for every scope).
       - name: Which files reach a Mac shard
         id: reach
         env:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 

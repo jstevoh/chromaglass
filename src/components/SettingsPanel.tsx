@@ -74,6 +74,8 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
 }
 
 interface SettingsPanelProps {
+  onPourVideo?: (file: File) => void;
+  onStopPourVideo?: () => void;
   settings: VisualizerSettings;
   /**
    * Song detection, the master switch: whether the app listens for which song
@@ -342,7 +344,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   const markInputRef = useRef<HTMLInputElement>(null);
@@ -1587,6 +1589,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="chemistry"
         />
         <Slider
+          label="↳ Pattern (Spots to Labyrinth)"
+          value={settings.chemistryPattern ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ chemistryPattern: v })}
+          settingKey="chemistryPattern"
+        />
+        <Slider
+          label="↳ Pattern Width"
+          value={settings.chemistryWidth ?? 0.5}
+          min={0.1}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ chemistryWidth: v })}
+          settingKey="chemistryWidth"
+        />
+        <Slider
           label="Gel Wheel"
           value={settings.gelWheel ?? 0}
           min={0}
@@ -1640,7 +1660,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {/* The Room Section */}
       <section id="settings-room" className={`${SECTION_CARD} ${shown('room') ? SECTION_GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
         <h3 className={SECTION_TITLE}>
-          <Video size={12} /> The Room
+          <Camera size={12} /> The Room
         </h3>
         <Info>
           The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
@@ -1774,7 +1794,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       */}
       <section id="settings-film" className={`${SECTION_CARD} ${shown('film') ? SECTION_GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
         <h3 className={SECTION_TITLE}>
-          <Film size={12} /> Film
+          <Video size={12} /> Video
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
@@ -1836,6 +1856,42 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               Off
             </button>
           </div>
+          
+          {/* Demo Videos */}
+          <div className="mt-3 flex flex-col gap-1">
+            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>
+            {[
+              { src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
+              { src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
+              { src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
+            ].map(v => (
+              <button
+                key={v.src}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(v.src);
+                    const blob = await res.blob();
+                    if (onFilmFile) onFilmFile(new File([blob], v.title, { type: 'video/webm' }));
+                  } catch (e) { console.error('Failed to load demo video', e); }
+                }}
+              >
+                <span className="text-[12px] font-medium">{v.title}</span>
+                <div className="flex gap-3">
+                  <span className="text-[10px] text-white/40 hover:text-white px-1" onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      const res = await fetch(v.src);
+                      const blob = await res.blob();
+                      if (onPourVideo) onPourVideo(new File([blob], v.title, { type: 'video/webm' }));
+                    } catch (e) { console.error('Failed to load demo video', e); }
+                  }}>Pour as Dye</span>
+                  <span className="text-[10px] text-white/40 hover:text-white px-1">Load Film</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
           <Info>
             <span className="text-white/60">Window</span> is the way to a film you did not download.
             Open one in another tab — the Internet Archive's Prelinger collection is thousands of
@@ -3471,6 +3527,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ centerGravity: v })}
           settingKey="centerGravity"
         />
+        <Slider
+          label="Comet Flow"
+          value={settings.cometSpeed}
+          min={0}
+          max={2.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ cometSpeed: v })}
+          settingKey="cometSpeed"
+        />
+        {(settings.cometSpeed ?? 0) > 0 && (
+          <div className="pl-4 border-l-2 border-white/10 ml-2">
+            <Slider
+              label="Flow Direction"
+              value={settings.cometAngle}
+              min={0}
+              max={360}
+              step={5}
+              onChange={(v: number) => onUpdate({ cometAngle: v })}
+              settingKey="cometAngle"
+            />
+          </div>
+        )}
         <Slider
           label="Gooey Blending"
           value={settings.gooeyEffect}

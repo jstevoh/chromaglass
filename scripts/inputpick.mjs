@@ -101,7 +101,7 @@ try {
   const [one, two] = inputs;
 
   // The way a hand gets there: the desk's Mic dot opens the settings at the input.
-  await page.click('[data-testid="dot-mic"]');
+  await page.click('[data-testid="dot-sound"]');
   const picker = page.locator('[data-testid="audio-input"]');
   await picker.waitFor({ state: 'visible' });
   await page.waitForFunction((ids) => ids.every((id) => [...document.querySelectorAll('[data-testid="audio-input"] option')].some((o) => o.value === id)),

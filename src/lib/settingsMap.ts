@@ -75,7 +75,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     here too, because nobody loads a reel and then goes to a different
     section to see it.
   */
-  { id: 'film', name: 'Film', category: 'inputs',
+  { id: 'film', name: 'Video', category: 'inputs',
     terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
   /*
     The patch bay, with every master over it.

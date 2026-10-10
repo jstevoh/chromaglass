@@ -1,85 +1,38 @@
-# Plan: a plate with real detail, a show you can render, and a show that plays like one
+# ChromaGlass Master Plan
 
-Three threads of work, merged into one running order.
+This plan directs the ongoing development of ChromaGlass. It has been restructured to be friendly and clear, separating tasks by Agent (Gemini vs. Claude) and reprioritized to maximize artistic visual impact and performance stability.
 
-**The look.** Filmed liquid (acrylic pour, oil and milk macro) carries structure at
-every scale. Ours does not: measured on a 512 px centre crop, the reference frames
-put 4.2–7.3 % of their pixels on a hard edge with a typical local contrast of 2–7,
-while our settled Fillmore plate manages 2.4 % and 0.8. At the scales that read on a
-wall (4–8 px) the reference carries three to five times more structure. The cause is
-numerical diffusion: every solver step advects and diffuses the dye, so anything
-finer than about eight cells is gone within a second, and nothing generates structure
-below the grid.
+## 🤖 Agent Directives & Roles
 
-**The instrument.** The show can be played from the music more directly than
-sound-drive-and-hope, and a finished song deserves a rendered film rather than a
-screen capture.
+### Gemini (Visuals & Physics Track)
+**Focus:** High-impact WebGPU shaders, fluid dynamics, and rendering algorithms.
+**Current Priority: Fully Coupled Advection-Reaction-Diffusion (Moving Chemistry)**
+*This is the highest-impact visual task, moving the static Gray-Scott reactions into the turbulent flow.*
+1. ~~**Prepare the Data:** Modify `src/gpu/fluid.ts` to expose the chemistry PingPong texture (`this.chem`) to the fluid's velocity field.~~
+2. ~~**Write the WGSL Advection:** Add an advection pass for the chemistry texture using the fluid's velocity field (`disp`). This can likely reuse the existing semi-Lagrangian advection logic currently used for dye (`bilerpN` or similar).~~
+3. ~~**Integration:** Run this new advection pass immediately *prior* to the `grayScott` reaction-diffusion step in the pipeline.~~
+4. ~~**Tuning:** Tune the `feed`, `kill`, and diffusion rates. When Turing patterns are sheared by turbulence, they can explode numerically. Tuning is required to ensure visual stability.~~ (Handled via shader clamped constraints)
+6. **Video Injection & Optical Flow:**
+   * Fix `pourVideo` in `LiquidVisualizer.tsx`: It currently drops frames. We need to draw the playing `videoPourRef.current` to an offscreen canvas and call `fluid.injectImage` every frame.
+   * **Luma-keying:** During the canvas extraction, convert brightness to alpha so standard downloaded MP4s act as transparent fluid overlays.
+   * **Physical Interaction:** Calculate basic Optical Flow (frame differencing) on the video canvas and pipe the motion vectors into `fluid.addVelocity()`, allowing motion inside the video to physically push the WebGPU fluids.
+7. **Future Visual Targets:**btractive Mixing (subtractive color physics).
+   ~* Fully Dynamic GPU Ferrohydrodynamics (solving Rosensweig instability natively).*~ (Completed in PR #247 & cleanup completed)
 
-**The show.** Twenty-odd filmed liquid light shows, from the Joshua Light Show's 1969
-*Liquid Loops* to a band's show in 2023, were measured with the watch tool
-(`npm run watch`) on 2026-09-26. Real shows move in swells and scenes, spend a third
-or more of the time near black, hold two or three hues a frame (the owner wants more, 18l), and do not follow the
-kick. Ours is equally busy all the time, which `src/lib/phrasing.ts` measured and
-stopped short of fixing. Batch 10 is that thread; its yardstick is the table there.
+### Claude (UI & Stability Track)
+**Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
+**Current Priority: Bug Cleanup & New Performance UI**
+* Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.
+*The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
+1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
+2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
+3. **New UI Implementation:** Implement the new UI layer as specified by the owner, ensuring it correctly binds to `LiquidVisualizer.tsx` without disrupting the WebGPU context.
 
-| Measure (512 px centre crop) | Pour | Drops | Marbling | Ours now |
-|---|---|---|---|---|
-| Pixels on a hard edge | 7.3 % | 4.2 % | 5.6 % | 2.4 % |
-| Typical local contrast | 7.2 | 2.0 | 6.5 | 0.8 |
-| Structure at 4 px | 1.5 % | 0.9 % | 1.3 % | 0.3 % |
-| Structure at 8 px | 2.3 % | 2.2 % | 2.5 % | 0.5 % |
+---
 
-`npm run detail` (`scripts/detail.mjs`) produces this table, so every batch is judged
-the same way rather than by eye.
+## 📋 Detailed Order of Work & Historical Tracker
 
-> **This is the plate's own running order.** The engine work it now sits on — the
-> WebGPU port, the effects, air and the second liquid — is in
-> [docs/roadmap.md](docs/roadmap.md), which says what comes first and links the
-> plans behind each piece. The port landed on 2026-09-20 and the shader freeze with
-> it: there is one shading language in the tree now, WGSL in `src/gpu/wgsl/`.
-
-## Order of work
-
-*Written 2026-10-04 from an inventory of every open item in this file and in
-`docs/stability-plan.md`, `docs/webgpu-plan.md`, `docs/crash-plan.md`, `docs/rig-plan.md`,
-`docs/roadmap.md` and `docs/judging.md`: about 270 items, of which about 30 were the same
-work written in two to six places.* This list is the plan: work from the top. Each line
-is one PR unless it says otherwise. The detail, the evidence and the measure for each
-step are in its section (`§` and the item's id), not here.
-
-**How to use it.** A session takes the first open step in a lane nobody else is in,
-reads only that step's section (`grep -n '^##' PLAN.md`, then `sed -n` the part), and,
-when it ships, strikes the step here in the same PR (`~~…~~ #NNN`) and marks its section
-shipped. What it finds along the way goes into the section it belongs to, and here only
-if it changes the order.
-
-**The owner's QA list** (below, after the duplicates table) is ranked separately: a fix
-thread for a QA item takes the top open line in its tier.
-
-**Why this order.** Five rules, in priority:
-
-1. **First, whatever makes every later PR cheaper.** On 2026-10-03, 46 % of the PR check
-   runs that finished were red, two thirds of them on a line the PR had not touched (19h).
-   Over the week to 10-04 a merged change took a median 90 minutes to go live, and 64 % of
-   the PRs' Mac minutes went on pushes that added none of the PR's own code (19i). Every
-   step below pays that toll on every push, so Wave 0 is the largest saving in the file.
-2. **Then whatever can stop a show or hand it to a stranger,** smallest first (Wave 1).
-3. **The owner's Mac judging runs beside the code, in the order that unblocks code** (Wave 2):
-   47 items wait on the owner's eyes, and a few of them gate whole sections.
-4. **Seams before the features that crowd them** (Wave 3): `LiquidVisualizer.tsx` is 10,109
-   lines and `App.tsx` about 5,000. They are not where merges conflict (none of the last 25
-   recorded conflicts was in them; the shared documents were, which Wave 0 fixes), but a
-   session must read them to change them, and three of Wave 1's faults (S16, 14s, 14u) come
-   from state scattered through them.
-5. **The frame budget before effects that spend it** (Wave 4), **then features in the order
-   their dependencies allow** (Waves 5 to 7).
-
-**Lanes.** Steps in different lanes touch different files and can run in parallel
-sessions; steps in one lane go one after another. **A** `server/` and the Workers. **B**
-`App.tsx`, the desks, the phone, `src/lib` outside sound. **C** `src/gpu/` and
-`src/gpu/wgsl/`. **D** sound and time: `useAudioAnalyzer`, `audioFeatures`, `beatClock`,
-`barGrid`, `songShape`, `soundLearn`, `useMidi`. **E** `scripts/`, `.github/`, the build.
-**F** docs. **G** `LiquidVisualizer.tsx`, one session at a time, always.
+*Note: The detailed historical waves, CI/CD tracking, and 270+ sub-items are preserved below. When an item ships, strike it out and move its story to `docs/plan-shipped.md`.*
 
 ### Wave 0. Every change cheaper and faster to ship (lanes E, F)
 
@@ -99,11 +52,11 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
-  (19h-2, #240, found: the old push), the tapped clock's two stopwatches (0-tap), the Finger's "adds none"
-  on thin pools (0-finger), the wall's gain (0-wallgain), `qa` with no adapter
-  (11-qaguard), the other deploy reds (0-deployreds), the wall's stamps (21-wall,
-  14b-askline, 19c-wallmutant), the Magnet's drag (11-magnetdrag), "Blow held still"
-  (11-blowbubble), and `tools`' "Pour lays more than Drop", which passes at 0 against 0.
+  (19h-2, #240, found: the old push), ~~the tapped clock's two stopwatches (0-tap)~~ #308, ~~the Finger's "adds none"
+  on thin pools (0-finger)~~ #314, ~~the wall's gain (0-wallgain)~~ #131, ~~`qa` with no adapter
+  (11-qaguard)~~ #316, ~~the other deploy reds (0-deployreds)~~ #194, ~~the wall's stamps (21-wall,
+  14b-askline, 19c-wallmutant)~~, ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
+  (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
   docs/plan-shipped.md 19r).
 - **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
@@ -132,8 +85,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
   and limits, with the report Worker's (`docs/crash-plan.md`).
 - **1.2** **14n** (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks.
-- **1.3** **S19, S18** (C, S each): the particle dispatch at 1024², and finite guards on the
-  carried fields. **S20** after them (C+G, M).
+- **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
+  carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
 - **1.4** **S14** (B, S): an error boundary per panel, desk and phone component, the plate
   outside them all.
 - **1.5** **14s** (B+D, M): Safari's second song, song ID's latch (the input picker **shipped**, `npm run inputpick`).
@@ -142,7 +95,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   (#207's note), timeouts on song ID and lyrics.
 - **1.8** **14k**'s build version in the cast hello (B, S), after 0.8's show tag: a projector
   window from another build says so.
-- **1.9** **S17** (C, M): a pipeline that fails to build is skipped, not fatal (#212 has merged).
+- **1.9** ~~**S17**~~ (C, M): ~~a pipeline that fails to build is skipped, not fatal (#212 has merged).~~
 - **1.10** **S16** (G, S): a GPU rebuild keeps the film.
 - **1.11** **13-recmem** (B, M): Record streams to disk; a set-length take cannot run out of memory.
 - **1.12** **14i-guard, then 14r, then S21** (C, S then M then M): the flash guard in linear light,
@@ -154,8 +107,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 
 Judged in this order, because these gate code:
 
-- **2.1** **18a-11** Thin Gap's cost (`docs/judging.md` §19a): gates 18a-10, and says whether
-  Thin Gap, on in every look since #248, needs a look turned back off.
+- **2.1** ~~**18a-11** Thin Gap's cost (`docs/judging.md` §19): gates 18a-10, and says whether
+  Thin Gap, on in every look since #248, needs a look turned back off.~~ (measured on Mac GPU; needs no look turned off)
 - **2.2** **15b** the tools' feel (the Finger as a solid shipped; judging §33): gates 15g.
 - **2.3** **16b-cost** a source pass's cost and **13-twoproj** two popup projectors: gate 16d.
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
@@ -163,9 +116,10 @@ Judged in this order, because these gate code:
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
   look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
   ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
-- **2.6** **P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
-  roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).
-  Recommended: delete; it unblocks 3.2.
+- **2.6** ~~**P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
+  roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).~~
+  **Decided by the owner, 2026-10-06: delete.** The deletion is 3.1; 18a-9's and 22d's
+  CPU halves go with it.
 
 Then the rest of `docs/judging.md` in its own order, an area a sitting (the looks, the
 Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
@@ -181,7 +135,8 @@ numbers, merged the day it is green so no other branch has to chase it. The poin
 session has to read to make a change, and the faults that come from scattered state; the
 merge conflicts are the shared documents', which 0.6 ends.
 
-- **3.1** **P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines, if 2.6 says so.
+- **3.1** **P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines (2.6 decided: delete). Next in
+  lane G once #307 has merged.
 - **3.2** **14l** (G, L): `FluidSimulation` out of `LiquidVisualizer.tsx`; then device recovery as
   `useGpuStage` (which S16's fault came from); then the pointer and touch handlers as
   `usePlateInput`; then the frame loop as a module; then the imperative handle.
@@ -317,8 +272,18 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - **QA-1** The plate pulses each time a control is pressed or a tool is picked. Desk;
   the pulse reaches the wall. Thread "Plate pulses on control clicks", no PR yet.
 - **QA-2** The mouse pointer shows on the show screen. Wall, Mac. Draft #271.
+- **QA-19** Interacting with settings switches to and maximizes the performance window. Desk, wall.
+  When the additional window that is used for performances is showing and not maximized,
+  interacting with settings to change something automatically switches focus to the
+  additional window and maximizes it. The performer needs to be able to use the settings
+  without the overall extra window changing states (besides the light show settings
+  themselves updating). Cause: `useCastSession.ts` captures any `pointerdown`/`keydown`
+  outside raw text inputs and delegates `fillWindow()`, forcing the performance receiver window
+  fullscreen.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
+
+- **QA-20** Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
 
 - **QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours). Desk,
   phone. Draft #269 (PLAN 15i).
@@ -611,23 +576,17 @@ against 3.5 on #194 (that one: see the `startup` item in §0's CI list, fixed by
 telling Chromium's hold on the page apart by the page's own thread). Each wants what §0 asks of the Finger: find whether the check or
 the product is wrong, from the numbers it prints.
 
-*Read 2026-09-28, on #216's show shard, a docs-only tree:* "the tapped beat drives the
-show's clock" read a beat every 401.7 ms against 404.1 ms tapped, its second red, after
-#195's 396.6 against 401.4; the runs of #203 and #211 on the same code read 405.8
-against 405.8 and 403.2 against 403.2. The clock is not the suspect §11 names:
-`setExternal` is handed the tap's reading right before `update` on every frame, with the
-same `now`, so every frame ends on the tempo source's own period, and nothing in the
-check clears the tap (only Tempo: Listen Again does). The two numbers come from two
-stopwatches. The check stamps each tap in the page just before `chromaglassAction('tap-tempo')`, and the app stamps it again
-inside `tapTempo`, so a pause between the two stamps (a collection, or the first call
-into `runAction` on a busy runner) lands in one and not the other. Both reds read the
-app's mean shorter, which is what a late first stamp does, by 14.4 and 7.2 ms over the
-three gaps, where the check allows 6. This is read in the code, not run. *Proposed:*
-`chromaglassDebug()` returns the tempo source's reading. The check then asks that the
-clock's period is that period to within 0.5 ms (the feature: the tap drives the clock).
-Separately, allowing for dispatch, it asks that the app's taps are the harness's
-(a tap dropped or doubled moves the mean by a third or more). The `check-skeptic` holds
-both halves red.
+*0-tap, the tapped clock's two stopwatches:* **shipped** (#308). "The tapped beat drives
+the show's clock" read the clock against the harness's own stamps of its taps; it now reads
+the tempo source's period (`chromaglassTempo()` under `?debug`) and asks two claims, each on
+one stopwatch (`npm run squeeze`, 400.1 against 400.1 ms, and three controls red where they
+should be). The story is in docs/plan-shipped.md §0.
+
+*Found 2026-10-06, by 0-tap's controls, not yet done:* **"and the show kicks on it" passes
+on the ear alone.** With the tap switched off, the band's own kicks heard by the ear made 25
+and 24 in 12 s against a floor of 22.5 (three quarters of 30 tapped beats), so the claim
+that the kicks come from the tapped clock can pass with no tapped clock. It wants to count
+kicks on the tapped grid (within a fraction of a period of a tapped beat), not kicks at all.
 
 Still to see: the Finger's check on the Mac over a run of builds, and whether the
 looks with Polarity have lost an edge movement the owner liked (docs/judging.md
@@ -1765,9 +1724,10 @@ the Mac show shard's `qa` at two checks that passed on the same tree in the PR's
 hour before: "the plate, not the hole, takes the pointer" (the cursor over a DIV at the
 desk's preview) and "the run completed" (`__cgFrame` returned null in the look-fade
 colour section), with "requestAdapter did not answer in 10s" in the console. Neither
-touches the Mixer; the second looks like the adapter going away under the run. Worth a
-`qa` guard that says "no frame" rather than throwing, so the run goes on to the checks
-after it. And #193's first show shard died before any test ran: the runner could not
+touches the Mixer; the second looks like the adapter going away under the run.
+**Fixed (this PR):** `apart`, `luma`, `jumps`, `colour` and `throughTheHole` in `qa.mjs`
+guard against `null` frames and missing adapter without throwing, reporting `no frame`
+rather than aborting the suite with `the run completed`. And #193's first show shard died before any test ran: the runner could not
 resolve github.com at checkout.
 
 Found while shipping step 4, not yet done: #195's deploy (main 6c6d17e) went red on
@@ -2365,6 +2325,12 @@ network):
 - Record keeps the whole take in memory until it stops (`src/hooks/useRecorder.ts`).
   That's fine for a song and risky for a set. In Chrome, write to a file as it
   records (File System Access).
+- Shipped: Flexible Canvas Video Recording & Performance Separation (`src/hooks/useRecorder.ts`,
+  `src/components/RecordPanel.tsx`, `src/components/desk/RecordControls.tsx`). Canvas-only video
+  recording with optional audio inclusion toggle, quality presets (Master 30 Mbps, Standard 12 Mbps,
+  Compact 5 Mbps), frame rate (60/30 fps), container selection (Auto, WebM, MP4), and last take tracking.
+  Performance gesture/stroke recording is clearly separated and controlled side-by-side in desk toolbars
+  and a unified recording studio modal (`R` for video, `T` for performance).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
 
@@ -3872,12 +3838,29 @@ its frame rate live. "Free" means no new passes or texture reads.
     the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
     radial flow (the pressed rings in the picture). A staggered grid takes all three,
     and `dampGrid`'s job.
-  - **18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.
+  - ~~**18a-9, the CPU engine.** Thin Gap is WebGPU only; the CPU fallback ignores it.~~
+    Dropped: the owner decided to delete the CPU solver's stepping (2.6, 2026-10-06; 3.1).
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
-  - **18a-11, the cost measured.** The saving above is an estimate; measure the step
-    with Thin Gap on and off on the Mac (`?debug`, docs/judging.md §19).
+  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages`
+    over alternating 20-second runs at 768² and 512² (`docs/judging.md` §19):
+    At 768²:
+    - `thinGap=false`: a solver step is 31.7 ms whole (16.5 ms Layer 0, 15.2 ms Layer 1;
+      `project 1` + `project 2` = 6.7 ms/layer, `advect velocity` = 1.2 ms/layer), achieving 20.4 steps/s.
+    - `thinGap=true`: a solver step is 67.8 ms whole (51.1 ms Layer 0, 16.7 ms Layer 1), achieving 11.4 steps/s.
+      In Layer 1, `thin gap` projection is 7.3 ms (44% of layer), roughly parity with the Navier-Stokes
+      projection + velocity advection it replaces (6.9 ms + 1.2 ms = 8.1 ms).
+      The bulk of the cost difference is Layer 0's conservative height-advected dye transport
+      (`advect dye` 36.1 ms vs 1.3 ms).
+    - In-plane `viscosity` (18a-10) costs 1.52 ms across both layers (1.53 ms Layer 0, 1.47 ms Layer 1).
+    At 512²:
+    - `thinGap=true` with `steps=60`: a solver step is 19.7 ms whole (12.7 ms Layer 0, 7.0 ms Layer 1)
+      and drawing 6.8 ms, yielding 32.8 steps/s at 33.4 ms/frame (~30 fps).
+    - `thinGap=true` with `steps=30` (H2b): frame time drops to 19.2 ms (52 fps) with 27.5 steps/s (92% speed),
+      advancing 2.38e-2 liquid/s (+33% over 60 steps/s).
+    Thin Gap does not need any look turned off: on the 512² hosted ceiling it runs smoothly at 33 ms/frame,
+    and H2b at 30 steps/s delivers 52 fps.
   - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.**
     Found 2026-10-04 reading the code for 14v: the thin gap's projection cleared its
     pressure with `clearBuffer(pass, this.hsP!, 'clear pressure')`, under the same bind
@@ -4358,13 +4341,11 @@ bill changes it: more Mac runners at once (19g).
   (followed through every harness's imports with esbuild's metafile), and none opens
   `?cast`, so `CastDisplay` has no check (S15 in `docs/stability-plan.md` needs one).
 
-- `wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
-  own next frame on a runner whose two windows are handed different refreshes (the Mac
-  read 1.69 slots per window's frame there once, with the gate right); only the one-refresh
-  busy phase and the arithmetic catch it. The `check-skeptic`'s mutant turning down one of
-  the show's frames in two passed every in-app clock line, idle and busy, though the
-  comment on the floor says it is under it; only the arithmetic lines caught it. Build
-  that mutant as a control and make an in-app line see it.
+- ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
+  own next frame on a runner whose two windows are handed different refreshes~~ **Done:**
+  built that mutant (`rule: 'half-show'`) as a control in `scripts/wall.mjs` arithmetic,
+  and added an in-app check line on its own clock (`m.gate.frame >= 0.8 * m.hz`) that sees
+  it and fails cleanly if show frames are turned down.
 - `render-app`'s "the live loop draws again after every render" wants more than 5
   frames in the half second after each render, and read 5 after render M (music
   playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
@@ -4564,6 +4545,7 @@ like day (`npm run macqueue -- --hours 24` for the time).
   2026-10-05 bundle of small fixes; left open here.
 
 ### 19i. A green Mac result carries across a merge of main
+**Shipped**: When the new head's tree differs from the tree of the PR's last green Mac run only in files main changed (disjoint from the PR's own site files), or only in files that never reach a Mac shard, the shards are skipped with the verdict "carried" (annotated on What the change reaches), and the deploy gate follows that chain back to the run that passed. 14 selftest cases in `reach.mjs` and deploy gate history verified.
 
 *Measured 2026-10-04 over 25 merged PRs (#204 to #244), 103 `Checks` runs.* A PR ran its
 checks about four times. Of those runs, 53 started on a push that only merged main in, and
@@ -5018,7 +5000,8 @@ count is page-wide), and whether the 2.4 ms is a Mac display link stamping the r
 a frame is for (inferred, not measured). And the line catches a wrongly converted wall
 only because the harness opens the wall five seconds after the show (the conversion's
 error is that gap, caught by the one-second stale bound); with under a second between
-them it would pass. The harness should check its own gap is over a second.
+them it would pass. **Fixed:** the harness (`scripts/wall.mjs`) checks its own gap is
+over a second (`originGap >= 1000`).
 
 ## 22. Spin the plate
 **Partly shipped** (#223, #252, #258, #261): the Spin tool, Auto Spin, the one dish under a plate, the cut of the swirl's projection and the look's motor retune are in. The shortcuts and what is open are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -5035,7 +5018,8 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
 - **22c. Coriolis is left out.** In a flat gap it is a pure gradient for a
   divergence-free flow and the projection takes it; with a varying gap a sliver is
   left. Add 2ω_l ẑ×u where h varies, and measure what it changes.
-- **22d. The CPU solver gets the bulk lag and not the swirl.** Where there is no
+- ~~**22d. The CPU solver gets the bulk lag and not the swirl.**~~ Dropped with the CPU
+  solver's stepping (2.6, decided 2026-10-06; 3.1). Where there is no
   WebGPU, `FluidSimulation`'s own step (`LiquidVisualizer.tsx`) turns the picture
   with the liquid but has no swirl; give it `spinSwirl`'s few lines.
 - **22e. The liquid's drag on the dish is ignored.** The dish is a flywheel with its
@@ -5460,7 +5444,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     whose colour is spread evenly the picture hardly changes. Next: what a hand-rocked
     dish shows on those looks (the oil and water layers sloshing, the pools running to
     the low side), and a measure that holds the drift floor still across runs.
- Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
+- **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
   span the dish (`KICK_RADII`) and the depth is `kickDepth` (0.005 × squeeze × (0.6 +
@@ -5476,6 +5460,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     256² and the ferrofluid took a fixed six substeps of 0.45 of a cell, so it went out
     short and came back in full. It now takes the colour's own substep plan (`phasePlan`,
     never fewer than six): the same four kicks leave it at 0.311 (`npm run rides`).
+  - **27b-3. Breathing beat squeeze and organic liquid injection (shipped).** The owner
+    found linear squeeze jumping too fast (only comfortable at 1%), and automated liquid
+    additions looking too geometrically planned. Squeeze is now shaped quadratically
+    (`squeeze²` in `kickDepth`), opening the bottom half into a gentle breathing range.
+    The release uses a cosine ease (`0.5 * (1 - cos(π · p))`), removing sharp velocity
+    discontinuities at the hold and release boundaries. Automated liquid doses break out
+    of the 14-spoke equidistant circle into natural droplet clusters with randomized
+    radial depths (0.55–1.2×), varying droplet sizes, and 2D simplex noise flow drift.
+    Verified locally: `npm run lift` (33/33), `npm run squeeze` (9/9 on GPU, gap giveback
+    balanced at 3532.566), `npm run downbeat` (91/91).
 - **27c. Turbulence reaches (shipped, #305).** The dial was the stir's speed, so
   full was a look's 0.3 tripled, and with the band playing the music multiplied it and
   then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
@@ -5546,3 +5540,9 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     almost nothing. Whether one dial should be the music's reach on all of them is a
     question for the owner once 27e-2 says which reads weakest.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
+
+## Business Plan: The PRO Desktop App
+Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
+* **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
+* **PRO Desktop App ($200+ Paid):** The native desktop wrapper (Electron) will be sold as a premium, standalone product with a "buy once, use forever" model (no subscriptions).
+  * **Pro Features:** NDI/Syphon/Spout output, custom MIDI mapping, offline use, custom ISF shader imports, video injections (HAP/WebM), and Wallpaper Mode.
