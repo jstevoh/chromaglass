@@ -9475,6 +9475,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         Evolve had begun would have carried on into the film.
       */
       rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      /*
+        The cover glass rides the rock (PLAN 27a-1) and is integrated frame
+        to frame the same way: a pendulum on its film, its slide dragging
+        the liquid. Left out of this list when it shipped, a render began
+        with the glass still swinging wherever the live show had left it,
+        and the same seed twice drew different films (render-app's "the
+        same seed twice", on main's deploy of 10-10: the plate's centre
+        velocity -0.05 against 4.50 by the first frame).
+      */
+      coverRef.current = { x: 0, y: 0, vx: 0, vy: 0 };
       lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
       gelAngleRef.current = 0;
       kaleidoPhaseRef.current = 0;
