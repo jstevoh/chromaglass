@@ -90,7 +90,9 @@ struct Sim {
     0 is none). The first stays in Args with the pass that uses it; these
     ride the Sim because every magnet pass reads them the same way.
   */
-  mags: array<vec4f, 3>,
+  extraMag0: vec4f,
+  extraMag1: vec4f,
+  extraMag2: vec4f,
   // The magnet's radius, every one of them (magnetDisc.ts): Magnet Size's.
   magRadius: f32,
 };
@@ -428,9 +430,9 @@ fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
 // than one magnet twice as strong would, which a hand does not notice.
 fn magnetsEnergy(uv: vec2f, m: vec4f) -> f32 {
   var e = magnetEnergy(uv, m);
-  for (var k = 0; k < 3; k++) {
-    if (S.mags[k].w > 0.0) { e += magnetEnergy(uv, S.mags[k]); }
-  }
+  if (S.extraMag0.w > 0.0) { e += magnetEnergy(uv, S.extraMag0); }
+  if (S.extraMag1.w > 0.0) { e += magnetEnergy(uv, S.extraMag1); }
+  if (S.extraMag2.w > 0.0) { e += magnetEnergy(uv, S.extraMag2); }
   return e;
 }
 ${SPIKES_WGSL}
@@ -442,7 +444,9 @@ ${SPIKES_WGSL}
 */
 fn spikesClose(m: vec4f) -> f32 {
   var a = spikeAmp(m.xy, m);
-  for (var k = 0; k < 3; k++) { a = max(a, spikeAmp(S.mags[k].xy, S.mags[k])); }
+  if (S.extraMag0.w > 0.0) { a = max(a, spikeAmp(S.extraMag0.xy, S.extraMag0)); }
+  if (S.extraMag1.w > 0.0) { a = max(a, spikeAmp(S.extraMag1.xy, S.extraMag1)); }
+  if (S.extraMag2.w > 0.0) { a = max(a, spikeAmp(S.extraMag2.xy, S.extraMag2)); }
   return a;
 }
 `;
