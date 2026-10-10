@@ -3911,8 +3911,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let own = c.b / max(reagent, 1e-4);
   let target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
   let target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
-  let feed = target_feed * reagent;
-  let kill = mix(0.06, target_kill, reagent);
+  /*
+    The supply saturates at a third of full reagent. Scaling F and k straight
+    with the reagent put a tap of it (0.3 to 0.6 where it lands) at F 0.018,
+    k 0.058, which is Pearson's dead region: the seed died where it was
+    poured (the lab, five pours on a look without Chemistry: one faint blot).
+  */
+  let supply = min(1.0, reagent / 0.3);
+  let feed = target_feed * supply;
+  let kill = mix(0.06, target_kill, supply);
 
   let un = c.r + A.a.x * l.r - uvv + feed * (1.0 - c.r);
   let vn = c.g + A.a.y * l.g + uvv - (feed + kill) * c.g;

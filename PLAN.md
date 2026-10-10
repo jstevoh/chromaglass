@@ -22,7 +22,25 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 ### Claude (UI & Stability Track)
 **Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
 **Current Priority: Bug Cleanup & New Performance UI**
-* Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.
+* ~~Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.~~
+  Done (26-colour, this PR). The chemistry first had to grow at all: on the looks with
+  Chemistry on, the GPU Gray–Scott fed nothing (its feed came only from poured reagent,
+  and every random seed wiped the reagent), so Sensual Laboratory and Neon Coral Reef
+  printed an empty plate (lab: 3.6 units of dye in four seconds, 451.6 after). Now a
+  look's Chemistry is a bath that feeds the whole plate, a pour of Turing Reagent feeds
+  and seeds the reaction where it lands on any look, and the field is cleared with the
+  look's other chemistry. Colours: Turing Reagent pours CIMA's pale straw (`#f5e69e`,
+  was a hot pink `#ff88ff`) and, on a look without Chemistry, its pattern prints in
+  starch–iodine indigo (`TURING_PRODUCT`); a look with Chemistry keeps its own palette
+  (the "Refresh preset and colour palettes" work owns those). The ferrofluid's colours
+  were left alone: Ferro Paint's amber, teal and coral and the thickness-drawn black and
+  brown already match Colored I and II.
+  - **26-colour-a** (open): the "Turing Print" relief that #327 described (the pattern's
+    gradient as a bump on the plate's normal) is not on main (reverted in 8278374), so
+    26d is still open, and a print still shows only as deposited dye.
+  - **26-colour-b** (open): the deposit's threshold (v > 0.22) draws the coral as soft
+    blurred rings on the 256² field; 26d's finer field and the plate's own edge
+    reconstruction would make it a print.
 *The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
