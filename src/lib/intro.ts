@@ -19,6 +19,31 @@
  * plate's first frame (`introPlateFrame`), cross-fading into it: it never
  * holds the plate back, it is only ever up while there is nothing to see.
  *
+ * It starts still, and moves once the opening's render pipelines are built
+ * (`introMove`, from `Quiet` in `gpu/prepare.ts`). What was reported: the
+ * Mac's `npm run startup` went red on "no stop in the opening" on about half
+ * of 10 October's runs, across PRs that never touched the opening (2.17 and
+ * 2.57 s against a 2 s bar). What was measured: over the open shard's 176
+ * runs from 27 September, the show's longest wait for a frame was a median
+ * 0.53 s (p90 0.78) on the 57 before this intro merged, and 1.73 s (p90
+ * 2.20, 19 of 119 over two seconds) on every one since; in the same hour the
+ * GPU device went from a median 0.09 s to be given to 1.63 s. A moving
+ * picture is a new frame for the compositor to present every sixtieth of a
+ * second, and it presents through the GPU process, which on a cold Mac is
+ * busy for seconds starting the device and then compiling the opening's
+ * first pipelines; the frame waits there, and so does the next, and so does
+ * the device itself. Held still, a frame has nothing new in it and needs
+ * nothing of the GPU process. On CI's Mac, three cold openings each way
+ * (PR #335's trials): as it was, 2.35, 2.13 and 2.32 s without a frame;
+ * still from the first paint, 1.18, 0.85 and 0.92 s; without the intro at
+ * all, 0.47, 0.47 and 0.82 s; without its colour pools but moving, 1.93,
+ * 2.33 and 2.17 s, so it is the motion and not what moves. Holding it still
+ * only around the render compiles (#283) had caught the second half of
+ * that and not the first. On a warm machine the device comes at once and
+ * the compiles are the cache's, so it starts turning within a second or so;
+ * cold, it is a still mark for the few seconds the GPU is busy, where moving
+ * it froze anyway, in stops nobody chose.
+ *
  * Never on the remote or a cast (the projector's window and the network
  * display are casts): `index.html` hides it there before the first paint.
  * Never a target either (`pointer-events: none`): a press reaches whatever is
@@ -73,6 +98,9 @@ export function installIntro(show: boolean): void {
   const el = node();
   if (!el) return;
   if (!show) { introOut('elsewhere'); return; }
+  // Still since the first paint (`index.html` starts it so): kept from 0,
+  // the page's start, until `introMove` lets it go.
+  if (el.classList.contains('cg-still')) (record.still ??= []).push([0, null]);
   const cap = setTimeout(() => introOut('cap'), Math.max(0, CAP_MS - performance.now()));
   const skip = (e: Event) => {
     if (out) return;
@@ -150,7 +178,9 @@ export function introPlateFrame(stepped: boolean): void {
  * Held still while the opening's render pipelines compile (`Quiet` in
  * `gpu/prepare.ts` says why: a moving intro there stopped the page's frames
  * for as long as the display compiled). Paused, not hidden: the picture
- * stays exactly where it was and moves on from there.
+ * stays exactly where it was and moves on from there. The first opening
+ * finds it still already, from the first paint (the top of this file says
+ * why); a later one, a lost device's replacement, holds it here.
  *
  * The promise resolves once the page has drawn two frames with it paused,
  * so the last moving frame is presented before the compile is asked for,
