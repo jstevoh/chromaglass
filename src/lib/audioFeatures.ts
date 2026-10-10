@@ -133,6 +133,8 @@ const LOW_MIDS: Range = [150, 400];
 export interface SpectrumFrame {
   /** Bins 0..fftSize/2-1, as `getFloatFrequencyData` or `getByteFrequencyData` fill them. */
   bins: ArrayLike<number>;
+  /** The waveform data (for zero-crossing rate). */
+  timeDomainData?: ArrayLike<number>;
   /** `db`: float decibels. `byte`: 0..255 across [minDb, maxDb]. `magnitude`: linear. */
   scale: 'db' | 'byte' | 'magnitude';
   sampleRate: number;
@@ -167,6 +169,8 @@ export interface AudioReading {
   pitch: number;
   pitchClass: number;
   brightness: number;
+  timbre: number;
+  complexity: number;
   /** BAND_COUNT values, 0..1, low to high; `band1` is `bands[0]`. */
   bands: number[];
   /** One per name in SOURCE_NAMES. */
@@ -486,6 +490,8 @@ export class AudioFeatures {
   pitch = 0;
   pitchClass = 0;
   brightness = 0;
+  timbre = 0;
+  complexity = 0;
 
   reset(): void {
     this.hasPrev = false;
@@ -501,6 +507,8 @@ export class AudioFeatures {
     this.pitch = 0;
     this.pitchClass = 0;
     this.brightness = 0;
+    this.timbre = 0;
+    this.complexity = 0;
   }
 
   private layout(sampleRate: number, fftSize: number, count: number): void {
@@ -593,6 +601,21 @@ export class AudioFeatures {
       pDen += p;
     }
     this.brightness = pDen > 0 ? pNum / pDen : 0;
+    this.timbre = this.brightness / (frame.sampleRate / 2);
+
+    if (frame.timeDomainData && frame.timeDomainData.length > 1) {
+      const td = frame.timeDomainData;
+      let zcr = 0;
+      for (let i = 1; i < td.length; i++) {
+        const prev = td[i - 1] - 128;
+        const curr = td[i] - 128;
+        if ((prev >= 0 && curr < 0) || (prev < 0 && curr >= 0)) zcr++;
+      }
+      const rawComplexity = zcr / (td.length - 1);
+      this.complexity = this.hasPrev ? this.complexity + (rawComplexity - this.complexity) * 0.15 : rawComplexity;
+    } else {
+      this.complexity = 0;
+    }
 
     const minHpsBin = Math.max(1, Math.floor(55 / this.hzPerBin));
     const maxHpsBin = Math.min(this.top, Math.ceil(1000 / this.hzPerBin));
@@ -701,6 +724,8 @@ export class AudioFeatures {
       pitch: this.pitch,
       pitchClass: this.pitchClass,
       brightness: this.brightness,
+      timbre: this.timbre,
+      complexity: this.complexity,
     };
   }
 }
@@ -731,6 +756,7 @@ export class AnalyserEmulator {
   private readonly im: Float32Array;
   private readonly smoothed: Float64Array;
   private readonly out: Float32Array;
+  private readonly outTimeDomain: Uint8Array;
 
   constructor(sampleRate: number, fftSize = ANALYSER_FFT_SIZE, smoothing = ANALYSER_SMOOTHING) {
     this.sampleRate = sampleRate;
@@ -746,20 +772,24 @@ export class AnalyserEmulator {
     this.im = new Float32Array(fftSize);
     this.smoothed = new Float64Array(fftSize / 2);
     this.out = new Float32Array(fftSize / 2);
+    this.outTimeDomain = new Uint8Array(fftSize);
   }
 
   /**
    * The spectrum of the fftSize samples ending just before sample `end`
-   * (samples before 0 are silence), in dB. The returned array is reused by
+   * (samples before 0 are silence), in dB. The returned arrays are reused by
    * the next call.
    */
-  frame(pcm: Float32Array, end: number, dtSec: number): Float32Array {
+  frame(pcm: Float32Array, end: number, dtSec: number): { bins: Float32Array, timeDomainData: Uint8Array } {
     const N = this.fftSize;
     const start = end - N;
     for (let i = 0; i < N; i++) {
       const s = start + i;
-      this.re[i] = (s >= 0 && s < pcm.length ? pcm[s] : 0) * this.window[i];
+      const v = s >= 0 && s < pcm.length ? pcm[s] : 0;
+      this.re[i] = v * this.window[i];
       this.im[i] = 0;
+      // getByteTimeDomainData scales [-1, 1] to [0, 255]
+      this.outTimeDomain[i] = Math.max(0, Math.min(255, Math.round(128 + v * 128)));
     }
     fft(this.re, this.im);
     const tau = Math.pow(this.smoothing, Math.max(0, dtSec) * ANALYSER_RATE_HZ);
@@ -768,7 +798,7 @@ export class AnalyserEmulator {
       this.smoothed[k] = tau * this.smoothed[k] + (1 - tau) * m;
       this.out[k] = this.smoothed[k] > 0 ? 20 * Math.log10(this.smoothed[k]) : -Infinity;
     }
-    return this.out;
+    return { bins: this.out, timeDomainData: this.outTimeDomain };
   }
 }
 
@@ -791,8 +821,8 @@ export function analysePcm(pcm: Float32Array, sampleRate: number, fps: number): 
   const readings: AudioReading[] = [];
   for (let i = 0; i < frames; i++) {
     const end = Math.round((i * sampleRate) / fps);
-    const bins = analyser.frame(pcm, end, 1 / fps);
-    readings.push(features.update({ bins, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps));
+    const { bins, timeDomainData } = analyser.frame(pcm, end, 1 / fps);
+    readings.push(features.update({ bins, timeDomainData, scale: 'db', sampleRate, fftSize: analyser.fftSize }, i / fps));
   }
   return readings;
 }
