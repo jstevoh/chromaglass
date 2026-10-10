@@ -163,10 +163,27 @@ try {
   check('a clear on the desk is not sent to the wall', s.cast.clear === clearWas && s.wall.clears === engineClearsWas,
     `the wall's engine was handed ${engineClearsWas} → ${s.wall.clears} clears, a receiver ${clearWas} → ${s.cast.clear}`);
 
-  await page.waitForTimeout(FRAMES ? 1500 : 0);
-  const painted = await wall.evaluate(() => window.__painted ?? {});
+  /*
+    Counted over a window of its own, with what the wall's engine drew in it
+    beside, rather than whatever the steps above happened to leave: the Mac's
+    first run counted 2 frames and its second 0 in about three seconds, which
+    on its own cannot say whether the window was not painted or the engine
+    drew nothing. With frames, waited for up to eight seconds for ten.
+  */
+  const drawnFrom = await page.evaluate(() => window.chromaglassDebug().frames);
+  await wall.evaluate(() => { window.__painted = {}; });
+  const started = Date.now();
+  let painted = {};
+  do {
+    await page.waitForTimeout(FRAMES ? 500 : 0);
+    painted = await wall.evaluate(() => window.__painted ?? {});
+  } while (FRAMES && (painted['liquid-canvas'] ?? 0) < 10 && Date.now() - started < 8000);
+  const drawn = (await page.evaluate(() => window.chromaglassDebug().frames)) - drawnFrom;
+  const seconds = (Date.now() - started) / 1000;
+  const wallSize = await wall.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, canvases: document.querySelectorAll('canvas').length }));
   const fromWall = painted['liquid-canvas'] ?? 0, fromCopy = painted['liquid-canvas-draft'] ?? 0;
   const anyPainted = fromWall + fromCopy > 0;
+  console.log(`  (in ${seconds.toFixed(1)} s the wall's engine drew ${drawn} frames; the projector window is ${wallSize.w}x${wallSize.h} with ${wallSize.canvases} canvas(es))`);
   check(anyPainted ? 'the projector window is painted from the wall\'s canvas, never the copy\'s'
     : `the projector window is painted from the wall's canvas (measured nothing: no frames ran here${FRAMES ? '' : '; on the Mac, --frames requires them'})`,
     FRAMES ? fromWall > 0 && fromCopy === 0 : !anyPainted || (fromWall > 0 && fromCopy === 0),
