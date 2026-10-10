@@ -251,10 +251,14 @@ try {
     A grid of window points over the plate, each asked where a hand there
     lands (plateAt, the pointer's own mapping) and whether the canvas is what
     is there to be touched. The drag ends at the one furthest from the
-    plate's middle row, within 0.35 of its middle; it starts at one at least
-    0.25 off the middle (this touch's own ask is 0.2), 0.3 to 0.45 from the
+    plate's middle row, within 0.25 of its middle; it starts at one 0.25 to
+    0.32 off the middle (this touch's own ask is 0.2), 0.3 to 0.45 from the
     end, as near 0.4 as there is, with the canvas under the whole line
-    between. The window shows only the middle of the plate (the plate is
+    between. Both kept off the rim, where the old line never went: the
+    first planned way ended 0.33 out, the pool (0.157 across) was dragged
+    to 0.30,0.90, half of it over the rim, and the plate then held 170% of
+    the ferrofluid poured (PLAN 19v-2), which is the rim's question and not
+    this one's. The window shows only the middle of the plate (the plate is
     drawn at one and a half times the window's longer side), and which part
     of the plate that is turns with it, so a path chosen on the window, or on
     the plate alone, can leave the glass or sit on its middle row.
@@ -270,17 +274,17 @@ try {
     }
     // The ends furthest off the middle row first; the first with a start that works is the way.
     const off = (p) => Math.abs(p.q.y - 0.5), mid = (p) => Math.hypot(p.q.x - 0.5, p.q.y - 0.5);
-    const ends = pts.filter((p) => mid(p) <= 0.35).sort((u, v) => off(v) - off(u));
+    const ends = pts.filter((p) => mid(p) <= 0.25).sort((u, v) => off(v) - off(u));
     let start = null, end = null, tried = 0;
     for (const e of ends) {
       const starts = pts.map((p) => ({ ...p, len: Math.hypot(p.q.x - e.q.x, p.q.y - e.q.y) }))
-        .filter((p) => mid(p) >= 0.25 && p.len >= 0.3 && p.len <= 0.45)
+        .filter((p) => mid(p) >= 0.25 && mid(p) <= 0.32 && p.len >= 0.3 && p.len <= 0.45)
         .sort((u, v) => Math.abs(u.len - 0.4) - Math.abs(v.len - 0.4));
       tried += starts.length;
       start = starts.find((p) => [1, 2, 3, 4, 5, 6, 7].every((k) => canvasAt(p.w[0] + (e.w[0] - p.w[0]) * k / 8, p.w[1] + (e.w[1] - p.w[1]) * k / 8)));
       if (start) { end = e; break; }
     }
-    return start ? { start, end } : { why: `of ${pts.length} points on the glass, ${ends.length} within 0.35 of the middle, no start 0.3 to 0.45 from one with the glass under the way (${tried} tried)` };
+    return start ? { start, end } : { why: `of ${pts.length} points on the glass, ${ends.length} within 0.25 of the middle, no start 0.3 to 0.45 from one with the glass under the way (${tried} tried)` };
   }, box);
   const startW = plan.start?.w ?? at(0.05);
   console.log(`     the hand's way on the plate: ${plan.start ? `${plan.start.q.x.toFixed(2)},${plan.start.q.y.toFixed(2)} → ${plan.end.q.x.toFixed(2)},${plan.end.q.y.toFixed(2)} ` +

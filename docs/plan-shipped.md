@@ -2446,14 +2446,17 @@ was 0.03 from the hand and 0.03 from its mirror. Now the hand's whole way is cho
 plate before the first touch: `chromaglassDebug().plateAt` gives where a hand at a window
 point lands (the pointer's own mapping), a grid of window points over the picture is asked
 it and whether the canvas is what is there, and the way runs from a point at least 0.25 off
-the middle (the first touch, where the pool is laid) to the point within 0.35 of the middle
-that is furthest off the middle row, 0.3 to 0.45 long, with the canvas under the whole line.
+0.25 to 0.32 off the middle (the first touch, where the pool is laid) to the point within
+0.25 of the middle that is furthest off the middle row, 0.3 to 0.45 long, with the canvas
+under the whole line. Off the rim on purpose: a first planned way that ended 0.33 out
+dragged the pool half over the rim, the drag itself passed (0.07 from the hand, 0.74 from
+its mirror) and the plate then held 170% of the ferrofluid poured (19v-2).
 The check also asks that the hand really ended more than 0.15 off that row (its mirror over
 0.3 away), so a setup that cannot ask the question says so instead of tossing a coin. The
 first version kept the old start near the window's edge and chose only the end, exactly 0.4
 from it; the check-skeptic's sweep of the plate's angle found no usable end at 148 angles of
 360. Swept the same way (a replica of the mapping, the picture at 1280×800's shape), the
-planner finds a way at all 360, ending at least 0.183 off the middle row.
+planner finds a way at all 360, ending at least 0.183 off the middle row, 0.40 to 0.44 long.
 
 **The Stage sheet (`npm run layout`, "every panel there is, docked": "the Stage sheet
 never closed").** Esc was pressed and the sheet stayed for six seconds; the next click,

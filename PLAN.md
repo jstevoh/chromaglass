@@ -4816,6 +4816,16 @@ commit. *Size:* S.
   sheet's Esc (19v) could drop a Space meant to send a look, if an earlier window listener
   sets state on that key. Nothing ahead of it does today, so not seen; read its handlers
   through a ref and listen once, as `desk/Desk.tsx` and `useEscape` do.
+- **19v-2. A ferrofluid pool dragged to the rim comes back with more ferrofluid.** Found
+  by #349's first planned drag on the Mac (`npm run magnet`, run 38089915722): the magnet
+  dragged a pool of 3.48% of the plate from 0.23,0.44 to 0.30,0.90, about 0.45 from the
+  middle with the pool 0.157 across, and the plate then held 170% of what was poured,
+  with nothing laid (phaseLays 0 → 0). The phase moves in flux form and should neither
+  make nor lose it. Not known yet whether the rim makes it (the wall's boundary on the
+  phase's flux, or the magnet's pull against it) or `readPhase` counts the field past the
+  dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
+  so the rim needs a check of its own: a pool held against the rim by the magnet, its
+  total read every second. Physics lane.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
