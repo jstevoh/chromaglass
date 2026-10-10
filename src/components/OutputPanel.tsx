@@ -321,7 +321,10 @@ const Row = ({ label, value, min, max, step, onChange, format }: {
     <input
       type="range" min={min} max={max} step={step} value={value} aria-label={label}
       onChange={e => onChange(parseFloat(e.target.value))}
-      className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-white"
+      // The settings' own rail (index.css): this was a 4px bar, which on a
+      // desk panel is a control you cannot find in the dark (`npm run layout`).
+      className="set-range"
+      style={{ '--fill': `${Math.round(100 * (value - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
     />
   </div>
 );
@@ -402,7 +405,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock }: {
       <div className="mb-3 flex justify-end">
         <button
           onClick={() => set({ corners: [...IDENTITY_CORNERS] as OutputConfig['corners'] })}
-          className="text-[12px] text-white/35 hover:text-white/70"
+          className="min-h-6 rounded-md px-1.5 text-[12px] text-white/60 hover:text-white/80"
           data-testid="corners-square"
         >
           Square the corners

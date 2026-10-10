@@ -27,6 +27,7 @@ This plan directs the ongoing development of ChromaGlass. It has been restructur
 1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
 2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
 3. **New UI Implementation:** Implement the new UI layer as specified by the owner, ensuring it correctly binds to `LiquidVisualizer.tsx` without disrupting the WebGPU context.
+   *Desk v2 (the owner's design, 2026-10-10) shipped as §8-v2: one desk, three layouts. Next: §8-play, then §8-draw, each a thread.*
 
 ---
 
@@ -925,7 +926,42 @@ set holds the live log's Go times and look names.
 
 ### 8. The desk: the laptop is a control surface, not the show
 
-**Shipped**, with one proposal open (below). How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**, with the proposals below open. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+~~**8-v2** Desk v2, the owner's design of 2026-10-10: one desk in three layouts (Build,
+Gig, Load-in), every panel docked, floated, folded or closed, knobs for encoders, the
+panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-shipped.md`
+§8; checks `npm run desklayout` and `npm run layout`).
+
+Open from Desk v2, each its own thread (Claude's lane, UI):
+
+- **8-play** (M) The Play route of the design (`/play`, the README's second screen): the
+  set list and the rides at a size a hand finds in the dark, for a show run from the
+  laptop with no controller. Its phone version is the PhoneStage it already has.
+- **8-draw** (M) Draw: the phone or iPad as a full drawing pad over the plate (the
+  design's third screen), every tool and the dye under the finger. It goes through
+  `performGesture` like every other hand; the phone's own Draw sheet is the same screen.
+- **8b** (M) A true Preview. Preview holds the sequencer, a song's show and a new song's
+  look (`designing` in App, as the Design desk did), but the plate being built is still
+  the plate on the wall. The design means an offline copy: a second solver, or the
+  back plate, drawn on the desk and not on the wall, until Send to wall. *Measure:* a
+  look changed in Preview leaves the projector window's frame unchanged (`wall`, Mac).
+- **8c** (S) Knobs turn the design's way too: a circular drag round the knob as well as up
+  and down, and a double-click goes back to the look's own value. The knob takes a
+  `resetTo` for it, but the look's value is not handed to the desk yet, so a
+  double-click does nothing.
+- **8d** (S) A control's kind from the controller's profile. A binding only says absolute
+  or relative, so an absolute pot on an APC draws as a slider (a fader); the profiles
+  (`midi.ts`) know which CCs are knobs. *Measure:* `npm run desk` with the APC40 map.
+- **8e** (S) Load-in's Wall panel gains the design's test pattern and Identify (each
+  projector flashes its number), and Output's Gain and Gamma as knobs.
+- **8f** (S) A QR code on the Phone · iPad panel for the link (`relayInfo()`), drawn
+  without a library.
+- **8g** (M) A panel popped out to a second display (`window.open`), for a laptop and a
+  monitor at a gig.
+- **8h** (S) The header at 1024 is full: five tabs, + Panel (its word hidden below
+  1280), the dots, search and Blackout. A sixth thing on it needs the dots folded into
+  one; `npm run layout`'s cover pass at 1024 is the measure.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's

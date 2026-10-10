@@ -40,7 +40,7 @@ import path from 'node:path';
 import { launchChromium } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { PINNABLE, PIN_RANGE } from '../src/lib/deskPins.ts';
-import { DEFAULT_RIDES } from '../src/components/desk/PerformDesk.tsx';
+import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 import { readingOf } from './judge.mjs';
 
@@ -159,7 +159,7 @@ try {
       const far = Math.abs(spec.max - v0) >= Math.abs(v0 - spec.min) ? spec.max : spec.min;
       /*
         Evolve Speed does nothing with Random Evolve off, so the desk's ride
-        switches it on when raised from zero and off at zero (PerformDesk).
+        switches it on when raised from zero and off at zero (DeskPanels' setControl).
         The harness does what the ride does.
       */
       const evolve = key === 'automateRate';

@@ -158,6 +158,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run desk
 
+      # The desk's layouts (Desk v2): what ships, what is stored, and that a
+      # stored layout from an older build cannot break the desk.
+      - name: The desk's layouts
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run desklayout
+
       # The spinning dish's CPU half: the liquid's lag behind the glass, Auto
       # Spin's rate and its tempo lock, and the hand on the Spin tool (PLAN §22).
       - name: The turntable

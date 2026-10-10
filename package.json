@@ -79,6 +79,7 @@
     "fx": "npm run build && node scripts/fx.mjs",
     "shots": "npm run build && node scripts/shots.mjs",
     "brand": "node scripts/brand.mjs",
+    "desklayout": "esbuild scripts/desklayout.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/desklayout.mjs && node node_modules/.cache/desklayout.mjs",
     "desk": "esbuild scripts/desk.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/desk.mjs && node node_modules/.cache/desk.mjs",
     "bubbles": "npm run build && node scripts/bubbles.mjs",
     "dye": "npm run build && node scripts/dye.mjs",
