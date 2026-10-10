@@ -969,7 +969,7 @@ jobs:
       # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
       # and its kicks used to drop air near the middle whatever the dial said.
       # On the laptop and the phone at 0, and at the default, where they still
-      # must. About two minutes.
+      # must (listened to for a minute there, for enough chances). About three minutes.
       - name: Audio Impact 0 drops no bubbles
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/kickbubbles.mjs
