@@ -8,7 +8,7 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { songShapeLine } from './lib/songShape';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs } from './lib/macroCamera';
+import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SETTINGS_SECTIONS, sectionSearchText } from './lib/settingsMap';
@@ -30,7 +30,7 @@ import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import type { SetAction, SetItemAction } from './components/desk/PerformDesk';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -90,6 +90,7 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
+import { PanelGuard } from './components/PanelGuard';
 import * as crashLog from './lib/crashLog';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
 import { parseSeed, showSeed, stream } from './lib/rng';
@@ -4217,6 +4218,7 @@ export default function App() {
         </div>
       )}
       {musicFile && ((renderOpen && !libraryOpen) || songRender.running) && (
+        <PanelGuard name="The song render" onClose={() => { setRenderOpen(false); songRender.reset(); }}>
         <RenderPanel
           songName={musicFile.name}
           songSeconds={musicTime.d}
@@ -4230,6 +4232,7 @@ export default function App() {
           onCancel={songRender.cancel}
           onClose={() => { setRenderOpen(false); songRender.reset(); }}
         />
+        </PanelGuard>
       )}
       {projector.projector && !isCasting && overlaysVisible && projector.mode !== 'off' && (
         <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 pl-4 pr-2 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl" data-testid="projector-hint">
@@ -4272,17 +4275,24 @@ export default function App() {
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
           <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>
           <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
-          {/* Who moves the camera. Alt-drag on the plate pans it; Alt-click fixes it on a spot. */}
+          {/* Who moves the camera. Alt-drag on the plate pans it; Alt-click fixes it on a spot.
+              Follow and Auto read differently at a glance (QA-11): the owner found them the
+              same thing, because between Auto's cuts both ride one bead and the difference
+              lived only in the hover titles. Follow wears a crosshair, for the one subject it
+              is locked on and never leaves; Auto names its cut, every Shot Length seconds
+              (`macroHold`, the same `max(0.5, … ?? 5)` LiquidVisualizer gives MacroCamera). */}
           <span className="mx-1 h-3 w-px bg-white/20" />
           {([
             ['hold', 'Hold', 'Hold still where it is aimed. Alt-drag on the plate to pan, Alt-click to fix on a spot; Random Evolve wanders it slowly.'],
-            ['follow', 'Follow', 'Lock onto the liquid where it is aimed and ride with it. Alt-click on something to follow it.'],
-            ['auto', 'Auto', 'The camera picks its own subjects and cuts between them.'],
+            ['follow', 'Follow', 'Locked on: rides the liquid where it is aimed and never cuts away. Alt-click on something to follow it.'],
+            ['auto', 'Auto', `Picks its own subjects: rides one for Shot Length (${shotLabel(settings.macroHold)}), then cuts to another.`],
           ] as const).map(([mode, label, title]) => (
             <button key={mode} onClick={() => updateSettings({ macroCamera: mode })} title={title}
               aria-pressed={(settings.macroCamera ?? 'hold') === mode} data-testid={`macro-camera-${mode}`}
-              className={`rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              {mode === 'follow' && <Crosshair size={11} aria-hidden />}
               {label}
+              {mode === 'auto' && <span className="font-normal normal-case tracking-normal opacity-70">cuts {shotLabel(settings.macroHold)}</span>}
             </button>
           ))}
         </div>
@@ -4866,6 +4876,7 @@ export default function App() {
       {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
       {phone && showControls && (
         <>
+          <PanelGuard name="The phone controls">
           <PhoneStage
             // Mid-fade the settings are between two looks and match neither,
             // so the look is named by where it is going: the name a thumb
@@ -4920,6 +4931,7 @@ export default function App() {
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
             camera={settings.macroCamera ?? 'hold'}
+            cameraShot={shotLabel(settings.macroHold)}
             onCamera={(c) => updateSettings({ macroCamera: c })}
             tilt={{ supported: tilt.supported, on: tilt.on, refused: tilt.refused, silent: tilt.silent, onToggle: () => { void toggleTilt(); } }}
             audioSource={audioSource}
@@ -4979,6 +4991,7 @@ export default function App() {
               setPhone(false);
             }}
           />
+          </PanelGuard>
           {/* The song-file picker the Sound sheet reaches for; on the laptop it
               lives in the overlay's audio column, which a phone does not draw. */}
           <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
@@ -4994,6 +5007,7 @@ export default function App() {
         {showControls && !showSettings && !isMinimized && !phone && <RunLocallyCard status={engineStatus} />}
       </AnimatePresence>
       <AnimatePresence>
+        <PanelGuard name="The bench" onClose={() => setBench(b => ({ ...b, text: null }))}>
         <BenchOverlay
           running={bench.running}
           done={bench.done}
@@ -5002,6 +5016,7 @@ export default function App() {
           text={bench.text}
           onClose={() => setBench(b => ({ ...b, text: null }))}
         />
+        </PanelGuard>
       </AnimatePresence>
 
       {/* ── Minimize / clean-screen chips ──────────────────────── */}
@@ -5041,6 +5056,7 @@ export default function App() {
       {/* ── Settings Panel ─────────────────────────────────────── */}
       <AnimatePresence>
         {showSettings && (
+          <PanelGuard name="Settings" onClose={() => { setShowSettings(false); setSettingsSection(null); }}>
           <SettingsPanel
             mixTakes={mixTakes}
             backLook={backLookName}
@@ -5102,20 +5118,24 @@ export default function App() {
             onMarkClear={clearMark}
             onClose={() => { setShowSettings(false); setSettingsSection(null); }}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── MIDI ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {showActivity && overlaysVisible && (
+          <PanelGuard name="MIDI activity" onClose={() => setShowActivity(false)}>
           <MidiActivity
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
             onHide={() => setShowActivity(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {showMidi && (
+          <PanelGuard name="MIDI" onClose={() => setShowMidi(false)}>
           <MidiPanel
             midi={midi}
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
@@ -5123,12 +5143,14 @@ export default function App() {
             onActivity={setShowActivity}
             onClose={() => setShowMidi(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Songs ──────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showSound && (
+          <PanelGuard name="Sound" onClose={() => setShowSound(false)}>
           <SoundPanel
             source={audioSource}
             onSource={(x) => { void handleSourceChange(x); }}
@@ -5150,8 +5172,10 @@ export default function App() {
             onDroneToggle={toggleDrone}
             onClose={() => setShowSound(false)}
           />
+          </PanelGuard>
         )}
         {showSongs && (
+          <PanelGuard name="Songs" onClose={() => setShowSongs(false)}>
           <SongsPanel
             shows={songShows}
             onShows={setSongShows}
@@ -5170,12 +5194,14 @@ export default function App() {
             onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
             onClose={() => setShowSongs(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Show Sequencer ─────────────────────────────────────── */}
       <AnimatePresence>
         {showSequencer && (
+          <PanelGuard name="The sequencer" onClose={() => setShowSequencer(false)}>
           <SequencerPanel
             sequences={sequencer.sequences}
             selectedId={sequencer.selectedId}
@@ -5197,12 +5223,14 @@ export default function App() {
             onBindSong={bindSequenceToSong}
             onClose={() => setShowSequencer(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Track Panel ────────────────────────────────────────── */}
       <AnimatePresence>
         {showTrackPanel && (
+          <PanelGuard name="The track" onClose={() => setShowTrackPanel(false)}>
           <TrackPanel
             state={musicIntel.state}
             musicSettings={musicSettings}
@@ -5218,11 +5246,13 @@ export default function App() {
             onDeletePerformance={musicIntel.deletePerformance}
             onClose={() => setShowTrackPanel(false)}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
       {/* ── Recording Studio Panel (Canvas Video & Performance) ─ */}
       {showRecordPanel && (
+        <PanelGuard name="Record" onClose={() => setShowRecordPanel(false)}>
         <RecordPanel
           onClose={() => setShowRecordPanel(false)}
           recorder={recorder}
@@ -5236,14 +5266,17 @@ export default function App() {
           onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
           onDeletePerformance={musicIntel.deletePerformance}
         />
+        </PanelGuard>
       )}
 
       {/* ── Lyrics Overlay ─────────────────────────────────────── */}
       {musicSettings.enabled && musicSettings.lyricsOverlay && (
+        <PanelGuard name="The lyrics">
         <LyricsOverlay
           line={musicIntel.state.line}
           sentiment={musicIntel.state.sectionSentimentValue}
         />
+        </PanelGuard>
       )}
 
       {/* ── What stopping a performance did (lib/performanceTake.ts) ── */}
@@ -5310,7 +5343,9 @@ export default function App() {
             </span>
           </button>
           {presetMenu === 'title' && (
+            <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
             <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
+            </PanelGuard>
           )}
         </div>
 
@@ -5434,7 +5469,9 @@ export default function App() {
               </div>
             )}
           </div>
+          <PanelGuard name="The crash report">
           <CrashReportButton />
+          </PanelGuard>
           <button
             onClick={() => setShowHelp(!showHelp)}
             className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
@@ -5462,6 +5499,7 @@ export default function App() {
         that exists in two places is a control you cannot trust mid-set.
       */}
       {performing && overlaysVisible && (
+        <PanelGuard name="The Perform desk" onClose={() => setDeskMode('design')} closeLabel="Open the Design desk">
         <PerformDesk
           onSendToWall={() => { void startCast('window'); }}
           onSave={saveLook}
@@ -5569,6 +5607,7 @@ export default function App() {
           frozen={!isActive}
           onDrain={() => setDrainTrigger(v => v + 1)}
         />
+        </PanelGuard>
       )}
 
       {/* ── The bench ──────────────────────────────────────────── */}
@@ -5580,6 +5619,7 @@ export default function App() {
         finding out a room was watching.
       */}
       {designing && overlaysVisible && (
+        <PanelGuard name="The Design desk" onClose={() => setDeskMode('perform')} closeLabel="Open the Perform desk">
         <DesignDesk
           onOpenSettings={openAllSettings}
           automated={isAutomated}
@@ -5657,6 +5697,7 @@ export default function App() {
           onSearch={() => setShowPalette(true)}
           status={{ audio: deskAudioLine, engine: engineStatus?.label ?? '' }}
         />
+        </PanelGuard>
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
@@ -5671,11 +5712,12 @@ export default function App() {
       {/* The crash report, under a desk: its header has no room for a
           button that is idle nearly always, so the chip says when there is
           news and ⌘K opens the sheet. */}
-      {(deskUp || phone) && <CrashReportButton floating />}
+      {(deskUp || phone) && <PanelGuard name="The crash report"><CrashReportButton floating /></PanelGuard>}
       {/* Gone on a clean screen: a dot on the wall is still a dot on the wall. */}
-      {overlaysVisible && <QuickReportDot />}
+      {overlaysVisible && <PanelGuard name="The report dot"><QuickReportDot /></PanelGuard>}
 
       {addingToSet && (
+        <PanelGuard name="Add to set" onClose={() => setAddingToSet(false)}>
         <AddToSetSheet
           looks={PRESETS.map(p => ({ id: p.id, name: p.name, swatch: swatchOf(p.id), detail: p.description }))}
           saved={userPresets.presets.map(p => ({ id: p.id, name: p.name, swatch: swatchOf(p.id), detail: p.song ? songLabel(p.song) : p.description }))}
@@ -5685,9 +5727,11 @@ export default function App() {
           onImport={importToSet}
           onClose={() => setAddingToSet(false)}
         />
+        </PanelGuard>
       )}
 
       {showSave && (
+        <PanelGuard name="Save" onClose={() => setShowSave(false)}>
         <SaveLookSheet
           suggested={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}
           replaceName={docId ? docName : null}
@@ -5696,16 +5740,20 @@ export default function App() {
           onSave={saveCurrentPreset}
           onClose={() => setShowSave(false)}
         />
+        </PanelGuard>
       )}
 
       {/* ── ⌘K ─────────────────────────────────────────────────── */}
       {showPalette && (
+        <PanelGuard name="The command palette" onClose={() => setShowPalette(false)}>
         <CommandPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />
+        </PanelGuard>
       )}
 
       {/* ── The cued look, and the button that sends it ────────── */}
       <AnimatePresence>
         {overlayUp && (cued || fading > 0 || previousLook.current) && (
+          <PanelGuard name="The cue bar" onClose={() => setCued(null)} closeLabel="Clear the cue">
           <CueBar
             cued={cued}
             liveName={liveLookName}
@@ -5716,6 +5764,7 @@ export default function App() {
             onCancel={() => setCued(null)}
             onRevert={previousLook.current ? revertLook : null}
           />
+          </PanelGuard>
         )}
       </AnimatePresence>
 
