@@ -190,7 +190,39 @@ export interface OutputConfig {
    * surface had to be re-dragged the first time the projector was nudged.
    */
   surfaces: Surface[];
+  /**
+   * The test pattern and Identify (PLAN.md 8e), while either is up. Never
+   * stored and never normalized in: a show that opened on last night's test
+   * pattern would put a grid on the wall in front of the room. App keeps it
+   * beside this config and lays it on only for the frame (`WallTest`).
+   */
+  test?: WallTest;
 }
+
+/**
+ * What Load-in puts on the wall to line a projector up (Desk v2, PLAN.md 8e).
+ *
+ * `pattern`: in place of the show, every quad (the projector's pin, or each
+ * mapped shape) draws a grid, its diagonals, a circle, its corners numbered
+ * 1–4 clockwise from the top left as the pin's handles are, and its own
+ * number in the middle. It goes through the same corner pin, flip and
+ * blanking as the show, so a square grid on the wall is a square show.
+ *
+ * `identifyUntil`: a clock time (ms, `Date.now()`) until which each quad's
+ * number flashes large over whatever is drawn, so in a room of shapes and
+ * projectors the one called 3 can be found.
+ */
+export interface WallTest {
+  pattern: boolean;
+  identifyUntil: number;
+}
+
+/** How long Identify flashes the numbers. */
+export const IDENTIFY_MS = 3000;
+
+/** Whether a wall test is putting anything on the wall at this moment. */
+export const wallTestOn = (t: WallTest | undefined, now = Date.now()): boolean =>
+  !!t && (t.pattern || t.identifyUntil > now);
 
 export const IDENTITY_CORNERS: OutputConfig['corners'] = [0, 0, 1, 0, 1, 1, 0, 1];
 
@@ -229,6 +261,8 @@ const near = (a: number, b: number) => Math.abs(a - b) < 1e-4;
  * pass of its own and must not drag one into existence on every machine.
  */
 export function outputIsIdentity(o: OutputConfig): boolean {
+  // The test pattern and Identify are drawn by this pass, so they need it.
+  if (wallTestOn(o.test)) return false;
   if (o.flipX || o.flipY) return false;
   if (!o.corners.every((v, i) => near(v, IDENTITY_CORNERS[i]))) return false;
   if (o.maskTop > 1e-4 || o.maskRight > 1e-4 || o.maskBottom > 1e-4 || o.maskLeft > 1e-4) return false;
@@ -370,7 +404,9 @@ export function loadOutput(): OutputConfig {
 }
 
 export function saveOutput(o: OutputConfig): void {
-  try { localStorage.setItem(OUTPUT_KEY, JSON.stringify(o)); } catch { /* private browsing */ }
+  // Never the wall test: see `OutputConfig.test`.
+  const { test: _test, ...kept } = o;
+  try { localStorage.setItem(OUTPUT_KEY, JSON.stringify(kept)); } catch { /* private browsing */ }
 }
 
 /**

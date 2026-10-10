@@ -113,13 +113,34 @@ export const coveredControls = (page, { skipInside = null } = {}) => page.evalua
   return out;
 }, skipInside);
 
-/** The desk header's status dots, and the ones showing no word. */
+/**
+ * The desk header's status dots, and the ones showing no word.
+ *
+ * When the header is short of room the dots fold into one "Status" button
+ * (PLAN.md 8h) and the dots themselves are only in its list. Counting the
+ * header then would find the one button, labelled, and pass on a single
+ * element: so the fold is opened, the real dots are counted inside it, the
+ * button's own word is asked for too, and the fold is closed again.
+ */
 export const statusDots = async (page) => {
-  const bare = await page.evaluate(() => [...document.querySelectorAll('header [data-testid^="dot-"]')]
-    .filter((el) => el.getBoundingClientRect().width > 0 && !(el.innerText || '').trim())
-    .map((el) => el.dataset.testid));
-  const all = await page.locator('header [data-testid^="dot-"]').count();
-  return { all, bare };
+  const fold = page.locator('header [data-testid="dot-fold"]');
+  const folded = (await fold.count()) > 0 && await fold.first().isVisible();
+  if (folded) {
+    await fold.first().click();
+    await page.locator('[data-testid="dot-fold-list"]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  }
+  const { all, bare } = await page.evaluate(() => {
+    const dots = [...document.querySelectorAll('header [data-testid^="dot-"]')]
+      .filter((el) => el.dataset.testid !== 'dot-fold-list' && el.getBoundingClientRect().width > 0);
+    const real = dots.filter((el) => el.dataset.testid !== 'dot-fold');
+    return {
+      all: real.length,
+      bare: dots.filter((el) => !(el.innerText || '').trim()).map((el) => el.dataset.testid),
+    };
+  });
+  // Closed by its own button: Escape would also run the app's own Escape, which closes panels.
+  if (folded) await fold.first().click();
+  return { all, bare, folded };
 };
 
 /** The widths "nothing covers a control" is asked at: the desk's, and the overlay's below 1024. */

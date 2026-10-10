@@ -45,6 +45,15 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
   pack.set('feather', cfg.maskFeather);
   pack.set('gain', cfg.gain);
   pack.set('gamma', cfg.gamma);
+  /*
+    The wall test (PLAN.md 8e). Identify's numbers breathe at two a second
+    while it lasts rather than sitting still, so a number that is the show's
+    own (a look with digits in it) is not mistaken for one, and so it reads
+    as a flash on a wall seen from across a room.
+  */
+  const test = cfg.test;
+  const left = test ? test.identifyUntil - Date.now() : 0;
+  pack.set('test', test?.pattern ? 1 : 0, left > 0 ? 0.7 + 0.3 * Math.cos((left / 500) * Math.PI * 2) : 0, 0, 0);
 
   let n = 0;
   const quad = (
@@ -55,6 +64,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     opacity: number,
     source: SurfaceSource = 'wall',
     blend: SurfaceBlend = 'over',
+    number = 1,
   ) => {
     if (n >= MAX_SURFACES) return;
     const m = cornerPinMatrix(corners);
@@ -67,7 +77,11 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
     pack.setAt('cornerCD', at, corners[4], corners[5], corners[6], corners[7]);
     pack.setAt('src', at, src[0], src[1], src[2], src[3]);
     pack.setAt('form', at, SHAPE_INDEX[shape], feather, opacity, SOURCE_INDEX[source]);
-    pack.setAt('lay', at, BLEND_INDEX[blend], 0, 0, 0);
+    // Its shape on the wall in pixels, the mean of opposite edges, so the
+    // test pattern's grid is square and its circle round there.
+    const edge = (i: number, j: number) => Math.hypot((corners[j] - corners[i]) * width, (corners[j + 1] - corners[i + 1]) * height);
+    const aspect = (edge(0, 2) + edge(6, 4)) / Math.max(1e-6, edge(0, 6) + edge(2, 4));
+    pack.setAt('lay', at, BLEND_INDEX[blend], aspect, number, 0);
     n++;
   };
 
@@ -79,11 +93,13 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
   } else {
     // Mapped, and possibly all of it switched off — which is a blackout, not
     // an absence of mapping.
-    for (const s of surfaces) {
-      if (!s.enabled || s.opacity <= 0) continue;
+    // A shape's number is its place in the Mapping list, counting the ones
+    // switched off, so it is the number the list shows.
+    surfaces.forEach((s, i) => {
+      if (!s.enabled || s.opacity <= 0) return;
       const placed = composeOntoPin(s.corners, cfg.corners);
-      if (placed) quad(placed, s.src, s.shape, s.feather, s.opacity, s.source, s.blend);
-    }
+      if (placed) quad(placed, s.src, s.shape, s.feather, s.opacity, s.source, s.blend, i + 1);
+    });
   }
   // Everything past the last quad still has to hold something: a uniform
   // buffer is read whole, and an unwritten slot is whatever the last frame

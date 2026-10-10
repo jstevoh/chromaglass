@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Segmented, StatusDot } from '../ui';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 import { AlphaBadge } from '../AlphaBadge';
@@ -79,27 +79,169 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   const headerRef = useRef<HTMLElement>(null);
   const switchRef = useRef<HTMLDivElement>(null);
   const clusterRef = useRef<HTMLDivElement>(null);
-  const [tight, setTight] = useState(false);
-  const wideW = useRef(0);
+  /*
+    And when even the words under the dots do not fit, the dots fold into one
+    (PLAN.md 8h). At 1024 the cluster (+ Panel, six dots with their words
+    under them, search and Blackout) measured 342 px against 337 of room
+    right of the switch, so the Sound dot sat 5 px under it; any seventh thing
+    (a controller with a long name, a phone linked while recording) ran it
+    further under. Folded, one Status button stands for all of them: its dot
+    is red while anything is recording, green while anything is connected,
+    and it opens the dots as they were, each still opening what it reports on.
+
+    Three levels, each measured rather than guessed: 0 the words beside the
+    dots, 1 the words under them, 2 folded. The words go under at 12 px from
+    the switch, as they always did; the dots fold only when the cluster
+    actually reaches it, so a width where the words-under fit with a few
+    pixels to spare (1280) keeps every dot in sight. A level comes back down
+    only when the cluster as it was at the level below fits again, so it
+    cannot flicker between two.
+  */
+  const [level, setLevel] = useState<0 | 1 | 2>(0);
+  /*
+    What each level saves, measured at the moment it was taken: the width
+    just before, less the width just after. Coming back down asks whether
+    today's cluster plus that saving fits, not whether the cluster as it was
+    then fits: what made it too wide (a Rec dot, a long controller name) may
+    have gone since, and the header should unfold when it has.
+  */
+  const saved = useRef<[number, number, number]>([0, 0, 0]);
+  const before = useRef<{ from: number; w: number } | null>(null);
   useLayoutEffect(() => {
     const fit = () => {
       const h = headerRef.current, sw = switchRef.current, c = clusterRef.current;
       if (!h || !sw || !c) return;
       const hr = h.getBoundingClientRect(), sr = sw.getBoundingClientRect(), cr = c.getBoundingClientRect();
-      const room = hr.right - 16 - sr.right - 12;
-      if (!tight) {
-        wideW.current = cr.width;
-        if (cr.left < sr.right + 12) setTight(true);
-      } else if (wideW.current + 4 < room) {
-        setTight(false);
+      // How close the cluster may come to the switch at each level before the next.
+      const margin = (l: number) => (l === 0 ? 12 : 0);
+      if (before.current && before.current.from === level - 1) {
+        saved.current[level] = Math.max(0, before.current.w - cr.width);
+        before.current = null;
       }
+      if (level < 2 && cr.left < sr.right + margin(level)) {
+        before.current = { from: level, w: cr.width };
+        setLevel((level + 1) as 1 | 2);
+        return;
+      }
+      if (level > 0 && cr.width + saved.current[level] + 4 < hr.right - 16 - sr.right - margin(level - 1)) setLevel((level - 1) as 0 | 1);
     };
     fit();
     const ro = new ResizeObserver(fit);
     if (headerRef.current) ro.observe(headerRef.current);
     if (clusterRef.current) ro.observe(clusterRef.current);
     return () => ro.disconnect();
-  }, [tight]);
+  }, [level]);
+  /*
+    But folded, the dots are inside the Status button, so the cluster is the
+    button's width whatever they are: a Rec dot going away when the take
+    stops, or a long controller name giving way to a short one, changes
+    nothing the observer sees, and the saving measured with them in it would
+    hold the header folded until the window grew by a dot. So when the set of
+    dots changes the header starts again from the words beside the dots and
+    measures its way back up; this runs before paint, so where it still has to
+    fold it folds without a frame shown unfolded. Recording is a dot or none,
+    not its clock: the clock ticks every second and would re-measure with it.
+  */
+  const dotSet = `${!!onWall}|${!!onPhone}|${!!dots.rec}|${midiName ?? ''}`;
+  const lastSet = useRef(dotSet);
+  useLayoutEffect(() => {
+    if (lastSet.current === dotSet) return;
+    lastSet.current = dotSet;
+    saved.current = [0, 0, 0];
+    before.current = null;
+    setLevel(0);
+  }, [dotSet]);
+  const tight = level >= 1;
+  const folded = level === 2;
+  const [openDots, setOpenDots] = useState(false);
+  const foldRef = useRef<HTMLDivElement>(null);
+  // A list left open when the header unfolded must not come back by itself when it folds again.
+  useEffect(() => { if (!folded) setOpenDots(false); }, [folded]);
+  useEffect(() => {
+    if (!folded || !openDots) return;
+    const away = (e: PointerEvent) => { if (!foldRef.current?.contains(e.target as Node)) setOpenDots(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenDots(false); };
+    window.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('pointerdown', away); window.removeEventListener('keydown', key); };
+  }, [folded, openDots]);
+
+  /** Every dot, beside one another in the bar or down the folded list. */
+  const dotsAt = (t: boolean) => (
+    <>
+      <StatusDot
+        on={dots.sound ?? dots.mic ?? false}
+        label="Sound" tight={t}
+        onClick={onSound}
+        title={(dots.sound ?? dots.mic) ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
+        testId="dot-sound"
+      />
+      <StatusDot
+        on={!!dots.video}
+        label="Video" tight={t}
+        onClick={onVideo}
+        title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
+        testId="dot-video"
+      />
+      {onWall && (
+        <StatusDot
+          on={!!dots.wall}
+          label="Wall" tight={t}
+          onClick={onWall}
+          title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
+          testId="dot-wall"
+        />
+      )}
+      <StatusDot
+        on={dots.midi}
+        label={midiName ?? 'MIDI'} short="MIDI" tight={t}
+        onClick={onMidi}
+        title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
+        testId="dot-midi"
+      />
+      {onPhone && (
+        <StatusDot
+          on={!!dots.phone}
+          label="Phone" tight={t}
+          onClick={onPhone}
+          title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
+          testId="dot-phone"
+        />
+      )}
+      {dots.rec && (
+        <StatusDot
+          on
+          tone="live"
+          label={`Rec ${dots.rec}`}
+          short="Rec"
+          tight={t}
+          onClick={onRecord}
+          title={`Recording canvas video (${dots.rec}). Click to manage recording options or press R to stop.`}
+          testId="dot-rec"
+        />
+      )}
+      {/*
+        Performances start and stop here, by hand (T). They used to follow
+        the song detection, which started late and ran on into the next
+        song; the song that is playing is still attached, on its own.
+        A short word, with the clock in its tooltip: "Performance 0:42"
+        beside it pushed Mic and Wall under the centred mode switch at 1440
+        (npm run qa), and with no word at all nobody could tell what it was.
+      */}
+      <StatusDot
+        on={!!dots.perf}
+        tone="live"
+        label="Perf" tight={t}
+        onClick={onPerformance}
+        title={dots.perf
+          ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
+          : 'Start recording a performance: what you paint, replayable later at the same moments in the song. Click or press T.'}
+        testId="dot-performance"
+      />
+    </>
+  );
+  const recording = !!dots.rec || !!dots.perf;
+  const connected = [dots.sound ?? dots.mic, dots.video, dots.wall, dots.midi, dots.phone].filter(Boolean).length;
 
   return (
     /*
@@ -182,77 +324,33 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           />
         </div>
       </div>
-      <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`}>
+      <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`} data-testid="header-cluster" data-fold={level}>
         {leading}
-        <StatusDot
-          on={dots.sound ?? dots.mic ?? false}
-          label="Sound" tight={tight}
-          onClick={onSound}
-          title={(dots.sound ?? dots.mic) ? 'Sound is coming in — click to choose the input' : 'Nothing is listening. Click to pick a microphone or another source.'}
-          testId="dot-sound"
-        />
-        <StatusDot
-          on={!!dots.video}
-          label="Video" tight={tight}
-          onClick={onVideo}
-          title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
-          testId="dot-video"
-        />
-        {onWall && (
-          <StatusDot
-            on={!!dots.wall}
-            label="Wall" tight={tight}
-            onClick={onWall}
-            title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
-            testId="dot-wall"
-          />
-        )}
-        <StatusDot
-          on={dots.midi}
-          label={midiName ?? 'MIDI'} short="MIDI" tight={tight}
-          onClick={onMidi}
-          title={dots.midi ? `${midiName ?? 'MIDI'} — open the controller panel` : 'No controller. Click to set one up.'}
-          testId="dot-midi"
-        />
-        {onPhone && (
-          <StatusDot
-            on={!!dots.phone}
-            label="Phone" tight={tight}
-            onClick={onPhone}
-            title={dots.phone ? 'A phone is driving the show — click to read what it can do' : 'No phone. Click to see how to connect one.'}
-            testId="dot-phone"
-          />
-        )}
-        {dots.rec && (
-          <StatusDot
-            on
-            tone="live"
-            label={`Rec ${dots.rec}`}
-            short="Rec"
-            tight={tight}
-            onClick={onRecord}
-            title={`Recording canvas video (${dots.rec}). Click to manage recording options or press R to stop.`}
-            testId="dot-rec"
-          />
-        )}
-        {/*
-          Performances start and stop here, by hand (T). They used to follow
-          the song detection, which started late and ran on into the next
-          song; the song that is playing is still attached, on its own.
-          A short word, with the clock in its tooltip: "Performance 0:42"
-          beside it pushed Mic and Wall under the centred mode switch at 1440
-          (npm run qa), and with no word at all nobody could tell what it was.
-        */}
-        <StatusDot
-          on={!!dots.perf}
-          tone="live"
-          label="Perf" tight={tight}
-          onClick={onPerformance}
-          title={dots.perf
-            ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
-            : 'Start recording a performance: what you paint, replayable later at the same moments in the song. Click or press T.'}
-          testId="dot-performance"
-        />
+        {folded ? (
+          <div ref={foldRef} className="relative">
+            <button
+              onClick={() => setOpenDots(v => !v)}
+              className="inline-flex h-8 items-center gap-2 rounded-md px-2 text-[12px] text-text-2 transition-colors hover:bg-hover"
+              title={`${connected} connected${recording ? ', recording' : ''}. Click for each one.`}
+              aria-expanded={openDots}
+              data-testid="dot-fold"
+            >
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: recording ? 'var(--color-live)' : connected > 0 ? 'var(--color-ok)' : 'var(--color-knob-off)' }}
+              />
+              Status
+            </button>
+            {openDots && (
+              <div
+                className="absolute right-0 top-full z-40 mt-1 flex flex-col items-start gap-1 rounded-md border border-border-strong bg-elevated p-2 shadow-lg"
+                data-testid="dot-fold-list"
+              >
+                {dotsAt(false)}
+              </div>
+            )}
+          </div>
+        ) : dotsAt(tight)}
         <button
           onClick={onSearch}
           className={`ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong ${tight ? 'px-2' : 'px-3'} text-[13px] text-muted transition-colors hover:bg-hover hover:text-text`}

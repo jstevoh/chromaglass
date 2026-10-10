@@ -26,7 +26,7 @@ export const OUTPUT_FIELDS: Field[] = [
   { name: 'cornerCD', type: 'vec4f', count: MAX_SURFACES, note: 'x2 y2 x3 y3' },
   { name: 'src', type: 'vec4f', count: MAX_SURFACES, note: 'which piece of the plate fills it: x, y, w, h' },
   { name: 'form', type: 'vec4f', count: MAX_SURFACES, note: 'shape index, shape feather, opacity, source (0 wall, 1 front, 2 back, 3 film)' },
-  { name: 'lay', type: 'vec4f', count: MAX_SURFACES, note: 'x: how it meets the wall (0 over, 1 add, the beam); yzw spare' },
+  { name: 'lay', type: 'vec4f', count: MAX_SURFACES, note: 'x: how it meets the wall (0 over, 1 add, the beam); y: its width over its height on the wall, for the test pattern; z: its number (1 up); w spare' },
   // Per frame.
   { name: 'mask', type: 'vec4f', note: 'blanking inset from top, right, bottom, left' },
   { name: 'flip', type: 'vec2f', note: '1 or -1 per axis' },
@@ -35,6 +35,7 @@ export const OUTPUT_FIELDS: Field[] = [
   { name: 'gain', type: 'f32' },
   { name: 'gamma', type: 'f32' },
   { name: 'quads', type: 'f32', note: 'how many quads are in the arrays above, for a beam to find the others it crosses' },
+  { name: 'test', type: 'vec4f', note: 'x: the test pattern in place of the picture (0 or 1); y: how bright Identify\'s numbers are now (0 off); zw spare (PLAN.md 8e)' },
 ];
 
 export const OUTPUT_LAYOUT = layOut(OUTPUT_FIELDS);

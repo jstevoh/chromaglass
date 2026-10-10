@@ -28,6 +28,8 @@
 
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
+import { controlKindOf, apc40Mk2Map, launchControlXlMap, nanoKontrol2Map, apcMiniMk2Map } from '../src/lib/midi.ts';
+import { KNOB_SWEEP, onRing, ringTravel } from '../src/lib/knobDrag.ts';
 import { blendLooks, targetLook, evolvedLook, STRUCTURE, ease, LOOK_BASE, RIG_KEYS, lookOf } from '../src/lib/lookFade.ts';
 
 const checks = [];
@@ -302,6 +304,58 @@ function drive({ from, to, seconds, clearing }) {
   } else {
     check('pressing Go still takes the structure with it', false, 'no preset pair to compare');
   }
+}
+
+// ── A control drawn as the hardware it is learned to (PLAN.md 8d) ────────
+//
+// The desk draws a CC on a fader as a slider and one on a knob as a knob. A
+// binding only says absolute or relative, so before profiles every absolute
+// knob (the APC40's sixteen, the Launch Control XL's twenty-four) drew as a
+// fader. The control is a board this does not know, whose absolute CCs must
+// stay faders, and an endless encoder on it, which must still be a knob.
+{
+  const apc = apc40Mk2Map([]);
+  const kinds = (map, keys, port) => keys.map(k => controlKindOf(map, k, port));
+  const apcKnobs = kinds(apc, ['lightPlay', 'bloom', 'beatSqueeze', 'macroSync', 'granulation']);
+  const apcFaders = kinds(apc, ['audioImpact', 'saturationBoost', 'dimmer', 'sharpness']);
+  check('the APC40 map\'s device and track knobs, and its cue encoder, draw as knobs', apcKnobs.every(k => k === 'encoder'), apcKnobs.join(' '));
+  check('and its track faders, master and crossfader draw as sliders', apcFaders.every(k => k === 'fader'), apcFaders.join(' '));
+  const lcxl = kinds(launchControlXlMap(), ['lightPlay', 'bloom', 'lumia', 'dimmer', 'bubbles']);
+  check('the Launch Control XL\'s three rows of knobs are knobs, its faders sliders',
+    lcxl.slice(0, 3).every(k => k === 'encoder') && lcxl.slice(3).every(k => k === 'fader'), lcxl.join(' '));
+  const nano = kinds(nanoKontrol2Map(), ['lightPlay', 'camera', 'audioImpact']);
+  check('the nanoKONTROL2\'s knobs are knobs, its faders sliders', nano[0] === 'encoder' && nano[1] === 'encoder' && nano[2] === 'fader', nano.join(' '));
+  check('the APC mini\'s faders are sliders', kinds(apcMiniMk2Map([]), ['audioImpact', 'camera']).every(k => k === 'fader'));
+  // A map with no device name (made from scratch) takes the board from the port it plays from.
+  const bare = { ...apc, device: undefined, name: 'Mine' };
+  check('a map with no device takes its board from the port', controlKindOf(bare, 'lightPlay', 'APC40 mkII') === 'encoder' && controlKindOf(bare, 'lightPlay', null) === 'fader');
+  // The control: an unknown board. Absolute CC 16 is a fader there; a relative one is a knob.
+  const unknown = { ...apc, device: 'Some Box', bindings: [
+    { id: 'a', source: { kind: 'cc', channel: 0, number: 16 }, target: { kind: 'setting', key: 'lightPlay', min: 0, max: 1 }, mode: 'absolute' },
+    { id: 'b', source: { kind: 'cc', channel: 0, number: 17 }, target: { kind: 'setting', key: 'bloom', min: 0, max: 1 }, mode: 'relative' },
+  ] };
+  check('on a board it does not know, an absolute CC stays a slider and an endless encoder is a knob',
+    controlKindOf(unknown, 'lightPlay', 'Some Box') === 'fader' && controlKindOf(unknown, 'bloom', 'Some Box') === 'encoder');
+  check('a setting learned to nothing has no kind', controlKindOf(apc, 'vorticityConfinement', 'APC40 mkII') === null);
+}
+
+// ── A knob turned round its ring (PLAN.md 8c) ────────────────────────────
+//
+// On the cap a knob is a vertical drag; on the ring it follows the hand. The
+// arithmetic: a quarter turn clockwise is a third of the 270° sweep, the
+// other way is the same back, a step across the gap at the bottom is the
+// short way round (not a whole turn), and a step at the centre is nothing.
+{
+  const r = 16;
+  const at = (deg) => [Math.cos(deg * Math.PI / 180) * r, Math.sin(deg * Math.PI / 180) * r];
+  let t = 0;
+  for (let d = 180; d < 270; d += 5) t += ringTravel(at(d), at(d + 5));
+  check('a quarter turn clockwise round the ring is a third of the sweep', Math.abs(t - (Math.PI / 2) / KNOB_SWEEP) < 1e-9, t.toFixed(4));
+  check('the same turn back is the same travel down', Math.abs(ringTravel(at(270), at(180)) + t) < 1e-9);
+  const gap = ringTravel(at(95), at(85));
+  check('a step across the bottom is the short way round', Math.abs(gap - (-10 * Math.PI / 180) / KNOB_SWEEP) < 1e-9, gap.toFixed(4));
+  check('a step at the centre turns nothing', ringTravel([1, 0], [0, 1]) === 0);
+  check('a hold on the ring is the ring, on the cap the cap', onRing(15, 0, 20) && !onRing(8, 6, 20));
 }
 
 console.log('');

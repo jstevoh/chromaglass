@@ -401,9 +401,9 @@ try {
     check(`nothing covers a control at ${w}px`, n > 10 && hit.length === 0,
       hit.length ? hit.slice(0, 4).join('; ') : `${n} controls`);
     if (w >= 1024) {
-      const { all, bare } = await statusDots(page);
+      const { all, bare, folded } = await statusDots(page);
       check(`every status dot is labelled at ${w}px`, all > 0 && bare.length === 0,
-        bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word`);
+        bare.length ? `no word on ${bare.join(', ')}` : `${all} dots, each with its word${folded ? ', in the opened Status fold' : ''}`);
     }
   }
 
@@ -570,6 +570,225 @@ try {
   }
   await page.keyboard.press('Escape');
   await settle(500);
+
+  // ── The rest of Desk v2 (PLAN.md 8c, 8e, 8f, 8h) ───────────────
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await clickOn('mode-segmented-design');
+  await settle(1000);
+  {
+    /*
+      8c: a knob turned round its ring, as well as up and down, and a
+      double-click back to the look's own value. The first knob in the deck,
+      read as its range input's value: unedited, the plate is the look, so
+      where it starts is the look's value and the double-click must land
+      there again after the hand has moved it both ways.
+    */
+    const knob = page.locator('[data-testid="desk-deck"] [data-knob] input[type="range"]').first();
+    const readKnob = () => knob.evaluate((el) => Number(el.value));
+    const box = await knob.boundingBox();
+    if (!box) {
+      check('a knob in the deck to turn', false, 'none drawn');
+    } else {
+      const cx = box.x + box.width / 2, cy = box.y + box.height / 2, r = box.width / 2 * 0.85;
+      const min = Number(await knob.getAttribute('min')), max = Number(await knob.getAttribute('max'));
+      const span = max - min || 1;
+      const lookValue = await readKnob();
+      // Down a little first, from the cap, so the ring has somewhere to go.
+      await page.mouse.move(cx, cy);
+      await page.mouse.down();
+      await page.mouse.move(cx, cy + 40, { steps: 8 });
+      await page.mouse.up();
+      await settle(200);
+      const start = await readKnob();
+      // Round the ring: from nine o'clock over the top to three, half a turn clockwise.
+      await page.mouse.move(cx - r, cy);
+      await page.mouse.down();
+      for (let a = 180; a <= 360; a += 10) await page.mouse.move(cx + Math.cos(a * Math.PI / 180) * r, cy + Math.sin(a * Math.PI / 180) * r);
+      await page.mouse.up();
+      await settle(200);
+      const turned = await readKnob();
+      // Begun on the cap, a sideways motion is a vertical drag, and moves next to nothing.
+      // It is drawn above the centre, from half the radius left to half right, so every
+      // point is on the cap (at most 0.58 of the radius out; the ring starts at 0.65) but
+      // far enough out that the ring's rule would read it as about 118° clockwise, 0.44
+      // of the travel: a knob that followed the ring from its cap would fail here. (Through
+      // the centre itself it would not: inside 4 px the ring's angle counts for nothing.)
+      const R = box.width / 2;
+      await page.mouse.move(cx - R * 0.5, cy - R * 0.3);
+      await page.mouse.down();
+      await page.mouse.move(cx + R * 0.5, cy - R * 0.3, { steps: 8 });
+      await page.mouse.up();
+      await settle(200);
+      const capSide = await readKnob();
+      check('a knob follows a hand round its ring: half a turn clockwise turns it up by well over a third of its travel',
+        (turned - start) / span > 0.4, `${start.toFixed(3)} → ${turned.toFixed(3)} of ${min}..${max}`);
+      check('and a hand sideways across its cap does not turn it (on the cap it is up and down)', Math.abs(capSide - turned) / span < 0.02,
+        `${turned.toFixed(3)} → ${capSide.toFixed(3)}`);
+      await knob.dblclick();
+      await settle(300);
+      const reset = await readKnob();
+      // Moved well away first, so a double-click that did nothing cannot pass.
+      check('a double-click puts it back to the look\'s own value', Math.abs(capSide - lookValue) / span > 0.1 && Math.abs(reset - lookValue) / span < 0.01,
+        `look ${lookValue.toFixed(3)}, moved to ${capSide.toFixed(3)}, back to ${reset.toFixed(3)}`);
+    }
+  }
+  {
+    /*
+      8e: Load-in's Wall panel carries the test pattern and Identify, and
+      Output's gain and gamma as knobs. The pattern itself is drawn in the
+      projector's pass and measured on it (`npm run wallpattern`); here, that
+      the switch is there, turns on, and is never written into the stored
+      output config, which a show reopens with.
+    */
+    await clickOn('mode-segmented-loadin');
+    await settle(1200);
+    const has = async (id) => (await page.getByTestId(id).count()) > 0;
+    const parts = await Promise.all(['output-test-pattern', 'output-identify', 'output-gain', 'output-gamma'].map(has));
+    check('Load-in\'s Wall panel has the test pattern, Identify, and gain and gamma as knobs', parts.every(Boolean),
+      ['test pattern', 'identify', 'gain', 'gamma'].filter((_, i) => !parts[i]).map(x => `no ${x}`).join(', ') || 'all four');
+    if (parts[0]) {
+      await page.getByTestId('output-test-pattern').first().click();
+      await settle(400);
+      const pressed = await page.getByTestId('output-test-pattern').first().evaluate((el) => el.className.includes('bg-white text-black'));
+      // A gain change, so the config is written while the pattern is up.
+      await page.evaluate(() => window.chromaglassOutput?.({ gain: 1.05 }));
+      await settle(300);
+      const stored = await page.evaluate(() => localStorage.getItem('chromaglass-output') ?? '');
+      check('the test pattern turns on, and is never stored with the wall\'s settings', pressed && stored.includes('"gain"') && !stored.includes('test'),
+        `${pressed ? 'on' : 'not on'}; stored ${stored.length} chars${stored.includes('test') ? ', with the test in it' : ''}`);
+      await page.getByTestId('output-test-pattern').first().click();
+      await page.evaluate(() => window.chromaglassOutput?.({ gain: 1 }));
+      await settle(300);
+    }
+  }
+  {
+    /*
+      8f: the Phone · iPad panel draws the link as a QR code. There is no show
+      server behind the preview, so its address is given here, and the code
+      drawn is read back into its modules and compared, module for module,
+      with the encoder's own for that address (`npm run qr` reads the encoder
+      back to the text).
+    */
+    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0' };
+    await page.route('**/remote-info.json', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(info) }));
+    // Out of Load-in and back, so the panel mounts again and asks.
+    await clickOn('mode-segmented-perform');
+    await settle(600);
+    await clickOn('mode-segmented-loadin');
+    await settle(1500);
+    const drawn = await page.evaluate(() => {
+      const svg = document.querySelector('[data-testid="phone-link-qr"]');
+      const url = document.querySelector('[data-testid="phone-link-url"]')?.textContent ?? null;
+      if (!svg) return { url, d: null };
+      const r = svg.getBoundingClientRect();
+      return { url, d: svg.querySelector('path')?.getAttribute('d') ?? null, w: Math.round(r.width), version: svg.getAttribute('data-qr-version') };
+    });
+    await page.unroute('**/remote-info.json');
+    const { encodeQr, qrPath } = await import('../src/lib/qr.ts');
+    const want = drawn.url ? encodeQr(drawn.url) : null;
+    check('the Phone · iPad panel draws its link as a QR code, module for module the code of the address it shows',
+      !!drawn.d && !!want && drawn.d === qrPath(want) && drawn.url.includes(info.key),
+      drawn.d ? `version ${drawn.version}, ${drawn.w}px, for ${drawn.url}` : `no code drawn${drawn.url ? '' : ', no address'}`);
+  }
+  {
+    /*
+      8h: at 1024 the header was full: + Panel, six dots with their words
+      under them, search and Blackout came to 342 px, five more than the room
+      right of the centred switch, so the Sound dot sat under it. Now the dots
+      fold into one Status button when they do not fit. Asked of every
+      layout: at 1024 the cluster is clear of the switch, and still clear
+      with a seventh thing in it (60 px, a dot's width); at 1280, where the
+      dots fit, that seventh thing folds them, the button opens every dot,
+      and with the thing gone they unfold.
+    */
+    const cluster = () => page.evaluate(() => {
+      const el = document.querySelector('[data-testid="header-cluster"]');
+      const c = el.getBoundingClientRect();
+      const sw = document.querySelector('[data-testid="mode-segmented"]')?.getBoundingClientRect();
+      return { fold: el.getAttribute('data-fold'), gap: sw ? Math.round(c.left - sw.right) : null, button: !!document.querySelector('[data-testid="dot-fold"]') };
+    });
+    const extra = (on, w = 60) => page.evaluate(([on, w]) => {
+      document.getElementById('layout-extra')?.remove();
+      if (!on) return;
+      const x = document.createElement('span');
+      x.id = 'layout-extra';
+      x.style.cssText = `display:inline-block;width:${w}px;height:8px;flex-shrink:0`;
+      document.querySelector('[data-testid="header-cluster"]')?.prepend(x);
+    }, [on, w]);
+    const rows = [];
+    for (const mode of ['design', 'perform', 'loadin']) {
+      await page.setViewportSize({ width: 1024, height: 860 });
+      await clickOn(`mode-segmented-${mode}`);
+      await settle(900);
+      const at1024 = await cluster();
+      await extra(true); await settle(600);
+      const more1024 = await cluster();
+      await extra(false);
+      await page.setViewportSize({ width: 1280, height: 860 });
+      await settle(900);
+      const at1280 = await cluster();
+      await extra(true); await settle(600);
+      const more1280 = await cluster();
+      let listed = false;
+      if (more1280.button) {
+        await clickOn('dot-fold');
+        await settle(300);
+        // Listed, and on top: each dot's middle is the dot, not the deck or a panel over the list.
+        listed = await page.evaluate(() => ['dot-sound', 'dot-video', 'dot-midi', 'dot-performance'].every((t) => {
+          const el = document.querySelector(`[data-testid="dot-fold-list"] [data-testid="${t}"]`);
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          const top = r.width && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return !!top && (top === el || el.contains(top));
+        }));
+        // Closed by its own button: Escape would also run the app's Escape, which closes panels.
+        await clickOn('dot-fold');
+      }
+      await extra(false); await settle(900);
+      const back1280 = await cluster();
+      rows.push({ mode, at1024, more1024, at1280, more1280, listed, back1280 });
+    }
+    check('at 1024 the header\'s right side is clear of the centred switch, in every layout, and still clear with a seventh thing in it',
+      rows.every(r => r.at1024.gap >= 0 && r.more1024.gap >= 0 && r.more1024.fold === '2'),
+      rows.map(r => `${r.mode}: ${r.at1024.gap}px (level ${r.at1024.fold}), ${r.more1024.gap}px with one more`).join('; '));
+    check('at 1280 the dots fit; a seventh thing folds them into one Status button clear of the switch, which opens every dot, and they unfold when it goes',
+      rows.every(r => r.at1280.fold !== '2' && r.more1280.fold === '2' && r.more1280.gap >= 0 && r.listed && r.back1280.fold === r.at1280.fold),
+      rows.map(r => `${r.mode}: level ${r.at1280.fold} → ${r.more1280.fold} (${r.more1280.gap}px) → ${r.back1280.fold}${r.listed ? '' : ', not listed'}`).join('; '));
+    /*
+      And a real dot, which is the harder case: folded, the dots are inside
+      the Status button, so a dot going away changes nothing the header's
+      observer sees. The cluster is filled to 12 px short of the switch, a
+      take started (R) puts its Rec dot in and folds the header, and the take
+      stopped must unfold it again, not leave it folded until the window
+      grows by a dot (found in review: the saving measured with the Rec dot in
+      it held the fold). The extra span stays put throughout, so the only
+      thing that changes is the dot.
+    */
+    {
+      await page.setViewportSize({ width: 1280, height: 860 });
+      await clickOn('mode-segmented-perform');
+      await settle(900);
+      const base = await cluster();
+      await extra(true, Math.max(0, (base.gap ?? 0) - 12)); await settle(600);
+      const full = await cluster();
+      const recording = () => page.evaluate(() => !!document.querySelector('[data-testid="dot-rec"]')
+        || /recording/.test(document.querySelector('[data-testid="dot-fold"]')?.getAttribute('title') ?? ''));
+      await page.evaluate(() => (document.activeElement)?.blur?.());
+      await page.keyboard.press('r'); await settle(1500);
+      const taking = await cluster(), wasRec = await recording();
+      await page.evaluate(() => (document.activeElement)?.blur?.());
+      await page.keyboard.press('r'); await settle(1500);
+      const stopped = await cluster(), stillRec = await recording();
+      await extra(false); await settle(600);
+      check('a take\'s Rec dot folds a full header and the take stopping unfolds it again',
+        full.fold !== '2' && wasRec && taking.fold === '2' && !stillRec && stopped.fold === full.fold,
+        `level ${full.fold} (${full.gap}px) → ${wasRec ? 'recording' : 'not recording'}, level ${taking.fold} → ${stillRec ? 'still recording' : 'stopped'}, level ${stopped.fold}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await settle(800);
+    const wide = await cluster();
+    check('at 1440 the dots are not folded', wide.fold !== '2', `level ${wide.fold}`);
+  }
 
   // ── Small screens ──────────────────────────────────────────────
   await page.setViewportSize({ width: 420, height: 820 });

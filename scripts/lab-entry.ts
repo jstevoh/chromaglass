@@ -12,7 +12,7 @@ import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
 import { speciesOf } from '../src/lib/liquidProps';
 import { DEFAULT_LIQUID_TYPES } from '../src/types';
-import { normalizeOutput } from '../src/lib/outputConfig';
+import { normalizeOutput, type OutputConfig } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
@@ -468,7 +468,11 @@ const api = {
   async projector(size: number, cfg: unknown, pictures: Partial<Record<'wall' | 'front' | 'back' | 'film', [number[], number[], 'y'?]>>) {
     const device = lab!.solver['device'] as GPUDevice;
     const out = new WebGPUOutput(device, 'rgba8unorm');
-    const quads = fillOutputUniforms(out.pack, normalizeOutput(cfg), size, size);
+    // The wall test (8e) is never normalized in (outputConfig.ts), so it is laid on as App lays it on.
+    const conf = normalizeOutput(cfg);
+    const test = (cfg as { test?: OutputConfig['test'] } | null)?.test;
+    if (test) conf.test = test;
+    const quads = fillOutputUniforms(out.pack, conf, size, size);
     const enc = device.createCommandEncoder();
     const ramp = (view: GPUTextureView, [a, b, axis]: [number[], number[], 'y'?]) => {
       const v = (c: number[]) => `vec3f(${c.map(x => x.toFixed(6)).join(', ')})`;

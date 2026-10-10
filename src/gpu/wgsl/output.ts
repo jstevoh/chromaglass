@@ -87,6 +87,103 @@ fn samePointDepth(j: u32, d: vec2f, uv: vec2f) -> f32 {
   return max(0.0, shapeDepth(i32(U.form[j].x), q));
 }
 
+// ── The wall test (PLAN.md 8e) ─────────────────────────────────────
+//
+// What Load-in puts on the wall to line a projector up, drawn here rather
+// than upstream so it goes through the same corner pin, flip and blanking as
+// the show: a square grid on the wall is a square show. Everything is drawn
+// in the quad's own unit square, y down, with the quad's width over height on
+// the wall (\`lay.y\`) to keep the grid square and the circle round, and \`px\`,
+// the size of one screen pixel in that square, to keep lines a pixel or two
+// wide however the quad is pulled.
+
+/** Whether point p of a seven-segment digit's box (0..1, y down; the box 0.6 wide to 1 tall) is lit for n. */
+fn segmentLit(n: u32, p: vec2f) -> bool {
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) { return false; }
+  // a b c d e f g as bits 0..6, the standard seven-segment table.
+  var lit = array<u32, 10>(0x3fu, 0x06u, 0x5bu, 0x4fu, 0x66u, 0x6du, 0x7du, 0x07u, 0x7fu, 0x6fu);
+  let m = lit[min(n, 9u)];
+  let t = 0.16;
+  let tx = t / 0.6;
+  let upper = p.y < 0.5;
+  var on = false;
+  if ((m & 1u) != 0u && p.y < t) { on = true; }                                        // a
+  if ((m & 2u) != 0u && p.x > 1.0 - tx && upper) { on = true; }                         // b
+  if ((m & 4u) != 0u && p.x > 1.0 - tx && !upper) { on = true; }                        // c
+  if ((m & 8u) != 0u && p.y > 1.0 - t) { on = true; }                                   // d
+  if ((m & 16u) != 0u && p.x < tx && !upper) { on = true; }                             // e
+  if ((m & 32u) != 0u && p.x < tx && upper) { on = true; }                              // f
+  if ((m & 64u) != 0u && abs(p.y - 0.5) < t * 0.5) { on = true; }                       // g
+  return on;
+}
+
+/** A number of one or two digits, h tall (of the quad's height), centred on c, on a quad aspect wide to 1 tall. */
+fn numberLit(n: u32, q: vec2f, c: vec2f, h: f32, aspect: f32) -> bool {
+  let w = 0.6 * h / aspect;
+  let gap = 0.3 * w;
+  let two = n >= 10u;
+  let total = select(w, 2.0 * w + gap, two);
+  let x0 = c.x - total * 0.5;
+  let y = (q.y - (c.y - h * 0.5)) / h;
+  if (two) {
+    if (segmentLit(n / 10u, vec2f((q.x - x0) / w, y))) { return true; }
+    return segmentLit(n % 10u, vec2f((q.x - x0 - w - gap) / w, y));
+  }
+  return segmentLit(n, vec2f((q.x - x0) / w, y));
+}
+
+/** How much of a line \`dist\` pixels away covers this pixel, for a line \`width\` pixels wide. */
+fn lineCover(dist: f32, width: f32) -> f32 {
+  return 1.0 - smoothstep(width * 0.5 - 0.5, width * 0.5 + 0.5, dist);
+}
+
+/** The test pattern for quad number \`num\` at q, with px the size of a screen pixel in q. */
+fn testPattern(q: vec2f, px: vec2f, aspect: f32, num: u32) -> vec3f {
+  // A hue of its own per quad, so where two shapes or two beams overlap
+  // each one's lines can be told apart.
+  let h = fract(f32(num) * 0.618034);
+  let tint = clamp(abs(fract(vec3f(h) + vec3f(0.0, 0.6667, 0.3333)) * 6.0 - 3.0) - 1.0, vec3f(0.0), vec3f(1.0));
+  let line = mix(vec3f(1.0), tint, 0.5);
+  var col = vec3f(0.03);
+  // The grid: eight columns, and as many rows as keep its cells square.
+  let cols = 8.0;
+  let rows = max(1.0, round(cols / max(aspect, 0.05)));
+  let gx = abs(fract(q.x * cols + 0.5) - 0.5) / (cols * px.x);
+  let gy = abs(fract(q.y * rows + 0.5) - 0.5) / (rows * px.y);
+  col = mix(col, line * 0.55, lineCover(min(gx, gy), 1.5));
+  // The centre cross, brighter.
+  let cx = abs(q.x - 0.5) / px.x;
+  let cy = abs(q.y - 0.5) / px.y;
+  col = mix(col, line, lineCover(min(cx, cy), 2.0));
+  // Both diagonals, corner to corner: on the wall they meet at the quad's
+  // true middle, which a keystone moves off the centre cross.
+  let pxd = length(px);
+  let d1 = abs(q.x - q.y) / pxd;
+  let d2 = abs(q.x + q.y - 1.0) / pxd;
+  col = mix(col, line * 0.8, lineCover(min(d1, d2) * 0.7071, 1.5));
+  // A circle 0.8 of the height across: round on the wall when the pin is right.
+  let c = vec2f((q.x - 0.5) * aspect, q.y - 0.5);
+  let dc = abs(length(c) - 0.4) / px.y;
+  col = mix(col, vec3f(1.0), lineCover(dc, 2.0));
+  // The border, inside the edge, white.
+  let bx = min(q.x, 1.0 - q.x) / px.x;
+  let by = min(q.y, 1.0 - q.y) / px.y;
+  col = mix(col, vec3f(1.0), lineCover(min(bx, by), 4.0));
+  // The corners numbered as the pin's handles are: 1 top left, clockwise.
+  let ch = 0.08;
+  let inx = 0.05 / aspect + 0.3 * ch / aspect;
+  let iny = 0.05 + ch * 0.5;
+  if (numberLit(1u, q, vec2f(inx, iny), ch, aspect)
+      || numberLit(2u, q, vec2f(1.0 - inx, iny), ch, aspect)
+      || numberLit(3u, q, vec2f(1.0 - inx, 1.0 - iny), ch, aspect)
+      || numberLit(4u, q, vec2f(inx, 1.0 - iny), ch, aspect)) {
+    col = vec3f(1.0);
+  }
+  // And its own number in the middle, over the cross, white like the corners'.
+  if (numberLit(num, q, vec2f(0.5, 0.5), 0.14, aspect)) { col = vec3f(1.0); }
+  return col;
+}
+
 fn dhash(p: vec2f) -> f32 {
   return fract(sin(dot(p, vec2f(12.9898, 78.233))) * 43758.5453);
 }
@@ -98,6 +195,10 @@ fn dhash(p: vec2f) -> f32 {
   // ── Corner pin ───────────────────────────────────────────────────
   let warp = mat3x3<f32>(U.warpA[i].xyz, U.warpB[i].xyz, U.warpC[i].xyz);
   let p = warp * vec3f(d, 1.0);
+  // A screen pixel's size in the quad's square, for the test pattern's
+  // lines. Taken here, before anything discards, where derivatives are
+  // still defined for the whole quad of pixels.
+  let px = max(fwidth(p.xy / max(p.z, 1e-6)), vec2f(1e-6));
   if (p.z <= 1e-6) { discard; }
   let q = p.xy / p.z;
   if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) { discard; }
@@ -126,6 +227,19 @@ fn dhash(p: vec2f) -> f32 {
 
   // ── Grade ────────────────────────────────────────────────────────
   col = pow(max(col * U.gain, vec3f(0.0)), vec3f(U.gamma)) * m;
+
+  // ── The wall test (PLAN.md 8e) ───────────────────────────────────
+  // In picture space, flipped as the picture is, so it lands on the wall
+  // exactly as the show does. Not graded: a test pattern is a known level.
+  if (U.test.x > 0.5 || U.test.y > 0.0) {
+    let pq = mix(q, 1.0 - q, step(U.flip, vec2f(0.0)));
+    let aspect = max(U.lay[i].y, 0.05);
+    let num = u32(U.lay[i].z + 0.5);
+    if (U.test.x > 0.5) { col = testPattern(pq, px, aspect, num) * m; }
+    if (U.test.y > 0.0 && numberLit(num, pq, vec2f(0.5, 0.5), 0.5, aspect)) {
+      col = mix(col, vec3f(1.0), U.test.y * m);
+    }
+  }
   let frag = vec2f(in.pos.x, U.resolution.y - in.pos.y);
   let dth = dhash(frag) + dhash(frag + vec2f(17.31, 5.73)) - 1.0;
   col += dth * step(1.0 / 255.0, max(col.r, max(col.g, col.b))) / 255.0;
