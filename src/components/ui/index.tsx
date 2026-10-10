@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
 import type { VisualizerSettings } from '../../types';
@@ -83,7 +83,7 @@ export function Button({
 // ── Segmented control ────────────────────────────────────────────────
 
 export function Segmented<T extends string>({
-  value, options, onChange, height = 36, testId, compact = false,
+  value, options, onChange, height = 36, testId, compact = false, divideBefore, tight = false,
 }: {
   value: T;
   options: readonly (readonly [T, string] | readonly [T, string, string])[];
@@ -106,10 +106,20 @@ export function Segmented<T extends string>({
    * ten fit on one (481 px in 664).
    */
   compact?: boolean;
+  /**
+   * A hairline before this option: the desk's layouts (Build, Gig, Load-in)
+   * are one kind of thing and Sequence another, and the design keeps them in
+   * one switch with a rule between.
+   */
+  divideBefore?: T;
+  /** Narrower items, for a header that has to fit at 1024. */
+  tight?: boolean;
 }) {
   return (
-    <div className={`inline-flex rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''}`} role="tablist" data-testid={testId}>
+    <div className={`inline-flex items-center rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''}`} role="tablist" data-testid={testId}>
       {options.map(([id, label, kbd]) => (
+        <span key={id} className="contents">
+        {divideBefore === id && <span className="mx-1 h-5 w-px shrink-0 bg-white/10" aria-hidden />}
         <button
           key={id}
           role="tab"
@@ -118,13 +128,14 @@ export function Segmented<T extends string>({
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
           title={compact && kbd ? `${label} (${kbd})` : undefined}
-          className={`inline-flex items-center gap-1.5 rounded-sm ${compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
+          className={`inline-flex items-center gap-1.5 rounded-sm ${compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
             value === id ? 'bg-active text-text' : 'text-muted hover:text-text-2'
           }`}
         >
           {label}
           {kbd && <span className={`font-mono text-[11px] text-faint ${compact ? 'hidden 2xl:inline' : ''}`}>{kbd}</span>}
         </button>
+        </span>
       ))}
     </div>
   );
@@ -255,7 +266,14 @@ export function StatusDot({ on, label, short, tone = 'ok', testId, onClick, titl
       onClick={onClick}
       data-testid={testId}
       title={tip}
-      className={`${shape} rounded-md py-1 transition-colors hover:bg-hover ${tight ? 'px-0.5 -mx-0.5' : 'px-1.5 -mx-1.5'}`}
+      /*
+        min-w-6: a dot you can press is a control, and a control is at least
+        24px on a side (`npm run layout`). In the tight header the word under
+        the dot is all the width the button has, and "Perf" at 10px measured
+        23px on CI's Linux fonts and 24px on this session's, so the floor is
+        set on the button rather than left to the font.
+      */
+      className={`${shape} min-w-6 shrink-0 rounded-md py-1 transition-colors hover:bg-hover ${tight ? 'px-0.5 -mx-0.5' : 'px-1.5 -mx-1.5'}`}
     >
       {body}
     </button>
@@ -373,6 +391,260 @@ export function Toggle({ label, on, onChange, testId }: {
   );
 }
 
+// ── Knob ─────────────────────────────────────────────────────────────
+
+/*
+  A control drawn as the hardware it is ridden on (Desk v2, the owner's
+  design, 2026-10-10).
+
+  The desk drew every control as a slider, and a deck of panels under the
+  plate is four sliders wide at most: a section like Fluid Physics, thirty-odd
+  controls, was a column you scrolled. A knob is a quarter of the width, so
+  four sit in a row and a section reads at a glance. Which one a control gets
+  is the controller's call, not the desk's: one learned to a fader is a
+  slider, because that is what the hand on it is moving, and an encoder or
+  nothing at all is a knob (`DeskControl` in the desk's panels).
+
+  It is a real range input under the drawing, not a picture of one. That is
+  what the keyboard, a screen reader and the checks drive (`npm run saves`
+  fills the recipe's inputs), and it means the knob takes the value the same
+  way the slider does: the same curved travel (`curveOf`), so Speed sits at
+  the same place on a knob, a slider, the phone and a fader. A mouse does not
+  drag the input sideways, though, which is how a range input moves: the
+  pointer is taken over and the knob turns with the hand going up and down,
+  half a percent of its travel a pixel, a tenth of that with ⌥ held.
+*/
+export interface KnobProps extends Keyed {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  /** A control that takes whole steps (folds, octaves): ticks on the ring, and it lands on one. */
+  step?: number;
+  onChange: (v: number) => void;
+  /** The value as it reads ("42%", "1.30×"). */
+  display: string;
+  /** What it is learned to ("K1"), shown faint after the value. */
+  mapping?: string | null;
+  /** Double-click goes back to this: the look's own value. */
+  resetTo?: number;
+  disabled?: boolean;
+  midiKey?: string | null;
+  testId?: string;
+  /** 40 on the desk; 56 in Load-in and the Stage sheet. */
+  size?: number;
+}
+
+/** The ring's geometry, from the design (`tokens.css`): 270° of a radius-16 circle. */
+const RING = 2 * Math.PI * 16;          // 100.53
+const SWEEP = RING * 0.75;              // 75.4
+
+export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40 }: KnobProps) {
+  const settingKey = settingKeyOf(midiKey);
+  const curve = settingKey ? curveOf(settingKey) : 1;
+  const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
+  const valueAt = (t: number) => {
+    const c = Math.max(0, Math.min(1, t));
+    const v = curve === 1 ? min + c * (max - min) : handValueAt(c, min, max, curve);
+    return step ? Math.max(min, Math.min(max, min + Math.round((v - min) / step) * step)) : v;
+  };
+  const at = travel(value);
+  const [drag, setDrag] = useState<{ fine: boolean } | null>(null);
+  const grab = useRef<{ y: number; t: number; id: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const hit = useMidiTouch(midiKey ?? null);
+
+  // A wheel turns it a notch. Not passive, so the deck does not scroll as well.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || disabled) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const notch = step ? step / (max - min || 1) : 0.01;
+      onChange(valueAt(travel(value) + (e.deltaY < 0 ? notch : -notch) * (e.altKey ? 0.25 : 1)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
+
+  const steps = step ? Math.round((max - min) / step) : 0;
+  return (
+    <div
+      className={`relative flex w-[58px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
+      // The label is cut to the knob's width; the whole name is a hover away.
+      title={label}
+      data-testid={testId}
+      data-midi-hit={hit ? 'true' : undefined}
+      data-knob
+    >
+      {drag && (
+        <span className="pointer-events-none absolute -top-6 z-10 whitespace-nowrap rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[11px] text-text shadow-[0_1px_3px_rgba(0,0,0,.6)]">
+          {display}{drag.fine ? ' · fine' : ' · ⌥ fine'}
+        </span>
+      )}
+      <span className={`group relative block ${hit ? `rounded-full ${MIDI_HIT}` : ''}`} style={{ width: size, height: size }}>
+        <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden className="block">
+          <circle cx="20" cy="20" r="16" fill="none" strokeWidth="3" strokeLinecap="round"
+            className="transition-colors group-hover:[stroke:var(--color-ring-hover)]"
+            style={{ stroke: 'var(--color-ring)' }}
+            strokeDasharray={`${SWEEP} ${RING}`} transform="rotate(135 20 20)" />
+          {steps > 1 && steps <= 24 && (
+            <circle cx="20" cy="20" r="16" fill="none" strokeWidth="3.2" style={{ stroke: 'var(--color-bg)' }}
+              strokeDasharray={`1.2 ${SWEEP / steps - 1.2}`} strokeDashoffset={-SWEEP / steps + 0.6} transform="rotate(135 20 20)" />
+          )}
+          <circle cx="20" cy="20" r="16" fill="none" strokeWidth="3" strokeLinecap="round"
+            style={{ stroke: drag ? 'var(--color-accent-text)' : 'var(--color-accent)' }}
+            strokeDasharray={`${Math.max(0.01, SWEEP * at)} ${RING}`} transform="rotate(135 20 20)" />
+          <circle cx="20" cy="20" r="11" className="transition-colors group-hover:[fill:var(--color-knob-off)]" style={{ fill: 'var(--color-active)' }} />
+          <line x1="20" y1="15" x2="20" y2="10" stroke="#fff" strokeWidth="2" strokeLinecap="round"
+            transform={`rotate(${-135 + 270 * at} 20 20)`} />
+        </svg>
+        <input
+          ref={inputRef}
+          type="range"
+          aria-label={label}
+          disabled={disabled}
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+          value={curve === 1 ? value : at}
+          onChange={e => {
+            const raw = Number(e.target.value);
+            onChange(curve === 1 ? raw : handValueAt(raw, min, max, curve));
+          }}
+          onPointerDown={e => {
+            if (disabled || e.button !== 0) return;
+            // Taken over: the input would move with the pointer sideways.
+            e.preventDefault();
+            e.currentTarget.focus();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            grab.current = { y: e.clientY, t: at, id: e.pointerId };
+            setDrag({ fine: e.altKey });
+          }}
+          onPointerMove={e => {
+            const g = grab.current;
+            if (!g || g.id !== e.pointerId) return;
+            const fine = e.altKey;
+            const dy = g.y - e.clientY;
+            // Re-anchored when ⌥ changes, so going fine does not jump the knob.
+            if (fine !== drag?.fine) { grab.current = { y: e.clientY, t: travel(value), id: e.pointerId }; setDrag({ fine }); return; }
+            onChange(valueAt(g.t + dy * 0.005 * (fine ? 0.1 : 1)));
+          }}
+          onPointerUp={e => { if (grab.current?.id === e.pointerId) { grab.current = null; setDrag(null); } }}
+          onPointerCancel={() => { grab.current = null; setDrag(null); }}
+          onDoubleClick={() => { if (resetTo !== undefined && !disabled) onChange(resetTo); }}
+          className="absolute inset-0 h-full w-full cursor-ns-resize appearance-none rounded-full opacity-0"
+        />
+      </span>
+      {drag ? (
+        <span className="mt-1 max-w-full truncate text-[13px] font-medium text-text">{display}</span>
+      ) : (
+        <span className="mt-1 max-w-full truncate text-[11px] font-medium text-text-2" title={label}>{label}</span>
+      )}
+      <span className="max-w-full truncate font-mono text-[10px] leading-tight">
+        <span className="text-dim">{disabled ? 'off' : display}</span>
+        {mapping && <span className="text-faint"> {mapping}</span>}
+      </span>
+    </div>
+  );
+}
+
+// ── Panel ────────────────────────────────────────────────────────────
+
+/*
+  The chrome every desk panel shares (Desk v2): a 32 px header with a grip,
+  the title, the hardware it rides, and three buttons (float or dock, fold,
+  close), over the section's own body.
+
+  The buttons are 24 px, the smallest anything clickable on a desk is allowed
+  to be (`npm run layout` measures it): the design's 12 px glyphs sit in a
+  24 px target.
+*/
+export function PanelFrame({
+  id, title, meta, floating = false, collapsed = false, children, onFloat, onDock, onCollapse, onClose,
+  onGripDown, onHeaderDown, onResizeDown, onTitleMenu, style, className = '', bodyClassName = '',
+}: {
+  id: string;
+  title: string;
+  meta?: ReactNode;
+  floating?: boolean;
+  collapsed?: boolean;
+  children?: ReactNode;
+  onFloat?: () => void;
+  onDock?: () => void;
+  onCollapse?: () => void;
+  onClose?: () => void;
+  /** Start dragging the panel by its grip (docked: to reorder, re-dock or float it). */
+  onGripDown?: (e: ReactPointerEvent) => void;
+  /** Start moving a floating panel by its header. */
+  onHeaderDown?: (e: ReactPointerEvent) => void;
+  onResizeDown?: (e: ReactPointerEvent) => void;
+  onTitleMenu?: (e: ReactMouseEvent) => void;
+  style?: CSSProperties;
+  className?: string;
+  bodyClassName?: string;
+}) {
+  const icon = 'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-faint transition-colors hover:bg-hover hover:text-muted';
+  return (
+    <section
+      className={`relative flex min-h-0 flex-col overflow-hidden rounded-lg border bg-surface ${floating ? 'border-[var(--color-float-border)] shadow-[0_20px_60px_rgba(0,0,0,.65)]' : 'border-border'} ${className}`}
+      style={style}
+      data-testid={`panel-${id}`}
+      data-panel={id}
+      data-floating={floating ? 'true' : undefined}
+      data-collapsed={collapsed ? 'true' : undefined}
+    >
+      <header
+        className={`flex h-8 shrink-0 items-center gap-1.5 pl-1.5 pr-1 ${floating ? 'cursor-move border-b border-border bg-elevated' : ''}`}
+        onPointerDown={floating ? onHeaderDown : undefined}
+        onContextMenu={onTitleMenu}
+        data-panel-head
+      >
+        <span
+          role="button"
+          aria-label={`Move ${title}`}
+          title="Drag to move"
+          onPointerDown={e => { e.stopPropagation(); onGripDown?.(e); }}
+          className="inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center text-faint"
+        >
+          <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden>
+            {[0, 1, 2].map(r => [0, 1].map(c => <circle key={`${r}${c}`} cx={1.5 + c * 5} cy={1.5 + r * 4.5} r="1.2" />))}
+          </svg>
+        </span>
+        <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
+        {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
+        {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
+        {floating ? (
+          <button className={icon} onClick={onDock} title="Dock it back" aria-label={`Dock ${title}`} data-testid={`panel-${id}-dock`}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden><path d="M7 1.5h3.5V11h-9V5" /><path d="M1.5 1.5L6 6M6 2.8V6H2.8" /></svg>
+          </button>
+        ) : (
+          <button className={icon} onClick={onFloat} title="Float it over the plate" aria-label={`Float ${title}`} data-testid={`panel-${id}-float`}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden><path d="M5 1.5H1.5V11h9V7" /><path d="M10.5 1.5L6 6M7 1.5h3.5V5" /></svg>
+          </button>
+        )}
+        <button className={icon} onClick={onCollapse} title={collapsed ? 'Open it' : 'Fold it to its header'} aria-label={collapsed ? `Open ${title}` : `Fold ${title}`} aria-expanded={!collapsed} data-testid={`panel-${id}-collapse`}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d={collapsed ? 'M3 4.5l3 3 3-3' : 'M3 7.5l3-3 3 3'} />
+          </svg>
+        </button>
+        <button className={icon} onClick={onClose} title="Close it (the + Panel browser opens it again)" aria-label={`Close ${title}`} data-testid={`panel-${id}-close`}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden><path d="M3 3l6 6M9 3l-6 6" /></svg>
+        </button>
+      </header>
+      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col px-3 pb-2.5 ${bodyClassName}`}>{children}</div>}
+      {floating && !collapsed && onResizeDown && (
+        <span
+          onPointerDown={onResizeDown}
+          className="absolute bottom-0 right-0 h-3 w-3 cursor-nwse-resize touch-none"
+          aria-hidden
+          style={{ background: 'linear-gradient(135deg, transparent 50%, var(--color-border-strong) 50%)' }}
+        />
+      )}
+    </section>
+  );
+}
+
 // ── Cue row ──────────────────────────────────────────────────────────
 
 /**
@@ -426,8 +698,10 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 // ── Sheet ────────────────────────────────────────────────────────────
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false }: {
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right' }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
+  /** Which edge a docked sheet lies against: the side of the panel that opened it. */
+  dockSide?: 'left' | 'right';
   /**
    * Beside the plate rather than over it: no dimmed, blurred scrim, the panel
    * against the right edge, and the rest of the window still live. For a
@@ -447,7 +721,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
       className={docked
         // Between the desk's 48 px header and its 28 px status bar, so the
         // header's buttons and lights stay in reach and in view beside it.
-        ? 'pointer-events-none fixed bottom-7 right-0 top-12 z-50 flex items-stretch justify-end p-2'
+        ? `pointer-events-none fixed bottom-7 top-12 z-50 flex items-stretch p-2 ${dockSide === 'left' ? 'left-0 justify-start' : 'right-0 justify-end'}`
         : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6'}
       onClick={docked ? undefined : onClose}
       data-testid={testId ? `${testId}-scrim` : undefined}

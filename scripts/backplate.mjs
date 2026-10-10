@@ -234,7 +234,7 @@ console.log('\n The wiring');
 const code = (p) => src(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 const lv = code('src/components/LiquidVisualizer.tsx');
 const app = code('src/App.tsx');
-const desk = code('src/components/desk/PerformDesk.tsx');
+const desk = code('src/components/desk/DeskPanels.tsx');
 const phone = code('src/components/phone/PhoneStage.tsx');
 const mixer = code('src/components/MixerPanel.tsx');
 const midi = code('src/lib/midi.ts');
@@ -310,9 +310,12 @@ check('and steps each plate with its own fold, and turns each dish at its own mo
 }
 check('each dish turns and drags at its own plate\'s settings',
   /const asked = Math\.max\(0, patch\.layer\(l\)\.rotationSpeed/.test(lv) && /\(1 \+ \(patch\.layer\(l\)\.platePressure \?\? 0\) \* 0\.8\)/.test(lv));
-check('the layer pickers offer the back plate while it has a look (desk, Design desk, phone, keys, the old sidebar)',
+// Two places draw layer tabs since Desk v2 made the two desks one: the desk
+// (every layout's plate bar) and the old sidebar below the desk's width.
+check('the layer pickers offer the back plate while it has a look (the desk, phone, keys, the old sidebar)',
   /const stageLayers = Math\.max\(1, settings\.layerCount \?\? 1, backLook \? 2 : 1\);/.test(app)
-  && (app.match(/layers=\{stageLayers\}/g) ?? []).length >= 3 && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)
+  && (app.match(/layers=\{stageLayers\}/g) ?? []).length === 2
+  && /layers=\{stageLayers\}/.test(app.slice(app.indexOf('<Desk\n'), app.indexOf('\n        />', app.indexOf('<Desk\n')))) && /Math\.min\(stageLayers - 1, l \+ dir\)/.test(app)
   && /if \(activeLayer >= stageLayers\)/.test(app) && !/settings\.layerCount - 1/.test(app));
 check('Follow the front keeps the back plate on the stage while it fades back, then lets it go',
   /setBackLook\(b => \(b && seconds > 0 \? \{ \.\.\.b, leaving: true \} : null\)\);/.test(app)

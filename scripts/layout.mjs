@@ -68,6 +68,14 @@ const page = await (await browser.newContext({ viewport: { width: 1440, height: 
 page.setDefaultTimeout(60_000);
 const settle = (ms = 900) => page.waitForTimeout(ms);
 const clickOn = (target) => clickAt(page, target);
+/** The other side of `appears`: a sheet that is still sliding away still takes the clicks under it. */
+const gone = async (testId) => {
+  for (let i = 0; i < 20; i++) {
+    if ((await page.getByTestId(testId).count()) === 0) return true;
+    await settle(300);
+  }
+  return false;
+};
 const appears = async (testId) => {
   for (let i = 0; i < 20; i++) {
     if ((await page.getByTestId(testId).count()) > 0) return true;
@@ -75,6 +83,34 @@ const appears = async (testId) => {
   }
   return false;
 };
+/** Which layout the desk is drawing: a mode switch that did nothing re-measures the last one. */
+const LAYOUT_OF = { design: 'build', perform: 'gig', loadin: 'loadin' };
+const layoutIs = (mode) => page.evaluate((want) => document.querySelector('[data-desk]')?.getAttribute('data-layout') === want, LAYOUT_OF[mode]);
+/**
+ * The desk's rules (11px, 60% opacity, 24px), asked only of what is inside
+ * `sel`: a measure of the whole page passes a panel that drew nothing.
+ */
+const measureIn = (sel) => page.evaluate((sel) => {
+  const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 1; const p = m[1].split(','); return p[3] === undefined ? 1 : parseFloat(p[3]); };
+  const bad = [];
+  const perPanel = {};
+  let n = 0;
+  for (const el of document.querySelectorAll(`${sel} :is(button, input, select, a)`)) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0 || el.offsetParent === null) continue;
+    n++;
+    const panel = el.closest('[data-panel]')?.getAttribute('data-panel') ?? '?';
+    // Its own controls, not the frame's (grip, fold, float, close).
+    if (!el.closest('[data-panel-head]')) perPanel[panel] = (perPanel[panel] ?? 0) + 1;
+    const cs = getComputedStyle(el);
+    const text = (el.textContent || '').trim();
+    const name = `${panel}: ${(text || el.getAttribute('aria-label') || el.tagName).slice(0, 24)}`;
+    if (text && parseFloat(cs.fontSize) < 11) bad.push(`${name} ${cs.fontSize}`);
+    if (text && alpha(cs.color) < 0.6) bad.push(`${name} α${alpha(cs.color)}`);
+    if (Math.min(r.width, r.height) < 24) bad.push(`${name} ${Math.round(r.width)}×${Math.round(r.height)}`);
+  }
+  return { n, bad, perPanel };
+}, sel);
 /*
   How many controls a measurement actually looked at. Every check here asks
   "is anything wrong with the controls", and a page that rendered none of
@@ -148,10 +184,13 @@ try {
 
   // ── Readable in a dark room, on both desks and inside the panels ─
   await page.setViewportSize({ width: 1600, height: 900 });
-  for (const mode of ['perform', 'design']) {
+  // Load-in is the third layout of the one desk (Desk v2): the controller,
+  // the sound, the wall and its mapping as panels, held to the same rules.
+  for (const mode of ['perform', 'design', 'loadin']) {
     await clickOn(`mode-segmented-${mode}`);
     await settle(1000);
     await noteIds();
+    check(`the mode switch puts up ${mode}'s layout`, await layoutIs(mode));
     const n = await visibleControls();
     const l = await legibility(page);
     check(`on ${mode}, nothing you can click has text under 11px`, n > 20 && l.tiny.length === 0,
@@ -161,6 +200,182 @@ try {
     const alpha = await alphaBadge();
     check(`on ${mode}, the Alpha label sits by the name`, alpha.ok, alpha.why);
   }
+
+  // ── Desk v2: one desk, its panels moved about ──────────────────
+  /*
+    The two desks became one desk in three layouts, and its panels can be
+    opened from the browser, floated over the plate, folded and closed. Each
+    of those is asked of the page, not of the layout model (that is
+    `npm run desklayout`): the thing a hand does, and what is then on screen.
+  */
+  {
+    const shown = (id) => page.evaluate((t) => [...document.querySelectorAll(`[data-testid="${t}"]`)]
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).length, id);
+    const boxOf = (id) => page.evaluate((t) => {
+      const el = document.querySelector(`[data-testid="${t}"]`);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), left: Math.round(r.left) };
+    }, id);
+    // The plate bar is the same bar in every layout: Send to wall was missing
+    // from one desk once (panel.mjs, "the same actions on both"), so each is
+    // looked for, once and visible, in all three.
+    const ACTIONS = ['send-to-wall', 'save-look', 'plate-mode-segmented', 'blackout-button', 'panel-browser-button', 'layer-segmented'];
+    for (const mode of ['design', 'perform', 'loadin']) {
+      await clickOn(`mode-segmented-${mode}`);
+      await settle(800);
+      const counts = await Promise.all(ACTIONS.map(shown));
+      const wrong = ACTIONS.filter((_, i) => counts[i] !== 1);
+      check(`on ${mode}, the plate bar and the header carry the same actions`,
+        (await layoutIs(mode)) && wrong.length === 0, wrong.length ? wrong.map(t => `${t} ×${counts[ACTIONS.indexOf(t)]}`).join(', ') : ACTIONS.length + ' actions');
+    }
+
+    await clickOn('mode-segmented-perform');
+    await settle(800);
+    // The browser finds a panel by what it is, and floats it over the plate.
+    await clickOn('panel-browser-button');
+    const opened = await appears('panel-browser');
+    await page.getByTestId('panel-browser-search').fill('mixer');
+    await settle(300);
+    const row = await shown('panel-browser-row-mixer');
+    await page.keyboard.press('Shift+Enter');
+    await settle(900);
+    const floating = await boxOf('floating-mixer');
+    const plate = await boxOf('desk-preview');
+    check('the panel browser opens, finds the Mixer, and floats it over the plate',
+      opened && row === 1 && !!floating && !!plate && (await shown('panel-browser')) === 0
+      && floating.left < plate.left + plate.w && floating.left + floating.w > plate.left
+      && floating.top < plate.top + plate.h && floating.top + floating.h > plate.top,
+      floating ? `${floating.w}×${floating.h} at ${floating.left},${floating.top}` : opened ? `row ${row}, nothing floated` : 'never opened');
+    if (floating) {
+      // Asked of the floating panel alone: the Mixer's body is about thirty controls.
+      const m = await measureIn('[data-testid="floating-mixer"]');
+      check('and the floating panel is readable and big enough to use',
+        m.n >= 20 && m.bad.length === 0, m.bad.slice(0, 5).join(', ') || `${m.n} controls in it`);
+      await clickOn('panel-mixer-collapse');
+      await settle(500);
+      const folded = await boxOf('floating-mixer');
+      check('folding a panel leaves its header', !!folded && folded.h <= 40 && folded.h >= 24, folded ? `${folded.h}px tall` : 'gone');
+      const count = async () => Number(/(\d+) panels?/.exec(await page.getByTestId('status-running').textContent())?.[1] ?? NaN);
+      const before = await count();
+      const there = await shown('panel-mixer');
+      await clickOn('panel-mixer-close');
+      await settle(500);
+      const after = await count();
+      check('and closing it takes it away', there === 1 && (await shown('floating-mixer')) === 0 && (await shown('panel-mixer')) === 0 && after === before - 1,
+        `${there} up, ${before} → ${after} panels`);
+    }
+
+    // Docked from the browser with Enter, it goes into the deck.
+    await clickOn('panel-browser-button');
+    await appears('panel-browser');
+    await page.getByTestId('panel-browser-search').fill('mixer');
+    await settle(300);
+    await page.keyboard.press('Enter');
+    await settle(900);
+    const inDeck = await page.evaluate(() => !!document.querySelector('[data-testid="desk-deck"] [data-testid="panel-mixer"]'));
+    check('Enter docks a panel in the deck', inDeck);
+    await noteIds();
+    if (inDeck) { await clickOn('panel-mixer-close'); await settle(500); }
+
+    // The deck folds to a strip and the plate takes its height.
+    const tall = await boxOf('desk-preview');
+    await clickOn('deck-fold');
+    await settle(900);
+    const taller = await boxOf('desk-preview');
+    const strip = await shown('deck-strip');
+    check('folding the deck gives the plate its height', strip === 1 && !!tall && !!taller && taller.h - tall.h > 150,
+      tall && taller ? `${tall.h} → ${taller.h}px` : 'no plate');
+    await clickOn('deck-show');
+    await settle(700);
+    check('and Show deck brings it back', (await shown('desk-deck')) === 1 && (await shown('deck-strip')) === 0);
+
+    // The Stage sheet (⌘,) has the room and the machine, and nothing of a look.
+    await page.keyboard.press('Control+Comma');
+    const stage = await appears('stage-sheet');
+    await settle(700);
+    // The Stage category, whole and alone: every section it draws and every
+    // row on its rail is one of these, and the rail has all of them.
+    const STAGE = ['projectors', 'mapping', 'mark', 'layers', 'simulation'];
+    const { sections, rail } = await page.evaluate(() => {
+      const seen = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+      const sheet = document.querySelector('[data-testid="stage-sheet"]');
+      return {
+        sections: [...(sheet?.querySelectorAll('[data-section]') ?? [])].filter(seen).map((el) => el.getAttribute('data-section')),
+        rail: [...(sheet?.querySelectorAll('[data-testid^="settings-nav-"]') ?? [])].map((el) => el.getAttribute('data-testid').slice('settings-nav-'.length)),
+      };
+    });
+    const l = await legibility(page);
+    const stray = [...sections, ...rail].filter(x => !STAGE.includes(x));
+    check('⌘, opens the Stage sheet on the room and the machine, readable',
+      stage && sections.length > 0 && stray.length === 0 && STAGE.every(x => rail.includes(x)) && l.tiny.length === 0,
+      stage ? `showing ${sections.join(', ') || 'no section'}; rail ${rail.join(', ')}${stray.length ? `; not stage: ${stray}` : ''}${l.tiny.length ? `; tiny ${l.tiny.slice(0, 3).join(', ')}` : ''}` : 'never opened');
+    await page.keyboard.press('Escape');
+    await settle(600);
+    const stageGone = await gone('stage-sheet');
+
+    /*
+      Every panel, docked. A settings section was only ever drawn in the
+      sheet, which this check never measured; as a desk panel it is on the
+      desk, and held to the desk's rules. The first look found a 4px rail on
+      the Wall's masks and two 20px switches in Audio Input. So every panel
+      the browser lists in Load-in (the one layout that takes the Stage
+      panels too) goes into its deck and is measured where it sits.
+    */
+    /*
+      Load-in first, and known to be up before its browser is read. One run in
+      six on SwiftShader read Gig's browser instead (27 panels, none of the
+      Stage's): the Stage sheet was still sliding away under a 600ms settle,
+      the click on Load-in landed on its backdrop, and the check stored a
+      Load-in layout of Gig's panels and then measured Gig. So the sheet has
+      to be gone, and the switch has to have put Load-in up, or the check
+      says that is what failed rather than blaming the panels.
+    */
+    await clickOn('mode-segmented-loadin');
+    let onLoadin = false;
+    for (let i = 0; i < 20 && !onLoadin; i++) { await settle(300); onLoadin = await layoutIs('loadin'); }
+    await clickOn('panel-browser-button');
+    await appears('panel-browser');
+    const ids = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="panel-browser-row-"]')]
+      .map((el) => el.getAttribute('data-testid').slice('panel-browser-row-'.length)));
+    await page.keyboard.press('Escape');
+    await page.evaluate((deck) => localStorage.setItem('chromaglass-desk-layout:loadin',
+      JSON.stringify({ left: [], right: [], deck, floating: [], collapsed: [], deckCollapsed: false, plateMode: 'live' })), ids);
+    await page.reload({ waitUntil: 'networkidle' });
+    const reloaded = await appears('loadin-desk');
+    await settle(2500);
+    const deck = await measureIn('[data-testid="desk-deck"]');
+    // Each panel drew its own body, not just its frame: a section's knobs, the
+    // section itself (with that section in it), or the desk panel's own list.
+    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer' };
+    // Why each one failed, so a red run says which of three things it was:
+    // the panel never reached the deck, it did and drew no body, or the body
+    // is there and has no height.
+    const bodies = await page.evaluate(({ ids, own }) => ids.map((id) => {
+      const panel = document.querySelector(`[data-testid="desk-deck"] [data-testid="panel-${id}"]`);
+      if (!panel) return `${id} (not on the deck)`;
+      const body = own[id] ? panel.querySelector(`[data-testid="${own[id]}"]`)
+        : panel.querySelector(`[data-testid="section-knobs-${id}"]`) ?? panel.querySelector(`[data-testid="settings-embed-${id}"] [data-section="${id}"]`);
+      if (!body) return `${id} (no body)`;
+      const h = body.getBoundingClientRect().height;
+      return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
+    }).filter(Boolean), { ids, own: OWN_BODY });
+    const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
+    // The phone link is words and a URL, and has no control without a relay.
+    const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
+    await noteIds();
+    check('every panel there is, docked, draws its own body, readable and big enough to use',
+      stageGone && onLoadin && reloaded && ids.length >= 33 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Load-in never came up', !reloaded && 'not on Load-in after the reload',
+        ids.length < 33 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+        || `${ids.length} panels, ${deck.n} controls`);
+    await page.evaluate(() => localStorage.removeItem('chromaglass-desk-layout:loadin'));
+    await page.reload({ waitUntil: 'networkidle' });
+    await appears('loadin-desk');
+    await clickOn('mode-segmented-perform');
+    await settle(1200);
+  }
+
   for (const [name, button, panel] of [
     ['settings', 'open-all-settings', 'settings-panel'],
     ['the controller panel', 'dot-midi', 'midi-panel'],

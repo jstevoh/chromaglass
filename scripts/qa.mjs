@@ -1193,7 +1193,8 @@ try {
   // `resize`. This is the check that keeps it that way.)
   //
   // The desk owns the whole window rather than floating over the plate, and
-  // Design is the same three columns holding the other half of the job. So
+  // Build (the Design desk's layout since Desk v2) holds the other half of the
+  // job round the same plate. So
   // the old "is the desk under the toolbar" clash checks are replaced by a
   // stronger one — while a desk is up, the overlay UI is not rendered at all —
   // and by checking that each mode shows its own columns.
@@ -1205,14 +1206,25 @@ try {
     const size = () => page.evaluate(() => {
       const c = document.getElementById('liquid-canvas');
       const r = document.querySelector('[data-testid="plate-frame"]').getBoundingClientRect();
-      return { w: c.width, h: c.height, boxW: Math.round(r.width), boxH: Math.round(r.height) };
+      return { w: c.width, h: c.height, boxW: Math.round(r.width), boxH: Math.round(r.height),
+        left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) };
     });
 
     const bench = await size();
     check('a desk lays out at laptop width',
       (await page.getByTestId('design-desk').count()) === 1 || (await page.getByTestId('perform-desk').count()) === 1);
+    /*
+      A preview, not the window: framed inside the desk on every side and
+      under half the window's area. This asked for under 75% of the width,
+      which the three-column Design desk met; Build has no left column (the
+      owner's Desk v2 design), so its plate is 76% of the width and 49% of the
+      height, framed by the header, the deck and a margin either side. What
+      the check is for, a plate that is not the window, is asked directly.
+    */
+    const area = (bench.boxW * bench.boxH) / (1440 * 900);
     check('and the plate is a preview inside it, not the window',
-      bench.boxW < 1440 * 0.75, `${bench.boxW}px of 1440`);
+      area < 0.5 && bench.left >= 8 && bench.top >= 48 && bench.right <= 1440 - 8 && bench.bottom <= 900 - 48,
+      `${bench.boxW}×${bench.boxH} at ${bench.left},${bench.top}: ${Math.round(area * 100)}% of the window`);
 
     await clickOn('mode-segmented-perform');
     await settle(1800);

@@ -349,9 +349,13 @@ const hang = () => {
   if (!adopted || !before.frame) throw new Error('intro: the intro never went into the plate\'s frame with the GPU held, so 5 has nothing to press');
   // A press on the desk, away from the plate's frame.
   const f = before.frame;
-  const desk = f && f[0] > 40 ? [Math.round(f[0] / 2), Math.round(before.window[1] - 20)] : null;
+  // Beside it where a column is, else under it: Build (Desk v2) has no left
+  // column, and its status line runs the window's width below the deck.
+  const desk = !f ? null
+    : f[0] > 40 ? [Math.round(f[0] / 2), Math.round(before.window[1] - 20)]
+    : f[1] + f[3] < before.window[1] - 30 ? [Math.round(before.window[0] / 2), Math.round(before.window[1] - 14)] : null;
   // At 1440 the plate is framed in the desk: a desk with nowhere to press
-  // beside the plate is a failure of this check, not a pass.
+  // beside or under the plate is a failure of this check, not a pass.
   let deskLeft = 'no desk beside the plate to press';
   if (desk) {
     // Somewhere on the desk that is not a control: its own background.
