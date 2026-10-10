@@ -483,9 +483,12 @@ jobs:
       # The wall under Draw's pad (scripts/drawwall.mjs, PLAN.md 8-draw-a): a
       # stand-in laptop running the real picture sender on a painted 4:3
       # canvas. Asked for only on Draw, painted the right way up at 8 a second
-      # or more, the frame in the wall's shape, and dimmed when it stops.
+      # or more, the frame in the wall's shape, and dimmed when it stops; and
+      # the WebGPU show's way, the frame read on the GPU, on SwiftShader.
       - name: The wall under Draw's pad
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        env:
+          PW_WEBGPU: '1'
         run: node --experimental-strip-types scripts/drawwall.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a

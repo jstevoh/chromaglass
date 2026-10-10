@@ -49,6 +49,14 @@ export const PAD_PICTURE_MAX_CHARS = 400_000;
 
 export type PadPictureMessage = Extract<RemoteMessage, { type: 'picture' }>;
 
+/**
+ * The WebGPU engine's read of the frame it just drew, shrunk to `w` by `h`:
+ * RGBA rows from the top, or null. Returns null at once when it cannot start
+ * one (`gpu/padGrab.ts`).
+ */
+export type PadGrab = (w: number, h: number) => Promise<Uint8ClampedArray | null> | null;
+type Done = (src: string | null, size: number) => void;
+
 /** The width a remote asks for, kept inside the range whatever it sent. */
 export function padPictureWidth(asked: unknown): number {
   const w = typeof asked === 'number' && Number.isFinite(asked) ? Math.round(asked) : PAD_PICTURE_MIN_WIDTH;
@@ -97,9 +105,10 @@ export class PadPictureSender {
   }
 
   /**
-   * The frame task's canvas, just drawn. Cheap when nobody is watching (a
-   * time compare); when a remote is, one small `drawImage` here, while the
-   * canvas still holds the frame, and the encode off the frame.
+   * The frame just drawn, as the WebGPU engine has it: `grab` shrinks it on
+   * the GPU and reads it back a frame or two later (`gpu/padGrab.ts`). The
+   * engine calls this from its frame; `tap` below is then left alone, so a
+   * frame is taken once.
    *
    * Paced by a due time rather than a gap since the last: a show drawing
    * at 18 frames a second has a frame every 55 ms, and "at least 64 ms since
@@ -107,86 +116,128 @@ export class PadPictureSender {
    * half a frame of slack it takes 15 when the frames allow, and every
    * frame when they come slower than that.
    *
-   * Up to three in flight, not one. With one, the Mac's show (CI, the app
-   * at 18 frames a second, the encode already in a worker) sent 4.3 a
-   * second: a picture's round trip is a bitmap promise, a post to the
-   * worker and its answer, and each of those waits for a gap between the
-   * page's frames, so it took three or four frames however fast the worker
-   * was. The pace is the due time's; the round trip only delays each
-   * picture by those frames, which a hand does not feel at a fifteenth of
-   * a second. Answers can come back out of order; one older than a picture
-   * already sent is dropped.
+   * Up to three in flight, not one: a picture's round trip (the read, the
+   * post to the worker and its answer) waits for gaps between the page's
+   * frames, and one at a time came to 4.3 a second on the Mac's show at 18
+   * frames. The pace is the due time's; the round trip only delays each
+   * picture by those frames. Answers can come back out of order; one older
+   * than a picture already sent is dropped.
+   */
+  tapGrab(grab: PadGrab, frameWidth: number, frameHeight: number): void {
+    this.grabbedAt = this.now();
+    this.take(frameWidth, frameHeight, (w, h, seq, done) => {
+      const read = grab(w, h);
+      if (!read) return false;
+      read.then((pixels) => {
+        const worker = pixels && this.encoder();
+        if (!pixels || !worker) { done(null, 0); return; }
+        this.post(worker, seq, { pixels, w, h }, [pixels.buffer], done);
+      }, () => done(null, 0));
+      return true;
+    });
+  }
+
+  /**
+   * The frame task's canvas, just drawn: the WebGL engine's way, and the
+   * cloud check's stand-in. One small `drawImage` here, while the canvas
+   * still holds the frame, and the encode off the frame. On WebGPU this was
+   * the way too, and the Mac's show got 6.3 pictures a second from it: the
+   * 2D canvas is the GPU's, and its readback for the encode waited behind
+   * the plate's work, about 375 ms a picture.
    */
   tap(canvas: HTMLCanvasElement): void {
+    if (this.now() - this.grabbedAt < 1000) return;   // the engine took this frame on the GPU
+    this.take(canvas.width, canvas.height, (w, h, seq, done) => {
+      const small = this.small ??= document.createElement('canvas');
+      if (small.width !== w || small.height !== h) { small.width = w; small.height = h; }
+      const ctx = small.getContext('2d');
+      if (!ctx) return false;
+      try {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
+        ctx.drawImage(canvas, 0, 0, w, h);
+      } catch {
+        return false;   // a canvas that cannot be read this frame; the next one will be
+      }
+      /*
+        The encode, in a worker. It was `toBlob` here, and on the Mac's show
+        that came to 2 pictures a second: Chromium runs a canvas's `toBlob`
+        in the page's idle time, and a page drawing a plate every frame has
+        next to none. `createImageBitmap` copies the small picture out now
+        (the copy is taken when it is called, so the next frame may draw
+        over `small` while this one is on its way). Without workers or
+        OffscreenCanvas, `toBlob`, which also takes its copy when called.
+      */
+      const worker = this.encoder();
+      if (worker) {
+        createImageBitmap(small).then((bmp) => {
+          if (this.worker !== worker) { bmp.close(); done(null, 0); return; }
+          this.post(worker, seq, { bmp }, [bmp], done);
+        }, () => done(null, 0));
+        return true;
+      }
+      // `toBlob` can throw (an encoder that fails, a canvas that is not
+      // origin-clean): then nothing is in flight, and a place held would
+      // narrow the pictures until the watchdog freed it.
+      try { small.toBlob((blob) => {
+        if (!blob) { done(null, 0); return; }
+        const reader = new FileReader();
+        reader.onloadend = () => done(typeof reader.result === 'string' ? reader.result : null, blob.size);
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', QUALITY); } catch { done(null, 0); }
+      return true;
+    });
+  }
+
+  /**
+   * The gate both ways share: the leases, the pace, the places in flight,
+   * and the size. `start` begins one picture and says whether it did; `done`
+   * is called once with its data URL, or null.
+   */
+  private take(frameWidth: number, frameHeight: number, start: (w: number, h: number, seq: number, done: Done) => boolean): void {
     const t = this.now();
     // An encode that never answered in two seconds is given up on, so it
     // cannot hold a place in flight until a reload.
     for (const [s, at] of this.inflight) if (t - at > 2000) { this.inflight.delete(s); this.waiting.delete(s); }
     if (this.inflight.size >= IN_FLIGHT || t < this.due - 8) return;
     const live = this.leases.filter(l => l.until > t);
-    if (live.length === 0 || canvas.width === 0 || canvas.height === 0) return;
+    if (live.length === 0 || frameWidth === 0 || frameHeight === 0) return;
     // The widest frame asking: the iPad's, when a phone and an iPad both are.
     const width = Math.max(...live.map(l => l.width));
-    const aspect = canvas.width / canvas.height;
-    const w = Math.min(width, canvas.width);
+    const aspect = frameWidth / frameHeight;
+    const w = Math.min(width, frameWidth);
     const h = Math.max(1, Math.round(w / aspect));
-    const small = this.small ??= document.createElement('canvas');
-    if (small.width !== w || small.height !== h) { small.width = w; small.height = h; }
-    const ctx = small.getContext('2d');
-    if (!ctx) return;
-    try {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'medium';
-      ctx.drawImage(canvas, 0, 0, w, h);
-    } catch {
-      return;   // a canvas that cannot be read this frame; the next one will be
-    }
-    this.due = Math.max(this.due + 1000 / PAD_PICTURE_FPS, t);
     const seq = ++this.seq;
     this.inflight.set(seq, t);
-    const done = (src: string | null, size: number) => {
+    const done: Done = (src, size) => {
       if (!this.inflight.delete(seq)) return;   // answered after the watchdog gave up on it
+      this.waiting.delete(seq);
       if (!src || seq < this.last) return;
       this.last = seq;
       this.sent++;
       this.bytes += size;
       this.send({ type: 'picture', src, w, h, aspect, seq });
     };
-    /*
-      The encode, in a worker. It was `toBlob` here, and on the Mac's show
-      (CI, the app at 18 frames a second) that came to 2 pictures a second:
-      Chromium runs a canvas's `toBlob` in the page's idle time, and a page
-      drawing a plate every frame has next to none. A worker has all of
-      its own. `createImageBitmap` copies the small picture out now (the
-      copy is taken when it is called, so the next frame may draw over
-      `small` while this one is still on its way); the worker draws it on
-      its own canvas and encodes there. Without workers or OffscreenCanvas,
-      `toBlob` as before, which also takes its copy when called.
-    */
-    const worker = this.encoder();
-    if (worker) {
-      createImageBitmap(small).then((bmp) => {
-        if (!this.inflight.has(seq) || this.worker !== worker) { bmp.close(); done(null, 0); return; }
-        this.waiting.set(seq, done);
-        worker.postMessage({ bmp, quality: QUALITY, seq }, [bmp]);
-      }, () => done(null, 0));
-      return;
-    }
-    // `toBlob` can throw (an encoder that fails, a canvas that is not
-    // origin-clean): then nothing is in flight, and a place held would
-    // narrow the pictures until the watchdog freed it.
-    try { small.toBlob((blob) => {
-      if (!blob) { done(null, 0); return; }
-      const reader = new FileReader();
-      reader.onloadend = () => done(typeof reader.result === 'string' ? reader.result : null, blob.size);
-      reader.readAsDataURL(blob);
-    }, 'image/jpeg', QUALITY); } catch { done(null, 0); }
+    if (!start(w, h, seq, done)) { this.inflight.delete(seq); return; }
+    this.due = Math.max(this.due + 1000 / PAD_PICTURE_FPS, t);
+  }
+
+  /** Hand one picture to the worker; its answer comes back by `seq`. */
+  private post(worker: Worker, seq: number, job: { bmp: ImageBitmap } | { pixels: Uint8ClampedArray; w: number; h: number }, transfer: Transferable[], done: Done): void {
+    if (!this.inflight.has(seq)) { done(null, 0); return; }   // the watchdog gave up on it while it was read
+    this.waiting.set(seq, done);
+    worker.postMessage({ ...job, quality: QUALITY, seq }, transfer);
   }
 
   private due = -Infinity;
+  /** When the engine last took a frame on the GPU (`tapGrab`). */
+  private grabbedAt = -Infinity;
   private worker: Worker | null | undefined;
   /** The worker's answers still awaited: seq → what to do with it. */
-  private waiting = new Map<number, (src: string | null, size: number) => void>();
+  private waiting = new Map<number, Done>();
+
+  /** Where the frames are read: on the GPU by the WebGPU engine, or from the canvas (for the checks). */
+  get from(): 'gpu' | 'canvas' { return this.now() - this.grabbedAt < 1000 ? 'gpu' : 'canvas'; }
 
   /** Where the pictures are encoded: 'worker', or 'toBlob' where a worker cannot (for the checks). */
   get via(): 'worker' | 'toBlob' | 'none' { return this.worker ? 'worker' : this.worker === null ? 'toBlob' : 'none'; }
@@ -225,16 +276,29 @@ export class PadPictureSender {
 /** Pictures taken and not yet sent, at most. */
 const IN_FLIGHT = 3;
 
-/** The worker: a bitmap in, a JPEG data URL out. */
+/**
+ * The worker: a bitmap or the GPU's bytes in, a JPEG data URL out. The bytes
+ * go on a canvas that is read often (`willReadFrequently`), which keeps it in
+ * memory: an encode that went back to the GPU would wait behind the plate,
+ * which is what this path is for avoiding.
+ */
 const ENCODER = `
-let c = null;
+let c = null, cpu = null;
 onmessage = async (e) => {
-  const { bmp, quality, seq } = e.data;
+  const { bmp, pixels, w, h, quality, seq } = e.data;
   try {
-    if (!c || c.width !== bmp.width || c.height !== bmp.height) c = new OffscreenCanvas(bmp.width, bmp.height);
-    c.getContext('2d').drawImage(bmp, 0, 0);
-    bmp.close();
-    const blob = await c.convertToBlob({ type: 'image/jpeg', quality });
+    let canvas;
+    if (pixels) {
+      if (!cpu || cpu.width !== w || cpu.height !== h) cpu = new OffscreenCanvas(w, h);
+      cpu.getContext('2d', { willReadFrequently: true }).putImageData(new ImageData(pixels, w, h), 0, 0);
+      canvas = cpu;
+    } else {
+      if (!c || c.width !== bmp.width || c.height !== bmp.height) c = new OffscreenCanvas(bmp.width, bmp.height);
+      c.getContext('2d').drawImage(bmp, 0, 0);
+      bmp.close();
+      canvas = c;
+    }
+    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
     postMessage({ seq, src: new FileReaderSync().readAsDataURL(blob), size: blob.size });
   } catch (err) {
     postMessage({ seq, src: null, size: 0 });
@@ -253,4 +317,10 @@ export function padPictureSender(): PadPictureSender | null { return current; }
 /** Called by the frame task with the canvas it just drew. Never throws into it: a pad's picture is not worth a frame. */
 export function tapPadPicture(canvas: HTMLCanvasElement): void {
   try { current?.tap(canvas); } catch { /* the next frame tries again */ }
+}
+/** Whether a remote wants pictures now: the WebGPU engine asks before it grabs. */
+export function padPictureWanted(): boolean { return current?.wanted ?? false; }
+/** The WebGPU engine's frame, read on the GPU. Never throws into the frame either. */
+export function grabPadPicture(grab: PadGrab, frameWidth: number, frameHeight: number): void {
+  try { current?.tapGrab(grab, frameWidth, frameHeight); } catch { /* the next frame tries again */ }
 }

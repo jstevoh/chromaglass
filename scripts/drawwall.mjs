@@ -131,7 +131,10 @@ try {
     });
 
     // ── The picture's laptop: the real sender, on a painted canvas ─────
-    const bundle = (await build({ entryPoints: ['src/lib/padPicture.ts'], bundle: true, format: 'iife', globalName: 'PP', write: false, logLevel: 'silent' })).outputFiles[0].text;
+    const bundle = (await build({
+      stdin: { contents: "export * from './src/lib/padPicture.ts'; export { WebGPUPadGrab } from './src/gpu/padGrab.ts';", resolveDir: process.cwd(), loader: 'ts' },
+      bundle: true, format: 'iife', globalName: 'PP', write: false, logLevel: 'silent',
+    })).outputFiles[0].text;
     const wall = await (await browser.newContext({ viewport: { width: 400, height: 300 } })).newPage();
     wall.on('pageerror', e => errors.push(`wall: ${e.message}`));
     // On the show server's own origin, as the laptop's page is: from about:blank
@@ -171,8 +174,37 @@ try {
       // `__hold`: milliseconds of the page's thread taken each frame, as the
       // real plate's frame takes it (the Mac's show draws 18 a second).
       window.__hold = 0;
+      /*
+        The WebGPU show's way (`__mode = 'gpu'`): a texture the size of the
+        canvas, in the Mac's canvas format, read by the real WebGPUPadGrab.
+        Its quarters are in another order from the canvas's, so the pad's
+        picture says which way it came.
+      */
+      window.__mode = '2d';
+      window.__gpuStart = async () => {
+        const adapter = await navigator.gpu?.requestAdapter();
+        if (!adapter) return 'no WebGPU adapter';
+        const device = await adapter.requestDevice();
+        const W = 960, H = 720;
+        const tex = device.createTexture({ size: [W, H], format: 'bgra8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+        // Blue, white over red, green; written as BGRA bytes.
+        const quad = [[0, 0, 255], [255, 255, 255], [255, 0, 0], [0, 255, 0]];
+        const data = new Uint8Array(W * H * 4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+          const [r, g, b] = quad[(y < H / 2 ? 0 : 2) + (x < W / 2 ? 0 : 1)];
+          data.set([b, g, r, 255], (y * W + x) * 4);
+        }
+        device.queue.writeTexture({ texture: tex }, data, { bytesPerRow: W * 4 }, [W, H]);
+        const grab = new window.PP.WebGPUPadGrab(device);
+        window.__gpu = { tex, grab, W, H };
+        window.__mode = 'gpu';
+        return 'ok';
+      };
       const loop = (t) => {
-        if (window.__drawing) { paint(t); sender.tap(c); }
+        if (window.__drawing && window.__mode === 'gpu') {
+          const { tex, grab, W, H } = window.__gpu;
+          sender.tapGrab((w, h) => grab.grab(tex, w, h), W, H);
+        } else if (window.__drawing) { paint(t); sender.tap(c); }
         for (const end = performance.now() + window.__hold; performance.now() < end;);
         requestAnimationFrame(loop);
       };
@@ -236,6 +268,41 @@ try {
       is(g[0], [1, 0, 0]) && is(g[1], [0, 1, 0]) && is(g[2], [0, 0, 1]) && is(g[3], [1, 1, 1]),
       g.map(c => c.map(v => v.toFixed(0)).join(',')).join(' | '));
     check('the picture is shown, not hidden', (await page.getByTestId('draw-picture').evaluate(c => getComputedStyle(c).opacity)) === '1');
+
+    // ── The WebGPU show's way: read on the GPU ────────────────────────
+    /*
+      The app on WebGPU does not hand the sender its canvas: on the Mac's
+      show the 2D canvas's readback waited behind the plate, 6.3 pictures a
+      second at 30 frames. It shrinks the frame's texture on its own device
+      and reads that back (gpu/padGrab.ts). Here the real grab reads a
+      texture in the Mac's format (BGRA) whose quarters are in another
+      order, so the pad's picture shows which way it came, the right way up
+      and in the right colours, and at the rate on a busy page. Needs
+      WebGPU: `PW_WEBGPU=1`, as CI's step runs it.
+    */
+    if (process.env.PW_WEBGPU) {
+      const started = await wall.evaluate(() => window.__gpuStart());
+      check('the GPU\'s read starts (software WebGPU)', started === 'ok', started);
+      if (started === 'ok') {
+        await page.waitForTimeout(1000);
+        const gg = await gridOf(page, 2, 2);
+        check('read on the GPU, each quarter in its own quarter, in its own colour',
+          is(gg[0], [0, 0, 1]) && is(gg[1], [1, 1, 1]) && is(gg[2], [1, 0, 0]) && is(gg[3], [0, 1, 0]),
+          gg.map(c => c.map(v => v.toFixed(0)).join(',')).join(' | '));
+        await wall.evaluate(() => { window.__hold = 70; window.__fr = 0; const n = () => { window.__fr++; if (window.__hold) requestAnimationFrame(n); }; requestAnimationFrame(n); });
+        await page.waitForTimeout(500);
+        const k0 = await framesOf(page);
+        const fr0 = await wall.evaluate(() => window.__fr);
+        await page.waitForTimeout(3000);
+        const gpuRate = ((await framesOf(page)) - k0) / 3;
+        const gpuFps = ((await wall.evaluate(() => window.__fr)) - fr0) / 3;
+        await wall.evaluate(() => { window.__hold = 0; window.__mode = '2d'; });
+        check('and at least 8 a second on a page drawing 14 frames', gpuRate >= 8 && gpuFps < 16, `${gpuRate.toFixed(1)}/s at ${gpuFps.toFixed(1)} frames/s`);
+        await page.waitForTimeout(1500);
+      }
+    } else {
+      console.log(' --   the GPU\'s read: run with PW_WEBGPU=1 (CI does)');
+    }
 
     // ── The wall's shape ──────────────────────────────────────────────
     check('the frame takes the picture\'s 4:3', near(w1.width / w1.height, 4 / 3, 0.02), `${w1.width.toFixed(0)}×${w1.height.toFixed(0)}`);
@@ -306,6 +373,8 @@ try {
     check('the laptop\'s own frames reach Draw, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s, the display drawing ${((b.d - a.d) / 3).toFixed(1)} frames/s`);
     const pad = await display.evaluate(() => window.chromaglassDebug?.()?.padPicture);
     check('each under 60 kB', pad && pad.sent > 0 && pad.bytes / pad.sent < 60_000, JSON.stringify(pad));
+    // On the GPU (gpu/padGrab.ts): the canvas's way gave 6.3/s at 30 frames here.
+    check('the show reads its frames for Draw on the GPU', pad?.from === 'gpu', pad?.from);
     const mean = (grid) => [0, 1, 2].map(i => grid.reduce((s, c) => s + c[i], 0) / grid.length);
     const remoteMean = mean(await gridOf(page, 4, 3));
     const frame = await display.evaluate(() => window.__cgFrame(64, 36));

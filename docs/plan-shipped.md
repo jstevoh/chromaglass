@@ -1141,7 +1141,11 @@ read; the projector window is drawn the same way), a copy as wide as the pad's f
 second, up to three in flight. Not the canvas's `toBlob`: Chromium runs it in the page's
 idle time, and the Mac's show, drawing every frame, got 2 pictures a second from it. Not one
 in flight: each round trip (bitmap, worker, answer) waits for gaps between the show's frames,
-and one at a time came to 4.3 a second at 18 frames. Not a WebRTC video track: that needs signalling through
+and one at a time came to 4.3 a second at 18 frames. On WebGPU, not from the canvas at all:
+a 2D canvas's copy is the GPU's too, and its readback waited behind the plate, 6.3 a second
+at 30 frames with three in flight. The engine shrinks the frame's texture in one small pass
+on its own device and reads it back a frame or two behind, as the flash probe does
+(`gpu/padGrab.ts`), and the worker encodes the bytes on the CPU. Not a WebRTC video track: that needs signalling through
 the relay, ICE on a show network that may not route between two Wi-Fi clients, and a
 decoder that buffers, which is latency a hand feels. Nothing is sent until a remote on
 Draw asks; it renews a three-second lease every second, so a phone that locks or leaves

@@ -23,6 +23,7 @@ import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
+import { WebGPUPadGrab } from '../gpu/padGrab';
 import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
@@ -33,7 +34,7 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
-import { padPictureSender, tapPadPicture } from '../lib/padPicture';
+import { grabPadPicture, padPictureSender, padPictureWanted, tapPadPicture } from '../lib/padPicture';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
@@ -9699,7 +9700,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
-        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via } : null; })(),
+        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via, from: s.from } : null; })(),
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
         wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
@@ -10063,6 +10064,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** The projector sources last frame drew, to scope the frame a new one is built on. */
     let sourcesBefore = '';
     let probe: WebGPUFrameProbe | null = null;
+    /** The remote's Draw picture, read on the GPU while a pad asks (gpu/padGrab.ts). */
+    let padGrab: WebGPUPadGrab | null = null;
     let chain: WebGPUPostChain | null = null;
     /** The compositor, so the cleanup releases it by name rather than leaving it to the device's destroy (S13). */
     let platePass: WebGPUPlate | null = null;
@@ -10657,6 +10660,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
           const frame = stage?.frame();
           cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
+
+          // ── What a pad on Draw sees ──────────────────────────
+          // The same frame, shrunk and read back on this device a frame or
+          // two behind, as the probe below reads it; only while a remote is
+          // asking. The frame task's canvas tap then leaves it alone.
+          if (frame && padPictureWanted()) {
+            if (padGrab && padGrab.device !== s.device) { padGrab.dispose(); padGrab = null; }
+            const grab = padGrab ??= new WebGPUPadGrab(s.device);
+            grabPadPicture((w, h) => grab.grab(frame, w, h), frame.width, frame.height);
+          }
 
           // ── What the audience just saw ───────────────────────
           // The delivered frame, reduced on the GPU to one number, a frame
@@ -11285,6 +11298,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       projector = null;
       probe?.dispose();
       probe = null;
+      padGrab?.dispose();
+      padGrab = null;
       chain?.dispose();
       chain = null;
       platePass?.dispose();
