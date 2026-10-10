@@ -393,7 +393,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     full screen (opening on Draw cannot ask; the fixed layout covers the
     page either way), and out again for Controls.
   */
+  /*
+    A finger down when the screen changes never sends its pointerup: the pad
+    it was on is gone. Left in, a held press kept pressing every 50 ms with
+    no end and the count read one touch, so the switch lets go of them all.
+  */
+  const letGo = () => {
+    padTouches.current.clear();
+    padPressAmount.current.clear();
+    padLastSend.current.clear();
+    setPadTouchCount(0);
+  };
   const openDraw = async () => {
+    letGo();
     setView('draw');
     try {
       const el = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
@@ -401,6 +413,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     } catch { /* iPhone Safari has no fullscreen; the fixed layout is enough */ }
   };
   const openControls = async () => {
+    letGo();
     setView('controls');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
   };
@@ -436,6 +449,13 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   };
 
   const layerCount = Math.max(1, Math.min(5, settings?.layerCount ?? 1));
+  /*
+    The laptop down to fewer plates than the one this device was on: back to
+    the last it has. Clamping only the label showed L1 while every touch went
+    on carrying layer 1, which the display drops (no fluid there), so the pad
+    drew nothing (`npm run draw`, "back to plate 1").
+  */
+  useEffect(() => { if (padLayer > layerCount - 1) setPadLayer(layerCount - 1); }, [padLayer, layerCount]);
 
   const padSurface = (
     <div

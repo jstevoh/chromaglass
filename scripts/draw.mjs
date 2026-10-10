@@ -226,10 +226,13 @@ async function wallChecks(d, label) {
   }, v);
   await setAmount(2);
   const twice = (await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)))).find(m => m.type === 'drop')?.amount;
+  await setAmount(0.5);
+  const half = (await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)))).find(m => m.type === 'drop')?.amount;
   await setAmount(0.1);
   const least = (await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)))).find(m => m.type === 'drop')?.amount;
   await setAmount(1);
   check('phone: Amount 2× doubles what a touch lays', typeof base === 'number' && near(twice, Math.min(1, base * 2), 0.001), `${base} → ${twice}`);
+  check('phone: 0.5× halves it (the multiplier, not the clamp)', near(half, base * 0.5, 0.001), `${half}`);
   check('phone: and 0.1× is the floor the laptop reads', near(least, Math.max(0.05, base * 0.1), 0.001), `${least}`);
   check('phone: the value reads 1.0× again', (await page.getByTestId('draw-amount').innerText()).includes('1.0×'));
 
@@ -256,9 +259,10 @@ async function wallChecks(d, label) {
   await page.waitForTimeout(250);
   const bb = await d.box('draw-blackout');
   got = await during(async () => {
+    const n = heard.length;
     await d.touch('touchStart', [[bb.x + bb.width / 2, bb.y + bb.height / 2]]);
     await wait(250);
-    const mid = toggles(heard.slice(-5));
+    const mid = toggles(heard.slice(n));
     await wait(450);
     await d.touch('touchEnd', []);
     check('phone: held, the wall goes dark at once', mid >= 1);
@@ -273,6 +277,9 @@ async function wallChecks(d, label) {
   got = await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)));
   check('phone: and the next touch is plate 2\'s', got.find(m => m.type === 'drop')?.layer === 1, JSON.stringify(got.find(m => m.type === 'drop')));
   setState({ settings: { layerCount: 1 } });
+  await page.waitForTimeout(300);
+  got = await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)));
+  check('phone: the laptop back to one plate, touches go back to plate 1', got.find(m => m.type === 'drop')?.layer === 0 && (await page.getByTestId('draw-layer').innerText()).includes('L1'), JSON.stringify(got.find(m => m.type === 'drop')));
 
   // Controls, remembered.
   await d.tap('draw-controls');
@@ -339,6 +346,9 @@ for (const [vw, vh, label] of [[1180, 820, 'iPad'], [820, 1180, 'iPad upright']]
     got = await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)));
     check('iPad: Layer 2 picked, the next touch is plate 2\'s', got.find(m => m.type === 'drop')?.layer === 1);
     setState({ settings: { layerCount: 1 } });
+    await page.waitForTimeout(300);
+    got = await during(() => d.tapAt(...wallPoint(w, 0.5, 0.5)));
+    check('iPad: back to one plate, back to plate 1', got.find(m => m.type === 'drop')?.layer === 0);
   }
   await d.ctx.close();
 }

@@ -155,8 +155,10 @@ export function DrawScreen(p: DrawScreenProps) {
     message the display does not have yet (PLAN 8-draw-c).
   */
   const blackHeld = useRef<{ at: number; fromLit: boolean } | null>(null);
-  const blackDown = () => {
+  const blackDown = (e: ReactPointerEvent) => {
     if (!p.connected) return;
+    // A mouse let go off the button still lets go of the blackout.
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
     const fromLit = !p.state?.blackout;
     blackHeld.current = { at: performance.now(), fromLit };
     if (fromLit) p.action('blackout-toggle');

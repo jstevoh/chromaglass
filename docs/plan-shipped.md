@@ -1122,7 +1122,7 @@ on it, so a tablet set up as the Gig remote opens as that again after a reload.
 - In the app, a wrong key or a missing laptop puts Change laptop in the frame, under
   the words that ask for it.
 
-Measured (cloud): `draw` 73/73 (phone, phone on its side, iPad both ways, wrong key),
+Measured (cloud): `draw` 76/76 (phone, phone on its side, iPad both ways, wrong key),
 `applink` 49/49, `remotemix` 17/17. Pictures: the project's draw-8 folder.
 
 
