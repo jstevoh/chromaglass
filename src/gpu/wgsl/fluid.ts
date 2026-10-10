@@ -3936,8 +3936,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * bicubic reconstruction draws it as a sharp, smooth edge at the
    * screen's resolution rather than the grid's. Where the reaction is fed
    * (the bath, or poured reagent) the liquid is the indicator's, and the
-   * print replaces what was there in proportion to the feed; elsewhere the
-   * dye is left alone.
+   * print replaces what was there in proportion to the feed and to Turing
+   * Print; elsewhere the dye is left alone.
    */
   depositChem: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -3962,9 +3962,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let x = pow(max(a, 0.0) / PRINT_K, PRINT_HILL);
   let bound = x / (1.0 + x);
-  let dens = A.a.z * PRINT_DENSITY * bound;
+  let dens = PRINT_DENSITY * bound;
   let fed = clamp(max(c.b, A.a.w) / 0.3, 0.0, 1.0);
-  d = mix(d, vec4f(dens * A.b.rgb, dens), fed);
+  /*
+    Turing Print is how much of the liquid is the indicator's: at 1 the fed
+    plate is the print alone, below it the print is laid over what is there
+    in that share. As a depth instead, its first notch (or a look fading
+    in) replaced every colour on a fed plate with a print 5% deep, nearly
+    clear, at once.
+  */
+  d = mix(d, vec4f(dens * A.b.rgb, dens), fed * min(A.a.z, 1.0));
   textureStore(dst, p, d);
 }`,
 

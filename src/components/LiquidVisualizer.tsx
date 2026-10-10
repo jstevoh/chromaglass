@@ -2702,6 +2702,8 @@ class FluidSimulation {
       // not a seed of blobs. (Wilfred's lumia did too, until the owner found
       // it underwhelming; it is laid by its areas now, above.)
       case 'sensual-laboratory':
+      // So does Turing Print: its colour is the reaction's alone (depositChem).
+      case 'turing-print':
       // Ferro Maze is ink on a white light table: the ferrofluid is the
       // picture, poured with the look (layPhase), and the glass stays clear.
       case 'ferro-maze':
