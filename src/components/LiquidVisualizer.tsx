@@ -9729,7 +9729,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
-        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted } : null; })(),
+        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via } : null; })(),
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
         wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */

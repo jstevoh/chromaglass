@@ -68,7 +68,6 @@ export function isPadPicture(m: { src?: unknown; aspect?: unknown }): boolean {
  */
 export class PadPictureSender {
   private leases: { width: number; until: number }[] = [];
-  private last = -Infinity;
   private busy = false;
   private seq = 0;
   private small: HTMLCanvasElement | null = null;
@@ -98,10 +97,17 @@ export class PadPictureSender {
    * The frame task's canvas, just drawn. Cheap when nobody is watching (a
    * time compare); when a remote is, one small `drawImage` here, while the
    * canvas still holds the frame, and the encode off the frame.
+   *
+   * Paced by a due time rather than a gap since the last: a show drawing
+   * at 18 frames a second has a frame every 55 ms, and "at least 64 ms since
+   * the last" took every other one, 9 a second; against a due time with
+   * half a frame of slack it takes 15 when the frames allow, and every
+   * frame when they come slower than that.
    */
   tap(canvas: HTMLCanvasElement): void {
     const t = this.now();
-    if (this.busy || t - this.last < 1000 / PAD_PICTURE_FPS - 2) return;
+    if (this.busy && t - this.since > 2000) this.busy = false;   // an encode that never answered
+    if (this.busy || t < this.due - 8) return;
     const live = this.leases.filter(l => l.until > t);
     if (live.length === 0 || canvas.width === 0 || canvas.height === 0) return;
     // The widest frame asking: the iPad's, when a phone and an iPad both are.
@@ -120,26 +126,96 @@ export class PadPictureSender {
     } catch {
       return;   // a canvas that cannot be read this frame; the next one will be
     }
-    this.last = t;
+    this.due = Math.max(this.due + 1000 / PAD_PICTURE_FPS, t);
     this.busy = true;
+    this.since = t;
     const seq = ++this.seq;
+    const done = (src: string | null, size: number) => {
+      if (seq !== this.seq) return;   // answered after the watchdog gave up on it
+      this.busy = false;
+      if (!src) return;
+      this.sent++;
+      this.bytes += size;
+      this.send({ type: 'picture', src, w, h, aspect, seq });
+    };
+    /*
+      The encode, in a worker. It was `toBlob` here, and on the Mac's show
+      (CI, the app at 18 frames a second) that came to 2 pictures a second:
+      Chromium runs a canvas's `toBlob` in the page's idle time, and a page
+      drawing a plate every frame has next to none. A worker has all of
+      its own. `createImageBitmap` copies the small picture out now; the
+      worker draws it on its own canvas and encodes there. Without workers
+      or OffscreenCanvas, `toBlob` as before.
+    */
+    const worker = this.encoder();
+    if (worker) {
+      createImageBitmap(small).then((bmp) => {
+        if (seq !== this.seq) { bmp.close(); return; }
+        this.waiting = { seq, done };
+        worker.postMessage({ bmp, quality: QUALITY, seq }, [bmp]);
+      }, () => done(null, 0));
+      return;
+    }
     // `toBlob` can throw (an encoder that fails, a canvas that is not
     // origin-clean): then nothing is in flight, and a stuck `busy` would end
     // the pictures until a reload.
     try { small.toBlob((blob) => {
-      if (!blob) { this.busy = false; return; }
+      if (!blob) { done(null, 0); return; }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        this.busy = false;
-        if (typeof reader.result !== 'string') return;
-        this.sent++;
-        this.bytes += blob.size;
-        this.send({ type: 'picture', src: reader.result, w, h, aspect, seq });
-      };
+      reader.onloadend = () => done(typeof reader.result === 'string' ? reader.result : null, blob.size);
       reader.readAsDataURL(blob);
-    }, 'image/jpeg', QUALITY); } catch { this.busy = false; }
+    }, 'image/jpeg', QUALITY); } catch { done(null, 0); }
+  }
+
+  private due = -Infinity;
+  private since = 0;
+  private worker: Worker | null | undefined;
+  private waiting: { seq: number; done: (src: string | null, size: number) => void } | null = null;
+
+  /** Where the pictures are encoded: 'worker', or 'toBlob' where a worker cannot (for the checks). */
+  get via(): 'worker' | 'toBlob' | 'none' { return this.worker ? 'worker' : this.worker === null ? 'toBlob' : 'none'; }
+
+  /** The encoding worker, made once; null where a worker cannot encode (then `toBlob`). */
+  private encoder(): Worker | null {
+    if (this.worker !== undefined) return this.worker;
+    this.worker = null;
+    if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') return null;
+    try {
+      const url = URL.createObjectURL(new Blob([ENCODER], { type: 'text/javascript' }));
+      const w = new Worker(url);
+      URL.revokeObjectURL(url);
+      // Only the answer to the picture asked for: one the watchdog gave up on is dropped.
+      w.onmessage = (e: MessageEvent<{ seq: number; src: string | null; size: number }>) => {
+        const wait = this.waiting;
+        if (!wait || wait.seq !== e.data.seq) return;
+        this.waiting = null;
+        wait.done(e.data.src, e.data.size);
+      };
+      w.onerror = () => { const wait = this.waiting; this.waiting = null; wait?.done(null, 0); this.worker = null; };
+      this.worker = w;
+    } catch {
+      this.worker = null;
+    }
+    return this.worker;
   }
 }
+
+/** The worker: a bitmap in, a JPEG data URL out. */
+const ENCODER = `
+let c = null;
+onmessage = async (e) => {
+  const { bmp, quality, seq } = e.data;
+  try {
+    if (!c || c.width !== bmp.width || c.height !== bmp.height) c = new OffscreenCanvas(bmp.width, bmp.height);
+    c.getContext('2d').drawImage(bmp, 0, 0);
+    bmp.close();
+    const blob = await c.convertToBlob({ type: 'image/jpeg', quality });
+    postMessage({ seq, src: new FileReaderSync().readAsDataURL(blob), size: blob.size });
+  } catch (err) {
+    postMessage({ seq, src: null, size: 0 });
+  }
+};
+`;
 
 /*
   The frame task is in LiquidVisualizer and the link is in App; the display

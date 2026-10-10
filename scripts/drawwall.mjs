@@ -196,7 +196,9 @@ try {
     await page.waitForTimeout(3000);
     const rate = ((await framesOf(page)) - f0) / 3;
     check('the picture lands in the frame, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s`);
-    const { sent, bytes } = await wall.evaluate(() => ({ sent: window.__sender.sent, bytes: window.__sender.bytes }));
+    const { sent, bytes, via } = await wall.evaluate(() => ({ sent: window.__sender.sent, bytes: window.__sender.bytes, via: window.__sender.via }));
+    // Off the page's idle time: toBlob there gave the Mac's busy show 2 a second.
+    check('encoded in a worker', via === 'worker', via);
     check('each under 60 kB', sent > 0 && bytes / sent < 60_000, `${(bytes / Math.max(1, sent) / 1000).toFixed(1)} kB`);
     const pic = await page.getByTestId('draw-picture').boundingBox();
     const w1 = await d.box();
