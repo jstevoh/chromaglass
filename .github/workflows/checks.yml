@@ -906,6 +906,15 @@ jobs:
       - name: The grain inside the dye, not at its edge
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run grainedge
+      # The Turing pattern (PLAN 26): one stripe width on every rung, carried
+      # with the colour and healed after a stir, grown only where it is fed,
+      # and Turing Print black on white where the reaction is, not piling up.
+      # The lab only; five or six minutes on SwiftShader, so on a Mac rather
+      # than in Measure, and on the show shard, which had the most room under
+      # the job's twenty minutes (13.2 against open's 16.8 on #331's run).
+      - name: The Turing pattern and its print
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        run: npm run turing
       # The show keeps hearing while its window is hidden behind the wall's
       # (scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second
       # window asking for frames as the projector window does, and the level

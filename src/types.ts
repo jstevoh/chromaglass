@@ -714,6 +714,7 @@ export interface VisualizerSettings {
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
   chemistryPattern: number;
   chemistryWidth: number;
+  turingPrint: number;        // the reaction drawn as starch's blue-black complex with it, in equilibrium, black on the lamp (26d); 0 deposits colour as the coral looks do
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
@@ -1070,6 +1071,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   chemistry: 0,
   chemistryPattern: 0,
   chemistryWidth: 0.5,
+  turingPrint: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
   filmMix: 0.7,

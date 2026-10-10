@@ -719,6 +719,13 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <Slider label="Ben-Day Dots" field="benDay" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('benDay') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
+            And Turing Print while the reaction runs (PLAN 26d): starch in the
+            dish, the pattern printed black on the lamp.
+          */}
+          {((settings?.chemistry ?? 0) > 0.001 || (settings?.turingPrint ?? 0) > 0.001) && (
+            <Slider label="Turing Print" field="turingPrint" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('turingPrint') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/*
             The plate as a thin gap (PLAN §18a), a switch on the slider's two
             stops, and its liquid's Thickness only while it is on.
           */}

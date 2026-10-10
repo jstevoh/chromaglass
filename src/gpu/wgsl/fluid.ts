@@ -1902,19 +1902,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // Semi-Lagrangian advection. A.a.x is the displacement's sign and scale.
-  advectChem: `${HEAD}
-@group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var vel: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(5) var lin: sampler;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let uv = uvOf(id);
-  let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
-  let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
-  let o = textureSampleLevel(src, lin, pos, 0.0);
-  textureStore(dst, vec2i(id.xy), select(vec4f(0.0), o, finite4(o)));
-}`,
   advect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
@@ -3817,17 +3804,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), acc / f32(n * n));
 }`,
 
-  /**
-   * Dye laid down by the reaction (`WebGPUFluid.depositChemistry`). The activator is
-   * on the logical grid, so it is read bilinearly, exactly as a CPU delta
-   * would have been; above the threshold it deposits colour the way
-   * `addDensity` does — absorption in rgb, density in a.
-   *
-   * A.a = (amount, threshold, 0, 0), A.b.rgb = the dye's absorbance (lib/dye.ts).
-   */
     addReagent: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -3856,7 +3835,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   seedChem: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -3878,7 +3857,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   grayScott: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -3921,24 +3900,79 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let feed = target_feed * supply;
   let kill = mix(0.06, target_kill, supply);
 
-  let un = c.r + A.a.x * l.r - uvv + feed * (1.0 - c.r);
-  let vn = c.g + A.a.y * l.g + uvv - (feed + kill) * c.g;
+  // A.b.y is the substep's share of a unit of time (stepChemistry, and why).
+  let dt = A.b.y;
+  let un = c.r + dt * (A.a.x * l.r - uvv + feed * (1.0 - c.r));
+  let vn = c.g + dt * (A.a.y * l.g + uvv - (feed + kill) * c.g);
   textureStore(dst, p, vec4f(clamp(un, 0.0, 1.0), clamp(vn, 0.0, 1.0), c.b, c.a));
 }`,
 
-  depositChem: `${HEAD}${BILERP_N}
+  /**
+   * Dye laid down by the reaction (`WebGPUFluid.depositChemistry`), absorption
+   * in rgb and density in a, the way `addDensity` lays it.
+   *
+   * The field is on the dye's own grid (stepChemistry's PingPong is N²) and
+   * is read texel for texel. It was read bilinearly as if it were on the
+   * logical 192² grid, which it was when the reaction ran on the CPU: on
+   * 256² the deposit drew the field's top-left 192² stretched over the whole
+   * plate, on 512² its top-left 37%, so every pattern was printed 1.3 to 2.7
+   * times its size, and not where its reagent was poured.
+   *
+   * A.a = (amount, threshold, print, bath), A.b.rgb = the colour's
+   * absorbance (lib/dye.ts).
+   *
+   * Print 0: above the threshold the activator deposits A.a.x a frame and
+   * the flow carries it off, the coral looks' bench.
+   *
+   * Print above 0: the colour is starch's complex with the activator, as in
+   * a CIMA dish, where starch is what makes the pattern visible (and, by
+   * holding the activator back, what lets a Turing pattern form at all:
+   * Lengyel and Epstein, 1991). The complex forms and comes apart in well
+   * under a frame, so the dye is set to its equilibrium with the field as
+   * it is now: nothing accumulates and nothing trails. Iodine binds into
+   * the amylose helix cooperatively, so the colour switches on over a
+   * narrow band of the activator, the Hill curve below; its steepness puts
+   * the switch inside a cell or two of a stripe's flank, where the plate's
+   * bicubic reconstruction draws it as a sharp, smooth edge at the
+   * screen's resolution rather than the grid's. Where the reaction is fed
+   * (the bath, or poured reagent) the liquid is the indicator's, and the
+   * print replaces what was there in proportion to the feed and to Turing
+   * Print; elsewhere the dye is left alone.
+   */
+  depositChem: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var chem: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+const PRINT_K = 0.2;
+const PRINT_HILL = 6.0;
+const PRINT_DENSITY = 1.6;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  var d = textureLoad(dye, vec2i(id.xy), 0);
-  let a = bilerpN(chem, uvOf(id), S.l).g;
-  if (a > A.a.y) {
-    let w = A.a.x * (a - A.a.y);
-    d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
+  let p = vec2i(id.xy);
+  var d = textureLoad(dye, p, 0);
+  let c = textureLoad(chem, p, 0);
+  let a = c.g;
+  if (A.a.z <= 0.0) {
+    if (a > A.a.y) {
+      let w = A.a.x * (a - A.a.y);
+      d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
+    }
+    textureStore(dst, p, d);
+    return;
   }
-  textureStore(dst, vec2i(id.xy), d);
+  let x = pow(max(a, 0.0) / PRINT_K, PRINT_HILL);
+  let bound = x / (1.0 + x);
+  let dens = PRINT_DENSITY * bound;
+  let fed = clamp(max(c.b, A.a.w) / 0.3, 0.0, 1.0);
+  /*
+    Turing Print is how much of the liquid is the indicator's: at 1 the fed
+    plate is the print alone, below it the print is laid over what is there
+    in that share. As a depth instead, its first notch (or a look fading
+    in) replaced every colour on a fed plate with a print 5% deep, nearly
+    clear, at once.
+  */
+  d = mix(d, vec4f(dens * A.b.rgb, dens), fed * min(A.a.z, 1.0));
+  textureStore(dst, p, d);
 }`,
 
   /*
