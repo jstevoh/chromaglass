@@ -5545,7 +5545,19 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
   forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
   own stir moves them 0.79).
-  - **27a-1. The cover glass slides as the dish tips (shipped, #328).** The tilt moves
+  - **27a-1. The cover glass slides as the dish tips (shipped in #328, taken out again
+    by #340; open).** Taken out because on the Mac it halved the frame rate with music
+    playing: `npm run renders` drew 10–21 frames a second on the laptop and 11–15 on the
+    phone against 26–32 before (main's deploy of 10-10 and #340's run; #328's own run
+    showed it too, and #337's run without it passed). Inferred, not yet measured: the
+    glass drags the whole film at half its slide, a uniform drift of a few cells a step,
+    and the carries' substeps (`CARRY_COURANT`, up to 33 a step) follow the fastest face,
+    so every carry ran several times as many substeps. Its glass was also not reset when
+    a render starts (`resetPlateClocks`), so the same seed rendered twice differed
+    (`render-app`). To bring it back: carry the glass's uniform drift without the
+    substeps (an exact shift of the carried fields, or the carries in the glass's own
+    frame), reset `coverRef` with the rock, and show `renders` at its old frame rate.
+    What it was: the tilt moves
     colour only where it is heavier than the plate's mean, so on a look whose colour is
     spread evenly a rock moved nothing (the Mac's controls run on #305: Rock visible on
     7 of 23 looks, "nothing" on Boiling Point, Crowd Plate, Red Cabbage, Clock Glass).
@@ -5569,11 +5581,10 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     - **27a-3, open.** Glass Smear's own noise speed is laid × dt and then read × disp
       again (the 2026-10-06 audit), so at a slow look's Speed it moves the plate about
       a ten-thousandth a second; lay it in m/s as the cover's slide is.
-    - **27a-4, open.** On #328's Mac run, `npm run renders` on the phone with the band
-      drew 11 frames a second in its second window (33 frames against the 45 floor; the
-      first window drew 20.6, and the ear read every frame). #336 and #337 passed it the
-      same day; the PR merged on the owner's word without a re-run. If it shows again,
-      measure the phone's frame time with and without the cover glass's step.
+    - **27a-4. Found: it was the cover glass** (see 27a-1). On #328's Mac run,
+      `npm run renders` on the phone with the band drew 11 frames a second; it showed
+      again on main's deploy of 10-10 on the laptop and the phone, and #340 took the
+      glass out.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
