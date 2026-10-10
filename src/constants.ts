@@ -92,7 +92,7 @@ export const COLOR_HARMONIES: number[][] = [
   each a filter that passes two thirds of the lamp, so where two overlap
   they leave one primary of light (yellow and magenta red, yellow and teal
   green, magenta and teal blue); Ink is the dark precipitates of the reactions that print
-  on the lamp (Sensual Laboratory, Agate, Turing Print); Pantry the
+  on the lamp (Sensual Laboratory, Agate, the Turing reaction); Pantry the
   liquids' own colours (syrup, oil, milk, ferrofluid: the Natural swatch,
   18d-12) as dyes; and Lava the wax colours of Lava Lamp.
 */

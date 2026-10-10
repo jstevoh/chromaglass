@@ -130,7 +130,6 @@ export const INTENT = {
   agate: ['dish', '"a reagent seeping out through a gel"'],
   'magnet-garden': ['dish', '"black ferrofluid on a bright golden pool"'],
   'lava-lamp': ['dish', '"the plate stood upright over a warm lamp": a lamp behind wax'],
-  'turing-print': ['dish', '"black on the white lamp": a precipitate on a platen'],
   'home-movie': ['dish', '"a light show filmed on Super 8": a projector'],
   'clock-glass': ['dish', '"two curved clock glasses with coloured oil and water between them ... a thin bright film"'],
   'ferro-maze': ['dish', '"black ferrofluid on a white light table"'],

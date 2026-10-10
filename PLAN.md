@@ -5405,7 +5405,7 @@ Steps:
   somewhere: the reaction runs only where its liquid was poured (a bottle on the shelf),
   and two pours with different feeds make two patterns that meet. A shape, a word or
   the camera can lay the reagent, as images already pour (`injectImage`).
-- **26d. The look: "Turing Print"** (**look added**, #330, 28a; its ink colours and the reaction growing are #331; the 512² rung below is open). A clear liquid, a white lamp, the
+- **26d. The look: "Turing Print"** (the look is #333; the reaction growing is #331). A clear liquid, a white lamp, the
   product drawn as an opaque precipitate: black on white, inverted by the lamp. Its edge
   goes through the plate's own reconstruction (Catmull-Rom and `fwidth`), so the stripes
   need no FXAA pass; at 256² a 12-pixel stripe is two cells, so it wants the 512² rung or
@@ -5541,8 +5541,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     slower evaporation).
   - *New*: **Lava Lamp**, the first look to stand the plate up (Plate Upright, Dye
     Weight, Double Diffusion: Rayleigh–Taylor plumes warmed back up by the lamp the
-    solver keeps under the plate), and **Turing Print** (26d: the reaction at Pattern
-    0.85 on a white lamp in graphite and midnight). Lava Lamp needed the mix force
+    solver keeps under the plate). Turing Print (26d) is its own thread's (#333). It needed the mix force
     waited for at opening (`Opening.gravity`; `npm run startup` on Metal caught it).
 - **28b. Colour palettes for the lamp** (**shipped**, #330). Pastel Glow and Galaxy each
   carried White and Icy Blue, which are 0 and 26 (CIELAB ΔE) from the white lamp, so on

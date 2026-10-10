@@ -2167,64 +2167,6 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
-  {
-    id: 'turing-print',
-    name: 'Turing Print',
-    description: 'A reaction that prints: two reagents diffusing at different speeds settle into stripes of one width, black on the white lamp, and the stir drags them into whorls that heal behind it.',
-    settings: {
-      /*
-        PLAN.md 26d, the look the owner asked for after the reaction-diffusion
-        VJ pack. The reaction is Gray–Scott carried by the flow (26a, the
-        `chemistry` setting); Pattern (26b, chemistryPattern) is pushed along
-        Pearson's map into the labyrinth, and the precipitate is drawn as dark
-        ink on a white lamp, so it reads black and white the way an opaque
-        product in a clear gel does. The ink's colours are the Ink palette for
-        now; the "Palette for ferro and Turing Print" work tunes them.
-      */
-      chemistry: 1,
-      chemistryPattern: 0.85,
-      chemistryWidth: 0.4,
-      lampGround: 1,
-      ledPlatform: true,
-      ledMode: 'single',
-      ledColor: '#f6f3ea',
-      ledSpeed: 0.0,
-      globalSpeed: 0.0105,
-      surge: 0.25,
-      layerCount: 1,
-      blendMode: 'multiply',
-      gooeyEffect: 0.3,
-      rotationSpeed: 0.03,       // slow enough that the stripes heal behind the drag
-      centerGravity: 0.0,
-      diffusionRate: 0,
-      buoyancy: 0.2,
-      advection: 0.35,
-      damping: 0.985,
-      heatDecay: 0.985,
-      automateRate: 0.02,        // the reaction lays the ink; drops would only blot it
-      platePressure: 0.15,
-      glassSmear: 0.1,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.6,
-      evaporationRate: 0.03,
-      airVelocity: 0.03,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.35,
-      turbulenceScale: 0.15,
-      blobSurfaceTension: 0.4,
-      boundaryContrast: 0.5,
-      saturationBoost: 1.0,
-      glossiness: 0.0,
-      dyeBudget: 0.4,
-      edgeRelief: 0.5,
-      bubbles: 0,
-      plateRock: 0.2,
-      beatSqueeze: 0.0,
-      exposure: 0.75,
-      audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
-    }
-  },
 ];
 
 /*

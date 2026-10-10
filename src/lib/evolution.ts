@@ -62,7 +62,7 @@ export function trackSeed(isrc: string): TrackSeed {
 // bucket comes from the live audio profile at identification time.
 const PRESET_BUCKETS = {
   calm:   ['classic', 'deep-ocean', 'velvet-underground', 'jellyfish-bloom', 'clock-glass', 'home-movie', 'lava-lamp'],
-  dreamy: ['galaxy', 'aurora-borealis', 'fractal-dream', 'timbre-shifter', 'soap-film', 'turing-print'],
+  dreamy: ['galaxy', 'aurora-borealis', 'fractal-dream', 'timbre-shifter', 'soap-film'],
   bright: ['cyberpunk', 'neon-coral-reef', 'stardust-collapse', 'acid-trip', 'crowd-plate'],
   heavy:  ['bass-drop', 'solar-flare', 'comet', 'microscopic-chaos', 'magnet-garden'],
 };
