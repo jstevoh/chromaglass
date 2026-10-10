@@ -271,7 +271,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <Field label="Transition (seconds)">
                 <input type="number" min={0} max={300} value={stage.transition} onChange={(e) => updateStage(editIndex, { transition: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} />
               </Field>
-              <Field label="Preset">
+              <Field label="Preset palette">
                 <select value={stage.presetId ?? ''} onChange={(e) => updateStage(editIndex, { presetId: e.target.value || undefined })} className={inputCls}>
                   <option value="">Keep the current one</option>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

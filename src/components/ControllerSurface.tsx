@@ -529,7 +529,7 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
             </div>
 
             <div className="max-h-[52vh] overflow-y-auto pr-1 scrollbar-hide">
-              {section('Presets', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
+              {section('Preset palettes', presets.map(p => ({ key: `preset-${p.id}`, label: p.name, target: { kind: 'preset', presetId: p.id } as MidiTarget })))}
               {section('Dyes', PALETTE.map((p, i) => ({ key: `dye-${i}`, label: p.name, swatch: p.hex, target: { kind: 'dye', paletteIndex: i } as MidiTarget })))}
               {section('Actions', (Object.keys(ACTION_LABELS) as MidiAction[]).map(a => ({ key: `action-${a}`, label: ACTION_LABELS[a], target: { kind: 'action', action: a } as MidiTarget })))}
               {section('Controls', LEARNABLE_SETTINGS.map(s => ({ key: `setting-${s.key}`, label: s.label, target: { kind: 'setting', key: s.key, min: s.min, max: s.max } as MidiTarget })))}

@@ -309,7 +309,7 @@ export function PerformDesk(p: PerformDeskProps) {
             <span className="ml-auto shrink-0 whitespace-nowrap pl-2 font-mono text-[12px] text-faint" data-testid="set-count">{p.cues.length} {p.cues.length === 1 ? 'item' : 'items'}</span>
           </div>
           <span className="flex items-center gap-1 whitespace-nowrap [&>*]:flex-1">
-            <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a look, a saved look, a sequence or a file to the set">+ Add</Button>
+            <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a preset palette, a saved one, a sequence or a file to the set">+ Add</Button>
             <Button
               height={28}
               onClick={() => { setAct('save'); setSaved(true); window.setTimeout(() => setSaved(false), 1400); }}
@@ -340,7 +340,7 @@ export function PerformDesk(p: PerformDeskProps) {
                 </>
               )}
               <MenuItem onClick={() => setAct('new')} testId="set-new">New empty set</MenuItem>
-              <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all presets</MenuItem>
+              <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all preset palettes</MenuItem>
               <div className="my-1 h-px bg-border" />
               <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
               <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
@@ -407,7 +407,7 @@ export function PerformDesk(p: PerformDeskProps) {
           ) : (
             <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
               <p>This set is empty.</p>
-              <p className="mt-1 text-[12px] text-faint">+ Add looks to it, or start from all presets in the ⋯ menu.</p>
+              <p className="mt-1 text-[12px] text-faint">+ Add preset palettes to it, or start from all of them in the ⋯ menu.</p>
             </div>
           )}
         </div>
@@ -430,7 +430,7 @@ export function PerformDesk(p: PerformDeskProps) {
               className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[12px] text-muted hover:text-text"
               data-testid="perform-saved-toggle"
             >
-              <span>Your presets</span>
+              <span>Your preset palettes</span>
               <span className="font-mono text-[11px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
             </button>
             {savedOpen && (

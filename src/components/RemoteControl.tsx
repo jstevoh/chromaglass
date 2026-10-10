@@ -865,7 +865,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
 
           {/* Presets */}
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Looks — tap to arm, Go sends</h2>
+            <h2 className="text-[10px] uppercase tracking-[0.3em] text-white/30">Preset palettes — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
               <button onClick={() => action('preset-prev')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={14} /></button>
               <button onClick={() => action('preset-next')} disabled={!connected} className="rounded-full border border-white/10 p-2 disabled:opacity-30 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={14} /></button>

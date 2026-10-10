@@ -397,7 +397,7 @@ export function targetLabel(t: MidiTarget, presetName?: (id: string) => string |
   switch (t.kind) {
     case 'setting': return SETTING_LABELS[t.key] ?? String(t.key);
     case 'action': return ACTION_LABELS[t.action];
-    case 'preset': return `Preset: ${presetName?.(t.presetId) ?? t.presetId}`;
+    case 'preset': return `Preset palette: ${presetName?.(t.presetId) ?? t.presetId}`;
     case 'dye': return `Dye ${t.paletteIndex + 1}`;
   }
 }

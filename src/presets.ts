@@ -2282,3 +2282,38 @@ export const PRESETS: Preset[] = [
     }
   },
 ];
+
+/*
+  Retired preset palettes, and the one that took each one's place (PLAN.md 28a).
+
+  A built-in look is named by its id everywhere a show is kept: a set list's
+  items, a MIDI map's pads, a sequence's stages, a song show's cues, the
+  remote's buttons and the `?look=` link. None of those is rewritten when a
+  look goes, and each one quietly does nothing when its id is missing: the
+  cue sends nothing, the pad is dead, and the plate seeds a random harmony
+  because PRESET_CONTRACTS has no dyes for the id. So when the 2026-10-10
+  refresh retired the looks that no longer showed anything their name
+  promised, each id was mapped here to the look nearest in what it did, and
+  every place that turns an id into a look goes through `findPreset`. A
+  saved show made last month still plays; it plays the replacement.
+
+  Saved presets ("Your presets", lib/userPresets.ts) never name a built-in
+  id: each keeps a full copy of its settings, dyes, pours and liquids, so a
+  retired look a person saved keeps looking exactly as it did.
+*/
+export const RETIRED_PRESETS: Readonly<Record<string, string>> = {};
+
+/** A retired id's replacement, followed to the end; any other id unchanged. */
+export function livePresetId(id: string): string {
+  let at = id;
+  // Bounded, so a mistake that maps two ids onto each other cannot hang a cue.
+  for (let i = 0; i < 8 && RETIRED_PRESETS[at] !== undefined; i++) at = RETIRED_PRESETS[at];
+  return at;
+}
+
+/** The built-in look an id names, through a retirement if it was retired. */
+export function findPreset(id: string | null | undefined): Preset | undefined {
+  if (!id) return undefined;
+  const live = livePresetId(id);
+  return PRESETS.find(p => p.id === live);
+}
