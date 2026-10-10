@@ -62,6 +62,17 @@ export class SettingRide {
   }
 
   /**
+   * The current un-drained shadow values, for the frame loop to read directly
+   * without clearing the flush markers or triggering a React render.
+   */
+  peek(): Record<string, number> | null {
+    if (this.shadow.size === 0) return null;
+    const patch: Record<string, number> = {};
+    for (const [k, v] of this.shadow) patch[k] = v;
+    return patch;
+  }
+
+  /**
    * The patch to give React, or null when nothing has changed since the last
    * one. Null rather than an empty object so a caller can skip the update
    * entirely: a frame that re-renders the app to set a value to itself is the

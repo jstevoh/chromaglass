@@ -1979,14 +1979,16 @@ export default function App() {
     setDocDirty(true);
     laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
-    if (rideFrame.current) return;
-    rideFrame.current = requestAnimationFrame(() => {
-      rideFrame.current = 0;
+  }, [ride]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!ride.waiting) return;
       const patch = ride.drain();
       if (patch) setSettings(prev => ({ ...prev, ...patch }));
-    });
+    }, 100);
+    return () => clearInterval(id);
   }, [ride]);
-  useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
 
   // ── Cue and Go ────────────────────────────────────────────────────
   //
@@ -4081,7 +4083,7 @@ export default function App() {
       <LiquidVisualizer
         ref={visualizerRef}
         onBackLookCleared={backLookCleared}
-        audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
+        audioData={audioData} hear={hear} settings={effectiveSettings} liveSettings={() => ride.peek()} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         onAim={aimMacro}
         onPinchZoom={phone ? pinchZoom : undefined}
