@@ -206,7 +206,10 @@ export class BubbleField {
    * rounds off, and a long time later pops; blow again beside it and the
    * plate fills with them.
    *
-   * `strength` is the tool's Amount (1 is a steady breath).
+   * `strength` is the breath's volume a second against a steady breath's
+   * (lib/breath.ts, strawFlow: the Amount, which is the breath's speed). It
+   * had a floor of 0.05, which held every Amount under about a fifth (the
+   * hands passed the Amount squared) at the same breath (PLAN.md QA-20).
    */
   blow(x: number, y: number, dt: number, strength = 1): void {
     const N = this.grid;
@@ -222,7 +225,7 @@ export class BubbleField {
       this.push(b);
       this.strawBubble = b;
     }
-    const rate = Math.max(0.05, strength) * Math.PI * rMax * rMax / 3.5;   // cells² a second
+    const rate = Math.max(0, strength || 0) * Math.PI * rMax * rMax / 3.5;   // cells² a second
     const r0 = b.r;
     b.r = Math.min(rMax, Math.sqrt(b.r * b.r + rate * dt / Math.PI));
     const speed = (b.r - r0) / Math.max(dt, 1e-4);                       // cells a second

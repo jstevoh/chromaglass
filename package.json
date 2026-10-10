@@ -139,6 +139,7 @@
     "presslift": "node scripts/presslift.mjs",
     "fingerflow": "node scripts/fingerflow.mjs",
     "airblow": "node scripts/airblow.mjs",
+    "blowrange": "node scripts/blowrange.mjs",
     "forces": "node scripts/forces.mjs",
     "rides": "node scripts/rides.mjs",
     "musicforce": "node scripts/musicforce.mjs",
