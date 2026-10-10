@@ -954,7 +954,9 @@ export class WebGPUFluid {
         first steps use. Behind the show they are ready some fifteen
         seconds after it opens, as mixForce always has been.
       */
-      ['mixSmooth', [R32], false],
+      // Except on a look that stands the plate up, whose dye's weight runs
+      // the mix force from its first step (Opening.gravity).
+      ['mixSmooth', [R32], open.gravity],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -1023,7 +1025,7 @@ export class WebGPUFluid {
       // drain. None was seen in a look's first steps, the mix's and the
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
-      ['mixForce', [VEL], false],
+      ['mixForce', [VEL], open.gravity],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],

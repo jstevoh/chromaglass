@@ -574,7 +574,7 @@ export function PhoneStage(p: PhoneStageProps) {
         </div>
         <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:pt-1 wide-land:w-[264px] wide-land:border-l wide-land:border-t-0 wide-land:pl-1.5 wide-land:pt-0">
           {([
-            ['looks', 'Looks', Palette],
+            ['looks', 'Presets', Palette],
             ['sound', 'Sound', Music],
             ['play', 'Play', Waves],
             ['mix', 'Mix', SlidersVertical],
@@ -711,8 +711,8 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       {sheet === 'looks' && (
-        <PhoneSheet title="Looks" onClose={close} testId="phone-sheet-looks">
-          <PanelGuard name="The Looks sheet" inline onClose={close}>
+        <PhoneSheet title="Preset palettes" onClose={close} testId="phone-sheet-looks">
+          <PanelGuard name="The preset palettes sheet" inline onClose={close}>
           <div className={`grid gap-1.5 ${[p.onRevert, p.onSaveLook].filter(Boolean).length === 2 ? 'grid-cols-3' : [p.onRevert, p.onSaveLook].some(Boolean) ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <Tile icon={Shuffle} label="Surprise me" onPress={() => { p.onRandomLook(); close(); }} testId="phone-random-look" />
             {p.onRevert && <Tile icon={Undo2} label="The last look" onPress={() => { p.onRevert?.(); close(); }} testId="phone-revert" />}

@@ -1983,7 +1983,7 @@ while this batch's plan was going in (#177), and no cause is known yet:
   the control's hold on the same run (3.82 s from 1.05 s, inside its device
   request) read neither held nor the page's own; the control is not judged, and a
   miss there can only make the show red, never pass it, but the opening line now
-  prints what 4b made of each page's wait so the next runs say why. *Answered by 14v-5 (2026-10-10): the intro turning while the GPU started; it now starts still.* Seen on #299 and #301, 2026-10-05: a third kind, frames stopped with the page's timer still running, inside the device request: #301's run 37355609842 stopped 2.07 s from 2.57 s, the device asked at 2.39 s and given at 4.71 s, a long animation frame from 2.58 s whose rendering began at 4.65 s with no script in it, and #299's earlier head 2.20 s the same way. Not held (the timer ran) and not the page's own (nothing of its ran); check 4 counts it. Neither PR runs anything before the device is given. Whether 4b should own a frame stop that lies wholly inside a pending requestDevice with no page script in its long animation frame is the question. The old "within 0.25 s of the control's stop" and "control plus a second" are
+  prints what 4b made of each page's wait so the next runs say why. *Answered by 14v-5 (2026-10-10): the intro turning while the GPU started; it now starts still.* Seen on #299 and #301, 2026-10-05: a third kind, frames stopped with the page's timer still running, inside the device request: #301's run 37355609842 stopped 2.07 s from 2.57 s, the device asked at 2.39 s and given at 4.71 s, a long animation frame from 2.58 s whose rendering began at 4.65 s with no script in it, and #299's earlier head 2.20 s the same way. Again on #330's run 38028974928 (2026-10-10): 2.17 s from 2.76 s, the device asked at 2.40 s and given at 5.03 s, no long task, nothing made or written in the gap; #330 changes nothing before the device either. Not held (the timer ran) and not the page's own (nothing of its ran); check 4 counts it. Neither PR runs anything before the device is given. Whether 4b should own a frame stop that lies wholly inside a pending requestDevice with no page script in its long animation frame is the question. The old "within 0.25 s of the control's stop" and "control plus a second" are
   gone. Read against the 53 logs: #204's red and 36339282520's split stop (1.28 s
   then 1.68 s) now count as one held stretch each, 2.57 s and about 3 s; 2 of the 53
   (4.05 s on 36294600123, 3.75 s on 36338802046, each wholly inside a four-second
@@ -5626,6 +5626,70 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     almost nothing. Whether one dial should be the music's reach on all of them is a
     question for the owner once 27e-2 says which reads weakest.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
+
+## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
+
+The owner, 2026-10-10: "Let's refactor the presets (now called preset palettes) as well
+as the color palettes to account for all the new work that we've done. Improve the
+current presets, create new ones, and dump ones that aren't doing anything interesting
+anymore." Most of the 42 looks were tuned before the lamp ground (18b), each liquid's
+own properties and colour (18d, 18d-12), the GPU reaction carried by the flow (§26),
+standing domes (9t), Blow's air (15g), the controls sweep (§27) and layers on every
+look (#273). The ferrofluid and Turing shader palettes are the "Palette for ferro and
+Turing Print" work (#331), which also made the reaction grow at all.
+
+- **28a. Keep, improve, new, retire** (**shipped**, #330). Judged on the Mac gallery of
+  main (`gallery` label, 2026-10-10, `/mnt/project-files/presets-28/before/`):
+  - *Named "Preset palettes"* in the menus, the desks, the phone's sheet (its tab says
+    Presets, for width), the remote, the MIDI surface and the guide (the owner's pick).
+  - *Retired*, each id mapped to its nearest look in `RETIRED_PRESETS` (src/presets.ts),
+    so a set list, MIDI pad, sequence stage, song show or `?look=` link naming it plays
+    the replacement (`findPreset`; `npm run plate`): Sunny Side Up → Colorful Cosmos (the
+    same soft static pink), Boiling Point → Aurora Borealis (the same greens and pace),
+    Glycerine Drift → Classic (one flat blue-to-magenta gradient). Saved presets keep
+    their own copy and are untouched.
+  - *Improved*: Cyberpunk Neon and Timbre Shifter drew a conic rainbow through every
+    clear patch (the LED platform's `cyberpunk` and `rainbow` modes: a colour picker
+    under the glass); now Cyberpunk is neon on black (luma 0.53 → 0.14 at 40 s, which is
+    the look) and Timbre Shifter a cyan-violet marble (0.30 → 0.61). Jellyfish Bloom sat
+    two bells on an empty plate (flat 0.61 → 0.51) and Cell Bloom drained by 40 s (more
+    drops, slower evaporation: motion 0.015 → 0.057). Fillmore East and Clock Glass run
+    Dye Budget 0.5 instead of 0.9 (18b-8), but the after gallery shows that was not why
+    they are dark: Clock Glass's low luma is the black round its dish, and Fillmore stayed
+    nearly black (0.064 → 0.052; 28c). Before and after at 40 s:
+    `/mnt/project-files/presets-28/pairs/`.
+  - *New*: **Lava Lamp**, the first look to stand the plate up (Plate Upright, Dye
+    Weight, Double Diffusion: Rayleigh–Taylor plumes warmed back up by the lamp the
+    solver keeps under the plate). Turing Print (26d) is its own thread's (#333). It needed the mix force
+    waited for at opening (`Opening.gravity`; `npm run startup` on Metal caught it).
+- **28b. Colour palettes for the lamp** (**shipped**, #330). Pastel Glow and Galaxy each
+  carried White and Icy Blue, which are 0 and 26 (CIELAB ΔE) from the white lamp, so on
+  a lamp look half their dyes poured invisibly; Lavender replaced White in both. Added,
+  after the 17 so a saved lock keeps its index: Overhead (yellow, magenta, teal,
+  ultramarine: the subtractive dishes), Ink (graphite, midnight, crimson, coffee: the
+  reactions' precipitates), Pantry (the liquids' own colours) and Lava. `npm run plate`
+  holds every palette to three of four colours 40 or more from black and from white
+  (before: Pastel Glow and Galaxy 4/2). A track's music picks among 21 now, so a song
+  identified before may land on a different palette once.
+- **28c. Open from 28a.**
+  - The retired looks' cases in `seedPreset` (LiquidVisualizer.tsx) are dead; delete
+    them when lane G is free (#307 held it), and drop the file's exemption in `npm run
+    plate`'s retired-id walk.
+  - Fillmore East is nearly black on the Mac (luma 0.05 at 40 s) with Dye Budget at 0.5
+    as at 0.9; find what darkens it (its layers' blend, the lamp's grade) before tuning
+    another setting.
+  - Still flat on the Mac and not retuned here: Oil Wheel (motion 0.003, a dark brown
+    disc; 18b-8 lists it), Deep Ocean (three bands), Bass Drop (one red: its Squeeze only
+    shows with a kick). Crowd Plate is
+    a camera look and photographs static without one.
+  - The gallery's 8 s frame came back empty on Classic ("no grabFrame"): the first look
+    is photographed before the page can grab a frame.
+  - Neon Coral Reef draws a smooth rainbow ramp across one blob (its dyes' hue walk over
+    a single body); judge after #331 makes its coral grow.
+  - More new looks the physics allows and none shows: salt fingers on their own
+    (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
+    into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
+    18d-12a: the automation pours colourless).
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Sheet } from './ui';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
-import { PRESETS, type Preset } from '../presets';
+import { PRESETS, livePresetId, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
 import { ShowSequence, ShowStage, SequencerStatus, StageAdvance, stageId, duplicateSequence, GLIDES } from '../lib/sequencer';
 import { songLabel, type SongRef } from '../lib/songRef';
@@ -174,7 +174,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
                 <span className="text-xs font-semibold truncate">{i + 1}. {st.name}</span>
                 <span className="text-[9px] font-mono opacity-50 shrink-0">
                   {st.advance === 'section' ? 'section' : st.advance === 'hold' ? 'hold' : fmt(st.seconds)}
-                  {st.presetId ? ` · ${presets.find(p => p.id === st.presetId)?.name ?? st.presetId}` : ''}
+                  {st.presetId ? ` · ${presets.find(p => p.id === livePresetId(st.presetId!))?.name ?? st.presetId}` : ''}
                   {st.paletteSize ? ` · ${st.paletteSize} dye${st.paletteSize > 1 ? 's' : ''}` : ''}
                 </span>
               </span>
@@ -271,8 +271,8 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               <Field label="Transition (seconds)">
                 <input type="number" min={0} max={300} value={stage.transition} onChange={(e) => updateStage(editIndex, { transition: Math.max(0, Number(e.target.value) || 0) })} className={inputCls} />
               </Field>
-              <Field label="Preset">
-                <select value={stage.presetId ?? ''} onChange={(e) => updateStage(editIndex, { presetId: e.target.value || undefined })} className={inputCls}>
+              <Field label="Preset palette">
+                <select value={stage.presetId ? livePresetId(stage.presetId) : ''} onChange={(e) => updateStage(editIndex, { presetId: e.target.value || undefined })} className={inputCls}>
                   <option value="">Keep the current one</option>
                   {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>

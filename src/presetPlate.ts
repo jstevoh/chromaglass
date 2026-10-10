@@ -63,7 +63,6 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'acid-trip':          [18, 20, 2, 21, 17, 6],
   'bass-drop':          [4, 11, 20, 18, 9, 7],
   'timbre-shifter':     [23, 10, 16, 7, 17, 21],
-  'boiling-point':      [6, 5, 19, 16, 17, 0],
   'microscopic-chaos':  [20, 2, 10, 23, 18, 8],
   'aurora-borealis':    [19, 5, 6, 16, 7, 23, 10], // greens through ice to a violet, as the sky has
   'solar-flare':        [17, 0, 1, 21, 3, 4],
@@ -90,12 +89,12 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
+  'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
   'oil-on-water':       [0, 17, 1, 21],
   'colorful-cosmos':    [18, 10, 20, 2, 17, 21],
-  'sunny-side-up':      [7, 23, 10, 20, 2],
   // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye. The three
@@ -111,7 +110,6 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 17, 2, 20, 8, 16, 6],
   'soap-film':          [23, 20, 10, 7, 16, 17],
-  'glycerine-drift':    [18, 10, 20, 23, 21, 11],
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
@@ -123,7 +121,6 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'acid-trip':          ['splatter', 'spray'],
   'bass-drop':          ['splatter', 'drop'],
   'timbre-shifter':     ['spray'],
-  'boiling-point':      ['spray', 'splatter'],
   'microscopic-chaos':  ['drop'],
   'aurora-borealis':    ['streak', 'spray'],
   'solar-flare':        ['splatter', 'streak'],
@@ -143,13 +140,11 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'crowd-plate':        ['drop', 'pour'],
   'oil-on-water':       ['drop'],
   'colorful-cosmos':    ['pour'],
-  'sunny-side-up':      ['pour', 'drop'],
   'macro-bead':         ['drop', 'splatter'],
   'cell-bloom':         ['drop'],
   'lace-run':           ['pour', 'streak'],
   'milk-marble':        ['drop'],
   'soap-film':          ['pour', 'drop'],
-  'glycerine-drift':    ['pour', 'streak'],
   'oil-and-water':      ['drop', 'pour'],
   'red-cabbage':        ['drop'],
   'chemical-clock':     ['drop'],
@@ -157,6 +152,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
   'ferro-maze':         ['pour'],
   'ferro-paint':        ['drop', 'pour'],
+  'lava-lamp':          ['pour', 'drop'],         // wax poured in, a drop now and then to start a plume
   'roy':                ['pour', 'drop'],         // big flat shapes, and a drop now and then to break one
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
@@ -200,9 +196,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'bass-drop':          ['water', 'soap'],
   // This one is about colour and rotation; the plate should stay out of it.
   'timbre-shifter':     ['water'],
-  // A film breaking open is what boiling looks like from above, and alcohol
-  // is the liquid that answers the heat.
-  'boiling-point':      ['water', 'soap', 'alcohol'],
   'microscopic-chaos':  ['oil', 'silicone'],
   // Curtains have to drape rather than blow away: body, not tension.
   'aurora-borealis':    ['water', 'glycerine'],
@@ -234,8 +227,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'oil-on-water':       ['oil', 'silicone', 'water'],
   // Round drops that stay round for as long as the photograph does.
   'colorful-cosmos':    ['milk', 'oil'],
-  // Interference colour lives on a thin film, and soap is what thins it.
-  'sunny-side-up':      ['oil', 'soap'],
   // Razor edges and lacing on the same bead.
   'macro-bead':         ['silicone', 'milk'],
   // Silicone oil is literally how a pour painter makes cells.
@@ -245,10 +236,9 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Hands on the glass: every dancer breaks the film a little.
   'crowd-plate':        ['water', 'soap'],
 
-  // ── The three that only exist because the liquids do ─────────────
+  // ── The two that only exist because the liquids do ───────────────
   'milk-marble':        ['milk', 'milk', 'soap'],
   'soap-film':          ['soap', 'water'],
-  'glycerine-drift':    ['glycerine', 'water'],
 
   // ── The three that show off a part of the app ────────────────────
   // Oil will not wet the ferrofluid, so the pools stand apart from it.
@@ -259,6 +249,9 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'magnet-garden':      ['water', 'oil'],
   'ferro-maze':         ['water', 'oil'],
   'ferro-paint':        ['water', 'oil', 'water'],
+  // Wax that is heavier than the liquid round it, and a liquid thick enough
+  // that it falls in plumes rather than drops.
+  'lava-lamp':          ['glycerine', 'water'],
   // Poster, 1969's pair: two dyes that hold their own edge and refuse to
   // blend into a third, so a shape stays one ink with a line round it.
   'roy':                ['milk', 'ink'],

@@ -53,10 +53,11 @@ const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
-// The nine thin looks with music routed to rotation (src/presets.ts).
-const NINE = ['galaxy', 'cyberpunk', 'acid-trip', 'timbre-shifter', 'boiling-point',
+// The thin looks with music routed to rotation (src/presets.ts): nine when
+// this was written, eight since Boiling Point was retired (PLAN.md 28a).
+const THIN = ['galaxy', 'cyberpunk', 'acid-trip', 'timbre-shifter',
   'aurora-borealis', 'solar-flare', 'fractal-dream', 'stardust-collapse'];
-const LOOKS = argOf('looks', null)?.split(',') ?? NINE;
+const LOOKS = argOf('looks', null)?.split(',') ?? THIN;
 /**
  * `--patch '{"acid-trip":{"rotationSpeed":0.421}}'`: settings laid over a look
  * once it is open, to measure a look as another PR will ship it (#261 turns

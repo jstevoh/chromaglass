@@ -64,7 +64,7 @@ export function AddToSetSheet({ looks, saved, sequences, count, onAdd, onImport,
       <div className="flex h-full min-w-0 flex-1 flex-col gap-3 p-5">
         <Segmented
           value={tab}
-          options={[['look', 'Looks'], ['saved', 'Saved'], ['sequence', 'Sequences'], ['file', 'File']] as const}
+          options={[['look', 'Preset palettes'], ['saved', 'Saved'], ['sequence', 'Sequences'], ['file', 'File']] as const}
           onChange={v => { setTab(v as Tab); setFilter(''); }}
           height={32}
           testId="add-to-set-tab"

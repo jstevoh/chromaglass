@@ -205,7 +205,7 @@ try {
     // This desk's own list of them (QA-18a): it was in none before.
     const encore = list?.[0]?.id;
     const row = page.getByTestId(`perform-saved-${encore}`);
-    check('perform: listed under Your presets on this desk', await row.count() === 1 && (await row.innerText()).includes('Encore'));
+    check('perform: listed under Your preset palettes on this desk', await row.count() === 1 && (await row.innerText()).includes('Encore'));
     // A second, so a cue moves off the look that is live.
     await page.getByTestId('save-look').click();
     await page.getByTestId('save-name').fill('Last song');

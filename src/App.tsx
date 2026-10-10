@@ -40,7 +40,7 @@ import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liqu
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
 import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
-import { PRESETS } from './presets';
+import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
 import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
@@ -213,7 +213,8 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
 export const OPENING_LOOK: string = (() => {
   try {
     const asked = new URLSearchParams(window.location.search).get('look');
-    if (asked && PRESETS.some(p => p.id === asked)) return asked;
+    const named = asked ? findPreset(asked) : undefined;
+    if (named) return named.id;
   } catch { /* no window: the default below */ }
   const pool = PRESETS.filter(p => !p.settings.macroMode);
   return pool.length ? stream('show.opening').pick(pool).id : 'classic';
@@ -2214,7 +2215,7 @@ export default function App() {
   const cues = useMemo<Cue[]>(() => {
     return setList.items.map(item => {
       const seq = item.kind === 'sequence' ? sequencerRef.current?.sequences.find(q => q.id === item.ref) : undefined;
-      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === item.ref);
+      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
       const name = item.name ?? look?.name ?? seq?.name ?? item.ref;
       return {
         id: item.id,
@@ -2267,10 +2268,10 @@ export default function App() {
 
   const cueLook = useCallback((presetId: string) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = PRESETS.find(p => p.id === presetId);
+    const built = up ? undefined : findPreset(presetId);
     const settings = up ? up.settings : built?.settings;
     const name = up?.name ?? built?.name ?? presetId;
-    if (settings) setCued({ id: presetId, name, settings });
+    if (settings) setCued({ id: built?.id ?? presetId, name, settings });
   }, []);
 
   /** What a set item will send: its look with its own controls on top, or its sequence. */
@@ -2281,10 +2282,10 @@ export default function App() {
       return seq ? { id: `sequence:${seq.id}`, name: item.name ?? seq.name, settings: {}, sequence: seq.id, ...extra } : null;
     }
     const up = isUserPresetId(item.ref) ? userPresetsRef.current.find(p => p.id === item.ref) : null;
-    const built = PRESETS.find(p => p.id === item.ref);
+    const built = up ? undefined : findPreset(item.ref);
     const base = up ? up.settings : built?.settings;
     if (!base) return null;
-    return { id: item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
+    return { id: built?.id ?? item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
   }, []);
   const cueItem = useCallback((itemId: string) => {
     const item = setListRef.current.items.find(i => i.id === itemId);
@@ -2392,9 +2393,9 @@ export default function App() {
   /** The same, for a look that was never armed — the palette's ⇧⏎. */
   const goLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = PRESETS.find(p => p.id === presetId);
+    const built = up ? undefined : findPreset(presetId);
     const look = up ? { id: presetId, name: up.name, settings: up.settings }
-      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+      : built ? { id: built.id, name: built.name, settings: built.settings } : null;
     if (look) sendLook(look, seconds);
   }, [fadeSeconds, sendLook]);
   goLookNowRef.current = goLookNow;
@@ -2435,9 +2436,9 @@ export default function App() {
   /** The same, for a look picked straight from a list (the phone's looks sheet). */
   const backLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
     const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = PRESETS.find(p => p.id === presetId);
+    const built = up ? undefined : findPreset(presetId);
     const look = up ? { id: presetId, name: up.name, settings: up.settings }
-      : built ? { id: presetId, name: built.name, settings: built.settings } : null;
+      : built ? { id: built.id, name: built.name, settings: built.settings } : null;
     if (look) sendBack(look, seconds);
   }, [fadeSeconds, sendBack]);
 
@@ -3169,7 +3170,7 @@ export default function App() {
       if (up) applyUserPreset(up);
       return;
     }
-    const preset = PRESETS.find(p => p.id === presetId);
+    const preset = findPreset(presetId);
     if (preset) applyPreset(preset.id, preset.settings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -3803,7 +3804,7 @@ export default function App() {
       activePresetId,
       dyeIndex: selectedDyeIndex,
       presetColor: (id) => {
-        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[id];
+        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[livePresetId(id)];
         const idx = contract?.[0];
         return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
       },
@@ -3890,7 +3891,7 @@ export default function App() {
       return {
         id: `look-${pr.id}`,
         name: pr.name,
-        kind: 'Looks',
+        kind: 'Preset palettes',
         look: true,
         hint: (contract ?? []).map(i => PALETTE[i]?.name ?? '').join(' '),
         swatch: `linear-gradient(135deg, ${a}, ${b})`,
@@ -5393,7 +5394,7 @@ export default function App() {
           <button
             onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
             className="flex items-center gap-2 mt-0.5 py-1.5 -mx-1 px-1 rounded-lg group"
-            title="Choose a preset"
+            title="Choose a preset palette"
             aria-haspopup="menu"
             aria-expanded={presetMenu === 'title'}
             data-testid="preset-title-button"
