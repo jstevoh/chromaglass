@@ -193,8 +193,8 @@ interface SettingsPanelProps {
 /** What the room can be read for, in the order they are worth reaching for. */
 const SCENE_FEATURES: [SceneFeature, string][] = [
   ['motion', 'How busy'],
-  ['motionHighFreq', 'Twitch & Pop (Fast)'],
-  ['motionOverTime', 'Swell (Sustained)'],
+  ['motionHighFreq', 'How sudden'],
+  ['motionOverTime', 'How busy, lately'],
   ['crowd', 'How many'],
   ['spread', 'How spread out'],
   ['centroidX', 'Where — across'],
@@ -233,7 +233,7 @@ const PATCH_SOURCES: [PatchSource, string][] = [
  * The features a source offers.
  *
  * The room and the film are the same analysis over different pixels, so they
- * offer the same nine. The sound offers its own seven, and switching between
+ * offer the same list. The sound offers its own seven, and switching between
  * them has to change the list — "how many people" is not something a microphone
  * can tell you.
  */
@@ -3639,6 +3639,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         On a phone the rail becomes a strip across the top: 1000px of sheet on
         a 390px screen is the sheet's own `max-w-full`, and a 216px column
         taken out of that leaves nothing to put a slider in.
+
+        The tabs are full width only in the column. In the strip, a tab of
+        `w-full` took its group's whole width, the group being as wide as its
+        labels laid end to end, so each group's tabs ran on past it and lay
+        under the next group: measured at 390 px, the Inputs group's six tabs
+        spanned 140 to 3180 px in a group 505 px wide, and 13 of the 26 tabs
+        could not be tapped (`npm run phone`): Mixer, every Inputs tab but
+        Sound (Patches among them), three of Look's and four of Plate's.
       */}
       <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
 
@@ -3662,7 +3670,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     key={row.id}
                     onClick={() => { setSection(row.id); setQuery(''); }}
                     aria-current={!q && section === row.id ? 'page' : undefined}
-                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:whitespace-normal ${
+                    className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:w-full sm:whitespace-normal ${
                       !q && section === row.id
                         ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
                         : 'text-white/60 hover:bg-white/[0.05] hover:text-white'

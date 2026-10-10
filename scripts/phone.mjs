@@ -869,6 +869,65 @@ try {
         `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
 
       /*
+        The room's two newer readings (PLAN 20c): how sudden the floor's
+        motion is, and how long it has been busy. They are choices in the
+        patch bay, and the phone's patch bay is the desk's own Settings sheet
+        filling the screen, so the phone version is that sheet: a patch added
+        from the phone, pointed at each of them in turn, read back from the
+        show's settings (not the select's words, which a select wired to
+        nothing would still change), with the select inside the screen, and
+        the patch taken off again so the checks below play an unpatched look.
+      */
+      await tap(page, 'phone-open-more');
+      await tap(page, 'phone-settings');
+      /*
+        And every tab of the Settings rail can be reached at all. On the
+        phone the rail is a strip, and each tab used to take its group's
+        whole width and lie under the next group: 13 of 26 took no tap,
+        Patches among them. Each tab is scrolled to and asked whether its own middle is
+        what a finger there would land on.
+      */
+      const railCovered = await page.evaluate(() => {
+        const covered = [];
+        const tabs = [...document.querySelectorAll('[data-testid^="settings-nav-"]')];
+        for (const t of tabs) {
+          t.scrollIntoView({ block: 'nearest', inline: 'center' });
+          const r = t.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (!hit || !t.contains(hit)) covered.push(t.textContent);
+        }
+        return { tabs: tabs.length, covered };
+      });
+      check('every tab of the phone\'s Settings rail takes a tap where it is drawn',
+        railCovered.tabs > 20 && railCovered.covered.length === 0,
+        `${railCovered.tabs} tabs; ${railCovered.covered.length ? `covered: ${railCovered.covered.join(', ')}` : 'none covered'}`);
+      await tap(page, 'settings-nav-patches');
+      const mappings = () => page.evaluate(() => window.chromaglassDebug?.().settings?.sceneMappings ?? null);
+      const patchesBefore = (await mappings())?.length ?? null;
+      await tap(page, 'scene-map-add');
+      const patchAt = patchesBefore ?? 0;
+      const featureSelect = page.getByTestId(`patch-feature-${patchAt}`);
+      const featurePicked = [];
+      let featureFits = false;
+      if (await visible(page, `patch-feature-${patchAt}`)) {
+        const fb = await box(page, `patch-feature-${patchAt}`);
+        featureFits = !!fb && fb.x >= 0 && fb.x + fb.width <= (page.viewportSize()?.width ?? 0);
+        for (const f of ['motionHighFreq', 'motionOverTime']) {
+          await featureSelect.selectOption(f);
+          await page.waitForTimeout(200);
+          featurePicked.push((await mappings())?.[patchAt]?.feature ?? null);
+        }
+        await page.getByLabel('Remove mapping').nth(patchAt).tap();
+        await page.waitForTimeout(250);
+      }
+      const patchesAfter = (await mappings())?.length ?? null;
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      check('the room\'s How sudden and How busy, lately are patched from the phone\'s Settings: each lands in the show\'s patch, the select inside the screen, and the patch comes off again',
+        patchesBefore !== null && featureFits && featurePicked.join() === 'motionHighFreq,motionOverTime' && patchesAfter === patchesBefore,
+        `${patchesBefore} patches before; ${featureFits ? 'the select fits' : 'the select is off the screen or missing'}; the show's patch says ${featurePicked.join(', ') || 'nothing'}; ${patchesAfter} patches after`);
+
+      /*
         A back plate added and taken off from the Play sheet, on a look with
         one plate and on a look with two.
 

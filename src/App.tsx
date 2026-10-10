@@ -2009,9 +2009,21 @@ export default function App() {
     late writes from a preset moving the same setting underneath it.
 
     A frame rather than a timer, so the rate matches the one thing that can
-    show the value. The cost is that a backgrounded tab stops flushing, which
-    is fine: a backgrounded tab has stopped drawing the plate too, so there is
-    no show to be riding, and a pending move lands on the frame after it comes
+    show the value. PLAN 14f wants the split instead (the plate reading the
+    ride itself, the desk told ten times a second), and #348 tried it on a
+    100 ms timer with the plate overlaying the ride's values every frame. It
+    went back to this because the overlay never stopped once a fader had been
+    touched, the shadow outliving the flush by design: measured, one move and
+    a render later, 3600 frames of the next 3600 still copied the whole
+    settings object, and the fader's last value sat over the identified
+    track's override of the same key (the plate read 0.6 with the track
+    asking 0.9). 14f says what a split that holds needs. Until then a move
+    reaches the plate on the frame after React renders it, and nothing runs
+    while no fader moves.
+
+    The cost is that a backgrounded tab stops flushing, which is fine: a
+    backgrounded tab has stopped drawing the plate too, so there is no show
+    to be riding, and a pending move lands on the frame after it comes
     back.
   */
   const ride = useRef(new SettingRide()).current;
@@ -2022,16 +2034,14 @@ export default function App() {
     setDocDirty(true);
     laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
-  }, [ride]);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (!ride.waiting) return;
+    if (rideFrame.current) return;
+    rideFrame.current = requestAnimationFrame(() => {
+      rideFrame.current = 0;
       const patch = ride.drain();
       if (patch) setSettings(prev => ({ ...prev, ...patch }));
-    }, 100);
-    return () => clearInterval(id);
+    });
   }, [ride]);
+  useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
 
   // ── Cue and Go ────────────────────────────────────────────────────
   //
@@ -4262,7 +4272,7 @@ export default function App() {
       <LiquidVisualizer
         ref={visualizerRef}
         onBackLookCleared={backLookCleared}
-        audioData={audioData} hear={hear} settings={effectiveSettings} liveSettings={() => ride.peek()} seedCount={seedCount} spinFlick={spinFlick}
+        audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
         onAim={aimMacro}
         onPinchZoom={phone ? pinchZoom : undefined}

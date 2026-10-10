@@ -90,8 +90,6 @@ interface LiquidVisualizerProps {
    */
   hear?: () => AudioData | null;
   settings: VisualizerSettings;
-  /** A fast-path to pull un-rendered setting patches directly on the animation frame, avoiding 60fps React renders for MIDI. */
-  liveSettings?: () => Partial<VisualizerSettings> | null;
   seedCount?: number;
   /**
    * A flick of one plate: spin it up and let it coast down.
@@ -4577,7 +4575,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, hear, settings, liveSettings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
@@ -6387,9 +6385,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // One object, reused: a copy per frame of a hundred-key settings object
       // is sixty allocations a second for a show that runs for hours.
       const patch = patchRef.current!;
-      const live = liveSettings?.();
-      const base = live ? { ...settingsRef.current, ...live } as VisualizerSettings : settingsRef.current;
-      patch.fold(base, {
+      patch.fold(settingsRef.current, {
         room: clockIsFixed() ? null : sceneRef?.current ?? null,
         film: clockIsFixed() ? null : filmSenseRef?.current ?? null,
         sound: currentAudioData,
