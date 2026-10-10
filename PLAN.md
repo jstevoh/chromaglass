@@ -4806,6 +4806,17 @@ commit. *Size:* S.
 ### 19u. Nothing reaches main without the checks
 **Shipped** (2026-10-10, a branch ruleset on `main`, not code): nothing lands on `main` without a pull request and green `Measure` and `WebGPU (macOS)`, and the admin's bypass works only on a pull request, never on a push. The ruleset, why those two checks, and what is left are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+### 19v. Two checks that could not tell what they were asked
+**Shipped** (2026-10-10): the magnet's drag is laid out on the plate, off its middle row, and the Stage sheet's Esc is listened for once (`hooks/useEscape.ts`). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+
+- **19v-1. The show keys' listener comes off and goes back 11 times a second.** App's
+  keydown effect for Space, Backspace, 1–9 and the tool letters is keyed on `goLook`,
+  `cueAny` and the rest, which App makes afresh as the sound re-renders it (measured: 11
+  re-adds a second with nothing open). The same dispatch rule that could drop the Stage
+  sheet's Esc (19v) could drop a Space meant to send a look, if an earlier window listener
+  sets state on that key. Nothing ahead of it does today, so not seen; read its handlers
+  through a ref and listen once, as `desk/Desk.tsx` and `useEscape` do.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show

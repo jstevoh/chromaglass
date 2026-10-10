@@ -5262,6 +5262,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmGainRef = useRef(4.5);
 
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
+  /** A window point on the lead plate, in plate units, as a hand there would land (`chromaglassDebug().plateAt`). */
+  const plateAtRef = useRef<((clientX: number, clientY: number) => { x: number; y: number }) | null>(null);
   /**
    * A gesture from any hand, applied to the plate.
    *
@@ -10728,6 +10730,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The second phase (H7), for the harness. */
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
+          /**
+           * Where on the plate a hand at this window point would land (plate
+           * units, unrounded): the pointer's own mapping, turn and closeup and
+           * all, so `npm run magnet` can lay its drag out on the plate rather
+           * than across the window.
+           */
+          plateAt: (clientX: number, clientY: number) => plateAtRef.current?.(clientX, clientY) ?? null,
           magnetNow: () => lastMagnetRef.current,
           phaseLays: () => phaseLaysRef.current,
           readPhase: async () => {
@@ -10887,6 +10896,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
       }
       return { x: fx, y: fy };
+    };
+    plateAtRef.current = (clientX, clientY) => {
+      const p = fluidPointAt(clientX, clientY, drawnRect());
+      return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const p = fluidPointAt(clientX, clientY, rect);

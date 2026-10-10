@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
+import { useEscape } from '../../hooks/useEscape';
 import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import type { VisualizerSettings } from '../../types';
@@ -767,11 +768,8 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
    */
   docked?: boolean;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // Listened for once: an effect keyed on onClose could drop the key (useEscape).
+  useEscape(onClose);
   return (
     <div
       className={docked
