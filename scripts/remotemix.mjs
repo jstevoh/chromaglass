@@ -220,10 +220,14 @@ try {
 
   // ── S14n: One malformed message cannot end the plate (PLAN.md §14n) ──
   const settingsBefore = await shown();
-  const cacheBefore = await display.evaluate(() => window.chromaglassHexCacheSize?.() ?? 0);
+  const cacheBefore = await display.evaluate(() => {
+    if (typeof window.chromaglassHexCacheSize !== 'function') throw new Error('chromaglassHexCacheSize hook missing');
+    return window.chromaglassHexCacheSize();
+  });
   const governorBefore = await display.evaluate(() => {
     const g = window.chromaglassGovernor?.();
-    return g ? { rungs: g.ladder?.length, rungIndex: g.rungIndex } : null;
+    if (!g) throw new Error('chromaglassGovernor hook missing or null');
+    return { rungs: g.rungs?.length ?? 0, rungIndex: g.rungIndex, failed: g.failedCount ?? 0 };
   });
 
   // Send malformed patch and gesture over a controller socket
@@ -236,21 +240,23 @@ try {
     ws.onerror = reject;
   });
 
-  // 1. Send malformed patch: simResolution: "x", NaN, and unknown key
+  // 1. Send malformed patch: simResolution: "x", invalid types (null for numeric),
+  // unknown key, and a valid key (globalSpeed: 0.25) as positive control
   ws.send(JSON.stringify({
     type: 'patch',
     settings: {
       simResolution: 'x',
-      globalSpeed: NaN,
+      zoom: null,
       notARealSettingAtAll: 9999,
+      globalSpeed: 0.25,
     },
   }));
 
-  // 2. Send 1,000-character colour gesture and malformed blow gesture
+  // 2. Send 1,000-character colour gesture and malformed gestures (non-finite x/y/dx/dy)
   const longColor = '#' + 'f'.repeat(1000);
   ws.send(JSON.stringify({
     type: 'drop',
-    x: 0.5,
+    x: 'notANumber',
     y: 0.5,
     layer: 0,
     amount: 0.5,
@@ -263,31 +269,67 @@ try {
   ws.send(JSON.stringify({
     type: 'blow',
     x: 0.5,
-    y: 0.5,
+    y: 'notANumber',
     layer: 0,
     dx: 'notANumber',
     dy: 'alsoNotANumber',
   }));
 
   // Also call hexToRgb directly with 1,000-char colour to ensure it rejects caching
-  await display.evaluate((c) => window.chromaglassHexToRgb?.(c), longColor);
+  await display.evaluate((c) => {
+    if (typeof window.chromaglassHexToRgb !== 'function') throw new Error('chromaglassHexToRgb hook missing');
+    return window.chromaglassHexToRgb(c);
+  }, longColor);
 
   // Wait for batches to settle
-  await display.waitForTimeout(300);
+  await display.waitForTimeout(400);
 
   const settingsAfter = await shown();
-  const cacheAfter = await display.evaluate(() => window.chromaglassHexCacheSize?.() ?? 0);
+  const cacheAfter = await display.evaluate(() => {
+    if (typeof window.chromaglassHexCacheSize !== 'function') throw new Error('chromaglassHexCacheSize hook missing');
+    return window.chromaglassHexCacheSize();
+  });
   const governorAfter = await display.evaluate(() => {
     const g = window.chromaglassGovernor?.();
-    return g ? { rungs: g.ladder?.length, rungIndex: g.rungIndex } : null;
+    if (!g) throw new Error('chromaglassGovernor hook missing or null');
+    return { rungs: g.rungs?.length ?? 0, rungIndex: g.rungIndex, failed: g.failedCount ?? 0 };
   });
-  const hasLongColor = await display.evaluate((c) => window.chromaglassHexCacheHas?.(c) ?? false, longColor);
+  const hasLongColor = await display.evaluate((c) => {
+    if (typeof window.chromaglassHexCacheHas !== 'function') throw new Error('chromaglassHexCacheHas hook missing');
+    return window.chromaglassHexCacheHas(c);
+  }, longColor);
 
+  // Directly verify sanitizePatch rejects NaN and Infinity in JS
+  const nanDropped = await display.evaluate(() => {
+    if (typeof window.chromaglassSanitizePatch !== 'function') throw new Error('chromaglassSanitizePatch hook missing');
+    const res = window.chromaglassSanitizePatch({ globalSpeed: NaN, zoom: Infinity, boundaryContrast: -Infinity });
+    return Object.keys(res).length === 0;
+  });
+
+  // Verify 512-entry eviction
+  const cacheEviction = await display.evaluate(() => {
+    if (typeof window.chromaglassHexToRgb !== 'function') throw new Error('chromaglassHexToRgb hook missing');
+    if (typeof window.chromaglassHexCacheSize !== 'function') throw new Error('chromaglassHexCacheSize hook missing');
+    if (typeof window.chromaglassHexCacheHas !== 'function') throw new Error('chromaglassHexCacheHas hook missing');
+    const firstColor = '#000001';
+    window.chromaglassHexToRgb(firstColor);
+    for (let i = 2; i <= 600; i++) {
+      window.chromaglassHexToRgb('#' + i.toString(16).padStart(6, '0'));
+    }
+    const size = window.chromaglassHexCacheSize();
+    const hasFirst = window.chromaglassHexCacheHas(firstColor);
+    const hasLast = window.chromaglassHexCacheHas('#' + (600).toString(16).padStart(6, '0'));
+    return { size, hasFirst, hasLast };
+  });
+
+  check('valid setting in the same patch lands (positive control)', settingsAfter.globalSpeed === 0.25, `globalSpeed is ${settingsAfter.globalSpeed}`);
   check('malformed simResolution "x" is dropped', settingsAfter.simResolution === settingsBefore.simResolution, `simResolution is ${JSON.stringify(settingsAfter.simResolution)}`);
-  check('NaN globalSpeed is dropped', settingsAfter.globalSpeed === settingsBefore.globalSpeed && Number.isFinite(settingsAfter.globalSpeed), `globalSpeed is ${settingsAfter.globalSpeed}`);
+  check('null/invalid type in patch is dropped', settingsAfter.zoom === settingsBefore.zoom, `zoom is ${settingsAfter.zoom}`);
   check('unknown settings are dropped', !('notARealSettingAtAll' in settingsAfter), 'unknown key dropped');
-  check('governor ladder is untouched by malformed simResolution', JSON.stringify(governorAfter) === JSON.stringify(governorBefore), `${JSON.stringify(governorBefore)} → ${JSON.stringify(governorAfter)}`);
+  check('NaN and Infinity numbers are dropped by sanitizePatch', nanDropped, 'non-finite dropped');
+  check('governor ladder is untouched by malformed simResolution', governorBefore.rungs > 0 && JSON.stringify(governorAfter) === JSON.stringify(governorBefore), `${JSON.stringify(governorBefore)} → ${JSON.stringify(governorAfter)}`);
   check('1000-character colour is not cached in hexCache', cacheAfter === cacheBefore && !hasLongColor, `hexCache size ${cacheBefore} → ${cacheAfter}, in cache: ${hasLongColor}`);
+  check('hexCache caps at 512 entries and evicts oldest', cacheEviction.size === 512 && !cacheEviction.hasFirst && cacheEviction.hasLast, `size: ${cacheEviction.size}, oldest evicted: ${!cacheEviction.hasFirst}, newest present: ${cacheEviction.hasLast}`);
 
   ws.close();
 } catch (err) {

@@ -761,6 +761,8 @@ export interface SongShapeReport {
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
+  /** The quality governor running the show. */
+  governor: () => QualityGovernor | null;
   injectImage: (imageData: ImageData) => void;
   pourVideo: (video: HTMLVideoElement) => void;
   stopPourVideo: () => void;
@@ -5636,6 +5638,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   useImperativeHandle(ref, () => ({
     render: () => renderApiRef.current,
+    governor: () => governorRef.current,
     drawnRect: () => drawnRectRef.current?.() ?? null,
     /*
       Numbers, not a photograph.

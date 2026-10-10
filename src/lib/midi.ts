@@ -802,10 +802,17 @@ export function parseMidiMap(text: string): MidiMap {
     }))
     .filter(b => {
       if (b.target.kind === 'setting') {
-        const keyKnown = b.target.key in DEFAULT_SETTINGS;
-        const minOk = typeof b.target.min === 'number' && Number.isFinite(b.target.min);
-        const maxOk = typeof b.target.max === 'number' && Number.isFinite(b.target.max);
-        return keyKnown && minOk && maxOk;
+        const key = b.target.key;
+        if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) return false;
+        if (typeof (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[key] !== 'number') return false;
+        if (typeof b.target.min !== 'number' || !Number.isFinite(b.target.min)) return false;
+        if (typeof b.target.max !== 'number' || !Number.isFinite(b.target.max)) return false;
+        const spec = LEARNABLE_BY_KEY.get(key);
+        if (spec) {
+          b.target.min = spec.min;
+          b.target.max = spec.max;
+        }
+        return b.target.min <= b.target.max;
       }
       return true;
     });

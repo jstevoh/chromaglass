@@ -393,8 +393,9 @@ export default function App() {
         // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
         return settingsRef.current;
       };
-    (window as unknown as { chromaglassGovernor?: unknown }).chromaglassGovernor =
-      () => (visualizerRef.current as unknown as { governor?: unknown })?.governor ?? null;
+    (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
+      () => visualizerRef.current?.governor?.() ?? null;
+    (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
@@ -2018,6 +2019,7 @@ export default function App() {
   ride.observe(settings as unknown as Record<string, unknown>);
   const rideFrame = useRef(0);
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
     ride.write(String(key), value);
     setDocDirty(true);
     laterWrites.mark([String(key)], showNow());
@@ -2026,7 +2028,12 @@ export default function App() {
     rideFrame.current = requestAnimationFrame(() => {
       rideFrame.current = 0;
       const patch = ride.drain();
-      if (patch) setSettings(prev => ({ ...prev, ...patch }));
+      if (patch) {
+        const clean = sanitizePatch(patch);
+        if (Object.keys(clean).length > 0) {
+          setSettings(prev => ({ ...prev, ...clean }));
+        }
+      }
     });
   }, [ride]);
   useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
@@ -3541,8 +3548,9 @@ export default function App() {
           }
           break;
         case 'blow': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          if (typeof message.x !== 'number' || !Number.isFinite(message.x) || typeof message.y !== 'number' || !Number.isFinite(message.y)) break;
+          const x = message.x;
+          const y = message.y;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
@@ -3551,11 +3559,12 @@ export default function App() {
           break;
         }
         case 'drop': {
+          if (typeof message.x !== 'number' || !Number.isFinite(message.x) || typeof message.y !== 'number' || !Number.isFinite(message.y)) break;
           if (message.color !== undefined && (typeof message.color !== 'string' || message.color.length > 9)) {
             break;
           }
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          const x = message.x;
+          const y = message.y;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const color = typeof message.color === 'string' ? message.color : undefined;
@@ -3563,16 +3572,18 @@ export default function App() {
           break;
         }
         case 'press': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          if (typeof message.x !== 'number' || !Number.isFinite(message.x) || typeof message.y !== 'number' || !Number.isFinite(message.y)) break;
+          const x = message.x;
+          const y = message.y;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           visualizerRef.current?.applyGesture({ tool: 'press', x, y, layer, amount });
           break;
         }
         case 'finger': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          if (typeof message.x !== 'number' || !Number.isFinite(message.x) || typeof message.y !== 'number' || !Number.isFinite(message.y)) break;
+          const x = message.x;
+          const y = message.y;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
@@ -3582,8 +3593,9 @@ export default function App() {
         }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
         case 'spin': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
+          if (typeof message.x !== 'number' || !Number.isFinite(message.x) || typeof message.y !== 'number' || !Number.isFinite(message.y)) break;
+          const x = message.x;
+          const y = message.y;
           const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
           const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
           const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
@@ -3591,8 +3603,9 @@ export default function App() {
           break;
         }
         case 'tilt': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
+          if (typeof message.x !== 'number' || !Number.isFinite(message.x) || typeof message.y !== 'number' || !Number.isFinite(message.y)) break;
+          const x = Math.max(-1, Math.min(1, message.x));
+          const y = Math.max(-1, Math.min(1, message.y));
           visualizerRef.current?.setExternalTilt(x, y);
           break;
         }

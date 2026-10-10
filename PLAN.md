@@ -99,7 +99,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **1.1** **14m, then 14o** (A, M then S): the show key to loopback only, long and timing-safe,
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
   and limits, with the report Worker's (`docs/crash-plan.md`).
-- **1.2** **14n** (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks.
+- **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, this PR** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
 - **1.4** ~~**S14** (B, S): an error boundary per panel, desk and phone component, the plate
@@ -2905,7 +2905,9 @@ wrong keys lock the address out; a 1 MB frame is refused without the process gro
 silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
 socket's `patch` is dropped.
 
-### 14n. One malformed message can end the plate
+### ~~14n. One malformed message can end the plate~~
+
+**Shipped** (PR #322): one `sanitizePatch` against the settings registry for the socket, MIDI map loader and loaded looks; gestures dropped if non-finite; `hexCache` bounded with 512-entry eviction; verified with `npm run sanitize` and `npm run remotemix`.
 
 **Read in the code; the chain was followed by hand, not run.** The display applies a
 remote `patch` as it comes (`case 'patch': queuePatch(message.settings)` →

@@ -1,13 +1,24 @@
-import { DEFAULT_SETTINGS, type VisualizerSettings, type SimResolution } from '../types.ts';
+import {
+  DEFAULT_SETTINGS,
+  BLEND_MODES,
+  LED_MODES,
+  MACRO_CAMERA_MODES,
+  ON_NEW_SONG_MODES,
+  MIX_BLENDS,
+  VISCOSITY_MODES,
+  AUDIO_FEATURES,
+  type VisualizerSettings,
+  type SimResolution,
+} from '../types.ts';
 import { PIN_RANGE, onStep } from './deskPins.ts';
 
-const VALID_VISCOSITY = new Set(['thin', 'thick', 'water']);
-const VALID_BLEND_MODE = new Set(['screen', 'normal', 'multiply', 'overlay']);
-const VALID_LED_MODE = new Set(['rainbow', 'solid', 'pulse', 'audio']);
-const VALID_MACRO_CAMERA = new Set(['hold', 'follow', 'auto']);
-const VALID_ON_NEW_SONG = new Set(['preset', 'none']);
-const VALID_ROW_BLEND = new Set(['own', 'add', 'screen', 'mult', 'over']);
-const VALID_AUDIO_FEATURES = new Set(['volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity', 'none']);
+const VALID_VISCOSITY = new Set<string>(VISCOSITY_MODES);
+const VALID_BLEND_MODE = new Set<string>(BLEND_MODES);
+const VALID_LED_MODE = new Set<string>(LED_MODES);
+const VALID_MACRO_CAMERA = new Set<string>(MACRO_CAMERA_MODES);
+const VALID_ON_NEW_SONG = new Set<string>(ON_NEW_SONG_MODES);
+const VALID_ROW_BLEND = new Set<string>(MIX_BLENDS);
+const VALID_AUDIO_FEATURES = new Set<string>(AUDIO_FEATURES);
 
 // stockType is the only numeric setting in DEFAULT_SETTINGS outside PIN_RANGE
 const EXTRA_NUMERIC_RANGES: Record<string, { min: number; max: number; step?: number }> = {
@@ -114,10 +125,12 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
     // Object settings: sceneMappings
     if (key === 'sceneMappings' && Array.isArray(value)) {
       const validMappings = value.filter(m =>
-        m && typeof m === 'object' &&
+        m && typeof m === 'object' && !Array.isArray(m) &&
         (m.source === undefined || typeof m.source === 'string') &&
+        typeof m.feature === 'string' &&
         typeof m.setting === 'string' &&
-        typeof m.depth === 'number' && Number.isFinite(m.depth)
+        typeof m.depth === 'number' && Number.isFinite(m.depth) &&
+        (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer)))
       ).slice(0, 32);
       out.sceneMappings = validMappings;
       continue;
