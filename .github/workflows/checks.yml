@@ -318,6 +318,12 @@ jobs:
       - name: The popped bubbles
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run pops
+      # Blow's Amount from a breath that only ripples the colour to a gale (PLAN.md
+      # QA-20): no air taken in below the speed the surface tears at, as much as
+      # ever at the default, more past it, a rate a second; the straw as the breath.
+      - name: Blow's range
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run blowrange
       # Drops, not rings (PLAN.md batch 3): on a plate a current has crowded,
       # each drop its own colour, pressed flat where it touches, a swallowed
       # one kept inside and let go, and at 0 the rings' field to the bit.
@@ -961,7 +967,7 @@ jobs:
       # PLAN.md 0-bandbubbles): a fresh browser's first click starts the band,
       # and its kicks used to drop air near the middle whatever the dial said.
       # On the laptop and the phone at 0, and at the default, where they still
-      # must. About two minutes.
+      # must (listened to for a minute there, for enough chances). About three minutes.
       - name: Audio Impact 0 drops no bubbles
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: node scripts/kickbubbles.mjs

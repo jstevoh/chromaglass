@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import { layFinger } from '../lib/handSolid';
-import { layBreath } from '../lib/breath';
+import { layBreath, airTaken, spawnsOf, strawFlow, WIND_SPAWNS_PER_SECOND } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../lib/handCarry';
 import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
@@ -5339,8 +5339,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           af.blowWind(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
           af.blowPhase(x, y, remoteBlowRadius(amt, false), BLOW_STRENGTH * amt, 0, 0);
         }
-        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0 && DICE.hands.float() < 0.15 * amt) {
-          bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+        // The air it tears in, as the mouse's (lib/breath.ts, airTaken): 0.15 a message at the default, none from a gentle breath.
+        if (layer === 0 && (settingsRef.current.bubbles ?? 0) > 0) {
+          const taken = airTaken(amt);
+          const n = taken > 0 ? spawnsOf(0.15 * taken, DICE.hands.float()) : 0;
+          if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
         }
         break;
       case 'drop': {
@@ -7527,7 +7530,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   step and a fresh reading of the dye.
                 */
                 if (activeLayerRef.current === 0 && held && primary) {
-                  bubblesRef.current.blow(x, y, simStepS, k);
+                  // A volume a second through the straw, as the breath's speed (lib/breath.ts, strawFlow), not its stress.
+                  bubblesRef.current.blow(x, y, simStepS, strawFlow(k));
                   blowStepsRef.current.straw++;
                   // Before the hand's first move: a press held, or a drag that blew a straw where it began (tools.mjs).
                   if (!hand.blowDir.moved) blowStepsRef.current.strawFirst++;
@@ -7560,8 +7564,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (carried > 0) blowStepsRef.current.carries++;
                   // On a thin gap the moving wind is air on the film and carries nothing by hand (PLAN.md §15g).
                   if (af.lastBlowAired) blowStepsRef.current.aired++;
-                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0 && gestureFrameRef.current % 6 === 0) {
-                    bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2, 3 * GRID_SCALE);
+                  /*
+                    The air the breath tears into the liquid: none below the
+                    speed the surface holds against (a gentle breath), as
+                    often as it always was at the default, more in a gale,
+                    and so many a second, not a count every sixth step
+                    whatever the Amount (PLAN.md QA-20; lib/breath.ts,
+                    airTaken, has the physics and the numbers).
+                  */
+                  if (activeLayerRef.current === 0 && (currentSettings.bubbles ?? 0) > 0) {
+                    const taken = airTaken(k);
+                    const n = taken > 0 ? spawnsOf(WIND_SPAWNS_PER_SECOND * taken * simStepS, DICE.hands.float()) : 0;
+                    if (n > 0) bubblesRef.current.spawn(x, y, 1.2 * GRID_SCALE, 2 * n, 3 * GRID_SCALE);
                   }
                 }
 

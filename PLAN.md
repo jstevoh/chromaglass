@@ -133,7 +133,7 @@ Judged in this order, because these gate code:
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
   look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
-  ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles).
+  ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles; its Classic line listens a minute since #346, having counted under its 15 chances on 6 of 38 Mac runs in 25 s).
 - **2.6** ~~**P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).~~
   **Decided by the owner, 2026-10-06: delete.** The deletion is 3.1; 18a-9's and 22d's
@@ -304,7 +304,30 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
-- **QA-20** Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
+- ~~**QA-20** Blow amount isn't sensitive enough.~~ **Fixed, #346**: the moving wind
+  laid two bubbles every sixth step whatever the Amount (ten spawns a second at 60
+  steps, twenty at 120), and each bubble pumps the colour out from under it; the
+  straw's growth had a floor that made every Amount under about a fifth the same
+  breath. Now the wind takes air in only past the speed the surface tears at (the
+  blowing number ρ_air U²/2√(ρgσ) past 1, 5.4 m/s against a firm breath's 8: Amount
+  0.67), as often as before at the default, 6× at Amount 2 and 44× at 5 (the plate's
+  cover limit bounds it), a rate a second; the straw grows as the breath's speed
+  (`lib/breath.ts` airTaken, strawFlow; `npm run blowrange`). The wind's push already
+  went as the Amount squared, and still does (`npm run airblow` line 6: the pool moved 0.003% at Amount 0.05, 0.085% at 0.25, 2.72% at 1, 14.6% at 2.5 and 16.5% at 5 in software, where the colour goes with the hand). What follows is the report as it was:
+  Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
+- **QA-20a** The other tools' Amounts, read the same way: what each lays or moves at
+  0.05, 1 and 5 of its Amount, against what the dial's ends should mean (the Spray's
+  mist, the Press's pressure, the Finger's drag, capped at 0.25 in `fingerDrag`, so its
+  Amount stops doing anything past about 1.7). Found with QA-20; not measured yet.
+- **QA-20b** Blow's push on `npm run tools` (Mac) spreads widely from run to run: on
+  twelve runs of 9 and 10 October the stroke out to the left moved the pool 0.08% to
+  2.62% and the one to the right 0.28% to 2.11%, against the lab's 2.72% and 2.82%
+  (`npm run airblow`); #335's run went red on 0.08% against 0.15% to beat with 44 of 46
+  steps laid as air, on a branch that did not touch Blow. Not QA-20's bubbles: the
+  check runs with Bubbles 0 (`scripts/tools.mjs`, its settings). Neither the way (left
+  read lower on 8 runs, right on 4) nor the steps laid as air (44 to 54 where printed) follows it,
+  so the spread is in what the app does between the pointer's moves and the steps
+  (15g-7 is the same question); the next read is the stroke's breath per step, printed.
 
 - ~~**QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours).~~ #269
   live (PLAN 15i).
