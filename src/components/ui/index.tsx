@@ -691,8 +691,10 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 // ── Sheet ────────────────────────────────────────────────────────────
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false }: {
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right' }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
+  /** Which edge a docked sheet lies against: the side of the panel that opened it. */
+  dockSide?: 'left' | 'right';
   /**
    * Beside the plate rather than over it: no dimmed, blurred scrim, the panel
    * against the right edge, and the rest of the window still live. For a
@@ -712,7 +714,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
       className={docked
         // Between the desk's 48 px header and its 28 px status bar, so the
         // header's buttons and lights stay in reach and in view beside it.
-        ? 'pointer-events-none fixed bottom-7 right-0 top-12 z-50 flex items-stretch justify-end p-2'
+        ? `pointer-events-none fixed bottom-7 top-12 z-50 flex items-stretch p-2 ${dockSide === 'left' ? 'left-0 justify-start' : 'right-0 justify-end'}`
         : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 backdrop-blur-[4px] sm:p-6'}
       onClick={docked ? undefined : onClose}
       data-testid={testId ? `${testId}-scrim` : undefined}

@@ -371,10 +371,20 @@ function CuesBody({ p }: { p: DeskProps }) {
 
 /** The rides' column; the docked Mixer is its width, so it covers the rides and not the plate. */
 export const RIDES_WIDTH = 312;
+/** The left column's width (the cue list's, in Gig). */
+export const LEFT_WIDTH = 272;
 
 function RidesBody({ p }: { p: DeskProps }) {
   const [picking, setPicking] = useState(false);
   const [mixerOpen, setMixerOpen] = useState(false);
+  /*
+    The Mixer sheet lies over the rides, on whichever side they are, at that
+    column's width, so it covers none of the plate. With the Mixer out as a
+    panel of its own the button goes: one Mixer on screen, not two.
+  */
+  const where = whereIs(p.layout, 'rides');
+  const mixerOut = whereIs(p.layout, 'mixer') !== null;
+  const side = where === 'left' ? 'left' : 'right';
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
       <div className="flex h-9 shrink-0 items-center justify-end px-3">
@@ -449,20 +459,20 @@ function RidesBody({ p }: { p: DeskProps }) {
         a level is a ride. `npm run layout` asks that it covers none of the plate.
       */}
       <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
-        <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>
+        {!mixerOut && <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
         <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings">All settings…</Button>
       </div>
       <div className="flex shrink-0 gap-2 p-3">
         <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
-      {mixerOpen && createPortal(
+      {mixerOpen && !mixerOut && createPortal(
         /*
           Into the body, not the desk: the plate's frame is a fixed layer above
           the desk's own, so a sheet inside the desk opened under the plate.
           The width of the rides' column, less the docked sheet's 8 px margin,
           so it lies over the rides and not over the plate (PLAN.md §11 step 5).
         */
-        <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={RIDES_WIDTH - 8} height={900} testId="mixer-sheet" docked>
+        <Sheet title="Mixer" onClose={() => setMixerOpen(false)} width={(side === 'left' ? LEFT_WIDTH : RIDES_WIDTH) - 8} height={900} testId="mixer-sheet" docked dockSide={side}>
           <div className="min-h-0 w-full overflow-y-auto px-3 py-3">
             <PanelGuard name="The Mixer" inline onClose={() => setMixerOpen(false)}>
             <MixerPanel settings={p.settings} onSetting={p.onSetting} hasFilm={p.hasFilm} hasMark={p.hasMark} onFade={p.takes?.onFade} fading={p.takes?.fading} backLook={p.onGoBackPlate ? (p.backLook ?? null) : undefined} testId="desk-mixer" />

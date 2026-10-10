@@ -4,7 +4,7 @@ import { Button, PanelFrame, Segmented, Tag } from '../ui';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
 import { DeskHeader } from './DeskHeader';
-import { PanelBody, panelMeta } from './DeskPanels';
+import { LEFT_WIDTH, PanelBody, RIDES_WIDTH, panelMeta } from './DeskPanels';
 import { PanelBrowser } from './PanelBrowser';
 import {
   LAYOUT_LABEL, PANEL_BY_ID, closePanel, collapseAll, dockPanel, floatPanel, openPanel, openPanels,
@@ -39,7 +39,7 @@ import type { DeskProps } from './deskProps';
 /** The deck's height (the design's): taller in Build, where the knobs are the work. */
 const DECK_H = { build: 268, gig: 236, loadin: 236 } as const;
 const STRIP_H = 36;
-const COLUMN_W = { left: 272, right: 312 } as const;
+const COLUMN_W = { left: LEFT_WIDTH, right: RIDES_WIDTH } as const;
 
 /** What is being dragged by its grip, and where the pointer is. */
 interface Drag { id: string; x: number; y: number; x0: number; y0: number; moved: boolean }
@@ -52,6 +52,15 @@ export function Desk(p: DeskProps) {
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Tab hides every floating panel and shows them again: a look at the plate under them. */
   const [floatsHidden, setFloatsHidden] = useState(false);
+  // A panel floated, or another layout, shows them again: hidden floats are
+  // easy to forget, and a panel just floated that does not appear reads as broken.
+  useEffect(() => { setFloatsHidden(false); }, [l.floating.length, p.layoutName]);
+  /**
+   * A floating panel being moved or resized, held here until the hand lets
+   * go. Written to the layout on every pointer move it re-rendered the whole
+   * app and wrote storage sixty times a second, mid-show.
+   */
+  const [gesture, setGesture] = useState<{ id: string; x: number; y: number; w: number; h: number } | null>(null);
   const browserButton = useRef<HTMLButtonElement | null>(null);
 
   const openBrowser = useCallback(() => {
@@ -67,32 +76,40 @@ export function Desk(p: DeskProps) {
   }, [l, p.layoutName, onRelayout]);
 
   // ── Keys ────────────────────────────────────────────────────────────
-  const { onMode, onStage } = p;
+  /*
+    Read through a ref and listened for once. The handlers come from App,
+    which re-renders whenever the sound does, and an effect keyed on them took
+    the listener off and put it back nearly every frame.
+  */
+  const latest = useRef({ onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length });
+  latest.current = { onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const k = latest.current;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       const mod = e.metaKey || e.ctrlKey;
+      // The ⌘ keys work from a text field, as App's ⌘K and ⌘S do: the panel
+      // browser's own search has the focus while it is open, and ⌘P there
+      // has to close it, not print the page.
       if (mod && !e.shiftKey && !e.altKey && ['1', '2', '3'].includes(e.key)) {
         e.preventDefault();
-        onMode(e.key === '1' ? 'design' : e.key === '2' ? 'perform' : 'loadin');
-      } else if (mod && (e.key === 'p' || e.key === 'P') && !e.shiftKey) {
+        k.onMode(e.key === '1' ? 'design' : e.key === '2' ? 'perform' : 'loadin');
+        return;
+      }
+      if (mod && (e.key === 'p' || e.key === 'P') && !e.shiftKey) { e.preventDefault(); k.openBrowser(); return; }
+      if (mod && e.key === ',') { e.preventDefault(); k.onStage(); return; }
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.altKey && !mod && e.code === 'KeyD') {
         e.preventDefault();
-        openBrowser();
-      } else if (mod && e.key === ',') {
-        e.preventDefault();
-        onStage();
-      } else if (e.altKey && !mod && e.code === 'KeyD') {
-        e.preventDefault();
-        set(x => ({ ...x, deckCollapsed: !x.deckCollapsed }));
-      } else if (e.key === 'Tab' && !mod && !e.altKey && !e.shiftKey && l.floating.length > 0 && (!t || t === document.body)) {
+        k.set(x => ({ ...x, deckCollapsed: !x.deckCollapsed }));
+      } else if (e.key === 'Tab' && !mod && !e.altKey && !e.shiftKey && k.floats > 0 && (!t || t === document.body)) {
         e.preventDefault();
         setFloatsHidden(v => !v);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onMode, onStage, openBrowser, set, l.floating.length]);
+  }, []);
 
   // ── Dragging a panel by its grip ────────────────────────────────────
   /*
@@ -109,6 +126,7 @@ export function Desk(p: DeskProps) {
         if (!d || !d.moved) return null;
         const hits = document.elementsFromPoint(e.clientX, e.clientY);
         const zone = hits.find(h => (h as HTMLElement).dataset?.slot) as HTMLElement | undefined;
+        const set = latest.current.set;
         if (zone) {
           const slot = zone.dataset.slot as Slot;
           const across = slot === 'deck';
@@ -126,10 +144,18 @@ export function Desk(p: DeskProps) {
         return null;
       });
     };
+    // A cancelled pointer (a touch taken by the system, the window losing it)
+    // drops the drag where it began rather than leaving the drop zones up.
+    const cancel = () => setDrag(null);
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [drag !== null, set]); // eslint-disable-line react-hooks/exhaustive-deps
+    window.addEventListener('pointercancel', cancel);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+  }, [drag !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startDrag = (id: string) => (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -146,15 +172,27 @@ export function Desk(p: DeskProps) {
     if (!f) return;
     set(x => raiseFloating(x, id));
     const sx = e.clientX, sy = e.clientY;
+    const from = { id, x: f.x, y: f.y, w: f.w, h: f.h };
+    let at = from;
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      set(x => placeFloating(x, id, kind === 'move'
-        ? { x: Math.max(0, Math.min(window.innerWidth - 80, f.x + dx)), y: Math.max(48, Math.min(window.innerHeight - 40, f.y + dy)) }
-        : { w: Math.max(220, f.w + dx), h: Math.max(120, f.h + dy) }));
+      at = kind === 'move'
+        ? { ...from, x: Math.max(0, Math.min(window.innerWidth - 80, f.x + dx)), y: Math.max(48, Math.min(window.innerHeight - 40, f.y + dy)) }
+        : { ...from, w: Math.max(220, f.w + dx), h: Math.max(120, f.h + dy) };
+      setGesture(at);
     };
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    const end = (keep: boolean) => () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      // Written once, where the hand let go.
+      if (keep && at !== from) set(x => placeFloating(x, id, { x: at.x, y: at.y, w: at.w, h: at.h }));
+      setGesture(null);
+    };
+    const onUp = end(true), onCancel = end(false);
     window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
   };
 
   // ── One panel ───────────────────────────────────────────────────────
@@ -361,7 +399,7 @@ export function Desk(p: DeskProps) {
             className="min-w-[180px] flex-1 rounded-lg border border-dashed border-border-strong text-[13px] text-dim transition-colors hover:bg-hover hover:text-text-2"
             data-testid="deck-add"
           >
-            + Panel here{l.deck.length > 0 ? ' · or drag one from the browser' : ''}
+            + Panel here
           </button>
           {l.deck.length > 0 && (
             <button
@@ -394,17 +432,24 @@ export function Desk(p: DeskProps) {
       {/* ── Over the plate ────────────────────────────────────────── */}
       {!floatsHidden && l.floating.length > 0 && createPortal(
         <>
-          {l.floating.map((f, i) => (
+          {l.floating.map((stored, i) => {
+            const f = gesture?.id === stored.id ? gesture : stored;
+            // Kept on this window: a layout floated on a big display and
+            // opened on a laptop would otherwise put the panel off the edge.
+            const left = Math.max(0, Math.min(f.x, window.innerWidth - 80));
+            const top = Math.max(48, Math.min(f.y, window.innerHeight - 40));
+            return (
             <div
               key={f.id}
               className="fixed"
-              style={{ left: f.x, top: f.y, width: f.w, height: l.collapsed.includes(f.id) ? undefined : f.h, zIndex: 30 + i }}
+              style={{ left, top, width: f.w, height: l.collapsed.includes(f.id) ? undefined : f.h, zIndex: 30 + i }}
               onPointerDown={() => set(x => raiseFloating(x, f.id))}
               data-testid={`floating-${f.id}`}
             >
               {frame(f.id, { floating: true, className: 'h-full' })}
             </div>
-          ))}
+            );
+          })}
         </>,
         document.body,
       )}

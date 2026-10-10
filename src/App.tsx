@@ -550,6 +550,10 @@ export default function App() {
   const deskLayouts = useDeskLayouts();
   const layoutName = LAYOUT_OF_MODE(deskMode);
   const deskLayout = deskLayouts.layouts[layoutName];
+  const { update: updateLayout, reset: resetLayout } = deskLayouts;
+  // Stable, so the desk's drag and key listeners are not rebuilt on every render the sound causes.
+  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(layoutName, change), [updateLayout, layoutName]);
+  const onDeskReset = useCallback(() => resetLayout(layoutName), [resetLayout, layoutName]);
   /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
   const [showStage, setShowStage] = useState(false);
   /*
@@ -4011,7 +4015,9 @@ export default function App() {
 
       // The rest are the show's, and only while the desk is up: on the bench
       // Space should not fire a look change at a room.
-      if (!performing) return;
+      // Nor with the plate in Preview: the bar says "not on wall", so a key
+      // that sends a look to the room would make it a lie.
+      if (!performing || designing) return;
       if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
       if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
       // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
@@ -5560,8 +5566,8 @@ export default function App() {
         <Desk
           layoutName={layoutName}
           layout={deskLayout}
-          onLayout={(change) => deskLayouts.update(layoutName, change)}
-          onResetLayout={() => deskLayouts.reset(layoutName)}
+          onLayout={onDeskLayout}
+          onResetLayout={onDeskReset}
           renderSection={(id) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} })}
           sheetOpen={showSettings || showStage}
           onOpenSection={openSettingsAt}

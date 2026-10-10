@@ -951,7 +951,7 @@ Gig, Load-in), every panel docked, floated, folded or closed, knobs for encoders
 panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-shipped.md`
 §8; checks `npm run desklayout` and `npm run layout`).
 
-Open from Desk v2, each its own thread (Claude's lane, UI):
+Open from Desk v2, each its own thread (the UI lane):
 
 - **8-play** (M) The Play route of the design (`/play`, the README's second screen): the
   set list and the rides at a size a hand finds in the dark, for a show run from the

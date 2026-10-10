@@ -1057,7 +1057,7 @@ heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a togg
 `PerformDesk.tsx` and `DesignDesk.tsx` removed. Checks: `npm run desklayout` (new),
 `npm run layout` (extended).
 
-The owner's design (a Claude Design project, handed over as a zip) replaced the two
+The owner's design (a design project, handed over as a zip) replaced the two
 fixed desks with one desk whose cells are filled from a layout. Every settings section
 is a panel under its own id, beside the desk's own panels (cues, rides, recipe,
 bottles, dyes, tools, the phone link). A panel docks in the left or right column or the
