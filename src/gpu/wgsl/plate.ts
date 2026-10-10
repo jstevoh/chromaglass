@@ -998,119 +998,7 @@ fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool,
 // per-pixel work) because the relief pass takes screen-space derivatives of
 // the height field, which are undefined inside divergent branches.
 fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32) -> vec4f {
-  var col = colIn;
-  // The silhouette warp is meant to crinkle blob outlines, not to deform the
-  // cells themselves — bent circles read as lumps rather than as bubbles.
-  let cuv = fuv - macroWarpOffset(fuv) * 0.75;
-  let focus = 1.0 - dof * 0.85;
-  let paint = smoothstep(0.02, 0.20, alpha);
-
-  // ── Packed cells ────────────────────────────────────────────────
-  var core = 0.0; var rim = 0.0; var fineCore = 0.0; var fineRim = 0.0; var id = 0.0; var k = 0.0;
-  var cellSlope = vec2f(0.0);
-  if (U.macroCells > 0.005) {
-    let freq = U.logicalGrid / max(0.15, U.macroCellScale * 8.0);
-    let p = cuv * freq;
-    let f = flow * freq;
-
-    // Cells cluster in patches, the way pouring medium breaks out unevenly.
-    // Larger, higher-contrast patches: a real pour breaks out in cell-covered
-    // areas next to smooth ones, rather than pebbling the whole frame evenly.
-    let clumping = smoothstep(0.04, 0.26, alpha) * smoothstep(0.26, 0.60, fbm3(cuv * 8.0 + U.time * 0.015));
-    // Each generation as it resolves (see resolved): at the default Cell
-    // Size the coarse cells break out from about 2.5x to 5x, the fine ones
-    // from about 6x to 12x. Bigger cells show sooner, smaller ones later.
-    let cell = 1.0 / freq;
-    let seeCoarse = resolved(cell, 0.078, 0.156);
-    let seeFine = resolved(cell / 2.9, 0.065, 0.13);
-    k = U.macroCells * focus * clumping * seeCoarse;
-
-    // Coarse cells: two generations, half a cycle apart
-    let g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13, U.cellClock);
-    let g1 = cellField(p, f, 17.0, 3.2, 0.5, 0.13, U.cellClock);
-    // Union, not sum: adding two generations' masks welds their circles into
-    // compound blobs, while taking the stronger of the two keeps every cell
-    // round as it fades in over the one it replaces.
-    core = max(g0.core, g1.core);
-    rim = max(g0.rim, g1.rim);
-    id = select(g1.id, g0.id, g0.core > g1.core);
-
-    // Fine cells crowd into the gaps between the big ones, as they do in a
-    // real pour, and read as the grain of the film rather than as bubbles.
-    let h0 = cellField(p * 2.9 + 11.3, f * 2.9, 41.0, 2.1, 0.0, 0.16, U.cellClock);
-    let h1 = cellField(p * 2.9 + 11.3, f * 2.9, 63.0, 2.1, 0.5, 0.16, U.cellClock);
-    // The fine cells crowd the gaps the coarse ones leave, once those are there.
-    let gap = clamp(1.0 - core * 1.6 * seeCoarse, 0.0, 1.0);
-    // Everything below scales by k, which is whole by the time these begin
-    // to resolve (the fine cells are 2.9 times smaller).
-    fineCore = max(h0.core, h1.core) * gap * seeFine;
-    fineRim = max(h0.rim, h1.rim) * gap * seeFine;
-    cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap * seeFine;
-
-    let ring = mix(col, vec3f(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
-    // Cell cores are fluid lenses, not black holes! Instead of darkening them,
-    // we make them slightly deeper and richer in color, while preserving the
-    // specular rim. They act like oil bubbles revealing the paint underneath.
-    let coreLens = mix(col, col * vec3f(0.8, 0.9, 1.2), 0.5);
-    col = mix(col, coreLens, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
-    col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
-  }
-
-  // ── Lacing — thin dark filaments streaming along the flow ───────
-  var lace = 0.0;
-  if (U.macroLacing > 0.005) {
-    var dir = vec2f(1.0, 0.0);
-    if (length(flow) > 1e-5) { dir = normalize(flow); }
-    let nrm = vec2f(-dir.y, dir.x);
-    let q = vec2f(dot(cuv, dir) * U.logicalGrid * 0.35, dot(cuv, nrm) * U.logicalGrid * 3.2);
-    let n = fbm3(q + U.time * 0.03) - 0.5;
-    let line = 1.0 - smoothstep(0.0, 0.055, abs(n));
-    let edgeMask = (0.35 + 0.65 * smoothstep(0.08, 0.45, grad)) * smoothstep(0.04, 0.2, alpha);
-    // Filaments a fraction of a cell wide: they come through last.
-    lace = line * edgeMask * U.macroLacing * focus * smoothstep(4.0, 9.0, U.camZoom);
-    col = mix(col, col * 0.04, lace);
-  }
-
-  // ── Relief ──────────────────────────────────────────────────────
-  // The surface normal is assembled from three scales: the bead's own dome
-  // (from the solver-grid normal), the meniscus of every cell (analytic, from
-  // each cell's radial slope) and grooves where the lacing cuts in. Lit, this
-  // is what makes the frame read as a wet surface with depth instead of as
-  // flat colour.
-  if (U.macroRelief > 0.005) {
-    let r3 = U.macroRelief;
-    let tilt = cellSlope * k * 1.6 + vec2f(0.0, lace * 0.6);
-    // The grid normal is a gentle slope over many sim cells; scaled up it
-    // becomes the dome of the bead, which is what carries the large-scale
-    // sense of volume under the cell detail.
-    let n = normalize(vec3f(gridNormal.xy * 5.0 - tilt * r3 * 2.2, 1.0));
-
-    let L = lampDir(fuv, U.lamp);
-    let H = normalize(L + vec3f(0.0, 0.0, 1.0));
-    let diff = max(0.0, dot(n, L));
-    
-    let spec = pow(max(0.0, dot(n, H)), 80.0);
-    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.8);
-    // Recessed cores and grooves sit in their own shadow.
-    let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
-
-    // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
-    // without darkening it overall.
-    col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
-    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 1.2;    // wet highlight on the domes
-    col += col * fres * r3 * paint * 0.4;                      // bright refracting edge
-  }
-
-  // ── Dome shading — thickness across the bead as a whole ─────────
-  if (U.macroDepth > 0.005) {
-    let belly = smoothstep(0.05, 0.45, alpha);
-    col *= mix(1.0, 0.74 + 0.42 * belly, U.macroDepth * 0.8);
-  }
-
-  // Ink pooled in a cell core is opaque — let it read as true black rather
-  // than as the lit ground showing through.
-  let aOut = clamp(alpha + clamp(core * k, 0.0, 1.0) * 0.5 * paint, 0.0, 1.0);
-  return vec4f(col, aOut);
+  return vec4f(colIn, alpha);
 }
 `;
 
@@ -2306,41 +2194,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
     fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
   }
-  // The per-pixel tests mask the result instead of branching around the
-  // call: lacing measures two widths with fwidth, and WGSL reads a
-  // derivative across the whole quad or not at all.
-  if (U.lacing > 0.005) {
-    let laced0 = lacing(fluid0.rgb, layer0, fuv0, fluid0.a, U.lacing);
-    if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
-  }
-  if (plateOn && U.edgeRelief > 0.005 && sharp0) {
-    fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), plateAmt), fluid0.a);
-  }
+  
 
-  // ── Plate cells ───────────────────────────────────────────────
-  if (plateOn && U.cells > 0.005 && fluid0.a > 0.03) {
-    let cfreq = U.logicalGrid / 3.2;
-    // Slid in over the travel into the closeup rather than switched on with
-    // it: the flow comes on at the first notch of the zoom, and the plate's
-    // cells are as old as the plate's clock makes them.
-    let cflow = fluidFlow(vel0, fuv0) * cfreq * macroAmt;
-    let cg0 = cellField(fuv0 * cfreq, cflow, 0.0, 3.2, 0.0, 0.13, U.time);
-    let cg1 = cellField(fuv0 * cfreq, cflow, 17.0, 3.2, 0.5, 0.13, U.time);
-    let ccore = max(cg0.core, cg1.core);
-    var crim = cg1.rim;
-    if (abs(cg0.rim) > abs(cg1.rim)) { crim = cg0.rim; }
-    var centreW = 1.0;
-    if (U.dishSpread > 0.001) {
-      let casp = U.resolution.x / U.resolution.y;
-      let cc = vec2f(0.5 + 0.144 * U.dishSpread / casp, 0.5 - 0.02 * U.dishSpread);
-      centreW = 1.0 - smoothstep(0.25, 0.7, length((uvScreen - cc) * vec2f(casp, 1.0)) / (0.5 * mix(0.98, 0.66, U.dishSpread)));
-    }
-    let kc = U.cells * smoothstep(0.03, 0.35, fluid0.a) * centreW * plateAmt;
-    var rgb = fluid0.rgb * (1.0 - max(0.0, -crim) * 0.7 * kc);
-    rgb *= 1.0 + max(0.0, crim) * 0.35 * kc;
-    rgb = mix(rgb, rgb * 1.1 + vec3f(0.02), ccore * kc * 0.4);
-    fluid0 = vec4f(rgb, fluid0.a);
-  }
+  
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
@@ -2772,16 +2628,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
       fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
     }
-    // The per-pixel tests mask the result instead of branching around the
-    // call: lacing measures two widths with fwidth, and WGSL reads a
-    // derivative across the whole quad or not at all.
-    if (U.lacing > 0.005) {
-      let laced1 = lacing(fluid1.rgb, layer1, fuv1, fluid1.a, U.lacing);
-      if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
-    }
-    if (plateOn && U.edgeRelief > 0.005 && sharp1) {
-      fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), plateAmt), fluid1.a);
-    }
+    
 
     if (closeup) {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);

@@ -306,6 +306,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(9) var<storage, read_write> mob: array<f32>;
 @group(0) @binding(10) var species: texture_2d<f32>;
+@group(0) @binding(11) var film: texture_2d<f32>;
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -340,8 +342,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     \`species\` is 1×1 and empty with nothing poured.
   */
   let sp = textureLoad(species, min(q, vec2i(textureDimensions(species)) - 1), 0);
+  let fm = textureLoad(film, min(q, vec2i(textureDimensions(film))) - 1, 0).r;
   let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
-  let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
+  let totalShare = clamp(sp.r + fm, 0.0, 1.0);
+  let lnSyrup = 7.02; // Approximation for syrup/glycerine viscosity log
+  let poured = exp(clamp(sp.g + fm * lnSyrup - totalShare * lnClear, -9.0, 9.0));
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured;
   var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
