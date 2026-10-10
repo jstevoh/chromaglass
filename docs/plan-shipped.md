@@ -1089,9 +1089,9 @@ What was kept, and why:
   is gone under a desk); the recipe leaves Evolve and All settings to the rides when
   both are out.
 
-Measured: `npm run layout` 39 → 55 checks, all green, at 1440/1280/1024 and phone
-widths, with 33 of 33 panels docked at once (513 controls) readable; `npm run desklayout`
-37/37 (it found two real faults in `sanitizeLayout` on its first run: a panel twice in
+Measured: `npm run layout` 39 → 58 checks, all green, at 1440/1280/1024 and phone
+widths, with all 33 panels docked at once (511 controls) each drawing its body; `npm run desklayout`
+40/40 (it found two real faults in `sanitizeLayout` on its first run: a panel twice in
 one list kept both, and a stored array read as an empty layout). `panel` 180/180,
 `desk`, `saves` 33/33, `phone` 292/292, `remotemix`, `rowfade`, `backplate`, `intro`
 12/12 unchanged in what they assert.
