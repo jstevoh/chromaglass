@@ -198,6 +198,13 @@ export class BeadField {
   private dropAmt = 0;
   /** The colours drops are dyed from: the look's palette, as seen (0..1). */
   private palette: [number, number, number][] = [];
+
+  /**
+   * Viscosity ratio lambda = mu_drop / mu_carrier (PLAN 18i).
+   * In a thin gap, an oil pancake drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
+   * At default lambda = 1.5, 2 / (1 + 1.5) = 0.8, matching the measured light show mineral oil.
+   */
+  viscosityRatio = 1.5;
   /** The drop mask's pixels and its scratch, kept between frames (see `rasterDrops`). */
   private dropPixels: Uint8ClampedArray | null = null;
   private dropOwn: Float32Array | null = null;
@@ -412,11 +419,12 @@ export class BeadField {
     const N = this.grid;
     const bs = this.beads;
     if (bs.length === 0) return;
+    const dropSpeed = 2 / (1 + this.viscosityRatio);
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
-      // Heavier than the dye: they lag the flow and drift little on their own.
-      b.x += (vx * CELLS_PER_UNIT * 0.8 - tiltX * 500) * dt + this.rng.centred() * 0.15;
-      b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + this.rng.centred() * 0.15;
+      // In a Hele-Shaw cell, a viscous drop lags the depth-mean flow: 2U / (1 + lambda)
+      b.x += (vx * CELLS_PER_UNIT * dropSpeed - tiltX * 500) * dt + this.rng.centred() * 0.15;
+      b.y += (vy * CELLS_PER_UNIT * dropSpeed - tiltY * 500) * dt + this.rng.centred() * 0.15;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
       if (b.sx !== undefined) {
