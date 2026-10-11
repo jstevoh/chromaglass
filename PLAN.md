@@ -6041,6 +6041,48 @@ Turing Print" work (#331), which also made the reaction grow at all.
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
 
+- **28g. Follow a known song played live, by what is heard, not by the clock** (the owner,
+  2026-10-11: "if we pre record the shape of the song, how can we map that to a different
+  sounding and sometimes improvisational version of the same song?"). A song map
+  (`songMap.ts`) is read by playback position, so it fits only the recording it was made
+  from. Instead keep the map's harmony, follow the room by it whatever the tempo and the
+  instruments, let the form change (a chorus twice, a verse left out, a solo that runs
+  long), and fall back on the live song shape when the match is weak. What it buys: the
+  show knows the chorus is next and can lean into the build before it is heard. Not a
+  preset patch source (28f: patches use fast readings only).
+  - **28g-1. The follower and its check** (**shipped**, this PR). `chroma.ts`: a twelve-
+    note profile, read from the analyser's tonal peaks (parabolic-refined) on a per-bin
+    quarter-second median (drums dropped), the same arithmetic in the ear
+    (`AudioReading.chroma`) and in the map (`mapChroma`, stored with every new map as
+    `SongMap.chroma`). `songFollow.ts`: the forward algorithm over a place × tempo grid
+    (0.6–1.6×), the form as transitions at the map's section ends, a leak for jumps the
+    form did not offer, a start prior, and confidence = match quality × agreement.
+    `npm run songfollow` (Measure, logic): takes 15% slower and faster on other
+    instruments 100% of hops within a bar of the very place, tempo within 3%; a band
+    speeding up 100 to 140 bpm with a bar of silence, 100%; bridge skipped, chorus
+    repeated, solo doubled, a 16-bar jam: back within 0.7–1.8 bars; joined at the second
+    verse, found in 1.9 bars; confidence 0.07 in the jam against 0.92 where followed.
+    `anchor(mapSec)` is the score's nudge (28h). The ear's frame costs 5 µs more (237 to
+    242 in node). Not wired into the show yet (28g-2).
+  - **28g-2. Use it live, with the fallback.** Run the follower in the frame loop when a
+    map with `chroma` is followed; when confidence is under about a third, the show leans
+    on `songShape.ts`; desk and phone show which map is followed and its confidence.
+  - **28g-3. The show leans into what the map says is next** (Pacing/sequencer), and a map
+    made from a file (the band's rehearsal, last night's set; §17 "hear the set ahead").
+  - **28g-4. Found along the way: the worker's sections are coarse.** On the check's song
+    `segment()` (`songMapAnalysis.ts`) found six sections where nine were played, one
+    "chorus" spanning verse, chorus, verse, chorus (18–73 s). The follower survives it
+    (the leak finds what the form did not offer) but its jumps land best on true section
+    starts; segment by the map's harmony at bar scale. Measured: on today's sections the
+    jumps do nothing (no jumps, same numbers); on the record's true sections a repeated
+    chorus is found 1.2 bars in against the leak's 1.4. Keep the jumps if better sections
+    make them earn more, else remove them.
+  - **28g-5. Found along the way: another key.** A band that tunes down a half step, or
+    plays the song in another key, rotates the whole profile; the follower would read it
+    as a jam. Try the twelve rotations when confidence stays low and the profile is tonal.
+  - **28g-6. Found along the way: maps made before 28g-1 have no harmony.** They follow
+    nothing until the song is heard again and its map remade.
+
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
