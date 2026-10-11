@@ -77,6 +77,10 @@ const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
+  // How far the music moves the frame (lib/plateRock.ts): a wander would
+  // start the frame sliding under the viewer by itself, the very thing the
+  // owner turned off (2026-10-11).
+  'frameSway',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*
