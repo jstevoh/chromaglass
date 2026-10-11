@@ -24,6 +24,8 @@
  *      shows (each laid on its look, then on the defaults, as the app lays
  *      them), Frame Sway is 0 and nothing moves the frame: the cover never
  *      slides, the lamp never follows the rock, the beat turns nothing.
+ *      And nothing but a hand turns it on: no look routes sound or a scene to
+ *      it, Evolve never drifts it, Lucky never rolls it.
  *   2. And it is the dial doing that, not a song that never kicked: the same
  *      look with Frame Sway at full slides the picture as #347 did (the
  *      default look at least 0.05% of the plate a frame at its peak), half
@@ -52,6 +54,8 @@ await build({
       "export { DEFAULT_SETTINGS } from './src/types.ts';",
       "export { PRESETS } from './src/presets.ts';",
       "export { builtInSequences } from './src/lib/sequencer.ts';",
+      "export { DRIFTABLE, driftLook } from './src/lib/drift.ts';",
+      "export { luckyLook } from './src/lib/lucky.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
   },
@@ -122,6 +126,22 @@ for (const { name, S } of looks) {
 console.log(`   ${looks.length} looks and show stages, ${rocked} with Plate Rock up; as #347 shipped (Frame Sway at full, what every look had), the worst slid the picture ${pc(worstBefore.slidePeak)} of the plate in a frame (${worstBefore.name})`);
 check('every shipped look and show stage holds the frame still: no cover slide, no lamp on the rock, no beat turn, on any frame of the song',
   moved.length === 0 && looks.length > 20, moved.length ? moved.slice(0, 4).join('; ') : `${looks.length} of ${looks.length} still`);
+
+/*
+  And nothing but a hand turns it on (the owner, 2026-10-11: "It's fine if
+  this is a setting, but this should never be the default experience"): no
+  look routes a sound or a scene to it, Evolve never drifts it (a hundred
+  drifts of the default look leave it at 0), and Lucky never rolls it (a
+  hundred rolls from the defaults).
+*/
+const routed = L.PRESETS.filter((p) => [...(p.settings.sceneMappings ?? []), ...(p.settings.soundMappings ?? [])].some((m) => m?.setting === 'frameSway')).map((p) => p.id);
+let drifted = { ...L.DEFAULT_SETTINGS }, driftOn = 0;
+for (let i = 0; i < 100; i++) { drifted = { ...drifted, ...L.driftLook(drifted, L.DEFAULT_SETTINGS, 1) }; if ((drifted.frameSway ?? 0) !== 0) driftOn++; }
+let luckyOn = 0;
+for (let i = 0; i < 100; i++) { let r = i + 1; const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647); if ((L.luckyLook({ ...L.DEFAULT_SETTINGS }, ['#ff0000'], rand).frameSway ?? 0) !== 0) luckyOn++; }
+check('and only a hand turns it on: no look routes sound or a scene to it, Evolve never drifts it, Lucky never rolls it',
+  routed.length === 0 && !L.DRIFTABLE.includes('frameSway') && driftOn === 0 && luckyOn === 0,
+  `routed by ${routed.length ? routed.join(', ') : 'no look'}; driftable ${L.DRIFTABLE.includes('frameSway')}; on after ${driftOn} of 100 drifts, ${luckyOn} of 100 rolls`);
 
 // ── 2. The dial, and the liquid's own rock ─────────────────────────────
 const base = { ...L.DEFAULT_SETTINGS };
