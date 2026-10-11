@@ -6060,6 +6060,15 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (2026-10-11) chose to fix every look and retire none. The black and the combed lines
     are Antigravity's, written up with times in `docs/showreel-findings.md`; the
     breakdown, Classic, the five dim looks and the four untrue names are Claude's.
+- **28f. Every look answers the music through its own patches** (the owner, 2026-10-11: use
+  the patch bay so the looks answer the music more by default; the whole plate may move with
+  the music on a small named set of looks, never as the default). Brief and findings in
+  `docs/sound-patches.md`. Step 1: the four patches that never fire (bands names under
+  `source: 'sound'`) and comet's depth of 45; sound to frame motion an opt-in per look on a
+  short list, held by `npm run framesway`. Step 2: song shape (section, build, drop,
+  breakdown, hit strength, pitch) patchable, desk and phone. Step 3: two or three liquid
+  patches per look, section sources first, judged on the showreel (Antigravity; Claude writes
+  the first three as the pattern).
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
