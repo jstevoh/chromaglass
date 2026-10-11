@@ -353,7 +353,6 @@ const SWIRL_SPIN_MIN = 0.05;
 const SPIN_OIL_LIGHT = 0.12;
 const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
-const DYE_ITERS = 4;
 /*
   How much of the grid's checkerboard the dye loses a step, the diffusion's
   share included (dampGrid). A twentieth: the grating the closeup showed is
@@ -679,6 +678,7 @@ export class WebGPUFluid {
   private readonly rbVel: Float32Array;
 
   private grainAge = 0;
+  private heatSeconds = 0;
   private disposed = false;
   /** Per-pass GPU times under ?debug. */
   readonly profiler: GpuProfiler;
@@ -1538,6 +1538,7 @@ export class WebGPUFluid {
 
   /** Wipe the plate: no dye, no motion, the gap at rest. */
   clear(): void {
+    this.heatSeconds = 0;
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
@@ -2149,10 +2150,25 @@ export class WebGPUFluid {
       with diffusionRate at 0 with no heat spreading at all. Now heat has its
       own physical diffusivity term. doubleDiffusion raises the heat's alone
       to simulate double-diffusive convection (salt fingers).
+
+      Precision: in rgba16float (FP16), heat's per-step change at real κ is below
+      half-float precision (~0.0009 cells²/step, truncating to 0.0% on SwiftShader).
+      The step's duration in physical seconds is `seconds` (from magnetSeconds).
+      We accumulate `heatSeconds` until the accumulated heat diffusion coefficient
+      reaches ≥ 0.02, where half-float changes survive quantization without loss,
+      or whenever doubleDiffusion is elevated.
     */
     const doubleDiff = Math.max(0, Math.min(1, p.doubleDiffusion ?? 0));
-    const heatDiff = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff);
-    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * heatDiff * n2, 0];
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    this.heatSeconds += seconds;
+    const heatRate = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff) * n2;
+    const heatA = this.heatSeconds * heatRate;
+    let heatVisc = 0;
+    if (heatA >= 0.02 || doubleDiff > 0) {
+      heatVisc = heatA;
+      this.heatSeconds = 0;
+    }
+    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, heatVisc, 0];
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
     }, visc.some((v) => v > 0));
@@ -2395,36 +2411,46 @@ export class WebGPUFluid {
         this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
-    // 9. Dye: dispersion along the flow (Taylor–Aris dispersion) plus molecular diffusion
+    // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h)
     /*
-      Replaces isotropic Jacobi diffusion with real Taylor–Aris dispersion along
-      the depth-mean flow (PLAN 18h). Transverse to the flow, diffusion is
-      purely molecular (Dm ~ 4e-10 m²/s), so dye stays sharp where it is still
-      and holds crisp edges across streamlines. Along the flow, shear across the
-      gap spreads dye as D_L ≈ Dm + h²|u|²/(210 Dm), forming natural streaks.
-      Discretised as a conservative finite-volume face flux, exactly conserving dye.
+      Molecular diffusion of food dye in water (Dm ≈ 4e-10 m²/s) is negligible
+      on show timescales, holding crisp edges across streamlines. Along the flow,
+      the Poiseuille parabolic velocity profile across the gap (u(z) = 1.5 ū (1 - 4z²/h²))
+      shears dye columns into parabolic sheets with variance σ² ≈ 0.2 |ū|² (Δt)².
+      On show timescales (t ≪ h²/Dm ≈ 25 hours), diffusion has not homogenized
+      across the 6 mm gap, so the flow is in the unsteady shear dispersion regime
+      rather than the asymptotic Taylor–Aris limit.
+
+      Shortcut: In this 2D depth-averaged solver, the depth z is not resolved.
+      We model along-streamline shear spreading as an anisotropic diffusion tensor
+      D_L = Dm + κ_T (h/h0)² |v_cells|² capped at 0.25 cells²/step (the von Neumann
+      positivity limit for 2D explicit face fluxes). κ_T = 0.45 models the
+      Poiseuille shear variance and flow-parallel stretching.
+      Molecular diffusion Dm scales with the Diffusion Rate slider (p.diff), but
+      shear dispersion κ_T is intrinsic to the flow shear and does not ride that slider.
     */
     const diffScale = p.diff > 0 ? p.diff / 0.0002 : 0;
     const dm = (D_MOLECULAR / (PLATE_METRES * PLATE_METRES)) * p.dt * n2 * diffScale;
     const dispCells = disp * (N - 2);
-    const kappaT = 0.5 * diffScale;
+    const kappaT = 0.45;
+    const dispCap = 0.25;
     stage('dye disperse', (pass) => {
       this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
-        this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, 0.35, 0, 0, 0]));
+        this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
       this.dye.swap();
       if (bodiesOn && !bodiesFresh) {
         const od = this.oilDye!;
         // Keep oil's pre-dispersion share in scratchB for bodyUnspread
         this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
         this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
-          this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, 0.35, 0, 0, 0]));
+          this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
         od.swap();
         this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
         this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
         this.dye.swap();
         od.swap();
       }
-    }, p.diff > 0);
+    }, dispCells > 0 || dm > 0);
     /*
       The poured liquids' species rides the colour's carry when it can (PLAN
       18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found
@@ -2574,14 +2600,11 @@ export class WebGPUFluid {
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Jacobi above removes about 8a/(1+8a)
-      of it a step (what a converged solve would; four sweeps take less at
-      large a, about 9% at 1024² and a ≈ 10, still above GRID_DAMP): most
-      of it in the looks with strong diffusion, none in the eleven with none (Red Cabbage, Classic,
-      Fillmore, Oil & Water, Agate, the ferrofluids…), and a few percent in
-      the slow ones with a little (Galaxy at 512², 3%). So this takes only
-      what the diffusion leaves short, and is not run at all where it leaves
-      nothing: the looks the diffusion already clears are as they were.
+      GRID_DAMP a step in every look. Previously, isotropic Jacobi diffusion
+      removed about 8a/(1+8a) of it a step. Now with physical molecular diffusion
+      Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
+      nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
+      elevated diffusion, keeping high-frequency grid modes smoothly damped.
     */
     const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);

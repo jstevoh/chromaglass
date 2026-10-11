@@ -4350,30 +4350,12 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **Gain:** a show ages the way a real plate does. It turns over, and it can dry.
 
 ### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+**Partly shipped** (#357): single explicit finite-volume shear dispersion stage (`dyeDisperse`) replaces 4-iteration isotropic Jacobi diffusion; molecular diffusion $D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$ holds sharp edges across streamlines while along-stream shear spreads streaks; water thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$) decoupled from dye diffusion slider; measured by `npm run dispersion` (6/6). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-- **Where:** Jacobi dye diffusion with one constant for every colour (the Diffusion Rate
-  blur at default 0.0002 measured an effective D of about 1.7e-5 m²/s in the lab, roughly
-  40,000× food dye in water ~4e-10 m²/s, not "about 1000×" as originally written; heat
-  previously shared the dye's number, leaving 12 looks with 0 heat spreading); the
-  MacCormack Jacobian clamp and neighbourhood cap (`fluid.ts` advection), which lose
-  the excess; `sharpenDye`, retired (0 by default) but still in the step.
-- **The real phenomenon:** molecular diffusion is negligible at this scale. The blur in
-  a Hele-Shaw cell is Taylor–Aris dispersion along the flow,
-  D_L ≈ D_m + h²|u|²/(210 D_m). Edges stay sharp where the liquid is still and streak
-  where it moves. Heat spreads at water's own thermal diffusivity (κ ≈ 1.4e-7 m²/s, Le ≈ 350).
-- **What it takes:** the dye moved in flux form (`bodyAdvect` exists), and one or two
-  explicit passes of dispersion with a tensor built from u⊗u. The Jacobian patch exists
-  because the transport field is divergent (the noise after the projection and the
-  depth multiply), so it can go with 18a.
-- **Cost:** about the same as today's diffusion (1.3 ms where it runs), or 0.3–0.6 ms
-  explicit. Single explicit pass measured at 0.39 ms (2.0% share), saving ~0.9 ms vs Jacobi.
-- **Gain:** streaks along the flow, and conserved dye. Honest: a minmod flux carries
-  fine threads a little softer than MacCormack, and the plate's detail table
-  (`npm run detail`) has to hold.
-- **Shipped (#357):** replaced 10-iteration Jacobi dye diffusion with single explicit conservative
-  finite-volume Taylor dispersion (`dyeDisperse`) with molecular diffusion D_m = 4e-10 m²/s and
-  longitudinal dispersion along depth-mean flow; decoupled heat diffusion to real water thermal
-  diffusivity κ = 1.4e-7 m²/s in viscosity stage. Checked by `npm run dispersion`.
+Left from 18h, each its own item:
+
+- **18h-1. Flux-form dye transport and removal of MacCormack clamp.** The dye advection stage currently uses MacCormack backtracing with neighbor bounding clamps, which causes minor mass drift (~0.4% over 60 steps) under shear flow. Moving dye advection to a conservative flux form across faces will allow removing the clamp and guaranteeing exact mass conservation during both advection and dispersion.
+- **18h-2. Pre-asymptotic shear modeling without cap shortcut.** On show timescales ($t \ll 25\text{ hours}$ across 6 mm gap), shear dispersion is in the unsteady pre-asymptotic regime ($\sigma^2 \approx 0.2 v^2$). The current implementation models this via an anisotropic tensor capped at 0.25 cells²/step (the von Neumann limit for explicit face fluxes). A multi-layer or sub-stepped flux scheme would allow un-capped shear dispersion across arbitrarily fast flows.
 
 ### 18i. Bubbles and beads live by physics, not timers
 

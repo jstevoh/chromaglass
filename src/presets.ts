@@ -1498,6 +1498,7 @@ export const PRESETS: Preset[] = [
       ledColor: '#000000',
       ledSpeed: 0.0,
       diffusionRate: 0.00004,      // near-zero: food colouring on milk does not bleed on its own
+      transmission: 0.85,          // prevent flecks on lamp ground across steep dye edges (PLAN 18l-7, npm run grainedge)
       buoyancy: 0.05,
       advection: 0.5,
       damping: 0.985,

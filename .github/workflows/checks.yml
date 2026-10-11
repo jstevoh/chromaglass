@@ -824,6 +824,11 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
+      # Dye spreads along the flow via shear dispersion (PLAN 18h): streaks
+      # along flow lines while holding sharp cross-stream edges, conserved exactly.
+      - name: Dye dispersion along the flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run dispersion
       # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
       # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter

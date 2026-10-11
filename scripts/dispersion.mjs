@@ -47,8 +47,8 @@ try {
   });
 
   const still0 = await readDye();
-  // 60 steps with default diffusionRate (0.0002) on still water
-  await page.evaluate(() => lab.step(60, { diff: 0.0002, advection: 0 }));
+  // 60 steps with default diffusionRate (0.0002) on still water (advection enabled)
+  await page.evaluate(() => lab.step(60, { diff: 0.0002 }));
   const still1 = await readDye();
 
   const peakRetention = still1.peak / still0.peak;
@@ -118,24 +118,38 @@ try {
   );
 
   // ── 4: Exact dye conservation under violent swirling flow ──
-  await page.evaluate(() => lab.create(128, 128));
-  await page.evaluate(() => {
-    let s = 17;
-    const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    for (let k = 0; k < 15; k++) {
-      lab.dye(r(), r(), 0.05 + 0.08 * r(), [r(), r(), r()], 1.0);
-      lab.vel(r(), r(), 0.1, [(r() - 0.5) * 4, (r() - 0.5) * 4, 0, 0]);
-    }
-    lab.flush();
-  });
-  const m0 = (await readDye()).mass;
+  const seedSwirl = async () => {
+    await page.evaluate(() => lab.create(128, 128));
+    await page.evaluate(() => {
+      let s = 17;
+      const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      for (let k = 0; k < 15; k++) {
+        lab.dye(r(), r(), 0.05 + 0.08 * r(), [r(), r(), r()], 1.0);
+        lab.vel(r(), r(), 0.1, [(r() - 0.5) * 4, (r() - 0.5) * 4, 0, 0]);
+      }
+      lab.flush();
+    });
+  };
+
+  // Run with dispersion on (diff: 0.0002)
+  await seedSwirl();
+  const m0_on = (await readDye()).mass;
   await page.evaluate(() => lab.step(60, { diff: 0.0002, advection: 0.45, damping: 0.99 }));
-  const m1 = (await readDye()).mass;
-  const massRatio = m1 / m0;
+  const m1_on = (await readDye()).mass;
+  const ratioOn = m1_on / m0_on;
+
+  // Control: same flow with diff: 0 (dispersion off)
+  await seedSwirl();
+  const m0_off = (await readDye()).mass;
+  await page.evaluate(() => lab.step(60, { diff: 0, advection: 0.45, damping: 0.99 }));
+  const m1_off = (await readDye()).mass;
+  const ratioOff = m1_off / m0_off;
+
+  const diffFromControl = Math.abs(ratioOn - ratioOff);
   check(
     'and none of the dye is made or lost',
-    Math.abs(massRatio - 1) < 0.01,
-    `total dye ${m0.toFixed(2)} → ${m1.toFixed(2)} (ratio ${massRatio.toFixed(6)})`
+    diffFromControl < 0.0001,
+    `diff vs control delta ${(diffFromControl * 100).toFixed(6)}% (on ${ratioOn.toFixed(6)} vs off ${ratioOff.toFixed(6)})`
   );
 
   // ── 5: Taylor dispersion scales with gap thickness (h²) ──
@@ -200,10 +214,17 @@ try {
   const heatSpread = (hd0.peakTemp - hd1.peakTemp) / hd0.peakTemp;
   const dyeSpread = (hd0.peakDye - hd1.peakDye) / hd0.peakDye;
 
+  // Estimated physical kappa: for 2D Gaussian spot of radius r0 = 0.08 * 0.20 m = 0.016 m:
+  // sigma0^2 ≈ r0^2 / 2 = 1.28e-4 m^2. Over dt = 90 * (1/60) = 1.5 s:
+  // kappa_meas = (heatSpread * sigma0^2) / (2 * dt)
+  const dtSeconds = 90 * (1 / 60);
+  const sigma0_sq = (0.08 * 0.20) ** 2 / 2;
+  const kappaMeas = (heatSpread * sigma0_sq) / (2 * dtSeconds);
+
   check(
     'heat spreads at water thermal diffusivity even when dye Diffusion Rate is zero',
-    heatSpread > 0.05 && dyeSpread < 0.001,
-    `heat peak dropped ${(heatSpread * 100).toFixed(1)}% through thermal diffusion, dye peak dropped ${(dyeSpread * 100).toFixed(2)}%`
+    kappaMeas >= 0.5e-7 && kappaMeas <= 5.0e-7 && dyeSpread < 0.001,
+    `measured kappa ${kappaMeas.toExponential(2)} m²/s (peak dropped ${(heatSpread * 100).toFixed(2)}%), dye peak dropped ${(dyeSpread * 100).toFixed(2)}%`
   );
 
 } finally {

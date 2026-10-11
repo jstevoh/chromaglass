@@ -1443,11 +1443,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    18h. Dye spreads along the flow (Taylor–Aris dispersion):
-    D_L ≈ Dm + h²|u|²/(210 Dm).
-    Dye streaks along the depth-mean flow and stays sharp where it is still.
-    Transverse to flow, D = Dm, preserving crisp edges across streamlines.
-    Conservative face-flux finite volume update ensures exact dye conservation.
+    18h. Dye spreads along the flow (pre-asymptotic shear dispersion) plus molecular diffusion:
+    In a Hele-Shaw cell on show timescales (t ≪ h²/Dm ≈ 25 hours), flow has not reached
+    the asymptotic Taylor–Aris regime. Parabolic Poiseuille shear across the gap creates
+    unsteady longitudinal spreading with variance σ² ≈ 0.2 |u|² Δt².
+    Shortcut: depth-averaged 2D solver models this as an anisotropic flux tensor along u⊗u
+    with cap 0.25 cells²/step (von Neumann stability limit).
+    Cross-term fluxes are limited to maintain strict positivity, exactly conserving dye mass.
   */
   dyeDisperse: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -1467,9 +1469,9 @@ fn getDisp(p: vec2i, n: i32) -> vec3f {
   let dm = A.a.x;
   let kappaT = A.a.y;
   let v2 = dot(v, v);
-  let taylor = kappaT * gapRel * gapRel * v2;
-  let taylorLim = min(taylor, max(0.0, A.b.x - dm));
-  let fac = select(0.0, taylorLim / max(v2, 1e-9), v2 > 1e-9);
+  let shear = kappaT * gapRel * gapRel * v2;
+  let shearLim = min(shear, max(0.0, A.b.x - dm));
+  let fac = select(0.0, shearLim / max(v2, 1e-9), v2 > 1e-9);
   return vec3f(
     dm + fac * v.x * v.x,
     dm + fac * v.y * v.y,
@@ -1477,13 +1479,11 @@ fn getDisp(p: vec2i, n: i32) -> vec3f {
   );
 }
 
-fn fluxX(p: vec2i, n: i32) -> vec4f {
+fn fluxX(p: vec2i, DL: vec3f, DR: vec3f, n: i32) -> vec4f {
   if (p.x < 0 || p.x >= n - 1 || p.y < 0 || p.y >= n) {
     return vec4f(0.0);
   }
   let pR = p + vec2i(1, 0);
-  let DL = getDisp(p, n);
-  let DR = getDisp(pR, n);
   let Dxx = 0.5 * (DL.x + DR.x);
   let Dxy = 0.5 * (DL.z + DR.z);
   let cL = getDye(p, n);
@@ -1493,16 +1493,19 @@ fn fluxX(p: vec2i, n: i32) -> vec4f {
     (getDye(p + vec2i(0, 1), n) - getDye(p - vec2i(0, 1), n)) +
     (getDye(pR + vec2i(0, 1), n) - getDye(pR - vec2i(0, 1), n))
   );
-  return -(Dxx * dc_dx + Dxy * dc_dy);
+  let prim = Dxx * dc_dx;
+  let cross = Dxy * dc_dy;
+  // Positivity-preserving cross-term limiter: bounds cross flux to 0.5 of primary flux magnitude,
+  // preventing cross-derivatives from pulling cell values negative or creating dye.
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
 }
 
-fn fluxY(p: vec2i, n: i32) -> vec4f {
+fn fluxY(p: vec2i, DB: vec3f, DT: vec3f, n: i32) -> vec4f {
   if (p.y < 0 || p.y >= n - 1 || p.x < 0 || p.x >= n) {
     return vec4f(0.0);
   }
   let pT = p + vec2i(0, 1);
-  let DB = getDisp(p, n);
-  let DT = getDisp(pT, n);
   let Dyx = 0.5 * (DB.z + DT.z);
   let Dyy = 0.5 * (DB.y + DT.y);
   let cB = getDye(p, n);
@@ -1512,20 +1515,29 @@ fn fluxY(p: vec2i, n: i32) -> vec4f {
     (getDye(p + vec2i(1, 0), n) - getDye(p - vec2i(1, 0), n)) +
     (getDye(pT + vec2i(1, 0), n) - getDye(pT - vec2i(1, 0), n))
   );
-  return -(Dyx * dc_dx + Dyy * dc_dy);
+  let prim = Dyy * dc_dy;
+  let cross = Dyx * dc_dx;
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
 }
 
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
-  let fE = fluxX(p, n);
-  let fW = fluxX(p - vec2i(1, 0), n);
-  let fN = fluxY(p, n);
-  let fS = fluxY(p - vec2i(0, 1), n);
+  let Dc = getDisp(p, n);
+  let De = getDisp(p + vec2i(1, 0), n);
+  let Dw = getDisp(p - vec2i(1, 0), n);
+  let Dn = getDisp(p + vec2i(0, 1), n);
+  let Ds = getDisp(p - vec2i(0, 1), n);
+
+  let fE = fluxX(p, Dc, De, n);
+  let fW = fluxX(p - vec2i(1, 0), Dw, Dc, n);
+  let fN = fluxY(p, Dc, Dn, n);
+  let fS = fluxY(p - vec2i(0, 1), Ds, Dc, n);
   let netFlux = -(fE - fW + fN - fS);
   let here = getDye(p, n);
-  let out = max(here + netFlux, vec4f(0.0));
+  let out = here + netFlux;
   textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
@@ -2938,7 +2950,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
-    host's 'dye diffuse' stage). In: the whole dye and the oil's share, both
+    host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused
     with the oil's put back as it was (A.a.w = 0), or the oil's share as it
     was (A.a.w = 1).
