@@ -431,6 +431,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+      # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
+      # scripts/draftwall.mjs): which engine each settings change reaches,
+      # what a receiver is sent, Send to wall, Live and the wall closing. Its
+      # line on what the projector window is painted from needs frames, so it
+      # runs again on the Mac's open shard, where it has them.
+      - name: Preview's copy
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/draftwall.mjs
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping
@@ -492,6 +500,16 @@ jobs:
       - name: The remote's Draw screen
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/draw.mjs
+      # The wall under Draw's pad (scripts/drawwall.mjs, PLAN.md 8-draw-a): a
+      # stand-in laptop running the real picture sender on a painted 4:3
+      # canvas. Asked for only on Draw, painted the right way up at 8 a second
+      # or more, the frame in the wall's shape, and dimmed when it stops; and
+      # the WebGPU show's way, the frame read on the GPU, on SwiftShader.
+      - name: The wall under Draw's pad
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        env:
+          PW_WEBGPU: '1'
+        run: node --experimental-strip-types scripts/drawwall.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
       # second more than the ear tells it (ten), and the plate still hears a
@@ -520,6 +538,14 @@ jobs:
       - name: No pointer on the show
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/showcursor.mjs
+      # The wall comes back after the show reloads (scripts/rewall.mjs, S15):
+      # the window Send to wall opened is taken back by the reloaded show
+      # within a second, dark while the show was away, and not loaded again
+      # by the next Send to wall. The mirror's hook, not the plate, so no
+      # GPU; on the same dist/.
+      - name: The wall after a reload
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/rewall.mjs
       # Picking an input changes what the show hears at once (scripts/
       # inputpick.mjs, PLAN.md 14s): Chromium's fake devices, Input 1 and then
       # Input 2 picked in the settings, each opened by its id and the earlier
@@ -876,6 +902,11 @@ jobs:
       - name: The wall's test pattern
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run wallpattern
+      # Preview's copy again (see Measure's), here with frames: the projector
+      # window is painted from the wall's canvas and never the copy's.
+      - name: Preview's copy, with frames
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: node scripts/draftwall.mjs --frames
       - name: The WebGPU smoke
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
         run: npm run webgpu
@@ -1020,6 +1051,14 @@ jobs:
       - name: Every tool lays the bottle
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/bottles.mjs
+      # And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md
+      # 8-draw-a): the laptop's own frames reach the pad, the plate's colour,
+      # and a drop near the wall's corner lands under the finger, where the
+      # plate's point (the old pad) does not. About a minute.
+      - name: Draw shows the wall and lands under the finger
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        timeout-minutes: 4
+        run: node --experimental-strip-types scripts/drawwall.mjs --app
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.

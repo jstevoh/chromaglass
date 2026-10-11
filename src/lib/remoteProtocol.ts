@@ -154,17 +154,27 @@ export type RemoteMessage =
    * at that point of the plate (normalised, y up), on the layer it holds;
    * its tilt rocks the plate. A pen adds `amount` (pressure) and, for a blow,
    * the direction it leans (`dx`/`dy`).
+   *
+   * `wall` says the point is the wall's own (the picture as it is drawn,
+   * normalised, y up), not the plate's (PLAN 8-draw-a). They differ: the
+   * wall shows the middle of a plate half again as wide as the wall (1/1.5
+   * of it across a 16:9 frame, 0.375 of it up), turned with the dish and
+   * magnified by the closeup, so a pad mapped onto the plate put a touch at
+   * the frame's top edge on plate y = 1, off the wall, and only the middle
+   * landed where the finger was. The display maps a wall point through its
+   * own camera, as it does its own pointer; without the flag (OSC, an older
+   * remote) the point is the plate's, as it always was.
    */
-  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
-  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string }
+  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string; wall?: boolean }
   /** A hand pressing the top glass: the film thins under it and the dye spreads out in a ring. */
-  | { type: 'press'; x: number; y: number; layer: number; amount?: number }
+  | { type: 'press'; x: number; y: number; layer: number; amount?: number; wall?: boolean }
   /**
    * A finger drawn through the liquid, carrying what it touches and mixing
    * two bottles that refuse each other. `dx`/`dy` are the stroke's direction;
    * without them there is no drag, because you mix by moving.
    */
-  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
+  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
   /**
    * A finger on the dish (the Spin tool, PLAN §22): the dish turns under it
    * as it goes round the middle, and holds still while it holds still. Sent
@@ -172,7 +182,7 @@ export type RemoteMessage =
    * the display lets go a quarter of a second after the last one. `id` is
    * the finger (its pointer id), so two fingers are two hands.
    */
-  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number }
+  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number; wall?: boolean }
   | { type: 'tilt'; x: number; y: number }
   /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
   | { type: 'dye'; color: string }
@@ -182,7 +192,19 @@ export type RemoteMessage =
    * land — so picking one from the pad has to set the display's *liquid*,
    * not its dye. An id the display does not know is ignored.
    */
-  | { type: 'liquid'; id: string };
+  | { type: 'liquid'; id: string }
+  /**
+   * Remote → display: "I am on Draw; send me the wall, this wide" (PLAN
+   * 8-draw-a, lib/padPicture.ts). A lease: renewed every second, lapsed
+   * after three, so nothing has to say goodbye.
+   */
+  | { type: 'pad-picture'; width: number }
+  /**
+   * Display → remotes: the wall as the laptop drew it, a small JPEG as a data
+   * URL. `aspect` is the canvas's own (width over height), so the remote's
+   * frame takes the wall's shape rather than a 16:9 it assumed.
+   */
+  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number };
 
 /**
  * Build the ws:// URL for the relay: the page's own origin, which is the show

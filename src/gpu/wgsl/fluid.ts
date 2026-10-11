@@ -3986,6 +3986,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     order as the float does, so the maximum of the bits is the bits of the
     maximum. A.b.y is the step's displacement and A.b.w the rest gap, as
     the carries take them.
+
+    The faces that count are the dish's own, both cells inside its open
+    rim (the mobility not negative, wgsl/thinGap.ts's hsPrep): the picture
+    never shows past the rim, and what lies there is not the liquid between
+    the glasses the substeps are for. Counted, it set them. Under Plate
+    Rock's cover glass the colour the film carries out past the rim piles
+    against the grid's wall (no face through the wall carries anything),
+    heavier than the plate's mean, and the tilt drives that pile on toward
+    the wall: the grid's corner cells went 1.7 cells a step where the dish
+    went 0.6, and the cells on the rim against the wall 0.9 where the dish
+    went 0.3, and they asked three substeps of every carry where the liquid
+    inside asked one (lab, the checker of \`npm run rides\` 5b, full rock).
+    Past the rim the carries still carry, each substep held to its 0.45 of
+    a cell, so what lies there keeps every amount and goes no faster than
+    that (PLAN 27a-6).
   */
   carryCourant: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -3996,6 +4011,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${THIN_FACE}
 var<workgroup> wgMost: atomic<u32>;
 fn faceCourant(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  if (mob[a.x + a.y * n] < 0.0 || mob[b.x + b.y * n] < 0.0) { return 0.0; }
   return abs(thinFaceVel(a, e, n) * A.b.y * f32(n));
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) li: u32) {
@@ -4115,6 +4132,111 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     }
   }
   textureStore(dst, me, sum / (f32(oldN) * f32(oldN)));
+}`,
+
+  /*
+    The glass's drift taken out of the flow the carries ride (PLAN 27a-1;
+    fluid.ts, driftCells, says why): the velocity less A.a.xy, the drift in
+    the velocity's units. What is left is the flow as seen from a frame
+    going with the film, which the carries take in as many substeps as it
+    needs; driftShift moves every carried field the rest of the way.
+  */
+  driftOff: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let v = textureLoad(vel, vec2i(id.xy), 0);
+  textureStore(dst, vec2i(id.xy), vec4f(v.xy - A.a.xy, v.zw));
+}`,
+
+  /*
+    A carried field moved with the glass's drift, A.a.xy cells (whole cells,
+    each at most 8 either way) and A.a.zw more (a fraction, at most half a
+    cell either way): what driftOff took out of the flow.
+
+    The whole cells are a shift, which is exact: nothing is interpolated,
+    so a drift of three cells a step blurs nothing, where a carry would cut
+    the step into eight substeps to move it and smear a little at each.
+    The fraction is one step of the carries' own flux (bodyAdvect's upwind,
+    limited, through every face alike at the fraction's Courant number),
+    which is what a carry would do with it, in one pass where the carry
+    would have needed two more substeps of the whole flow to stay under
+    its 0.4 of a cell.
+
+    At the grid's wall both do what the carries do there (no face through
+    the wall carries anything; bodyAdvect's \`courant\`): what is carried
+    into the wall piles up in the cell against it, and the cells it left on
+    the far side are left empty. So every amount on the plate is kept, as
+    across faces. \`at\` gathers a cell of the shifted field from the range
+    [lo, hi] of cells that land in it, per axis: one cell inside, every
+    cell carried past it for the cell against the wall, none for a cell the
+    drift left.
+
+    What is moved is what its carry moves, so A.b.x says which:
+      0, an amount a cell, as bodyAdvect carries the colour, the poured
+         liquids, the reaction and the species, floored at 0 as it does;
+      1, the mix, as mixAdvect carries it: the oil (.g, floored), the
+         oil's colour (.r) and the acidity (.b, signed: + acid, − base),
+         and its chemical potential (.a) not carried at all;
+      2, the ferrofluid's share of the column, which on a thin gap its
+         carry keeps as a volume, c·h (phaseAdvect): the share times the
+         gap is what moves, and what lands is divided by the gap it lands
+         in, so where the gap varies (a press, a kick) the drift keeps the
+         ferrofluid's volume as the carry it stands in for did.
+    \`sq\` is the gap, read only by 2.
+  */
+  driftShift: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var sq: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn gapAt(q: vec2i) -> f32 { return select(1.0, max(textureLoad(sq, q, 0).r, 0.004), A.b.x > 1.5); }
+fn sources(j: i32, s: i32, n: i32) -> vec2i {
+  var lo = j - s;
+  var hi = j - s;
+  if (j == n - 1) { hi = n - 1; }
+  if (j == 0) { lo = 0; }
+  return vec2i(max(lo, 0), min(hi, n - 1));
+}
+// The field moved by the whole cells, at q (clamped to the grid, as the carries read past it).
+fn at(q0: vec2i, n: i32) -> vec4f {
+  let q = clamp(q0, vec2i(0), vec2i(n - 1));
+  let sx = sources(q.x, i32(round(A.a.x)), n);
+  let sy = sources(q.y, i32(round(A.a.y)), n);
+  var sum = vec4f(0.0);
+  for (var y = sy.x; y <= sy.y; y++) {
+    for (var x = sx.x; x <= sx.y; x++) { sum += textureLoad(src, vec2i(x, y), 0) * gapAt(vec2i(x, y)); }
+  }
+  return sum;
+}
+fn mm(a: vec4f, b: vec4f) -> vec4f {
+  return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
+}
+// bodyAdvect's flux through the face a → a + e at Courant number c; nothing through the grid's wall.
+fn flux(a: vec2i, e: vec2i, c: f32, n: i32) -> vec4f {
+  let b = a + e;
+  if (c == 0.0 || a.x < 0 || a.y < 0 || b.x >= n || b.y >= n) { return vec4f(0.0); }
+  if (c > 0.0) {
+    let s = mm(at(a, n) - at(a - e, n), at(b, n) - at(a, n));
+    return c * (at(a, n) + 0.5 * (1.0 - c) * s);
+  }
+  let s = mm(at(b, n) - at(a, n), at(b + e, n) - at(b, n));
+  return c * (at(b, n) - 0.5 * (1.0 + c) * s);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let n = i32(S.n);
+  let p = vec2i(id.xy);
+  let x = vec2i(1, 0);
+  let y = vec2i(0, 1);
+  let cx = clamp(A.a.z, -0.5, 0.5);
+  let cy = clamp(A.a.w, -0.5, 0.5);
+  let d = flux(p, x, cx, n) - flux(p - x, x, cx, n) + flux(p, y, cy, n) - flux(p - y, y, cy, n);
+  let moved = at(p, n) - d;
+  var out = max(moved, vec4f(0.0));
+  if (A.b.x > 1.5) { out = max(moved / gapAt(p), vec4f(0.0)); }
+  else if (A.b.x > 0.5) { out = vec4f(moved.r, max(moved.g, 0.0), moved.b, textureLoad(src, p, 0).a); }
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   // Clear a field to a constant (A.a), used by clear() and the pressure warm start.
