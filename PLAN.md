@@ -303,6 +303,11 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   themselves updating). Cause: `useCastSession.ts` captures any `pointerdown`/`keydown`
   outside raw text inputs and delegates `fillWindow()`, forcing the performance receiver window
   fullscreen.
+- ~~**QA-28** The whole plate slides under the camera with the sound, a jolt on every
+  kick: nauseating to watch (the owner, 2026-10-11).~~ **Fixed** (Frame Sway, 27a-7):
+  #347's cover glass dragged the whole picture 0.39% of the plate a frame on average
+  at the default Plate Rock (0.72% at the peak, a quarter of the plate a second);
+  it is seated by default now and slides 0 (`npm run framesway`).
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
@@ -422,6 +427,26 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   Make it obvious on the chip, for example a mark where Follow is locked and Auto's
   cuts named in its label; keep both. Desk (`src/App.tsx`, the zoom chip) and phone
   (`PhoneStage.tsx`, the same three buttons).
+
+**Checks that went red on a tree they do not measure.** Not seen by the room, but each
+holds a deploy until someone re-runs it, so they rank by how often they cost one; Wave
+0's step 0.3 is their home and its rule holds: root cause, never loosen. Found on #338's
+own deploy, which went red on five Mac checks #338 does not touch and green on the next
+run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
+
+- **QA-21** Same-seed render determinism failed: two renders of one seed differed
+  slightly, then matched on the re-run. Either the check reads a frame before the
+  plate is settled or something in the step is not seeded.
+- **QA-22** Beat Squeeze failed, then passed.
+- **QA-23** The ferrofluid ring drifting with the band failed, then passed.
+- **QA-24** Startup missed its 2 s limit by 0.02 s: a near miss, so find whether
+  startup grew or the Mac runner was slow, before touching the limit.
+- **QA-25** One of the ear's checks missed narrowly; which line, and by how much, is
+  still to be read from the run.
+- **QA-26** The phone's clean-screen check is flaky; a fix is proposed in a comment on
+  #339 (from the Wall reconnect thread), not yet pushed.
+- **QA-27** The phone's two-finger Drop (19h-2) is instrumented and waits for its next
+  failure to show where the dye goes; read that run before changing anything.
 
 ## Running order
 
@@ -997,20 +1022,28 @@ Open from Desk v2, each its own thread (the UI lane):
   instead is the owner's call on a phone.
 - ~~**8-draw** Draw: the phone or iPad as the wall's pad~~ (shipped; story in
   `docs/plan-shipped.md` §8; check `npm run draw`). Found along the way:
-  - **8-draw-a** (M) The wall under the pad. Draw's frame is black: the remote gets
-    the laptop's state, not its frames, so a hand draws blind on the phone and looks
-    up at the wall. The relay already carries a mirror (`role: 'mirror'`, the cast);
-    a small, slow copy of it under the frame would show where the colour is.
-    *Measure:* frames reach the remote's frame at a rate and size the relay holds.
+  - ~~**8-draw-a** The wall under the pad~~ (shipped; story in `docs/plan-shipped.md`
+    §8-draw-a; check `npm run drawwall`, and `-- --app` on the Mac). Found along the way:
+    - **8-draw-a-1** (S) The picture is the canvas after the output pass, so a wall
+      corner-pinned or masked in Output shows warped on the pad, while a touch is mapped
+      through the camera only. With Output's corners at their defaults (most rooms) the
+      two agree. *Measure:* `drawwall --app` with corners moved.
+    - **8-draw-a-2** (S) Every remote gets the pictures once one asks: the relay keeps no
+      state, so a tablet left on Controls as the Gig remote is sent 100–400 kB/s it does
+      not paint. A relay that routes `picture` only to sockets that sent `pad-picture`
+      in the last 3 s would stop that. *Measure:* bytes to a Controls remote.
+    - **8-draw-a-3** (S) OSC's `/blow`, `/drop`, `/press` still take the plate's point,
+      not the wall's, so a TouchOSC pad has the old pad's fault (only its middle lands
+      under the finger). A `/wall/...` form, or a flag argument, as the remote's `wall`.
   - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
     tools only); they are in Controls. A bottle tile on the phone, or a long press on
     Drop for the bottle list, would put soap on the plate from Draw.
   - **8-draw-c** (S) Blackout's hold-to-snap. The display has one blackout, a toggle
     that fades over 1.1 s, so Draw's hold is a fade both ways. A snap needs a
     `blackout-snap` action the display honours at once (protocol, App, MIDI).
-  - **8-draw-d** (S) The wall's real shape. Draw assumes 16:9 (the design's label);
-    a wall mapped to 4:3 or a dome is another frame. The state could carry the
-    output's aspect. And the design's dashed "+" (an image as dye) has no message yet.
+  - **8-draw-d** (S) The wall's real shape: the frame now takes the laptop's picture's
+    shape (8-draw-a), so a 4:3 wall is a 4:3 frame; before the first picture, and with
+    an older laptop, it is still 16:9. A dome is another frame. And the design's dashed "+" (an image as dye) has no message yet.
 - ~~**8b** A true Preview: with a wall up, the desk builds on a copy the wall does not
   see until Send to wall~~ (shipped; story in `docs/plan-shipped.md` §8; check
   `npm run draftwall`). Found along the way:
@@ -1040,6 +1073,8 @@ Open from Desk v2, each its own thread (the UI lane):
     window is painted from the wall's canvas and never the copy's, and which settings
     each engine was handed; a picture of the window against a look changed in Preview
     would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
+  - ~~**8b-6** `draftwall`'s fade line read one moment, 0.4 s after Send~~ (fixed
+    2026-10-11: it watches the whole fade; story in `docs/plan-shipped.md`, 8b).
 - ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
   the look's own value (a double tap on Play's sliders)~~ (shipped; story in
   `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
@@ -5725,6 +5760,31 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       The real fix is to model what is past the rim: liquid that crosses the open rim
       leaves the film (and the tilt and the body forces do not act where there is no
       film), rather than a walled square round the dish.
+  - **27a-7. Frame Sway: the music moves the liquid, not the frame (shipped).** The
+    owner, the evening 27a-1 went live: "It moves around the x/y axis with sounds ...
+    like the whole plate moves around under the camera. Make the liquids and their
+    interactions the main focus." The cover glass drags the film, which is the whole
+    picture: through a song's kicks at the default Plate Rock it slid the picture
+    0.39% of the plate a frame on average and 0.72% at the peak (1.03% on the worst
+    show stage), and the lamp jumped 0.32% a frame with the rock (`npm run framesway`,
+    the frame loop's own spring, sway and cover at 60 frames a second). A new dial,
+    Frame Sway (`frameSway`, 0 to 1, **0 by default**; desk, phone sheet, remote, MIDI),
+    is the room between the two glasses' rims: at 0 the cover sits seated in the
+    bottom glass's rim, as a clamped clock glass does, and drags nothing; at 1 the
+    4 cm 27a-1 gave it. The lamp following the rock and the plate shader's two beat
+    pulses (a kaleidoscope's turn and breath, the closeup's crinkle) ride the same
+    dial. The tilt stays on: it moves only the colour heavier than the mean, which is
+    the liquid's motion. `framesway` holds every shipped look and show stage at 0; the
+    Mac's `render-app` holds the app's own frames to it on Classic with the band.
+    Evolve never drifts it.
+    - **27a-8, open.** What still turns or zooms the whole frame with the sound, each
+      off at the defaults: nine looks route a band to the dish's turn
+      (`audioMappings.rotation`, about 0.02–0.05 rad/s, slow), Auto Spin's Tempo, and
+      the closeup camera's kick punch-in and energy push when zoomed (`macroSync`,
+      1.5–10% of zoom). Read each with the owner: a slow dish turn is the oil wheel's
+      own move; a punch-in on the kick is a camera move and may want Frame Sway too.
+      And Beat Squeeze's press spans the dish (Bass Drop at 0.8): measure its
+      plate-wide radial part, which reads as a zoom on the kick.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs

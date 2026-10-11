@@ -351,6 +351,13 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
+      # through a song's kicks, every shipped look and show stage slides the
+      # whole picture 0% a frame, against up to 1% with the cover glass free
+      # as #347 shipped it; the app's own frames are held to it in render-app.
+      - name: The frame holds still
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run framesway
       # Hold stays where the closeup is (PLAN.md QA-12): the real closeup
       # camera on a made-up plate, switched to Hold from Auto and from Follow,
       # moves the frame on main's Hold and not on this one.
@@ -500,6 +507,16 @@ jobs:
       - name: The remote's Draw screen
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/draw.mjs
+      # The wall under Draw's pad (scripts/drawwall.mjs, PLAN.md 8-draw-a): a
+      # stand-in laptop running the real picture sender on a painted 4:3
+      # canvas. Asked for only on Draw, painted the right way up at 8 a second
+      # or more, the frame in the wall's shape, and dimmed when it stops; and
+      # the WebGPU show's way, the frame read on the GPU, on SwiftShader.
+      - name: The wall under Draw's pad
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        env:
+          PW_WEBGPU: '1'
+        run: node --experimental-strip-types scripts/drawwall.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
       # second more than the ear tells it (ten), and the plate still hears a
@@ -1041,6 +1058,14 @@ jobs:
       - name: Every tool lays the bottle
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/bottles.mjs
+      # And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md
+      # 8-draw-a): the laptop's own frames reach the pad, the plate's colour,
+      # and a drop near the wall's corner lands under the finger, where the
+      # plate's point (the old pad) does not. About a minute.
+      - name: Draw shows the wall and lands under the finger
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        timeout-minutes: 4
+        run: node --experimental-strip-types scripts/drawwall.mjs --app
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.
