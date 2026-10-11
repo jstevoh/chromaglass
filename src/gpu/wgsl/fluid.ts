@@ -465,8 +465,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
   let soap = textureLoad(liquids0, p, 0).r;
-  // PLAN 18g: On a thin gap, colour moves by Marangoni stress / surfactant flow, not by soap destroying dye via a multiply.
-  let soapMul = select(1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0), 1.0, S.thinGap > 0.5);
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
   textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
 }`,
 
@@ -1439,8 +1438,22 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let s = textureLoad(x, clampP(p - vec2i(1, 0), S.n), 0) + textureLoad(x, clampP(p + vec2i(1, 0), S.n), 0)
-        + textureLoad(x, clampP(p - vec2i(0, 1), S.n), 0) + textureLoad(x, clampP(p + vec2i(0, 1), S.n), 0);
+  let l = clampP(p - vec2i(1, 0), S.n);
+  let r = clampP(p + vec2i(1, 0), S.n);
+  let d = clampP(p - vec2i(0, 1), S.n);
+  let u = clampP(p + vec2i(0, 1), S.n);
+  var xl = textureLoad(x, l, 0);
+  var xr = textureLoad(x, r, 0);
+  var xd = textureLoad(x, d, 0);
+  var xu = textureLoad(x, u, 0);
+  if (S.thinGap > 0.5) {
+    let xp = textureLoad(x, p, 0);
+    if (length((vec2f(l) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { xl = xp; }
+    if (length((vec2f(r) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { xr = xp; }
+    if (length((vec2f(d) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { xd = xp; }
+    if (length((vec2f(u) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { xu = xp; }
+  }
+  let s = xl + xr + xd + xu;
   textureStore(dst, p, (textureLoad(x0, p, 0) + A.a * s) * A.b);
 }`,
 

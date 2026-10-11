@@ -33,7 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -383,11 +383,10 @@ const MAX_SPEED = 0.002;
 const PLATE_METRES = DISH_METRES;
 const REST_GAP = 0.03;
 /*
-  The dish's rim, in plate widths from the middle: the plate's inscribed
-  circle, which is all the picture ever shows of it (plate.ts keeps both
-  dishes inside it). Past it the liquid is open to the air.
+  The dish's rim, OPEN_RIM (from turntable.ts), in plate widths from the middle:
+  the plate's inscribed circle, which is all the picture ever shows of it
+  (plate.ts keeps both dishes inside it). Past it the liquid is open to the air.
 */
-const OPEN_RIM = 0.5;
 /*
   The forces' own physics on a thin gap (PLAN 18a-2, wgsl/thinGap.ts's
   hsBody, hsPrep and hsDivergence).
@@ -457,7 +456,7 @@ const AIR_SHEAR = 0.5;
   pools rocked as the app rocks them the colour moved 0.43 against 0.028
   before, where a look's own stir moves it 0.79.
 */
-export const ROCK_FALL = 12;
+export const ROCK_FALL = 13;
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
@@ -1528,10 +1527,10 @@ export class WebGPUFluid {
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
       neither damps nor clamps it: only the heat decays there.
-      PLAN 18g: on a thin gap, colour leaves by flushing over the open rim,
-      not by fading: S.evap is held at 1.
+      PLAN 18g: on a thin gap, colour leaves by flushing over the open rim.
+      p.evapFactor is retained as a named safety cap (regulator) and for evaporation.
     */
-    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = thin ? 1 : fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
+    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);

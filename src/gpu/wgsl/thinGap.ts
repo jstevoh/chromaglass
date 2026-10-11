@@ -80,7 +80,7 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
-import { DISH_METRES } from '../../lib/turntable';
+import { DISH_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
 
 /**
@@ -224,7 +224,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // both the dye's weight over the plate's mean, the second down whichever way the hand tips the glass.
   // Comet flow adds an explicit, constant pull to the dye (S.cometX, S.cometY).
   if (A.a.x > 0.0 || any(A.b.xy != vec2f(0.0)) || S.cometX != 0.0 || S.cometY != 0.0) {
-    let w = textureLoad(dye, q, 0).a - S.meanD;
+    let outOfDish = length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
+    let w = select(textureLoad(dye, q, 0).a - S.meanD, 0.0, outOfDish);
     v = vec4f(v.xy - S.up * (A.a.x * w) + (A.b.xy + vec2f(S.cometX, S.cometY)) * w, v.z, v.w);
   }
   if (S.air > 0.1) {

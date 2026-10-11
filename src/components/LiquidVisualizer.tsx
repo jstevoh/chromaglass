@@ -3608,6 +3608,11 @@ class FluidSimulation {
           this.densityR[i] = 0;
           this.densityG[i] = 0;
           this.densityB[i] = 0;
+        } else {
+          this.density[i]  *= p.evapFactor;
+          this.densityR[i] *= p.evapFactor;
+          this.densityG[i] *= p.evapFactor;
+          this.densityB[i] *= p.evapFactor;
         }
       }
       // Per-cell soft cap — keeps color ratios but stops runaway thickness,
@@ -3817,11 +3822,35 @@ class FluidSimulation {
       exactly nothing however steep it is. The only thing a bigger number can
       do is stop a plate exceeding what it was asked for.
     */
-    // PLAN 18g: on a thin gap, colour leaves by flushing over the open rim,
-    // not by fading. The dye-budget regulator's artificial quadratic evaporation
-    // is bypassed.
-    const regulatorEvap = this.thinGap ? 0 : Math.min(0.12, over * over * 0.6);
-    const perStep = this.thinGap ? 1.0 : 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
+    // PLAN 18g: Kept as a named safety cap until PLAN 18c-2 (pours add volume): prevents
+    // runaway saturation on looks where colour is injected without added volume.
+    const regulatorEvap = Math.min(0.12, over * over * 0.6);
+    /*
+      Only ever upward, and H6 tried the other direction and took it out
+      again. A bubble's exclusion is a multiply, so it destroys the dye it
+      removes, and making this loop symmetric was the first attempt at
+      keeping the plate's colour. It never engaged: the deficit term is
+      quadratic, so a plate 10% under its budget contributed 0.0001. The dye
+      goes back where it physically went instead — a ring at the bubble's
+      rim, in `depositBubbleRims` — which conserves by construction because
+      both halves read the same mirror.
+    */
+    /*
+      Per second of the plate's own time, not per step.
+
+      This was a flat multiply applied once a step with no dt in it at all,
+      while every other rate in here is scaled by dt — so lowering the speed
+      slowed the liquid down and left the drying running at full pace. A plate
+      set slow therefore stopped moving and went on evaporating until there
+      was no dye left, and what you were looking at was the bare backdrop,
+      which the randomiser had just given a new colour. That is the reported
+      "random evolve fills the screen with one colour", and the older "evolve
+      removes all of the dye" is the same fault without the recolour.
+
+      Raised to dt over the reference step, the drying takes the same time per
+      second of plate time at any speed, which is what a dish does.
+    */
+    const perStep = 1.0 - settings.evaporationRate * 0.02 - regulatorEvap;
     /*
       Referenced to a full-speed step, so no existing look changes.
 

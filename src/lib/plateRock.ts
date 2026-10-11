@@ -93,7 +93,7 @@ export function rockSwing(rock: RockSpring, R: number, swayX: number, swayY: num
   one's when the same hand rocks it.
 */
 export type CoverGlass = { x: number; y: number; vx: number; vy: number };
-import { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './turntable';
+import { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './turntable.ts';
 /** The cover's mass per area, kg/m²: 2 mm of glass at 2,500 kg/m³. */
 export const COVER_KG_M2 = 5;
 /*

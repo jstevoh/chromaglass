@@ -215,7 +215,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   it), then **18f** heat from the lamp (which unblocks 10.6
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
-  ~~**18g**~~ colour leaves by flushing #362 and **18k-spray**.
+  ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then **18m-1** to **18m-5**), **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
@@ -3827,7 +3827,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
-| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **Shipped** (#362) |
+| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362); 18g-2..5 open |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
@@ -4329,7 +4329,14 @@ its frame rate live. "Free" means no new passes or texture reads.
   on (heat with a strength). Turbulence stays as the declared stir dial.
 
 ### 18g. Colour leaves by flushing, not by fading
-**Shipped** (#362): on a thin gap, old colour leaves by being pushed over the open circular rim ($r \ge 0.5$) into the overflow trough as new liquid enters. Artificial evaporation and quadratic dye-budget regulation are bypassed on thin gap; soap no longer multiplies dye down on thin gap; a named safety cap ($d.a > 6.0$) is preserved in decayDye. Measured in `npm run flush` (9/9).
+
+**18g-1 shipped** (the open circular rim, $r \ge 0.5$, into the overflow trough; `npm run flush`, story in `docs/plan-shipped.md` §18g; #362). The rest of 18g is these items, each its own PR:
+
+- ~~**18g-1**~~ Flushing, not fading: the open rim (#362). Dye is flushed out over $r \ge 0.5$ on a thin gap as pours add volume (`npm run flush`). The dye-budget regulator is kept as a named safety cap pending 18c-2 (pours add volume).
+- **18g-2** airExclude and the standing bubble pump: replace the destructive multiply with volume-fraction exclusion.
+- **18g-3** capDye and solvent evaporation: model real evaporation as solvent loss leaving a coffee ring at the rim, rather than dye loss.
+- **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
+- **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
 
 - **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
   applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's
