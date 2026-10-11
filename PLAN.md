@@ -1845,6 +1845,26 @@ The steps, most visible first. Each is one PR with its own check, and every step
    having a strength.
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field
    and a streak layer, each at its own speed, added as light.
+8. ~~**Evolve changes slowly with the song.**~~ Shipped: one move at a time (a few
+   related dials, 30–90 s glides, about one a minute), steered by the song's sections
+   and its level over half a minute, the palette turning at drops and breakdowns, the
+   same on a slow clock with no music; nothing that moves the frame. `npm run
+   slowevolve`. Story in `docs/plan-shipped.md` §10 step 8.
+   - **8a** (open, the owner's eye): judge it on the Mac, with a song and without
+     (`docs/judging.md` §51). If a minute's glide reads as nothing happening, the
+     reach (`moveTargets`' share of each dial's window) is the dial to turn, not the
+     glide's length.
+   - **8b** (open): `npm run evolving`, the browser check that Evolve works in the
+     running app, is not in CI. Run in a cloud session on SwiftShader, its dial lines
+     pass (4 of 81 dials moved in 70 s at full speed, all inside their windows; on main,
+     14 of 99, one of them Lamp Motion, which moves the whole picture), but its two hand
+     lines fail the same way on main and here: the app draws no frames there, so the
+     hands never run. Put it on a Mac shard, or split the dial lines into Measure.
+   - **8c** (open): the palette change only colours dye still to come, which is the
+     real thing (a pour does not recolour the dish). With Evolve's hands at a drop
+     every seven seconds that turns the plate over in a minute or two; on a look with
+     few drops it may read as no change at all. Measure how long the plate takes to
+     carry half the new palette on the film table, per look.
 
 Small things that ride along with the steps: drops with a coloured rim lined up in
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
