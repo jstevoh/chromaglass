@@ -1,8 +1,10 @@
 import type { SourceName } from './lib/audioFeatures';
 
-export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
+export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
 /** How a mixer row is laid over what is under it (lib/mixer.ts, `MixBlend`). */
-export type MixBlend = 'own' | 'screen' | 'add' | 'multiply' | 'key';
+export const MIX_BLENDS = ['own', 'screen', 'add', 'multiply', 'key'] as const;
+export type MixBlend = (typeof MIX_BLENDS)[number];
 
 /**
  * What a liquid writes into the plate's liquid field when it lands — see
@@ -242,7 +244,8 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     // Its viscosity reaches the thin gap through the phase (FERRO_NU).
     behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6, viscosity: 6, density: 1.21, tension: 29 } },
 ];
-export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
+export const LED_MODES = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'] as const;
+export type LedMode = (typeof LED_MODES)[number];
 /**
  * Fluid solver grid: an edge length the solver runs at, or 'auto' to leave it
  * to the governor. There was a 'cpu' member here for the 192² JavaScript
@@ -250,7 +253,20 @@ export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
  * with it rather than quietly resolving to 256².
  */
 export type SimResolution = 'auto' | number;
-export type AudioFeature = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
+export const AUDIO_FEATURES = ['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'] as const;
+export type AudioFeature = (typeof AUDIO_FEATURES)[number];
+
+export const ON_NEW_SONG_MODES = ['off', 'preset', 'random'] as const;
+export type OnNewSongMode = (typeof ON_NEW_SONG_MODES)[number];
+
+export const VISCOSITY_MODES = ['thick', 'thin'] as const;
+export type ViscosityMode = (typeof VISCOSITY_MODES)[number];
+
+export const MACRO_CAMERA_MODES = ['hold', 'follow', 'auto'] as const;
+export type MacroCameraMode = (typeof MACRO_CAMERA_MODES)[number];
+
+export const RENDER_STYLES = ['show', 'photo'] as const;
+export type RenderStyle = (typeof RENDER_STYLES)[number];
 
 export interface AudioMappings {
   velocity: AudioFeature;
@@ -354,7 +370,7 @@ export interface VisualizerSettings {
   stockGrainSize: number;
   stockWeave: number;
   stockGate: number;
-  onNewSong: 'off' | 'preset' | 'random';
+  onNewSong: OnNewSongMode;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -555,7 +571,7 @@ export interface VisualizerSettings {
   spectralOptics: number;
   glassSmear: number;
   rainDrip: number;
-  viscosity: 'thick' | 'thin';
+  viscosity: ViscosityMode;
   polarity: number; // Repulsion between blobs
   
   /*
@@ -838,7 +854,7 @@ export interface VisualizerSettings {
   iridescence: number;        // thin-film colour running round bubble rims
 
   // Photograph — the macro shot of oil on water rather than the projected show
-  renderStyle: 'show' | 'photo'; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
+  renderStyle: RenderStyle; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
   paperA: string;             // the backdrop's two colours
   paperB: string;
   camera: number;             // the camera pass as a whole (0 = off): refraction, depth of field, bloom, chromatic aberration, the sensor's roll-off
@@ -865,7 +881,7 @@ export interface VisualizerSettings {
    * aim, 'follow' locks onto the liquid under the aim and rides with it,
    * 'auto' picks its own subjects and cuts between them. Absent is hold.
    */
-  macroCamera?: 'hold' | 'follow' | 'auto';
+  macroCamera?: MacroCameraMode;
   /** Where the closeup camera is aimed, across and up the plate (0-1). */
   macroAimX?: number;
   macroAimY?: number;

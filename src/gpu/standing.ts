@@ -31,7 +31,7 @@ const H0 = FILM_H0;
 const EPS = 0.03;
 const THETA = (10 * Math.PI) / 180;
 const HS = 2;
-const LANGEVIN = 0.035;
+export const LANGEVIN = 0.035;
 const LC = SPIKE_PITCH / (2 * Math.PI);
 /*
   The liquid's initial susceptibility, the slope of its magnetisation at
@@ -76,7 +76,7 @@ const LC = SPIKE_PITCH / (2 * Math.PI);
   whole one above, with a lift nearer the real one to stand domes on the
   mound it makes.
 */
-const CHI0 = 2.6;
+export const CHI0 = 2.6;
 const PULL_SHARE = 0;
 function langevin(x: number): number { return x < 1e-3 ? x / 3 : 1 / Math.tanh(Math.min(x, 20)) - 1 / x; }
 const PULL = PULL_SHARE * (2 / langevin(SPIKE_ONSET / LANGEVIN) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);

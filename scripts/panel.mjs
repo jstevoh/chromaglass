@@ -267,8 +267,8 @@ check('a map saved before rides today\'s ranges',
   ['globalSpeed', 'macroZoom', 'kaleidoscope'].every(k =>
     travel[k]?.[0] === PIN_RANGE.get(k).min && travel[k]?.[1] === PIN_RANGE.get(k).max),
   Object.entries(travel).map(([k, [a, b]]) => `${k} ${a}–${b}`).join(', '));
-check('and a binding MIDI cannot learn keeps the travel it came with',
-  travel.sensitivity?.[0] === 0.2 && travel.sensitivity?.[1] === 2);
+check('and a binding MIDI cannot learn is dropped',
+  travel.sensitivity === undefined && oldMap.bindings.length === 3);
 check('and every MIDI range is in the registry as it is',
   LEARNABLE_SETTINGS.every(m => PIN_RANGE.get(String(m.key))?.min === m.min && PIN_RANGE.get(String(m.key))?.max === m.max));
 
