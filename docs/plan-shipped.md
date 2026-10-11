@@ -2787,6 +2787,41 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
   Stardust Collapse 21 → 127, Soap Film 63 → 136); the 14 left alone from 54.5 to 62.5,
   from the dye and the grade alone.
 
+### 18m. A drop slumps under its own weight (replaces a drop that sits or blurs)
+
+- **What was reported** (the owner, 2026-10-11): "I don't feel like we have dye and
+  other diffusion through clear water."
+- **What was measured** (the audit, lab, a 1 cm drop on a still thin-gap plate): at
+  Diffusion Rate 0, as twelve looks have it, the drop did not move in 20 s (rms radius
+  4.69 → 4.70 mm); at the slider's top it blurred into a Gaussian at D ≈ 1.7e-5 m²/s,
+  about 40,000× food dye's molecular rate (18h's "about 1000×" corrected). Neither is
+  what ink does: molecular diffusion would move it under 0.01 mm in 20 s. What spreads
+  a drop of food colouring is its weight (its glycol makes it a percent or two denser
+  than water): it sinks to the lower glass and runs out under the clear water as a
+  viscous gravity current, a flat pool with a sharp front, r ∝ t^⅛ (Huppert 1982).
+- **What was built:** `wgsl/slump.ts`, a stage of its own in the dye's step (apart from
+  18h's 'dye diffuse', which Antigravity is replacing). The dense layer's flux between
+  two glasses, with no slip on both, no net flux through the gap and equal viscosities,
+  is q = −(g′/3ν) η³(1 − η/b)³ ∇η (derived for this, the same as Zheng, Rongy and Stone
+  2015): Huppert's current while the layer is thin against the gap, choked as it fills
+  it. The depth is the dye's amount × DYE_LAYER (0.36 mm a unit: the lab's drop is a
+  0.05 mL drop from a dropper), Δρ is Dye Weight's contrast (2% to 15%) times the dye's
+  strength (its strongest band per unit over a full-strength dye's; white, clear liquid,
+  weighs nothing), the current runs in the water's share of a cell, and cos θ of g on a
+  plate stood up. Explicit, in flux form (no dye made or lost), colour carried upwind,
+  K worked out once a step, up to six substeps with each face held to 0.24 of its
+  difference (18m-1 names the cap). On the default Thickness (a light oil, ν 2.2e-5)
+  that is two passes and a drop spreads slowly; in water seven, and it runs.
+- **Measured** (`npm run slump`, lab, 256², a 0.05 mL full-strength drop in water,
+  before the check's controls were added): front 3.94 mm → 6.6 (1 s) → 8.0 (5 s) → 9.6
+  (20 s) → 11.25 mm (60 s), against Huppert's 6.54, 7.99, 9.51, 10.91; growth t^0.125
+  from 5 to 30 s; the edge 0.886 (half-peak radius over twentieth-peak; a Gaussian
+  reads 0.48); Dye Weight 1 ×1.266 further at 20 s against the law's ×1.286. A numpy copy
+  of the kernels at 768² (the cap binds harder there) reads 10.96 mm at 60 s. The
+  before and after pictures are in the project's files (`diffusion/`).
+- **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
+  drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
