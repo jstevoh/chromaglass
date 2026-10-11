@@ -1,8 +1,8 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import type { SongMap } from '../lib/musicTypes';
 import type { ActionWhat, ActionWhen, SongShow } from '../lib/songShows';
 import {
-  scoreOf, playhead, nudgeFor, nudgeStep, nudgeLabel, pinWhen, sectionName, mmss,
+  scoreOf, playhead, nudgeFor, nudgeStep, nudgeLabel, pinWhen, sectionName, mmss, hasBeat, type NudgeKind,
 } from '../lib/songScore';
 
 /**
@@ -31,9 +31,13 @@ export interface SongScoreProps {
   nudgeSec: number;
   /** The tempo the show hears, for a beat's nudge; 0 when it has none. */
   bpm: number;
+  /** How long the runtime counts the song as lasting, for "before the end" cues (`songDuration`). */
+  durationSec: number | null;
   /** The song's show, when it has one. */
   show: SongShow | null;
   onNudge: (deltaSec: number) => void;
+  /** Worked out from the song's position at the press, not the one drawn (which can be half a second old). */
+  onNudgeToSection: (kind: NudgeKind) => void;
   onResetNudge: () => void;
   /** Add a cue to the song's show (making the show, if the song has none). */
   onPin: (when: ActionWhen, what: ActionWhat) => void;
@@ -72,11 +76,13 @@ const SAYS: Record<Exclude<ScorePhase, 'ready'>, (song: string | null) => string
 };
 
 export function SongScore(p: SongScoreProps) {
-  const score = useMemo(() => (p.map && p.phase === 'ready' ? scoreOf(p.map, p.show) : null), [p.map, p.phase, p.show]);
+  const score = useMemo(() => (p.map && p.phase === 'ready' ? scoreOf(p.map, p.show, p.durationSec) : null), [p.map, p.phase, p.show, p.durationSec]);
   const head = score ? playhead(score, p.positionSec) : null;
   // The section being looked at: one picked on the lane, or else the one the song is in.
   const [picked, setPicked] = useState<number | null>(null);
   const [every, setEvery] = useState(false);
+  // A section picked in one song is not a section of the next.
+  useEffect(() => { setPicked(null); }, [p.map]);
   const sel = score ? score.sections[picked ?? head?.index ?? -1] ?? null : null;
 
   const laneH = p.touch ? 72 : 56;
@@ -164,17 +170,17 @@ export function SongScore(p: SongScoreProps) {
       <div className="flex flex-wrap items-center gap-1.5" data-testid="score-nudge">
         <button type="button" className={btn} disabled={!ready} onClick={() => p.onNudge(-step)} data-testid="score-nudge-earlier"
           title="The show is ahead of the song: move it back">
-          − {p.bpm >= 40 ? 'beat' : '½ s'}
+          − {hasBeat(p.bpm) ? 'beat' : '½ s'}
         </button>
         <button type="button" className={btn} disabled={!ready} onClick={() => p.onNudge(step)} data-testid="score-nudge-later"
           title="The show is behind the song: move it on">
-          + {p.bpm >= 40 ? 'beat' : '½ s'}
+          + {hasBeat(p.bpm) ? 'beat' : '½ s'}
         </button>
-        <button type="button" className={btn} disabled={toStart === null} onClick={() => toStart !== null && p.onNudge(toStart)} data-testid="score-section-now"
+        <button type="button" className={btn} disabled={toStart === null} onClick={() => p.onNudgeToSection('section-start')} data-testid="score-section-now"
           title="The show reached this section early: it starts now">
           Section starts now
         </button>
-        <button type="button" className={btn} disabled={toNext === null} onClick={() => toNext !== null && p.onNudge(toNext)} data-testid="score-next-now"
+        <button type="button" className={btn} disabled={toNext === null} onClick={() => p.onNudgeToSection('next-section')} data-testid="score-next-now"
           title="The song is already in the next section">
           Next section now
         </button>

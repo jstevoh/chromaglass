@@ -36,8 +36,10 @@
  * really turns, which is an estimate from one listen. So the nudge moves the
  * position: a beat at a time, or "the section the show is in starts now"
  * (the show got there early) and "the next section is now" (the song got
- * there first). Everything that reads the position (the song's show, the
- * sequencer's section stages, the lyrics) moves with it.
+ * there first). What reads the song's position moves with it: a song's show
+ * that follows the song, the sequencer's section stages, the lyrics. A show
+ * started by hand keeps its own clock and does not (PLAN 28h-4), nor do a
+ * listen's replay and a take (28h-7), which count from the recognised start.
  *
  * Pure: a map and a show in, a score out; no DOM, no clock. `npm run score`
  * drives it with a known song.
@@ -118,9 +120,19 @@ function resample(curve: readonly number[], n: number): number[] {
  * fire. `show` may be null (a song with no show yet: the score is still the
  * song, and pinning the first cue makes the show).
  */
-export function scoreOf(map: Pick<SongMap, 'durationSec' | 'sections' | 'energyCurve'>, show: SongShow | null, points = 160): Score {
+export function scoreOf(
+  map: Pick<SongMap, 'durationSec' | 'sections' | 'energyCurve'>,
+  show: SongShow | null,
+  /**
+   * How long the runtime believes the song is, which is what its "before the
+   * end" cues count back from (`songDuration`). The map's own length when
+   * omitted, which is the runtime's last resort too.
+   */
+  durationSec?: number | null,
+  points = 160,
+): Score {
   const sections0 = map.sections;
-  const duration = Math.max(1, map.durationSec || (sections0.length ? sections0[sections0.length - 1].end : 1));
+  const duration = Math.max(1, durationSec || map.durationSec || (sections0.length ? sections0[sections0.length - 1].end : 1));
   const counts: Record<string, number> = {};
   const sections: ScoreSection[] = sections0.map((s: SongSection, index) => {
     const key = countKey(s.label);
@@ -162,6 +174,18 @@ export function scoreOf(map: Pick<SongMap, 'durationSec' | 'sections' | 'energyC
   return { duration, sections, energy: resample(map.energyCurve ?? [], points), cues, loose };
 }
 
+/**
+ * How long a song is, as a song's show counts it: whoever started the show,
+ * then the recognised track, then the show's own note of the song, then the
+ * song map. One answer for the runtime (`useSongShows`) and the score, so a
+ * cue drawn "8 s before the end" fires there; the map is last because the
+ * listen it was made from can run long or stop short.
+ */
+export function songDuration(...sources: (number | null | undefined)[]): number | null {
+  for (const d of sources) if (typeof d === 'number' && Number.isFinite(d) && d > 0) return d;
+  return null;
+}
+
 /** Where the playhead is: its place, the section it is in, and how long until the next one. */
 export function playhead(score: Score, positionSec: number): { x: number; index: number | null; intoSection: number; toNext: number | null } {
   const t = Math.max(0, positionSec);
@@ -187,7 +211,7 @@ export type NudgeKind = 'section-start' | 'next-section';
  * the next section is now: the song got there first, so the position goes
  * forward to the next one's first second, and that section's cues fire.
  */
-export function nudgeFor(score: Pick<Score, 'sections'>, positionSec: number, kind: NudgeKind): number | null {
+export function nudgeFor(score: { sections: readonly { start: number; end: number }[] }, positionSec: number, kind: NudgeKind): number | null {
   const t = Math.max(0, positionSec);
   const i = score.sections.findIndex(s => t >= s.start && t < s.end);
   if (kind === 'section-start') return i >= 0 ? score.sections[i].start - t : null;
@@ -196,7 +220,8 @@ export function nudgeFor(score: Pick<Score, 'sections'>, positionSec: number, ki
 }
 
 /** The nudge's fine step: a beat at the tempo the show hears, or half a second without one. */
-export const nudgeStep = (bpm: number): number => (bpm >= 40 && bpm <= 240 ? 60 / bpm : 0.5);
+export const hasBeat = (bpm: number): boolean => bpm >= 40 && bpm <= 240;
+export const nudgeStep = (bpm: number): number => (hasBeat(bpm) ? 60 / bpm : 0.5);
 
 /**
  * The "when" for a cue pinned on the score: this section only ("at the second
@@ -218,3 +243,39 @@ export const mmss = (sec: number): string => {
   const s = Math.max(0, Math.round(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
+
+/**
+ * Where the song is: the clock started when the song was recognised, plus the
+ * nudge. `useMusicIntelligence` reads the position through this, every tick
+ * and at a nudge, so `npm run score` can run the same arithmetic.
+ *
+ * The nudge is held here and not written into the track's `offsetSec`, because
+ * the fingerprint re-anchors `offsetSec` every few seconds while a song is
+ * known (the local matcher, then the API), and a nudge written there would be
+ * gone within twelve seconds. The re-anchor is right about where the *audio*
+ * is; what the nudge corrects is where the map put an edge, or where a
+ * performer hears the chorus begin, which no re-anchor knows. So it outlives
+ * every re-anchor of the same song and goes when the song does.
+ */
+export class SongPosition {
+  private isrc: string | null = null;
+  private nudgeSec = 0;
+
+  get nudge(): number { return this.nudgeSec; }
+
+  /** The position now, seconds into the song; null when no song is on the clock. A different song takes the nudge away. */
+  at(track: { isrc: string; offsetSec?: number; identifiedAtMs?: number } | null, nowMs: number): number | null {
+    if (!track || track.identifiedAtMs == null) return null;
+    if (track.isrc !== this.isrc) { this.isrc = track.isrc; this.nudgeSec = 0; }
+    return Math.max(0, (track.offsetSec ?? 0) + (nowMs - track.identifiedAtMs) / 1000 + this.nudgeSec);
+  }
+
+  /** Move the song later (+) or earlier (-). */
+  add(deltaSec: number): void { if (Number.isFinite(deltaSec)) this.nudgeSec += deltaSec; }
+
+  /** Take the nudge out. */
+  reset(): void { this.nudgeSec = 0; }
+
+  /** The song went: the next one, even the same song played again, starts unnudged. */
+  forget(): void { this.isrc = null; this.nudgeSec = 0; }
+}

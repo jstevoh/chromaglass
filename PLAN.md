@@ -6036,6 +6036,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (`startAt`) lays its stages end to end by seconds and does not follow the nudge or
     a section's time; show the stages against the sections, and let a stage advance
     on a named section ("the second chorus"), not only on any section change.
+    A show started by hand from the Songs sheet keeps its own clock and reads no
+    sections, so the nudge leaves it alone.
+  - **28h-7.** A listen's replay and a recorded take count from the recognised
+    start (`songStartMs`), not the nudged position: a take made after a nudge stores
+    the unnudged start. Decide whether a take should carry the nudge.
   - **28h-5.** The remote phone (`RemoteControl.tsx`, over the show server) does not
     get the score yet; the phone layout's Play sheet does.
   - **28h-6.** A repeated section in a live take (the band plays the chorus twice)

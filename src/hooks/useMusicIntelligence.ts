@@ -21,6 +21,7 @@ import { identify, manualIdentity, fingerprintingAvailable, capturePcm } from '.
 import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '../lib/localFingerprint';
 import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
 import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/songMap';
+import { SongPosition, nudgeFor, type NudgeKind } from '../lib/songScore';
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
 import {
   trackSeed, newTrackState, evolveAfterListen, buildVisualParams,
@@ -108,6 +109,8 @@ export interface MusicIntelResult {
    * this play of this song. The score's nudge (`lib/songScore.ts`).
    */
   nudgePosition: (deltaSec: number) => void;
+  /** "Section starts now" or "Next section now", from the song's position as it is this instant. */
+  nudgeToSection: (kind: NudgeKind) => void;
   /** Take the nudge back out: the position is the clock's own again. */
   resetNudge: () => void;
 }
@@ -123,22 +126,9 @@ export function useMusicIntelligence(
   const [lyrics, setLyrics] = useState<LyricsResult | null>(null);
   const [trackState, setTrackState] = useState<TrackEvolutionState | null>(null);
   const [positionSec, setPositionSec] = useState(0);
-  /*
-    The nudge: seconds added to the position clock's own reading, for this play
-    of this song.
-
-    Why an offset the clock carries, and not a change to the track's
-    `offsetSec`: the clock is re-anchored from the fingerprint every few
-    seconds while a track is known (the local matcher, then the API), and each
-    re-anchor writes a fresh `offsetSec`, which would wipe a nudge out within
-    twelve seconds of its being made. On a record the re-anchor is right about
-    where the *audio* is, to a frame; what it cannot be right about is where
-    the song map put a section's edge, which is an estimate from one listen
-    (`songMapWorker.ts`), or where a performer hears the chorus begin. That
-    disagreement is what the nudge corrects, so it has to outlive the re-anchor
-    and go only when the song does.
-  */
-  const nudgeRef = useRef(0);
+  // The position clock, with the score's nudge in it (lib/songScore.ts
+  // SongPosition says why the nudge is kept beside offsetSec, not in it).
+  const posClockRef = useRef(new SongPosition());
   const [nudgeSec, setNudgeSec] = useState(0);
   const [identifying, setIdentifying] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -229,7 +219,7 @@ export function useMusicIntelligence(
   const adoptTrack = useCallback(async (identity: TrackIdentity, streamForRecording: MediaStream | null) => {
     setTrack(identity);
     setReplayListenNumber(null);
-    nudgeRef.current = 0;
+    posClockRef.current.forget();
     setNudgeSec(0);
     setPositionSec(identity.offsetSec ?? 0);
     lastPosRef.current = identity.offsetSec ?? 0;
@@ -312,7 +302,7 @@ export function useMusicIntelligence(
     if (reason !== 'trackChange') {
       setTrack(null); setSongMap(null); setLyrics(null);
       setPositionSec(0);
-      nudgeRef.current = 0;
+      posClockRef.current.forget();
       setNudgeSec(0);
     }
   }, [refreshTracks, addToFpIndex]);
@@ -336,7 +326,7 @@ export function useMusicIntelligence(
 
       // Position clock
       if (currentTrack?.identifiedAtMs != null) {
-        const pos = Math.max(0, (currentTrack.offsetSec ?? 0) + (now - currentTrack.identifiedAtMs) / 1000 + nudgeRef.current);
+        const pos = posClockRef.current.at(currentTrack, now) ?? 0;
         setPositionSec(pos);
 
         // Lyric triggers in (lastPos, pos]
@@ -529,21 +519,37 @@ export function useMusicIntelligence(
 
   const clearTrack = useCallback(() => { finalizeListen('manual'); }, [finalizeListen]);
 
-  // Shown at once rather than on the clock's next half-second tick, so a
-  // performer pressing it twice sees each press land.
-  const nudgePosition = useCallback((deltaSec: number) => {
+  /*
+    A nudge is a seek, not playback: what lies between the old position and
+    the new is jumped over, so the lyric triggers and a replay's gestures
+    (which fire on the span since the last tick) start from where it lands
+    instead of firing everything the jump crossed at once. And the new
+    position is shown at once rather than on the clock's next half-second
+    tick, so two presses read as two.
+  */
+  const seekBy = useCallback((deltaSec: number) => {
+    const clock = posClockRef.current;
     if (!trackRef.current || !Number.isFinite(deltaSec) || deltaSec === 0) return;
-    nudgeRef.current += deltaSec;
-    setNudgeSec(nudgeRef.current);
-    setPositionSec(p => Math.max(0, p + deltaSec));
+    clock.add(deltaSec);
+    const pos = clock.at(trackRef.current, performance.now());
+    setNudgeSec(clock.nudge);
+    if (pos !== null) { setPositionSec(pos); lastPosRef.current = pos; }
   }, []);
-  const resetNudge = useCallback(() => {
-    const d = nudgeRef.current;
-    if (d === 0) return;
-    nudgeRef.current = 0;
-    setNudgeSec(0);
-    setPositionSec(p => Math.max(0, p - d));
-  }, []);
+  const nudgePosition = useCallback((deltaSec: number) => seekBy(deltaSec), [seekBy]);
+  /*
+    The section nudges are worked out here, from the clock as it reads now,
+    not from the position the score was last drawn with: that is up to half a
+    second old, and pressed just after the show crossed an edge, "Section
+    starts now" would have seen the section before and gone back to its start.
+  */
+  const nudgeToSection = useCallback((kind: NudgeKind) => {
+    const map = songMapRef.current;
+    const pos = posClockRef.current.at(trackRef.current, performance.now());
+    if (!map || pos === null) return;
+    const d = nudgeFor(map, pos, kind);
+    if (d !== null) seekBy(d);
+  }, [seekBy]);
+  const resetNudge = useCallback(() => seekBy(-posClockRef.current.nudge), [seekBy]);
 
   const replayListenNumberRef = useRef<number | null>(null);
   useEffect(() => { replayListenNumberRef.current = replayListenNumber; }, [replayListenNumber]);
@@ -656,6 +662,6 @@ export function useMusicIntelligence(
     overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
     manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
-    nudgePosition, resetNudge,
+    nudgePosition, nudgeToSection, resetNudge,
   };
 }

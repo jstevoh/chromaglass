@@ -29,7 +29,7 @@
  */
 
 import { dueActions, sectionsAt, newId } from '../src/lib/songShows.ts';
-import { scoreOf, playhead, nudgeFor, nudgeStep, pinWhen, sectionName, nudgeLabel } from '../src/lib/songScore.ts';
+import { scoreOf, playhead, nudgeFor, nudgeStep, pinWhen, sectionName, nudgeLabel, songDuration, SongPosition } from '../src/lib/songScore.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -66,13 +66,13 @@ const SHOW = {
  * at each real time, and what fired when. `posAt` is the clock the show
  * reads, so a nudge or a live take's warp is just a different `posAt`.
  */
-function play(show, posAt, sections = SECTIONS, until = DURATION) {
+function play(show, posAt, sections = SECTIONS, until = DURATION, duration = DURATION) {
   const fired = new Map();
   const log = [];
   const timed = { ...show, actions: show.actions.filter((a) => a.when.at !== 'kick') };
   for (let real = 0; real <= until + 1e-9; real += STEP) {
     const t = posAt(real);
-    const clock = { t, duration: DURATION, ...sectionsAt(sections, t), kicks: 0 };
+    const clock = { t, duration, ...sectionsAt(sections, t), kicks: 0 };
     for (const a of dueActions(timed, clock, fired)) log.push({ id: a.id, real, t });
   }
   return log;
@@ -106,6 +106,20 @@ check('a cue on every chorus is drawn on each of the three, the second chorus on
   `every: ${score.cues.filter((c) => c.actionId === SHOW.actions[2].id).map((c) => c.at)}; second: ${score.cues.filter((c) => c.actionId === SHOW.actions[3].id).map((c) => c.at)}`);
 check('a kick cue is listed beside the lane, not placed on it',
   score.loose.length === 1 && score.loose[0].actionId === SHOW.actions[7].id && !score.cues.some((c) => c.actionId === SHOW.actions[7].id));
+/*
+  "Before the end" counts back from the length the runtime believes, which is
+  the recognised track's when it has one and the map's only when nothing else
+  says. A track the service says is 170 s long, with a map made from a listen
+  that ran to 180: the countdown cue must be drawn where it fires, 162 s.
+*/
+const endCue = SHOW.actions[6];
+const trackLong = songDuration(null, 170, undefined, MAP.durationSec);
+const drawnEnd = scoreOf(MAP, SHOW, trackLong).cues.find((c) => c.actionId === endCue.id)?.at;
+const firedEnd = play(SHOW, (r) => r, SECTIONS, DURATION, trackLong).find((f) => f.id === endCue.id)?.t;
+check('a "before the end" cue is drawn where it fires, from the length the runtime counts by, the map\'s only as the last resort',
+  trackLong === 170 && near(drawnEnd, 162) && near(firedEnd, 162)
+    && songDuration(null, undefined, undefined, 180) === 180 && songDuration(0, NaN, null, null) === null,
+  `drawn at ${drawnEnd} s, fired at ${firedEnd} s`);
 check('a song with no show is still a score, with no cues', (() => { const s = scoreOf(MAP, null); return s.sections.length === 8 && s.cues.length === 0; })());
 
 // ── 3. Pinning on the score ───────────────────────────────────────────
@@ -182,6 +196,38 @@ check('the fine nudge is a beat at the tempo heard, half a second without one',
   Math.abs(nudgeStep(120) - 0.5) < 1e-9 && Math.abs(nudgeStep(90) - 2 / 3) < 1e-9 && nudgeStep(0) === 0.5 && nudgeStep(400) === 0.5);
 check('the nudge reads as signed seconds, and as nothing at none',
   nudgeLabel(0) === '' && nudgeLabel(1.25) === '+1.3 s' && nudgeLabel(-3) === '−3.0 s');
+
+// ── 6. The clock the nudge lives in (useMusicIntelligence reads through it) ──
+/*
+  The fingerprint re-anchors the song's clock every few seconds: a fresh
+  offsetSec and identifiedAtMs for the same song. A nudge kept in offsetSec
+  would be gone at the first; kept beside it, it must survive every one, and
+  go when the song changes or is forgotten (the same song played again
+  later starts unnudged).
+*/
+const pos = new SongPosition();
+const songA = { isrc: 'A', offsetSec: 10, identifiedAtMs: 0 };
+const before = pos.at(songA, 5000);
+pos.add(1.5);
+const nudgedNow = pos.at(songA, 5000);
+const reanchored = pos.at({ isrc: 'A', offsetSec: 27, identifiedAtMs: 12000 }, 17000);
+const otherSong = pos.at({ isrc: 'B', offsetSec: 0, identifiedAtMs: 17000 }, 18000);
+pos.add(2); pos.forget();
+const afterForget = pos.at({ isrc: 'B', offsetSec: 0, identifiedAtMs: 17000 }, 18000);
+check('the nudge moves the clock, survives the fingerprint re-anchoring the same song, and goes with the song',
+  before === 15 && nudgedNow === 16.5 && reanchored === 33.5 && otherSong === 1 && afterForget === 1 && pos.at(null, 0) === null,
+  `15 → ${nudgedNow} nudged, ${reanchored} after a re-anchor (32 + 1.5), ${otherSong} on the next song`);
+/*
+  Pressed 0.2 s after the show crossed into the first chorus (40 s), with the
+  score last drawn at 39.8: "Section starts now" worked out from the drawn
+  position would go back to the verse's start (12 s, 27.8 s back); from the
+  clock at the press, to the chorus's start, 0.2 s back.
+*/
+const live = new SongPosition();
+const atPress = live.at({ isrc: 'A', offsetSec: 40.2, identifiedAtMs: 0 }, 0);
+check('a section nudge is worked out from the clock at the press, not the position last drawn',
+  Math.abs(nudgeFor(score, atPress, 'section-start') + 0.2) < 1e-9 && Math.abs(nudgeFor(score, 39.8, 'section-start') + 27.8) < 1e-9,
+  `${nudgeFor(score, atPress, 'section-start').toFixed(1)} s from the clock, ${nudgeFor(score, 39.8, 'section-start').toFixed(1)} s from the drawn position`);
 
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} score checks pass`);
