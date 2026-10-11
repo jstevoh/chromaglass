@@ -190,7 +190,9 @@ film's measure.
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
 (S) then **10.3-4otf, 10.3-sure, 10.3-half, 10.3-newsong, 10.3-fill** (S each);
-**10.2-snare** then **10.2-build** (M); **10.3-rest** (M).
+**10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11):
+**30a** shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
+with 30's envelope (M), **30b** LFOs and envelopes you set (S).
 
 Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back** (S);
 **16a-render, 16a-cast, 16a-remote, 16a-follow** (S each); **16b-logo** (S); **5-learncast**
@@ -202,7 +204,8 @@ Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the loa
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
-**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**.
+**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**; **13.5-link** before
+**13.5-osc** (§30), **13.4-ipad**, later **13.7-ipad**.
 
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
 
@@ -2481,11 +2484,27 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    finds it (the show server's page and `docs/`), plus a starter Resolume OSC map and
    a TouchDesigner OSC Out example that play presets, actions and settings. Works
    on the website with `npm run show` too. *Not started.*
-5. **ChromaGlass talks back and keeps time** (one PR, in the show server): OSC *out*
-   for the plate's colour, the sound bands and the beat, the way Art-Net out already
-   sends the colour to the lighting (`server/artnet.js`), so a VJ app's effects can
-   follow the plate. And Ableton Link in, feeding the beat clock the way MIDI clock
-   does. *Not started.*
+   - **13.4-ipad** (from §30): the same write-up for playing the show from an iPad in
+     AUM, with no new code. The iPad joins a network MIDI session, which a Mac shows to
+     Chrome as a Web MIDI port; AUM's MIDI matrix then sends clock, notes, CC and Program
+     Change (14t-pc) to the show; the audio arrives on the interface's line in; Link
+     joins once 13.5-link ships. The network MIDI path is inferred, not tested: then
+     *(owner)* tried once on the Mac with an iPad, a `docs/judging.md` entry (next free
+     number at merge).
+5. **ChromaGlass talks back and keeps time**, now two PRs in the show server, Link
+   first (§30, 2026-10-11: Link is the shared clock of the iPad's music apps, AUM, Loopy
+   Pro, Drambo, Koala, as well as of Resolume, VDMX and TouchDesigner, and VS offers it
+   as a clock source):
+   - **13.5-link**: Ableton Link in, feeding the beat clock the way MIDI clock does
+     (`beatClock.setExternal`), with tempo and phase; "Link" as a tempo source in the
+     Sound sheet. A page cannot join Link, so it is the Mac app's and the show server's,
+     which fits §23's rule that paid is what a page cannot do. On the phone, Link's
+     switch, its peers and its tempo in the More sheet. *Measure:* a node Link peer at
+     a tempo and a phase the clock reaches within a beat, and follows when it changes.
+   - **13.5-osc**: OSC *out* for the plate's colour, the sound bands and the beat, the
+     way Art-Net out already sends the colour to the lighting (`server/artnet.js`), so
+     a VJ app's effects can follow the plate.
+   *Not started.*
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
    (§11), not through a virtual camera. *Not started.*
 
@@ -2517,6 +2536,12 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    the link's switch and its slot bindings are in the More sheet.
    Before any of it, the MIDI route in the table above, tried once in Logic and
    Ableton and written up with step 4. *Not started.*
+   - **13.7-ipad** (later, from §30; after step 7 and §12's iPad app): the iPad sibling.
+     An AUv3 that draws nothing, sits on an AUM (or Loopy Pro, Drambo) channel, and
+     sends that channel's readings, its notes and the host's transport to the show over
+     Wi-Fi, so each instrument has its own ear with no cables, as 24.1's patch inputs
+     give a rack. The same bridge link in the show server as step 7, so the node fake
+     checks both.
 
 8. **Later: one renderer core, native as well as on the web** (asked 2026-10-04,
    the owner: "add it to the plan for later"). Not scheduled: it is what the plate
@@ -3167,6 +3192,15 @@ is live after the third track); `npm run music` with a `finalizeListen` that thr
   three quarters of a beat off. (Start and a clock dropout are 14e's.) 14-bit pairs and
   NRPN (CC 99/98/6/38) are not decoded either, so learn and auto-map bind the coarse
   byte or the parameter number.
+- *Program Change is dropped* (**14t-pc**, from §30). `parseMidi` (`midi.ts`) returns
+  CC and note on/off and nothing else, so a 0xC0 message never reaches learn. AUM's
+  MIDI matrix, the Elektron boxes and most hardware sequencers send Program Change (and
+  Bank Select, CC 0/32) when the pattern changes, and Imaginando's VS switches patches
+  on it. A `program` binding kind in `MidiTarget`, bound either to set-list item n or
+  to a named preset, played with the item's own fade. On the phone, the bindings are
+  listed on its MIDI page. *Measure:* beside `npm run desk`'s MIDI lines, a recorded
+  run of Program Change messages lands on the bound look every time, none doubled,
+  with the item's fade.
 - *The decks already know the bar* (*proposed*). Pioneer's Pro DJ Link (a CDJ's beat
   packets carry the beat within the bar and the tempo) and Denon's StageLinQ are on the
   network the show server already listens on for OSC and Art-Net. They give the true
@@ -5493,6 +5527,12 @@ sit behind the key.
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 
+**Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
+standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
+with an unlock on Android. Pro at $199 sits above it, so Pro's pitch leads with what VS
+does not do: a simulated liquid rather than a stack of shaders, the room's lights
+(Art-Net), the phone as a remote, and several projectors.
+
 ## 24. Modular rigs: patch the rack into the liquid
 
 *Asked 2026-10-04: how to sell ChromaGlass straight to modular (Eurorack) synth players,
@@ -5574,6 +5614,13 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   `npm run desk`'s MIDI lines, a page fed a recorded sequence of notes on two
   channels: one drop per note-on, the dye by pitch, the size rising with velocity, and
   a held note's pour lasting its length within a frame.
+  *Moved up and widened (§30, 2026-10-11).* Sequencer apps in an iPad host (AUM, Loopy
+  Pro, Drambo) send notes rather than CCs, and Imaginando's VS is played by notes firing
+  envelopes. Two additions: each channel's pour gets an attack and a release, so a note
+  can swell in and fade out rather than start and stop; and notes become a patch-bay
+  source (`notes`: velocity, pitch, held, per channel), so a note can ride any setting
+  the way a band does. The measure adds a held note whose pour rises over its attack
+  and falls over its release, each within 10% of its time.
 - **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
   DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
   (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid
@@ -6102,8 +6149,88 @@ the code's entry points, the checks to add and the scenes to match, in
   and the phone: how much it beads up (today Relief / 3D), where the light is, how big
   the drop is.
 
+## 30. Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11)
+
+*Asked 2026-10-11: the owner shared Imaginando's post of an iPad running FRMS (a
+granular synth) and GRFX (granular effects) inside AUM, driving visuals made in VS, as
+an improvised audio-visual set, and asked what ChromaGlass should change or add. The
+owner put all of it into the plan the same day.*
+
+**What VS is.** Imaginando's visual synth: up to eight shader layers with blend modes,
+four voices a layer, four LFOs, two ADSR envelopes a layer and one modulation matrix.
+Its audio modulators either follow peaks (gate) or follow a band picked by dragging on
+a live spectrum, each with threshold, gain, attack and release. It reads MIDI notes,
+velocity, CC, clock and Program Change, keeps time on its own clock, MIDI clock or
+Ableton Link, plays playlists with a duration and a fade per entry, and sends NDI,
+Syphon and Spout. FRMS and GRFX are the sound side and have nothing visual to borrow.
+AUM is the iPad host: it routes audio, routes and filters MIDI through a matrix, and
+keeps everything on Link.
+
+**Where ChromaGlass already stands.** The patch bay is VS's matrix (sources onto any
+setting, bipolar depth, per plate: `SceneMapping` in `types.ts`); the named kick, snare,
+hats, bass, note and eight bands are its audio modulators; the set list and the
+sequencer are its playlists; MIDI learn, clock and timecode come in; Record is its
+recorder; and Art-Net puts the plate on the room's lights, which VS does not do at all.
+The gap is in how a sound or a note is shaped before it reaches a setting.
+
+**Ranked.** By what a performer gains for the work; each is briefed by Claude with its
+check written first and built by Antigravity. None moves the whole frame by default
+(the owner's rule), and every reading is a fast one (the owner's rule for sound patches).
+
+1. **30a**, below: shape each sound cord.
+2. **14t-pc**: Program Change picks a look or a set-list item.
+3. **24.3**, moved up: notes as voices, with an envelope per note and notes as a source.
+4. **13.5-link** before **13.5-osc**: Link first.
+5. **30b**, below: LFOs and envelopes you set.
+6. **13.4-ipad**: playing from an iPad in AUM, written up and tried once.
+7. **13.7-ipad**, later: an AUv3 bridge for iPad hosts.
+
+NDI, Syphon and Spout out (13.2, 13.3) stay where they are: VS ships all three, so a VJ
+expects them. The lights (14q, R8, 14m) stay next. §23 has VS's price.
+
+### 30a. A sound cord has only a depth
+
+A patch whose source is `sound` or `bands` carries a depth and nothing else, so a kick
+patch that fires on every boom of a live room, or a swell too slow for a ballad, cannot
+be tuned at the gig except by moving the depth, which changes how far it goes and not
+when. Add to each such patch a mode (*follow*: the reading rides the setting, as today;
+*gate*: a crossing fires a shaped pulse), a threshold, a gain, an attack and a release;
+and let a `bands` patch take its edges from a drag across a live spectrum in the panel
+rather than the eight fixed bands (`BAND_EDGES_HZ`, `audioFeatures.ts`), heard against
+its own recent range as the named bands are. Absent fields read as today's patch (follow,
+no threshold, gain 1, no smoothing beyond the feature's own), so every saved look and
+preset loads unchanged. On the phone, the patch's view carries the same controls and
+the spectrum strip. *Measure:* a new check fed synthetic tone bursts in and out of a
+dragged band: crossings counted against the threshold (equal, none doubled, none from
+outside the band), and the patch's rise and fall timed within 10% of its attack and
+release.
+
+### 30b. The LFOs and envelopes are fixed
+
+`modulators.ts` has four LFOs locked to bars and two envelopes, all fixed: an eight-bar
+and a two-bar sine, a one-bar triangle, a stepped LFO every beat, a snap and a swell,
+and a MIDI note fires both envelopes. A fixed eight-bar sine fits some songs and fights
+others. Let each LFO pick its rate in bars (a quarter to sixteen) and its shape (sine,
+triangle, ramp, stepped), and each envelope its attack and decay and what fires it (the
+kick, the snare, a note channel, a pad, or anything, as today). Today's rates and shapes
+are the defaults, so a look saved before keeps its motion; an LFO aimed at a setting
+that moves the frame stays off by default as every frame-moving source is. On the phone,
+rate and shape on the patch view. *Measure:* `npm run shapes` with each rate and shape
+set: the period within a frame of its bars at 120 and at 90 bpm, and an envelope fired
+by the kick on a recorded loop once per kick.
+
+**Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
+plate is a simulated liquid, not a stack of shaders (the owner's rule to model the real
+phenomenon), and VS sells pasting shaders made by a chatbot, which fails the rule that
+nothing in the app seems like AI. The "Business Plan" section below used to list
+"custom ISF shader imports" as a Pro feature; the owner dropped it on 2026-10-11. A feedback layer: the liquid already carries its own memory. The tunnel in
+the post's video, which zooms the whole frame on the sound: frame motion, off by default.
+ChromaGlass itself as an AUv3 inside AUM: the plate needs WebGPU and more memory than an
+audio extension gets (inferred), the same reason as §13's "not doing a plugin inside
+the host"; 13.7-ipad is the part of it that fits.
+
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
 * **PRO Desktop App ($200+ Paid):** The native desktop wrapper (Electron) will be sold as a premium, standalone product with a "buy once, use forever" model (no subscriptions).
-  * **Pro Features:** NDI/Syphon/Spout output, custom MIDI mapping, offline use, custom ISF shader imports, video injections (HAP/WebM), and Wallpaper Mode.
+  * **Pro Features:** NDI/Syphon/Spout output, custom MIDI mapping, offline use, video injections (HAP/WebM), and Wallpaper Mode.
