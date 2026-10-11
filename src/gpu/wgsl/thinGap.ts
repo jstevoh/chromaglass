@@ -346,14 +346,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let fm = clamp(textureLoad(film, min(q * filmDims / n, filmDims - 1), 0).r, 0.0, 1.0);
   let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
   let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
-  // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~20-50 cSt at 20°C):
-  // Two stratified layers in series across the gap (harmonic mean of viscosities):
-  // 1 / nu_eff = (1 - fm) / nu_water + fm / nu_oil.
+  // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~50 cSt at 20°C, 50x water):
+  // Two layers stacked across a pressure-driven Poiseuille gap (oil thickness fm against one
+  // wall, water depth a = 1 - fm against the other, continuous velocity and shear stress at interface).
   const OIL_REL_NU: f32 = 50.0;
-  let seriesDrag = 1.0 / max(1.0 - fm + fm / OIL_REL_NU, 1e-4);
-  let k0dt = A.a.x / (A.a.z * A.a.z) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * seriesDrag;
-  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * seriesDrag;
-  var ustar = u0 + (um - u0) * (A.b.y * (A.a.x / (A.a.z * A.a.z) * A.a.y)) + (uf.xy - um) * k0dt + A.b.zw * kdt;
+  let a_w = 1.0 - fm;
+  let B_poiseuille = (1.0 + (OIL_REL_NU - 1.0) * a_w * a_w) / (2.0 * OIL_REL_NU * (1.0 + (OIL_REL_NU - 1.0) * a_w));
+  let C_poiseuille = 1.0 / (2.0 * OIL_REL_NU) - B_poiseuille;
+  let Q_poiseuille = -a_w * a_w * a_w / 6.0 + OIL_REL_NU * B_poiseuille * a_w * a_w * 0.5
+    - (1.0 - a_w * a_w * a_w) / (6.0 * OIL_REL_NU) + B_poiseuille * (1.0 - a_w * a_w) * 0.5
+    + C_poiseuille * (1.0 - a_w);
+  let filmDrag = 1.0 / max(12.0 * Q_poiseuille, 1e-4);
+  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag;
+  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
     layer, and the liquid it touches moves with it. Brinkman's penalised
