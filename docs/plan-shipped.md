@@ -1858,7 +1858,34 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   10.16 s and first step 10.69 s (was 11.54 s on this PR's first run, the same
   opening), no frame gap over 0.62 s. The lanes now spend 27.4 of their 29 s
   compiling, so what is left is the compiles themselves: 48 of them, the first three
-  under Chromium's 2.9 s GPU start.
+  ### 14n. One malformed message can end the plate
+
+**Shipped** (#322): one `sanitizePatch` against the settings registry for the socket, MIDI map loader and loaded looks; gestures dropped if non-finite; `hexCache` bounded with 512-entry eviction; verified with `npm run sanitize` and `npm run remotemix`.
+
+**Read in the code; the chain was followed by hand, not run.** The display applies a
+remote `patch` as it comes (`case 'patch': queuePatch(message.settings)` →
+`updateSettings`, `App.tsx`): any key, of any type. `{"simResolution":"x"}` gives
+`Math.round("x")`, `NaN`, in `resolveSimResolution` (`LiquidVisualizer.tsx`); `new
+WebGPUFluid(device, NaN)` throws on `createTexture`, and the catch calls
+`governor.failRung()`, which marks the rung failed forever (`governor.ts`). Each rung in
+turn fails the same way, until the plate stands on "no WebGPU": a one-way door in the
+sense of `docs/stability-plan.md`. A phone on an older build that sends a renamed or
+retyped key does the same by accident. The OSC path already drops non-finite numbers
+(`oscToMessage`'s `num()`); the socket does not. Two more doors of the kind:
+
+- a MIDI map file's setting binding keeps any key and, for a key not in
+  `LEARNABLE_BY_KEY`, its own `min` and `max` unchecked (`parseMidiMap`, `midi.ts`),
+  where `parseSoundBindings` drops unknown keys;
+- gestures: `dx`/`dy` sent as strings become `NaN` in the CPU velocity
+  (`blowDirected`), and every distinct `drop.color` string becomes a key in `hexCache`
+  (`constants.ts`), which never forgets one.
+
+*Fix:* one `sanitizePatch` against the settings registry (known keys, the default's
+`typeof`, finite numbers clamped to the setting's range), used by the socket, the MIDI
+map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` bounded.
+*Measure:* a node check beside `npm run remotemix` that sends `simResolution: "x"`, a
+`NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
+governor's ladder and the cache as they were.
 
 ### 14s. The ear: the input picker (shipped)
 
