@@ -6215,9 +6215,8 @@ by the kick on a recorded loop once per kick.
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
 plate is a simulated liquid, not a stack of shaders (the owner's rule to model the real
 phenomenon), and VS sells pasting shaders made by a chatbot, which fails the rule that
-nothing in the app seems like AI. The "Business Plan" section below lists "custom ISF
-shader imports" as a Pro feature; that line and this one disagree, and the owner decides
-which stands. A feedback layer: the liquid already carries its own memory. The tunnel in
+nothing in the app seems like AI. The "Business Plan" section below used to list
+"custom ISF shader imports" as a Pro feature; the owner dropped it on 2026-10-11. A feedback layer: the liquid already carries its own memory. The tunnel in
 the post's video, which zooms the whole frame on the sound: frame motion, off by default.
 ChromaGlass itself as an AUv3 inside AUM: the plate needs WebGPU and more memory than an
 audio extension gets (inferred), the same reason as §13's "not doing a plugin inside
@@ -6227,4 +6226,4 @@ the host"; 13.7-ipad is the part of it that fits.
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
 * **PRO Desktop App ($200+ Paid):** The native desktop wrapper (Electron) will be sold as a premium, standalone product with a "buy once, use forever" model (no subscriptions).
-  * **Pro Features:** NDI/Syphon/Spout output, custom MIDI mapping, offline use, custom ISF shader imports, video injections (HAP/WebM), and Wallpaper Mode.
+  * **Pro Features:** NDI/Syphon/Spout output, custom MIDI mapping, offline use, video injections (HAP/WebM), and Wallpaper Mode.
