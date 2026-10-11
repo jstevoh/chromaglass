@@ -456,7 +456,7 @@ const AIR_SHEAR = 0.5;
   pools rocked as the app rocks them the colour moved 0.43 against 0.028
   before, where a look's own stir moves it 0.79.
 */
-export const ROCK_FALL = 13;
+export const ROCK_FALL = 12;
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
@@ -1341,11 +1341,11 @@ export class WebGPUFluid {
   private arg(name: string, values: number[]): GPUBuffer {
     let buf = this.args.get(name);
     if (!buf) {
-      buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+      buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
       this.args.set(name, buf);
     }
-    const v = new Float32Array(8);
-    v.set(values.slice(0, 8));
+    const v = new Float32Array(12);
+    v.set(values.slice(0, 12));
     this.device.queue.writeBuffer(buf, 0, v);
     return buf;
   }
@@ -3918,7 +3918,15 @@ export class WebGPUFluid {
     // x0, the field before the diffusion, kept while the field ping-pongs.
     this.run(pass, 'scaleDye', scratch, [field.read], this.arg('scale one', [1, 0, 0, 0]));
     const rcp = a.map((v) => 1 / (1 + 4 * v));
-    const args = this.arg(`jacobi ${label}`, [...a, ...rcp]);
+    /*
+      Zero-flux Neumann condition at the dish rim (OPEN_RIM = 0.5) is gated to
+      dye diffusion (label 'dye' or 'oil dye') so colour cannot diffuse out of
+      the dish into the overflow trough. Velocity viscosity diffusion must not
+      enforce a zero-gradient wall at the rim, which would damp tilt flow and
+      plate rock.
+    */
+    const isDye = label === 'dye' || label === 'oil dye';
+    const args = this.arg(`jacobi ${label}`, [...a, ...rcp, isDye ? 1 : 0, 0, 0, 0]);
     for (let k = 0; k < iters; k++) {
       this.run(pass, 'jacobi', field.write, [field.read, scratch], args);
       field.swap();
@@ -4664,6 +4672,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const enc = this.device.createCommandEncoder({ label: 'measure' });
     const pass = enc.beginComputePass({ label: 'measure' });
@@ -4677,7 +4686,7 @@ export class WebGPUFluid {
     this.statsFresh = !!data;
     if (data && this.statsRing.landed > this.statsLatest.at) {
       const f = new Float32Array(data);
-      const area = this.N * this.N;
+      const area = this.thinLive ? this.dishArea : this.N * this.N;
       this.statsLatest = {
         meanDensity: f[3] / area,
         meanColor: [f[0] / area, f[1] / area, f[2] / area],
@@ -4691,6 +4700,23 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
+  private dishAreaCells = 0;
+  /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
+  private get dishArea(): number {
+    if (this.dishAreaCells) return this.dishAreaCells;
+    let count = 0;
+    const n = this.N;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n - 0.5;
+        const v = (j + 0.5) / n - 0.5;
+        if (Math.hypot(u, v) < OPEN_RIM) count++;
+      }
+    }
+    this.dishAreaCells = count;
+    return count;
+  }
+
   /**
    * The same measurement, waiting for the GPU. For harnesses, not the show:
    * it answers about the plate as it is now rather than as it was two frames
@@ -4700,6 +4726,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const out = this.device.createBuffer({ label: 'stats now', size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'measure now' });
@@ -4713,7 +4740,7 @@ export class WebGPUFluid {
     const f = new Float32Array(out.getMappedRange().slice(0));
     out.unmap();
     out.destroy();
-    const area = this.N * this.N;
+    const area = this.thinLive ? this.dishArea : this.N * this.N;
     return {
       meanDensity: f[3] / area,
       meanColor: [f[0] / area, f[1] / area, f[2] / area],

@@ -101,6 +101,7 @@ struct Sim {
 struct Args {
   a: vec4f,            // jacobi's a, or another pass's four numbers
   b: vec4f,            // jacobi's 1/(1+4a), or four more
+  c: vec4f,            // pass flags / extra parameters
 };
 @group(0) @binding(1) var<uniform> A: Args;
 
@@ -1446,7 +1447,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var xr = textureLoad(x, r, 0);
   var xd = textureLoad(x, d, 0);
   var xu = textureLoad(x, u, 0);
-  if (S.thinGap > 0.5) {
+  // Zero-flux Neumann condition at the dish rim (OPEN_RIM = 0.5): gated to dye
+  // diffusion (A.c.x > 0.5) to keep colour inside the dish. Velocity viscosity
+  // diffusion must not enforce a zero-gradient wall at an open rim, which would
+  // damp tilt flow and plate rock.
+  if (S.thinGap > 0.5 && A.c.x > 0.5) {
     let xp = textureLoad(x, p, 0);
     if (length((vec2f(l) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { xl = xp; }
     if (length((vec2f(r) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { xr = xp; }
