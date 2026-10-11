@@ -2442,29 +2442,50 @@ export class WebGPUFluid {
         this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
-    // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h)
+    // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h, 18h-2)
     /*
       Molecular diffusion of food dye in water (Dm ≈ 4e-10 m²/s) is negligible
       on show timescales, holding crisp edges across streamlines. Along the flow,
       the Poiseuille parabolic velocity profile across the gap (u(z) = 1.5 ū (1 - 4z²/h²))
       shears dye columns into parabolic sheets with variance σ² ≈ 0.2 |ū|² (Δt)².
       On show timescales (t ≪ h²/Dm ≈ 25 hours), diffusion has not homogenized
-      across the 6 mm gap, so the flow is in the unsteady shear dispersion regime
-      rather than the asymptotic Taylor–Aris limit.
+      across the 6 mm gap, so the flow is in the pre-asymptotic, unsteady shear
+      dispersion regime rather than the asymptotic Taylor–Aris limit.
 
-      Shortcut: In this 2D depth-averaged solver, the depth z is not resolved.
-      We model along-streamline shear spreading as an anisotropic diffusion tensor
-      D_L = Dm + κ_T (h/h0)² |v_cells|² capped at 0.25 cells²/step (the von Neumann
-      positivity limit for 2D explicit face fluxes). κ_T = 0.45 models the
-      Poiseuille shear variance and flow-parallel stretching.
-      Molecular diffusion Dm scales with the Diffusion Rate slider (p.diff), but
-      shear dispersion κ_T is intrinsic to the flow shear and does not ride that slider.
+      In that pre-asymptotic regime, the parabolic shear is kinematically
+      reversible: when the flow stops or reverses, the sheared sheets fold back
+      up. A single 2D depth-averaged layer cannot resolve depth z, so modeling
+      shear spreading as an anisotropic diffusion tensor (D_L = Dm + κ_T |v|²)
+      acted as an irreversible diffusion proxy that smeared dye permanently
+      (failing reversibility checks). True reversible shear spreading is not
+      modelled here and is deferred to PLAN 18h-2 (e.g. multi-layer or profile
+      tracking).
+
+      In the app, shear dispersion is disabled (kappaT = 0.0), preserving sharp
+      edges across streamlines and physical reversibility under flow reversals.
+      kappaT is retained solely as a lab control for scripts/dispersion.mjs to
+      verify that an irreversible diffusion proxy fails the reversibility check.
+      Molecular diffusion Dm scales with the Diffusion Rate slider (p.diff).
     */
     const diffScale = p.diff > 0 ? p.diff / 0.0002 : 0;
     const dm = (D_MOLECULAR / (PLATE_METRES * PLATE_METRES)) * p.dt * n2 * diffScale;
     const dispCells = disp * (N - 2);
-    const kappaT = (p as any).kappaT ?? 0.0; // 18h: Pre-asymptotic shear is reversible, diffusion proxy causes permanent smear
+    const kappaT = p.kappaT ?? 0.0;
     const dispCap = 0.25;
+    /*
+      Skip the dye disperse pass when there is no plate displacement and physical
+      diffusion is negligible. `dm` is the step's molecular spread in cells²
+      ((D_m / plate_area) * dt * (N-2)² * diffScale).
+      At 0.0039 ≈ 1/256 (one 8-bit unorm quantum, 1/255 ≈ 0.00392), a step's
+      explicit Laplacian flux across a full-strength edge (|ΔC| = 1.0) produces
+      less than a single 8-bit quantization step of change.
+      At default show resolution (N = 256, dx ≈ 0.79 mm, dt = 1/60 s) with
+      p.diff = 0.0002, physical food dye diffusion in water (Dm ≈ 4e-10 m²/s)
+      yields dm ≈ 1.08e-5 cells²/step — ~360× below 1/256. Skipping this near
+      no-op pass saves ~0.4 ms/step on the GPU with zero visible change.
+      If dt or grid N changes, dm scales as dt * (N - 2)²; 0.0039 remains the
+      threshold where a step's diffusion alters an 8-bit level.
+    */
     stage('dye disperse', (pass) => {
       this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
         this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));

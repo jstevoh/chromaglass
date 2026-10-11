@@ -60,9 +60,10 @@ try {
   );
 
   
-  // ── 2: Pre-asymptotic shear is reversible ──
+  // ── 2 & 3: Pre-asymptotic shear is reversible, sharp across flow ──
   // A flow run forward and then reversed must return the spot to within 5%,
-  // while the same spot does stretch during the forward leg.
+  // while the same spot does stretch during the forward leg and stays sharp
+  // across the flow (sigY < 1.08x).
   // The control (kappaT = 0.45) must fail the return check.
 
   const testReversibility = async (kappaT_val) => {
@@ -129,6 +130,12 @@ try {
     'dye dispersion is physically reversible: spot stretches then returns',
     currentStretch > 1.02 && currentReturn < 0.05 && controlReturn > 0.05,
     `stretch ${currentStretch.toFixed(2)}x, returned within ${(currentReturn * 100).toFixed(1)}%, control failed at ${(controlReturn * 100).toFixed(1)}%`
+  );
+
+  check(
+    'dye stays sharp across the flow',
+    current.forward.sigY < current.before.sigY * 1.08,
+    `cross-flow sigma ${current.before.sigY.toFixed(4)} → ${current.forward.sigY.toFixed(4)} (change ${((current.forward.sigY / current.before.sigY - 1) * 100).toFixed(1)}%)`
   );
 
   // ── 4: Exact dye conservation under violent swirling flow ──
