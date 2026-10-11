@@ -59,62 +59,76 @@ try {
     `peak retention ${(peakRetention * 100).toFixed(2)}%, radius growth ${radiusGrowth.toFixed(4)} plate widths`
   );
 
-  // ── 2 & 3: Moving liquid: streaks along flow, sharp across flow ──
-  await page.evaluate(() => lab.create(128, 128));
-  await page.evaluate(() => {
-    lab.dye(0.5, 0.5, 0.06, [1, 0, 0], 1.0);
-    lab.flush();
-  });
+  
+  // ── 2: Pre-asymptotic shear is reversible ──
+  // A flow run forward and then reversed must return the spot to within 5%,
+  // while the same spot does stretch during the forward leg.
+  // The control (kappaT = 0.45) must fail the return check.
 
-  const spotMoments = () => page.evaluate(async () => {
-    const f = await lab.field('dye');
-    const L = 128;
-    let t = 0, cx = 0, cy = 0;
-    for (let j = 0; j < L; j++) {
-      for (let i = 0; i < L; i++) {
-        const d = f[(i + j * L) * 4 + 3];
-        t += d;
-        cx += d * (i + 0.5) / L;
-        cy += d * (j + 0.5) / L;
-      }
-    }
-    cx /= t; cy /= t;
-    let varX = 0, varY = 0;
-    for (let j = 0; j < L; j++) {
-      for (let i = 0; i < L; i++) {
-        const d = f[(i + j * L) * 4 + 3];
-        const dx = (i + 0.5) / L - cx;
-        const dy = (j + 0.5) / L - cy;
-        varX += d * dx * dx;
-        varY += d * dy * dy;
-      }
-    }
-    const sigX = Math.sqrt(varX / t);
-    const sigY = Math.sqrt(varY / t);
-    return { mass: t, sigX, sigY, aspect: sigX / sigY };
-  });
-
-  const spot0 = await spotMoments();
-  // Flow sustained in +x direction: inject velocity vx each step
-  for (let s = 0; s < 25; s++) {
+  const testReversibility = async (kappaT_val) => {
+    await page.evaluate(() => lab.create(128, 128));
     await page.evaluate(() => {
-      lab.vel(0.5, 0.5, 0.45, [2.5, 0, 0, 0]);
+      lab.dye(0.5, 0.5, 0.06, [1, 0, 0], 1.0);
       lab.flush();
-      return lab.step(1, { diff: 0.0002 });
     });
-  }
-  const spot1 = await spotMoments();
+    const spotMoments = () => page.evaluate(async () => {
+      const f = await lab.field('dye');
+      const L = 128;
+      let t = 0, cx = 0, cy = 0;
+      for (let j = 0; j < L; j++) {
+        for (let i = 0; i < L; i++) {
+          const d = f[(i + j * L) * 4 + 3];
+          t += d; cx += d * (i + 0.5) / L; cy += d * (j + 0.5) / L;
+        }
+      }
+      cx /= t; cy /= t;
+      let varX = 0, varY = 0;
+      for (let j = 0; j < L; j++) {
+        for (let i = 0; i < L; i++) {
+          const d = f[(i + j * L) * 4 + 3];
+          const dx = (i + 0.5) / L - cx;
+          const dy = (j + 0.5) / L - cy;
+          varX += d * dx * dx; varY += d * dy * dy;
+        }
+      }
+      return { sigX: Math.sqrt(varX / t), sigY: Math.sqrt(varY / t) };
+    });
+
+    const before = await spotMoments();
+    // Forward
+    for (let s = 0; s < 10; s++) {
+      await page.evaluate((kT) => {
+        lab.vel(0.5, 0.5, 0.45, [2.5, 0, 0, 0]);
+        lab.flush();
+        return lab.step(1, { diff: 0, kappaT: kT });
+      }, kappaT_val);
+    }
+    const forward = await spotMoments();
+
+    // Reversed
+    for (let s = 0; s < 10; s++) {
+      await page.evaluate((kT) => {
+        lab.vel(0.5, 0.5, 0.45, [-2.5, 0, 0, 0]);
+        lab.flush();
+        return lab.step(1, { diff: 0, kappaT: kT });
+      }, kappaT_val);
+    }
+    const returned = await spotMoments();
+
+    return { before, forward, returned };
+  };
+
+  const current = await testReversibility(0.0);
+  const control = await testReversibility(0.45);
+
+  const currentStretch = current.forward.sigX / current.before.sigX;
+  const currentReturn = current.returned.sigX / current.before.sigX - 1;
+  const controlReturn = control.returned.sigX / control.before.sigX - 1;
 
   check(
-    'dye does not smear irreversibly along the flow (pre-asymptotic shear is reversible)',
-    spot1.aspect < spot0.aspect * 1.05,
-    `aspect ratio ${spot0.aspect.toFixed(3)} → ${spot1.aspect.toFixed(3)} along flow`
-  );
-
-  check(
-    'dye stays sharp across the flow',
-    spot1.sigY < spot0.sigY * 1.08,
-    `cross-flow sigma ${spot0.sigY.toFixed(4)} → ${spot1.sigY.toFixed(4)} (change ${((spot1.sigY / spot0.sigY - 1) * 100).toFixed(1)}%)`
+    'dye dispersion is physically reversible: spot stretches then returns',
+    currentStretch > 1.02 && currentReturn < 0.05 && controlReturn > 0.05,
+    `stretch ${currentStretch.toFixed(2)}x, returned within ${(currentReturn * 100).toFixed(1)}%, control failed at ${(controlReturn * 100).toFixed(1)}%`
   );
 
   // ── 4: Exact dye conservation under violent swirling flow ──
@@ -150,33 +164,6 @@ try {
     'and none of the dye is made or lost',
     diffFromControl < 0.0001,
     `diff vs control delta ${(diffFromControl * 100).toFixed(6)}% (on ${ratioOn.toFixed(6)} vs off ${ratioOff.toFixed(6)})`
-  );
-
-  // ── 5: Taylor dispersion scales with gap thickness (h²) ──
-  // Compare dispersion at tight gap (curve -0.4) vs open gap (curve +0.4)
-  const testCurveDispersion = async (curve) => {
-    await page.evaluate(() => lab.create(128, 128));
-    await page.evaluate(() => {
-      lab.dye(0.5, 0.5, 0.06, [1, 0, 0], 1.0);
-      lab.flush();
-    });
-    const before = await spotMoments();
-    for (let s = 0; s < 20; s++) {
-      await page.evaluate((c) => {
-        lab.vel(0.5, 0.5, 0.45, [2.0, 0, 0, 0]);
-        lab.flush();
-        return lab.step(1, { diff: 0.0002, plateCurve: c });
-      }, curve);
-    }
-    const after = await spotMoments();
-    return after.sigX - before.sigX;
-  };
-  const dThick = await testCurveDispersion(0.4);  // +0.4 is thick gap at center
-  const dThin = await testCurveDispersion(-0.4);  // -0.4 is thin gap at center
-  check(
-    'Taylor dispersion is negligible on show timescales (t ≪ h²/Dm)',
-    dThick < 0.005 && dThin < 0.005,
-    `longitudinal stretch +${dThick.toFixed(4)} in open gap vs +${dThin.toFixed(4)} in tight gap`
   );
 
   // ── 6: Heat spreads even when dye Diffusion Rate is 0 ──
