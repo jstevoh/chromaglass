@@ -28,6 +28,7 @@ import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
 import { filmKernels } from './film';
+import { slumpKernels } from './slump';
 
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
@@ -4215,7 +4216,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var sq: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
-fn gapAt(q: vec2i) -> f32 { return select(1.0, max(textureLoad(sq, q, 0).r, 0.004), A.b.x > 1.5); }
+/*
+  The gap is read only for the ferrofluid's volume (2): a \`select\` reads
+  both of its sides, so as one it loaded the gap at every cell of every
+  field the drift moves.
+*/
+fn gapAt(q: vec2i) -> f32 {
+  if (A.b.x > 1.5) { return max(textureLoad(sq, q, 0).r, 0.004); }
+  return 1.0;
+}
 fn sources(j: i32, s: i32, n: i32) -> vec2i {
   var lo = j - s;
   var hi = j - s;
@@ -4237,16 +4246,32 @@ fn at(q0: vec2i, n: i32) -> vec4f {
 fn mm(a: vec4f, b: vec4f) -> vec4f {
   return select(vec4f(0.0), select(max(a, b), min(a, b), a > vec4f(0.0)), a * b > vec4f(0.0));
 }
-// bodyAdvect's flux through the face a → a + e at Courant number c; nothing through the grid's wall.
-fn flux(a: vec2i, e: vec2i, c: f32, n: i32) -> vec4f {
-  let b = a + e;
-  if (c == 0.0 || a.x < 0 || a.y < 0 || b.x >= n || b.y >= n) { return vec4f(0.0); }
-  if (c > 0.0) {
-    let s = mm(at(a, n) - at(a - e, n), at(b, n) - at(a, n));
-    return c * (at(a, n) + 0.5 * (1.0 - c) * s);
-  }
-  let s = mm(at(b, n) - at(a, n), at(b + e, n) - at(b, n));
-  return c * (at(b, n) - 0.5 * (1.0 + c) * s);
+/*
+  bodyAdvect's limited upwind flux through a face at Courant number c, from
+  the four cells along it: am, a | b, bp. Only one of am and bp is read,
+  by c's sign.
+*/
+fn face(am: vec4f, a: vec4f, b: vec4f, bp: vec4f, c: f32) -> vec4f {
+  if (c > 0.0) { return c * (a + 0.5 * (1.0 - c) * mm(a - am, b - a)); }
+  return c * (b - 0.5 * (1.0 + c) * mm(b - a, bp - b));
+}
+/*
+  The flux through a cell's two faces along e at Courant number c: \`o\` to
+  p + e, \`i\` from p − e, nothing through the grid's wall (as bodyAdvect).
+  The five cells along the line are each read once, and of the two cells
+  two away only the upwind one; the kernel this replaces called \`at\`
+  once per use, twenty-one times a cell, two loads each (PLAN QA-25).
+*/
+struct Faces { o: vec4f, i: vec4f }
+fn faces(p: vec2i, e: vec2i, c: f32, n: i32, here: vec4f) -> Faces {
+  if (c == 0.0) { return Faces(vec4f(0.0), vec4f(0.0)); }
+  let back = at(p - e, n);
+  let on = at(p + e, n);
+  let far = at(p + select(2, -2, c > 0.0) * e, n);
+  let q = p + e;
+  let r = p - e;
+  return Faces(select(vec4f(0.0), face(back, here, on, far, c), q.x < n && q.y < n),
+               select(vec4f(0.0), face(far, back, here, on, c), r.x >= 0 && r.y >= 0));
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -4256,8 +4281,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let y = vec2i(0, 1);
   let cx = clamp(A.a.z, -0.5, 0.5);
   let cy = clamp(A.a.w, -0.5, 0.5);
-  let d = flux(p, x, cx, n) - flux(p - x, x, cx, n) + flux(p, y, cy, n) - flux(p - y, y, cy, n);
-  let moved = at(p, n) - d;
+  let here = at(p, n);
+  let fx = faces(p, x, cx, n, here);
+  let fy = faces(p, y, cy, n, here);
+  // Summed in the order the old kernel summed them: on SwiftShader the field is the same to the bit.
+  let moved = here - (fx.o - fx.i + fy.o - fy.i);
   var out = max(moved, vec4f(0.0));
   if (A.b.x > 1.5) { out = max(moved / gapAt(p), vec4f(0.0)); }
   else if (A.b.x > 0.5) { out = vec4f(moved.r, max(moved.g, 0.0), moved.b, textureLoad(src, p, 0).a); }
@@ -4275,6 +4303,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.
   ...filmKernels(HEAD, W),
+  // A drop of ink slumps under its own weight (PLAN 18m): see wgsl/slump.ts.
+  ...slumpKernels(HEAD, W),
 };
 
 /*

@@ -277,6 +277,15 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run pacing
 
+      # Slow Evolve (PLAN.md §10, step 8): one move at a time, each glided 30 to 90 s,
+      # about one a minute; the lean livelier after drops than in breakdowns,
+      # the palette turning only at a drop or a breakdown (or every few
+      # minutes with no music); a level shaken every half second leaning as
+      # the steady song does; and nothing that moves the whole picture moved.
+      - name: Slow Evolve
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run slowevolve
+
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
       # number while rendering and the browser's own clock live; the song's
       # track is the same bytes twice and hears the kicks at the same moments
@@ -636,6 +645,11 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # A drop of ink on a level plate slumps out along the lower glass as a
+      # viscous gravity current, its front where Huppert's law puts it (PLAN 18m).
+      - name: A drop slumps under its own weight
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run slump
       # A press goes down round and lifts into fingers, and a plain spring lift does not.
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}

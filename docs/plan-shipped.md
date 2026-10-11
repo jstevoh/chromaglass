@@ -1582,6 +1582,47 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
      and `applySquish` round every centre now, so the next fractional caller lands on
      the nearest cell instead of laying nothing (`npm run lift`).
 
+8. **Evolve changes slowly with the song** (2026-10-11). The owner: "I want evolve to
+   focus on more slowly changing settings (as opposed to directly reacting to frequency
+   and bouncing around). It should consider the music in longer changing ways, and
+   slowly changes the visuals in creative and interesting ways. If there is no music,
+   it can do basically the same thing and slowly change across time."
+
+   What it was: every six seconds two unrelated dials picked at random, each glided over
+   four seconds (`driftLook`), with no ear at all; the hands (a drop or a puff about
+   every seven seconds) sized each drop by the frame's energy, heated it by the frame's
+   treble and chose drop or air by the frame's spectral centroid; the palette re-rolled
+   on a one-in-ten-thousand chance every frame; the closeup's aim jumped ±0.12 over four
+   seconds every twelve; under Evolve the plate's pace heard eight seconds of loudness and
+   slewed over three. And `DRIFTABLE` let it drift Plate Rock, Beat Squeeze, the
+   kaleidoscope's spin and the turntable on a look that had them.
+
+   What it is (`src/lib/slowEvolve.ts`, `src/lib/drift.ts`): one move at a time, a few
+   dials from one theme (flow, dye, surface, heat, glass, chemistry, ferrofluid, film)
+   going the same way, glided over 30–90 s, then a rest. Which way is a lean from the
+   song shape tracker's intensity averaged over 30 s against the song's own 4-minute
+   level, pushed livelier through a build and for 30 s after a drop, calmer through a
+   breakdown; a section change during a rest starts the next move. The palette turns at
+   a drop or a breakdown (at most every 75 s), for the dye still to come
+   (`evolvePalette` on the visualizer's handle). With no music the lean is an
+   Ornstein–Uhlenbeck walk on three minutes and the palette turns every 3–5 minutes.
+   The hands hear the 30 s level and the section (a build reaches for the air, a
+   breakdown halves them), never the frame. The pace hears 30 s and slews over 20 under
+   Evolve. The aim moves ±0.08 over a whole move. `FRAME_MOTION` holds every
+   frame-moving dial out.
+
+   Measured (`npm run slowevolve`, Classic, default Evolve Speed), before → after:
+   moves started 10/min → 0.7/min with a song, 0.6/min without, each followed by a rest
+   of at least 6 s; glide 4 s → 57–81 s; fastest dial 0.78 → 0.13 %/s of its travel;
+   the aim's fastest 45 → 2.5 thousandths of the plate a second (at full speed); change
+   over 1 min 0.37 → 0.31 % and over 10 min 1.21 → 1.37 % (RMS of the dials' travel),
+   so about the same amount of change, made as one slow move instead of twenty
+   twitches; the lean 0.57 after drops and −0.13 in breakdowns (it heard nothing
+   before); a level shaken ±0.3 every half second leans within 0.04 of the steady song.
+   Review found a glide carrying the old look's dials into a new one (a look laid,
+   opened, faded to or taken back now stops the move) and cues kept through a glide
+   starting the next move with no rest; both fixed and checked.
+
 ### 11. The mixer
 
 5. **The mixer on a narrow desk**, *shipped* (#196). At 1024 px the docked sheet
@@ -2572,6 +2613,56 @@ Pinning them to GitHub Actions (integration 15368) closes that gap. Deleting `ma
 restricted; adding the deletion rule closes that one. The rule a session wrote out is
 `handoff/main-ruleset.json` in the project's shared files.
 
+### 19v. Two checks that could not tell what they were asked
+
+**Shipped** 2026-10-10. Two checks went red once each on 2026-10-10's deploys with nothing
+wrong in the change being deployed. Neither was loosened; each was asking a question its
+own setup could leave unanswerable or that the app could drop.
+
+**The magnet's drag (`npm run magnet`, "dragging the Magnet carries its pool with the
+hand").** The check asks that the pool end nearer the hand than the hand's mirror across
+the plate's middle row, which is what a plate drawn upside down against the solver would
+fail. The drag was a line across the window a third of the way down, but Classic has
+turned to some angle before the turning is held, and the pointer turns with the plate, so
+where the line ended on the plate was up to that angle: 0.36,0.59 in a cloud session,
+0.71,0.51 on the Mac run that failed (#340's deploy, which needed a re-run). There the pool
+was 0.03 from the hand and 0.03 from its mirror. Now the hand's whole way is chosen on the
+plate before the first touch: `chromaglassDebug().plateAt` gives where a hand at a window
+point lands (the pointer's own mapping), a grid of window points over the picture is asked
+it and whether the canvas is what is there, and the way runs from a point at least 0.25 off
+0.25 to 0.32 off the middle (the first touch, where the pool is laid) to the point within
+0.25 of the middle that is furthest off the middle row, 0.3 to 0.45 long, with the canvas
+under the whole line. Off the rim on purpose: a first planned way that ended 0.33 out
+dragged the pool half over the rim, the drag itself passed (0.07 from the hand, 0.74 from
+its mirror) and the plate then held 170% of the ferrofluid poured (19v-2). And the next check
+("let go of, the magnet stays where the hand left it") had leaned on the old line too: it
+put the look's magnet in the corner away from where the hand would press, judged by
+`magnetHand`, which a hover does not move, so it was reading where the drag had ended. With
+the drag elsewhere the corner landed 0.28 from the press; it now asks `plateAt`.
+The check also asks that the hand really ended more than 0.15 off that row (its mirror over
+0.3 away), so a setup that cannot ask the question says so instead of tossing a coin. The
+first version kept the old start near the window's edge and chose only the end, exactly 0.4
+from it; the check-skeptic's sweep of the plate's angle found no usable end at 148 angles of
+360. Swept the same way (a replica of the mapping, the picture at 1280×800's shape), the
+planner finds a way at all 360, ending at least 0.183 off the middle row, 0.40 to 0.44 long.
+
+**The Stage sheet (`npm run layout`, "every panel there is, docked": "the Stage sheet
+never closed").** Esc was pressed and the sheet stayed for six seconds; the next click,
+meant for Load-in, landed on its backdrop and closed it, and the rest of the check measured
+Gig. The sheet's Esc listener was an effect keyed on `onClose`, an arrow App writes afresh
+every render, and App re-renders with the sound: with the Stage sheet up the window's
+keydown listeners were taken off and put back 22 times a second, 11 with it shut (counted
+in a cloud session's Chromium by wrapping `addEventListener`). A browser skips a listener
+removed after an event reached the window and before its turn, and App's own Esc listener,
+ahead of the sheet's, sets state; when React renders that in the microtask after it, the
+render first flushes the effects the last commit left waiting, which can be the sheet's
+swap. Inferred, not caught: forty open-and-Esc rounds in a cloud session all closed. The
+fix is `hooks/useEscape.ts`, listened for once and read through a ref (the way the Desk's
+own keys already were), used by the desk's `Sheet`, the phone's `PhoneSheet` and the
+controller surface (which re-renders itself every 120 ms); and the Stage sheet is on App's
+Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
+sheet up, the show keys' alone (19v-1).
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -2786,6 +2877,41 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
   distinct colours and 19 hue bins to 101 and 25 (Classic 65 → 100, Galaxy 27 → 72,
   Stardust Collapse 21 → 127, Soap Film 63 → 136); the 14 left alone from 54.5 to 62.5,
   from the dye and the grade alone.
+
+### 18m. A drop slumps under its own weight (replaces a drop that sits or blurs)
+
+- **What was reported** (the owner, 2026-10-11): "I don't feel like we have dye and
+  other diffusion through clear water."
+- **What was measured** (the audit, lab, a 1 cm drop on a still thin-gap plate): at
+  Diffusion Rate 0, as twelve looks have it, the drop did not move in 20 s (rms radius
+  4.69 → 4.70 mm); at the slider's top it blurred into a Gaussian at D ≈ 1.7e-5 m²/s,
+  about 40,000× food dye's molecular rate (18h's "about 1000×" corrected). Neither is
+  what ink does: molecular diffusion would move it under 0.01 mm in 20 s. What spreads
+  a drop of food colouring is its weight (its glycol makes it a percent or two denser
+  than water): it sinks to the lower glass and runs out under the clear water as a
+  viscous gravity current, a flat pool with a sharp front, r ∝ t^⅛ (Huppert 1982).
+- **What was built:** `wgsl/slump.ts`, a stage of its own in the dye's step (apart from
+  18h's 'dye diffuse', which Antigravity is replacing). The dense layer's flux between
+  two glasses, with no slip on both, no net flux through the gap and equal viscosities,
+  is q = −(g′/3ν) η³(1 − η/b)³ ∇η (derived for this, the same as Zheng, Rongy and Stone
+  2015): Huppert's current while the layer is thin against the gap, choked as it fills
+  it. The depth is the dye's amount × DYE_LAYER (0.36 mm a unit: the lab's drop is a
+  0.05 mL drop from a dropper), Δρ is Dye Weight's contrast (2% to 15%) times the dye's
+  strength (its strongest band per unit over a full-strength dye's; white, clear liquid,
+  weighs nothing), the current runs in the water's share of a cell, and cos θ of g on a
+  plate stood up. Explicit, in flux form (no dye made or lost), colour carried upwind,
+  K worked out once a step, up to six substeps with each face held to 0.24 of its
+  difference (18m-1 names the cap). On the default Thickness (a light oil, ν 2.2e-5)
+  that is two passes and a drop spreads slowly; in water seven, and it runs.
+- **Measured** (`npm run slump`, lab, 256², a 0.05 mL full-strength drop in water,
+  before the check's controls were added): front 3.94 mm → 6.6 (1 s) → 8.0 (5 s) → 9.6
+  (20 s) → 11.25 mm (60 s), against Huppert's 6.54, 7.99, 9.51, 10.91; growth t^0.125
+  from 5 to 30 s; the edge 0.886 (half-peak radius over twentieth-peak; a Gaussian
+  reads 0.48); Dye Weight 1 ×1.266 further at 20 s against the law's ×1.286. A numpy copy
+  of the kernels at 768² (the cap binds harder there) reads 10.96 mm at 60 s. The
+  before and after pictures are in the project's files (`diffusion/`).
+- **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
+  drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
 
 ## 21. Looks after painters
 
