@@ -83,7 +83,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
 | `.github/workflows/checks.yml`, `scripts/reach.mjs` | `npm run reach`, `npm run closedruns`, `actionlint`; `npm run macqueue -- --hours 24` for the Mac time before and after |
-| a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
+| a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is

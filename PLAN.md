@@ -4992,7 +4992,7 @@ commit. *Size:* S.
   total read every second. Physics lane.
 
 ### 19w. A moved bar names itself
-**Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 8 would have had to name something, every one a real change to a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19w.
+**Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19w.
 
 - **19w-1. Bars declared where the guard can read them.** The guard reads code as written
   because every check writes its bar inline. The checks the physics lane edits most
@@ -5001,8 +5001,9 @@ commit. *Size:* S.
   computed from a variable two lines up is called a bar and not an input. One file at a
   time, each bar carried over unchanged and the guard's `--base` run proving it.
 - **19w-2. Physics constants that are not SHOUTING_CASE.** The guard watches
-  `const NAME = <number>` in `src/`; a coefficient written into a WGSL string or a
-  camelCase field of a preset is not watched. Measure how often such a number moved under
+  `const NAME = <number>` under `src/gpu/` (WGSL included) and any a script names; a bare
+  number inside a shader's expression or a camelCase field of a preset is not watched, nor
+  a new line that bends a measured value (`moved *= 1.3`) with nothing removed. Measure how often such a number moved under
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 

@@ -2704,13 +2704,16 @@ loosened to get green.
 
 `scripts/checkguard.mjs` reads the PR's merge commit against its base. Every file it
 compares is first read whole by a small tokenizer (comments, quoted and template strings
-with their `${…}`, regex literals), so only code is compared. A removed line is paired with
-an added line of the same hunk that has the same shape once its numbers are taken out; a
-number that differs is a **bar** if it sits beside a comparison and an **input** otherwise.
-A comparison that cannot be paired counts if the same comparison of the same thing with the
-same number is nowhere in the new file (a renamed quantity on the replacing lines is the
-same bar). A file under `scripts/` with fewer `check(` calls is a **removal**, its bars
-listed under it. In `src/`, a SHOUTING_CASE number constant that changes value is an input.
+with their `${…}`, regex literals), so only code is compared; a `?stir=0.3` in a URL string
+is kept as code. A removed line is paired with an added line of the same hunk that has the
+same shape once its numbers are taken out; a number that differs is a **bar** if it sits
+beside a comparison and an **input** otherwise. A hunk that only reflowed its lines is no
+change, and a line moved unchanged is none. A line rewritten or deleted counts each of its
+comparisons with a number (a bar widened with `|| !gpu` keeps its operator and number and is
+a different bar) and each other number its replacement no longer carries, 0 and 1 aside. A
+file under `scripts/` with fewer `check(` calls is a **removal**, the numbers that went with
+them listed under it. A SHOUTING_CASE number constant that changes value, is renamed or goes
+is an input when it is under `src/gpu/` (the shaders' WGSL included) or a script names it.
 Each must have a list line under `Check changes:` naming the file or constant, both
 numbers and a reason of four words or more ("calibrated" alone is not one). The guard
 decides nothing about the reason; it makes the change impossible to miss and impossible to
@@ -2722,16 +2725,21 @@ by accident (19w-1 does it a file at a time). Why its own job: after the body ga
 section, re-running the failed jobs re-reads the body from the API without a push or the
 Mac queue; `Measure` needs it, so the branch rule's required check covers it.
 
-Measured. `npm run checkguard`: 35 self-tests, including #362's two real moves (the bar
-found as looser; `ROCK_FALL 12 → 13` found as an input; both named lines accepted, and
-"calibrated", the wrong number, another file or no numbers refused), and the things it must
-not fire on (a number in a comment, a check's name, a multi-line template string, a regex,
-`toFixed` digits, a moved line, a new check, a reworded bar). Run on #362's own commits it
-finds both. `npm run checkguard -- --history 50` over the 50 merges before it: 8 would
-have had to name something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s
-rewritten fade line, `layout`'s 33 → 31 panels, #340's seven checks taken out of `rides`
-with the cover glass, two rewritten Desk v2 checks, a `SPLAT_FLOATS` revert), every one a
-real change to a check, none a comment or prose.
+Measured. `npm run checkguard`: 51 self-tests. #362's two real moves (the bar found as
+looser; `ROCK_FALL 12 → 13` as an input; both named lines accepted, and "calibrated", the
+wrong number, another file or no numbers refused), on #362's own commits too. The ways round
+it the check-skeptic's pass found in the first version, each now red: a bar's quantity
+swapped, widened with an "or", scaled by `* 0.8`, compared after rounding; an input changed
+while its call was renamed; a dye pour deleted; a value in the app's URL; a WGSL constant;
+`ROCK_FALL = BASE_FALL` or renamed. And what it must not fire on: a number in a comment, a
+check's name, a multi-line template string, a regex, `toFixed` digits, a moved line, a new
+check, a bar wrapped onto two lines, a panel's width in `src/components` no script reads.
+`npm run checkguard -- --history 50` over the 50 merges before it: 9 would have had to name
+something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s rewritten fade
+line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven checks taken
+out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
+every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
+lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
 
 ### 20b. A clear film that tears (the thin-film equation)
 

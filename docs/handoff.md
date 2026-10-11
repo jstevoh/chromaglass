@@ -80,8 +80,9 @@ not say so (`npm run checkguard`, the "Check changes named" job, under the requi
 `Measure`; PLAN.md 19w). That is any number a check compares against (`>= 0.05` to
 `>= 0.04`), a comparison turned round, a check or its bar deleted or rewritten, any other
 number on a code line under `scripts/` (a stir strength, a seed, a duration, a run count,
-where a drop is poured), and any SHOUTING_CASE number constant in `src/` that changes value
-(`ROCK_FALL`, which a check reads through the app). Comments, check names, log text and
+where a drop is poured, a `?stir=0.3` in a URL), and a SHOUTING_CASE number constant under
+`src/gpu/` (WGSL too), or anywhere in `src/` that a script names, that changes value, is
+renamed or goes (`ROCK_FALL`, which a check reads through the app). Comments, check names, log text and
 `toFixed` digits never count. Each change gets one list line under `Check changes:` with
 the file (or the constant), the old and the new number, and the reason, which is the
 measurement that says why it moves:

@@ -24,12 +24,14 @@
 //
 //   bar       a number a check compares against (`>= 0.05` to `>= 0.04`), a
 //             comparison turned round (`>=` to `>`), or a comparison with a
-//             number that was there before and is gone from the file;
+//             number on a line that was rewritten or deleted;
 //   input     any other number on a code line of a script under scripts/ (a
 //             stir strength, a seed, a duration, a run count, where a drop is
-//             poured), and any SHOUTING_CASE number constant in src/ that
-//             changes value (ROCK_FALL): a check that reads the app's own
-//             constant moves with it, which is how #362 moved one;
+//             poured, a `?stir=0.3` in the URL a script opens), and a
+//             SHOUTING_CASE number constant that changes value, is renamed or
+//             goes, under src/gpu/ (shaders' WGSL included) or anywhere in
+//             src/ if a script names it (ROCK_FALL): a check that reads the
+//             app's own constant moves with it, which is how #362 moved one;
 //   removed   a file under scripts/ that held `check(` calls now holds fewer,
 //             or is gone.
 //
@@ -59,16 +61,24 @@
 // digits of a `toFixed(3)` is never a bar. A changed line is paired with its
 // replacement by its shape with the numbers taken out, so a line that moved
 // is not a change, a line whose words changed is not a change, and a line
-// whose only difference is a number is exactly one. A comparison that cannot
-// be paired (the line was rewritten) counts if the same comparison with the
-// same number is nowhere in the file afterwards.
+// whose only difference is a number is exactly one, and a hunk that only
+// reflowed its lines is none. A line that cannot be paired and is not
+// elsewhere in the new file unchanged was rewritten or deleted: each of its
+// comparisons with a number counts (`>= 0.05` widened to `>= 0.05 || !gpu`
+// keeps the operator and the number and is a different bar), and so does
+// each other number the lines that replaced it no longer carry. The
+// check-skeptic's review of the first version found each of those ways
+// round it; they are in the self-test.
 //
-// What it does not see: a bar computed from another variable two lines up
-// whose own number changed shows as an input (still named, just called an
-// input); a check that stops being run because its caller changed; a
-// physics constant that is not SHOUTING_CASE. `--history` measures how often
-// it fires on ordinary work: run over the sixty merges before it shipped, see
-// PLAN.md 19w for the count.
+// What it does not see: a new line that bends a measured value
+// (`moved *= 1.3`) with nothing removed; a 0 or a 1 on a rewritten line (left
+// out on purpose, see below); arguments in package.json's scripts or a
+// workflow's steps; a check that stops being run because its caller changed;
+// a physics constant that is not SHOUTING_CASE (PLAN.md 19w-2). A bar
+// computed from a variable two lines up whose own number changed shows as an
+// input: still named, just called an input. `--history` measures how often
+// it fires on ordinary work; over the 50 merges before it shipped, 9 would
+// have had to name something, every one a real edit of a check.
 //
 // It never relaxes anything: it adds one way to be red and none to be green.
 // In CI it is its own job, "Check changes named", and the required "Measure"
@@ -79,6 +89,7 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 // ─── Reading code ──────────────────────────────────────────────────────────
 
@@ -100,6 +111,10 @@ export function codeLines(text) {
   // A stack of contexts: 'code' at the bottom, 'tpl' for a template string,
   // 'expr' for a `${` inside one (with its brace depth).
   const stack = [{ k: 'code', depth: 0 }];
+  // A value passed in a URL inside a string (`?stir=0.3`, 17 scripts open the
+  // app that way) is a test input, so it is kept as code: `S«stir=0.3»`.
+  let lit = '';
+  const params = (t) => { const m = t.match(/[?&][\w.-]+=-?[\d.]+(?:e-?\d+)?/g); return m ? `«${m.join(' ').replace(/[?&]/g, '')}»` : ''; };
   let i = 0;
   const n = text.length;
   let prevSig = '';   // the last significant code character, for the regex rule
@@ -113,9 +128,10 @@ export function codeLines(text) {
       continue;
     }
     if (top.k === 'tpl') {
-      if (c === '\\') { i += 2; continue; }
-      if (c === '`') { stack.pop(); push('`'); prevSig = '`'; i++; continue; }
-      if (c === '$' && text[i + 1] === '{') { stack.push({ k: 'expr', depth: 0 }); push('${'); prevSig = '{'; i += 2; continue; }
+      if (c === '\\') { lit += text.slice(i, i + 2); i += 2; continue; }
+      if (c === '`') { stack.pop(); push(`${params(lit)}\``); lit = ''; prevSig = '`'; i++; continue; }
+      if (c === '$' && text[i + 1] === '{') { stack.push({ k: 'expr', depth: 0 }); push(`${params(lit)}\${`); lit = ''; prevSig = '{'; i += 2; continue; }
+      lit += c;
       i++;
       continue;
     }
@@ -131,14 +147,14 @@ export function codeLines(text) {
       continue;
     }
     if (c === '\'' || c === '"') {
-      i++;
+      const from = ++i;
       while (i < n && text[i] !== c && text[i] !== '\n') { if (text[i] === '\\') i++; i++; }
+      push(`S${params(text.slice(from, i))}`);
       i++;
-      push('S');
       prevSig = 'S';
       continue;
     }
-    if (c === '`') { stack.push({ k: 'tpl' }); push('`'); i++; continue; }
+    if (c === '`') { stack.push({ k: 'tpl' }); lit = ''; push('`'); i++; continue; }
     if (c === '/') {
       const regexHere = prevSig === '' || /[(,=:[!&|?{};+\-*%<>~^]/.test(prevSig) || /^(return|typeof|case|of|in|yield|await)$/.test(prevWord);
       if (regexHere) {
@@ -181,7 +197,7 @@ export function codeLines(text) {
 }
 
 // Digits that only say how a number is printed are not a measurement.
-const PRINTING = /\.(toFixed|toPrecision|padStart|padEnd|toString)\(\s*\d+\s*(,[^)]*)?\)/g;
+const PRINTING = /\.(toFixed|toPrecision|padStart|padEnd|toString)\(\s*\d+\s*(,[^)]*)?\)(?![\s)]*(<|>))/g;
 const NUM = /(?<![\w$.])(?:\d[\d_]*\.?\d*(?:e[-+]?\d+)?|\.\d+(?:e[-+]?\d+)?)(?![\w$])/gi;
 const CMP = /(<=|>=|===|!==|==|!=|(?<![=<>-])<(?![<=])|(?<![=>-])>(?![>=]))/;
 
@@ -237,15 +253,35 @@ function direction(op, from, to) {
 
 const CHECK_FILE = /^scripts\/.*\.(mjs|js|cjs|ts)$/;
 const SRC_FILE = /^src\/.*\.(ts|tsx|js|mjs)$/;
+const WGSL_FILE = /^src\/gpu\/wgsl\//;
 const CONSTANT = /^\s*(?:export\s+)?const\s+([A-Z][A-Z0-9_]*[A-Z0-9])\s*(?::[^=]+)?=\s*(.+?);?\s*$/;
+
+/*
+  Which SHOUTING_CASE constants in src/ are a check's input: every one under
+  src/gpu/ (the solver, where ROCK_FALL lives) and its shaders, and any other
+  whose name a script under scripts/ mentions. Not all of src/: 391 constants
+  in components/ and lib/ alone are layout and timing (a panel's width) that
+  no check reads, and asking for a line each time one moved would teach
+  everyone to paste lines without reading them. `scriptsText` is every
+  script's text, read once.
+*/
+const watchedConstant = (file, name, scriptsText) => /^src\/gpu\//.test(file) || new RegExp(`\\b${name}\\b`).test(scriptsText);
+
+/*
+  The lines of a shader file as code, for its constants: the WGSL lives in
+  template strings, which `codeLines` drops as text, so here only comments are
+  taken out (WGSL's are `//` too).
+*/
+const rawLines = (text) => ['', ...text.split('\n').map((l) => l.replace(/\/\/.*$/, ''))];
 
 /*
   The changes in one file. `hunks` are git's (-U0): for each, the line numbers
   removed from the old file and added to the new. Returns a list of
-  `{ file, line, kind, what, from, to, words, code }`, where `words` are what
-  a naming line must carry besides a reason (the place and the numbers).
+  `{ file, line, kind, what, from, to, words, need, code }`, where `words` and
+  `need` are what a naming line must carry besides a reason (the place, and
+  the numbers by value).
 */
-export function changesIn(file, oldText, newText, hunks) {
+export function changesIn(file, oldText, newText, hunks, scriptsText = '') {
   const isCheck = CHECK_FILE.test(file);
   const isSrc = SRC_FILE.test(file);
   if (!isCheck && !isSrc) return [];
@@ -255,31 +291,50 @@ export function changesIn(file, oldText, newText, hunks) {
   const found = [];
 
   if (isSrc) {
-    // SHOUTING_CASE number constants whose value moved, matched by name.
-    const consts = (lines, nums) => {
+    // SHOUTING_CASE number constants whose value moved, matched by name. One
+    // that is gone, renamed or no longer a number (`= BASE_FALL`) is a change
+    // too: its old value is what the checks were passing on.
+    const rb = WGSL_FILE.test(file) && oldText != null ? rawLines(oldText) : before;
+    const ra = WGSL_FILE.test(file) && newText != null ? rawLines(newText) : after;
+    const consts = (lines, nums, all) => {
       const m = new Map();
       for (const ln of nums) {
         const c = CONSTANT.exec(lines[ln] ?? '');
-        if (c && NUM.test(c[2])) m.set(c[1], { line: ln, val: clean(c[2]) });
-        NUM.lastIndex = 0;
+        if (c && (all || /\d/.test(c[2].replace(/[A-Za-z_]\w*/g, '')))) m.set(c[1], { line: ln, val: clean(c[2]) });
       }
       return m;
     };
-    const was = consts(before, hunks.flatMap((h) => h.removed));
-    const now = consts(after, hunks.flatMap((h) => h.added));
+    const was = consts(rb, hunks.flatMap((h) => h.removed), false);
+    const now = consts(ra, hunks.flatMap((h) => h.added), true);
     for (const [name, o] of was) {
+      if (!watchedConstant(file, name, scriptsText)) continue;
       const nw = now.get(name);
-      if (!nw || nw.val === o.val) continue;
-      found.push({ file, line: nw.line, kind: 'input', what: `${name} ${o.val} → ${nw.val}`, from: o.val, to: nw.val, words: [name], need: numsOf(o.val, nw.val), code: nw.val });
+      if (nw && nw.val === o.val) continue;
+      if (!nw && ra.some((l) => new RegExp(`const\\s+${name}\\b`).test(l))) continue;   // the line moved, unchanged
+      found.push(nw
+        ? { file, line: nw.line, kind: 'input', what: `${name} ${o.val} → ${nw.val}`, from: o.val, to: nw.val, words: [name], need: numsOf(o.val, nw.val), code: nw.val }
+        : { file, line: o.line, kind: 'input', what: `${name} ${o.val} removed or renamed`, from: o.val, to: '', words: [name], need: numsOf(o.val), code: `was ${o.val}`, old: true });
     }
     return found;
   }
 
-  // A check script. First pair each removed line with an added line of the
-  // same hunk that has the same shape once its numbers are taken out.
-  const unpairedRemoved = [];
+  // A check script. Code lines whole, so that a line moved unchanged is known.
+  const norm = (code) => clean(code).replace(/\s+/g, '');
+  const present = new Set();
+  for (let ln = 1; ln < after.length; ln++) present.add(norm(after[ln]));
+  const values = (lines) => lines.flatMap((l) => numbers(l).map((x) => value(x.text)));
+
   for (const h of hunks) {
+    // A hunk that only reflowed its code (a long bar wrapped onto two lines)
+    // changes nothing.
+    const joined = (ls, src) => ls.map((l) => src[l] ?? '').join(' ');
+    if (shape(joined(h.removed, before)) === shape(joined(h.added, after))
+      && values(h.removed.map((l) => before[l] ?? '')).join() === values(h.added.map((l) => after[l] ?? '')).join()) continue;
+
+    // Pair each removed line with an added line of the same hunk that has the
+    // same shape once its numbers are taken out.
     const used = new Set();
+    const loose = [];
     for (const r of h.removed) {
       const rc = before[r] ?? '';
       if (!/\d/.test(clean(rc))) continue;
@@ -288,17 +343,17 @@ export function changesIn(file, oldText, newText, hunks) {
       let match = h.added.find((a) => !used.has(a) && shape(after[a] ?? '') === rs);
       if (match === undefined) {
         // The same shape but a comparison turned round.
-        const flip = (s) => s.replace(/<=|>=|<|>/g, '<>');
+        const flip = (x) => x.replace(/<=|>=|<|>/g, '<>');
         match = h.added.find((a) => !used.has(a) && flip(shape(after[a] ?? '')) === flip(rs) && shape(after[a] ?? '') !== rs);
         if (match !== undefined) {
           used.add(match);
-          const ops = (s) => (clean(s).match(/<=|>=|<|>/g) ?? []);
+          const ops = (x) => (clean(x).match(/<=|>=|<|>/g) ?? []);
           const o = ops(rc); const w = ops(after[match]);
           const k = o.findIndex((x, i) => x !== w[i]);
           found.push({ file, line: match, kind: 'bar', what: `comparison ${o[k]} → ${w[k]}`, from: o[k], to: w[k], words: [base], need: [], ops: [o[k], w[k]], code: clean(after[match]) });
           continue;
         }
-        unpairedRemoved.push(r);
+        if (!present.has(norm(rc))) loose.push(r);   // rewritten or deleted, not moved
         continue;
       }
       used.add(match);
@@ -311,34 +366,44 @@ export function changesIn(file, oldText, newText, hunks) {
         found.push({ file, line: match, kind: bar ? 'bar' : 'input', what: `${a[k].text} → ${b[k].text}${dir ? ` (${dir})` : ''}`, from: a[k].text, to: b[k].text, words: [base], need: [a[k].text, b[k].text], code: clean(after[match]) });
       }
     }
-  }
 
-  // A comparison on a rewritten line counts if the same comparison of the
-  // same thing with the same number is nowhere in the new file.
-  // A comparison of a renamed quantity with the same number, on the lines
-  // that replaced it, is the same bar. A deleted file is one change, below.
-  const everywhere = new Set();
-  for (let ln = 1; ln < after.length; ln++) for (const c of comparisons(after[ln])) everywhere.add(`${c.key}|${c.op}|${value(c.num)}`);
-  const hunkOf = (r) => hunks.find((h) => h.removed.includes(r));
-  for (const r of newText == null ? [] : unpairedRemoved) {
-    const near = new Set((hunkOf(r)?.added ?? []).flatMap((a) => comparisons(after[a] ?? '')).map((c) => `${c.op}|${value(c.num)}`));
-    for (const c of comparisons(before[r])) {
-      if (everywhere.has(`${c.key}|${c.op}|${value(c.num)}`) || near.has(`${c.op}|${value(c.num)}`)) continue;
-      found.push({ file, line: r, kind: 'bar', what: `${c.op} ${c.num} rewritten or removed (was line ${r})`, from: c.num, to: '', words: [base], need: [c.num], code: clean(before[r]), old: true });
+    // A line rewritten or deleted. Each comparison with a number on it counts
+    // unless the very same line is somewhere in the new file: a bar's quantity
+    // renamed, `>= 0.05` widened to `>= 0.05 || !r.gpu` or to `>= 0.05 * 0.8`,
+    // all keep the operator and the number and all are different bars. Every
+    // other number on it counts unless the lines that replaced it in the hunk
+    // still carry that number (a call renamed around the same values).
+    // On these lines 0 and 1 are left out: measured over 50 merges they were
+    // nearly all `?? 0`, `[0]`, `> 0` guards and `1 / 60`, plumbing rewritten
+    // around the check rather than its bar, and they tripled what the guard
+    // asked to be named. A 0 or 1 changed in place (paired above) still counts.
+    const left = values(h.added.filter((a) => !used.has(a)).map((a) => after[a] ?? ''));
+    const trivial = (t) => value(t) === 0 || value(t) === 1;
+    for (const r of loose) {
+      const rc = before[r];
+      const cmps = comparisons(rc).filter((c) => !trivial(c.num));
+      for (const c of cmps) found.push({ file, line: r, kind: 'bar', what: `${c.op} ${c.num} on a rewritten or deleted line (was line ${r})`, from: c.num, to: '', words: [base], need: [c.num], code: clean(rc), old: true });
+      for (const x of numbers(rc)) {
+        if (trivial(x.text) || cmps.some((c) => value(c.num) === value(x.text))) continue;
+        const k = left.indexOf(value(x.text));
+        if (k >= 0) { left.splice(k, 1); continue; }
+        found.push({ file, line: r, kind: 'input', what: `${x.text} on a rewritten or deleted line (was line ${r})`, from: x.text, to: '', words: [base], need: [x.text], code: clean(rc), old: true });
+      }
     }
   }
 
-  // Fewer checks than before. The bars that went with them are listed under
-  // the removal for the reviewer, and the removal is the one line to name:
-  // #340 took a feature and seven of its checks out of rides.mjs, and asking
-  // for thirty-five lines, one per comparison, would bury the one that
-  // matters. A bar changed in place (paired above) is still its own line.
-  const count = (lines) => lines.reduce((s, l) => s + (l.match(/(?<![\w$.])check\s*\(/g) ?? []).length, 0);
+  // Fewer checks than before. The bars and inputs that went with them are
+  // listed under the removal for the reviewer, and the removal is the one
+  // line to name: #340 took a feature and seven of its checks out of
+  // rides.mjs, and asking for thirty-five lines, one per comparison, would
+  // bury the one that matters. A number changed in place (paired above) is
+  // still its own line.
+  const count = (lines) => lines.reduce((n, l) => n + (l.match(/(?<![\w$.])check\s*\(/g) ?? []).length, 0);
   const had = count(before); const has = newText == null ? 0 : count(after);
-  if (has < had) {
+  if (has < had || newText == null) {
     const gone = found.filter((f) => f.old);
     found.splice(0, found.length, ...found.filter((f) => !f.old));
-    found.push({ file, line: 0, kind: 'removed', what: newText == null ? `the file and its ${had} checks deleted` : `${had - has} of its ${had} checks removed`, from: String(had), to: String(has), words: [base], need: [], removed: true, code: gone.length ? `with ${gone.length} comparison${gone.length === 1 ? '' : 's'}: ${gone.map((g) => `${g.code.slice(0, 60)}`).join(' | ')}` : '' });
+    if (had > 0 || gone.length) found.push({ file, line: 0, kind: 'removed', what: newText == null ? `the file and its ${had} checks deleted` : `${had - has} of its ${had} checks removed`, from: String(had), to: String(has), words: [base], need: [], removed: true, code: gone.length ? `with ${gone.length} number${gone.length === 1 ? '' : 's'}: ${[...new Set(gone.map((g) => g.code.slice(0, 60)))].join(' | ')}` : '' });
   }
   return found;
 }
@@ -419,15 +484,17 @@ export function names(line, change) {
 // ─── Running ───────────────────────────────────────────────────────────────
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-const show = (rev, file) => { try { return git('show', `${rev}:${file}`); } catch { return null; } };
+const show = (rev, file) => git('show', `${rev}:${file}`);
 
 export function changesBetween(from, to) {
   const diff = git('diff', '--no-renames', '-U0', from, to, '--', 'scripts', 'src');
   const out = [];
+  const scriptsText = git('ls-tree', '-r', '--name-only', to, 'scripts').trim().split('\n')
+    .filter((f) => CHECK_FILE.test(f)).map((f) => show(to, f)).join('\n');
   for (const f of parseDiff(diff).values()) {
     if (!CHECK_FILE.test(f.file) && !SRC_FILE.test(f.file)) continue;
     if (f.created) continue;   // a new file moves no bar that was there
-    out.push(...changesIn(f.file, show(from, f.file), f.deleted ? null : show(to, f.file), f.hunks));
+    out.push(...changesIn(f.file, show(from, f.file), f.deleted ? null : show(to, f.file), f.hunks, scriptsText));
   }
   return out;
 }
@@ -450,7 +517,7 @@ function report(changes, body) {
     for (const c of changes) {
       if (lines.some((l) => names(l, c))) continue;
       const where = c.line ? `${c.file}:${c.line}` : c.file;
-      const what = c.removed ? `${c.what}` : c.ops ? `${c.ops[0]} → ${c.ops[1]}` : c.to ? `${c.words[0] === c.file.split('/').pop() ? '' : `${c.words[0]} `}${c.from} → ${c.to}` : `${c.from} removed`;
+      const what = c.removed ? `${c.what}` : c.ops ? `${c.ops[0]} → ${c.ops[1]}` : c.to ? `${c.from} → ${c.to}` : `${c.from} removed`;
       console.log(`- ${c.words[0] === c.file.split('/').pop() ? where : `${c.words[0]} (${where})`} ${what.trim()}: <why, and what it measured>`);
     }
   } else if (changes.length) console.log(`\nok   every change to a check's bar or input is named`);
@@ -545,7 +612,8 @@ function selftest() {
   same('a number inside a regular expression', s.replace('\\d{3}', '\\d{4}'));
   same('a line moved, unchanged', [s.split('\n')[7], ...s.split('\n').slice(0, 7)].join('\n'));
   same('a new check added', `${s}\ncheck('and a new one', x < 0.2, '');`);
-  same('a bar\'s words reworded around the same numbers', s.replace('cells >= 5', 'cellsMoved >= 5').replace('const STIR', 'const STIR'));
+  same('a bar wrapped onto two lines, unchanged', s.replace('cells >= 5, `', 'cells >=\n    5, `'));
+  same('a line with a stir and a run length moved elsewhere, unchanged', `${s.split('\n').slice(2).join('\n')}\n${s.split('\n').slice(0, 2).join('\n')}`);
 
   // What is.
   const ch = (b) => run('scripts/x.mjs', s, b);
@@ -562,6 +630,37 @@ function selftest() {
   t(names('scripts/x.mjs >= → >: five exactly was the old plate\'s rounding', c[0]), 'and named with both operators, it passes');
   c = ch(s.replace('cells >= 5, `${cells', '(cells > 2 || slow) && moved, `${cells'));
   t(c.some((x) => x.kind === 'bar' && x.from === '5' && x.old), 'a bar rewritten into a different condition, its old number gone, is caught', c.map((x) => x.what).join('; '));
+  // The ways round a paired line the check-skeptic found, each red.
+  for (const [what, b] of [
+    ['the bar\'s quantity swapped for another, the same number', s.replace('cells >= 5', 'peakCells >= 5')],
+    ['the bar widened with an "or"', s.replace('cells >= 5', 'cells >= 5 || slow')],
+    ['the bar scaled down', s.replace('cells >= 5', 'cells >= 5 * 0.8')],
+    ['the bar compared after rounding', s.replace('cells >= 5', '+cells.toFixed(0) >= 5').replace('cells >= 5', 'cells >= 5')],
+  ]) {
+    const r = ch(b);
+    t(r.length >= 1 && r.some((x) => x.kind === 'bar'), what, r.map((x) => `${x.kind} ${x.what}`).join('; ') || 'nothing found');
+  }
+  const lab = 'lab.dye(0.5, 0.5, 0.09, red, 1.4);\nlab.vel(0.4, 0.45, 0.3, [0.25, -0.15, 0, 0]);\ncheck(\'a\', x >= 0.05, \'\');\nawait page.goto(`${url}?stir=0.3&seed=7`);';
+  c = run('scripts/x.mjs', lab, lab.replace('lab.vel(0.4, 0.45, 0.3, [0.25', 'lab2.vel(0.4, 0.45, 0.3, [2.5'));
+  t(c.length === 1 && c[0].kind === 'input' && c[0].from === '0.25', 'an input changed on a line whose call was renamed', c.map((x) => x.what).join('; '));
+  c = run('scripts/x.mjs', lab, lab.replace('lab.dye(0.5, 0.5, 0.09, red, 1.4);\n', ''));
+  t(c.length >= 1 && c.every((x) => x.kind === 'input'), 'a line that pours the test\'s dye, deleted', c.map((x) => x.what).join('; '));
+  c = run('scripts/x.mjs', lab, lab.replace('stir=0.3', 'stir=0.9'));
+  t(c.length === 1 && c[0].what === '0.3 → 0.9', 'a value passed to the app in its URL', c.map((x) => x.what).join('; '));
+  c = run('scripts/x.mjs', lab, lab.replace('?stir=0.3&seed=7`', '?stir=0.3&seed=7` + \' (0.9 here)\''));
+  t(c.length === 0, 'but not the rest of the string', c.map((x) => x.what).join('; '));
+  const wgsl = 'export const FINGER = /* wgsl */ `\n  const FINGER_REACH = 0.9;\n  const PI: f32 = 3.14159;\n  // const OLD = 2.0;\n`;\n';
+  c = run('src/gpu/wgsl/finger.ts', wgsl, wgsl.replace('0.9', '1.2'));
+  t(c.length === 1 && c[0].what === 'FINGER_REACH 0.9 → 1.2', 'a constant inside a shader\'s WGSL', c.map((x) => x.what).join('; '));
+  t(run('src/gpu/wgsl/finger.ts', wgsl, wgsl.replace('const OLD = 2.0', 'const OLD = 3.0')).length === 0, 'but not one in a shader\'s comment');
+  c = run('src/gpu/fluid.ts', fluidA, fluidA.replace('ROCK_FALL = 12', 'ROCK_FALL = BASE_FALL'));
+  t(c.length === 1 && c[0].from === '12', 'ROCK_FALL turned into another constant\'s name', c.map((x) => x.what).join('; '));
+  c = run('src/gpu/fluid.ts', fluidA, fluidA.replace('ROCK_FALL = 12', 'ROCK_FALL_RATE = 14'));
+  t(c.length === 1 && c[0].from === '12', 'ROCK_FALL renamed with a new value', c.map((x) => x.what).join('; '));
+  t(run('src/gpu/fluid.ts', fluidA, `export const ROCK_FALL = 12;\n${fluidA.replace('export const ROCK_FALL = 12;\n', '')}`).length === 0, 'ROCK_FALL moved up the file, unchanged');
+  const panel = 'export const PANEL_WIDTH = 320;\n';
+  t(changesIn('src/components/Panel.tsx', panel, panel.replace('320', '340'), hunksOf(panel, panel.replace('320', '340')), 'no script says so').length === 0, 'a panel\'s width in src/components is not watched');
+  t(changesIn('src/components/Panel.tsx', panel, panel.replace('320', '340'), hunksOf(panel, panel.replace('320', '340')), 'expect(width).toBe(PANEL_WIDTH)').length === 1, 'unless a script reads it by name');
   c = ch(s.replace('check(\'it moves 5 cells or more\', cells >= 5, `${cells.toFixed(2)} cells of 5`);', ''));
   t(c.length === 1 && c[0].kind === 'removed' && /cells >= #|cells >= 5/.test(c[0].code), 'a check deleted is caught, its bar listed with it', c.map((x) => `${x.kind} ${x.what} ${x.code}`).join('; '));
   c = run('scripts/x.mjs', s, null);
@@ -578,7 +677,10 @@ function selftest() {
 
 const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : undefined; };
 
-if (process.argv.includes('--diff')) {
+const main = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
+if (!main) {
+  // imported: the functions above only
+} else if (process.argv.includes('--diff')) {
   // In CI: the checked-out commit is GitHub's merge of the PR into its base,
   // so its first parent is the base and the difference is the PR's own.
   if (!process.env.PR_NUMBER) {
