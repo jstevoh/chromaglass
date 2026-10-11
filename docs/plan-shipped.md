@@ -2572,6 +2572,28 @@ Pinning them to GitHub Actions (integration 15368) closes that gap. Deleting `ma
 restricted; adding the deletion rule closes that one. The rule a session wrote out is
 `handoff/main-ruleset.json` in the project's shared files.
 
+### 19w. A fifth Mac shard: every shard well inside its timeout
+
+**Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
+20-minute timeout, and #353's was killed at 20:16 on a slow runner after every check in it
+had passed (main's own deploy took 19:32). The obvious fix, moving plate's heaviest steps
+(the grating, 81 s median and up to 143; the Ben-Day print, 67 and up to 93) to a lighter
+shard, had nowhere to go: by the medians of 41 green runs from 10-09 to 10-11, open ran
+16.4 minutes, tools 15.9 and show 15.3 beside plate's 16.7. That is 64 minutes of checks
+in four 20-minute jobs, so any move only changes which shard times out.
+
+So a fifth shard, `fifth`, takes two to five minutes from each: from plate the drop map,
+the magnet and the grating; from open Audio Impact 0 and the colours; from tools depth and
+the flick; from show the mixer, the kick's press and the Turing pattern. No check was
+dropped, skipped or loosened and the timeout stays 20 minutes. Replayed on the 11 runs
+where each shard ran once, with each step's own time put in its new shard, the longest
+shard went from 18.4 minutes to 15.0 (plate 10.7 median, 13.7 at most; open 13.4, 15.0;
+tools 13.6, 14.1; show 13.2, 14.2; fifth 12.8, 13.4). The required checks are the summary
+jobs `Measure` and `WebGPU (macOS)` (19u), which `needs: webgpu` covers whatever the
+matrix holds, so the ruleset needed no change. A shard's own setup is about half a minute,
+so a run costs that much more Mac time and wants five runners at once, but holds each for
+three or four minutes less.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
