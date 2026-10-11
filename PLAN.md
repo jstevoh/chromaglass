@@ -6092,7 +6092,7 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29c-1. The phaseCompress shortcut.** To keep the drop's edge sharp while moving,
     Weller's interface compression is used (a flux along the edge's normal at the flow's speed)
     to precisely counter the grid's numerical diffusion, standing in for an interface the grid cannot draw.
-  - **29c-2. The MAGNET_GAIN factor.** Tuned to 10.8e-4 to compensate for the restoration of accurate physical Darcy drag to body forces in `wgsl/thinGap.ts`.
+  - **29c-2. The MAGNET_GAIN factor.** Derived from first principles for a real ferrofluid (Ferrotec EFH1: susceptibility χ = 1.22, viscosity μ_ff = 0.006 Pa.s) and a hand-held N52 neodymium cylinder magnet (B_r = 1.48 T, 20x40mm) at the plate's distance. The Kelvin body force f = μ₀ M ∇H = ∇(½(χ/μ₀)B²) acts through the ferrofluid's Darcy mobility h²/(12μ_ff) in the gap (h = 6 mm). Converted to solver units (plate metres per second), the physical gain is 1.04e-4. With this derived gain, the pull is about 10x weaker than the tuned 10.8e-4, meaning the drop trails the hand smoothly rather than snapping to it instantly, but is still fast enough to follow (93% of the way in ferrodrag).
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

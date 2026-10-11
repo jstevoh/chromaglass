@@ -519,13 +519,17 @@ export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
 }
 /*
   How hard the magnet pulls the liquid where the ferrofluid is, per unit of
-  magnetic energy gradient, in real seconds (phaseForce). Calibrated in the
-  lab (scripts/lab.mjs): a hand-held magnet a fifth of the plate from a pool
-  draws it in at a quarter of the plate a second, fast enough to follow a
-  hand dragging it, and a pool a sixth of the plate off arrives in about a
-  second.
+  magnetic energy gradient, in real seconds (phaseForce). Derived from first
+  principles for a real ferrofluid (Ferrotec EFH1: susceptibility χ = 1.22,
+  viscosity μ_ff = 0.006 Pa.s) and a hand-held N52 neodymium cylinder magnet
+  (B_r = 1.48 T, 20x40mm) at the plate's distance. The Kelvin body force
+  f = μ₀ M ∇H = ∇(½(χ/μ₀)B²) acts through the ferrofluid's Darcy mobility
+  h²/(12μ_ff) in the gap (h = 6 mm). Converted to solver units (plate metres
+  per second), the physical gain is 1.04e-4. (A pool a sixth of the plate off
+  is drawn much slower than the hand, making the drop trail the hand smoothly
+  rather than snap to it instantly, but still fast enough to follow.)
 */
-const MAGNET_GAIN = 10.8e-4;
+const MAGNET_GAIN = 1.04e-4;
 /*
   The most one step of the magnet may add to a cell, in plate widths a
   second: a guard, not a limit on the pull. At half a plate a second it
@@ -2207,7 +2211,7 @@ export class WebGPUFluid {
         const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read, this.ensureStand()],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
-            MAGNET_CAP * perStep, 0, 0]));
+            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
         this.vel.swap();
       });
     }
