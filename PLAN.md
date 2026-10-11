@@ -324,6 +324,18 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
+- **QA-30** A switch that is on looks like one that is off: the Record panel's Include
+  Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
+  the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
+  are drawn in all, one of them the design's (the owner, 2026-10-11, with a screenshot).
+  Desk, phone, remote. **Check first** (`npm run switches`, this branch's PR): every control
+  that says a state is read in both states, on the desk, every Settings section, the
+  phone's sheets, Play and the remote; a knob against its track at 3:1, on against off at
+  ΔE 20, a switch's on track the accent, and the switch saying its state. 421 controls,
+  15 under the bar. The fix is Antigravity's, briefed in `docs/handoff-switches.md`: the
+  shared `Toggle` for every switch, the phone dock's lit sheet button, and `aria` on what
+  changes its look without saying so (the swatches, the Wall chips, the sequencer's cards,
+  the Record panel's buttons and tabs, the Play screen's Save pill).
 - ~~**QA-20** Blow amount isn't sensitive enough.~~ **Fixed, #346**: the moving wind
   laid two bubbles every sixth step whatever the Amount (ten spawns a second at 60
   steps, twenty at 120), and each bubble pumps the colour out from under it; the
