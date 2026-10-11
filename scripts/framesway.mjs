@@ -25,7 +25,7 @@
  *      them), Frame Sway is 0 and nothing moves the frame: the cover never
  *      slides, the lamp never follows the rock, the beat turns nothing.
  *      And nothing but a hand turns it on: no look routes sound or a scene to
- *      it, Evolve never drifts it, Lucky never rolls it.
+ *      it, no sound or scene patch can, Evolve never drifts it, Lucky never rolls it.
  *   2. And it is the dial doing that, not a song that never kicked: the same
  *      look with Frame Sway at full slides the picture as #347 did (the
  *      default look at least 0.05% of the plate a frame at its peak), half
@@ -56,6 +56,8 @@ await build({
       "export { builtInSequences } from './src/lib/sequencer.ts';",
       "export { DRIFTABLE, driftLook } from './src/lib/drift.ts';",
       "export { luckyLook } from './src/lib/lucky.ts';",
+      "export { soundMappable } from './src/lib/midi.ts';",
+      "export { PATCH_TARGETS } from './src/lib/sceneMap.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
   },
@@ -139,9 +141,10 @@ let drifted = { ...L.DEFAULT_SETTINGS }, driftOn = 0;
 for (let i = 0; i < 100; i++) { drifted = { ...drifted, ...L.driftLook(drifted, L.DEFAULT_SETTINGS, 1) }; if ((drifted.frameSway ?? 0) !== 0) driftOn++; }
 let luckyOn = 0;
 for (let i = 0; i < 100; i++) { let r = i + 1; const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647); if ((L.luckyLook({ ...L.DEFAULT_SETTINGS }, ['#ff0000'], rand).frameSway ?? 0) !== 0) luckyOn++; }
-check('and only a hand turns it on: no look routes sound or a scene to it, Evolve never drifts it, Lucky never rolls it',
-  routed.length === 0 && !L.DRIFTABLE.includes('frameSway') && driftOn === 0 && luckyOn === 0,
-  `routed by ${routed.length ? routed.join(', ') : 'no look'}; driftable ${L.DRIFTABLE.includes('frameSway')}; on after ${driftOn} of 100 drifts, ${luckyOn} of 100 rolls`);
+const patchable = L.soundMappable('frameSway') || L.PATCH_TARGETS.some((t) => t.key === 'frameSway');
+check('and only a hand turns it on: no look routes sound or a scene to it, no patch can, Evolve never drifts it, Lucky never rolls it',
+  routed.length === 0 && !patchable && L.soundMappable('plateRock') && !L.DRIFTABLE.includes('frameSway') && driftOn === 0 && luckyOn === 0,
+  `routed by ${routed.length ? routed.join(', ') : 'no look'}; a patch target ${patchable} (Plate Rock ${L.soundMappable('plateRock')}); driftable ${L.DRIFTABLE.includes('frameSway')}; on after ${driftOn} of 100 drifts, ${luckyOn} of 100 rolls`);
 
 // ── 2. The dial, and the liquid's own rock ─────────────────────────────
 const base = { ...L.DEFAULT_SETTINGS };

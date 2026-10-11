@@ -286,6 +286,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Thin Gap, which switches the solver: see the same list there.
 // Nor Clear Film, which pours over the whole dish: the same list again.
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
+  // Frame Sway is a hand's alone (the owner, 2026-10-11): a kick routed to it would slide the whole frame on the beat (lib/plateRock.ts).
+  'frameSway',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');

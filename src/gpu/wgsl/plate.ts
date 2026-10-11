@@ -935,7 +935,9 @@ fn macroWarpOffset(fuv: vec2f) -> vec2f {
   // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat,
   // as far as Frame Sway lets the beat move the frame (0 by default: the
   // whole closeup's silhouette throbbing on every beat reads as the camera
-  // shaking, not the liquid moving; lib/plateRock.ts).
+  // shaking, not the liquid moving; lib/plateRock.ts). At 0 it rests where it
+  // rests with no beat clock (the edge as set), on purpose: a pulse held at its
+  // average would still be a beat-locked level, and the look without music is the reference.
   let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
   let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.4);
   
