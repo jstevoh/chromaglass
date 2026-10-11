@@ -95,6 +95,13 @@ const BARS = {
   accentTolerance: 8,
   /** Fewer stateful controls than this on a surface and it was not reached: red, not green. */
   minControls: { desk: 150, phone: 50, remote: 4 },
+  /**
+   * Fewer binary controls than this actually changed state when clicked: the
+   * clicks are not landing (a re-render between read and click, a page that
+   * stopped answering), and a run that reads one state of everything would
+   * otherwise look like a run that read both.
+   */
+  minFlipped: { desk: 150, phone: 15 },
 };
 
 /** The settings sections, as the palette lists them (`lib/settingsMap.ts`): id and the name typed to find it. */
@@ -281,7 +288,8 @@ const PROBE = `(() => {
         item.on = !!on;
         item.group = key.split('|')[0];
         item.label = on ? label(on) : label(el);
-        if (on && off) { item.a = measure(on); item.b = measure(off); item.pair = label(off); }
+        item.testids = all.map(s => s.dataset.testid).filter(Boolean);
+        if (on && off) { item.a = measure(on); item.b = measure(off); item.pair = label(off); item.i = els.push(on) - 1; item.j = els.push(off) - 1; }
       }
       out.push(item);
     };
@@ -326,31 +334,38 @@ const lab = ([r, g, b]) => {
 };
 const dE = (a, b) => { if (!a || !b) return 0; const p = lab(a), q = lab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
 const hex = (c) => c ? '#' + c.slice(0, 3).map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('') : '-';
-const fmt = (x) => x ? x.toFixed(x >= 10 ? 0 : 1) : '-';
+const fmt = (x) => x == null ? '-' : x.toFixed(x >= 10 ? 0 : 1);
 const slug = (s) => s.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60);
 
 /** Two readings of a control (on and off, or chosen and unchosen): the strongest channel that tells them apart, as ΔE. */
-function difference(a, b) {
+function difference(a, b, { parts = true } = {}) {
   const chan = (p, q) => {
     const fill = dE(p.fill, q.fill);
-    const border = p.border && q.border ? dE(p.border, q.border) : (p.border ? dE(p.border, q.fill) : (q.border ? dE(q.border, p.fill) : 0));
-    const text = p.text && q.text ? dE(p.text, q.text) : 0;
+    const border = p.border && q.border ? dE(p.border, q.border) : (p.border ? dE(p.border, q.fill) : (q.border ? dE(q.border, p.fill) : null));
+    const text = p.text && q.text ? dE(p.text, q.text) : null;
     return { fill, border, text };
   };
   const own = chan(a, b);
   // A ring one state has and the other lacks, against the surround.
   const ringOf = (p) => Math.max(0, ...p.ring.map(c => dE(c, a.under)));
-  const ring = Math.abs(ringOf(a) - ringOf(b));
-  let part = 0;
+  const ring = a.ring.length || b.ring.length ? Math.abs(ringOf(a) - ringOf(b)) : null;
+  // The parts inside, paired by position: for one control read twice. Two
+  // members of a group have their own content (a liquid tile's own bottle
+  // swatch), which would tell them apart whatever their state, so for a
+  // group the parts are reported and not counted.
+  let part = null;
   const n = Math.min(a.parts.length, b.parts.length);
-  for (let i = 0; i < n; i++) { const c = chan(a.parts[i], b.parts[i]); part = Math.max(part, c.fill, c.border, c.text); }
-  const best = Math.max(own.fill, own.border, own.text, ring, part);
-  const by = best === own.fill ? 'fill' : best === own.border ? 'border' : best === own.text ? 'text' : best === ring ? 'ring' : 'a part inside';
+  for (let i = 0; i < n; i++) { const c = chan(a.parts[i], b.parts[i]); part = Math.max(part ?? 0, c.fill, c.border ?? 0, c.text ?? 0); }
+  const counted = [own.fill, own.border ?? 0, own.text ?? 0, ring ?? 0, parts ? (part ?? 0) : 0];
+  const best = Math.max(...counted);
+  const by = ['fill', 'border', 'text', 'ring', 'a part inside'][counted.indexOf(best)];
   return { best, by, ...own, ring, part };
 }
 
 const rows = [];
 const surfaceCounts = { desk: 0, phone: 0, remote: 0 };
+const surfaceFlips = { desk: 0, phone: 0, remote: 0 };
+const sectionsReached = [];
 const named = new Set();
 
 async function visit(page, where, surface, opts = {}) {
@@ -360,13 +375,33 @@ async function visit(page, where, surface, opts = {}) {
   let flipped = 0;
   const detailOf = (j, a, b) => `fill ${hex(a.fill)}/${hex(b.fill)} ${fmt(j.fill)}, border ${fmt(j.border)}, text ${fmt(j.text)}, ring ${fmt(j.ring)}, inside ${fmt(j.part)}`;
   for (const it of items) {
-    if (it.testid) named.add(it.testid);
+    for (const id of it.testids ?? [it.testid]) if (id) named.add(id);
     if (it.kind === 'native') { rows.push({ where, label: it.label, kind: 'native', verdict: 'exempt' }); continue; }
     if (it.kind === 'group') {
       if (!it.a || !it.b) { rows.push({ where, label: it.group, kind: 'group', verdict: 'unmeasured', note: it.on ? 'no unchosen member beside it' : 'none chosen here' }); continue; }
-      const j = difference(it.a, it.b);
-      const ok = j.best >= BARS.difference;
-      check(`${where}: ${it.group}: ${it.label} (chosen) against ${it.pair}: ΔE ${fmt(j.best)} by ${j.by}`, ok, detailOf(j, it.a, it.b));
+      let j = difference(it.a, it.b, { parts: false });
+      let ok = j.best >= BARS.difference;
+      let how = `against ${it.pair}`;
+      // A group whose cue is a part inside (the Play screen's look tiles ring
+      // their swatch) cannot be read across two members, each with its own
+      // content. So the choice is moved to the other member and the chosen
+      // one is read again, unchosen: the same element in both states, where
+      // its parts do count. Put back afterwards.
+      if (!ok && !it.disabled) {
+        const before = await scrims(page);
+        try {
+          await page.evaluate(k => window.__sw.click(k), it.j);
+          const moved = await changed(page, it.i, true);
+          if (moved && moved.on === false) {
+            const twice = difference(it.a, moved.body, { parts: true });
+            if (twice.best >= BARS.difference) { j = twice; ok = true; how = 'read chosen, then unchosen'; }
+            await page.evaluate(k => window.__sw.click(k), it.i);
+            await changed(page, it.i, false);
+          }
+        } catch { /* the choice would not move: the in-place reading stands */ }
+        for (const id of (await scrims(page)).filter(x => !before.includes(x))) { await page.keyboard.press('Escape'); await page.waitForTimeout(200); if ((await scrims(page)).includes(id)) await tap(page, id); }
+      }
+      check(`${where}: ${it.group}: ${it.label} (chosen) ${how}: ΔE ${fmt(j.best)} by ${j.by}`, ok, detailOf(j, it.a, it.b));
       rows.push({ where, label: it.group, kind: 'group', verdict: ok ? 'ok' : 'FAIL', best: j.best, by: j.by });
       continue;
     }
@@ -380,12 +415,10 @@ async function visit(page, where, surface, opts = {}) {
       const before = await scrims(page);
       try {
         await page.evaluate(i => window.__sw.click(i), it.i);
-        await page.waitForTimeout(opts.settle ?? 80);
-        second = await page.evaluate(i => window.__sw.read(i), it.i);
-        if (second && second.on === first.on && !(it.kind === 'switch' && !it.said)) second = null;
+        second = await changed(page, it.i, first.on);
         if (second && SHOTS && it.kind === 'switch') await shoot(page, it, second.on);
         await page.evaluate(i => window.__sw.click(i), it.i);
-        await page.waitForTimeout(opts.settle ?? 80);
+        if (second) await changed(page, it.i, second.on);
       } catch { second = null; }
       const after = await scrims(page);
       for (const id of after.filter(x => !before.includes(x))) {
@@ -411,7 +444,13 @@ async function visit(page, where, surface, opts = {}) {
         const d = dE(on.track.fill, off.track.fill);
         detail.push(`track on ${hex(on.track.fill)} / off ${hex(off.track.fill)} ΔE ${fmt(d)}`);
         if (d < BARS.difference) ok = false;
-      } else detail.push(`${on ? 'off' : 'on'} state not reached${it.disabled ? ' (disabled here)' : ` (read ${first.on} then ${second ? second.on : 'nothing'})`}`);
+      } else {
+        // A switch that will not flip is a switch this cannot read: red, so a
+        // run whose clicks stopped landing is not a green one. Disabled is
+        // the one excuse (the remote's, until a laptop is connected).
+        if (!it.disabled) ok = false;
+        detail.push(`${on ? 'off' : 'on'} state not reached${it.disabled ? ' (disabled here)' : ' (did not change on click)'}`);
+      }
       if (on?.track) {
         const want = [0, 1, 2].map(k => accent[3] * accent[k] + (1 - accent[3]) * on.track.under[k]);
         const d = Math.max(...[0, 1, 2].map(k => Math.abs(on.track.fill[k] - want[k])));
@@ -431,8 +470,24 @@ async function visit(page, where, surface, opts = {}) {
       rows.push({ where, label: it.label, kind: 'button', verdict: ok ? 'ok' : 'FAIL', best: j.best, by: j.by });
     }
   }
+  surfaceFlips[surface] += flipped;
   console.log(`      ${where}: ${items.length} new controls, ${flipped} flipped`);
   return items.length;
+}
+
+/**
+ * The control's reading once its state is not `was`: polled, since a click
+ * re-renders on React's schedule, not on a timer. Null when it never changes
+ * (a momentary button, a control whose click did not land), after 400 ms.
+ */
+async function changed(page, i, was) {
+  const until = Date.now() + 400;
+  while (Date.now() < until) {
+    const r = await page.evaluate(i => window.__sw.read(i), i);
+    if (r.on !== was) return r;
+    await page.waitForTimeout(25);
+  }
+  return null;
 }
 
 async function shoot(page, it, state) {
@@ -482,21 +537,27 @@ try {
     await desk.waitForTimeout(500);
     return true;
   };
-  await visit(desk, 'desk Perform', 'desk');
-  if (await count(desk, 'mode-segmented-design')) {
-    await tap(desk, 'mode-segmented-design');
-    await desk.waitForTimeout(500);
-    await visit(desk, 'desk Build', 'desk');
-    await tap(desk, 'mode-segmented-perform');
-    await desk.waitForTimeout(300);
+  // Each layout of the desk, by its tab (the desk opens on Build, so the
+  // first is tapped like the rest rather than assumed).
+  for (const [mode, name] of [['design', 'Build'], ['perform', 'Gig'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']]) {
+    if (!await tap(desk, `mode-segmented-${mode}`)) { console.log(`      desk ${name}: no tab`); continue; }
+    await desk.waitForTimeout(400);
+    await visit(desk, `desk ${name}`, 'desk');
   }
+  await tap(desk, 'mode-segmented-perform');
   for (const [id, name] of SETTINGS_SECTIONS) {
-    if (!await palette(`Settings: ${name}`, `settings-${id}`)) { console.log(`      settings ${id}: not reachable from the palette`); continue; }
+    const opened = await palette(`Settings: ${name}`, `settings-${id}`)
+      && await appears(desk, `settings-nav-${id}`, 10)
+      && await desk.locator(`[data-testid="settings-nav-${id}"][aria-current]`).count() > 0;
+    if (!opened) { console.log(`      settings ${id}: not reached`); continue; }
+    sectionsReached.push(id);
     await visit(desk, `settings ${id}`, 'desk');
   }
   await desk.keyboard.press('Escape');
-  for (const [row, name] of [['open-midi', 'MIDI'], ['open-songs', 'Songs'], ['open-seq', 'Sequences'], ['open-stage', 'Stage'], ['record-studio', 'Record']]) {
-    if (!await palette(name, row)) { console.log(`      ${name}: not reachable from the palette`); continue; }
+  for (const [row, name, landmark] of [['open-midi', 'MIDI', 'midi-soft'], ['open-songs', 'Songs', 'songs-follow'], ['open-seq', 'Sequences', 'seq-export'], ['open-stage', 'Stage', null], ['record-studio', 'Record', 'record-audio-toggle']]) {
+    const opened = await palette(name, row) && (!landmark || await appears(desk, landmark, 10));
+    check(`${name} opened from the palette`, opened);
+    if (!opened) continue;
     await visit(desk, name, 'desk');
     if (name === 'Record' && await count(desk, 'record-tab-performance')) {
       await tap(desk, 'record-tab-performance');
@@ -508,7 +569,7 @@ try {
   }
   if (await count(desk, 'crash-report-button')) {
     await tap(desk, 'crash-report-button');
-    await desk.waitForTimeout(400);
+    check('the crash report opened', await appears(desk, 'crash-with-shot', 10));
     await visit(desk, 'Crash report', 'desk');
     await desk.keyboard.press('Escape');
   }
@@ -529,6 +590,10 @@ try {
   await phone.context().close();
   const play = await open(`${BASE}play?${QUERY}`, PHONE);
   await visit(play, 'phone Play', 'phone');
+  if (await tap(play, 'play-handle')) {
+    await play.waitForTimeout(500);
+    await visit(play, 'phone Play sheet', 'phone');
+  }
   await play.context().close();
 
   // ── The remote ──────────────────────────────────────────────────────
@@ -542,8 +607,13 @@ try {
   await remote.context().close();
 
   // ── Was anything measured at all ────────────────────────────────────
+  check(`every Settings section reached: ${sectionsReached.length}/${SETTINGS_SECTIONS.length}`, sectionsReached.length === SETTINGS_SECTIONS.length,
+    SETTINGS_SECTIONS.map(([id]) => id).filter(id => !sectionsReached.includes(id)).join(' ') || '');
   for (const [s, min] of Object.entries(BARS.minControls)) {
     check(`${s}: at least ${min} stateful controls found`, surfaceCounts[s] >= min, `${surfaceCounts[s]}`);
+  }
+  for (const [s, min] of Object.entries(BARS.minFlipped)) {
+    check(`${s}: at least ${min} controls changed state when clicked`, surfaceFlips[s] >= min, `${surfaceFlips[s]}`);
   }
   for (const id of ['record-audio-toggle', 'song-detection-toggle', 'flash-limit-master', 'toggle-evolve', 'mode-segmented-perform', 'phone-open-dye', 'play-follow']) {
     check(`${id} was among them`, named.has(id));

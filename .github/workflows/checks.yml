@@ -110,7 +110,9 @@ jobs:
   measure-part:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The browser part ran 11:47 on main before the switches step (two to three
+    # minutes in CI); 15 left it no headroom.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

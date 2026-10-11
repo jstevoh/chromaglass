@@ -8,7 +8,7 @@ sure they are clear when things are turned on/off."
 
 Plan: `PLAN.md` QA-30 (`grep -n 'QA-30' PLAN.md`). The check is `npm run switches`
 (`scripts/switches.mjs`, read its header first) and lands with this brief on the branch
-`claude/clear-switch-states-2o9z8d`, whose draft PR carries the `handoff` label: carry on in
+`claude/clear-switch-states-2o9z8d`, whose draft PR #381 carries the `handoff` label: carry on in
 that PR (`docs/handoff.md`, "Stopping halfway"), do not open another.
 
 ## What was found
@@ -22,7 +22,7 @@ owner's design (`DESIGN-SYSTEM.md`: "on = accent bg, white knob at right; off = 
 | Record panel, Include Audio Track (`record-audio-toggle`, `RecordPanel.tsx` ~233) | track `bg-primary` (#FAFAFA), knob `bg-white` | track `bg-border-strong`, knob white | knob on 1.0:1 (the reported one); on track not the accent |
 | Settings: Flash Limit (`flash-limit-master`, `SettingsPanel.tsx` ~570), Auto Calibrate (~726, no role), Song Detection (`song-detection-toggle`, ~840), LED Platform (~3508, no role) | track `bg-white`, knob `bg-black` | track `bg-white/20`, knob black | knob off 2.0–2.2:1; on track not the accent; two say no state |
 | Remote, Macro Closeup (`RemoteControl.tsx` ~842, no role, disabled until connected) | as above | as above | knob off 2.2:1; says no state |
-| Track panel's local `Toggle` ×4 (`TrackPanel.tsx` ~37, no role) | track `bg-purple-500` | track `bg-white/20` | not reached by the check today (an overlay the desk does not open); purple-500 is not the accent |
+| Track panel's local `Toggle` ×4 (`TrackPanel.tsx` ~37, no role) | track `bg-purple-500` | track `bg-white/20` | not reached by the check today: its button is in the old overlay (`overlayUp`, shown only with the desk down, `App.tsx` ~5836, no testid); purple-500 is not the accent. Fix it with the rest, and give its button a testid so the check can reach it |
 | Wall panel's local `Switch` ×4 (`OutputPanel.tsx` ~333: `output-flip-x`, `output-flip-y`, `output-test-pattern`, `output-flash-guard`, no role) | white chip | `bg-white/5` chip | invisible to the check: says no state |
 | Phone dock, the lit sheet button (`phone-open-{dye,looks,sound,play,mix,more}`, `PhoneStage.tsx` ~564–595) | `bg-active text-text` | `text-text-2` | ΔE 16 by fill, 13 by text, under the 20 bar (the tools beside it: ΔE 56 by border) |
 
@@ -42,10 +42,12 @@ Grade/Graded (`MixerPanel.tsx` ~280, text colour only), and the Play screen's `P
   or any part inside it, each composited over what is behind it): **ΔE 20** or more (CIE76)
 - a switch's on track is `--color-accent` (#8B5CF6), ±8 per channel
 - every switch says its state: `role="switch"` with `aria-checked` (or `aria-pressed`)
-- floors: at least 150 stateful controls found on the desk, 50 on the phone, 4 on the
-  remote, and the named ones among them
+- floors: every Settings section reached; at least 150 stateful controls found on the desk,
+  50 on the phone, 4 on the remote; at least 150 of the desk's and 15 of the phone's changed
+  state when clicked; the named ones among them
 
-Today (`node scripts/switches.mjs | tail -3`): **421 controls, 350 ok, 15 under the bar**.
+Today (`node scripts/switches.mjs | tail -3`): **429 controls, 356 ok, 16 under the bar** (the
+seven switches, the six dock buttons, the Play screen's Save pill, the remote's switch).
 **Target: 0 under the bar, every control in the table and the list above read by the check
 (so it says its state), and the count of controls read not lower than today's.**
 
