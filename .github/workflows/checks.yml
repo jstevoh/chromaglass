@@ -370,6 +370,12 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # A setting from a menu, the phone or a saved look survives sanitizePatch
+      # (PLAN.md QA-29, 14n): every value every choice setting can take, every
+      # preset intact, malformed patches, gestures and MIDI maps dropped.
+      - name: Settings survive the sanitiser
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run sanitize
       # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
       # through a song's kicks, every shipped look and show stage slides the
       # whole picture 0% a frame, against up to 1% with the cover glass free
