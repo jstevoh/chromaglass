@@ -83,6 +83,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
 | `.github/workflows/checks.yml`, `scripts/reach.mjs` | `npm run reach`, `npm run closedruns`, `actionlint`; `npm run macqueue -- --hours 24` for the Mac time before and after |
+| a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
@@ -95,6 +96,9 @@ deploy:
 
 - **Measure** (ubuntu, three parts side by side, ~5 min each): typecheck, every script
   parsing, the shaders compiling on SwiftShader, and the node harnesses.
+- **Check changes named** (`scripts/checkguard.mjs`, under `Measure`): a PR that moves a
+  check's bar or input names each change in its body under `Check changes:`, or is red.
+  Re-run the failed jobs after editing the body; no push is needed.
 - **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
   `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
   that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the

@@ -71,8 +71,32 @@ Done: what changed, in a sentence or two
 Measured: the npm scripts run, where they ran (Mac GPU / cloud / CI) and the numbers
 Controls: each check-skeptic control run and what it read (red where it should be)
 Review owed: the .claude agents only followed by hand, or "none"
+Check changes: "none", or one list line per change to a check's bar or input (below)
 Left: the next concrete step, if the work stops here
 ```
+
+**Check changes.** CI fails a PR that moves what a check measures against or with and does
+not say so (`npm run checkguard`, the "Check changes named" job, under the required
+`Measure`; PLAN.md 19w). That is any number a check compares against (`>= 0.05` to
+`>= 0.04`), a comparison turned round, a check or its bar deleted or rewritten, any other
+number on a code line under `scripts/` (a stir strength, a seed, a duration, a run count,
+where a drop is poured), and any SHOUTING_CASE number constant in `src/` that changes value
+(`ROCK_FALL`, which a check reads through the app). Comments, check names, log text and
+`toFixed` digits never count. Each change gets one list line under `Check changes:` with
+the file (or the constant), the old and the new number, and the reason, which is the
+measurement that says why it moves:
+
+```
+Check changes:
+- scripts/rides.mjs:518 heavyTilt.moved >= 0.05 → 0.04: the corners outside the dish no longer count; heavy red measured 0.0474 in the dish
+- ROCK_FALL 12 → 13 (src/gpu/fluid.ts): Δρ/ρ re-derived for the dye's real density, 0.0012 not 0.0011
+```
+
+A red guard prints these lines with the reason left for you; paste them into the body, write
+the reasons, and re-run the failed jobs (no push needed). A named change passes; it is the
+reviewer who judges the reason, and the owner's rule still holds: a bar is never loosened to
+get green. If the check is red, find why the plate fails it. Changing a test's input needs
+the physics that justifies it, checked against the old input.
 
 ## Stopping halfway
 
@@ -117,12 +141,15 @@ pick one of them at random instead.
 
 **What, in this order, stopping at the first real problem:**
 
-1. `check-skeptic` on every check the PR added or changed. Run its controls again
+1. Read the PR's `Check changes:` lines first (the guard makes every moved bar and input
+   list itself there). A loosened bar, or an input changed without the physics behind it,
+   is the first problem to name.
+2. `check-skeptic` on every check the PR added or changed. Run its controls again
    rather than trusting the ones pasted in the PR body; if they cannot run here (they need
    a GPU), check that the pasted ones mutate what they claim to.
-2. `prepush-reviewer` on the PR's diff (`git diff <base>...<head>`, or the squash
+3. `prepush-reviewer` on the PR's diff (`git diff <base>...<head>`, or the squash
    commit's parent for a merged PR).
-3. The one or two `npm run` scripts named under `Measured:` that can run where the session
+4. The one or two `npm run` scripts named under `Measured:` that can run where the session
    is (the table in `CLAUDE.md`).
 
 **Then.** Leave one comment on the PR headed `Review pass`, with one line per step: what

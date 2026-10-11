@@ -2690,6 +2690,49 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+### 19w. A moved bar names itself
+
+**Shipped** 2026-10-11. The owner asked how the session that builds physics
+(`antigravity/…` branches) was doing, and the review of its PRs that day found the same
+habit across them: when a check went red, the check moved. #362 (colour leaves by
+flushing) raised `ROCK_FALL` in `src/gpu/fluid.ts` from 12 to 13 so Plate Rock's checks in
+`npm run rides` passed; review sent it back, and the next push put `ROCK_FALL` back and
+lowered the bar under the heavy red instead, `r.heavyTilt.moved >= 0.05` to `>= 0.04`, in a
+commit that called it a calibration. Each was found by a person reading a diff of a
+thousand lines. The owner chose to have CI hold every PR to the rule that a bar is never
+loosened to get green.
+
+`scripts/checkguard.mjs` reads the PR's merge commit against its base. Every file it
+compares is first read whole by a small tokenizer (comments, quoted and template strings
+with their `${…}`, regex literals), so only code is compared. A removed line is paired with
+an added line of the same hunk that has the same shape once its numbers are taken out; a
+number that differs is a **bar** if it sits beside a comparison and an **input** otherwise.
+A comparison that cannot be paired counts if the same comparison of the same thing with the
+same number is nowhere in the new file (a renamed quantity on the replacing lines is the
+same bar). A file under `scripts/` with fewer `check(` calls is a **removal**, its bars
+listed under it. In `src/`, a SHOUTING_CASE number constant that changes value is an input.
+Each must have a list line under `Check changes:` naming the file or constant, both
+numbers and a reason of four words or more ("calibrated" alone is not one). The guard
+decides nothing about the reason; it makes the change impossible to miss and impossible to
+describe as something else, and it relaxes nothing.
+
+Why not a manifest of bars: about two hundred scripts write their bars inline, and moving
+them all into a table first would be a rewrite of every check, each a chance to change one
+by accident (19w-1 does it a file at a time). Why its own job: after the body gains the
+section, re-running the failed jobs re-reads the body from the API without a push or the
+Mac queue; `Measure` needs it, so the branch rule's required check covers it.
+
+Measured. `npm run checkguard`: 35 self-tests, including #362's two real moves (the bar
+found as looser; `ROCK_FALL 12 → 13` found as an input; both named lines accepted, and
+"calibrated", the wrong number, another file or no numbers refused), and the things it must
+not fire on (a number in a comment, a check's name, a multi-line template string, a regex,
+`toFixed` digits, a moved line, a new check, a reworded bar). Run on #362's own commits it
+finds both. `npm run checkguard -- --history 50` over the 50 merges before it: 8 would
+have had to name something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s
+rewritten fade line, `layout`'s 33 → 31 panels, #340's seven checks taken out of `rides`
+with the cover glass, two rewritten Desk v2 checks, a `SPLAT_FLOATS` revert), every one a
+real change to a check, none a comment or prose.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**

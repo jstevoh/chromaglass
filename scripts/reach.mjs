@@ -22,7 +22,8 @@
 // apps, which `npm run build` does not read and which `ios.yml` and
 // `desktop.yml` build. Three scripts about the workflows themselves
 // (`closedruns.mjs`, `macqueue.mjs`, `deploygate.sh`) are run by Measure, the
-// deploy or by hand, and imported by no Mac step. `checks.yml` itself, `deploy.yml`, `scripts/`,
+// deploy or by hand, and imported by no Mac step; so is the guard that reads
+// a PR's diff for moved bars (`checkguard.mjs`), which reads code as text. `checks.yml` itself, `deploy.yml`, `scripts/`,
 // `docs/`' JSON (the set list and liquids files are read by checks) all reach.
 //
 // Measure, on ubuntu, runs in full on every push whatever this says: it is
@@ -61,7 +62,7 @@ const NOT_MAC = [
   /^ios\//,
   /^desktop\//,
   /^LICENSE[^/]*$/,
-  /^scripts\/(closedruns\.mjs|macqueue\.mjs|deploygate\.sh)$/,
+  /^scripts\/(closedruns\.mjs|macqueue\.mjs|deploygate\.sh|checkguard\.mjs)$/,
 ];
 
 export const reachesMac = (path) => !NOT_MAC.some((re) => re.test(path));
@@ -207,6 +208,7 @@ async function selftest() {
     ['scripts/closedruns.mjs', false],
     ['scripts/macqueue.mjs', false],
     ['scripts/deploygate.sh', false],
+    ['scripts/checkguard.mjs', false],
     ['scripts/closedruns.mjs.bak', true],
     ['scripts/lab/closedruns.mjs', true],
     ['src/gpu/wgsl/plate.ts', true],
