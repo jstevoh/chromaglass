@@ -213,7 +213,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
   it), then **18f** heat from the lamp (which unblocks 10.6
-  and the slide plan's S2) and **18j** milk (in progress) (which replaces 4-milk), and **20a**.
+  and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
@@ -436,7 +436,7 @@ Where each batch stands, as of 2026-09-27:
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
-| 4 | Liquids that behave differently | **Shipped**; milk's opacity still owed |
+| 4 | Liquids that behave differently | **Shipped**; milk's opacity shipped (#353, 18j) |
 | 5 | Playing it | Sound learn **shipped** (#155, on #154's bands); shutter and look link **not started** |
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
@@ -779,13 +779,9 @@ Found with it, open:
 
 ### 4. Liquids that behave differently
 
-**Shipped**, with milk's opacity still owed (below). How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**, with milk's opacity shipped in 18j (#353). How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-**Still owed: milk's opacity.** What ships is behaviour, not optics. Colour still
-transmits through milk rather than sitting on it, because the dye texture's RGBA is
-already fully spent — three log-absorptions and a density — and there is no channel
-left for an opaque ground. That is the part of the reference's solid reds this does
-not yet reach, and it needs a render change rather than a solver one.
+**Milk's opacity shipped (#353, 18j).** Optical scattering (Kubelka–Munk diffuse backscattering on black ground, two-flux forward extinction and forward halo on lamp ground) packed into `vel.w` from the advected `species.b` field. Colour sits on the opaque white body of milk as solid vibrant red (reference §4).
 
 ### 4a. What is in each preset's dish
 
@@ -3795,7 +3791,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
-| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **In progress** |
+| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
 
@@ -4361,6 +4357,7 @@ its frame rate live. "Free" means no new passes or texture reads.
   a look in its own right, so both stay available as looks.
 
 ### 18j. Milky liquids scatter
+**Shipped** (#353): scattering packed into `vel.w` via `packVel` from `species.b` (conserved flux-form advection); two-flux forward extinction and forward halo on lamp ground (projector shadow, not white); Kubelka–Munk diffuse backscattering on black ground, allowing food dye to sit on white body as solid vibrant red (PLAN §4).
 
 - **Where:** everything in the plate is a pure absorber. `colourBody` pushes opacity
   and saturation up to imitate a body of colour, `granulation` modulates the dye's

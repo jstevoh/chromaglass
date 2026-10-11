@@ -174,6 +174,7 @@ fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t
   pre-push review).
 */
 var<private> lampBg: vec3f = vec3f(1.0);
+var<private> milkScatter: f32 = 0.0;
 
 /*
   A decoded dye f over the ground bg, on the ground the look asks for
@@ -181,9 +182,18 @@ var<private> lampBg: vec3f = vec3f(1.0);
   the plate always drew; at 1 the lamp filtered through the dye, which is
   what a lamp under a dish does; between, the one fading into the other.
   through is the dyeThrough the decode of f left.
+
+  Milky liquids scatter light (PLAN 18j): on the black ground, diffuse
+  backscattering provides an opaque white body (Kubelka–Munk) for dye to sit on;
+  on the lamp ground, forward extinction and halo attenuate the transmission.
 */
 fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
-  let painted = mix(bg, f.rgb, f.a);
+  var painted = mix(bg, f.rgb, f.a);
+  if (milkScatter > 0.001) {
+    let rDiff = (1.0 - exp(-milkScatter * 2.0)) * vec3f(0.96, 0.95, 0.92);
+    let effBg = mix(bg, rDiff, 1.0 - exp(-milkScatter * 2.5));
+    painted = mix(effBg, f.rgb, f.a);
+  }
   if (U.lampGround <= 0.001) { return painted; }
   return mix(painted, lampBg * through, U.lampGround);
 }
@@ -528,6 +538,19 @@ fn uvToFluid(uv: vec2f, c: f32, s: f32) -> vec2f {
  */
 fn fluidFlow(vtex: texture_2d<f32>, fuv: vec2f) -> vec2f {
   return tex2(vtex, fuv).rg * U.flowRate;
+}
+
+/**
+ * Forward scattering halo around milky pools (PLAN 18j).
+ * A soft 4-tap blur of the packed scattering coefficient (vtex.a).
+ */
+fn milkScatterHalo(vtex: texture_2d<f32>, fuv: vec2f) -> f32 {
+  let d = 0.012;
+  let s0 = tex2(vtex, fuv + vec2f(-d, -d)).a;
+  let s1 = tex2(vtex, fuv + vec2f(d, -d)).a;
+  let s2 = tex2(vtex, fuv + vec2f(-d, d)).a;
+  let s3 = tex2(vtex, fuv + vec2f(d, d)).a;
+  return (s0 + s1 + s2 + s3) * 0.25;
 }
 `;
 
@@ -2379,8 +2402,18 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     outColor += vec3f(1.0, 0.98, 0.95) * sb * a * (0.35 + 0.6 * fres);
     outColor += vec3f(0.95, 0.97, 1.0) * fres * a * 0.18;
   } else {
+    let sc0 = max(0.0, tex2(vel0, fuv0).a);
+    var t0 = through0;
+    if (sc0 > 0.001) {
+      let ext0 = exp(-vec3f(0.85, 0.95, 1.20) * (sc0 * 0.90) * gapScale);
+      let halo0 = milkScatterHalo(vel0, fuv0);
+      let fwd0 = (halo0 * 0.08) * exp(-sc0 * 0.6) * vec3f(1.05, 1.0, 0.92);
+      t0 = t0 * ext0 + fwd0;
+    }
+    milkScatter = sc0;
     outColor = onGround(outColor, fluid0,
-      throughScaled(through0, more0) * reliefOf(fluid0.rgb, tint0, alpha0));
+      throughScaled(t0, more0) * reliefOf(fluid0.rgb, tint0, alpha0));
+    milkScatter = 0.0;
 
     /*
       The second phase, over the dye it is moving through (H7).
@@ -2808,7 +2841,20 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       outColor = blendRow(outColor, fluid1.rgb, fluid1.a, bm);
     } else {
       let blended = applyBlend(outColor, fluid1.rgb, U.blendMode);
-      let painted1 = mix(outColor, blended, fluid1.a);
+      var painted1 = mix(outColor, blended, fluid1.a);
+      let sc1 = max(0.0, tex2(vel1, fuv1).a);
+      if (sc1 > 0.001) {
+        let rDiff1 = (1.0 - exp(-sc1 * 2.0)) * vec3f(0.96, 0.95, 0.92);
+        let effBg1 = mix(outColor, rDiff1, 1.0 - exp(-sc1 * 2.5));
+        painted1 = mix(effBg1, blended, fluid1.a);
+      }
+      var t1 = through1;
+      if (sc1 > 0.001) {
+        let ext1 = exp(-vec3f(0.85, 0.95, 1.20) * (sc1 * 0.90));
+        let halo1 = milkScatterHalo(vel1, fuv1);
+        let fwd1 = (halo1 * 0.08) * exp(-sc1 * 0.6) * vec3f(1.05, 1.0, 0.92);
+        t1 = t1 * ext1 + fwd1;
+      }
       /*
         On a lamp ground the back plate is a second filter in the light's
         path, whatever the look's Blend Mode says (a mixer row's own blend,
@@ -2817,7 +2863,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         how much of its dye is in the path (throughScaled).
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(through1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let lit1 = outColor * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
         outColor = painted1;

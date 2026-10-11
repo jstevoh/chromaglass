@@ -3068,7 +3068,7 @@ export class WebGPUFluid {
    * for a check that needs a pool in place (`npm run thick`). Only on a thin
    * gap; in plate units.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number } | null, volume = true): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume = true): void {
     if (!(radius > 0) || !(take > 0)) return;
     const enc = this.device.createCommandEncoder({ label: 'pour' });
     const pass = enc.beginComputePass({ label: 'pour' });
@@ -3079,7 +3079,7 @@ export class WebGPUFluid {
       if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
       const s = this.species;
       if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-      this.run(pass, 'speciesSplat', s.write, [s.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.density, sp.index, push ? 1 : 0]));
+      this.run(pass, 'speciesSplat', s.write, [s.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
@@ -4730,6 +4730,8 @@ export class WebGPUFluid {
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
       chem: this.chemLive ? this.chem.read : null,
+      /** The poured species field (carries scatter in b channel). */
+      species: this.speciesLive && this.species ? this.species.read : null,
     };
   }
 
