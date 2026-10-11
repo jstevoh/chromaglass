@@ -2292,8 +2292,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var film0 = fluid0.a;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
-    fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
-    more0 *= grain;
+    let gd0 = grainedDepth(bare0, grain);
+    fluid0.a = min(1.0, fluid0.a * gd0);
+    more0 *= gd0;
   }
 
   let sharp0 = dof < 0.55;
@@ -2758,8 +2759,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // The grain after the edge, not before it: see the front plate's.
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
-      more1 *= grain;
+      let gd1 = grainedDepth(bare1, grain);
+      fluid1.a = min(1.0, fluid1.a * gd1);
+      more1 *= gd1;
     }
 
     let sharp1 = dof < 0.55;

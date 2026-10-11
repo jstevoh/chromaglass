@@ -214,16 +214,17 @@ try {
   const heatSpread = (hd0.peakTemp - hd1.peakTemp) / hd0.peakTemp;
   const dyeSpread = (hd0.peakDye - hd1.peakDye) / hd0.peakDye;
 
-  // Estimated physical kappa: for 2D Gaussian spot of radius r0 = 0.08 * 0.20 m = 0.016 m:
-  // sigma0^2 ≈ r0^2 / 2 = 1.28e-4 m^2. Over dt = 90 * (1/60) = 1.5 s:
+  // Estimated physical kappa: for 2D spot of radius r0 = 0.08 * 0.20 m = 0.016 m,
+  // effective Gaussian width sigma0 ≈ r0 / 2 = 0.008 m, sigma0^2 = 6.4e-5 m^2.
+  // Over dt = 90 * (1/60) = 1.5 s:
   // kappa_meas = (heatSpread * sigma0^2) / (2 * dt)
   const dtSeconds = 90 * (1 / 60);
-  const sigma0_sq = (0.08 * 0.20) ** 2 / 2;
+  const sigma0_sq = ((0.08 * 0.20) / 2) ** 2;
   const kappaMeas = (heatSpread * sigma0_sq) / (2 * dtSeconds);
 
   check(
     'heat spreads at water thermal diffusivity even when dye Diffusion Rate is zero',
-    kappaMeas >= 0.5e-7 && kappaMeas <= 5.0e-7 && dyeSpread < 0.001,
+    kappaMeas >= 0.7e-7 && kappaMeas <= 2.1e-7 && dyeSpread < 0.001,
     `measured kappa ${kappaMeas.toExponential(2)} m²/s (peak dropped ${(heatSpread * 100).toFixed(2)}%), dye peak dropped ${(dyeSpread * 100).toFixed(2)}%`
   );
 
