@@ -1610,11 +1610,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.35,
       glossiness: 0.2,
       postBlurRadius: 0.2,
-      // The film's mean thickness (the dye is its thickness, see filmPhysics):
-      // at a half the plate sat at the clear dye's opacity cap, the pale
-      // washed-out orders past 1 µm; at a quarter it runs in the second
-      // order's blues and greens, thinning to gold, silver and black.
-      dyeBudget: 0.25,
+      dyeBudget: 0.5,
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
@@ -1626,18 +1622,6 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.45,
       iridescence: 0.6,
       thinFilm: 1.0,
-      // No pigment grain: a soap film is clear water and soap, and its colour
-      // is all interference (Film Physics above), so there is no pigment to
-      // granulate. At the default 0.5 the grain had nothing to texture once
-      // the film was drawn as its own light, and npm run grainedge read
-      // none in its bodies.
-      granulation: 0,
-      // The soap film's own colours (Airy's sum through the eye's matching
-      // functions, lib/filmTable.ts) drawn as the film's reflected light, its
-      // thickness the dye's amount: black, silver, straw, purple, blue,
-      // green-gold, magenta, in that order. At 0 Thin Film was a cosine
-      // rainbow on the dye's thin rims, and the sheet was its dyes.
-      filmPhysics: 1,
       secondLamp: 0,
       sceneMappings: [
         { source: 'sound', feature: 'energy', setting: 'beads', depth: 0.15 }

@@ -2756,48 +2756,16 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  /*
-    A soap film (Thin Film with Film Physics on). The film is clear: its
-    colour is all interference, the light its two faces reflect, so it is
-    drawn as that light and not as a tint over the dye. And its thickness is
-    the dye's amount, the optical thickness decodeFluidRaw gave it (linear in
-    the amount, where the opacity saturates), at two periods (414 nm) a unit:
-    a plate at a half of clear dye runs at about 580 nm, the second order's
-    blue and green, and its thick pools wash out to the pale high orders.
-    Where it thins to almost nothing (under 0.03 of the dye) it hands back
-    to the plate under it, which on this look is the dark ground.
-
-    The rim-only rainbow below drew only where the opacity was under 0.4,
-    which is a fifth of the clear dye's budget of a half: on Soap Film the
-    lab drew the interference on the first sixteenth of a ramp of dye and
-    the look's own lavender and magenta on the rest, the showreel's "crisp
-    hot-magenta and white cells round black holes, no thin-film rainbow".
-    The looks that use Thin Film with Film Physics at 0 keep that path, bit
-    for bit.
-  */
-  if (U.thinFilm > 0.001 && film0 > 0.004) {
-    var sheet = outColor;
-    if (film0 < 0.4) {
-      let thin = smoothstep(0.4, 0.04, film0) * smoothstep(0.004, 0.03, film0);
-      let filmT = film0 * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
-      // The soap film's thickness: the dye amount, with a little of the same
-      // grain centred on it. The rainbow's phase carries 1.4 periods of noise,
-      // which as thickness would be up to 290 nm that is not the dye's, and
-      // would put the thinnest film at straw rather than black.
-      let filmThick = film0 * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
-      let filmC = filmColourAt(filmT + U.time * 0.02, filmThick);
-      sheet = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
-    }
-    // Film Physics fades from the rim-only rainbow above to the film drawn
-    // as its own light, so the knob blends as it does everywhere else: at
-    // 0.05 a look keeps 95% of its rims, not a sheet of rainbow.
-    if (U.filmPhysics > 0.001) {
-      let tau = -log(max(1.0 - film0, 0.05));
-      let filmThick = tau * 2.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
-      let lit = mix(outColor, filmTableAt(filmThick, false), smoothstep(0.004, 0.03, film0) * U.thinFilm);
-      sheet = mix(sheet, lit, U.filmPhysics);
-    }
-    outColor = sheet;
+  if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
+    let thin = smoothstep(0.4, 0.04, film0) * smoothstep(0.004, 0.03, film0);
+    let filmT = film0 * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
+    // The soap film's thickness: the dye amount, with a little of the same
+    // grain centred on it. The rainbow's phase carries 1.4 periods of noise,
+    // which as thickness would be up to 290 nm that is not the dye's, and
+    // would put the thinnest film at straw rather than black.
+    let filmThick = film0 * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
+    let filmC = filmColourAt(filmT + U.time * 0.02, filmThick);
+    outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
   }
 
   // ── The mixer: the front plate's grade and level ─────────────────

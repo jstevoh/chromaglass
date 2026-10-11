@@ -59,6 +59,7 @@ shader (the refraction or edge terms, or the pigment's grain at the dye's edge; 
   and Classic: Claude, "Looks calm in the breakdown".
 - Five dim or flat looks (fillmore-1969, oil-wheel, colorful-cosmos, deep-ocean, galaxy)
   and four looks that are not what their names say (red-cabbage, timbre-shifter,
-  chemical-clock, soap-film): small preset changes, Claude.
+  chemical-clock, soap-film): small preset changes, Claude (Soap Film's needs Film
+  Physics redefined, PLAN 28d's last bullet).
 - White and cream grounds (ferro-maze, turing-print, roy, milk-marble, lava-lamp,
   sensual-laboratory): proposed to ship on the black ground with the lamp kept as a choice.

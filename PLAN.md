@@ -6058,10 +6058,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
       rate: a spiral every 0.73 s. Now on the show clock (0.26 reaction units a second): a
       20 s period, fronts 0.010 of the plate a second. The dish is red at rest, clear gel.
       Shortcut: the plate is a ~6 mm patch of the dish, as under a magnifier.
-    - Soap Film: the film colour was drawn only where the dye's opacity was under 0.4, so
-      on this look almost nowhere. With Film Physics on, the film is its own reflected light
-      from `filmTable.ts` (Airy and CIE), thickness from the dye: Newton's series (black,
-      silver, straw, orange, purple, blue, green) in the lab. Dye budget 0.5 to 0.25.
     - Timbre Shifter: the colour was the clock plus pitch plus timbre, and pitch (6.3 dyes,
       jumping at every chord) swamped timbre (2.7): one cyan-violet mean. A look whose colour
       follows timbre now takes it from timbre alone (Cyberpunk Neon, Microscopic Chaos and
@@ -6075,6 +6071,17 @@ Turing Print" work (#331), which also made the reaction grow at all.
       budget 0.35 so it is mostly void.
     - Left: Fillmore East waits for 18b-5 (28c). Combed lines and lost black are 18e and 18g
       (`docs/showreel-findings.md`). Oil Wheel's sound patch on its motor goes with 28f.
+    - Left, **Soap Film** (Claude): Thin Film is drawn only where the dye's opacity is under
+      0.4, so on this look (budget 0.5, opacity ~0.94) the interference shows on the first
+      sixteenth of a ramp of dye and the sheet is the look's lavender and magenta. A fix was
+      tried here and taken out: Film Physics drawing the whole film as its own reflected
+      light (`filmTable.ts`, thickness `-ln(1-opacity)` at 414 nm a unit, clear dye, budget
+      0.25) gave Newton's series on a ramp in the lab, but it changes what Film Physics is:
+      `npm run filmlook` holds the setting to recolouring the rim rainbow at the rainbow's
+      brightness (the Mac: 23608 pixels changed outside the rainbow's footprint, film
+      luminance 133 against 40, 4/9). Doing it means a new setting or a redefined Film
+      Physics, with `filmlook` rewritten to the new contract (the check-skeptic on it), the
+      desk and the phone. Not in this PR.
 - **28f. Every look answers the music through its own patches** (the owner, 2026-10-11: use
   the patch bay so the looks answer the music more by default; the whole plate may move with
   the music on a small named set of looks, never as the default). Brief and findings in

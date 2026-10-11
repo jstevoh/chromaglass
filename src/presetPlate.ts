@@ -111,9 +111,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 17, 2, 20, 8, 16, 6],
-  // A soap film is clear: its colour is interference, and its dye is only
-  // its thickness. Lavender, magenta and the rest drew the sheet itself.
-  'soap-film':          [15],
+  'soap-film':          [23, 20, 10, 7, 16, 17],
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
