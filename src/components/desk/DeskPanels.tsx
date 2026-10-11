@@ -16,6 +16,7 @@ import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
 import { PickList } from './PickList';
+import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 
@@ -945,6 +946,7 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'dyes': return <DyesBody p={p} />;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
+    case 'score': return p.score ? <SongScore {...p.score} /> : null;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;
@@ -968,6 +970,7 @@ export function panelMeta(id: string, p: DeskProps): string | null {
     case 'dyes': return p.paletteLock === null ? 'auto' : null;
     case 'tools': return `layer ${p.layer + 1}`;
     case 'phone': return p.status.phone ? 'linked' : 'not linked';
+    case 'score': return p.score?.songName ?? null;
   }
   const spec = PANEL_BY_ID.get(id);
   if (spec?.kind === 'knobs') return ccs(SECTION_KEYS.get(id) ?? []);

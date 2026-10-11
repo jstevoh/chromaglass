@@ -3249,6 +3249,29 @@ the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% 
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
 
+## 28. Preset palettes, and the song
+
+### 28h. The score: the song drawn, its show's cues on it, and a nudge (asked 2026-10-11, this PR)
+
+The owner: now that the show hears a song and
+remembers it, draw it as a score, put the sequencer's changes on the song's shape,
+and during a show watch it and nudge the visuals back into step. Built on what was
+there: the song map (sections and energy from the first listen, `songMap.ts`) and
+the song's show (`songShows.ts`, cues that already fire "at the second chorus").
+`lib/songScore.ts` draws the sections, the energy and the playhead, and places each
+cue by running the scheduler itself over the song, so the picture cannot disagree
+with what fires. A tap on the lane picks a section; a cue added there is pinned to
+it ("this chorus only" or "every chorus"), and a song with no show gets one on the
+look that is playing. The nudge moves the song's position: a beat (half a second
+with no tempo), "Section starts now" (the show got there early) and "Next section
+now" (the song got there first); it lasts for that play of the song and survives
+the fingerprint's re-anchoring, which is right about the audio and blind to where
+the map put an edge. The desk's Score panel (Live) and the phone's Play sheet draw
+the same component. `npm run score` (in Measure): every cue drawn where the
+scheduler fires it, pinning, a stretched and skipped live take read through map
+time, and both section nudges (a late map edge: the chorus cue at 40 s unnudged,
+at 37 s when "Next section now" is pressed as the chorus is heard).
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)

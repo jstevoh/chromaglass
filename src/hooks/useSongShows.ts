@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SongMap, SongSection, TrackIdentity } from '../lib/musicTypes';
+import type { SongMap, TrackIdentity } from '../lib/musicTypes';
 import { songRefFromTrack, songLabel } from '../lib/songRef';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
-import { dueActions, describeWhat, describeWhen, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
+import { dueActions, describeWhat, describeWhen, sectionsAt, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
 
 /**
  * Runs a song's show while the song plays (see lib/songShows.ts).
@@ -37,6 +37,13 @@ export interface SongShowRuntime {
    */
   start: (showId: string, opts?: { skip?: string[]; duration?: number }) => void;
   stop: () => void;
+  /**
+   * Move a show started by hand along its own clock: later (+) or earlier (-).
+   * A show that follows an identified song reads the song's position, which
+   * the score's nudge moves instead (`useMusicIntelligence`'s nudgePosition),
+   * so this touches only the hand-started run, whose clock is its own.
+   */
+  nudge: (deltaSec: number) => void;
 }
 
 interface Args {
@@ -55,19 +62,6 @@ interface Args {
 }
 
 const IDLE: SongShowStatus = { showId: null, song: null, t: 0, manual: false, last: null };
-
-/** Which section the song is in, and how many of each kind have begun, from the song map. */
-function sectionsAt(sections: SongSection[] | undefined, t: number): Pick<SongClock, 'section' | 'sectionCounts'> {
-  if (!sections?.length) return { section: null, sectionCounts: {} };
-  const index = sections.findIndex((s) => t >= s.start && t < s.end);
-  if (index < 0) return { section: null, sectionCounts: {} };
-  const counts: Record<string, number> = {};
-  for (let i = 0; i <= index; i++) {
-    const kind = sections[i].label.toLowerCase().replace(/[^a-z].*$/, '');
-    counts[kind] = (counts[kind] ?? 0) + 1;
-  }
-  return { section: { label: sections[index].label, index }, sectionCounts: counts };
-}
 
 export function useSongShows(a: Args): SongShowRuntime {
   const argsRef = useRef(a);
@@ -108,6 +102,11 @@ export function useSongShows(a: Args): SongShowRuntime {
   }, [begin]);
 
   const stop = useCallback(() => { runRef.current = null; setStatus(IDLE); }, []);
+
+  const nudge = useCallback((deltaSec: number) => {
+    const run = runRef.current;
+    if (run?.manual && Number.isFinite(deltaSec)) run.startedAt -= deltaSec * 1000;
+  }, []);
 
   // Follow: the identified song has a show, and it is not the one running.
   useEffect(() => {
@@ -158,5 +157,5 @@ export function useSongShows(a: Args): SongShowRuntime {
     return () => clearShowInterval(timer);
   }, [stop]);
 
-  return { status, start, stop };
+  return { status, start, stop, nudge };
 }

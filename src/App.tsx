@@ -60,7 +60,8 @@ import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
 import { useSongShows } from './hooks/useSongShows';
-import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, type ActionSet, type SongAction, type SongShow } from './lib/songShows';
+import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
+import type { SongScoreProps } from './components/SongScore';
 import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
@@ -3973,6 +3974,53 @@ export default function App() {
   const songRuntimeRef = useRef(songRuntime);
   songRuntimeRef.current = songRuntime;
 
+  /*
+    The score (PLAN 28h): the song as a timeline, its show's cues on it, and
+    the nudge. One set of props for the desk's Score panel and the phone's Play
+    sheet, so a cue pinned on either lands in the same song show.
+
+    A cue pinned to a song that has no show yet makes one, on the look that is
+    playing: the show then starts at once (Follow songs) and its look arrives
+    as the same look, rather than the plate being taken somewhere the person
+    pinning a burst did not ask to go.
+  */
+  const currentShow = useMemo(() => showFor(songShows, currentSong), [songShows, currentSong]);
+  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat) => {
+    if (!currentSong) return;
+    const action: SongAction = { id: newId('act'), when, what };
+    const shows = songShowsRef.current;
+    const existing = showFor(shows, currentSong);
+    if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
+    const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
+    const saved = userPresets.presets.find(u => u.id === lookId);
+    const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
+    const look = saved ? { kind: 'saved' as const, id: saved.id, name: saved.name } : { kind: 'preset' as const, id: preset?.id ?? 'classic', name: preset?.name };
+    setSongShows([...shows, { id: newId('song'), song: currentSong, look, actions: [action] }]);
+  }, [currentSong, setSongShows, activePresetId, pinnedPresetId, userPresets.presets]);
+  const removeScoreCue = useCallback((actionId: string) => {
+    setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
+  }, [setSongShows]);
+  const { nudgePosition, resetNudge } = musicIntel;
+  const scoreProps = useMemo<SongScoreProps>(() => ({
+    songName: currentSong ? songLabel(currentSong) : null,
+    map: musicIntel.state.songMap,
+    phase: !musicIntel.state.track ? 'none'
+      : musicIntel.state.songMap ? 'ready'
+      : musicIntel.state.analyzing ? 'analyzing'
+      : musicIntel.state.recording ? 'hearing' : 'unmapped',
+    positionSec: musicIntel.state.positionSec,
+    nudgeSec: musicIntel.state.nudgeSec,
+    bpm: tempoLabel.bpm,
+    show: currentShow,
+    // Both clocks: the song's (which a followed show and the sequencer's
+    // section stages read) and a show started by hand, which keeps its own.
+    onNudge: (d) => { nudgePosition(d); songRuntimeRef.current.nudge(d); },
+    onResetNudge: resetNudge,
+    onPin: pinScoreCue,
+    onRemoveCue: removeScoreCue,
+  }), [currentSong, musicIntel.state.songMap, musicIntel.state.track, musicIntel.state.analyzing, musicIntel.state.recording,
+    musicIntel.state.positionSec, musicIntel.state.nudgeSec, tempoLabel.bpm, currentShow, nudgePosition, resetNudge, pinScoreCue, removeScoreCue]);
+
   // ── Render this song (PLAN.md §6) ───────────────────────────────
   const showSequencerRef = useRef(sequencer);
   showSequencerRef.current = sequencer;
@@ -5477,6 +5525,7 @@ export default function App() {
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
             songLine={audioSource === 'none' ? '' : songLine}
+            score={scoreProps}
             deaf={earDeaf}
             show={{
               running: sequencer.status.running,
@@ -6071,6 +6120,7 @@ export default function App() {
           onSetAction={onSetAction}
           onItemAction={onItemAction}
           songNow={currentSong ? songLabel(currentSong) : null}
+          score={scoreProps}
           liveId={setActive ? liveItemId : activePresetId}
           nextId={setActive ? (cued?.item ?? null) : (cued?.id ?? null)}
           onCue={cueAny}

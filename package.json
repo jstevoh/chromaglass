@@ -94,6 +94,7 @@
     "bench": "npm run build && node scripts/bench.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",
     "qr": "node --experimental-strip-types scripts/qr.mjs",
+    "score": "esbuild scripts/score.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/score.mjs && node node_modules/.cache/score.mjs",
     "songs": "esbuild scripts/songs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songs.mjs && node node_modules/.cache/songs.mjs",
     "stages": "npm run build && node scripts/stages.mjs",
     "ab": "npm run build && node scripts/ab.mjs",

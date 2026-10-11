@@ -6022,6 +6022,26 @@ Turing Print" work (#331), which also made the reaction grow at all.
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
 
+- **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
+  this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
+  - **28h-1.** The follower (28g) writes the position the score and the shows read;
+    a nudge should re-anchor the follower rather than add an offset to it. Proposed
+    to that thread: position stays in the map's own seconds.
+  - **28h-2.** Correct the score, not just the clock: drag a section's edge and save
+    the map, so the next play of the song is right without a nudge. Today the nudge
+    is an offset for the whole song, which fixes one late edge and moves the rest.
+  - **28h-3.** A score that draws itself as an unknown song plays, from the live song
+    shape (`songShape.ts`: builds, drops, breakdowns), before any map exists.
+  - **28h-4.** The sequencer's own stages on the lane: a sequence started for a song
+    (`startAt`) lays its stages end to end by seconds and does not follow the nudge or
+    a section's time; show the stages against the sections, and let a stage advance
+    on a named section ("the second chorus"), not only on any section change.
+  - **28h-5.** The remote phone (`RemoteControl.tsx`, over the show server) does not
+    get the score yet; the phone layout's Play sheet does.
+  - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
+    maps back to the same section index, so a cue on it fires once; decide with 28g
+    whether a repeat should fire its cue again.
+
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more

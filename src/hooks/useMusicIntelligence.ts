@@ -56,6 +56,8 @@ export interface MusicIntelState {
   lyrics: LyricsResult | null;
   trackState: TrackEvolutionState | null;
   positionSec: number;
+  /** How far the score's nudge has moved the position from the clock's own reading, seconds (+ is later in the song). */
+  nudgeSec: number;
   section: SongSection | null;
   line: LyricLine | null;
   sectionSentimentValue: number;
@@ -101,6 +103,13 @@ export interface MusicIntelResult {
   replayListen: (listenNumber: number) => void;
   stopReplay: () => void;
   refreshTracks: () => void;
+  /**
+   * Move where the show thinks the song is: later (+) or earlier (-), for
+   * this play of this song. The score's nudge (`lib/songScore.ts`).
+   */
+  nudgePosition: (deltaSec: number) => void;
+  /** Take the nudge back out: the position is the clock's own again. */
+  resetNudge: () => void;
 }
 
 export function useMusicIntelligence(
@@ -114,6 +123,23 @@ export function useMusicIntelligence(
   const [lyrics, setLyrics] = useState<LyricsResult | null>(null);
   const [trackState, setTrackState] = useState<TrackEvolutionState | null>(null);
   const [positionSec, setPositionSec] = useState(0);
+  /*
+    The nudge: seconds added to the position clock's own reading, for this play
+    of this song.
+
+    Why an offset the clock carries, and not a change to the track's
+    `offsetSec`: the clock is re-anchored from the fingerprint every few
+    seconds while a track is known (the local matcher, then the API), and each
+    re-anchor writes a fresh `offsetSec`, which would wipe a nudge out within
+    twelve seconds of its being made. On a record the re-anchor is right about
+    where the *audio* is, to a frame; what it cannot be right about is where
+    the song map put a section's edge, which is an estimate from one listen
+    (`songMapWorker.ts`), or where a performer hears the chorus begin. That
+    disagreement is what the nudge corrects, so it has to outlive the re-anchor
+    and go only when the song does.
+  */
+  const nudgeRef = useRef(0);
+  const [nudgeSec, setNudgeSec] = useState(0);
   const [identifying, setIdentifying] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [recordingActive, setRecordingActive] = useState(false);
@@ -203,6 +229,8 @@ export function useMusicIntelligence(
   const adoptTrack = useCallback(async (identity: TrackIdentity, streamForRecording: MediaStream | null) => {
     setTrack(identity);
     setReplayListenNumber(null);
+    nudgeRef.current = 0;
+    setNudgeSec(0);
     setPositionSec(identity.offsetSec ?? 0);
     lastPosRef.current = identity.offsetSec ?? 0;
     firedTriggerIdxRef.current = new Set();
@@ -284,6 +312,8 @@ export function useMusicIntelligence(
     if (reason !== 'trackChange') {
       setTrack(null); setSongMap(null); setLyrics(null);
       setPositionSec(0);
+      nudgeRef.current = 0;
+      setNudgeSec(0);
     }
   }, [refreshTracks, addToFpIndex]);
 
@@ -306,7 +336,7 @@ export function useMusicIntelligence(
 
       // Position clock
       if (currentTrack?.identifiedAtMs != null) {
-        const pos = (currentTrack.offsetSec ?? 0) + (now - currentTrack.identifiedAtMs) / 1000;
+        const pos = Math.max(0, (currentTrack.offsetSec ?? 0) + (now - currentTrack.identifiedAtMs) / 1000 + nudgeRef.current);
         setPositionSec(pos);
 
         // Lyric triggers in (lastPos, pos]
@@ -499,6 +529,22 @@ export function useMusicIntelligence(
 
   const clearTrack = useCallback(() => { finalizeListen('manual'); }, [finalizeListen]);
 
+  // Shown at once rather than on the clock's next half-second tick, so a
+  // performer pressing it twice sees each press land.
+  const nudgePosition = useCallback((deltaSec: number) => {
+    if (!trackRef.current || !Number.isFinite(deltaSec) || deltaSec === 0) return;
+    nudgeRef.current += deltaSec;
+    setNudgeSec(nudgeRef.current);
+    setPositionSec(p => Math.max(0, p + deltaSec));
+  }, []);
+  const resetNudge = useCallback(() => {
+    const d = nudgeRef.current;
+    if (d === 0) return;
+    nudgeRef.current = 0;
+    setNudgeSec(0);
+    setPositionSec(p => Math.max(0, p - d));
+  }, []);
+
   const replayListenNumberRef = useRef<number | null>(null);
   useEffect(() => { replayListenNumberRef.current = replayListenNumber; }, [replayListenNumber]);
 
@@ -603,12 +649,13 @@ export function useMusicIntelligence(
 
   return {
     state: {
-      track, songMap, lyrics, trackState, positionSec, section, line,
+      track, songMap, lyrics, trackState, positionSec, nudgeSec, section, line,
       sectionSentimentValue, identifying, recording: recordingActive, analyzing,
       fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
     },
     overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
     manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
+    nudgePosition, resetNudge,
   };
 }
