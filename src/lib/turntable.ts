@@ -80,7 +80,8 @@ export function carrierViscosity(viscosity: string | undefined): number {
  * percent or two; coloured water in a dish of oil is 12 to 18% heavier than
  * the oil round it. The look's Dye Weight (solutalBuoyancy) already says
  * which of those its dye is when the plate is stood up, so the spun dish
- * reads the same dial: 2% at 0, 15% at 1. The oil a look pours is lighter
+ * reads the same dial: 2% at 0, 15% at 1. So does the slump of a pool on a
+ * level plate (PLAN 18m, wgsl/slump.ts). The oil a look pours is lighter
  * than the water, about 12% (mineral oil 0.85–0.88 against 1.0), and the
  * ferrofluid heavier, about 25% (a light-oil ferrofluid is 1.1–1.2 against a
  * 0.88 oil), both fixed properties of the liquids and so constants in the
@@ -89,6 +90,16 @@ export function carrierViscosity(viscosity: string | undefined): number {
 export function dyeDensityContrast(dyeWeight: number | undefined): number {
   const w = Math.max(0, Math.min(1, Number.isFinite(dyeWeight) ? dyeWeight! : 0));
   return 0.02 + 0.13 * w;
+}
+
+/**
+ * The clear liquid's kinematic viscosity, m²/s, from the Thickness dial (0
+ * to 1): water at 0, glycerine at 1, on a log scale (fluid.ts says why;
+ * `thinGapViscosity` there is this). Here so a pure module (the cover glass,
+ * lib/plateRock.ts) can read it without the GPU solver.
+ */
+export function thicknessViscosity(thickness: number): number {
+  return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
 }
 
 /** The drag time h²/12ν, seconds, for a gap in plate widths. */

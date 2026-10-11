@@ -1126,6 +1126,53 @@ Measured (cloud): `draw` 76/76 (phone, phone on its side, iPad both ways, wrong 
 `applink` 49/49, `remotemix` 17/17. Pictures: the project's draw-8 folder.
 
 
+
+#### 8-draw-a. The wall under Draw's pad, and touches that land under the finger (2026-10-10)
+
+`src/lib/padPicture.ts` (new), `DrawScreen.tsx`, `RemoteControl.tsx`, `App.tsx`,
+`LiquidVisualizer.tsx` (the frame task's tap and `wallToPlate`), `remoteProtocol.ts`.
+Check: `npm run drawwall` (new; Measure's browser part) and `drawwall -- --app` (the
+Mac's tools shard).
+
+Reported: Draw's frame was black, so a hand drew blind on the phone. The laptop now
+sends what it drew: in the frame task (the only place a presented WebGPU canvas can be
+read; the projector window is drawn the same way), a copy as wide as the pad's frame
+(160–480 px) is encoded as a JPEG in a worker and sent over the relay, at most 15 a
+second, up to three in flight. Not the canvas's `toBlob`: Chromium runs it in the page's
+idle time, and the Mac's show, drawing every frame, got 2 pictures a second from it. Not one
+in flight: each round trip (bitmap, worker, answer) waits for gaps between the show's frames,
+and one at a time came to 4.3 a second at 18 frames. On WebGPU, not from the canvas at all:
+a 2D canvas's copy is the GPU's too, and its readback waited behind the plate, 6.3 a second
+at 30 frames with three in flight. The engine shrinks the frame's texture in one small pass
+on its own device and reads it back a frame or two behind, as the flash probe does
+(`gpu/padGrab.ts`), and the worker encodes the bytes on the CPU. Not a WebRTC video track: that needs signalling through
+the relay, ICE on a show network that may not route between two Wi-Fi clients, and a
+decoder that buffers, which is latency a hand feels. Nothing is sent until a remote on
+Draw asks; it renews a three-second lease every second, so a phone that locks or leaves
+Draw stops the pictures without saying goodbye, and the relay stays stateless. The pad
+paints each picture by hand on a canvas (no React render per picture), latest-wins,
+dims it when pictures stop for 2 s, hides it while unlinked, and takes its shape.
+
+Found while building it: the pad's touches were the plate's points, and the wall shows
+the middle of a plate half again as wide (1/1.5 of it across a 16:9 wall, 0.375 of it
+up), turned with the dish. A touch at the frame's top went to plate y = 1, off the wall,
+and on a turned dish (Classic's was about 110° round in the cloud probe) a touch away
+from the middle landed round from the finger. Pad
+messages now carry `wall: true` and the laptop maps them through its own pointer's
+camera (`wallToPlate`: overscan, the dish's turn, the closeup, layer 2's view); a stroke
+maps both ends, a pen's lean is turned and keeps its length, and Spin leaves the dish's
+turn out (it reads the hand's angle as the room sees it). Without the flag (OSC, an
+older remote) the point is the plate's, as before.
+
+Measured (cloud): `drawwall` 16/16 (15.0 pictures/s, 6.2 kB each on a textured 4:3
+test card; quarters the right way up; frame 333×250 = 4:3); controls: a lease that never
+lapses fails "stops sending" (161 → 176), a frame that ignores the picture's shape fails
+"4:3" (444×250). `draw` 76/76, `phone` 351, `layout` 58, `applink` 49, `remotemix` 17,
+`panel` 180. On the Mac (`drawwall --app`): the pad's picture is the plate's colour
+(159,53,82 against grabFrame's 159,53,82); on a dish turned a radian, four drops from
+the pad changed the finger's cell by 287 (median cell 4, drift 5, centre 0.69,0.58 for
+0.69,0.58); the same point without the dish's turn changed it by 11 (it landed at
+0.56,0.82), and the old plate point by 3.
 #### 8-play. Play: the phone's listening screen (2026-10-10)
 
 `src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`
@@ -1221,6 +1268,14 @@ following `drafting` instead of `wallLook` fails "nor for a render" (plates 1/2/
 reaches the wall, 0 → 1). `layout` 72/72, `phone` 352/352, `panel` 180/180, `desk` 40/40,
 `desklayout` 40/40. Found along the way: 8b-1 to 8b-5.
 
+Afterwards (2026-10-11): "across the fade" read the wall once, 0.4 s after Send, and
+went red on main's deploy after #339 with the fade 0% along; four green Mac runs had it 20,
+14, 6 and 3% along, so the reading measured how soon a loaded page answered the key. It
+now reads the wall until it lands and asks for three or more readings between the looks
+and at least 1 s from the last on the old look to the first on the new (2.02 s here, 36
+readings). Controls: an instant Send fails (0 readings, 0.05 s), a 0.3 s fade fails (0.38
+s), and so does a page stalled 1.1 s inside the Send (the wall's fade cut to 0.92 s).
+
 #### 8g. A panel in a window of its own (2026-10-10)
 
 `desk/PanelWindow.tsx` (new), `desk/Desk.tsx`, `ui/index.tsx` (`PanelFrame`), `desk/DeskPanels.tsx`.
@@ -1304,6 +1359,34 @@ the header clear of the switch at 1024 with a seventh dot in it, folding and unf
 the dots fit, and a take's Rec dot folding a full header and unfolding it when the take stops; the "every status dot is labelled" check opens the fold and counts the five dots inside
 it, not the one button); `phone` 369/369 with Play's double tap back to the look's speed; `panel` 180/180; `wgsl`;
 `desklayout` 40/40.
+
+**8i, shipped 2026-10-10: fewer panels, each usable at any size.** Three asks from the
+owner in one evening, with screenshots. *No setting alone on a panel*: a knobs panel draws
+the numbers of its section, so Sound Mappings (Sound Drive and four band pickers) was a
+panel of one knob and Heat Slide one of two. Sound Mappings went into Sound (Sound Drive
+first, the bands under "What the sound moves"), where Room Drive and Film Drive already
+sit with their sources; Heat Slide went into Fluid Physics beside Heat Spread and
+Buoyancy. `MERGED_SECTIONS` in `settingsMap.ts` sends the old ids on: a saved layout
+naming them opens the merged panel in the same place (`sanitizeLayout`), and
+`openSettingsAt` follows them. Build's deck has Sound where Sound Mappings was. MIDI maps
+and presets name settings, not sections, so nothing in them moved. *Fade and Go
+smaller*: the strip under the cue list went from 140px to 68px (a fade row that fills the
+column, so 8s no longer ran past it, and a 36px Go); Back and Freeze are off it, and
+stay on ⌫ and F, ⌘K, and their MIDI actions. *Panels as windows resize*: the frame
+clips its rounded corners, and the Dyes body did not scroll, so on Gig's 236px deck
+Palette, Image and Video were out of reach; and the palette list opened below its button
+whatever was there. Every panel body now scrolls (never sideways), the swatch grid fits
+as many 28px swatches a row as there is room for, the palette list opens over its button
+when there is no room under it and is never taller than the window, and the Sound
+section's source switch and the Video section's source buttons narrow or wrap to a
+312px panel. Measured: `desklayout` 40/45 on main → 45/45 (no knobs panel under three,
+the old ids landing on the merged panels, never twice); `layout`'s new reach check
+(every control in every panel, scrolled into view only by what a hand can scroll, then
+hit with a pointer: the three shipped layouts at 1024, 1280, 1440, 1920 and an iPad's
+1180, every panel in the deck, in a column and floating) is red on main (Gig's Dyes
+panel: Image and Video out of reach, and the palette list 667–1087px in a 700px window;
+Load-in's Sound: Band cut off) and 4,162 controls in 255 panels over 23 desks reachable
+after. `layout` 72 → 73. It takes the run from about one minute to under three.
 
 ### 9. Ferrofluid after the references
 
@@ -1498,6 +1581,47 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
    - **Stroke centres are not checked to be whole cells anywhere. Done:** `squishDisc`
      and `applySquish` round every centre now, so the next fractional caller lands on
      the nearest cell instead of laying nothing (`npm run lift`).
+
+8. **Evolve changes slowly with the song** (2026-10-11). The owner: "I want evolve to
+   focus on more slowly changing settings (as opposed to directly reacting to frequency
+   and bouncing around). It should consider the music in longer changing ways, and
+   slowly changes the visuals in creative and interesting ways. If there is no music,
+   it can do basically the same thing and slowly change across time."
+
+   What it was: every six seconds two unrelated dials picked at random, each glided over
+   four seconds (`driftLook`), with no ear at all; the hands (a drop or a puff about
+   every seven seconds) sized each drop by the frame's energy, heated it by the frame's
+   treble and chose drop or air by the frame's spectral centroid; the palette re-rolled
+   on a one-in-ten-thousand chance every frame; the closeup's aim jumped ±0.12 over four
+   seconds every twelve; under Evolve the plate's pace heard eight seconds of loudness and
+   slewed over three. And `DRIFTABLE` let it drift Plate Rock, Beat Squeeze, the
+   kaleidoscope's spin and the turntable on a look that had them.
+
+   What it is (`src/lib/slowEvolve.ts`, `src/lib/drift.ts`): one move at a time, a few
+   dials from one theme (flow, dye, surface, heat, glass, chemistry, ferrofluid, film)
+   going the same way, glided over 30–90 s, then a rest. Which way is a lean from the
+   song shape tracker's intensity averaged over 30 s against the song's own 4-minute
+   level, pushed livelier through a build and for 30 s after a drop, calmer through a
+   breakdown; a section change during a rest starts the next move. The palette turns at
+   a drop or a breakdown (at most every 75 s), for the dye still to come
+   (`evolvePalette` on the visualizer's handle). With no music the lean is an
+   Ornstein–Uhlenbeck walk on three minutes and the palette turns every 3–5 minutes.
+   The hands hear the 30 s level and the section (a build reaches for the air, a
+   breakdown halves them), never the frame. The pace hears 30 s and slews over 20 under
+   Evolve. The aim moves ±0.08 over a whole move. `FRAME_MOTION` holds every
+   frame-moving dial out.
+
+   Measured (`npm run slowevolve`, Classic, default Evolve Speed), before → after:
+   moves started 10/min → 0.7/min with a song, 0.6/min without, each followed by a rest
+   of at least 6 s; glide 4 s → 57–81 s; fastest dial 0.78 → 0.13 %/s of its travel;
+   the aim's fastest 45 → 2.5 thousandths of the plate a second (at full speed); change
+   over 1 min 0.37 → 0.31 % and over 10 min 1.21 → 1.37 % (RMS of the dials' travel),
+   so about the same amount of change, made as one slow move instead of twenty
+   twitches; the lean 0.57 after drops and −0.13 in breakdowns (it heard nothing
+   before); a level shaken ±0.3 every half second leans within 0.04 of the steady song.
+   Review found a glide carrying the old look's dials into a new one (a look laid,
+   opened, faded to or taken back now stops the move) and cues kept through a glide
+   starting the next move with no rest; both fixed and checked.
 
 ### 11. The mixer
 
@@ -1734,7 +1858,34 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   10.16 s and first step 10.69 s (was 11.54 s on this PR's first run, the same
   opening), no frame gap over 0.62 s. The lanes now spend 27.4 of their 29 s
   compiling, so what is left is the compiles themselves: 48 of them, the first three
-  under Chromium's 2.9 s GPU start.
+  ### 14n. One malformed message can end the plate
+
+**Shipped** (#322): one `sanitizePatch` against the settings registry for the socket, MIDI map loader and loaded looks; gestures dropped if non-finite; `hexCache` bounded with 512-entry eviction; verified with `npm run sanitize` and `npm run remotemix`.
+
+**Read in the code; the chain was followed by hand, not run.** The display applies a
+remote `patch` as it comes (`case 'patch': queuePatch(message.settings)` →
+`updateSettings`, `App.tsx`): any key, of any type. `{"simResolution":"x"}` gives
+`Math.round("x")`, `NaN`, in `resolveSimResolution` (`LiquidVisualizer.tsx`); `new
+WebGPUFluid(device, NaN)` throws on `createTexture`, and the catch calls
+`governor.failRung()`, which marks the rung failed forever (`governor.ts`). Each rung in
+turn fails the same way, until the plate stands on "no WebGPU": a one-way door in the
+sense of `docs/stability-plan.md`. A phone on an older build that sends a renamed or
+retyped key does the same by accident. The OSC path already drops non-finite numbers
+(`oscToMessage`'s `num()`); the socket does not. Two more doors of the kind:
+
+- a MIDI map file's setting binding keeps any key and, for a key not in
+  `LEARNABLE_BY_KEY`, its own `min` and `max` unchecked (`parseMidiMap`, `midi.ts`),
+  where `parseSoundBindings` drops unknown keys;
+- gestures: `dx`/`dy` sent as strings become `NaN` in the CPU velocity
+  (`blowDirected`), and every distinct `drop.color` string becomes a key in `hexCache`
+  (`constants.ts`), which never forgets one.
+
+*Fix:* one `sanitizePatch` against the settings registry (known keys, the default's
+`typeof`, finite numbers clamped to the setting's range), used by the socket, the MIDI
+map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` bounded.
+*Measure:* a node check beside `npm run remotemix` that sends `simResolution: "x"`, a
+`NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
+governor's ladder and the cache as they were.
 
 ### 14s. The ear: the input picker (shipped)
 
@@ -2489,6 +2640,56 @@ Pinning them to GitHub Actions (integration 15368) closes that gap. Deleting `ma
 restricted; adding the deletion rule closes that one. The rule a session wrote out is
 `handoff/main-ruleset.json` in the project's shared files.
 
+### 19v. Two checks that could not tell what they were asked
+
+**Shipped** 2026-10-10. Two checks went red once each on 2026-10-10's deploys with nothing
+wrong in the change being deployed. Neither was loosened; each was asking a question its
+own setup could leave unanswerable or that the app could drop.
+
+**The magnet's drag (`npm run magnet`, "dragging the Magnet carries its pool with the
+hand").** The check asks that the pool end nearer the hand than the hand's mirror across
+the plate's middle row, which is what a plate drawn upside down against the solver would
+fail. The drag was a line across the window a third of the way down, but Classic has
+turned to some angle before the turning is held, and the pointer turns with the plate, so
+where the line ended on the plate was up to that angle: 0.36,0.59 in a cloud session,
+0.71,0.51 on the Mac run that failed (#340's deploy, which needed a re-run). There the pool
+was 0.03 from the hand and 0.03 from its mirror. Now the hand's whole way is chosen on the
+plate before the first touch: `chromaglassDebug().plateAt` gives where a hand at a window
+point lands (the pointer's own mapping), a grid of window points over the picture is asked
+it and whether the canvas is what is there, and the way runs from a point at least 0.25 off
+0.25 to 0.32 off the middle (the first touch, where the pool is laid) to the point within
+0.25 of the middle that is furthest off the middle row, 0.3 to 0.45 long, with the canvas
+under the whole line. Off the rim on purpose: a first planned way that ended 0.33 out
+dragged the pool half over the rim, the drag itself passed (0.07 from the hand, 0.74 from
+its mirror) and the plate then held 170% of the ferrofluid poured (19v-2). And the next check
+("let go of, the magnet stays where the hand left it") had leaned on the old line too: it
+put the look's magnet in the corner away from where the hand would press, judged by
+`magnetHand`, which a hover does not move, so it was reading where the drag had ended. With
+the drag elsewhere the corner landed 0.28 from the press; it now asks `plateAt`.
+The check also asks that the hand really ended more than 0.15 off that row (its mirror over
+0.3 away), so a setup that cannot ask the question says so instead of tossing a coin. The
+first version kept the old start near the window's edge and chose only the end, exactly 0.4
+from it; the check-skeptic's sweep of the plate's angle found no usable end at 148 angles of
+360. Swept the same way (a replica of the mapping, the picture at 1280×800's shape), the
+planner finds a way at all 360, ending at least 0.183 off the middle row, 0.40 to 0.44 long.
+
+**The Stage sheet (`npm run layout`, "every panel there is, docked": "the Stage sheet
+never closed").** Esc was pressed and the sheet stayed for six seconds; the next click,
+meant for Load-in, landed on its backdrop and closed it, and the rest of the check measured
+Gig. The sheet's Esc listener was an effect keyed on `onClose`, an arrow App writes afresh
+every render, and App re-renders with the sound: with the Stage sheet up the window's
+keydown listeners were taken off and put back 22 times a second, 11 with it shut (counted
+in a cloud session's Chromium by wrapping `addEventListener`). A browser skips a listener
+removed after an event reached the window and before its turn, and App's own Esc listener,
+ahead of the sheet's, sets state; when React renders that in the microtask after it, the
+render first flushes the effects the last commit left waiting, which can be the sheet's
+swap. Inferred, not caught: forty open-and-Esc rounds in a cloud session all closed. The
+fix is `hooks/useEscape.ts`, listened for once and read through a ref (the way the Desk's
+own keys already were), used by the desk's `Sheet`, the phone's `PhoneSheet` and the
+controller surface (which re-renders itself every 120 ms); and the Stage sheet is on App's
+Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
+sheet up, the show keys' alone (19v-1).
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -2703,6 +2904,41 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
   distinct colours and 19 hue bins to 101 and 25 (Classic 65 → 100, Galaxy 27 → 72,
   Stardust Collapse 21 → 127, Soap Film 63 → 136); the 14 left alone from 54.5 to 62.5,
   from the dye and the grade alone.
+
+### 18m. A drop slumps under its own weight (replaces a drop that sits or blurs)
+
+- **What was reported** (the owner, 2026-10-11): "I don't feel like we have dye and
+  other diffusion through clear water."
+- **What was measured** (the audit, lab, a 1 cm drop on a still thin-gap plate): at
+  Diffusion Rate 0, as twelve looks have it, the drop did not move in 20 s (rms radius
+  4.69 → 4.70 mm); at the slider's top it blurred into a Gaussian at D ≈ 1.7e-5 m²/s,
+  about 40,000× food dye's molecular rate (18h's "about 1000×" corrected). Neither is
+  what ink does: molecular diffusion would move it under 0.01 mm in 20 s. What spreads
+  a drop of food colouring is its weight (its glycol makes it a percent or two denser
+  than water): it sinks to the lower glass and runs out under the clear water as a
+  viscous gravity current, a flat pool with a sharp front, r ∝ t^⅛ (Huppert 1982).
+- **What was built:** `wgsl/slump.ts`, a stage of its own in the dye's step (apart from
+  18h's 'dye diffuse', which Antigravity is replacing). The dense layer's flux between
+  two glasses, with no slip on both, no net flux through the gap and equal viscosities,
+  is q = −(g′/3ν) η³(1 − η/b)³ ∇η (derived for this, the same as Zheng, Rongy and Stone
+  2015): Huppert's current while the layer is thin against the gap, choked as it fills
+  it. The depth is the dye's amount × DYE_LAYER (0.36 mm a unit: the lab's drop is a
+  0.05 mL drop from a dropper), Δρ is Dye Weight's contrast (2% to 15%) times the dye's
+  strength (its strongest band per unit over a full-strength dye's; white, clear liquid,
+  weighs nothing), the current runs in the water's share of a cell, and cos θ of g on a
+  plate stood up. Explicit, in flux form (no dye made or lost), colour carried upwind,
+  K worked out once a step, up to six substeps with each face held to 0.24 of its
+  difference (18m-1 names the cap). On the default Thickness (a light oil, ν 2.2e-5)
+  that is two passes and a drop spreads slowly; in water seven, and it runs.
+- **Measured** (`npm run slump`, lab, 256², a 0.05 mL full-strength drop in water,
+  before the check's controls were added): front 3.94 mm → 6.6 (1 s) → 8.0 (5 s) → 9.6
+  (20 s) → 11.25 mm (60 s), against Huppert's 6.54, 7.99, 9.51, 10.91; growth t^0.125
+  from 5 to 30 s; the edge 0.886 (half-peak radius over twentieth-peak; a Gaussian
+  reads 0.48); Dye Weight 1 ×1.266 further at 20 s against the law's ×1.286. A numpy copy
+  of the kernels at 768² (the cap binds harder there) reads 10.96 mm at 60 s. The
+  before and after pictures are in the project's files (`diffusion/`).
+- **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
+  drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
 
 ## 21. Looks after painters
 

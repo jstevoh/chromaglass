@@ -306,6 +306,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(8) var dst: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(9) var<storage, read_write> mob: array<f32>;
 @group(0) @binding(10) var species: texture_2d<f32>;
+@group(0) @binding(11) var film: texture_2d<f32>;
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -340,9 +342,22 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     \`species\` is 1×1 and empty with nothing poured.
   */
   let sp = textureLoad(species, min(q, vec2i(textureDimensions(species)) - 1), 0);
+  let filmDims = vec2i(textureDimensions(film));
+  let fm = clamp(textureLoad(film, min(q * filmDims / n, filmDims - 1), 0).r, 0.0, 1.0);
   let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
   let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
-  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured;
+  // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~50 cSt at 20°C, 50x water):
+  // Two layers stacked across a pressure-driven Poiseuille gap (oil thickness fm against one
+  // wall, water depth a = 1 - fm against the other, continuous velocity and shear stress at interface).
+  const OIL_REL_NU: f32 = 50.0;
+  let a_w = 1.0 - fm;
+  let B_poiseuille = (1.0 + (OIL_REL_NU - 1.0) * a_w * a_w) / (2.0 * OIL_REL_NU * (1.0 + (OIL_REL_NU - 1.0) * a_w));
+  let C_poiseuille = 1.0 / (2.0 * OIL_REL_NU) - B_poiseuille;
+  let Q_poiseuille = -a_w * a_w * a_w / 6.0 + OIL_REL_NU * B_poiseuille * a_w * a_w * 0.5
+    - (1.0 - a_w * a_w * a_w) / (6.0 * OIL_REL_NU) + B_poiseuille * (1.0 - a_w * a_w) * 0.5
+    + C_poiseuille * (1.0 - a_w);
+  let filmDrag = 1.0 / max(12.0 * Q_poiseuille, 1e-4);
+  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag;
   var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
@@ -373,9 +388,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) / max(S.l * S.disp, 1e-9); }
   let c = 1.0 / (1.0 + kdt + grip);
   var mo = hsGap(g, A.a.z) * c;
-  // Past the rim the liquid is open to the air: p is held at zero there.
+  /*
+    Past the rim the liquid is open to the air: p is held at zero there.
+    And on the grid's own edge, which the rim touches at the middle of
+    each side: the inscribed circle leaves a strip of cells there, about
+    ten either side of the middle on a 192² solver, that were inside the
+    rim and walled by the grid. The dish has no wall there, only its open
+    rim, and walled, those cells turned every flow across the plate
+    sideways: under Plate Rock's cover glass, whose drag moves the whole
+    film together, the liquid against the wall went 3.4 times as fast as
+    the plate's middle (lab, full rock), the fastest faces on the plate,
+    so they and not the film's drift set the carries' substeps (fluid.ts,
+    driftCells; PLAN 27a-1).
+  */
   let d = uvOf(id) - vec2f(0.5);
-  if (length(d) >= A.a.w) { mo = -mo; }
+  if (length(d) >= A.a.w || q.x == 0 || q.y == 0 || q.x == n - 1 || q.y == n - 1) { mo = -mo; }
   mob[q.x + q.y * n] = mo;
   /*
     Under a hand what is stored is u* + K·Δt·U, which the gradient takes

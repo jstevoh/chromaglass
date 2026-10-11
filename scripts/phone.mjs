@@ -869,6 +869,65 @@ try {
         `before the tap ${blendBefore} (the show's config ${blendLiveBefore}); after, ${blendPick.map(b => `${b.id} ${b.h}px${b.on ? ' on' : ''}`).join(' · ')}; the show's config says ${blendLive}`);
 
       /*
+        The room's two newer readings (PLAN 20c): how sudden the floor's
+        motion is, and how long it has been busy. They are choices in the
+        patch bay, and the phone's patch bay is the desk's own Settings sheet
+        filling the screen, so the phone version is that sheet: a patch added
+        from the phone, pointed at each of them in turn, read back from the
+        show's settings (not the select's words, which a select wired to
+        nothing would still change), with the select inside the screen, and
+        the patch taken off again so the checks below play an unpatched look.
+      */
+      await tap(page, 'phone-open-more');
+      await tap(page, 'phone-settings');
+      /*
+        And every tab of the Settings rail can be reached at all. On the
+        phone the rail is a strip, and each tab used to take its group's
+        whole width and lie under the next group: 13 of 26 took no tap,
+        Patches among them. Each tab is scrolled to and asked whether its own middle is
+        what a finger there would land on.
+      */
+      const railCovered = await page.evaluate(() => {
+        const covered = [];
+        const tabs = [...document.querySelectorAll('[data-testid^="settings-nav-"]')];
+        for (const t of tabs) {
+          t.scrollIntoView({ block: 'nearest', inline: 'center' });
+          const r = t.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (!hit || !t.contains(hit)) covered.push(t.textContent);
+        }
+        return { tabs: tabs.length, covered };
+      });
+      check('every tab of the phone\'s Settings rail takes a tap where it is drawn',
+        railCovered.tabs > 20 && railCovered.covered.length === 0,
+        `${railCovered.tabs} tabs; ${railCovered.covered.length ? `covered: ${railCovered.covered.join(', ')}` : 'none covered'}`);
+      await tap(page, 'settings-nav-patches');
+      const mappings = () => page.evaluate(() => window.chromaglassDebug?.().settings?.sceneMappings ?? null);
+      const patchesBefore = (await mappings())?.length ?? null;
+      await tap(page, 'scene-map-add');
+      const patchAt = patchesBefore ?? 0;
+      const featureSelect = page.getByTestId(`patch-feature-${patchAt}`);
+      const featurePicked = [];
+      let featureFits = false;
+      if (await visible(page, `patch-feature-${patchAt}`)) {
+        const fb = await box(page, `patch-feature-${patchAt}`);
+        featureFits = !!fb && fb.x >= 0 && fb.x + fb.width <= (page.viewportSize()?.width ?? 0);
+        for (const f of ['motionHighFreq', 'motionOverTime']) {
+          await featureSelect.selectOption(f);
+          await page.waitForTimeout(200);
+          featurePicked.push((await mappings())?.[patchAt]?.feature ?? null);
+        }
+        await page.getByLabel('Remove mapping').nth(patchAt).tap();
+        await page.waitForTimeout(250);
+      }
+      const patchesAfter = (await mappings())?.length ?? null;
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      check('the room\'s How sudden and How busy, lately are patched from the phone\'s Settings: each lands in the show\'s patch, the select inside the screen, and the patch comes off again',
+        patchesBefore !== null && featureFits && featurePicked.join() === 'motionHighFreq,motionOverTime' && patchesAfter === patchesBefore,
+        `${patchesBefore} patches before; ${featureFits ? 'the select fits' : 'the select is off the screen or missing'}; the show's patch says ${featurePicked.join(', ') || 'nothing'}; ${patchesAfter} patches after`);
+
+      /*
         A back plate added and taken off from the Play sheet, on a look with
         one plate and on a look with two.
 
@@ -1372,8 +1431,37 @@ try {
       await settle(2500);
       const snap = () => page.evaluate(() => [...window.chromaglassDebug().fluids[0].readDensity]);
       const readbacks = () => page.evaluate(() => window.chromaglassDebug().fluids[0].readbacks ?? -1);
+      /*
+        The plate's own state either side of the window, printed with the dye
+        line (PLAN.md 19h-2). Twice in about 350 Mac runs both fingers read
+        nothing at all, under them and at their mirrors, while their own count
+        said each laid ~7.9 a step on every step and the plate's readbacks
+        kept landing (69 and 89): the plate gained −10 of the 435 it was
+        handed. So the hands laid and fluids[0] kept none of it. Where it went
+        is one of: the other plate (the hands lay on the active one, and
+        Classic has two), a clear or a drain landing in the window, or a
+        solver rebuilt under it (a governor move rebuilds it from the CPU's
+        copy, which is a readback old). Each is read here, and every plate's
+        gain, so the next red names which.
+      */
+      const plateState = () => page.evaluate(() => {
+        const d = window.chromaglassDebug();
+        const h = d.hands();
+        // Each solver object numbered the first time it is seen, so a rebuild reads as a new number.
+        window.__cgSolvers ??= { ids: new WeakMap(), next: 1 };
+        const { ids } = window.__cgSolvers;
+        return {
+          engine: d.engine, layer: h.layer, clears: h.clears, drains: h.drains,
+          plates: d.fluids.map((f) => {
+            if (f.gpu && !ids.has(f.gpu)) ids.set(f.gpu, window.__cgSolvers.next++);
+            return { N: f.gpu?.N ?? 0, solver: f.gpu ? ids.get(f.gpu) : null, steps: f.stepCount, readbacks: f.readbacks ?? -1 };
+          }),
+          sums: d.fluids.map((f) => { let t = 0; for (const v of f.readDensity) t += Math.max(0, v); return t; }),
+        };
+      });
       const rb0 = await readbacks();
       const before = await snap();
+      const stateBefore = await plateState();
       // The plate's own step count either side of the two touches, so what
       // each finger laid is held to the steps it can have been down for.
       const plateSteps = () => page.evaluate(() => window.chromaglassDebug().fluids[0].stepCount);
@@ -1399,10 +1487,16 @@ try {
         const d = window.chromaglassDebug();
         return { held: d.hands().hands, s2: d.fluids[0].stepCount };
       });
+      const stateHeld = await plateState();
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
       const after = await snap();
       const rb1 = await readbacks();
+      const stateAfter = await plateState();
+      const said = (st) => `${st.engine || 'no engine'}, laying on plate ${st.layer ?? '?'}, ${st.clears ?? '?'} clears, ${st.drains ?? '?'} drains, `
+        + st.plates.map((p, i) => `plate ${i} ${p.N}² solver #${p.solver ?? '-'} at ${p.steps} steps, ${p.readbacks} readbacks`).join(', ');
+      const plateLine = `before: ${said(stateBefore)}; held: ${said(stateHeld)}; after: ${said(stateAfter)}; each plate gained `
+        + stateAfter.sums.map((t, i) => (t - (stateBefore.sums[i] ?? 0)).toFixed(0)).join(' / ');
       /*
         What each finger laid is the app's own count, so it is asked wherever
         the plate stepped through the hold, readbacks or none (the plate
@@ -1510,7 +1604,8 @@ try {
           && Math.min(rows[0].near, rows[1].near) > 0.4 * Math.max(rows[0].near, rows[1].near);
         check('two fingers holding Drop lay dye under both, and not at their mirrors', ok,
           rows.map((r, i) => `${'AB'[i]} ${r.laid.toFixed(0)} under it (${r.near.toFixed(0)} nearest it) against ${r.elsewhere.map(v => v.toFixed(0)).join('/') || 'no clear control'}`).join('; ')
-            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); the plate gained ${gained.toFixed(0)} of ${handed} handed it; ${rb1 - rb0} readbacks`);
+            + `; fingers at (${DA.x}, ${DA.y}) and (${DB.x}, ${DB.y}) px, cells ${fmt(fingers)} (${held.length === 2 ? `${drift.toFixed(1)} cells from where they were picked` : 'held cells not read'}); the plate gained ${gained.toFixed(0)} of ${handed} handed it; ${rb1 - rb0} readbacks`
+            + (ok ? '' : `; ${plateLine}`));
       } else if (NEED_GPU) {
         check('the plate reads back, so the dye can be measured', false, `${rb1 - rb0} readbacks landed in two seconds`);
       } else {

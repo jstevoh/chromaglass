@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Thermometer, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MAPPABLE_SOURCES, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
@@ -193,6 +193,8 @@ interface SettingsPanelProps {
 /** What the room can be read for, in the order they are worth reaching for. */
 const SCENE_FEATURES: [SceneFeature, string][] = [
   ['motion', 'How busy'],
+  ['motionHighFreq', 'How sudden'],
+  ['motionOverTime', 'How busy, lately'],
   ['crowd', 'How many'],
   ['spread', 'How spread out'],
   ['centroidX', 'Where — across'],
@@ -231,7 +233,7 @@ const PATCH_SOURCES: [PatchSource, string][] = [
  * The features a source offers.
  *
  * The room and the film are the same analysis over different pixels, so they
- * offer the same nine. The sound offers its own seven, and switching between
+ * offer the same list. The sound offers its own seven, and switching between
  * them has to change the list — "how many people" is not something a microphone
  * can tell you.
  */
@@ -635,6 +637,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className={TITLE}>
           <Activity size={12} /> Audio Input
         </h3>
+        {/*
+          Sound Drive: how hard the music moves the plate at all. First in
+          Sound, which it joined with the rest of Sound Mappings (2026-10-10):
+          on the desk Sound Mappings was a panel of this one knob.
+
+          It is the headline ride — the first fader on every factory map and
+          the one a hand is on through a chorus — and until now the only place
+          it existed was the narrow-screen toolbar, which a desktop never
+          draws. The panel that claims to hold every setting did not hold the
+          most important one.
+        */}
+        <Slider
+          label="Sound Drive"
+          value={settings.audioImpact}
+          min={0}
+          max={1}
+          step={0.01}
+          icon={Activity}
+          onChange={(v: number) => onUpdate({ audioImpact: v })}
+          settingKey="audioImpact"
+        />
         <Slider
           label="Sensitivity"
           value={settings.sensitivity}
@@ -669,6 +692,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               ] as const}
               onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
               height={32}
+              fill
               testId="audio-source"
             />
             <Info>
@@ -878,35 +902,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             </button>
           </div>
         )}
-      </section>
-      )}
-
-      {/* Sound Mappings Section */}
-      {keep('audio-mappings') && (
-      <section id="settings-audio-mappings" className={`${CARD} ${shown('audio-mappings') ? GRID : 'hidden'} ${focusSection === 'audio-mappings' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-mappings">
-        <h3 className={TITLE}>
-          <Activity size={12} /> Sound Mappings
-        </h3>
-
-        {/*
-          Sound Drive: how hard the music moves the plate at all.
-
-          It is the headline ride — the first fader on every factory map and
-          the one a hand is on through a chorus — and until now the only place
-          it existed was the narrow-screen toolbar, which a desktop never
-          draws. The panel that claims to hold every setting did not hold the
-          most important one.
-        */}
-        <Slider
-          label="Sound Drive"
-          value={settings.audioImpact}
-          min={0}
-          max={1}
-          step={0.01}
-          icon={Activity}
-          onChange={(v: number) => onUpdate({ audioImpact: v })}
-          settingKey="audioImpact"
-        />
+        {/* What each band of the sound moves: Sound Mappings, as was. */}
+        <span className="mb-2 mt-4 block text-[11px] font-medium uppercase tracking-wide text-white/40">What the sound moves</span>
         {/*
           The four selects below are the fixed wiring — which audio band drives
           velocity, density, colour and rotation — and they stay, because they
@@ -1074,6 +1071,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ plateRock: v })}
           settingKey="plateRock"
+        />
+        <Slider
+          label="Frame Sway"
+          value={settings.frameSway ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ frameSway: v })}
+          settingKey="frameSway"
         />
         <Slider
           label="Layer Scale Variety"
@@ -1809,7 +1815,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 : 'off'}
             </span>
           </div>
-          <div className="flex gap-2">
+          {/* Wraps: as a 312px desk panel its four sources ran past the frame, and Off was cut off. */}
+          <div className="flex flex-wrap gap-2">
             <input
               ref={filmInputRef}
               id="film-loop-file"
@@ -3093,37 +3100,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
       )}
 
-      {/* Heat Slide Section */}
-      {keep('heat') && (
-      <section id="settings-heat" className={`${CARD} ${shown('heat') ? GRID : 'hidden'} ${focusSection === 'heat' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="heat">
-        <h3 className={TITLE}>
-          <Thermometer size={12} /> Heat Slide
-        </h3>
-        {/* Heat Intensity and Boiling Point were here: nothing in either solver
-            read them. The keys stay in saved looks; the sliders are gone. */}
-        {/* 0–0.08: the looks run from 0.0015 to 0.06, and the old 0–1 slider's
-            first step (0.05) was seventeen times the default. */}
-        <Slider
-          label="Evaporation Rate"
-          value={settings.evaporationRate}
-          min={0}
-          max={0.08}
-          step={0.0005}
-          onChange={(v: number) => onUpdate({ evaporationRate: v })}
-          settingKey="evaporationRate"
-        />
-        <Slider
-          label="Heat Decay"
-          value={settings.heatDecay}
-          min={0.8}
-          max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ heatDecay: v })}
-          settingKey="heatDecay"
-        />
-      </section>
-      )}
-
       {/* Manual Interaction Section */}
       {keep('interaction') && (
       <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
@@ -3231,6 +3207,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.01}
           onChange={(v: number) => onUpdate({ damping: v })}
           settingKey="damping"
+        />
+        {/*
+          Heat Slide, as was: two knobs on a panel of their own until the owner
+          asked for no setting to sit alone (2026-10-10). The heat they set is
+          the heat Heat Spread spreads and Buoyancy lifts.
+        */}
+        {/* Heat Intensity and Boiling Point were here: nothing in either solver
+            read them. The keys stay in saved looks; the sliders are gone. */}
+        {/* 0–0.08: the looks run from 0.0015 to 0.06, and the old 0–1 slider's
+            first step (0.05) was seventeen times the default. */}
+        <Slider
+          label="Evaporation Rate"
+          value={settings.evaporationRate}
+          min={0}
+          max={0.08}
+          step={0.0005}
+          onChange={(v: number) => onUpdate({ evaporationRate: v })}
+          settingKey="evaporationRate"
+        />
+        <Slider
+          label="Heat Decay"
+          value={settings.heatDecay}
+          min={0.8}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ heatDecay: v })}
+          settingKey="heatDecay"
         />
       </section>
       )}
@@ -3637,6 +3640,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         On a phone the rail becomes a strip across the top: 1000px of sheet on
         a 390px screen is the sheet's own `max-w-full`, and a 216px column
         taken out of that leaves nothing to put a slider in.
+
+        The tabs are full width only in the column. In the strip, a tab of
+        `w-full` took its group's whole width, the group being as wide as its
+        labels laid end to end, so each group's tabs ran on past it and lay
+        under the next group: measured at 390 px, the Inputs group's six tabs
+        spanned 140 to 3180 px in a group 505 px wide, and 13 of the 26 tabs
+        could not be tapped (`npm run phone`): Mixer, every Inputs tab but
+        Sound (Patches among them), three of Look's and four of Plate's.
       */}
       <div className="flex min-h-0 w-full flex-1 flex-col sm:flex-row">
 
@@ -3660,7 +3671,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     key={row.id}
                     onClick={() => { setSection(row.id); setQuery(''); }}
                     aria-current={!q && section === row.id ? 'page' : undefined}
-                    className={`w-full shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:whitespace-normal ${
+                    className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:w-full sm:whitespace-normal ${
                       !q && section === row.id
                         ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
                         : 'text-white/60 hover:bg-white/[0.05] hover:text-white'

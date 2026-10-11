@@ -277,6 +277,15 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run pacing
 
+      # Slow Evolve (PLAN.md §10, step 8): one move at a time, each glided 30 to 90 s,
+      # about one a minute; the lean livelier after drops than in breakdowns,
+      # the palette turning only at a drop or a breakdown (or every few
+      # minutes with no music); a level shaken every half second leaning as
+      # the steady song does; and nothing that moves the whole picture moved.
+      - name: Slow Evolve
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run slowevolve
+
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
       # number while rendering and the browser's own clock live; the song's
       # track is the same bytes twice and hears the kicks at the same moments
@@ -351,6 +360,13 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
+      # through a song's kicks, every shipped look and show stage slides the
+      # whole picture 0% a frame, against up to 1% with the cover glass free
+      # as #347 shipped it; the app's own frames are held to it in render-app.
+      - name: The frame holds still
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run framesway
       # Hold stays where the closeup is (PLAN.md QA-12): the real closeup
       # camera on a made-up plate, switched to Hold from Auto and from Follow,
       # moves the frame on main's Hold and not on this one.
@@ -500,6 +516,16 @@ jobs:
       - name: The remote's Draw screen
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/draw.mjs
+      # The wall under Draw's pad (scripts/drawwall.mjs, PLAN.md 8-draw-a): a
+      # stand-in laptop running the real picture sender on a painted 4:3
+      # canvas. Asked for only on Draw, painted the right way up at 8 a second
+      # or more, the frame in the wall's shape, and dimmed when it stops; and
+      # the WebGPU show's way, the frame read on the GPU, on SwiftShader.
+      - name: The wall under Draw's pad
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        env:
+          PW_WEBGPU: '1'
+        run: node --experimental-strip-types scripts/drawwall.mjs
       # The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md
       # §14f): with the band playing the App renders at most five times a
       # second more than the ear tells it (ten), and the plate still hears a
@@ -528,6 +554,14 @@ jobs:
       - name: No pointer on the show
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/showcursor.mjs
+      # The wall comes back after the show reloads (scripts/rewall.mjs, S15):
+      # the window Send to wall opened is taken back by the reloaded show
+      # within a second, dark while the show was away, and not loaded again
+      # by the next Send to wall. The mirror's hook, not the plate, so no
+      # GPU; on the same dist/.
+      - name: The wall after a reload
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/rewall.mjs
       # Picking an input changes what the show hears at once (scripts/
       # inputpick.mjs, PLAN.md 14s): Chromium's fake devices, Input 1 and then
       # Input 2 picked in the settings, each opened by its id and the earlier
@@ -611,6 +645,11 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # A drop of ink on a level plate slumps out along the lower glass as a
+      # viscous gravity current, its front where Huppert's law puts it (PLAN 18m).
+      - name: A drop slumps under its own weight
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run slump
       # A press goes down round and lifts into fingers, and a plain spring lift does not.
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
@@ -1033,6 +1072,14 @@ jobs:
       - name: Every tool lays the bottle
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: node scripts/bottles.mjs
+      # And from the remote's Draw (scripts/drawwall.mjs --app, PLAN.md
+      # 8-draw-a): the laptop's own frames reach the pad, the plate's colour,
+      # and a drop near the wall's corner lands under the finger, where the
+      # plate's point (the old pad) does not. About a minute.
+      - name: Draw shows the wall and lands under the finger
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        timeout-minutes: 4
+        run: node --experimental-strip-types scripts/drawwall.mjs --app
       # And on a phone, several at once: two fingers are two hands, each
       # where it is, lifting one leaves the other, two fingers holding Drop
       # lay dye under both, and on the closeup two fingers pinch the zoom.

@@ -154,17 +154,27 @@ export type RemoteMessage =
    * at that point of the plate (normalised, y up), on the layer it holds;
    * its tilt rocks the plate. A pen adds `amount` (pressure) and, for a blow,
    * the direction it leans (`dx`/`dy`).
+   *
+   * `wall` says the point is the wall's own (the picture as it is drawn,
+   * normalised, y up), not the plate's (PLAN 8-draw-a). They differ: the
+   * wall shows the middle of a plate half again as wide as the wall (1/1.5
+   * of it across a 16:9 frame, 0.375 of it up), turned with the dish and
+   * magnified by the closeup, so a pad mapped onto the plate put a touch at
+   * the frame's top edge on plate y = 1, off the wall, and only the middle
+   * landed where the finger was. The display maps a wall point through its
+   * own camera, as it does its own pointer; without the flag (OSC, an older
+   * remote) the point is the plate's, as it always was.
    */
-  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
-  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string }
+  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string; wall?: boolean }
   /** A hand pressing the top glass: the film thins under it and the dye spreads out in a ring. */
-  | { type: 'press'; x: number; y: number; layer: number; amount?: number }
+  | { type: 'press'; x: number; y: number; layer: number; amount?: number; wall?: boolean }
   /**
    * A finger drawn through the liquid, carrying what it touches and mixing
    * two bottles that refuse each other. `dx`/`dy` are the stroke's direction;
    * without them there is no drag, because you mix by moving.
    */
-  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number }
+  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
   /**
    * A finger on the dish (the Spin tool, PLAN §22): the dish turns under it
    * as it goes round the middle, and holds still while it holds still. Sent
@@ -172,7 +182,7 @@ export type RemoteMessage =
    * the display lets go a quarter of a second after the last one. `id` is
    * the finger (its pointer id), so two fingers are two hands.
    */
-  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number }
+  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number; wall?: boolean }
   | { type: 'tilt'; x: number; y: number }
   /** The tablet paints with a colour of its own choosing: the display's selected dye takes it. */
   | { type: 'dye'; color: string }
@@ -182,7 +192,19 @@ export type RemoteMessage =
    * land — so picking one from the pad has to set the display's *liquid*,
    * not its dye. An id the display does not know is ignored.
    */
-  | { type: 'liquid'; id: string };
+  | { type: 'liquid'; id: string }
+  /**
+   * Remote → display: "I am on Draw; send me the wall, this wide" (PLAN
+   * 8-draw-a, lib/padPicture.ts). A lease: renewed every second, lapsed
+   * after three, so nothing has to say goodbye.
+   */
+  | { type: 'pad-picture'; width: number }
+  /**
+   * Display → remotes: the wall as the laptop drew it, a small JPEG as a data
+   * URL. `aspect` is the canvas's own (width over height), so the remote's
+   * frame takes the wall's shape rather than a 16:9 it assumed.
+   */
+  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number };
 
 /**
  * Build the ws:// URL for the relay: the page's own origin, which is the show
@@ -243,3 +265,74 @@ export async function relayInfo(): Promise<RelayInfo | null> {
     return null;
   }
 }
+
+export type ParsedRemoteGesture =
+  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string; wall?: boolean }
+  | { type: 'press'; x: number; y: number; layer: number; amount?: number; wall?: boolean }
+  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number; wall?: boolean }
+  | { type: 'tilt'; x: number; y: number };
+
+/**
+ * Pure parser for incoming remote gestures and tilt.
+ *
+ * Drops malformed gestures (non-finite coordinates, invalid color strings)
+ * and clamps tilt to [-1, 1]. Returns null if the gesture is malformed or
+ * of an unknown gesture type.
+ */
+export function parseRemoteGesture(raw: unknown): ParsedRemoteGesture | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const msg = raw as Record<string, unknown>;
+  const type = msg.type;
+  if (typeof type !== 'string') return null;
+
+  if (type === 'tilt') {
+    if (typeof msg.x !== 'number' || !Number.isFinite(msg.x)) return null;
+    if (typeof msg.y !== 'number' || !Number.isFinite(msg.y)) return null;
+    return {
+      type: 'tilt',
+      x: Math.max(-1, Math.min(1, msg.x)),
+      y: Math.max(-1, Math.min(1, msg.y)),
+    };
+  }
+
+  if (type !== 'blow' && type !== 'drop' && type !== 'press' && type !== 'finger' && type !== 'spin') {
+    return null;
+  }
+
+  if (typeof msg.x !== 'number' || !Number.isFinite(msg.x)) return null;
+  if (typeof msg.y !== 'number' || !Number.isFinite(msg.y)) return null;
+
+  const layer = typeof msg.layer === 'number' && Number.isFinite(msg.layer) ? msg.layer : 0;
+  const amount = typeof msg.amount === 'number' && Number.isFinite(msg.amount) ? msg.amount : undefined;
+  const wall = msg.wall === true ? true : undefined;
+
+  switch (type) {
+    case 'blow': {
+      const dx = typeof msg.dx === 'number' && Number.isFinite(msg.dx) ? msg.dx : undefined;
+      const dy = typeof msg.dy === 'number' && Number.isFinite(msg.dy) ? msg.dy : undefined;
+      return { type: 'blow', x: msg.x, y: msg.y, layer, amount, dx, dy, wall };
+    }
+    case 'drop': {
+      if (msg.color !== undefined && (typeof msg.color !== 'string' || msg.color.length > 9)) {
+        return null;
+      }
+      const color = typeof msg.color === 'string' ? msg.color : undefined;
+      return { type: 'drop', x: msg.x, y: msg.y, layer, amount, color, wall };
+    }
+    case 'press': {
+      return { type: 'press', x: msg.x, y: msg.y, layer, amount, wall };
+    }
+    case 'finger': {
+      const dx = typeof msg.dx === 'number' && Number.isFinite(msg.dx) ? msg.dx : undefined;
+      const dy = typeof msg.dy === 'number' && Number.isFinite(msg.dy) ? msg.dy : undefined;
+      return { type: 'finger', x: msg.x, y: msg.y, layer, amount, dx, dy, wall };
+    }
+    case 'spin': {
+      const id = typeof msg.id === 'number' && Number.isInteger(msg.id) ? msg.id : undefined;
+      return { type: 'spin', x: msg.x, y: msg.y, layer, amount, id, wall };
+    }
+  }
+}
+

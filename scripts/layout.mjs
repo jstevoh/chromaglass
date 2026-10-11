@@ -361,13 +361,17 @@ try {
       return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
     }).filter(Boolean), { ids, own: OWN_BODY });
     const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
+    // 31: the seven desk panels and the twenty-four settings sections. It was
+    // 33 until Sound Mappings and Heat Slide were folded into Sound and Fluid
+    // Physics (2026-10-10; `npm run desklayout` holds that), and a browser
+    // listing fewer has lost a panel.
     // The phone link is words and a URL, and has no control without a relay.
     const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
     await noteIds();
     check('every panel there is, docked, draws its own body, readable and big enough to use',
-      stageGone && onLoadin && reloaded && ids.length >= 33 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      stageGone && onLoadin && reloaded && ids.length >= 31 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
       [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Load-in never came up', !reloaded && 'not on Load-in after the reload',
-        ids.length < 33 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+        ids.length < 31 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
         || `${ids.length} panels, ${deck.n} controls`);
     await page.evaluate(() => localStorage.removeItem('chromaglass-desk-layout:loadin'));
     await page.reload({ waitUntil: 'networkidle' });
@@ -910,6 +914,128 @@ try {
       if (floated) { await clickOn(`panel-${id}-dock`); await settle(600); }
       check('with windows blocked, the button floats the panel rather than doing nothing', floated === 1, floated ? 'floated' : 'nothing happened');
     }
+  }
+
+  // ── Every panel's every control within reach, at every size ────
+  /*
+    The owner, 2026-10-10, over a screenshot of the Dyes panel on Gig's deck:
+    "I can't access the palettes at the bottom - I can't scroll down." The
+    deck is 236px tall, the frame clips (rounded corners, overflow hidden)
+    and the Dyes body did not scroll, so Palette, Image and Video were under
+    the deck's edge; and the palette list, once open, ran off the bottom of
+    the window. The checks above measured what was on screen and passed,
+    because a control that is never drawn has nothing wrong with it.
+
+    So this asks of every control in every panel what a hand can do: bring it
+    into view the way a hand can (scrolling only what scrolls; a box with
+    overflow hidden that the script scrolled is put back) and then find some
+    point of it, inside its panel and the window, that a pointer lands on.
+    At five window sizes, on the three shipped layouts, then with every panel
+    there is in the deck (236px tall), in one column, and floating at the
+    size a panel floats at. On main before this it found the Dyes panel's
+    three on Gig, and the Sound section's source switch and the Video
+    section's source buttons running out of a 312px panel sideways.
+  */
+  {
+    // Every panel there is, from the panel browser on Load-in (the one layout that offers the Stage panels too).
+    const panelIds = await (async () => {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const pg = await ctx.newPage();
+      await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'loadin'); } catch { /* */ } });
+      await pg.goto(URL, { waitUntil: 'networkidle' });
+      for (let i = 0; i < 20 && !(await pg.getByTestId('panel-browser-button').count()); i++) await pg.waitForTimeout(300);
+      await clickAt(pg, 'panel-browser-button');
+      for (let i = 0; i < 20 && !(await pg.getByTestId('panel-browser').count()); i++) await pg.waitForTimeout(300);
+      const ids = await pg.evaluate(() => [...document.querySelectorAll('[data-testid^="panel-browser-row-"]')].map(el => el.getAttribute('data-testid').slice('panel-browser-row-'.length)));
+      await ctx.close();
+      return ids;
+    })();
+    const L = (over) => ({ left: [], right: [], deck: [], floating: [], collapsed: [], deckCollapsed: false, plateMode: 'live', ...over });
+    const runs = [];
+    for (const [w, h] of [[1024, 700], [1280, 800], [1440, 900], [1920, 1080], [1180, 820]]) {
+      for (const [mode, name] of [['design', 'build'], ['perform', 'gig'], ['loadin', 'loadin']]) runs.push({ w, h, mode, name, label: name, layout: null });
+    }
+    for (const [w, h] of [[1024, 700], [1920, 1080]]) {
+      runs.push({ w, h, mode: 'loadin', name: 'loadin', label: 'every panel in the deck', layout: L({ deck: panelIds }) });
+      runs.push({ w, h, mode: 'loadin', name: 'loadin', label: 'every panel in a column', layout: L({ right: panelIds }) });
+    }
+    for (let k = 0; k < panelIds.length; k += 10) {
+      const ids = panelIds.slice(k, k + 10);
+      runs.push({ w: 1920, h: 1080, mode: 'loadin', name: 'loadin', label: `floating, ${ids[0]}…`, layout: L({ deckCollapsed: true, floating: ids.map((id, i) => ({ id, x: 8 + (i % 5) * 316, y: 56 + Math.floor(i / 5) * 400, w: 312, h: 360 })) }) });
+    }
+    const out = [];
+    let panelsSeen = 0, controlsSeen = 0;
+    for (const run of runs) {
+      const ctx = await browser.newContext({ viewport: { width: run.w, height: run.h } });
+      const pg = await ctx.newPage();
+      await pg.addInitScript(([m, n, l]) => {
+        try { localStorage.setItem('chromaglass-desk-mode', m); if (l) localStorage.setItem(`chromaglass-desk-layout:${n}`, JSON.stringify(l)); } catch { /* */ }
+      }, [run.mode, run.name, run.layout]);
+      await pg.goto(URL, { waitUntil: 'networkidle' });
+      for (let i = 0; i < 20 && !(await pg.locator('[data-panel]').count()); i++) await pg.waitForTimeout(300);
+      await pg.waitForTimeout(1500);
+      const r = await pg.evaluate(() => {
+        const bad = [];
+        let panels = 0, controls = 0;
+        for (const frame of document.querySelectorAll('[data-panel]')) {
+          // Folded to its header, or out in a window of its own: nothing to reach here.
+          if (!frame.querySelector(':scope > :not([data-panel-head])')) continue;
+          panels++;
+          const id = frame.getAttribute('data-panel');
+          for (const el of frame.querySelectorAll('button, input, select, [role=button]')) {
+            if (el.closest('[data-panel-head]')) continue;
+            const r0 = el.getBoundingClientRect();
+            if (r0.width === 0 || r0.height === 0) continue;
+            controls++;
+            el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+              const cs = getComputedStyle(a);
+              if ((cs.overflowY === 'hidden' || cs.overflowY === 'clip') && a.scrollTop) a.scrollTop = 0;
+              if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && a.scrollLeft) a.scrollLeft = 0;
+            }
+            const r = el.getBoundingClientRect(), f = frame.getBoundingClientRect();
+            let ok = false;
+            for (let i = 1; i < 6 && !ok; i++) for (let j = 1; j < 6 && !ok; j++) {
+              const x = r.left + (r.width * i) / 6, y = r.top + (r.height * j) / 6;
+              if (x < Math.max(0, f.left) || x > Math.min(innerWidth, f.right) || y < Math.max(0, f.top) || y > Math.min(innerHeight, f.bottom)) continue;
+              const hit = document.elementFromPoint(x, y);
+              ok = !!hit && (hit === el || el.contains(hit));
+            }
+            if (!ok) bad.push(`${id}: ${(el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 20)}`);
+          }
+        }
+        return { bad, panels, controls };
+      });
+      panelsSeen += r.panels; controlsSeen += r.controls;
+      // A layout handed to the desk is the one it drew, all of it: a desk that dropped panels from it would otherwise pass on what was left.
+      const asked = run.layout ? run.layout.left.length + run.layout.right.length + run.layout.deck.length + run.layout.floating.length : 1;
+      if (run.layout ? r.panels !== asked : r.panels === 0) out.push(`${run.w}×${run.h} ${run.label}: ${r.panels} panels drawn${run.layout ? ` of ${asked}` : ''}`);
+      if (r.bad.length) out.push(`${run.w}×${run.h} ${run.label}: ${r.bad.slice(0, 4).join(', ')}${r.bad.length > 4 ? ` +${r.bad.length - 4}` : ''}`);
+      // The palette list opens where it can be read to its end, wherever its button is.
+      if (run.name === 'gig' && !run.layout) {
+        const btn = pg.getByTestId('palette-button');
+        if (await btn.count()) {
+          await btn.scrollIntoViewIfNeeded();
+          await btn.click();
+          const menu = await pg.evaluate(() => {
+            const m = document.querySelector('[data-testid="palette-menu"]');
+            if (!m) return 'did not open';
+            const r = m.getBoundingClientRect();
+            if (r.top < 0 || r.bottom > innerHeight + 1 || r.left < 0 || r.right > innerWidth + 1) return `${Math.round(r.top)}–${Math.round(r.bottom)} in ${innerHeight}`;
+            const last = [...m.querySelectorAll('button')].pop();
+            last?.scrollIntoView({ block: 'nearest' });
+            const lr = last?.getBoundingClientRect();
+            const hit = lr && document.elementFromPoint(lr.left + lr.width / 2, lr.top + lr.height / 2);
+            return last && hit && last.contains(hit) ? null : 'its last palette is out of reach';
+          });
+          if (menu) out.push(`${run.w}×${run.h} gig: the palette list ${menu}`);
+        } else out.push(`${run.w}×${run.h} gig: no Palette button`);
+      }
+      await ctx.close();
+    }
+    check('every control in every panel can be reached, docked, in the deck, in a column and floating, at five window sizes',
+      out.length === 0 && panelIds.length >= 31 && controlsSeen > 1500,
+      out.length ? out.slice(0, 6).join(' | ') : `${runs.length} desks, ${panelsSeen} panels, ${controlsSeen} controls`);
   }
 
   // ── Small screens ──────────────────────────────────────────────

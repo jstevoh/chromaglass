@@ -57,3 +57,158 @@ export function stepRock(rock: RockSpring, dt: number): void {
 export function rockSwing(rock: RockSpring, R: number, swayX: number, swayY: number): [number, number] {
   return [(rock.x + swayX * ROCK_SWAY) * R, (rock.y + swayY * ROCK_SWAY) * R];
 }
+
+/*
+  The cover glass (PLAN 27a-1). The tilt above moves only the colour that is
+  heavier than the plate's mean, so on a look whose colour is spread evenly a
+  rock moved almost nothing (the Mac's controls run on #305: Plate Rock
+  visible on 7 looks of 23, and "nothing" on the even ones, Boiling Point,
+  Crowd Plate, Red Cabbage, Clock Glass). That is the right answer for the
+  weight, and not the whole of what a hand rocking a clock glass shows.
+
+  The top glass is not fixed to the bottom one. It rides on the liquid film,
+  nested in the bottom glass's curve, and tipping the pair makes it slide
+  downhill on that film until the curve (or the bottom glass's rim) stops it,
+  then back when the hand tips the other way. A glass sliding over a film
+  drags it with a shear, linear across the gap, so the liquid's column goes
+  at half the glass's speed (Couette; it is what Glass Smear already is in
+  hsPrep), and everything in it, colour spread evenly or not, goes with it:
+  the picture sloshes with the hand.
+
+  The glass is a damped pendulum in the bottom glass's bowl:
+
+      dv/dt = g sinθ − (g/R_c) x − v/τ,     τ = m_A h / μ
+
+  m_A the cover's mass per area (2 mm of glass, 5 kg/m²), R_c the bowl's
+  radius of curvature, and τ the film's shear drag
+  on it, which the liquid's viscosity sets: 1.4 s on the default light oil
+  in the 6 mm middle, so the glass swings a few times before it settles, and
+  three hundredths of a second in glycerine, so it creeps. It slides only as
+  far as the gap between the two glasses' rims lets it (COVER_ROOM), where
+  it stops dead: a glass against glass does not bounce.
+
+  It moves the liquid in real seconds, not the plate's: the slide is laid in
+  m/s and fluid.ts turns it into the flow's units with the step's seconds
+  (as a Blow's breath), so a slow look's picture sloshes as far as a fast
+  one's when the same hand rocks it.
+*/
+export type CoverGlass = { x: number; y: number; vx: number; vy: number };
+import { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './turntable';
+/** The cover's mass per area, kg/m²: 2 mm of glass at 2,500 kg/m³. */
+export const COVER_KG_M2 = 5;
+/*
+  The bottom glass's radius of curvature, m, and how far the cover can slide
+  before its rim meets the bottom glass's: a 20 cm bowl 6½ cm deep (R_c
+  0.11), with a 12 cm cover in it (4 cm each way). The cover swings in it at
+  √(g/R_c), 1.5 Hz, and lightly damped (on the default oil a swing falls to a
+  third in 2.8 s, four swings), so how far a rock drives it is mostly how close the hand's
+  0.9 Hz is to that. In a shallow clock glass it is close and the cover
+  rings out to the rim on any rock at all: a 20 cm glass 3 cm deep (0.18,
+  1.2 Hz) with 3 cm of room drove it there from Plate Rock 0.2 on, and on
+  an evenly coloured plate in the lab (`npm run rides`) 0.2 slid the
+  picture 9.4 cells and the default 0.45 as far, so the dial did nothing
+  past its first fifth. A deeper bowl both holds the cover more firmly
+  (R_c sinθ, two fifths less far for a tilt) and swings it further from the
+  hand, so the dial reaches the rim only near its top: 3.7 cells at 0.2,
+  8.7 at the default, 13.5 at full, each within an eighth of where the
+  glass's slide says the liquid should be. A bowl that deep is a
+  dish for a liquid show rather than a watch glass, which is what the
+  projectionist would pick for a cover that answers the hand.
+*/
+export const BOWL_RADIUS = 0.11;
+export const COVER_ROOM = 0.04;
+/*
+  The plate's sinθ as the solver takes it, from the hold's tilt (the swing ×
+  HOLD_TILT, and the phone's) and the rock's swing: the hold × 10 and the
+  rock × CUR_ROCK (fluid.ts takes both; LiquidVisualizer's step). The cover
+  is tipped by the same, and `npm run rides` drives it through this too.
+*/
+export const HOLD_TILT = 0.004;
+export function plateSin(hold: number, swing: number): number {
+  return hold * 10 + swing * CUR_ROCK;
+}
+const G = 9.81;
+/** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (6 mm in the middle). */
+export function coverDrag(thickness: number, density = 1000): number {
+  return (density * thicknessViscosity(thickness)) / (COVER_KG_M2 * DISH_REST_GAP * DISH_METRES);
+}
+/**
+ * One step of `dt` seconds: the plate tipped by `tiltX`, `tiltY` (the sinθ
+ * the solver takes, plateSin) and the film's drag `drag` (coverDrag).
+ * The drag is taken implicitly, so glycerine's 30 per second is as steady
+ * as the oil's 0.7 at any step.
+ */
+export function stepCover(c: CoverGlass, tiltX: number, tiltY: number, drag: number, dt: number, room = COVER_ROOM): void {
+  /*
+    A tilt that is not a number (a phone's reading gone bad) is level, and a
+    glass that has become one starts again at rest: the cover integrates
+    what it is given, so one NaN would otherwise stay in it, and in the
+    liquid it drags, for the rest of the show.
+  */
+  if (!Number.isFinite(tiltX)) tiltX = 0;
+  if (!Number.isFinite(tiltY)) tiltY = 0;
+  if (![c.x, c.y, c.vx, c.vy].every(Number.isFinite)) { c.x = 0; c.y = 0; c.vx = 0; c.vy = 0; }
+  /*
+    A cover with no room is seated in the bottom glass's rim: it cannot slide
+    and drags nothing (Frame Sway at 0, `coverRoom`). Held at rest outright,
+    so not even a rounding error's drift reaches the film.
+  */
+  if (!(room > 0)) { c.x = 0; c.y = 0; c.vx = 0; c.vy = 0; return; }
+  const w2 = G / BOWL_RADIUS;
+  c.vx = (c.vx + dt * (G * tiltX - w2 * c.x)) / (1 + dt * drag);
+  c.vy = (c.vy + dt * (G * tiltY - w2 * c.y)) / (1 + dt * drag);
+  c.x += c.vx * dt; c.y += c.vy * dt;
+  const r = Math.hypot(c.x, c.y);
+  if (r > room) {
+    // Against the rim: held there, and what was going outward stops.
+    const nx = c.x / r, ny = c.y / r;
+    c.x = nx * room; c.y = ny * room;
+    const out = c.vx * nx + c.vy * ny;
+    if (out > 0) { c.vx -= out * nx; c.vy -= out * ny; }
+  }
+}
+
+/*
+  Frame Sway (the owner, 2026-10-11): "I'm getting nauseous watching the
+  visuals. It moves around the x/y axis with sounds ... like the whole plate
+  moves around under the camera. Make the liquids and their interactions the
+  main focus, not the overall movement of the plates or cameras."
+
+  What moved was the cover glass above. On a thin gap it drags the film at
+  half its slide, and the film is the whole picture: every kick at the
+  default Plate Rock slid all of it a few cells one way and swung it back at
+  the bowl's 1.5 Hz (`npm run framesway` measures it, per frame, on a song's
+  kicks). That is a real clock glass rocked by a hand, and it is also exactly
+  a camera shake, which is what a viewer's stomach reads it as. The tilt
+  itself stays: it moves only the colour heavier than the plate's mean, a
+  pool sliding downhill through clear liquid while the rest holds still,
+  which is the liquid's own motion and what the rock is for (27a).
+
+  So the cover sits seated by default and the dial says how loose it is: the
+  room between the two glasses' rims, from none (the cover held in the
+  bottom glass's rim, as a clamped clock glass is) to the 4 cm `COVER_ROOM`
+  the cover had. The other things that moved the whole frame with the beat
+  ride the same dial (LiquidVisualizer: the lamp following the rock; the
+  plate shader: a kaleidoscope's turn and breath on the beat, the closeup's
+  crinkle pulsing with it), so one dial, off by default, is everything that
+  moves the frame rather than the liquid.
+*/
+/** The Frame Sway dial's default: the frame holds still and the liquid moves. */
+export const FRAME_SWAY_DEFAULT = 0;
+/** The dial, clamped, with a NaN read as off. */
+export function frameSway(v: number | undefined): number {
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : FRAME_SWAY_DEFAULT;
+}
+/** The room the cover has to slide in for the dial: none seated, `COVER_ROOM` at full. */
+export function coverRoom(sway: number | undefined): number {
+  return COVER_ROOM * frameSway(sway);
+}
+/**
+ * How far the plate's rock moves the lamp, in plate widths across and up: a
+ * tipped plate lit from a new side, a twentieth of the plate at the spring's
+ * full swing, for Plate Rock and Frame Sway (none by default; above).
+ */
+export function lampRock(rock: { x: number; y: number }, plateRock: number | undefined, sway: number | undefined): [number, number] {
+  const k = (Number.isFinite(plateRock) ? Math.max(0, Math.min(1, plateRock as number)) : 0) * frameSway(sway);
+  return [rock.x * 0.05 * k, rock.y * 0.05 * k];
+}

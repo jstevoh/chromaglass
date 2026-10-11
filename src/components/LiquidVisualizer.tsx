@@ -23,6 +23,7 @@ import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
+import { WebGPUPadGrab } from '../gpu/padGrab';
 import { WebGPUPostChain } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
@@ -33,6 +34,7 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
+import { grabPadPicture, padPictureSender, padPictureWanted, tapPadPicture } from '../lib/padPicture';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
@@ -40,7 +42,7 @@ import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFra
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { CUR_ROCK, kickRock, stepRock, rockSwing, swayAt } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -787,6 +789,8 @@ export interface SongShapeReport {
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
   render: () => VisualizerRender | null;
+  /** The quality governor running the show. */
+  governor: () => QualityGovernor | null;
   injectImage: (imageData: ImageData) => void;
   pourVideo: (video: HTMLVideoElement) => void;
   stopPourVideo: () => void;
@@ -857,6 +861,12 @@ export interface LiquidVisualizerHandle {
   setHarmony: (indices: number[]) => void;
   /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
   setHarmonyLock: (indices: number[] | null) => void;
+  /**
+   * Evolve turns the palette for the dye still to come (lib/slowEvolve.ts: at a
+   * drop or a breakdown, or every few minutes with no music). Nothing already
+   * on the plate changes colour; a palette lock or a hue journey keeps its own.
+   */
+  evolvePalette: () => void;
   /** Fire a themed dye burst for a lyric word-trigger. */
   triggerTheme: (theme: string, energy?: number) => void;
   /** Re-fire a recorded manual gesture (performance replay). Normalized coords; `layer` defaults to the active one. */
@@ -867,6 +877,14 @@ export interface LiquidVisualizerHandle {
    * (a pen's tilt, a stick's push) instead of a radial puff.
    */
   applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => void;
+  /**
+   * A point on the wall (the drawn picture, normalised, y up) as the plate's
+   * point under it, through the camera: the plate is wider than the wall,
+   * turns with the dish and is magnified by the closeup. `turned` false
+   * leaves the dish's turn out, for a hand on the dish (Spin reads its
+   * angle as the room sees it). The point itself, until the canvas is up.
+   */
+  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
   /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
   setExternalTilt: (x: number, y: number) => void;
   /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
@@ -1036,6 +1054,9 @@ class FluidSimulation {
   dropFingering = 0;
   rockX = 0;
   rockY = 0;
+  /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
+  coverX = 0;
+  coverY = 0;
   // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
   // at half the logical grid: velocity, warm pressure and divergence.
   private readonly CM = GRID_SIZE / 2;
@@ -1143,7 +1164,7 @@ class FluidSimulation {
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
-    this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0;
+    this.tiltX = 0; this.tiltY = 0; this.rockX = 0; this.rockY = 0; this.coverX = 0; this.coverY = 0;
     this.phrase = { drive: 1, gust: 0, drift: 0.5 };
     this.tempoMul = 1;
     this.paceMul = 1;
@@ -3972,8 +3993,10 @@ class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      rockX: this.tiltX * 10.0 + this.rockX * CUR_ROCK,
-      rockY: this.tiltY * 10.0 + this.rockY * CUR_ROCK,
+      rockX: plateSin(this.tiltX, this.rockX),
+      rockY: plateSin(this.tiltY, this.rockY),
+      coverX: this.coverX,
+      coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,
       /*
         No stir for the look's motor (PLAN 22j). The current had one, a
@@ -4525,7 +4548,7 @@ interface FrameView {
    * (gpu/plateUniforms.ts), which is where the shader's `pitchClass`,
    * `brightness` and `beatPhase` come from.
    */
-  audio: { pitchClass: number; brightness: number; beatPhase: number };
+  audio: { pitchClass: number; brightness: number; beatPhase: number; beatSway: number };
   /**
    * The oil beads' mask, on the frames the beads moved and it was redrawn —
    * null on every other frame, and whenever the beads are off. The show
@@ -4792,6 +4815,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
+  const coverRef = useRef<CoverGlass>({ x: 0, y: 0, vx: 0, vy: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
   /** The camera pass, built the first time a frame asks for it. */
@@ -5116,6 +5140,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const soapAtRef = useRef(0);
   const liesSeedAtRef = useRef(0);
   const loudnessRef = useRef(0);
+  /** The music's level over the last half minute, for Evolve's hands (lib/slowEvolve.ts). */
+  const evolveLoudRef = useRef(0);
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
@@ -5231,7 +5257,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     another. Two integers make the difference between "the plate moved" and
     "evolving thinned it twice and drew a finger through it once".
   */
-  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0 });
+  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0, palettes: 0 });
   /*
     A finger the automation is drawing, over frames rather than in one.
 
@@ -5298,6 +5324,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmGainRef = useRef(4.5);
 
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
+  /** A window point on the lead plate, in plate units, as a hand there would land (`chromaglassDebug().plateAt`). */
+  const plateAtRef = useRef<((clientX: number, clientY: number) => { x: number; y: number }) | null>(null);
+  const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean) => { x: number; y: number }) | null>(null);
   /**
    * A gesture from any hand, applied to the plate.
    *
@@ -5672,6 +5701,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   useImperativeHandle(ref, () => ({
     render: () => renderApiRef.current,
+    governor: () => governorRef.current,
     drawnRect: () => drawnRectRef.current?.() ?? null,
     /*
       Numbers, not a photograph.
@@ -6089,6 +6119,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       harmonyLockRef.current = indices;
       if (indices) harmonyRef.current = indices;
     },
+    evolvePalette: () => {
+      if (harmonyLockRef.current || (settingsRef.current.hueJourney ?? 0) > 0) return;
+      harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
+      autoEventsRef.current.palettes = (autoEventsRef.current.palettes ?? 0) + 1;
+    },
     triggerTheme: (theme: string, energy = 0.6) => {
       const af = fluidsRef.current[activeLayerRef.current];
       if (!af || drainFrameRef.current > 0) return;
@@ -6153,6 +6188,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     applyGesture: (g) => performGesture(g),
+    wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
   }));
 
   // Outside a render: a harness's `pour` between frames reads the ref too.
@@ -6748,11 +6784,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // and a render does not follow it: its pace is the song's own, heard.
           const bpm = (clockIsFixed() ? 0 : tempoRef?.current?.bpm) || heard;
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
-          loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / 8));
+          /*
+            Under Evolve the pace hears the song over half a minute and eases
+            over twenty seconds, not eight and three: Evolve leans hardest on
+            the music's pace (tempoPace.ts), so it was the one place the plate's
+            speed still swung with a loud few bars. A song's pace is its
+            tempo and its sections, and those last minutes.
+          */
+          const evolving = isAutomatedRef.current;
+          loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / (evolving ? 30 : 8)));
+          // Evolve's hands hear the same half minute (the automation below).
+          evolveLoudRef.current += (energy - evolveLoudRef.current) * (1 - Math.exp(-realDt / 30));
           const playing = isActiveRef.current && !!currentAudioData && loudnessRef.current > 0.01;
           const want = tempoMultiplier(lookSpeed(currentSettings), musicPace(bpm, loudnessRef.current, playing),
-            currentSettings.tempoSync ?? 0.5, isAutomatedRef.current);
-          tempoMulRef.current += (want - tempoMulRef.current) * (1 - Math.exp(-realDt / 3));
+            currentSettings.tempoSync ?? 0.5, evolving);
+          tempoMulRef.current += (want - tempoMulRef.current) * (1 - Math.exp(-realDt / (evolving ? 20 : 3)));
           for (const f of fluidsRef.current) if (f) f.tempoMul = tempoMulRef.current;
         }
         dynamicSpeed *= tempoMulRef.current;
@@ -7772,9 +7818,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
             const rate = Math.max(0, Math.min(1, currentSettings.automateRate ?? 0.12));
-            const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
-            const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
-            const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
+            /*
+              What the hands hear: the song over the last half minute, and its
+              section. Not the frame's energy, treble and spectral centroid,
+              which they used to read for every drop: the size of a drop, the
+              heat under it and whether it was a drop or a puff of air all
+              followed the moment, and the owner saw Evolve "directly reacting
+              to frequency and bouncing around" (2026-10-11). The kick and the
+              bands still reach the plate through the look's own sound
+              settings; Evolve is the slow hand, and now it is only that.
+
+              A build reaches for the air more (a riser is a held breath) and a
+              little more often; a breakdown leaves the dish alone more.
+            */
+            const energy = evolveLoudRef.current;
+            const section = songShapeRef.current.now.section;
+            const sectionRate = section === 'breakdown' ? 0.5 : section === 'build' ? 1.25 : 1;
+            const airShare = section === 'build' ? 0.45 : 0.25;
 
             /*
               The rate scales everything: at the default it is one small drop
@@ -7839,7 +7899,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // about one a second at full — against two or three a
             // second before, each of them large.
             // A paced scene's rests are rests for the automation's hands too.
-            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * ph.drive * paceNowRef.current.activity) {
+            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * sectionRate * ph.drive * paceNowRef.current.activity) {
               const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
                 // A look built on areas tends them: the drop lands in one of
@@ -7850,7 +7910,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const at = area ? pointInArea(area, GRID_SIZE, DICE.evolve) : null;
                 const rx = at ? Math.floor(at.x) : DICE.evolve.int(GRID_SIZE - 20) + 10;
                 const ry = at ? Math.floor(at.y) : DICE.evolve.int(GRID_SIZE - 20) + 10;
-                const isBlow = DICE.evolve.float() > 0.75 - (spectralCentroid / 128) * 0.4;
+                const isBlow = DICE.evolve.float() < airShare;
                 if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
@@ -7869,7 +7929,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
                   af.autoInject(style, rx, ry, 1.5 + energy * 4, color.r, color.g, color.b, energy);
-                  af.addTemp(rx, ry, 0.3 + trebleBoost * 1.5);
+                  af.addTemp(rx, ry, 0.3 + energy * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
                   // At an area, the bottle is the one kept there.
@@ -7879,13 +7939,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
 
-            // With no hue journey set, an evolving plate re-picks its palette at
-            // random every ~3 min (it was ~45 s). Only the dye still to come
-            // takes the new colours, so with small drops this is a drift, not
-            // a change of scene. The journey itself runs below, evolving or not.
-            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && DICE.evolve.float() < 0.0001) {
-              harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
-            }
+            // The palette turns at the song's drops and breakdowns now, or every
+            // few minutes with no music, from App (lib/slowEvolve.ts, and
+            // `evolvePalette` on the handle): it used to be a one-in-ten-thousand
+            // roll every frame, so how often it came depended on the frame rate
+            // and when had nothing to do with the song.
 
             /*
               And dye leaves, which nothing here used to do.
@@ -8480,8 +8538,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const ext = externalTiltRef.current;
             const extAge = showNow() * 0.001 - ext.at;
             const extK = extAge < 2.5 ? 1 - Math.max(0, extAge - 1.5) : 0;
-            const tiltX = swingX * 0.004 + ext.x * 0.0045 * extK;
-            const tiltY = swingY * 0.004 + ext.y * 0.0045 * extK;
+            const tiltX = swingX * HOLD_TILT + ext.x * 0.0045 * extK;
+            const tiltY = swingY * HOLD_TILT + ext.y * 0.0045 * extK;
             /*
               The plate takes the swing itself (±1–2 at full), scaled by the
               slider; the phone's tilt joins it. On a thin gap that is the
@@ -8491,7 +8549,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const rockX = swingX + ext.x * 1.1 * extK;
             const rockY = swingY + ext.y * 1.1 * extK;
-            for (const fluid of fluidsRef.current) { fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; }
+            /*
+              And the cover glass slides on its film as the pair tips, and
+              drags the liquid with it (lib/plateRock.ts, PLAN 27a-1): what
+              makes a rock show on a look whose colour is spread evenly. Its
+              drag is the look's own liquid's: it swings on a light oil and
+              creeps on glycerine. It is tipped as the solver's plate is
+              (plateSin, as the step's rockX below).
+
+              Only as far as Frame Sway lets it: the glass drags the whole
+              picture, which is the frame moving rather than the liquid, and
+              by default it sits seated in the rim and drags nothing
+              (coverRoom, lib/plateRock.ts; `npm run framesway`).
+            */
+            const cover = coverRef.current;
+            stepCover(cover, plateSin(tiltX, rockX), plateSin(tiltY, rockY),
+              coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS,
+              coverRoom(currentSettings.frameSway));
+            for (const fluid of fluidsRef.current) {
+              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
+              fluid.coverX = cover.vx; fluid.coverY = cover.vy;
+            }
 
             // ── Oil beads ───────────────────────────────────────
             {
@@ -9137,15 +9215,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // See the note in the fragment source.
         if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
 
-        // The lamp wanders slowly under the plate, and the plate's own rock
-        // moves it too — a tilted plate is lit from a new side.
+        // The lamp wanders slowly under the plate, and with Frame Sway up
+        // the plate's own rock moves it too — a tilted plate is lit from a
+        // new side. Off by default: the lamp jumping a twentieth of the plate
+        // on every kick lights the whole frame from somewhere else in time
+        // with the beat, which reads as the frame moving (lib/plateRock.ts).
         {
           const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
           const rock = rockRef.current;
           const lamp = lampRef.current;
-          const rockK = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
-          lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rock.x * 0.05 * rockK;
-          lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rock.y * 0.05 * rockK;
+          const [rockLx, rockLy] = lampRock(rock, currentSettings.plateRock, currentSettings.frameSway);
+          lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rockLx;
+          lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rockLy;
           lamp.x2 = 0.5 - (lamp.x - 0.5) * 0.7 + noise2D(time * 0.019, 27.1) * 0.3 * motion;
           lamp.y2 = 0.5 - (lamp.y - 0.5) * 0.7 + noise2D(29.3, time * 0.023) * 0.3 * motion;
         }
@@ -9221,6 +9302,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             audioBass: currentAudioData?.bass ?? -1,
             kick: kickRef.current.kick,
             kicks: kickCountRef.current,
+            // What moves the whole frame rather than the liquid (Frame Sway,
+            // lib/plateRock.ts): the cover glass's slide handed to the plate
+            // (m/s; the liquid goes at half of it), the lamp's share of the
+            // rock, and how far the beat turns a kaleidoscope. `npm run render-app` holds them at 0 by default.
+            coverVx: coverRef.current.vx,
+            coverVy: coverRef.current.vy,
+            lampRock: Math.hypot(...lampRock(rockRef.current, currentSettings.plateRock, currentSettings.frameSway)),
+            beatSway: frameSway(currentSettings.frameSway),
             loudness: loudnessRef.current,
             tempoMul: tempoMulRef.current,
             phraseDrive: phraseRef.current.drive,
@@ -9298,7 +9387,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             brightness: audioDataRef.current?.features?.brightness ?? 0, 
             beatPhase: beatClockRef.current?.period > 0 
                 ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
-                : 0 
+                : 0,
+            // How far the beat may turn and breathe the frame (Frame Sway, lib/plateRock.ts).
+            beatSway: frameSway(currentSettings.frameSway),
           },
           beadMask,
           outputCfg: rendering ? DEFAULT_OUTPUT : outputCfgRef.current,
@@ -9325,6 +9416,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (mirror) {
           try { mirror(canvas); } catch { /* the projector window went away mid-frame */ }
         }
+        // The remote's Draw, for the same reason and in the same place: a
+        // small copy of this frame while a pad is asking (lib/padPicture.ts).
+        // Not Preview's copy: the pad shows the wall, as the projector does.
+        if (!isDraftRef.current) tapPadPicture(canvas);
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
@@ -9470,6 +9565,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       simAccumRef.current = 0;
       wanderClockRef.current = 0;
       loudnessRef.current = 0;
+      evolveLoudRef.current = 0;
       tempoMulRef.current = 1;
       kickRef.current = { kick: false, predicted: false };
       kickCountRef.current = 0;
@@ -9495,6 +9591,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         Evolve had begun would have carried on into the film.
       */
       rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      /*
+        And the cover glass the rock slides (PLAN 27a-1), which carries its
+        own swing from frame to frame: left where the live show had swung it,
+        the same seed rendered twice began with the glass in two places and
+        drew different frames (main's deploy of 10-10, `npm run render-app`).
+      */
+      coverRef.current = { x: 0, y: 0, vx: 0, vy: 0 };
       lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
       gelAngleRef.current = 0;
       kaleidoPhaseRef.current = 0;
@@ -9740,6 +9843,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // under `?debug`.
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
+        /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
+        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via, from: s.from } : null; })(),
+        /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
+        wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
         frames: framesDrawnRef.current,
         /** The clears this engine has been handed (`clearTrigger`): `npm run draftwall` reads the wall's against the desk's copy (PLAN.md 8b). */
@@ -9836,6 +9943,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             ...[...extraHandsRef.current.values()].map(h => ({ x: h.x, y: h.y, laid: { ...h.laid } })),
           ],
           pinch: pinchRef.current !== null,
+          /*
+            Which plate the hands are laying on, and the clears and drains the
+            loop has taken: what the phone's two-finger Drop prints when the
+            plate it reads holds none of what the hands handed it (PLAN.md
+            19h-2), so a red says whether the dye went to the other plate or
+            was cleared in the window.
+          */
+          layer: activeLayerRef.current,
+          clears: lastClearTrigger.current,
+          drains: lastDrainTrigger.current,
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
@@ -10105,6 +10222,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     /** The projector sources last frame drew, to scope the frame a new one is built on. */
     let sourcesBefore = '';
     let probe: WebGPUFrameProbe | null = null;
+    /** The remote's Draw picture, read on the GPU while a pad asks (gpu/padGrab.ts). */
+    let padGrab: WebGPUPadGrab | null = null;
     let chain: WebGPUPostChain | null = null;
     /** The compositor, so the cleanup releases it by name rather than leaving it to the device's destroy (S13). */
     let platePass: WebGPUPlate | null = null;
@@ -10700,6 +10819,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const frame = stage?.frame();
           cpuMs += (performance.now() - t0 - cpuMs) * 0.1;
 
+          // ── What a pad on Draw sees ──────────────────────────
+          // The same frame, shrunk and read back on this device a frame or
+          // two behind, as the probe below reads it; only while a remote is
+          // asking. The frame task's canvas tap then leaves it alone.
+          if (frame && !isDraftRef.current && padPictureWanted()) {
+            if (padGrab && padGrab.device !== s.device) { padGrab.dispose(); padGrab = null; }
+            const grab = padGrab ??= new WebGPUPadGrab(s.device);
+            grabPadPicture((w, h) => grab.grab(frame, w, h), frame.width, frame.height);
+          }
+
           // ── What the audience just saw ───────────────────────
           // The delivered frame, reduced on the GPU to one number, a frame
           // or two behind. The reading goes back rather than
@@ -10788,6 +10917,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The second phase (H7), for the harness. */
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
+          /**
+           * Where on the plate a hand at this window point would land (plate
+           * units, unrounded): the pointer's own mapping, turn and closeup and
+           * all, so `npm run magnet` can lay its drag out on the plate rather
+           * than across the window.
+           */
+          plateAt: (clientX: number, clientY: number) => plateAtRef.current?.(clientX, clientY) ?? null,
           magnetNow: () => lastMagnetRef.current,
           phaseLays: () => phaseLaysRef.current,
           readPhase: async () => {
@@ -10907,16 +11043,29 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     };
     drawnRectRef.current = drawnRect;
     /*
+      A point on the wall (the canvas, normalised, y up) as a point on the
+      plate, through the same camera as this screen's own pointer: the
+      remote's pad sends the wall's points (PLAN 8-draw-a), and the wall is
+      the middle of a plate half again as wide, turned and magnified. A
+      DOMRect the canvas's own size stands for the screen's box; only its
+      proportions are read.
+    */
+    wallPointRef.current = (u, v, layer, turned) => {
+      const rect = new DOMRect(0, 0, Math.max(1, canvas.width), Math.max(1, canvas.height));
+      const p = fluidPointAt(u * rect.width, (1 - v) * rect.height, rect, layer, turned);
+      return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
+    };
+    /*
       Where a pointer is, in the plate's cells, not rounded: the Spin tool
       reads a hand's angle round the middle from it, and a pointer rounded to
       a cell is an angle rounded to a sixtieth of a radian at a third of the
       plate out, which at sixty readings a second is a turn a second of noise.
     */
-    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect) => {
+    const fluidPointAt = (clientX: number, clientY: number, rect: DOMRect, layer = activeLayerRef.current, turned = true) => {
       const cxp = clientX - rect.left - rect.width / 2;
       const cyp = -(clientY - rect.top - rect.height / 2); // the plate's uv counts up, CSS counts down
       const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE;
-      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const angle = turned ? rotationAnglesRef.current[layer] || 0 : 0;
       const rx = cxp * Math.cos(-angle) - cyp * Math.sin(-angle);
       const ry = cxp * Math.sin(-angle) + cyp * Math.cos(-angle);
       // Mirror the shader's camera transform so the brush lands under the
@@ -10927,7 +11076,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const spread = Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0)) * (1 - macroAmountOf(settingsRef.current));
       if (spread > 0.001) {
         // The layers are spread into dishes: this layer's dish is its whole plate.
-        const layer = activeLayerRef.current;
         const aspect = rect.width / Math.max(1, rect.height);
         const cen = layer === 0 ? [0.5 + 0.144 * spread / aspect, 0.5 - 0.02 * spread] : [0.5 - 0.304 * spread / aspect, 0.5 + 0.06 * spread];
         const rad = layer === 0 ? 0.98 + (0.66 - 0.98) * spread : 0.98 + (0.36 - 0.98) * spread;
@@ -10942,11 +11090,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       let fy = ry / (scale * z) + shot.cy * GRID_SIZE;
       // The second layer is viewed through its own zoom and drift.
       const view = layer1ViewRef.current;
-      if (activeLayerRef.current === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
+      if (layer === 1 && shot.zoom <= 1.0001 && view.zoom > 1.001) {
         fx = ((fx / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dx) * GRID_SIZE;
         fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
       }
       return { x: fx, y: fy };
+    };
+    plateAtRef.current = (clientX, clientY) => {
+      const p = fluidPointAt(clientX, clientY, drawnRect());
+      return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const p = fluidPointAt(clientX, clientY, rect);
@@ -11315,6 +11467,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       projector = null;
       probe?.dispose();
       probe = null;
+      padGrab?.dispose();
+      padGrab = null;
       chain?.dispose();
       chain = null;
       platePass?.dispose();

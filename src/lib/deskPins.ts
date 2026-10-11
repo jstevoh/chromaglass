@@ -78,12 +78,13 @@ export interface DeskSpec {
 /** Where each of the MIDI forty is shown in the panel. */
 const SECTION_OF: Record<string, string> = {
   dimmer: 'master',
-  audioImpact: 'audio-mappings',
+  audioImpact: 'audio-input',
   automateRate: 'automation',
   globalSpeed: 'master',
   dyeBudget: 'look',
   turbulenceScale: 'look',
   plateRock: 'look',
+  frameSway: 'look',
   beatSqueeze: 'show',
   beatAccent: 'show',
   fingering: 'show',
@@ -233,8 +234,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },
   { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'squish' },
-  { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.08, section: 'heat' },
-  { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'heat' },
+  { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.08, section: 'physics' },
+  { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'physics' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
 
