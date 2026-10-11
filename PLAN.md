@@ -99,7 +99,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **1.1** **14m, then 14o** (A, M then S): the show key to loopback only, long and timing-safe,
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
   and limits, with the report Worker's (`docs/crash-plan.md`).
-- **1.2** **14n** (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks.
+- **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
 - **1.4** ~~**S14** (B, S): an error boundary per panel, desk and phone component, the plate
@@ -134,7 +134,7 @@ Judged in this order, because these gate code:
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
-  look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
+  look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** #358 timed pops (partly shipped: Bretherton speedup, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; timed pops stay default pending physical pop setting);
   ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles; its Classic line listens a minute since #346, having counted under its 15 chances on 6 of 38 Mac runs in 25 s).
 - **2.6** ~~**P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).~~
@@ -225,6 +225,9 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
+- **6.8b** The closeup's ferrofluid drop (§29, the owner, 2026-10-11): ~~**29a**~~ the drop
+  as a lit bead, then **29c** it follows the hand, **29b** the dye on it, **29d** its
+  wake, **29e** the look, **29f** its controls.
 - **6.9** Several areas of interest (§25, lane G): ~~**25a**~~ areas of the dish, with Velvet
   Underground, Lumia and Cell Bloom, then **25b** the next looks in its order, **25e**,
   **25c**, **25f** (after 18f and 18d).
@@ -1845,6 +1848,26 @@ The steps, most visible first. Each is one PR with its own check, and every step
    having a strength.
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field
    and a streak layer, each at its own speed, added as light.
+8. ~~**Evolve changes slowly with the song.**~~ Shipped: one move at a time (a few
+   related dials, 30–90 s glides, about one a minute), steered by the song's sections
+   and its level over half a minute, the palette turning at drops and breakdowns, the
+   same on a slow clock with no music; nothing that moves the frame. `npm run
+   slowevolve`. Story in `docs/plan-shipped.md` §10 step 8.
+   - **8a** (open, the owner's eye): judge it on the Mac, with a song and without
+     (`docs/judging.md` §51). If a minute's glide reads as nothing happening, the
+     reach (`moveTargets`' share of each dial's window) is the dial to turn, not the
+     glide's length.
+   - **8b** (open): `npm run evolving`, the browser check that Evolve works in the
+     running app, is not in CI. Run in a cloud session on SwiftShader, its dial lines
+     pass (4 of 81 dials moved in 70 s at full speed, all inside their windows; on main,
+     14 of 99, one of them Lamp Motion, which moves the whole picture), but its two hand
+     lines fail the same way on main and here: the app draws no frames there, so the
+     hands never run. Put it on a Mac shard, or split the dial lines into Measure.
+   - **8c** (open): the palette change only colours dye still to come, which is the
+     real thing (a pour does not recolour the dish). With Evolve's hands at a drop
+     every seven seconds that turns the plate over in a minute or two; on a look with
+     few drops it may read as no change at all. Measure how long the plate takes to
+     carry half the new palette on the film table, per look.
 
 Small things that ride along with the steps: drops with a coloured rim lined up in
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
@@ -2784,7 +2807,17 @@ fewer), and stamp the reading's time against the frame's.
 Still open here: the MIDI half. A fader still re-renders the App once a frame while
 it moves (`rideSetting`: the ride drains into `setSettings` on an animation frame), by
 design so the desk shows the value; reading the ride's shadow in the frame loop and
-showing the desk's value at ten a second is the same split, not yet done. And the
+showing the desk's value at ten a second is the same split, not yet done. #348 tried
+it (a 100 ms timer, the frame loop laying `ride.peek()` over the settings) and went
+back to the frame's flush in review, because of three faults a second try has to
+avoid: the overlay never stopped, since the shadow outlives the flush by design
+(3600 of 3600 frames a minute after one move still copied the whole settings
+object); it lay over the identified track's overrides of the same key, which then
+never reached the plate; and the loop's other direct reads of `settingsRef`
+(Room and Sound Impact, Magnet Size, Phase Amount) would still lag the fader by up
+to a tenth of a second. Overlay only keys the render has not caught up with and
+the overrides do not hold, into a reused object, and give the loop one settings
+object to read. And the
 reading's two byte arrays are still new each reading (about 60 KB a second), not
 reused: a listener may hold an older reading, so reusing them needs the readers
 checked first.
@@ -2994,32 +3027,9 @@ wrong keys lock the address out; a 1 MB frame is refused without the process gro
 silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
 socket's `patch` is dropped.
 
-### 14n. One malformed message can end the plate
+### ~~14n. One malformed message can end the plate~~
 
-**Read in the code; the chain was followed by hand, not run.** The display applies a
-remote `patch` as it comes (`case 'patch': queuePatch(message.settings)` →
-`updateSettings`, `App.tsx`): any key, of any type. `{"simResolution":"x"}` gives
-`Math.round("x")`, `NaN`, in `resolveSimResolution` (`LiquidVisualizer.tsx`); `new
-WebGPUFluid(device, NaN)` throws on `createTexture`, and the catch calls
-`governor.failRung()`, which marks the rung failed forever (`governor.ts`). Each rung in
-turn fails the same way, until the plate stands on "no WebGPU": a one-way door in the
-sense of `docs/stability-plan.md`. A phone on an older build that sends a renamed or
-retyped key does the same by accident. The OSC path already drops non-finite numbers
-(`oscToMessage`'s `num()`); the socket does not. Two more doors of the kind:
-
-- a MIDI map file's setting binding keeps any key and, for a key not in
-  `LEARNABLE_BY_KEY`, its own `min` and `max` unchecked (`parseMidiMap`, `midi.ts`),
-  where `parseSoundBindings` drops unknown keys;
-- gestures: `dx`/`dy` sent as strings become `NaN` in the CPU velocity
-  (`blowDirected`), and every distinct `drop.color` string becomes a key in `hexCache`
-  (`constants.ts`), which never forgets one.
-
-*Fix:* one `sanitizePatch` against the settings registry (known keys, the default's
-`typeof`, finite numbers clamped to the setting's range), used by the socket, the MIDI
-map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` bounded.
-*Measure:* a node check beside `npm run remotemix` that sends `simResolution: "x"`, a
-`NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
-governor's ladder and the cache as they were.
+**Shipped, #322.** Story in `docs/plan-shipped.md`.
 
 ### 14o. The song-ID Worker is open to anyone
 
@@ -3843,7 +3853,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
-| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
+| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
@@ -4389,29 +4399,10 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18i. Bubbles and beads live by physics, not timers
 
-- **Bubbles** (`src/lib/bubbles.ts`) live 9–23 s and pop at the end. The soap film's
-  colour runs on age over life. A pop makes 2–3 random daughters, merges are random
-  (`rng < dt·0.12`), pairs are pulled together, and the drift has a random wander at a
-  fixed 1.4× the flow. A bubble trapped between glasses is an air pancake with no
-  draining film, so it does not pop on a timer. It ends at the rim, by dissolving (the
-  Ostwald ripening already there), by merging when the film between two drains, or
-  when a drop breaks it. With no free surface there is no pull between bubbles. A
-  bubble runs at about twice the flow, less a film correction.
-  The cheap version drops the timed pops, daughters and pull, drives merges by drainage
-  time and sets speed from the capillary number. The full one (air as a phase with
-  Laplace pressure in 18a's solve) lets bubbles finger and split. The Straw's finger
-  count is random (`lobes: 8 + rng(7)`); the real count follows the finger wavelength
-  λ ≈ πb/√Ca.
-- **Beads** (`src/lib/beads.ts`) are a carpet of particles born where a noise patch
-  allows, coloured from the look's palette, moving at a fixed 0.8× the flow with
-  jitter, merging at random. Nothing in the file knows about Oil Bodies. Real beads are
-  oil that broke up where threads pinched off (Rayleigh–Plateau), carrying the colour
-  they were poured with, and moving at about 2U/(1 + λ) for a viscosity ratio λ. What it
-  takes: beads handed down from the Cahn–Hilliard oil where it pinches, coloured from
-  the dye at birth, with speed from the bottle's λ.
-- **Cost:** CPU, plus a readback of the oil field for the beads.
-- **The owner's call:** timed pops also pace a show (`lifeScale`), and the bead carpet is
-  a look in its own right, so both stay available as looks.
+**Partly shipped** (#358): Bretherton lubrication speedup ($U_b / U = 1.5 / (1 + 2.26\text{Ca}^{2/3})$ with ratio falling dynamically with flow speed $U$), unagitated Brownian wander removed (treble acoustic vibration drives isotropic 2D wander scaling with agitation), Saffman-Taylor finger wavelength scaling on the Straw ($m \propto R \sqrt{\text{Ca}}$), Reynolds/Chesters thin-film drainage merge ($t_\text{drain} \propto (\mu / \sigma) R_e$ with restored 0.98 resting push so foam rafts remain stable), and bead viscous pancake lag ($2U / (1 + \lambda)$ with default $\lambda = 1.5$ yielding $0.8\cdot U$). Measured by `npm run bubblephysics`. How it was modeled, tuned shortcuts ($1.5\cdot U$ premise, $b_\text{eff}$ gap scaling, and $t_\text{drain}$ film factor), and measurements are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
+- Expose physical-only pop mode as a user setting (`timedPops = false`).
+- Rim drainage when bubbles reach the dish boundary.
+
 
 ### 18j. Milky liquids scatter
 
@@ -4979,6 +4970,27 @@ commit. *Size:* S.
 ### 19u. Nothing reaches main without the checks
 **Shipped** (2026-10-10, a branch ruleset on `main`, not code): nothing lands on `main` without a pull request and green `Measure` and `WebGPU (macOS)`, and the admin's bypass works only on a pull request, never on a push. The ruleset, why those two checks, and what is left are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+### 19v. Two checks that could not tell what they were asked
+**Shipped** (2026-10-10): the magnet's drag is laid out on the plate, off its middle row, and the Stage sheet's Esc is listened for once (`hooks/useEscape.ts`). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+
+- **19v-1. The show keys' listener comes off and goes back 11 times a second.** App's
+  keydown effect for Space, Backspace, 1–9 and the tool letters is keyed on `goLook`,
+  `cueAny` and the rest, which App makes afresh as the sound re-renders it (measured: 11
+  re-adds a second with nothing open). The same dispatch rule that could drop the Stage
+  sheet's Esc (19v) could drop a Space meant to send a look, if an earlier window listener
+  sets state on that key. Nothing ahead of it does today, so not seen; read its handlers
+  through a ref and listen once, as `desk/Desk.tsx` and `useEscape` do.
+- **19v-2. A ferrofluid pool dragged to the rim comes back with more ferrofluid.** Found
+  by #349's first planned drag on the Mac (`npm run magnet`, run 38089915722): the magnet
+  dragged a pool of 3.48% of the plate from 0.23,0.44 to 0.30,0.90, about 0.45 from the
+  middle with the pool 0.157 across, and the plate then held 170% of what was poured,
+  with nothing laid (phaseLays 0 → 0). The phase moves in flux form and should neither
+  make nor lose it. Not known yet whether the rim makes it (the wall's boundary on the
+  phase's flux, or the magnet's pull against it) or `readPhase` counts the field past the
+  dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
+  so the rim needs a check of its own: a pool held against the rim by the magnet, its
+  total read every second. Physics lane.
+
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
 
@@ -5186,7 +5198,7 @@ film, whose own stretching viscosity 4ηh resists its retraction (a Trouton shee
 a thin film dragged over the glass. Two ways to get it, in order:
 
 1. **On 18a (shipped behind Thin Gap, on in every look):** the film as a phase of high
-   viscosity in the Hele-Shaw solver. The
+   viscosity in the Hele-Shaw solver. The oil film against the glass with water beside it is modeled as two layers stacked across a pressure-driven Poiseuille gap (relative viscosity m = 50 for clear light mineral oil at 50 cSt, `OIL_NU = 5e-5` m²/s, with continuous velocity and shear stress at the interface; 4.15x drag at h=0.4, 15.95x drag at h=0.8). Stir impulse in `scripts/lace.mjs` scaled to [2.5, -1.5] / [-2.0, 2.0] so dye moves far enough under the ~16x drag to measure displacement (> 1 cell) without altering the 12% wave ratio bar. The
    hole is water invading a viscous liquid under capillary pressure, resisted by
    Darcy drag. This needs 18a's variable mobility and 18d's per-liquid viscosity, and
    costs nothing beyond them.
@@ -5198,6 +5210,11 @@ a thin film dragged over the glass. Two ways to get it, in order:
 the film's thickness at the edge over its far thickness, stays under 1.2, where the
 prototype's h³ film reaches about 2. A sheared hole stretches along the flow by at
 least 2:1 before it meets another.
+
+- **20c-1. Macro closeup cell field is a look-alike shortcut (retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
+
+- **20c-2. Settings tabs on the phone (shipped in #348's review).** The Settings rail is a strip across the top on a phone, and each tab took its group's whole width and lay under the next group: 13 of the 26 tabs took no tap, Patches among them, so the room's two new patch features (How sudden, How busy lately) could not be reached from a phone. The tabs are full width only in the desk's column now; `npm run phone` taps every tab where it is drawn, and patches each new feature from the phone.
+
 
 ### 20d. Hairline edges from the optical path (this is 18e)
 
@@ -6007,6 +6024,79 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
+
+## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
+
+The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
+3d drops. I want to see a drop of ferro fluid with light reflecting off of it, with some
+dye on top of it as it gets pulled through dyes, causing the dye to spread as the drop
+gets pulled through dyes. At some point the dye rolls off of the ferrofluid drip,
+leaving some dye around and then the ferrofluid keeps getting pulled through the dye and
+making waves of sorts. [...] Calm details and control."
+
+What the closeup drew, rendered in the lab (a drop 0.03 of the plate across, Ferro Paint's
+settings, a magnet walked through three dyes; pictures in the project's shared files,
+`macro-ferro-drop/`): a flat black disc with a brown line round it and one painted dot;
+the drop's inside one value of black to the byte. The solver carries the ferrofluid as a
+layer of one depth (a full cell 0.3 l_c, FILM_H0), so there was no surface to light. And
+with the look's own magnet walked at a tenth of the plate a second, the drop crept 0.05
+of the plate in four seconds; with one strong enough to drag it (0.5 at 0.2) it plowed
+through the yellow, parting it round itself and leaving it behind, and then spread into a
+brown smear with no cell left half full within two seconds.
+
+One PR each, in this order. The steps after 29a are handed to Antigravity, with the physics,
+the code's entry points, the checks to add and the scenes to match, in
+`docs/handoff-macro-ferro-drop.md`.
+
+- ~~**29a. The drop as a bead with the light on it.**~~ **Shipped** (this PR; the story in
+  `docs/plan-shipped.md` §29a). Its shortcuts, each still open:
+  - **29a-1.** A drop smaller than l_c comes out lower than its spherical cap: P is one
+    value for every drop (set by the contact angle on a wide drop), not each drop's own
+    from its contact angle. Per-drop P (a drop's slope at its line set to tan θ).
+  - **29a-2.** The small-slope curvature (∇²h, not the full mean curvature), with the
+    plateau set exact: the slope at the contact line is not θ.
+  - **29a-3.** The picture's drop is taller than the solver's layer (0.3 l_c a full
+    cell); carry the drop's volume in the solver as the bead's thickness, so the drop the
+    flow moves is the drop the picture draws.
+  - **29a-4.** The magnet's volume shift is held to its mean over all the ferrofluid on
+    the plate, not drop by drop.
+  - **29a-5.** The magnets' radius is the default Magnet Size's in the solve (the plate's
+    uniforms carry no radius).
+  - **29a-6.** The top glass's own reflection of the room (4% of the tent over everything)
+    and the exit losses through the glass are left out, as a photographer's flag and
+    polariser would leave them; the reflected plate past total reflection is the plate
+    decoded plainly, without the closeup's cells or lacing.
+  - **29a-7.** Its cost read on the Mac (`npm run stages` with the closeup in over a
+    drop): about 18 million texel reads a frame on 384², 24 sweeps warm and 200 from cold.
+- **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
+  drop is the gap less the drop's height and is dragged with the drop's surface (no slip
+  on the drop, no shear at the top glass's far side through the thin film), so its dye
+  rides along, thins as the column does where the drop is tall, and is left at the rear
+  stagnation point as the drop moves on: trails. Today `phaseDisplace` pushes the dye out
+  of the ferrofluid as though the drop filled the gap. The dye's own passes belong to
+  other threads (18h, the dye's spread along the flow; 18m, a pour's slump): this one
+  changes only how the dye is carried where the ferrofluid is, after coordinating.
+- **29c. The drop follows the hand and holds together.** Measured above: a look's magnet
+  leaves the drop behind, and one strong enough to drag it spreads it thin. A real drop
+  under a dragged magnet holds together and heaps (the Kelvin force on a 6 mm drop is
+  about 10⁴ times its drag at 2 cm/s). Find which of the pull's cap (MAGNET_CELLS), the
+  standing film's window and the phase's own relaxation thins it, and fix that; a check
+  that a dragged drop keeps its half-full area. If the closeup's camera follows the drop, it follows
+  smoothly and never with the sound: the owner, 2026-10-11, is made sick by the frame
+  moving with the beat, and the liquid's own motion must be what moves (the sway work's
+  `frameSway`, default 0, stays the only way sound moves the frame).
+- **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
+  gap the flow round a moving drop is the potential flow round a cylinder, so the dye
+  parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the
+  magnet rings at its capillary frequency, waves on its surface damped by the
+  ferrofluid's viscosity. The second needs the drop's surface to carry momentum (a wave
+  equation on h), not only the static balance 29a solves.
+- **29e. A Ferro Drop look.** One drop, three dyes, a calm magnet walk, the closeup
+  following the drop, the cells off: the owner's description as a look, on the desk and
+  the phone.
+- **29f. Calm control.** The drop's controls where a performer reaches them on the desk
+  and the phone: how much it beads up (today Relief / 3D), where the light is, how big
+  the drop is.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

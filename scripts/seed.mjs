@@ -59,7 +59,7 @@ import { MacroCamera } from '../src/lib/macroCamera.ts';
 import { ChemistryField } from '../src/lib/chemistry.ts';
 import { Modulators } from '../src/lib/modulators.ts';
 import { Phrasing } from '../src/lib/phrasing.ts';
-import { driftLook } from '../src/lib/drift.ts';
+import { THEMES, moveTargets } from '../src/lib/drift.ts';
 import { luckyLook } from '../src/lib/lucky.ts';
 import { pickHarmony, harmonyColor } from '../src/constants.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -366,7 +366,8 @@ const wander = (seed) => {
   const nums = [];
   let cur = { ...DEFAULT_SETTINGS };
   for (let i = 0; i < 40; i++) {
-    const patch = driftLook(cur, DEFAULT_SETTINGS, 1);
+    const r = stream('show.drift');
+    const patch = moveTargets(THEMES[r.int(THEMES.length)], cur, DEFAULT_SETTINGS, r.float() * 2 - 1, 1);
     for (const [k, v] of Object.entries(patch).sort()) nums.push(k.length, v);
     cur = { ...cur, ...patch };
   }
@@ -390,7 +391,7 @@ const libs = [
   ['palette', palette, () => '60 palettes and drop colours'],
   ['modulators', modulators, (r) => `${r.n} distinct stepped-LFO values`],
   ['phrasing', phrasing, (r) => `${r.n} gusty frames in a minute`],
-  ["Evolve's wander", wander, () => '40 drifts'],
+  ["Evolve's wander", wander, () => '40 moves'],
   ['Lucky', lucky, () => '20 rolls'],
 ];
 for (const [name, run, say] of libs) {
