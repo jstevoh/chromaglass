@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
@@ -62,6 +62,7 @@ type Lab = {
 };
 let lab: Lab | null = null;
 
+let lastDrop: { n: number; h: Float32Array } | null = null;
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
@@ -264,6 +265,8 @@ const api = {
   /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */
   stepSeconds: BASE.magnetSeconds ?? 1 / 60,
   ferroViscosity: FERRO_NU,
+  /** The dye's depth per unit (PLAN 18m), so `npm run slump` lays the drop it means to. */
+  dyeLayer: DYE_LAYER,
   /** A shipped look's settings and the shape it pours its ferrofluid in, as the app reads them. */
   look(id: string) {
     const p = PRESETS.find(q => q.id === id);
@@ -559,6 +562,8 @@ const api = {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
+    // The closeup's drop kernels, built behind the show in the app; here before the one frame drawn (PLAN §29a).
+    await plate.drop.prepare();
     const zoom = cam.zoom ?? 1;
     // The beads' mask, as the app uploads it: a BeadField's render(), square
     // for rings and twice as wide for drops.
@@ -640,9 +645,13 @@ const api = {
       buf.unmap(); buf.destroy(); tex.destroy();
       pictures[kind] = Array.from(out);
     }
+    // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
+    lastDrop = await plate.drop.read();
     plate.dispose();
     return cam.sources ? pictures : pictures.wall;
   },
+  /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
+  dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

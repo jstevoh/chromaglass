@@ -33,10 +33,10 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, thicknessViscosity } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
-import { dyeAbsorbances } from '../lib/dye';
+import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 
 /*
@@ -459,6 +459,32 @@ const AIR_SHEAR = 0.5;
 */
 export const ROCK_FALL = 12;
 /*
+  A drop of ink slumping under its own weight on a level plate (PLAN 18m,
+  wgsl/slump.ts has the physics).
+
+  DYE_LAYER is how deep a layer of the dyed liquid one unit of dye is, in
+  metres: the plate stores an amount of dye per cell, and the current's flux
+  goes as the cube of a depth. Set by volume, from the drop the audit and
+  `npm run slump` lay: the lab's soft disc 0.04 of the plate across in
+  radius at 1.4 units in its middle (8 mm on the 0.2 m plate) holds
+  1.4·πr²/2 = 1.41e-4 unit·m², and a drop from a dropper is 0.05 mL (twenty
+  to the millilitre), so a unit is 5e-8/1.41e-4 = 0.36 mm of the liquid. The
+  dye's cap of six units is then 2.1 mm, a third of the plate's 6 mm middle,
+  and a look's pale wash of a few tenths a film a tenth of a millimetre deep,
+  which (at the cube) barely moves: pools slump, washes and threads stay.
+*/
+export const DYE_LAYER = 3.55e-4;
+/*
+  The explicit slump's limits (wgsl/slump.ts, "The one shortcut"): a face
+  moves at most SLUMP_FACE of the difference across it in a substep (¼ is
+  the edge of stability on a square grid), in at most SLUMP_SUBSTEPS
+  substeps a step. Six passes of five reads each at 768² is the price.
+*/
+const SLUMP_FACE = 0.24;
+const SLUMP_SUBSTEPS = 6;
+/** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
+const DYE_CAP = 6;
+/*
   The clear liquid's density, kg/m³, to turn a Blow's stress into the speed
   it drives the liquid to (τh/2μ, μ = ρν; lib/breath.ts). The plate's
   liquids are water and oils, 0.8 to 1.26 of water's; the clear liquid is
@@ -811,6 +837,8 @@ export class WebGPUFluid {
     the dye needs to know it exists.
   */
   private oilDye: PingPong | null = null;
+  /** The slump's K Δt/Δx² a cell, once a step (PLAN 18m, wgsl/slump.ts); made on the first step that slumps. */
+  private slumpK: GPUTexture | null = null;
   /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
   private oilReach: PingPong | null = null;
   /** Whether the last step asked for Oil Bodies (the setting, and oil's tension to have oil at all). */
@@ -1166,6 +1194,9 @@ export class WebGPUFluid {
       [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
       [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
+      // The dye's slump (PLAN 18m), which runs on every thin step of a liquid thin enough to let it.
+      [`slumpRate:${R32}`, kernel('slumpRate', R32)],
+      [`slump:${dye}`, kernel('slump', dye)],
     ];
   }
 
@@ -2946,6 +2977,28 @@ export class WebGPUFluid {
       });
     }
 
+    /*
+      9b. The dye's weight on a level plate (PLAN 18m, wgsl/slump.ts): a pool
+      of ink sinks to the lower glass and runs out along it under the clear
+      liquid. Its own pass, apart from 'dye diffuse' (the blur 18h replaces
+      with the real rates), so the two can change apart.
+    */
+    const slump = thin ? this.slumpPlan(p) : null;
+    stage('slump', (pass) => {
+      // run() skips a pipeline that failed to build, and a swap after a skipped
+      // pass would hand the plate the other buffer's stale dye: no pass, no slump.
+      if (!this.pipeline('slumpRate', R32) || !this.pipeline('slump', this.dye.write.format)) return;
+      const rate = this.ensureSlump();
+      const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
+      this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
+        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), 0, 0, 0, 0]));
+      const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
+      for (let k = 0; k < slump!.substeps; k++) {
+        this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);
+        this.dye.swap();
+      }
+    }, !!slump);
+
     // 10. Decay: damping, the speed limit, evaporation, the cap, heat decay
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
@@ -3428,6 +3481,51 @@ export class WebGPUFluid {
   private ensureReach(): PingPong {
     if (!this.oilReach) this.oilReach = new PingPong(this.device, this.disposer, [this.N, this.N], R32, 'oil reach');
     return this.oilReach;
+  }
+
+  /** The slump's per-cell rate, made once (PLAN 18m). */
+  private ensureSlump(): GPUTexture {
+    if (!this.slumpK) {
+      this.slumpK = this.disposer.track(this.device.createTexture({
+        label: 'slump rate', size: [this.N, this.N], format: R32,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    }
+    return this.slumpK;
+  }
+
+  /**
+   * How the dye's slump runs this step (PLAN 18m, wgsl/slump.ts), or null when
+   * it would move nothing a person could see.
+   *
+   * `rate` is g′Δt/(3νΔx²) for one substep, in 1/m³: K Δt/Δx² is it times
+   * η³(1 − η/b)³ and the dye's strength, cell by cell, on the GPU. The
+   * substeps are as many as the deepest layer the plate can hold asks for
+   * (the dye's cap), up to SLUMP_SUBSTEPS. Not the plate's own thickest cell
+   * from the measure: that lands a frame or two late, whenever its readback
+   * does, so the substeps (and the plate) would differ between two renders of
+   * the same seed (`node scripts/render-app.mjs`: 221 of 240 frames differed
+   * from frame 20 when they were planned from it). On a thick liquid nothing moves (the rate goes as 1/ν: in
+   * glycerine a pool takes minutes to spread a millimetre), and the pass is
+   * skipped.
+   */
+  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number } | null {
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
+    // Stood up by θ (Gravity, 0 flat to 1 upright), only cos θ of g is through the glass.
+    const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
+    const gPrime = 9.81 * dyeDensityContrast(p.solutalBuoyancy) * Math.cos(upright * Math.PI / 2);
+    const dx = PLATE_METRES / this.N;
+    const perStep = gPrime * seconds / (3 * nu * dx * dx);
+    if (!(perStep > 0) || !Number.isFinite(perStep)) return null;
+    const eta = DYE_CAP * DYE_LAYER;
+    const b = REST_GAP * PLATE_METRES;
+    // η³(1 − η/b)³ rises to its peak at half the gap.
+    const e = Math.min(eta, b / 2);
+    const most = perStep * e * e * e * Math.pow(1 - e / b, 3);
+    if (most < 1e-4) return null;
+    const substeps = Math.max(1, Math.min(SLUMP_SUBSTEPS, Math.ceil(most / SLUMP_FACE)));
+    return { rate: perStep / substeps, substeps };
   }
 
   private ensureOilDye(): PingPong {
@@ -4394,10 +4492,11 @@ export class WebGPUFluid {
     const hand = hands ?? this.blankPhase();
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}`,
+    const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}`,
       this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film]);
     this.vel.swap();
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,

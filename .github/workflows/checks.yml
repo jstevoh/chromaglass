@@ -277,6 +277,15 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run pacing
 
+      # Slow Evolve (PLAN.md §10, step 8): one move at a time, each glided 30 to 90 s,
+      # about one a minute; the lean livelier after drops than in breakdowns,
+      # the palette turning only at a drop or a breakdown (or every few
+      # minutes with no music); a level shaken every half second leaning as
+      # the steady song does; and nothing that moves the whole picture moved.
+      - name: Slow Evolve
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run slowevolve
+
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
       # number while rendering and the browser's own clock live; the song's
       # track is the same bytes twice and hears the kicks at the same moments
@@ -318,6 +327,10 @@ jobs:
       - name: The popped bubbles
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run pops
+      # Bubbles and beads live by physics, not timers (PLAN.md §18i).
+      - name: Bubble and bead physics
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run bubblephysics
       # Blow's Amount from a breath that only ripples the colour to a gale (PLAN.md
       # QA-20): no air taken in below the speed the surface tears at, as much as
       # ever at the default, more past it, a rate a second; the straw as the breath.
@@ -351,6 +364,12 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # A setting from a menu, the phone or a saved look survives sanitizePatch
+      # (PLAN.md QA-29, 14n): every value every choice setting can take, every
+      # preset intact, malformed patches, gestures and MIDI maps dropped.
+      - name: Settings survive the sanitiser
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run sanitize
       # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
       # through a song's kicks, every shipped look and show stage slides the
       # whole picture 0% a frame, against up to 1% with the cover glass free
@@ -636,6 +655,11 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # A drop of ink on a level plate slumps out along the lower glass as a
+      # viscous gravity current, its front where Huppert's law puts it (PLAN 18m).
+      - name: A drop slumps under its own weight
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run slump
       # A press goes down round and lifts into fingers, and a plain spring lift does not.
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
@@ -805,6 +829,13 @@ jobs:
       - name: The Press on the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferropress
+      # The closeup's ferrofluid drop (PLAN 29a): its surface the sessile
+      # balance's for its contact angle and size, leaned toward a magnet with
+      # its volume kept, lit from the key's side, coloured by the dye over it;
+      # the plate at 1x the same to the byte. In the open shard, beside the Press.
+      - name: The ferrofluid drop in the closeup
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferrodrop
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye

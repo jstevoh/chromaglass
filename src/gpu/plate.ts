@@ -21,6 +21,8 @@ import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
 import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
+import { FerroDrop } from './ferroDrop';
+import { DROP_KERNELS } from './wgsl/ferroDrop';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -110,6 +112,8 @@ export class WebGPUPlate {
   private readonly uniformBuffer: GPUBuffer;
   private readonly packArgs: GPUBuffer;
   readonly pack: UniformPack;
+  /** The ferrofluid drop's surface in the closeup (PLAN §29a), packed into the lead plate's flow. */
+  readonly drop: FerroDrop;
 
   private layers: LayerTargets[] = [];
   private sources = new Map<string, Source>();
@@ -159,6 +163,7 @@ export class WebGPUPlate {
   constructor(private readonly device: GPUDevice, readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'plate');
     this.pack = new UniformPack(PLATE_LAYOUT);
+    this.drop = new FerroDrop(device, this.pipelines, this.disposer);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -286,6 +291,34 @@ export class WebGPUPlate {
     // ── Pack ────────────────────────────────────────────────────────
     const packPass = encoder.beginComputePass({ label: 'pack' });
     const groups = Math.ceil(grid / 8);
+    /*
+      The ferrofluid drop's surface (PLAN §29a), on the lead plate only (the
+      display draws the ferrofluid from its view alone), and only while the
+      closeup can see it. Packed into the flow's third channel by
+      packVelDrop in place of packVel.
+    */
+    const leadView = fields[0].view;
+    const dropWanted = !!leadView && leadView.width === grid
+      && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
+    const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets')) : null;
+    if (!dropWanted) this.drop.cool();
+    if (height) {
+      const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
+      if (pipe) {
+        packPass.setPipeline(pipe);
+        packPass.setBindGroup(0, this.device.createBindGroup({
+          layout: pipe.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: this.packArgs } },
+            { binding: 1, resource: fields[0].velForced.createView() },
+            { binding: 2, resource: height.createView() },
+            { binding: 3, resource: leadView!.createView() },
+            { binding: 4, resource: this.layers[0].vel.createView() },
+          ],
+        }));
+        packPass.dispatchWorkgroups(groups, groups);
+      }
+    }
     for (let i = 0; i < fields.length; i++) {
       const pipeDye = this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
       if (pipeDye) {
@@ -300,6 +333,7 @@ export class WebGPUPlate {
         }));
         packPass.dispatchWorkgroups(groups, groups);
       }
+      if (i === 0 && height) continue;
       const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
       if (pipeVel) {
         packPass.setPipeline(pipeVel);
