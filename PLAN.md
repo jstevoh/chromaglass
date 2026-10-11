@@ -213,7 +213,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
   it), then **18f** heat from the lamp (which unblocks 10.6
-  and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
+  and the slide plan's S2) and **18j** milk (in progress) (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
@@ -3795,7 +3795,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
-| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
+| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **In progress** |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
 
