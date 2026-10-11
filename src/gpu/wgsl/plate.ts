@@ -1166,56 +1166,73 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var viewSrc: texture_2d<u32>;
 
-fn deriveView(uv: vec2f) -> vec3f {
+fn viewProps(uv: vec2f) -> vec3f {
   let dims = textureDimensions(viewSrc);
   if (dims.x <= 1u) { return vec3f(0.0, 0.03, 0.0); }
-  let n = vec2f(dims);
-  let q = uv * n - 0.5;
-  let i = vec2i(floor(q));
-  let f = q - floor(q);
-  let d = vec2i(dims) - 1;
-  let q00 = textureLoad(viewSrc, clamp(i, vec2i(0), d), 0);
-  let q10 = textureLoad(viewSrc, clamp(i + vec2i(1, 0), vec2i(0), d), 0);
-  let q01 = textureLoad(viewSrc, clamp(i + vec2i(0, 1), vec2i(0), d), 0);
-  let q11 = textureLoad(viewSrc, clamp(i + vec2i(1, 1), vec2i(0), d), 0);
-  let v00 = vec3f(unpack2x16unorm(q00.x).y, unpack2x16unorm(q00.w).x * 0.06, f32(q00.w >> 24u) / 255.0);
-  let v10 = vec3f(unpack2x16unorm(q10.x).y, unpack2x16unorm(q10.w).x * 0.06, f32(q10.w >> 24u) / 255.0);
-  let v01 = vec3f(unpack2x16unorm(q01.x).y, unpack2x16unorm(q01.w).x * 0.06, f32(q01.w >> 24u) / 255.0);
-  let v11 = vec3f(unpack2x16unorm(q11.x).y, unpack2x16unorm(q11.w).x * 0.06, f32(q11.w >> 24u) / 255.0);
-  return mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);
+  let coord = clamp(vec2i(uv * vec2f(dims)), vec2i(0), vec2i(dims) - 1);
+  let q = textureLoad(viewSrc, coord, 0);
+  let oil = unpack2x16unorm(q.x).y;
+  let gap = unpack2x16unorm(q.w).x * 0.06;
+  let film = f32(q.w >> 24u) / 255.0;
+  return vec3f(oil, gap, film);
 }
 
-fn oplAt(uv: vec2f) -> f32 {
-  let d = decodeDensity(textureBicubic(src, uv).a);
-  let v = deriveView(uv);
-  let oil = v.x;
-  let gap = v.y;
-  let film = v.z;
-
-  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
+fn calcOpl(d: f32, v: vec3f, dyeGain: f32) -> f32 {
   let deltaDye = d * (0.015 * dyeGain);
-  let deltaOil = oil * 0.137;
-  let deltaFilm = film * 0.087;
-
+  let deltaOil = v.x * 0.137;
+  let deltaFilm = v.z * 0.087;
   let n = 1.333 + deltaDye + deltaOil + deltaFilm;
+  let gap = v.y;
   let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
-  let h = hScale * (1.0 - 0.5 * film);
+  let h = hScale * (1.0 - 0.5 * v.z);
   return n * h;
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
   let ts = 1.0 / U.logicalGrid;
-  let o00 = oplAt(in.uv + vec2f(-ts, -ts));
-  let o10 = oplAt(in.uv + vec2f( 0.0, -ts));
-  let o20 = oplAt(in.uv + vec2f( ts, -ts));
-  let o01 = oplAt(in.uv + vec2f(-ts,  0.0));
-  let oC  = oplAt(in.uv);
-  let o21 = oplAt(in.uv + vec2f( ts,  0.0));
-  let o02 = oplAt(in.uv + vec2f(-ts,  ts));
-  let o12 = oplAt(in.uv + vec2f( 0.0,  ts));
-  let o22 = oplAt(in.uv + vec2f( ts,  ts));
+  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
-  let g = sobelGrad(src, in.uv);
+  let d00 = decodeDensity(tex2(src, in.uv + vec2f(-ts, -ts)).a);
+  let d10 = decodeDensity(tex2(src, in.uv + vec2f( 0.0, -ts)).a);
+  let d20 = decodeDensity(tex2(src, in.uv + vec2f( ts, -ts)).a);
+  let d01 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  0.0)).a);
+  let dC  = decodeDensity(tex2(src, in.uv).a);
+  let d21 = decodeDensity(tex2(src, in.uv + vec2f( ts,  0.0)).a);
+  let d02 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  ts)).a);
+  let d12 = decodeDensity(tex2(src, in.uv + vec2f( 0.0,  ts)).a);
+  let d22 = decodeDensity(tex2(src, in.uv + vec2f( ts,  ts)).a);
+
+  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
+  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
+  let g = vec2f(gradX, gradY);
+
+  let vC = viewProps(in.uv);
+  let oC = calcOpl(dC, vC, dyeGain);
+
+  var o00: f32; var o10: f32; var o20: f32;
+  var o01: f32; var o21: f32;
+  var o02: f32; var o12: f32; var o22: f32;
+
+  if (vC.x > 0.001 || vC.z > 0.001) {
+    o00 = calcOpl(d00, viewProps(in.uv + vec2f(-ts, -ts)), dyeGain);
+    o10 = calcOpl(d10, viewProps(in.uv + vec2f( 0.0, -ts)), dyeGain);
+    o20 = calcOpl(d20, viewProps(in.uv + vec2f( ts, -ts)), dyeGain);
+    o01 = calcOpl(d01, viewProps(in.uv + vec2f(-ts,  0.0)), dyeGain);
+    o21 = calcOpl(d21, viewProps(in.uv + vec2f( ts,  0.0)), dyeGain);
+    o02 = calcOpl(d02, viewProps(in.uv + vec2f(-ts,  ts)), dyeGain);
+    o12 = calcOpl(d12, viewProps(in.uv + vec2f( 0.0,  ts)), dyeGain);
+    o22 = calcOpl(d22, viewProps(in.uv + vec2f( ts,  ts)), dyeGain);
+  } else {
+    o00 = calcOpl(d00, vC, dyeGain);
+    o10 = calcOpl(d10, vC, dyeGain);
+    o20 = calcOpl(d20, vC, dyeGain);
+    o01 = calcOpl(d01, vC, dyeGain);
+    o21 = calcOpl(d21, vC, dyeGain);
+    o02 = calcOpl(d02, vC, dyeGain);
+    o12 = calcOpl(d12, vC, dyeGain);
+    o22 = calcOpl(d22, vC, dyeGain);
+  }
+
   let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
 
   return vec4f(g, lap, oC);
@@ -2386,8 +2403,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
     } else {
       if (U.derivedOn > 0.5) {
-        let refract0 = refractionOptics(near0);
-        fluid0 = vec4f(fluid0.rgb * refract0.total, fluid0.a);
+        if (fluid0.a > 0.03) {
+          let refract0 = refractionOptics(near0);
+          fluid0 = vec4f(fluid0.rgb * refract0.total, fluid0.a);
+        }
       } else if (U.boundaryContrast > 0.005 && fluid0.a > 0.03) {
         let edge0 = boundaryEdge(layer0, fuv0);
         fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
@@ -2868,8 +2887,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         }
       } else {
         if (U.derivedOn > 0.5) {
-          let refract1 = refractionOptics(near1);
-          fluid1 = vec4f(fluid1.rgb * refract1.total, fluid1.a);
+          if (fluid1.a > 0.03) {
+            let refract1 = refractionOptics(near1);
+            fluid1 = vec4f(fluid1.rgb * refract1.total, fluid1.a);
+          }
         } else if (U.boundaryContrast > 0.005 && fluid1.a > 0.03) {
           let edge1 = boundaryEdge(layer1, fuv1);
           fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
