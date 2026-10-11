@@ -441,8 +441,22 @@ run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
 - **QA-23** The ferrofluid ring drifting with the band failed, then passed.
 - **QA-24** Startup missed its 2 s limit by 0.02 s: a near miss, so find whether
   startup grew or the Mac runner was slow, before touching the limit.
-- **QA-25** One of the ear's checks missed narrowly; which line, and by how much, is
-  still to be read from the run.
+- **QA-25** One of the ear's checks missed narrowly. Read from the runs: `npm run renders`'
+  "the ear is reading", whose bar is 45 frames in a three-second window (15 a second).
+  Every Mac run since 10-10 read 28–36 a second in both windows until #347 (the cover
+  glass's return); its own PR run and every deploy since read 15–19 in the second
+  window, on the bar. #345 (Preview), #339 and #350 alone read 28–36, so it was the
+  glass. In the lab (384², the app's rock and kicks at the default Plate Rock, 600
+  steps, SwiftShader): the glass took the same substeps as the tilt alone (2.1–3.2 a
+  step), so 27a-1's plan held, but a step cost 1,080 ms against the tilt's 740: its
+  drift shift (`driftShift`, one pass for every carried field) called `at` once per use,
+  twenty-one times a cell, each a load of the field and one of the gap (a `select`
+  reads both sides). **Fixed (this PR):** each of the seven cells it needs read once,
+  the gap only for the ferrofluid's volume, summed in the old order: on SwiftShader the field is
+  the same to the bit (the lab's dye after 120 steps of the glass, 8879.708350418165 both),
+  and a step with the glass costs 865 ms, the glass's own cost from 340 ms to 125.
+  Also, since #361 the glass only drifts with Frame Sway up (default 0), so
+  at the defaults the shift does not run at all.
 - **QA-26** The phone's clean-screen check is flaky; a fix is proposed in a comment on
   #339 (from the Wall reconnect thread), not yet pushed.
 - **QA-27** The phone's two-finger Drop (19h-2) is instrumented and waits for its next
@@ -5781,7 +5795,8 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     - **27a-4. Found: it was the cover glass** (see 27a-1). On #328's Mac run,
       `npm run renders` on the phone with the band drew 11 frames a second; it showed
       again on main's deploy of 10-10 on the laptop and the phone, and #340 took the
-      glass out. Fixed with 27a-1's return: the drift is a shift, not substeps.
+      glass out. Fixed with 27a-1's return: the drift is a shift, not substeps. The
+      shift itself then cost half again on a step (QA-25), fixed by reading each cell once.
     - **27a-5, open.** One carry still rides the glass's whole drift in fixed
       substeps of 0.45 of a cell and so falls behind it: the clear film's holes
       (`filmAdvect`, wgsl/film.ts), which a sliding glass should carry with the
