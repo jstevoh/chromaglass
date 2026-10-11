@@ -482,6 +482,8 @@ export const DYE_LAYER = 3.55e-4;
 */
 const SLUMP_FACE = 0.24;
 const SLUMP_SUBSTEPS = 6;
+/** The Froude number for a gravity current front in the slumping regime (Huppert and Simpson 1980). */
+const FROUDE_FRONT = 1.19;
 /** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
 const DYE_CAP = 6;
 /*
@@ -2991,8 +2993,8 @@ export class WebGPUFluid {
       const rate = this.ensureSlump();
       const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
       this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
-        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), 0, 0, 0, 0]));
-      const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
+        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
+      const args = this.arg('slump', [0, 0, 0, 0]);
       for (let k = 0; k < slump!.substeps; k++) {
         this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);
         this.dye.swap();
@@ -3509,7 +3511,7 @@ export class WebGPUFluid {
    * glycerine a pool takes minutes to spread a millimetre), and the pass is
    * skipped.
    */
-  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number } | null {
+  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number; inertRate: number } | null {
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
     // Stood up by θ (Gravity, 0 flat to 1 upright), only cos θ of g is through the glass.
@@ -3522,10 +3524,16 @@ export class WebGPUFluid {
     const b = REST_GAP * PLATE_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
-    const most = perStep * e * e * e * Math.pow(1 - e / b, 3);
+    const open = 1 - e / b;
+    const mostVisc = perStep * e * e * e * open * open * open;
+    // The inertial Froude current's maximum speed √(g′e(1 - e/b)) (Huppert and Simpson 1980).
+    const mostInert = FROUDE_FRONT * (seconds / dx) * Math.sqrt(gPrime * e * open);
+    const most = Math.min(mostVisc, mostInert);
     if (most < 1e-4) return null;
     const substeps = Math.max(1, Math.min(SLUMP_SUBSTEPS, Math.ceil(most / SLUMP_FACE)));
-    return { rate: perStep / substeps, substeps };
+    const dtSub = seconds / substeps;
+    const inertRate = FROUDE_FRONT * (dtSub / dx) * Math.sqrt(gPrime);
+    return { rate: perStep / substeps, substeps, inertRate };
   }
 
   private ensureOilDye(): PingPong {
