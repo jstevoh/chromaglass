@@ -122,6 +122,8 @@ export type RemoteMessage =
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
   | { type: 'mirrors'; count: number }
+  /** Relay → display: how many phones (controllers) are connected. */
+  | { type: 'controllers'; count: number }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**

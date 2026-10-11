@@ -69,7 +69,7 @@ export interface DeskProps {
   onOpenSettings: () => void;
   /** Gig's breadcrumb: the show and the look that is up. */
   showCrumb: ReactNode;
-  status: { audio: string; engine: string; sequence: string | null; phone: boolean; rec: string | null };
+  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null };
   onBlackout: () => void;
   blackout: boolean;
 

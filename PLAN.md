@@ -1121,6 +1121,7 @@ Open from Desk v2, each its own thread (the UI lane):
     differ by layout.
 - ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
   `npm run qr`, `npm run layout`).
+  - ~~**8f-1** The code whenever nothing is linked, and Link another while phones are~~ (shipped; check `npm run phonelink`).
 - ~~**8g** A panel in a window of its own, for a laptop and a monitor at a gig~~ (shipped;
   check `npm run layout`).
   - **8g-1** (S) The keys in a panel's window. ⌘1–3, ⌘P, Tab and the show's keys (Go,
