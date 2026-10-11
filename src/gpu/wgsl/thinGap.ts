@@ -360,7 +360,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag;
   let k0dt = A.a.x / (A.a.z * A.a.z) * A.a.y;
   let ferroShare = smoothstep(0.01, 0.2, share);
-  var ustar = u0 + (um - u0) * mix(k0dt * A.b.y, 1.0, ferroShare) + (uf.xy - um) * k0dt + A.b.zw * kdt;
+  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * k0dt + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
     layer, and the liquid it touches moves with it. Brinkman's penalised

@@ -6092,6 +6092,7 @@ the code's entry points, the checks to add and the scenes to match, in
   - **29c-1. The phaseCompress shortcut.** To keep the drop's edge sharp while moving,
     Weller's interface compression is used (a flux along the edge's normal at the flow's speed)
     to precisely counter the grid's numerical diffusion, standing in for an interface the grid cannot draw.
+  - **29c-2. The MAGNET_GAIN factor.** Tuned to 10.8e-4 to compensate for the restoration of accurate physical Darcy drag to body forces in `wgsl/thinGap.ts`.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

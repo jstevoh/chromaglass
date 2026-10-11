@@ -966,7 +966,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // None under a standing layer: the film has the magnet's pull in its own
   // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
   let aside = 1.0 - textureLoad(stand, p, 0).r;
-  let dropMask = smoothstep(0.01, 0.2, phs(p, n));
+  let dropMask = phs(p, n);
   var f = aside * dropMask * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }

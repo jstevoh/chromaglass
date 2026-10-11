@@ -525,7 +525,7 @@ export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
   hand dragging it, and a pool a sixth of the plate off arrives in about a
   second.
 */
-const MAGNET_GAIN = 6e-6;
+const MAGNET_GAIN = 10.8e-4;
 /*
   The most one step of the magnet may add to a cell, in plate widths a
   second: a guard, not a limit on the pull. At half a plate a second it
@@ -2207,7 +2207,7 @@ export class WebGPUFluid {
         const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read, this.ensureStand()],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
-            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
+            MAGNET_CAP * perStep, 0, 0]));
         this.vel.swap();
       });
     }
