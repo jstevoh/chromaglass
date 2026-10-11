@@ -232,6 +232,16 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run shape
 
+      # Following a known song played live (PLAN.md 28g): a map made from one
+      # recording, as the app makes it, followed through takes 15% slower and
+      # faster on other instruments, with the bridge left out, the last chorus
+      # twice, the solo twice as long and a jam the song never had: within a
+      # bar of the true place, the tempo within 5%, back within four bars of a
+      # change, and confidence falling in the jam. Arithmetic only, so `logic`.
+      - name: Following a song
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run songfollow
+
       # The kicks (PLAN.md §14d): the show's own band, its score rendered to
       # samples at 48 and 44.1 kHz and heard through the live ear, with the
       # plate at 60, 30 and 20 fps and frames late, and the ear reading at
