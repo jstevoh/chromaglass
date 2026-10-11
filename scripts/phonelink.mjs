@@ -37,8 +37,11 @@
  *      index.html as Firebase does) the panel still draws a code, of the page's
  *      own address with nothing after the slash: no key, no `?remote=1`. That
  *      page opens the show on the phone itself, which is the right page when
- *      there is no show server to drive; the panel's words still say how to
- *      get one.
+ *      there is no show server to drive; the panel's words say so, and how to
+ *      get a show server.
+ *   7. A press of Link another is forgotten when the count reaches 0: a phone
+ *      joining later finds the code put away again. And a socket that never
+ *      says hello is never a phone.
  *
  * Why a count from the relay and not the display's socket: the display's
  * socket is open whenever the relay is, phones or not (the mistake above). Why
@@ -163,15 +166,35 @@ try {
   const hosts = Array.isArray(info.hosts) ? info.hosts : [];
   check('the show server names at least one LAN address (the machine this runs on has one)', hosts.length > 0, hosts.join(' ') || 'none');
 
+  /*
+    A socket that connects and never says hello: the relay keeps it as
+    'unknown' and it must never count. Held open through everything below,
+    so a build that counted every socket on connection rather than those
+    whose hello the relay accepted would read one phone too many on every
+    line; the wrong-key stranger below is closed by the relay too quickly to
+    catch that by itself.
+  */
+  const silent = new WebSocket(`ws://localhost:${PORT}/remote-ws`);
+  await new Promise((resolve, reject) => { silent.onopen = resolve; silent.onerror = () => reject(new Error('the silent socket could not reach the relay')); });
+
   let p = await openDesk(`http://localhost:${PORT}`);
-  const relayUrl = hosts[0] ? `http://${hosts[0]}:${PORT}/?remote=1&key=${KEY}` : null;
+  const relayUrlOf = (host) => `http://${host}:${PORT}/?remote=1&key=${KEY}`;
+  const relayUrl = hosts[0] ? relayUrlOf(hosts[0]) : null;
   /** The address is the relay's: one of its LAN addresses, its port, the remote flag and the key. */
-  const isRelays = (url) => !!url && hosts.some(h => url === `http://${h}:${PORT}/?remote=1&key=${KEY}`);
+  const isRelays = (url) => !!url && hosts.some(h => url === relayUrlOf(h));
+  /*
+    The code is compared with the encoder's own for the address the check
+    expects, not for the address the panel printed: against the printed one
+    the line reads f(x) === f(x) and would pass a panel that printed and drew
+    the wrong address (the skeptic's control), so only the line above would
+    catch it. Anchored this way each line stands on its own.
+  */
+  const isRelaysCode = (d) => !!d && hosts.some(h => d === codeOf(relayUrlOf(h)));
   check('with no phone, the panel says "No phone linked." and shows the relay\'s address, with the key',
     p.status === 'No phone linked.' && isRelays(p.url),
     `status "${p.status}", address ${p.url ?? 'none'}${relayUrl && p.url !== relayUrl ? ` (expected ${relayUrl})` : ''}`);
-  check('and draws that address as a QR code, module for module the encoder\'s own',
-    !!p.d && !!p.url && p.d === codeOf(p.url), p.d ? `${p.d.length} chars of path` : 'no code drawn');
+  check('and draws that address as a QR code, module for module the encoder\'s own for the relay\'s address',
+    isRelaysCode(p.d), p.d ? `${p.d.length} chars of path` : 'no code drawn');
   const codeAtRest = p.d;
   check('with no phone there is no Link another button: the code is already up', p.more === null, p.more ?? 'none');
 
@@ -186,7 +209,7 @@ try {
   let took = await says('1 phone linked.');
   p = await panel();
   check(`a phone's hello is counted within ${NOTICE_MS / 1000} s: "1 phone linked."`, took >= 0, took >= 0 ? `${took} ms` : `still "${p.status}"`);
-  check('with a phone linked, the code, the address and Copy are put away', p.d === null && p.url === null && !p.copy,
+  check('with a phone linked, the code, the address and Copy are put away', p.there && p.status === '1 phone linked.' && p.d === null && p.url === null && !p.copy,
     `${p.d ? 'code' : 'no code'}, ${p.url ? 'address' : 'no address'}, ${p.copy ? 'Copy' : 'no Copy'}`);
   check('and a Link another button stands in their place', /link another/i.test(p.more ?? ''), p.more ?? 'no button');
   check('the footer counts the phone too', /1 phone linked/.test(p.footer), p.footer.trim().slice(0, 80));
@@ -197,7 +220,7 @@ try {
     p = await panel();
     check('Link another brings the same code and address back', !!p.d && p.d === codeAtRest && isRelays(p.url) && p.copy,
       p.d ? (p.d === codeAtRest ? 'the same code' : 'a different code') : 'no code');
-    check('and the button now offers to put it away', !!p.more && !/link another/i.test(p.more), p.more ?? 'no button');
+    check('and the button now reads "Put the code away"', /put the code away/i.test(p.more ?? ''), p.more ?? 'no button');
     await clickAt(page, 'phone-link-more');
     await settle(400);
     p = await panel();
@@ -226,6 +249,28 @@ try {
   check('the last phone leaving brings the code back with no button pressed', took >= 0 && !!p.d && p.d === codeAtRest && p.more === null,
     took >= 0 ? `${took} ms, ${p.d ? (p.d === codeAtRest ? 'the same code' : 'a different code') : 'no code'}${p.more ? `, button "${p.more}"` : ''}` : `still "${p.status}"`);
 
+  // The press is forgotten at 0: bring the code up by hand with a phone on,
+  // let it leave, and the next phone to join must find the code put away.
+  // A build that kept the toggle would show the code with a phone on.
+  const third = await phone();
+  await says('1 phone linked.');
+  p = await panel();
+  const hadButton = !!p.more;
+  if (hadButton) { await clickAt(page, 'phone-link-more'); await settle(400); }
+  check('Link another with a phone on brings the code up', hadButton && !!(await panel()).d, hadButton ? ((await panel()).d ? 'up' : 'no code') : 'no button to press');
+  await hangUp(third);
+  await says('No phone linked.');
+  const fourth = await phone();
+  took = await says('1 phone linked.');
+  p = await panel();
+  check('the next phone to join finds the code put away again: the press was forgotten at 0',
+    took >= 0 && p.d === null && /link another/i.test(p.more ?? ''), took >= 0 ? (p.d ? 'the code is still up' : 'away') : `still "${p.status}"`);
+  await hangUp(fourth);
+  await says('No phone linked.');
+  check('the silent socket never counted: back to "No phone linked." with it still open',
+    silent.readyState === WebSocket.OPEN && (await panel()).status === 'No phone linked.', `socket state ${silent.readyState}, status "${(await panel()).status}"`);
+  silent.close();
+
   stop(relay); relay = null;
 
   // ── On a static host, as the hosted site is ─────────────────────────
@@ -234,8 +279,9 @@ try {
   p = await openDesk(origin);
   check('with no show server behind the page, the panel still says "No phone linked."', p.status === 'No phone linked.', `status "${p.status}"`);
   check('and shows the page\'s own address, with no key and no remote flag after it', p.url === `${origin}/`, p.url ?? 'no address');
-  check('drawn as a QR code, module for module the encoder\'s own', !!p.d && !!p.url && p.d === codeOf(p.url), p.d ? `${p.d.length} chars of path` : 'no code drawn');
-  check('and its words still say how to get a show server', /show server/.test(p.words) && /npm run remote/.test(p.words), p.words.replace(/\s+/g, ' ').slice(0, 120));
+  check('drawn as a QR code, module for module the encoder\'s own for that address', !!p.d && p.d === codeOf(`${origin}/`), p.d ? `${p.d.length} chars of path` : 'no code drawn');
+  check('and its words say the code opens the show on the phone itself, and how to get a show server',
+    /on the phone itself/.test(p.words) && /show server/.test(p.words) && /npm run remote/.test(p.words), p.words.replace(/\s+/g, ' ').slice(0, 120));
   check('with no relay there is no Link another button', p.more === null, p.more ?? 'none');
 } finally {
   stop(relay);

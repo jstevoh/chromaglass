@@ -28,9 +28,9 @@ carries `handoff`, so push to it (`docs/handoff.md`, "Claiming").
 `scripts/phonelink.mjs`; Measure's browser part runs it after `remotemix`. Its header says
 what is asked and why. It starts the real show server, opens the desk in Chromium, joins
 phones as sockets, then serves `dist/` from `vite preview` as a static host. On `main` it
-reads 5 ok, 16 FAIL (what passes today: the relay's code drawn module for module, no button
-when none is wanted, and the words naming the show server; everything about the status
-line, the count, Link another and the static host's code is red). The target is every
+reads 4 ok, 20 FAIL (what passes today: the relay's code drawn module for module, and no
+button where none is wanted; everything about the status line, the count, Link another,
+the silent socket and the static host's code and words is red). The target is every
 line ok, with the script unchanged. If a line is wrong, say which and why under
 "Check changes:" in the PR body; do not loosen it.
 
