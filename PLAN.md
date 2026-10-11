@@ -311,6 +311,13 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   #347's cover glass dragged the whole picture 0.39% of the plate a frame on average
   at the default Plate Rock (0.72% at the peak, a quarter of the plate a second);
   it is seated by default now and slides 0 (`npm run framesway`).
+- ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were
+  silently dropped (2026-10-09 to 2026-10-11).~~ **Fixed** (#322's type-derived lists,
+  held by #367's check): the first `sanitizePatch` kept its own hand-written lists,
+  already behind the types, so Lighter and Exclusion on the blend menu, four of the
+  five LED modes, Off and Random for a new song and the mixer's Multiply and Key were
+  dropped by `updateSettings`, the phone's patches and a saved look. `npm run sanitize`
+  now walks every value of every choice setting (80 kept) and runs in CI's logic part.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
