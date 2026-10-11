@@ -83,7 +83,12 @@ number on a code line under `scripts/` (a stir strength, a seed, a duration, a r
 where a drop is poured, a `?stir=0.3` in a URL), and a SHOUTING_CASE number constant under
 `src/gpu/` (WGSL too), or anywhere in `src/` that a script names, that changes value, is
 renamed or goes (`ROCK_FALL`, which a check reads through the app). Comments, check names, log text and
-`toFixed` digits never count. Each change gets one list line under `Check changes:` with
+`toFixed` digits never count. So does a check turned to assert the opposite (a `>` that
+becomes `<`, a name that gains "does not" or "negligible" as its condition changes), and
+that one is read in every commit of the PR, not only against main: #357 turned two of its
+own new checks of dye streaking into checks that nothing streaks, which would pass with the
+feature deleted. Name a flip with the word "turned", "inverted" or "opposite" and why the
+feature now predicts no effect. Each change gets one list line under `Check changes:` with
 the file (or the constant), the old and the new number, and the reason, which is the
 measurement that says why it moves:
 

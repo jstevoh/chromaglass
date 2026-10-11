@@ -2719,13 +2719,26 @@ numbers and a reason of four words or more ("calibrated" alone is not one). The 
 decides nothing about the reason; it makes the change impossible to miss and impossible to
 describe as something else, and it relaxes nothing.
 
+Turned checks. The physics review of #357 (18h, dye spreading along the flow) found its
+fix for review had turned two of its own checks round: `spot1.aspect > spot0.aspect * 1.12`
+("dye streaks along the flow") became `< spot0.aspect * 1.05` ("does not smear"), and
+`dThick > dThin * 1.5` became `dThick < 0.005 && dThin < 0.005` ("negligible"). Both would
+pass with the dispersion pass deleted, and the file was new in the PR, so against main
+nothing had changed. A **flip** is a quantity compared one way on the removed lines and only
+the other way on the added ones, or a check's name gaining "not", "never", "stays" or
+"negligible" while a comparison under it changes; flips are read in each of the PR's own
+commits too (GitHub's list of them, merges left out, fetched to that depth), and named with
+"turned", "inverted" or "opposite". Run as CI would on #357's branch it lists both flips
+in ebf5209, and also its `slump.mjs` blur control 0.0002 → 8.5 and `DYE_ITERS` removed.
+Over the 50 merges and #362's commits it finds no flip.
+
 Why not a manifest of bars: about two hundred scripts write their bars inline, and moving
 them all into a table first would be a rewrite of every check, each a chance to change one
 by accident (19w-1 does it a file at a time). Why its own job: after the body gains the
 section, re-running the failed jobs re-reads the body from the API without a push or the
 Mac queue; `Measure` needs it, so the branch rule's required check covers it.
 
-Measured. `npm run checkguard`: 52 self-tests. #362's two real moves (the bar found as
+Measured. `npm run checkguard`: 59 self-tests, #357's two turned checks among them. #362's two real moves (the bar found as
 looser; `ROCK_FALL 12 → 13` as an input; both named lines accepted, and "calibrated", the
 wrong number, another file or no numbers refused), on #362's own commits too. The ways round
 it the check-skeptic's pass found in the first version, each now red: a bar's quantity

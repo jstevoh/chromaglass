@@ -33,7 +33,14 @@
 //             src/ if a script names it (ROCK_FALL): a check that reads the
 //             app's own constant moves with it, which is how #362 moved one;
 //   removed   a file under scripts/ that held `check(` calls now holds fewer,
-//             or is gone.
+//             or is gone;
+//   flip      a check turned to assert the opposite: a quantity compared with
+//             `>` on the removed lines and only with `<` on the added ones,
+//             or a check's name that gains "not", "never", "stays" or
+//             "negligible" while a comparison under it changes. These are
+//             read in each of the PR's own commits as well as against its
+//             base, because a check brought in new and turned round in a
+//             later commit (#357) is no change at all against the base.
 //
 // Each has to be named in the pull request's body, under a line that reads
 // "Check changes:", one list line per change, with the file or the constant,
@@ -281,7 +288,7 @@ const CONSTANT = /^\s*(?:export\s+)?const\s+([A-Z][A-Z0-9_]*[A-Z0-9])\s*(?::[^=]
   everyone to paste lines without reading them. `scriptsText` is every
   script's text, read once.
 */
-const watchedConstant = (file, name, scriptsText) => /^src\/gpu\//.test(file) || new RegExp(`\\b${name}\\b`).test(scriptsText);
+const watchedConstant = (file, name, scriptsText) => /^src\/gpu\//.test(file) || new RegExp(`\\b${name}\\b`).test(typeof scriptsText === 'function' ? scriptsText() : scriptsText);
 
 /*
   The lines of a shader file as code, for its constants: the WGSL lives in
@@ -366,7 +373,8 @@ export function changesIn(file, oldText, newText, hunks, scriptsText = '') {
           const ops = (x) => (clean(x).match(/<=|>=|<|>/g) ?? []);
           const o = ops(rc); const w = ops(after[match]);
           const k = o.findIndex((x, i) => x !== w[i]);
-          found.push({ file, line: match, kind: 'bar', what: `comparison ${o[k]} → ${w[k]}`, from: o[k], to: w[k], words: [base], need: [], ops: [o[k], w[k]], code: clean(after[match]) });
+          const turned = o[k][0] !== w[k][0];
+          found.push({ file, line: match, kind: turned ? 'flip' : 'bar', what: `comparison ${o[k]} → ${w[k]}${turned ? ' (the check now asserts the opposite)' : ''}`, from: o[k], to: w[k], words: [base], need: [], ops: [o[k], w[k]], code: clean(after[match]) });
           continue;
         }
         if (!present.has(norm(rc))) loose.push(r);   // rewritten or deleted, not moved
@@ -408,6 +416,47 @@ export function changesIn(file, oldText, newText, hunks, scriptsText = '') {
         const k = left.indexOf(value(x.text));
         if (k >= 0) { left.splice(k, 1); continue; }
         found.push({ file, line: r, kind: 'input', what: `${x.text} on a rewritten or deleted line (was line ${r})`, from: x.text, to: '', words: [base], need: [x.text], code: clean(rc), old: true });
+      }
+    }
+
+    // A check turned to assert the opposite (#357). Its fix for review took
+    // two checks that asserted 18h's streaking, `spot1.aspect > spot0.aspect
+    // * 1.12` ("dye streaks along the flow") and `dThick > dThin * 1.5`
+    // ("Taylor dispersion scales with gap thickness"), and made them assert
+    // that nothing happens: `<` instead of `>`, "does not smear", "is
+    // negligible". Both would then pass with the dispersion pass deleted. No
+    // bar's number had to move for that, so it is caught by its direction:
+    // a quantity compared one way on the removed lines and only the other
+    // way on the added ones, or a check's name that gains a "not", "no",
+    // "never", "stays" or "negligible" while a comparison under it changes.
+    const sides = (ls, src) => {
+      const m = new Map();
+      for (const l of ls) {
+        for (const x of clean(src[l] ?? '').matchAll(/([\w$.\]]+)\s*(<=|>=|(?<![=<>-])<(?![<=])|(?<![=>-])>(?![>=]))/g)) {
+          if (/^[\d.]/.test(x[1])) continue;
+          if (!m.has(x[1])) m.set(x[1], new Set());
+          m.get(x[1]).add(x[2][0]);
+        }
+      }
+      return m;
+    };
+    const was = sides(h.removed, before); const now = sides(h.added, after);
+    const flagged = found.filter((f) => f.kind === 'flip').map((f) => f.code).join(' ');
+    for (const [k, dirs] of was) {
+      const nw = now.get(k);
+      if (!nw || dirs.size !== 1 || nw.size !== 1 || [...dirs][0] === [...nw][0] || flagged.includes(k)) continue;
+      const a = h.added.find((l) => sides([l], after).has(k));
+      found.push({ file, line: a, kind: 'flip', what: `${k} compared with ${[...dirs][0]} before and ${[...nw][0]} now (the check asserts the opposite)`, from: [...dirs][0], to: [...nw][0], words: [base], need: [], flipWord: true, code: clean(after[a] ?? '') });
+    }
+    if (oldText != null && newText != null && h.removed.some((r) => /<|>/.test(clean(before[r] ?? '').replace(/=>/g, '')))) {
+      const rawB = oldText.split('\n'); const rawA = newText.split('\n');
+      const strs = (ls, raw) => ls.map((l) => raw[l - 1] ?? '').join('\n').match(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g) ?? [];
+      const NEG = /\b(not|no|never|nothing|none|stays?|negligible|unchanged|without|doesn't|isn't|won't)\b/gi;
+      const negs = (ss) => ss.reduce((n, x) => n + (x.match(NEG) ?? []).length, 0);
+      const rs = strs(h.removed, rawB); const as = strs(h.added, rawA);
+      if (rs.length && negs(as) > negs(rs) && !found.some((f) => f.kind === 'flip' && h.added.includes(f.line))) {
+        found.push({ file, line: h.added[0], kind: 'flip', what: `a check's name turned to expect nothing (${as.find((x) => NEG.test(x))?.slice(0, 70) ?? ''})`, from: '', to: '', words: [base], need: [], flipWord: true, code: clean(after[h.added.find((l) => /<|>/.test(clean(after[l] ?? '').replace(/=>/g, ''))) ?? h.added[0]] ?? '') });
+        NEG.lastIndex = 0;
       }
     }
   }
@@ -489,6 +538,7 @@ export function names(line, change) {
   for (const t of change.need) if (!vals.some((v) => Math.abs(v - value(t)) <= 1e-12 * Math.max(1, Math.abs(v)))) return false;
   if (change.ops && !(line.includes(change.ops[0]) && line.includes(change.ops[1]))) return false;
   if (change.removed && !/\b(remov|delet|drop)/i.test(line)) return false;
+  if (change.flipWord && !/(flip|invert|revers|opposite|negat|turned|no effect|nothing)/i.test(line)) return false;
   // The reason: what is left once the place, paths, numbers and arrows are gone.
   const rest = line
     .replace(/\S*[/.]\S*\.(mjs|js|ts|tsx)(:\d+)?/g, ' ')
@@ -509,12 +559,35 @@ const show = (rev, file) => git('show', `${rev}:${file}`);
 export function changesBetween(from, to) {
   const diff = git('diff', '--no-renames', '-U0', from, to, '--', 'scripts', 'src');
   const out = [];
-  const scriptsText = git('ls-tree', '-r', '--name-only', to, 'scripts').trim().split('\n')
-    .filter((f) => CHECK_FILE.test(f)).map((f) => show(to, f)).join('\n');
+  // Every script's text, read only when a constant outside src/gpu/ moved.
+  let text = null;
+  const scriptsText = () => (text ??= git('ls-tree', '-r', '--name-only', to, 'scripts').trim().split('\n')
+    .filter((f) => CHECK_FILE.test(f)).map((f) => show(to, f)).join('\n'));
   for (const f of parseDiff(diff).values()) {
     if (!CHECK_FILE.test(f.file) && !SRC_FILE.test(f.file)) continue;
     if (f.created) continue;   // a new file moves no bar that was there
     out.push(...changesIn(f.file, show(from, f.file), f.deleted ? null : show(to, f.file), f.hunks, scriptsText));
+  }
+  return out;
+}
+
+/*
+  The flips in each of the pull request's own commits. A check can be turned
+  round and the PR still add nothing against its base: #357 brought
+  dispersion.mjs in new, then turned two of its checks round in a later
+  commit, so against main it is a new file with no bar that was there before.
+  The commits are where the turn shows, so each is read against its parent,
+  for flips only: a bar tuned while a new check is written is ordinary, a
+  check made to assert the opposite of what it asserted is not. A flip later
+  turned back is still listed; name it as such.
+*/
+export function flipsIn(shas) {
+  const out = [];
+  for (const sha of shas) {
+    for (const c of changesBetween(`${sha}^`, sha)) {
+      if (c.kind !== 'flip') continue;
+      out.push({ ...c, what: `${c.what}, in commit ${sha.slice(0, 7)}` });
+    }
   }
   return out;
 }
@@ -537,23 +610,39 @@ function report(changes, body) {
     for (const c of changes) {
       if (lines.some((l) => names(l, c))) continue;
       const where = c.line ? `${c.file}:${c.line}` : c.file;
-      const what = c.removed ? `${c.what}` : c.ops ? `${c.ops[0]} → ${c.ops[1]}` : c.to ? `${c.from} → ${c.to}` : `${c.from} removed`;
+      const what = c.removed ? `${c.what}` : c.flipWord ? 'turned to assert the opposite' : c.ops ? `${c.ops[0]} → ${c.ops[1]}` : c.to ? `${c.from} → ${c.to}` : `${c.from} removed`;
       console.log(`- ${c.words[0] === c.file.split('/').pop() ? where : `${c.words[0]} (${where})`} ${what.trim()}: <why, and what it measured>`);
     }
   } else if (changes.length) console.log(`\nok   every change to a check's bar or input is named`);
   return unnamed;
 }
 
+async function api(path) {
+  const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'chromaglass-checkguard' };
+  if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
+  const res = await fetch(`https://api.github.com/repos/${repo}/${path}`, { headers, signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// The pull request's own commits (GitHub's list: in the head, not in the
+// base), with how many there are counting merges, for the fetch's depth.
+async function prCommits(pr) {
+  const all = [];
+  for (let page = 1; page <= 3; page++) {
+    const got = await api(`pulls/${pr}/commits?per_page=100&page=${page}`);
+    all.push(...got);
+    if (got.length < 100) break;
+  }
+  return { total: all.length, shas: all.filter((c) => (c.parents ?? []).length === 1).map((c) => c.sha) };
+}
+
 async function liveBody() {
   const pr = process.env.PR_NUMBER;
   if (!pr) return null;
-  const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
   try {
-    const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'chromaglass-checkguard' };
-    if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
-    const res = await fetch(`https://api.github.com/repos/${repo}/pulls/${pr}`, { headers, signal: AbortSignal.timeout(20_000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()).body ?? '';
+    return (await api(`pulls/${pr}`)).body ?? '';
   } catch (e) {
     console.log(`(the pull request's body could not be read live, ${e.message}; using the one the run started with)`);
     return null;
@@ -612,6 +701,35 @@ function selftest() {
   t(run('src/gpu/fluid.ts', fluidA, fluidA.replace('name = 3', 'name = 4').replace('A = 1', 'A = 2')).length === 0, 'a camelCase constant or a one-letter one in src/ is not watched');
   t(run('src/gpu/fluid.ts', fluidA, fluidA.replace('the fall rate', 'the fall rate, 13 by one estimate')).length === 0, 'nor a comment next to ROCK_FALL');
   t(run('src/gpu/fluid.ts', fluidA, fluidA.replace('ROCK_FALL = 12;', 'ROCK_FALL = 12; // per unit dye')).length === 0, 'nor a comment added on its line');
+
+  // #357, ebf5209: two checks of 18h's streaking turned to assert that
+  // nothing happens, as they were written.
+  const dispA = [
+    'check(',
+    '    \'dye streaks along the flow where it moves\',',
+    '    spot1.aspect > spot0.aspect * 1.12,',
+    '    `aspect ${spot1.aspect.toFixed(2)}`);',
+    'check(',
+    '    \'Taylor dispersion scales with gap thickness (h²)\',',
+    '    dThick > dThin * 1.5,',
+    '    `longitudinal stretch +${dThick.toFixed(4)} in open gap vs +${dThin.toFixed(4)} in tight gap (ratio ${(dThick / dThin).toFixed(2)}x)`',
+    ');',
+  ].join('\n');
+  const dispB = dispA
+    .replace('\'dye streaks along the flow where it moves\'', '\'dye does not smear irreversibly along the flow (pre-asymptotic shear is reversible)\'')
+    .replace('spot1.aspect > spot0.aspect * 1.12', 'spot1.aspect < spot0.aspect * 1.05')
+    .replace('\'Taylor dispersion scales with gap thickness (h²)\'', '\'Taylor dispersion is negligible on show timescales (t ≪ h²/Dm)\'')
+    .replace('dThick > dThin * 1.5,\n    `longitudinal stretch +${dThick.toFixed(4)} in open gap vs +${dThin.toFixed(4)} in tight gap (ratio ${(dThick / dThin).toFixed(2)}x)`', 'dThick < 0.005 && dThin < 0.005,\n    `longitudinal stretch +${dThick.toFixed(4)} in open gap vs +${dThin.toFixed(4)} in tight gap`');
+  c = run('scripts/dispersion.mjs', dispA, dispB).filter((x) => x.kind === 'flip');
+  t(c.length === 2 && c[0].what.startsWith('comparison > → <') && /dThick/.test(c[1].what), '#357\'s two streaking checks turned to assert nothing happens are two flips', c.map((x) => x.what).join('; '));
+  t(names('scripts/dispersion.mjs dThick turned round: Taylor dispersion is negligible at show timescales, measured below 0.005', c[1]), 'and a flip named as turned, with a reason, passes');
+  t(!names('scripts/dispersion.mjs: Taylor dispersion is negligible at show timescales, measured below 0.005', c[1]), 'but not without saying it was turned');
+  c = run('scripts/x.mjs', 'check(\'the pool moves\', moved > 0.3, \'\');', 'check(\'the pool stays\', moved < 2 || calm, \'\');').filter((x) => x.kind === 'flip');
+  t(c.length === 1, 'a check rewritten to expect no effect is a flip', c.map((x) => x.what).join('; '));
+  c = run('scripts/x.mjs', 'check(\'the pool moves\', moved > 0.3, \'\');', 'check(\'the pool does not move far\', moved > 0.3 && moved <= 9, \'\');').filter((x) => x.kind === 'flip');
+  t(c.length === 1 && /expect nothing/.test(c[0].what), 'and so is a name that gains a "not" while its condition changes', c.map((x) => x.what).join('; '));
+  t(run('scripts/x.mjs', 'check(\'the pool moves\', moved > 0.3, \'\');', 'check(\'the pool does not stay put\', moved > 0.3, \'\');').length === 0, 'a name reworded with a "not" over the same condition is not');
+  t(run('scripts/x.mjs', 'const ok = a > b && c < d;', 'const ok = c < d && a > b && e > 0;').filter((x) => x.kind === 'flip').length === 0, 'nor comparisons reordered, each the same way round');
 
   // What is not a change.
   const s = [
@@ -714,7 +832,18 @@ if (!main) {
     process.exit(1);
   }
   const body = (await liveBody()) ?? process.env.PR_BODY ?? '';
-  process.exit(report(changesBetween('HEAD^1', 'HEAD'), body) ? 1 : 0);
+  const net = changesBetween('HEAD^1', 'HEAD');
+  let flips;
+  try {
+    const { total, shas } = await prCommits(process.env.PR_NUMBER);
+    git('fetch', '--no-tags', '--quiet', `--depth=${total + 2}`, 'origin', `+refs/pull/${process.env.PR_NUMBER}/head:refs/remotes/pr/head`);
+    flips = flipsIn(shas);
+  } catch (e) {
+    console.log(`FAIL the pull request's own commits could not be read for turned checks (${e.message}); re-run the failed jobs`);
+    process.exit(1);
+  }
+  const seen = new Set(net.map((c) => `${c.file}|${c.code}`));
+  process.exit(report([...net, ...flips.filter((f) => !seen.has(`${f.file}|${f.code}`))], body) ? 1 : 0);
 } else if (arg('--history')) {
   const n = Number(arg('--history'));
   const commits = git('log', '--first-parent', '--format=%H %s', `-${n}`, arg('--ref') ?? 'origin/main').trim().split('\n');
@@ -731,7 +860,10 @@ if (!main) {
 } else if (arg('--base')) {
   const base = git('merge-base', arg('--base'), 'HEAD').trim();
   const body = arg('--body-file') ? fs.readFileSync(arg('--body-file'), 'utf8') : '';
-  process.exit(report(changesBetween(base, 'HEAD'), body) ? 1 : 0);
+  const net = changesBetween(base, 'HEAD');
+  const shas = git('rev-list', '--no-merges', '--reverse', `${base}..HEAD`).trim().split('\n').filter(Boolean);
+  const seen = new Set(net.map((c) => `${c.file}|${c.code}`));
+  process.exit(report([...net, ...flipsIn(shas).filter((f) => !seen.has(`${f.file}|${f.code}`))], body) ? 1 : 0);
 } else {
   const failed = selftest();
   console.log(failed ? `\n${failed} FAILED` : '\nall ok');

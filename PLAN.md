@@ -4992,7 +4992,7 @@ commit. *Size:* S.
   total read every second. Physics lane.
 
 ### 19w. A moved bar names itself
-**Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19w.
+**Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a check to assert the opposite (also commit by commit, #357's case), without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19w.
 
 - **19w-1. Bars declared where the guard can read them.** The guard reads code as written
   because every check writes its bar inline. The checks the physics lane edits most
