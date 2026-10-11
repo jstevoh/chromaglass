@@ -1735,7 +1735,15 @@ the Mac `renders` also holds that at least half the frames during the sweep draw
 React has not rendered yet, and that none does once the fader is let go. The same PR
 treats a ride as a hand's write for Evolve (14t): a glide on the dial is dropped at the
 first message, the drift's anchor moves to where the fader put it, and the drift skips a
-dial a fader holds that React has not rendered yet.
+dial a fader holds that React has not rendered yet. Found in review and fixed in the
+same PR: a receiver that draws its own plate (a Chromecast, a mirror) is sent the state
+with the ride laid over it, and a ride asks the cast's throttle for a send, so it still
+hears a fader at the cast's 15 a second rather than React's 10; a preset, a Go or a desk
+slider landing within the tenth of a second before a flush hands React the ride first
+(`flushRide`), so the newer write wins as it did when the window was a frame; a look fade
+starts from where the fader has the plate, not where React last heard it; and the MIDI
+panel's activity light renders itself out 400 ms after the last message, which the App's
+renders used to do for it.
 
 ### 14v. The show takes a long time to load on the web
 

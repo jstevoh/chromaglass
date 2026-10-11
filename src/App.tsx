@@ -1605,6 +1605,33 @@ export default function App() {
   const driftGlide = useRef(new Map<string, { from: number; to: number; at: number }>());
 
   /*
+    A MIDI fader's ride (lib/ride.ts): `rideSetting` below says how it reaches
+    the plate and React. Declared here because the other ways into the
+    settings hand React the ride first (`flushRide`). React hears a ride
+    every RIDE_VIEW_MS, so a preset, a Go or a desk slider landing in that
+    tenth of a second would otherwise be written over by the fader's older
+    move when it flushed; flushed first, the newer write lands last and wins,
+    and the ride sees it as somebody else's and lets go, as it always has.
+  */
+  const ride = useRef(new SettingRide()).current;
+  const rideFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushRide = () => {
+    if (rideFlush.current) { clearTimeout(rideFlush.current); rideFlush.current = null; }
+    const patch = ride.drain();
+    if (!patch) return;
+    // Where Evolve's drift wanders from: a ride is a hand's write (PLAN.md 14t).
+    driftAnchor.current = { ...driftAnchor.current, ...patch };
+    setSettings(prev => ({ ...prev, ...patch }));
+    /*
+      Here and not on every message: setting a state to what it already is
+      is not always free, and per message it rendered the App another ten
+      times a second while the fader moved (`npm run renders`, 20 a second
+      for the desk's 9 before, the fader's lines).
+    */
+    setDocDirty(true);
+  };
+
+  /*
     The Mixer's take buttons (lib/mixFade.ts), declared here because both of
     the hand's ways into the settings, just below, tell them when a hand has
     taken a row's level: the hand wins, and the fade stops where it was put.
@@ -1639,6 +1666,7 @@ export default function App() {
   const updateSettings = (patch: Partial<VisualizerSettings>) => {
     const clean = sanitizePatch(patch);
     if (Object.keys(clean).length === 0) return;
+    flushRide();
     /*
       Hold stays where the closeup is (QA-12, reported by the owner as the
       picture jumping when Hold was pressed): see holdWhereItIs. Here rather
@@ -1670,6 +1698,7 @@ export default function App() {
   const removeLayer = backLook ? undefined : () => updateSettings({ layerCount: 1 });
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
+    flushRide();
     lookTakesLevels();
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
     // (the microphone's calibration, the dimmer, the logo, the grid) stays.
@@ -2078,30 +2107,19 @@ export default function App() {
     and the next drift pulled the dial back into the window round the look as
     laid.
   */
-  const ride = useRef(new SettingRide()).current;
   ride.observe(settings as unknown as Record<string, unknown>);
-  const rideFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Tells the cast's throttle a ride moved (`castNudge` below): a receiver hears it at the cast's own rate. */
+  const castNudgeRef = useRef<() => void>(() => {});
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
     const k = String(key);
     ride.write(k, value);
     driftGlide.current.delete(k);
     laterWrites.mark([k], showNow());
     if (rowFades.handOn([k])) setRowFading(rowFades.running());
+    castNudgeRef.current();
     if (rideFlush.current) return;
-    rideFlush.current = setTimeout(() => {
-      rideFlush.current = null;
-      const patch = ride.drain();
-      if (!patch) return;
-      driftAnchor.current = { ...driftAnchor.current, ...patch };
-      setSettings(prev => ({ ...prev, ...patch }));
-      /*
-        Here and not on every message: setting a state to what it already is
-        is not always free, and per message it rendered the App another ten
-        times a second while the fader moved (`npm run renders`, 20 a second
-        for the desk's 9 before, the fader's lines).
-      */
-      setDocDirty(true);
-    }, RIDE_VIEW_MS);
+    rideFlush.current = setTimeout(() => { rideFlush.current = null; flushRide(); }, RIDE_VIEW_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ride]);
   useEffect(() => () => { if (rideFlush.current) clearTimeout(rideFlush.current); }, []);
 
@@ -2649,7 +2667,9 @@ export default function App() {
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
-    const from = settingsRef.current;
+    flushRide();
+    // From where a fader has the plate now, not where React last heard it.
+    const from = ride.lay(settingsRef.current as unknown as Record<string, unknown>, () => true, rideSlot()) as unknown as VisualizerSettings;
     const step = lookFadeStep(back);
     if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
@@ -3195,7 +3215,15 @@ export default function App() {
   const castSentCountRef = useRef(0);
   const sendCastState = useCallback((withMark = false) => {
     if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
-    const state = castStateRef.current;
+    /*
+      With a fader's moves React has not rendered yet (PLAN.md §14f): React
+      hears a ride ten times a second, and a receiver that drew only that
+      would take a ride to black as the staircase CAST_STATE_MS is there to
+      prevent. The wall's view of the ride, since a receiver draws the wall.
+    */
+    const told = castStateRef.current;
+    const laid = ridePlate.wall(told.settings);
+    const state = laid === told.settings ? told : { ...told, settings: laid };
     const send = castSendRef.current;
     castSentAtRef.current = performance.now();
     castSentTriggersRef.current = castTriggers(state);
@@ -3244,6 +3272,17 @@ export default function App() {
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
   castReadyRef.current = () => sendCastState(true);
+  /*
+    A ride between React's renders asks for a send the way a change of state
+    does (the throttle just below), so a receiver hears a fader at the cast's
+    own rate rather than at React's.
+  */
+  castNudgeRef.current = () => {
+    if (!castLinkRef.current || castTrailRef.current) return;
+    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
+    if (wait <= 0) { sendCastState(false); return; }
+    castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
+  };
   const castLinkRef = useRef('');
   useEffect(() => {
     if (!isCasting && mirrorCount === 0) {

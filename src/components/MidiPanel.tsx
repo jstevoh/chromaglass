@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
 import {
@@ -132,6 +132,17 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
 export function MidiPanel({ midi, presets, activity, onActivity, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
   const lastEvent = useMidiLastEvent(midi);
+  /*
+    The activity light goes out 400 ms after the last message, and the panel
+    has to render then to show it: the App used to render it there, many
+    times a second while anything moved, and no longer does (PLAN.md §14f).
+  */
+  const [, lightOut] = useState(0);
+  useEffect(() => {
+    if (!lastEvent) return;
+    const t = setTimeout(() => lightOut(n => n + 1), Math.max(0, lastEvent.at + 420 - performance.now()));
+    return () => clearTimeout(t);
+  }, [lastEvent]);
   // The controller drawn to scale: the fastest way to make a map, and the
   // cheat sheet to read during a show. Falls back to the first surface we
   // know so a map can be built before the hardware arrives.

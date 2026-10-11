@@ -5049,8 +5049,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * React state) would hear a new one on about one frame in six.
    */
   const hearingRef = useRef({ frames: 0, fresh: 0, ownFrame: 0, last: null as AudioData | null });
-  /** For `npm run renders`: live frames, and how many drew a fader's move React had not rendered yet (PLAN.md §14f). */
-  const ridingRef = useRef({ frames: 0, laid: 0 });
+  /**
+   * For `npm run renders`: live frames, how many drew a fader's move React had
+   * not rendered yet, and what the last one drew (PLAN.md §14f). `drawn` is
+   * the object itself, not a copy, so keeping it costs nothing: the check
+   * reads a value out of it on every frame, so it can tell a plate that
+   * really moved with the fader from one handed a copy that never changed.
+   */
+  const ridingRef = useRef({ frames: 0, laid: 0, drawn: settings as VisualizerSettings });
   /** The animation frame the plate is drawing (its timestamp), null for a frame the wall asked for. */
   const plateTsRef = useRef<number | null>(null);
   /** What React last rendered, before a fader's ride is laid over it (`ride`). */
@@ -6466,6 +6472,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const lay = rideRef.current;
         settingsRef.current = lay ? lay(settingsPropRef.current) : settingsPropRef.current;
         ridingRef.current.frames++;
+        ridingRef.current.drawn = settingsRef.current;
         if (settingsRef.current !== settingsPropRef.current) ridingRef.current.laid++;
       }
       // ── The room, on the settings ─────────────────────────────
@@ -9843,7 +9850,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         heard: audioDataRef.current ? { volume: audioDataRef.current.volume, energy: audioDataRef.current.energy } : null,
         /** Live frames drawn, how many read a reading the frame before had not, and how many a reading taken on that same frame (§14f). */
         hearing: { frames: hearingRef.current.frames, fresh: hearingRef.current.fresh, ownFrame: hearingRef.current.ownFrame },
-        riding: { ...ridingRef.current },
+        riding: { frames: ridingRef.current.frames, laid: ridingRef.current.laid },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -10011,6 +10018,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       });
     if (!isDraftRef.current && new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = debugState;
+      // The ride's counters themselves, read on every frame by `npm run renders`:
+      // `chromaglassDebug()` builds its whole report, too much to call per frame.
+      (window as unknown as { __cgRiding?: unknown }).__cgRiding = ridingRef.current;
       // Turn the plates to given angles (radians), for scripts/mirror.mjs to
       // reproduce a report's plate exactly.
       (window as unknown as { chromaglassRotation?: unknown }).chromaglassRotation = (angles: number[]) => {

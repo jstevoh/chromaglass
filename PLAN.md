@@ -2760,12 +2760,7 @@ fewer), and stamp the reading's time against the frame's.
 
 Still open here: the reading's two byte arrays are still new each reading (about 60 KB
 a second), not reused: a listener may hold an older reading, so reusing them needs the
-readers checked first. And a receiver that draws its own plate (a Chromecast, a second
-machine) is sent the state at most fifteen times a second and now hears a fader at the
-desk's ten (`castState` follows React): the HDMI wall mirrors the show's own canvas and
-is not affected. If a fader ride to black reads as steps on such a receiver, the cast's
-trailing send wants the ride laid over it as the plate has (*Found:* building the MIDI
-half, 2026-10-11; inferred from the code, not seen).
+readers checked first.
 
 ### 14g. A knocked cable: the audio interface and the projector do not come back
 

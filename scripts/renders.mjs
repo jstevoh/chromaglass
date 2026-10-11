@@ -51,9 +51,10 @@
  *                   desk frozen on one value renders nothing and passes a
  *                   ceiling), the App renders for each of those plus the
  *                   Perform desk's clock and no more, the fader's last value
- *                   is where the setting lands, and, where a plate draws, at
- *                   least half its frames draw a move React has not rendered
- *                   yet. That last one is the feature: a fix that stopped the
+ *                   is where the setting lands, and, where a plate draws, the
+ *                   Dimmer the plate draws changes at least twice as often as
+ *                   the desk's (read by value on every frame, so a stale copy
+ *                   cannot pass). That last one is the feature: a fix that stopped the
  *                   renders by feeding the plate React's ten-a-second state
  *                   would pass every count and step the picture. And a
  *                   second after the fader stops, no frame lays a ride at all
@@ -124,7 +125,7 @@ const sample = (page) => page.evaluate(() => {
   const h = window.chromaglassDebug?.()?.hearing ?? { frames: 0, fresh: 0, ownFrame: 0 };
   const rd = window.chromaglassDebug?.()?.riding ?? { frames: 0, laid: 0 };
   return {
-    rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0,
+    rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0,
     t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
@@ -205,6 +206,7 @@ async function measure(page) {
       rideFrames: b.rideFrames - a.rideFrames,
       laid: b.laid - a.laid,
       deskMoves: (b.deskMoves - a.deskMoves) / s,
+      drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
     });
   }
   return out;
@@ -265,12 +267,18 @@ try {
       const wired = await page.evaluate(() => typeof window.__fader?.onmidimessage === 'function');
       check(`${screen.name}, a fader: the app is listening to the stubbed controller`, wired);
       await page.evaluate(() => {
-        let v = 0, dir = 2, last;
+        let v = 0, dir = 2, last, lastDrawn;
         window.__deskMoves = 0;
+        window.__drawnMoves = 0;
         const watch = () => {
           const d = window.chromaglassCastState().settings.dimmer;
           if (last !== undefined && d !== last) window.__deskMoves++;
           last = d;
+          // And the Dimmer the plate last drew: a value, so a copy handed
+          // back unchanged frame after frame cannot pass for a moving fader.
+          const drawn = window.__cgRiding?.drawn?.dimmer;
+          if (lastDrawn !== undefined && drawn !== lastDrawn) window.__drawnMoves++;
+          lastDrawn = drawn;
           window.__deskWatch = requestAnimationFrame(watch);
         };
         watch();
@@ -289,10 +297,15 @@ try {
       check(`${screen.name}, a fader: the App renders for those and the desk's clock, at most ${ALLOWED_EXTRA} a second besides`,
         w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits <= x.deskMoves + ALLOWED_EXTRA),
         w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s for ${f(x.deskMoves)}`).join(', '));
-      const laidLine = `${screen.name}, a fader: the plate draws the move before React renders it on half its frames or more`;
+      /*
+        Twice as often as React is told, at least: at sixty messages a second
+        the plate's Dimmer changes on nearly every frame it draws (24 to 60 a
+        second on the Mac), and a plate fed only React's would change 9 times.
+      */
+      const laidLine = `${screen.name}, a fader: the plate's Dimmer moves at least twice as often as the desk's`;
       if (PLATE) {
-        check(laidLine, w.every(x => x.rideFrames >= 45 && x.laid >= 0.5 * x.rideFrames),
-          w.map(x => `${x.laid} of ${x.rideFrames} frames`).join(', '));
+        check(laidLine, w.every(x => x.rideFrames >= 45 && x.drawnMoves >= 2 * x.deskMoves && x.laid > 0),
+          w.map(x => `${f(x.drawnMoves)}/s drawn for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
       } else skip(laidLine, `no plate draws here (${w.map(x => x.rideFrames).join(', ')} frames); held on the Mac`);
       // Let go, and give the last tenth of a second time to reach React.
       const at = await page.evaluate(() => { clearInterval(window.__sweep); return window.__faderAt; });
