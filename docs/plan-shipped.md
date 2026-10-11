@@ -2853,6 +2853,21 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
   - **$\lambda = 1.5$ on beads**: solved back from tuned $0.8\times$ flow speed.
 - **Measured** (`npm run bubblephysics`): 11/11 checks pass. Foam stability test over 3600 frames on a resting raft yields 0 merges (stable foam).
 
+### 18j. Milky liquids scatter
+
+**Shipped** (2026-10-10, #353): milky liquids scatter light, turning milk into an opaque white body under diffuse backscatter and casting a warm dark projector shadow with a soft forward halo.
+- **Where:** everything in the plate was previously treated as a pure absorber. `colourBody` pushed opacity and saturation up to imitate a body of colour, `granulation` modulated dye optical depth with noise, and milk was rendered as dye tinting.
+- **The real phenomenon:** milk is an emulsion of sub-micron fat globules and casein micelles (~100 nm) that undergo Mie and Rayleigh-Gans scattering without significant intrinsic absorption in visible wavelengths.
+  - *On black ground (diffuse backscatter):* multiple scattering produces a bright, white diffuse body. Modeled using non-absorbing Kubelka–Munk theory: $Sd = \mu_s' \cdot 6.0 \cdot d_{gap}$, $R_{KM} = \frac{Sd}{1.0 + Sd}$. Strictly energy conserving ($R_{KM} + T_{KM} \equiv 1.0$) with equal RGB scattering, giving pure white reflectance ($R=G=B \approx 98.8\%$ luminance). Absorbing food dyes sit on top of this white reflective substrate, creating vibrant opaque pastel tints (e.g. pinks/reds rather than dark mud on black ground, fulfilling PLAN §4).
+  - *On lamp ground (projector transmission):* a projector collection aperture (f/2–f/4 lens) collects only unscattered or forward-scattered light within a narrow pupil angle ($\sim 10^\circ$). Over $90\%$ of scattered light misses the lens entirely. Consequently, milk casts a dark shadow (mean transmission $\approx 25.4\% \le 30\%$). Casein micelle scattering follows Rayleigh-Gans $\lambda^{-1.5}$ wavelength dependence ($\vec{\kappa}_{casein} = (0.85, 0.95, 1.20)$), scattering blue light more strongly than red, causing the projector shadow to appear warm/amber ($t_R > t_B$).
+  - *Forward halo:* light scattered at small forward angles forms a soft forward halo around the pool boundary, glowing slightly above bare plate transmission (+0.46%) in an annulus just outside the pool core.
+  - *Zero-scatter species (control):* liquids with zero scattering coefficient ($\mu_s' = 0$, e.g. glycerine, water) render byte-for-byte identical to the bare plate across all pixels on both black ground and lamp ground.
+- **Conserved transport & packing:**
+  - Optical scattering coefficient $\mu_s'$ is carried in the GPU species field (channel 2, `species.b`) and advected via the existing conserved flux-form pairing (`bodyAdvectPairSub`, PLAN 18d-11a).
+  - Because `view0` and `dye` textures were full, $\mu_s'$ is packed into `vel.w` via `packVel` during velocity packing (`max(0.0, sp.b)` in `.w`), alongside temperature in `v.z` (PLAN 18f / #352) and clamped velocities in `.xy`.
+  - Species channel 2 was traded from density $\rho$ (which is read by nothing yet in the solver) to avoid allocating an extra PingPong texture and doubling advection bandwidth, maintaining 18d-11a's 6.73 ms paired carry. When 18d-4 buoyancy lands, density can be packed or restored (PLAN 18d-4a).
+- **Verification:** `npm run milk` enforces 9 automated checks including dark warm shadow, halo glow, white diffuse backscatter, dye-on-milk pastel reflectance, conserved species advection, and zero-diff glycerine control against bare plate.
+
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 
 - **What was reported** (the owner, 2026-10-04): "in general there just aren't enough

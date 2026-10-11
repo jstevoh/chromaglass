@@ -82,13 +82,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * cell clock in the shader (lib/detailFlow.ts). The clamp is far past
    * anything the solver reaches (`safeVel`) and only keeps a runaway value
    * inside half float.
+   *
+   * Binding 3 carries the species field (rgba32float), packing the local
+   * scattering coefficient (sp.b, PLAN 18j) into the 4th channel (dst.w).
    */
   packVel: `${HEAD}
 @group(0) @binding(1) var vel: texture_2d<f32>;
 @group(0) @binding(2) var dst: texture_storage_2d<${PACKED_VEL_FORMAT}, write>;
+@group(0) @binding(3) var species: texture_2d<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
   let v = textureLoad(vel, vec2i(id.xy), 0).xy;
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), 0.0, 1.0));
+  let sp = textureLoad(species, min(vec2i(id.xy), vec2i(textureDimensions(species)) - 1), 0);
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), 0.0, max(0.0, sp.b)));
 }`,
 };

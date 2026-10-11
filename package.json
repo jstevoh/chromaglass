@@ -161,6 +161,7 @@
     "turing": "node scripts/turing.mjs",
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
+    "milk": "node scripts/milk.mjs",
     "colours": "node scripts/colours.mjs",
     "lace": "node scripts/lace.mjs",
     "mixer": "node --experimental-strip-types scripts/mixer.mjs",
