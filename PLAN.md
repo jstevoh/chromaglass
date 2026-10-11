@@ -216,7 +216,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   **18g** colour leaves by flushing and **18k-spray**.
-- **6.4** **18e** edges from refraction (which is #219's 20d).
+- **6.4** **18e** edges from refraction (in progress, antigravity/18e-refraction-edges; replaces painted rims and highlights with real Snell refraction / aperture loss / shadowgraph Becke lines; #219's 20d).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
