@@ -7,6 +7,7 @@ import {
   MIX_BLENDS,
   VISCOSITY_MODES,
   AUDIO_FEATURES,
+  RENDER_STYLES,
   type VisualizerSettings,
   type SimResolution,
 } from '../types.ts';
@@ -20,6 +21,9 @@ const VALID_MACRO_CAMERA = new Set<string>(MACRO_CAMERA_MODES);
 const VALID_ON_NEW_SONG = new Set<string>(ON_NEW_SONG_MODES);
 const VALID_ROW_BLEND = new Set<string>(MIX_BLENDS);
 const VALID_AUDIO_FEATURES = new Set<string>(AUDIO_FEATURES);
+const VALID_RENDER_STYLE = new Set<string>(RENDER_STYLES);
+// The audio slots are the default's own, so a slot added to AudioMappings is kept too.
+const AUDIO_SLOTS = Object.keys(DEFAULT_SETTINGS.audioMappings) as (keyof VisualizerSettings['audioMappings'])[];
 
 // stockType is the only numeric setting in DEFAULT_SETTINGS outside PIN_RANGE
 const EXTRA_NUMERIC_RANGES: Record<string, { min: number; max: number; step?: number }> = {
@@ -101,7 +105,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
       } else if (key === 'mixOrder') {
         if (value.length <= 64 && /^[a-z ]+$/.test(value)) out.mixOrder = value;
       } else if (key === 'renderStyle') {
-        if (value === 'show' || value === 'photo') out.renderStyle = value;
+        if (VALID_RENDER_STYLE.has(value)) out.renderStyle = value as VisualizerSettings['renderStyle'];
       } else if (value.length <= 64) {
         (out as Record<string, unknown>)[key] = value;
       }
@@ -112,7 +116,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
     if (key === 'audioMappings' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
       const am = value as Record<string, unknown>;
       const sanitizedAm: Partial<VisualizerSettings['audioMappings']> = {};
-      for (const slot of ['velocity', 'density', 'color', 'rotation'] as const) {
+      for (const slot of AUDIO_SLOTS) {
         if (typeof am[slot] === 'string' && VALID_AUDIO_FEATURES.has(am[slot] as string)) {
           sanitizedAm[slot] = am[slot] as VisualizerSettings['audioMappings'][typeof slot];
         }

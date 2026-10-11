@@ -8,7 +8,10 @@
  * PLAN.md §14n: One sanitizePatch against the settings registry used by the
  * socket, the MIDI map loader and a loaded look alike.
  */
-import { DEFAULT_SETTINGS } from '../src/types.ts';
+import {
+  DEFAULT_SETTINGS, BLEND_MODES, LED_MODES, ON_NEW_SONG_MODES, VISCOSITY_MODES,
+  MACRO_CAMERA_MODES, MIX_BLENDS, AUDIO_FEATURES, RENDER_STYLES,
+} from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { sanitizePatch } from '../src/lib/sanitizeSettings.ts';
 import { parseRemoteGesture } from '../src/lib/remoteProtocol.ts';
@@ -86,6 +89,59 @@ const check = (name, ok, detail = '') => {
   // Valid enums survive
   const goodEnums = sanitizePatch({ blendMode: 'lighter', ledMode: 'cyberpunk', onNewSong: 'random', macroCamera: 'follow' });
   check('valid enums survive', goodEnums.blendMode === 'lighter' && goodEnums.ledMode === 'cyberpunk' && goodEnums.onNewSong === 'random' && goodEnums.macroCamera === 'follow');
+
+  /*
+    Every value each choice setting can take, not one value of each. The
+    first sanitizePatch kept its own hand-written lists, and they had already
+    drifted from the types when it landed on main (live from 2026-10-09 to
+    #322): Lighter and Exclusion on the blend menu, four of the five LED
+    modes, Off and Random for a new song and the mixer's Multiply and Key
+    were all dropped by updateSettings, the phone's patches and a saved look,
+    while the one-value check above passed. The lists are now the types' own
+    arrays; walking every value of every key that uses them is what catches
+    the next member added to a type and forgotten in the sanitiser.
+  */
+  const lists = [
+    ['blendMode', BLEND_MODES], ['ledMode', LED_MODES], ['onNewSong', ON_NEW_SONG_MODES],
+    ['viscosity', VISCOSITY_MODES], ['macroCamera', MACRO_CAMERA_MODES], ['renderStyle', RENDER_STYLES],
+    // Every mixer row's blend, found by name, so a row added later is walked too.
+    ...Object.keys(DEFAULT_SETTINGS).filter(k => k.endsWith('Blend')).map(k => [k, MIX_BLENDS]),
+  ];
+  const slots = Object.keys(DEFAULT_SETTINGS.audioMappings);
+  const lost = [], letIn = [], thin = [];
+  for (const [key, values] of lists) {
+    if (values.length < 2) thin.push(key);
+    for (const v of values) if (sanitizePatch({ [key]: v })[key] !== v) lost.push(`${key}=${v}`);
+    // And a value no type has is turned away: a key that slipped out of its
+    // own list into the catch-all string branch keeps every value above too.
+    if (sanitizePatch({ [key]: '__nope__' })[key] !== undefined) letIn.push(key);
+  }
+  for (const slot of slots) {
+    for (const f of AUDIO_FEATURES) {
+      if (sanitizePatch({ audioMappings: { [slot]: f } }).audioMappings?.[slot] !== f) lost.push(`audioMappings.${slot}=${f}`);
+    }
+    if (sanitizePatch({ audioMappings: { [slot]: '__nope__' } }).audioMappings?.[slot] === '__nope__') letIn.push(`audioMappings.${slot}`);
+  }
+  const tried = lists.reduce((n, [, v]) => n + v.length, 0) + slots.length * AUDIO_FEATURES.length;
+  check('every value of every choice setting survives, and a value outside them is turned away',
+    lost.length === 0 && letIn.length === 0 && thin.length === 0 && slots.length >= 4 && tried > 60,
+    lost.length || letIn.length || thin.length
+      ? `${lost.length} dropped: ${lost.join(', ')}; let in: ${letIn.join(', ') || 'none'}; a list under two values: ${thin.join(', ') || 'none'}`
+      : `${tried} values kept across ${lists.length} keys and ${slots.length} audio slots, a stranger turned away by each`);
+
+  /*
+    And no choice setting is missing from the walk above. Every string the
+    defaults hold is either one of those choices or one of the free-form
+    strings named here (colours, the mixer's order, the solver's 'auto'), so
+    a new choice setting added to the types without a line above fails here
+    instead of passing unwalked.
+  */
+  const FREE_FORM = new Set(['paperA', 'paperB', 'ledColor', 'mixOrder', 'simResolution']);
+  const walked = new Set(lists.map(([k]) => k));
+  const unwalked = Object.entries(DEFAULT_SETTINGS)
+    .filter(([k, v]) => typeof v === 'string' && !walked.has(k) && !FREE_FORM.has(k)).map(([k]) => k);
+  check('every string setting is either a walked choice or a named free-form string', unwalked.length === 0,
+    unwalked.length ? `not walked: ${unwalked.join(', ')}` : `${walked.size} choices, ${FREE_FORM.size} free-form`);
 
   // Scene mappings validation: setting checked against SETTING_TRAVEL with own-property, depth clamped to -100..100
   const badMappings = sanitizePatch({
