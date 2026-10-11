@@ -1193,7 +1193,9 @@ Perform desk and on the phone:
   be plain without being a lurch; say if full is too much;
 - **Plate Rock** from 0 to the top: the colours should slosh one way on a kick and swing
   back, the thicker colour sliding through the thinner. At 0 nothing sloshes. Say if full
-  pours the colour off the dish;
+  pours the colour off the dish. The picture as a whole should not move: since 27a-7 the
+  cover glass sloshes the whole picture only with **Frame Sway** up (0 by default), so an
+  evenly coloured look barely moves with Plate Rock alone;
 - **Turbulence** from 0 to the top: at a look's own value it should look as it did; past
   the middle it should start churning, and at the top stir the plate into streaks within
   a second or two. Say where on the slider it stops being pleasant.
@@ -1297,3 +1299,17 @@ phone and an iPad (Draw is the screen it opens on).
 3. Lock the phone for ten seconds and unlock it: the picture comes back on its own.
 4. Say if the lag reads as a delay under the finger; if it does, the size or the rate
    (`lib/padPicture.ts`) is the trade to revisit.
+
+## 51. Evolve changes slowly with the song (PLAN §10 step 8)
+
+On the Mac, a look you know (Classic, then a ferrofluid look), Evolve on at its default
+speed, ten minutes with a song that has builds and drops, then five with nothing playing.
+
+1. The look should change by itself in slow moves you can follow: the oil thickening,
+   the glass going glossier, the chemistry coming up. One thing at a time, never a jump,
+   and never anything that sways, spins or presses the whole picture.
+2. After a drop it should lean busier over the next half minute; through a breakdown it
+   should settle. The colours of new drops change at a drop or a breakdown.
+3. With nothing playing it should still wander, more slowly.
+4. Say if a minute's glide reads as nothing happening (the moves are too small) or as
+   the look drifting away from itself (too big).

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the frame holds still; the music moves the liquid
+
+- With the band playing, the whole plate no longer slides under the camera on every
+  kick. Plate Rock's cover glass sits seated by default, so a kick tips the plate and the
+  heavier colour slides, and the picture as a whole stays put. A new **Frame Sway**
+  control (Settings → Look, MIDI, the desks, the remote, the phone) lets the glass slide
+  again, with the lamp following the rock and a kaleidoscope turning on the beat. It is
+  0 in every look and only a hand turns it up.
+
 ### Added — Turing Print
 
 - A new look, **Turing Print**: the CIMA reaction in a gel with starch, under a white

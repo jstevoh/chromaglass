@@ -68,6 +68,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'pitchClass', type: 'f32', note: 'audio feature: True Synesthesia base hue' },
   { name: 'brightness', type: 'f32', note: 'audio feature: brightness proxy' },
   { name: 'beatPhase', type: 'f32', note: 'audio feature: 0 to 1 cycle pulsing on the beat' },
+  { name: 'beatSway', type: 'f32', note: 'how far the beat may move the frame (Frame Sway): the kaleidoscope\'s turn and breath, the closeup\'s crinkle; 0 by default' },
   { name: 'filmKey', type: 'f32' },
   { name: 'filmLevel', type: 'f32', note: 'density below which magnified dye reads as bare ground' },
   { name: 'filmMix', type: 'f32' },
