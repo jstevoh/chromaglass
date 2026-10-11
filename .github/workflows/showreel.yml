@@ -25,6 +25,10 @@ on:
         description: 'Comma-separated look ids (blank for all)'
         required: false
         default: ''
+      set:
+        description: 'Settings laid over every look, as JSON (e.g. {"plateRock":0}; blank for none)'
+        required: false
+        default: ''
   pull_request:
     types: [labeled]
 
@@ -61,6 +65,7 @@ jobs:
         run: npm run showreel
         env:
           SHOWREEL_ONLY: ${{ inputs.only }}
+          SHOWREEL_SET: ${{ inputs.set }}
           SHOWREEL_SHARD: ${{ matrix.shard }}/6
       - uses: actions/upload-artifact@v4
         if: always()
