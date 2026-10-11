@@ -267,6 +267,7 @@ try {
     }
 
     // ── 5b. An evenly coloured plate, rocked with its cover glass ──────
+    // (with the glass free to slide: Frame Sway at full. By default the app seats it, PLAN 27a-7, `npm run framesway`.)
     {
       /*
         The dye's weight is even, so the tilt alone moves nothing; the
