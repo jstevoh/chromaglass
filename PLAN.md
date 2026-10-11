@@ -6069,6 +6069,19 @@ Turing Print" work (#331), which also made the reaction grow at all.
   the pattern. Step 2: two or three liquid patches per look from what is heard at once (the
   bands and their onsets; not song shape, which hears a section bars late: the owner,
   2026-10-11), judged on the showreel (Antigravity).
+- **28g. Follow a known song played live, by what is heard, not by the clock** (the owner,
+  2026-10-11: "if we pre record the shape of the song, how can we map that to a different
+  sounding and sometimes improvisational version of the same song?"). Today a song map
+  (`songMap.ts`) is read by playback position (`sectionAt`, `energyAt`), so it only fits the
+  recording it was made from. Instead: keep the map as sections with each one's harmonic
+  fingerprint (a 12-note chroma profile, which survives a different band, tuning of the mix
+  and instruments) and its energy; follow the live audio by online time warping (as score
+  followers do for live players), so a slower or faster take still lines up; model the song
+  as sections that may repeat, stretch or be skipped (a solo that runs long, a chorus played
+  twice), not as one timeline; and fall back to the live song shape when the match is weak
+  (a jam the map never heard). What it buys: the show knows the chorus is next and can lean
+  into the build before it is heard, where the live song shape hears a section bars late.
+  A map made from the band's own rehearsal or last night's set is the likeliest source.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
