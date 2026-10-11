@@ -33,7 +33,10 @@
  *   1. the control: the old press (the route over 70, no passage) changes more
  *      a second in the breakdown than in the groove, as on the showreel; if it
  *      does not, the song has lost the shape and nothing below means anything;
- *   2. the press now changes less in the breakdown than in the groove, by at
+ *   2. the groove's bass no longer holds the glass flat at the bottom of its
+ *      travel (it did 0.23 of the time on the band's chorus, 0.55 on the
+ *      showreel's minute), and the press changes less in the breakdown than in
+ *      the groove, by at
  *      least a quarter, and the groove's own change is not less than it was
  *      (the groove's kicks still move the plate);
  *   3. the hands' levels times the passage fall in the breakdown to at most
@@ -53,8 +56,9 @@
 import fs from 'node:fs';
 import { renderBand } from './band.mjs';
 import { songAudioTrack } from '../src/lib/songTrack.ts';
-import { bassPressDepth, bassPressLevel, BASS_PRESS } from '../src/lib/squish.ts';
-import { levels01 } from '../src/lib/soundLevels.ts';
+import { bassPressDepth, bassPressFor, bassPressLevel, BASS_PRESS } from '../src/lib/squish.ts';
+import { levels01, musicHands } from '../src/lib/soundLevels.ts';
+import { DEFAULT_LEVEL_PARAMS } from '../src/lib/songTrack.ts';
 import { setShowSeed } from '../src/lib/rng.ts';
 
 // The band's noise (hats, snares) is drawn from the show's seed: fixed, so a run is the same song every time.
@@ -77,31 +81,34 @@ const concat = (...parts) => {
 const scaled = (pcm, k) => pcm.map((x) => x * k);
 
 /** Per second of the song: the press's change (new and old), the hands' level (new and old), the passage. */
-function measure(pcm) {
-  const t = songAudioTrack(pcm, SR, FPS);
+function measure(pcm, params = DEFAULT_LEVEL_PARAMS) {
+  const t = songAudioTrack(pcm, SR, FPS, params);
   const secs = Math.floor(t.length / FPS);
   const rows = [];
   let prevNew = 0, prevOld = 0;
   for (let s = 0; s < secs; s++) {
-    let pressNew = 0, pressOld = 0, handsNew = 0, handsOld = 0, passage = 0;
+    let pressNew = 0, pressOld = 0, handsNew = 0, handsOld = 0, passage = 0, pinnedOld = 0, pinnedNew = 0;
     for (let i = s * FPS; i < (s + 1) * FPS; i++) {
-      const a = t[i], g = a.passage ?? 1;
+      const a = t[i];
       const route = Math.min(1, a.bass / 100);   // getAudioValue's 'bass', the default velocity route
-      const dNew = bassPressDepth(bassPressLevel(route, false), IMPACT) * g;
+      // The plate's own arithmetic (squish.ts, soundLevels.ts), which LiquidVisualizer calls.
+      const dNew = bassPressFor(route, false, IMPACT, a.passage);
       const dOld = bassPressDepth(Math.min(1, route * (100 / 70)), IMPACT);
+      // Held at the bottom of the hand's travel: the glass flat, the kicks moving nothing.
+      pinnedNew += (bassPressLevel(route, false) >= 1 ? 1 : 0) / FPS; pinnedOld += (route * (100 / 70) >= 1 ? 1 : 0) / FPS;
       pressNew += Math.abs(dNew - prevNew) / BASS_PRESS; prevNew = dNew;
       pressOld += Math.abs(dOld - prevOld) / BASS_PRESS; prevOld = dOld;
       const l = levels01(a), mean = (l.bass + l.mid + l.treble + l.energy) / 4;
-      handsNew += mean * g / FPS; handsOld += mean / FPS; passage += g / FPS;
+      handsNew += mean * musicHands(0.45, a.passage) / FPS; handsOld += mean / FPS; passage += (a.passage ?? 1) / FPS;
     }
-    rows.push({ pressNew, pressOld, handsNew, handsOld, passage });
+    rows.push({ pressNew, pressOld, handsNew, handsOld, passage, pinnedOld, pinnedNew });
   }
   return rows;
 }
 const over = (rows, [a, b], k) => rows.slice(a, b).reduce((s, r) => s + r[k], 0) / Math.max(1, Math.min(b, rows.length) - a);
 
 function table(rows, sections, names) {
-  for (const k of ['pressOld', 'pressNew', 'handsOld', 'handsNew', 'passage']) {
+  for (const k of ['pressOld', 'pressNew', 'pinnedOld', 'pinnedNew', 'handsOld', 'handsNew', 'passage']) {
     const v = sections.map((sec) => over(rows, sec, k));
     console.log(`     ${k.padEnd(9)} ${names.map((n, i) => `${n} ${f2(v[i])}`).join('  ')}  breakdown/groove ${f2(v[1] / v[0])}`);
   }
@@ -126,6 +133,11 @@ check(pNew[1] <= 0.75 * pNew[0], 'the press changes at most three quarters as mu
   `${f2(pNew[1])} against ${f2(pNew[0])}, ${f2(pNew[1] / pNew[0])}×`);
 check(pNew[0] >= 0.9 * pOld[0], 'the groove\'s press moves at least nine tenths as much as before (its kicks press and let go)',
   `${f2(pNew[0])} a second, was ${f2(pOld[0])}`);
+{
+  const [was, now] = [over(rows, G, 'pinnedOld'), over(rows, G, 'pinnedNew')];
+  check(was >= 0.15 && now <= was / 3, 'the groove\'s bass holds the glass flat at the bottom of its travel a third as often or less (the control: it did, often)',
+    `${f2(now)} of the time, was ${f2(was)}`);
+}
 check(hNew[1] <= 0.6 * hNew[0], 'the hands fall to at most 0.6 of the groove\'s in the breakdown',
   `${f2(hNew[1] / hNew[0])}× (the levels alone: ${f2(over(rows, B, 'handsOld') / over(rows, G, 'handsOld'))}×)`);
 check(over(rows, G, 'passage') >= 0.85, 'the passage reads the groove as the song\'s level', f2(over(rows, G, 'passage')));
@@ -145,8 +157,9 @@ check(over(rows, G, 'passage') >= 0.85, 'the passage reads the groove as the son
   const at = (s) => over(turned, [s - 2, s + 2], 'passage');
   const learned = turned.findIndex((r, s) => s > 48 && over(turned, [s, s + 4], 'passage') >= 0.75);
   console.log(`     volume down 10 dB at 48 s: passage ${f2(at(40))} before, ${f2(at(52))} just after, ${f2(at(108))} a minute on, ${f2(at(168))} two, ${f2(at(228))} three`);
-  check(learned > 48 && learned - 48 <= 180, 'the volume turned down 10 dB is learned as the new level within three minutes',
-    learned > 48 ? `0.75 reached ${learned - 48} s after` : 'never reached 0.75');
+  check(at(52) <= 0.6, 'the volume turned down 10 dB calms the plate at once', `passage ${f2(at(52))} just after`);
+  check(at(52) <= 0.6 && learned > 52 && learned - 48 <= 180, 'and is learned as the new level within three minutes',
+    learned > 52 ? `0.75 reached ${learned - 48} s after` : 'never fell, or never reached 0.75');
 }
 
 // ── A real song, when one is given ────────────────────────────────────────────

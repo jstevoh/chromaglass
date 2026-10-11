@@ -239,7 +239,9 @@ export class SoundLevels {
 
 /*
   How loud this passage is, against the song's loud passages, as a sound's
-  amplitude: 1 in the groove, about 0.4 in a breakdown 8 dB down.
+  amplitude: near 1 in the groove (0.88 to 0.97 measured: the reference rides
+  the groove's louder bars, so its quieter ones read a little under), about
+  0.4 in a breakdown 8 dB down.
 
   What was reported (the showreel, PLAN 28d): on 28 of 41 looks the plate
   moved more in a song's quiet breakdown than in the groove around it. A real
@@ -270,8 +272,12 @@ export class SoundLevels {
   sixteen-second breakdown at 0.45 of the groove at its end. The price is a
   listener turning the music down 10 dB: the plate calms with it and takes
   a minute or two to learn the new level (measured, `npm run breakdown`:
-  0.54 a minute on, 0.78 two, 0.91 three). That is the show following the volume knob, which is fair; a new
-  stream (a new song in a render, a new audio context live) starts fresh.
+  0.54 a minute on, 0.78 two, 0.91 three). That is the show following the
+  volume knob, which is fair. The same holds live between songs: a render
+  starts fresh with each song, but the live ear keeps one reference for its
+  audio context, so a track mastered 10 dB quieter than the one before plays
+  its first minute or two with gentler hands (PLAN 28f: forget the
+  reference when a song ends, from the song-change clock).
 */
 /** Seconds of sound the passage's loudness is heard over: about a bar at 120 bpm. */
 export const HEARD_S = 2;
@@ -310,7 +316,17 @@ export class Passage {
     return Math.min(1, Math.sqrt(Math.max(0, this.power) / this.reference));
   }
 
-  reset(): void { this.power = 0; this.reference = 0; }
+}
+
+/**
+ * How hard the music's hands push this frame: Sound Drive over its 0.45 "1×",
+ * times the passage (an absent one is 1, the plate as it was). One function
+ * so the plate and `npm run breakdown` scale the same hands.
+ */
+export function musicHands(audioImpact: number | undefined, passage: number | undefined): number {
+  const impact = Number.isFinite(audioImpact) ? (audioImpact as number) : 0.45;
+  const g = Number.isFinite(passage) ? Math.max(0, Math.min(1, passage as number)) : 1;
+  return (impact / 0.45) * g;
 }
 
 /** The smoothed fields, as `AudioData` carries them. */

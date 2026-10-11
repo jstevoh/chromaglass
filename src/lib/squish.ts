@@ -544,6 +544,16 @@ export function bassPressLevel(routeValue: number, energyRoute: boolean): number
   const v = Number.isFinite(routeValue) ? routeValue : 0;
   return Math.max(0, Math.min(1, energyRoute ? v / 0.85 : v * (100 / 85)));
 }
+/**
+ * The press the show asks for this step: the route's reading over its ceiling,
+ * Sound Drive, and the passage's loudness (lib/soundLevels.ts, `Passage`; an
+ * absent one is 1). One function so the plate and `npm run breakdown` press
+ * the same glass.
+ */
+export function bassPressFor(routeValue: number, energyRoute: boolean, impact: number, passage: number | undefined): number {
+  const g = Number.isFinite(passage) ? Math.max(0, Math.min(1, passage as number)) : 1;
+  return bassPressDepth(bassPressLevel(routeValue, energyRoute), impact) * g;
+}
 export const BASS_PRESS = 0.004;
 /** The bass's depth for the velocity route's level (0–1) and Sound Drive (`impact`): see above. */
 export function bassPressDepth(level01: number, impact: number): number {

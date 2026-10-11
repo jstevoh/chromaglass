@@ -59,8 +59,8 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, bassPressLevel, type Presser, type Stroke } from '../lib/squish';
-import { levels01 } from '../lib/soundLevels';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
+import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -8235,21 +8235,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
                   /*
                     How loud this passage is against the song's loud ones, as an
-                    amplitude (lib/soundLevels.ts, Passage): 1 in the groove,
-                    about 0.4 in a breakdown 8 dB down. Every hand below is
-                    scaled by it, the pours, the bursts and the bass's press,
-                    because the levels they read are each ranged against their
-                    own ceiling and read a breakdown at 0.6 to 0.76 of the
-                    groove, and the press, which moves the plate on the bass's
-                    swing, read it busier than the groove (PLAN 28d,
-                    `npm run breakdown`). Absent (a producer that cannot hear
-                    it), it is 1, the plate as it was.
+                    amplitude (lib/soundLevels.ts, Passage): near 1 in the
+                    groove, about 0.4 in a breakdown 8 dB down. The music's
+                    hands in this block are scaled by it (through autoAmp: the
+                    pulse, the burst, the kick's ring, the mid's stream, the
+                    sparks, the swell; and the bass's press), because the
+                    levels they read are each ranged against their own ceiling
+                    and read a breakdown at 0.6 to 0.76 of the groove, and the
+                    press, which moves the plate on the bass's swing, read it
+                    busier than the groove (PLAN 28d, `npm run breakdown`).
+                    Beat Squeeze and Plate Rock ride the kicks, which a
+                    breakdown mostly drops, and are left as they were. Absent
+                    (a producer that cannot hear it), it is 1, the plate as it
+                    was.
                   */
-                  const passage = Math.max(0, Math.min(1, currentAudioData.passage ?? 1));
                   // Evolve used to multiply every music reaction by 2.2 — dye,
                   // heat, bursts — which is most of why it read as massive. It
                   // leaves the music's own reactions as the look sets them now.
-                  const autoAmp = impactMul * passage;
+                  const autoAmp = musicHands(currentSettings.audioImpact ?? 0.45, currentAudioData.passage);
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
@@ -8303,7 +8306,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bassPressAt = {
                     x: bassX, y: bassY,
                     r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-                    depth: bassPressDepth(bassPressLevel(velRaw, velRoute === 'energy'), currentSettings.audioImpact ?? 0.45) * passage,
+                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage),
                   };
                   // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
                   if (vel01 > 0.25 && !activeFluid.thinGap) {
@@ -8340,7 +8343,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const rx2 = Math.floor(bassX + Math.cos(a) * rad);
                       const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * impactMul;
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * autoAmp;
                         activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward expansion with natural fluid swirl
                         const swirl = 0.2 * (DICE.music.float() - 0.5);

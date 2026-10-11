@@ -5952,6 +5952,10 @@ Turing Print" work (#331), which also made the reaction grow at all.
     hears through is -120 dB wide at the bottom, where live it fits the room. Seed the
     floor from the first frame with sound, and check a render's window against live's
     (`npm run render`).
+  - Live, the passage's reference is kept for the whole audio context, so a track
+    mastered 10 dB quieter than the one before plays its first minute or two with gentler
+    hands (0.54 a minute on, 0.78 two). Forget the reference when a song ends, from the
+    song-change clock (`useSongChange`), and hold it with `npm run breakdown`.
   - Re-render the showreel after 28e lands (and after Antigravity's #348, #352, #353,
     #355), and re-score Classic and the 28 busier looks against the same minute.
 
