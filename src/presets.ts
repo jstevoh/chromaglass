@@ -394,8 +394,8 @@ export const PRESETS: Preset[] = [
         density: 'volume',
         color: 'timbre',
         // Not the dish: a turn of the whole plate on the sound is the frame
-        // moving with the music, which no look does (the owner's rule). The
-        // motor above still turns it.
+        // moving with the music, which the owner does not want by default.
+        // The motor above still turns it.
         rotation: 'none',
       },
     }

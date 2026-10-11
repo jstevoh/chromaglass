@@ -8270,11 +8270,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   own offset of up to three dyes: every hue of the set was in
                   every bar whatever the timbre, and Timbre Shifter's plate
                   stayed its set's cyan-violet mean ("hue never shifts", the
-                  showreel). Here the timbre walks the set from its first dye
-                  to its last, and the features keep a quarter of their
-                  offsets so the pulse and the sparks are still told apart.
-                  The other routes, Classic's treble among them, are as they
-                  were.
+                  showreel). Here the timbre walks the set, dull to bright
+                  (in proportion: a timbre of 0.85 sits 85% of the way along it),
+                  and the features keep a quarter of their offsets so the
+                  pulse and the sparks are still told apart. Every look whose
+                  colour follows timbre takes this (Cyberpunk Neon,
+                  Microscopic Chaos and Jellyfish Bloom too); the other
+                  routes, Classic's treble among them, are as they were.
                 */
                 const timbreColour = currentSettings.audioMappings.color === 'timbre';
                 const colFor = (off: number) => {

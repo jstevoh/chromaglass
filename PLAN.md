@@ -6064,8 +6064,9 @@ Turing Print" work (#331), which also made the reaction grow at all.
       silver, straw, orange, purple, blue, green) in the lab. Dye budget 0.5 to 0.25.
     - Timbre Shifter: the colour was the clock plus pitch plus timbre, and pitch (6.3 dyes,
       jumping at every chord) swamped timbre (2.7): one cyan-violet mean. A look whose colour
-      follows timbre now takes it from timbre alone (five other looks route colour to timbre
-      and change too); its dish no longer turns with the timbre. Unmeasured until a Mac render.
+      follows timbre now takes it from timbre alone (Cyberpunk Neon, Microscopic Chaos and
+      Jellyfish Bloom route colour to timbre and change too, unjudged); its dish no longer turns
+      with the timbre. Unmeasured until a Mac render.
     - Oil Wheel: one disc, no brown LED, Lamp Warmth 0.75 to 0.3 (it took a quarter of the
       blue), and the motor at the half a turn a minute its description says (0.232; it was a
       turn every 21 minutes). Colorful Cosmos: a deep paper (bare 0.58 to 0.15 luma). Deep
