@@ -6065,10 +6065,10 @@ Turing Print" work (#331), which also made the reaction grow at all.
   the music on a small named set of looks, never as the default). Brief and findings in
   `docs/sound-patches.md`. Step 1: the four patches that never fire (bands names under
   `source: 'sound'`) and comet's depth of 45; sound to frame motion an opt-in per look on a
-  short list, held by `npm run framesway`. Step 2: song shape (section, build, drop,
-  breakdown, hit strength, pitch) patchable, desk and phone. Step 3: two or three liquid
-  patches per look, section sources first, judged on the showreel (Antigravity; Claude writes
-  the first three as the pattern).
+  short list, held by `npm run framesway`; Claude writes the first three looks' patches as
+  the pattern. Step 2: two or three liquid patches per look from what is heard at once (the
+  bands and their onsets; not song shape, which hears a section bars late: the owner,
+  2026-10-11), judged on the showreel (Antigravity).
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
