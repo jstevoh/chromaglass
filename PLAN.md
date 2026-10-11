@@ -4175,7 +4175,7 @@ its frame rate live. "Free" means no new passes or texture reads.
   through 0.16 of the green where Beer–Lambert says 0.09). On the lamp only its blur
   counts. A look on the lamp that wants crisp blobs needs them from the liquid (18a's
   surface tension, 18d), not from a curve.
-- **18b-5. The back plate's mixer blends on the lamp.** With its own blend (the look's
+- ~~**18b-5. The back plate's mixer blends on the lamp.**~~ With its own blend (the look's
   Blend Mode) the back plate filters the lamp; a mixer row set to screen, add, multiply
   or key still lays its dye as it did. Decide whether a row blend means anything under
   the lamp, or the lamp overrides it.

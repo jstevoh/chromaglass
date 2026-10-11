@@ -2229,7 +2229,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     only: divided at the hot-spot instead, the paint's half of a fader was
     divided too, and halfway was not half of each (3 bytes off).
   */
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w); }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * mix(1.0, 0.5, f32(U.layerCount > 1 && U.blendMode <= 1)); }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2928,15 +2928,21 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
-        On a lamp ground the back plate is a second filter in the light's
-        path, whatever the look's Blend Mode says (a mixer row's own blend,
-        above, still lays it as it did: PLAN 18b-5): the lamp through both dishes is
-        the product of what each lets through. Its level in the mixer is
-        how much of its dye is in the path (throughScaled).
+        On a lamp ground, when the look's Blend Mode is 'screen' or 'lighter', the
+        plates are separate projectors: their light adds on the screen (each filtered
+        by its own plate, from a lamp dimmed to half). For other modes ('multiply'),
+        they are stacked dishes on one lamp: a second filter in the light's path.
+        A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
-        outColor = mix(painted1, lit1, U.lampGround);
+        if (U.blendMode <= 1) {
+          let lampBgHere = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * 0.5;
+          let lit1 = lampBgHere * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+          outColor = mix(painted1, outColor + lit1, U.lampGround);
+        } else {
+          let lit1 = outColor * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+          outColor = mix(painted1, lit1, U.lampGround);
+        }
       } else {
         outColor = painted1;
       }
