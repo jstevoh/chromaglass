@@ -6734,8 +6734,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
-          hitSourceRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
+          hitSourceRef.current.update(heard, songClockRef.current);
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
