@@ -467,7 +467,7 @@ fn filmColourAt(tR: f32, tP: f32) -> vec3f {
   return mix(rainbow, filmTableAt(tP, false), U.filmPhysics);
 }
 
-fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f) -> vec3f {
+fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f, isCamera: bool) -> vec3f {
   if (U.glossiness < 0.005) { return color; }
   let L = lampDir(fuv, U.lamp);
   let V = vec3f(0.0, 0.0, 1.0);
@@ -478,7 +478,8 @@ fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f) -> ve
   let cosTheta = max(0.0, normal.z);
   let f0 = 0.04;
   let fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
-  let specularTotal = specular + fresnel * 0.12;
+  let specMult = select(0.0, 1.0, isCamera);
+  let specularTotal = specular * specMult + fresnel * 0.12;
 
   var lit: vec3f;
   if (darkBlend) {
@@ -493,7 +494,7 @@ fn boundaryLine(diff: f32) -> f32 { return smoothstep(0.12, 0.75, diff); }
 
 fn boundaryEdge(t: texture_2d<f32>, fuv: vec2f) -> f32 { return boundaryLine(boundaryDiff(t, fuv)); }
 
-fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f) -> vec3f {
+fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f, isCamera: bool) -> vec3f {
   let rim = clamp((1.0 - n.z) * 6.0, 0.0, 1.0) * smoothstep(0.02, 0.2, a);
   let L = lampDir(fuv, U.lamp);
   let spec = pow(max(dot(n, L), 0.0), mix(10.0, 24.0, U.photo)) * mix(1.0, 0.3, U.photo);
@@ -502,12 +503,13 @@ fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f) -> vec3f {
   let play = U.lightPlay;
   var c = color * (1.0 - rim * (0.55 + 0.3 * max(0.0, -facing) * play));
   c += color * rim * max(0.0, facing) * 0.7 * play;
-  c += vec3f(1.0, 0.98, 0.92) * spec * rim * 1.1;
+  let specMult = select(0.0, 1.0, isCamera);
+  c += vec3f(1.0, 0.98, 0.92) * spec * rim * 1.1 * specMult;
   if (U.lamp2.w > 0.001) {
     let L2 = lampDir(fuv, U.lamp2);
     let facing2 = clamp(dot(nd, L2.xy) * 3.0, -1.0, 1.0);
     let spec2 = pow(max(dot(n, L2), 0.0), 10.0);
-    c += (vec3f(0.72, 0.84, 1.0) * spec2 * rim * 1.0 + mix(color, vec3f(0.7, 0.85, 1.0), 0.4) * rim * max(0.0, facing2) * 0.6 * play) * U.lamp2.w;
+    c += (vec3f(0.72, 0.84, 1.0) * spec2 * rim * 1.0 * specMult + mix(color, vec3f(0.7, 0.85, 1.0), 0.4) * rim * max(0.0, facing2) * 0.6 * play) * U.lamp2.w;
   }
   return mix(color, c, U.edgeRelief);
 }
@@ -1162,12 +1164,61 @@ override FLIP_Y: f32 = 1.0;
  */
 export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 @group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var viewSrc: texture_2d<u32>;
+
+fn deriveView(uv: vec2f) -> vec3f {
+  let dims = textureDimensions(viewSrc);
+  if (dims.x <= 1u) { return vec3f(0.0, 0.03, 0.0); }
+  let n = vec2f(dims);
+  let q = uv * n - 0.5;
+  let i = vec2i(floor(q));
+  let f = q - floor(q);
+  let d = vec2i(dims) - 1;
+  let q00 = textureLoad(viewSrc, clamp(i, vec2i(0), d), 0);
+  let q10 = textureLoad(viewSrc, clamp(i + vec2i(1, 0), vec2i(0), d), 0);
+  let q01 = textureLoad(viewSrc, clamp(i + vec2i(0, 1), vec2i(0), d), 0);
+  let q11 = textureLoad(viewSrc, clamp(i + vec2i(1, 1), vec2i(0), d), 0);
+  let v00 = vec3f(unpack2x16unorm(q00.x).y, unpack2x16unorm(q00.w).x * 0.06, f32(q00.w >> 24u) / 255.0);
+  let v10 = vec3f(unpack2x16unorm(q10.x).y, unpack2x16unorm(q10.w).x * 0.06, f32(q10.w >> 24u) / 255.0);
+  let v01 = vec3f(unpack2x16unorm(q01.x).y, unpack2x16unorm(q01.w).x * 0.06, f32(q01.w >> 24u) / 255.0);
+  let v11 = vec3f(unpack2x16unorm(q11.x).y, unpack2x16unorm(q11.w).x * 0.06, f32(q11.w >> 24u) / 255.0);
+  return mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);
+}
+
+fn oplAt(uv: vec2f) -> f32 {
+  let d = decodeDensity(textureBicubic(src, uv).a);
+  let v = deriveView(uv);
+  let oil = v.x;
+  let gap = v.y;
+  let film = v.z;
+
+  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
+  let deltaDye = d * (0.015 * dyeGain);
+  let deltaOil = oil * 0.137;
+  let deltaFilm = film * 0.087;
+
+  let n = 1.333 + deltaDye + deltaOil + deltaFilm;
+  let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
+  let h = hScale * (1.0 - 0.5 * film);
+  return n * h;
+}
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
+  let ts = 1.0 / U.logicalGrid;
+  let o00 = oplAt(in.uv + vec2f(-ts, -ts));
+  let o10 = oplAt(in.uv + vec2f( 0.0, -ts));
+  let o20 = oplAt(in.uv + vec2f( ts, -ts));
+  let o01 = oplAt(in.uv + vec2f(-ts,  0.0));
+  let oC  = oplAt(in.uv);
+  let o21 = oplAt(in.uv + vec2f( ts,  0.0));
+  let o02 = oplAt(in.uv + vec2f(-ts,  ts));
+  let o12 = oplAt(in.uv + vec2f( 0.0,  ts));
+  let o22 = oplAt(in.uv + vec2f( ts,  ts));
+
   let g = sobelGrad(src, in.uv);
-  var diff = 0.0;
-  if (U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
-  return vec4f(g, diff, 0.0);
+  let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
+
+  return vec4f(g, lap, oC);
 }
 `;
 
@@ -1676,6 +1727,36 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   }
   return decodeFluidRaw(foldRaw(raw, pt, fuv));
 }
+
+struct RefractOptics {
+  aperture: f32,
+  shadow: f32,
+  total: f32,
+};
+
+fn refractionOptics(near: vec4f) -> RefractOptics {
+  if (U.edgeRelief <= 0.005) {
+    return RefractOptics(1.0, 1.0, 1.0);
+  }
+  let grad = near.xy;
+  let lap = near.z;
+  let opl = max(1.0, near.w);
+
+  let na = DROP_NA;
+  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
+  let theta = length(grad) * 0.015 * dyeGain;
+  let u = clamp(theta / (2.0 * na), 0.0, 1.0);
+  let overlap = 1.0 - smoothstep(0.0, 1.0, u);
+  let aperture = mix(0.15, 1.0, overlap);
+
+  let deltaZ = (U.focus - 0.5) * 1.5;
+  let shadowGain = max(1.0, U.boundaryContrast * 2.0);
+  let edgeDeflect = smoothstep(0.005, 0.05, length(grad));
+  let shadow = clamp(1.0 - deltaZ * (lap / opl) * shadowGain * edgeDeflect, 0.2, 2.5);
+
+  let total = mix(1.0, aperture * shadow, U.edgeRelief);
+  return RefractOptics(aperture, shadow, total);
+}
 `;
 
 /** The display pass: the plate as it reaches the wall. */
@@ -2081,6 +2162,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
   let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
+  let isCamera = U.photo > 0.5 || closeup;
   /*
     How much of the plate-wide view is left: the plate's own dressing (the
     meniscus relief, the cells, the droplets) fades out over the same travel
@@ -2293,13 +2375,24 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (sharp0) {
     if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
   }
-  fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
+  fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0, isCamera), fluid0.a);
   if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
 
-  if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
-    var edge0 = boundaryLine(near0.z);
-    if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
-    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
+  if (sharp0) {
+    if (isCamera) {
+      if (U.boundaryContrast > 0.005 && fluid0.a > 0.03) {
+        let edge0 = boundaryEdge(layer0, fuv0);
+        fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
+      }
+    } else {
+      if (U.derivedOn > 0.5) {
+        let refract0 = refractionOptics(near0);
+        fluid0 = vec4f(fluid0.rgb * refract0.total, fluid0.a);
+      } else if (U.boundaryContrast > 0.005 && fluid0.a > 0.03) {
+        let edge0 = boundaryEdge(layer0, fuv0);
+        fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
+      }
+    }
   }
   // The per-pixel tests mask the result instead of branching around the
   // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -2309,7 +2402,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
   }
   if (plateOn && U.edgeRelief > 0.005 && sharp0) {
-    fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), plateAmt), fluid0.a);
+    if (isCamera || U.derivedOn <= 0.5) {
+      fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0, isCamera), plateAmt), fluid0.a);
+    }
   }
 
   // ── Plate cells ───────────────────────────────────────────────
@@ -2661,11 +2756,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // drop on a projector is ringed by a thin dark line (the meniscus), and
     // its body, a weak lens, is a touch brighter than the water around it.
     if (view.oil > 0.004) {
-      let e = 1.2 / U.logicalGrid;
-      let og = vec2f(viewAt(fuvBase + vec2f(e, 0.0)).oil - viewAt(fuvBase - vec2f(e, 0.0)).oil,
-                     viewAt(fuvBase + vec2f(0.0, e)).oil - viewAt(fuvBase - vec2f(0.0, e)).oil);
-      let rim = clamp(length(og) * 2.2, 0.0, 1.0);
-      outColor = outColor * (1.0 - 0.55 * rim) + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
+      if (isCamera || U.derivedOn <= 0.5) {
+        let e = 1.2 / U.logicalGrid;
+        let og = vec2f(viewAt(fuvBase + vec2f(e, 0.0)).oil - viewAt(fuvBase - vec2f(e, 0.0)).oil,
+                       viewAt(fuvBase + vec2f(0.0, e)).oil - viewAt(fuvBase - vec2f(0.0, e)).oil);
+        let rim = clamp(length(og) * 2.2, 0.0, 1.0);
+        outColor = outColor * (1.0 - 0.55 * rim);
+      }
+      outColor = outColor + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
     }
     // A pH indicator in the dye (red cabbage's anthocyanin): red-pink in
     // acid, purple near neutral, green then yellow in base. Where there is no
@@ -2759,13 +2857,24 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (sharp1) {
       if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, fuv1); }
     }
-    fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1), fluid1.a);
+    fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1, isCamera), fluid1.a);
     if (darkBlend) { fluid1.a *= 0.6; }
 
-    if (U.boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
-      var edge1 = boundaryLine(near1.z);
-      if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
-      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
+    if (sharp1) {
+      if (isCamera) {
+        if (U.boundaryContrast > 0.005 && fluid1.a > 0.03) {
+          let edge1 = boundaryEdge(layer1, fuv1);
+          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
+        }
+      } else {
+        if (U.derivedOn > 0.5) {
+          let refract1 = refractionOptics(near1);
+          fluid1 = vec4f(fluid1.rgb * refract1.total, fluid1.a);
+        } else if (U.boundaryContrast > 0.005 && fluid1.a > 0.03) {
+          let edge1 = boundaryEdge(layer1, fuv1);
+          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
+        }
+      }
     }
     // The per-pixel tests mask the result instead of branching around the
     // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -2775,7 +2884,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
     }
     if (plateOn && U.edgeRelief > 0.005 && sharp1) {
-      fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), plateAmt), fluid1.a);
+      if (isCamera || U.derivedOn <= 0.5) {
+        fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1, isCamera), plateAmt), fluid1.a);
+      }
     }
 
     if (closeup) {

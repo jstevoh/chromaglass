@@ -309,12 +309,14 @@ export class WebGPUPlate {
           colorAttachments: [{ view: this.layers[i].derived.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
         });
         pass.setPipeline(derive);
+        const viewTex = fields[i]?.view ?? this.blankU;
         pass.setBindGroup(0, this.device.createBindGroup({
           layout: derive.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: { buffer: this.uniformBuffer } },
             { binding: 1, resource: this.sampler },
             { binding: 2, resource: this.layers[i].dye.createView() },
+            { binding: 3, resource: viewTex.createView() },
           ],
         }));
         pass.draw(6);

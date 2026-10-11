@@ -57,9 +57,15 @@ try {
       return e === 0 ? s * f * 2 ** -24 : e === 31 ? 0 : s * (1 + f / 1024) * 2 ** (e - 15);
     };
     let sum = 0, sx = 0, sy = 0;
+    let minLap = 1e9, maxLap = -1e9, maxOpl = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const o = y * (row / 2) + x * 4;
       const g = Math.hypot(half(halves[o]), half(halves[o + 1]));
+      const l = half(halves[o + 2]);
+      const opl = half(halves[o + 3]);
+      if (l < minLap) minLap = l;
+      if (l > maxLap) maxLap = l;
+      if (opl > maxOpl) maxOpl = opl;
       if (!(g > 0)) continue;
       sum += g; sx += g * (x + 0.5) / w; sy += g * (y + 0.5) / h;
     }
@@ -71,12 +77,16 @@ try {
       if (!(d > 0)) continue;
       dsum += d; dx += d * (x + 0.5) / n; dy += d * (y + 0.5) / n;
     }
-    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum };
+    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, maxOpl };
   });
   const at = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
   check('the derive pass finds slopes at all', r.sum > 0, `weight ${r.sum.toFixed(1)}`);
   check('where the dye is', Math.hypot(r.px - r.dx, r.py - r.dy) < 0.08,
     `slopes at ${at(r.px, r.py)}, dye at ${at(r.dx, r.dy)} (its mirror across the middle is ${at(r.dx, 1 - r.dy)})`);
+  check('Becke line doublet present in Laplacian', r.minLap < -0.05 && r.maxLap > 0.05,
+    `Laplacian min ${r.minLap.toFixed(3)}, max ${r.maxLap.toFixed(3)}`);
+  check('optical path length tracks liquid presence', r.maxOpl > 1.333,
+    `max OPL ${r.maxOpl.toFixed(3)} (water baseline 1.333)`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
