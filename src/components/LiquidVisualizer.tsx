@@ -8279,12 +8279,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   routes, Classic's treble among them, are as they were.
                 */
                 const timbreColour = currentSettings.audioMappings.color === 'timbre';
-                const colFor = (off: number) => {
-                  const h = harmonyOf(activeLayerRef.current);
-                  return harmonyCycle(h, timbreColour
-                    ? colorMod * (h.length - 1) + off * 0.25
-                    : time * 0.1 + pitchAngle + colorMod * Math.PI + off);
-                };
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), timbreColour
+                  ? colorMod * (harmonyOf(activeLayerRef.current).length - 1) + off * 0.25
+                  : time * 0.1 + pitchAngle + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
