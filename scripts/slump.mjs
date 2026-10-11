@@ -38,8 +38,14 @@
  *      contrasts are the ones lib/turntable.ts says, written here, not read
  *      from the function the solver uses
  *   7. the same drop in glycerine (Thickness 1, a thousand times water's
- *      viscosity) moves under half a millimetre in 20 s, as the law says
- *      (its r_N at 20 s is the drop's own 4 mm), and is still all there
+ *      viscosity) slumps as slowly as the same equation says: its middle at
+ *      20 s within 5% of a radial solve of ∂η/∂t = ∇·((g′/3ν) η³(1 − η/b)³ ∇η)
+ *      from the same paraboloid in a 6 mm gap, worked out here on the CPU
+ *      (3.94 units of 5.6; water's is down to 0.68 by then), and still all
+ *      there. Not its front: at 256² a front that moves under a cell reads up
+ *      to a cell wide (4.50 mm on Metal against the solve's 4.04), and
+ *      Huppert's law from t = 0 does not hold yet for a drop that starts
+ *      wider than the law's own radius
  *   8. a drop of clear liquid (white, which is not a dye) does not slump: it
  *      is the water's own density
  *   9. the measure sees a blur: the glycerine drop under the Diffusion Rate
@@ -156,8 +162,38 @@ report('6. a heavier dye runs further, as (g′)^(1/8)', Math.abs(got / want - 1
 
 const still = (rows, T) => Math.abs(at(rows, T).front - rows[0].front) < 0.5 && Math.abs(rows[0].front - water[0].front) < 0.2
   && Math.abs(at(rows, T).total / rows[0].total - 1) < 0.01;
-report('7. in glycerine the same drop barely moves', still(syrup, 20),
-  `${mm(syrup[0].front)} to ${mm(at(syrup, 20).front)} in 20 s, total ×${(at(syrup, 20).total / syrup[0].total).toFixed(4)} (law: ${mm(huppert(g0, V, nuSyrup, 20))})`);
+/*
+  The radial solve for check 7: the same equation, explicit, on 600 rings of
+  0.02 mm, from the paraboloid the drop is laid as. Cheap in glycerine (K
+  is a thousandth of water's, so a stable step is long); far too slow in
+  water, where Huppert's law is the reference instead.
+*/
+function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = 0.006) {
+  const n = 600, dr = 2e-5, G = gPrime / (3 * nuv);
+  const h = new Float64Array(n), dh = new Float64Array(n);
+  for (let i = 0; i < n; i++) { const r = (i + 0.5) * dr; h[i] = Math.max(0, 1 - (r / R) ** 2) * peakUnits * dyeLayer; }
+  let t = 0;
+  while (t < T) {
+    let most = 0;
+    const flux = new Float64Array(n - 1);
+    for (let i = 0; i < n - 1; i++) {
+      const e = 0.5 * (h[i] + h[i + 1]), k = G * e ** 3 * Math.max(0, 1 - e / gap) ** 3;
+      most = Math.max(most, k);
+      flux[i] = -k * (h[i + 1] - h[i]) / dr * (i + 1) * dr;
+    }
+    const dt = Math.min(0.2 * dr * dr / Math.max(most, 1e-30), T - t);
+    dh.fill(0);
+    for (let i = 0; i < n - 1; i++) { dh[i] -= flux[i]; dh[i + 1] += flux[i]; }
+    for (let i = 0; i < n; i++) h[i] += dt * dh[i] / ((i + 0.5) * dr * dr);
+    t += dt;
+  }
+  return h[0] / dyeLayer;
+}
+const syrupWant = radialMiddle(g0, nuSyrup, syrup[0].peak, 0.004, 20);
+const syrupGot = at(syrup, 20).peak;
+report('7. in glycerine the drop slumps as slowly as the equation says',
+  Math.abs(syrupGot / syrupWant - 1) <= 0.05 && Math.abs(syrup[0].front - water[0].front) < 0.2 && Math.abs(at(syrup, 20).total / syrup[0].total - 1) < 0.01,
+  `its middle ${syrup[0].peak.toFixed(2)} → ${syrupGot.toFixed(2)} units in 20 s, the radial solve ${syrupWant.toFixed(2)}; front ${mm(syrup[0].front)} → ${mm(at(syrup, 20).front)}, total ×${(at(syrup, 20).total / syrup[0].total).toFixed(4)}`);
 
 report('8. clear liquid does not slump', still(clear, 10),
   `${mm(clear[0].front)} to ${mm(at(clear, 10).front)} in 10 s, total ×${(at(clear, 10).total / clear[0].total).toFixed(4)} (the dyed drop: ${mm(w5.front)} at 5 s)`);
