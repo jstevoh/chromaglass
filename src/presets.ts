@@ -1158,11 +1158,14 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.35,
       edgeRelief: 0.6,
       bubbles: 0.35,
-      // The gradient deep, so the drops are the light: at teal '#2a9aa3' to
+      // The gradient deeper, so the drops are the light: at teal '#2a9aa3' to
       // orange '#ff9a4a' the paper alone was luma 0.58 and the frame a milky
-      // wash with no dark anywhere; this one is 0.15 bare.
-      paperA: '#0b2f38',
-      paperB: '#4a1f0a',
+      // wash with no dark anywhere; this one is 0.36. Not darker: at 0.15
+      // ('#0b2f38' to '#4a1f0a') the dye lit by it is so dim that its
+      // pigment grain is under a level, twice the grain only 1.5x the
+      // texture (`npm run grainedge`: 0.133, x2 0.205); here 0.258, x2 0.575.
+      paperA: '#1c626a',
+      paperB: '#a0582a',
       lightPlay: 1.0,
       lampMotion: 0.4,
       lampHotspot: 0.6,

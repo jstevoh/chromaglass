@@ -6069,7 +6069,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
       with the timbre. Unmeasured until a Mac render.
     - Oil Wheel: one disc, no brown LED, Lamp Warmth 0.75 to 0.3 (it took a quarter of the
       blue), and the motor at the half a turn a minute its description says (0.232; it was a
-      turn every 21 minutes). Colorful Cosmos: a deep paper (bare 0.58 to 0.15 luma). Deep
+      turn every 21 minutes). Colorful Cosmos: a deeper paper (bare 0.58 to 0.36 luma; at 0.15 its grain fell under a level). Deep
       Ocean: a single deep blue LED instead of the cyan 'ocean' ramp (empty plate 0.23 to
       0.07). Galaxy: five hues instead of two (ice blue, ultramarine, magenta, amber), dye
       budget 0.35 so it is mostly void.
