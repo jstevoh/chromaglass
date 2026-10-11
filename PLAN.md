@@ -5833,6 +5833,12 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - Then: a gallery of stills and clips, the controls ranked by how much each visibly
     changes the plate (`controls.yml`), and a ranked list of looks to fix or retire and
     controls to bring forward, for the owner to pick; each pick its own PR.
+  - *Found* (the showreel of 2026-10-10, 41 looks): 28 move more in the breakdown than
+    in the groove; ten open on black and lose at least half of it by 30 s; nine draw
+    hairline combed lines inside the bodies; six sit on white or cream. The owner
+    (2026-10-11) chose to fix every look and retire none. The black and the combed lines
+    are Antigravity's, written up with times in `docs/showreel-findings.md`; the
+    breakdown, Classic, the five dim looks and the four untrue names are Claude's.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
