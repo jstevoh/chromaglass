@@ -106,8 +106,8 @@ try {
   const spot1 = await spotMoments();
 
   check(
-    'dye streaks along the flow where it moves',
-    spot1.aspect > spot0.aspect * 1.12,
+    'dye does not smear irreversibly along the flow (pre-asymptotic shear is reversible)',
+    spot1.aspect < spot0.aspect * 1.05,
     `aspect ratio ${spot0.aspect.toFixed(3)} → ${spot1.aspect.toFixed(3)} along flow`
   );
 
@@ -174,9 +174,9 @@ try {
   const dThick = await testCurveDispersion(0.4);  // +0.4 is thick gap at center
   const dThin = await testCurveDispersion(-0.4);  // -0.4 is thin gap at center
   check(
-    'Taylor dispersion scales with gap thickness (h²)',
-    dThick > dThin * 1.5,
-    `longitudinal stretch +${dThick.toFixed(4)} in open gap vs +${dThin.toFixed(4)} in tight gap (ratio ${(dThick / dThin).toFixed(2)}x)`
+    'Taylor dispersion is negligible on show timescales (t ≪ h²/Dm)',
+    dThick < 0.005 && dThin < 0.005,
+    `longitudinal stretch +${dThick.toFixed(4)} in open gap vs +${dThin.toFixed(4)} in tight gap`
   );
 
   // ── 6: Heat spreads even when dye Diffusion Rate is 0 ──

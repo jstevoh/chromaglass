@@ -2463,7 +2463,7 @@ export class WebGPUFluid {
     const diffScale = p.diff > 0 ? p.diff / 0.0002 : 0;
     const dm = (D_MOLECULAR / (PLATE_METRES * PLATE_METRES)) * p.dt * n2 * diffScale;
     const dispCells = disp * (N - 2);
-    const kappaT = 0.45;
+    const kappaT = 0.0; // 18h: Pre-asymptotic shear is reversible, diffusion proxy causes permanent smear
     const dispCap = 0.25;
     stage('dye disperse', (pass) => {
       this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
