@@ -1052,6 +1052,8 @@ Open from Desk v2, each its own thread (the UI lane):
     window is painted from the wall's canvas and never the copy's, and which settings
     each engine was handed; a picture of the window against a look changed in Preview
     would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
+  - ~~**8b-6** `draftwall`'s fade line read one moment, 0.4 s after Send~~ (fixed
+    2026-10-11: it watches the whole fade; story in `docs/plan-shipped.md`, 8b).
 - ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
   the look's own value (a double tap on Play's sliders)~~ (shipped; story in
   `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).

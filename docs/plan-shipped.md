@@ -1268,6 +1268,14 @@ following `drafting` instead of `wallLook` fails "nor for a render" (plates 1/2/
 reaches the wall, 0 → 1). `layout` 72/72, `phone` 352/352, `panel` 180/180, `desk` 40/40,
 `desklayout` 40/40. Found along the way: 8b-1 to 8b-5.
 
+Afterwards (2026-10-11): "across the fade" read the wall once, 0.4 s after Send, and
+went red on main's deploy after #339 with the fade 0% along; four green Mac runs had it 20,
+14, 6 and 3% along, so the reading measured how soon a loaded page answered the key. It
+now reads the wall until it lands and asks for three or more readings between the looks
+and at least 1 s from the last on the old look to the first on the new (2.02 s here, 36
+readings). Controls: an instant Send fails (0 readings, 0.05 s), a 0.3 s fade fails (0.38
+s), and so does a page stalled 1.1 s inside the Send (the wall's fade cut to 0.92 s).
+
 #### 8g. A panel in a window of its own (2026-10-10)
 
 `desk/PanelWindow.tsx` (new), `desk/Desk.tsx`, `ui/index.tsx` (`PanelFrame`), `desk/DeskPanels.tsx`.
