@@ -1615,10 +1615,22 @@ export default function App() {
   */
   const ride = useRef(new SettingRide()).current;
   const rideFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /*
+    The ride's schedule: when React was last handed it, stepped by
+    RIDE_VIEW_MS the way the ear steps its own (useAudioAnalyzer's
+    publishedAtRef). Timed from each flush instead, every late timer and
+    every wait for the next message was added to the period: on the Mac's
+    phone page, drawing 20 frames a second, the desk showed a fader 7.0 to
+    7.3 times a second (`npm run renders`). Never more than one step behind
+    now, so a stall does not buy a burst after it.
+  */
+  const rideMark = useRef(-Infinity);
   const flushRide = () => {
     if (rideFlush.current) { clearTimeout(rideFlush.current); rideFlush.current = null; }
     const patch = ride.drain();
     if (!patch) return;
+    const now = performance.now();
+    rideMark.current = Number.isFinite(rideMark.current) ? Math.max(rideMark.current + RIDE_VIEW_MS, now - RIDE_VIEW_MS) : now;
     // Where Evolve's drift wanders from: a ride is a hand's write (PLAN.md 14t).
     driftAnchor.current = { ...driftAnchor.current, ...patch };
     setSettings(prev => ({ ...prev, ...patch }));
@@ -2118,7 +2130,8 @@ export default function App() {
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
     castNudgeRef.current();
     if (rideFlush.current) return;
-    rideFlush.current = setTimeout(() => { rideFlush.current = null; flushRide(); }, RIDE_VIEW_MS);
+    const wait = Math.max(0, rideMark.current + RIDE_VIEW_MS - performance.now());
+    rideFlush.current = setTimeout(() => { rideFlush.current = null; flushRide(); }, wait);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ride]);
   useEffect(() => () => { if (rideFlush.current) clearTimeout(rideFlush.current); }, []);
