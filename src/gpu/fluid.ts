@@ -144,6 +144,15 @@ const DRIFT_LEAST = 0.2;
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
 /*
+  C_α, how hard a moving edge of the ferrofluid is pressed back to the
+  grid's width against the flux step's spreading (phaseCompress in
+  wgsl/fluid.ts, PLAN 29c-1). 1 is the volume-of-fluid solvers' usual
+  value: the compression's speed is the flow's own, which is about what a
+  first-order step spreads an edge by, no more. Nothing at rest whatever
+  it is.
+*/
+const PHASE_COMPRESS = 1;
+/*
   The mix's forces, each in plate widths a second at full strength (see
   mixForce), set in the lab (scripts/lab.mjs) so each effect is plainly
   there at full and gone at zero.
@@ -1094,6 +1103,7 @@ export class WebGPUFluid {
       ['phaseAdvect', [R32], open.phase],
       ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
+      ['phaseCompress', [R32], open.phase],
       // The two volume forms (phaseGridPlan, phaseCHVolume) run only on a thin
       // gap. Every look opens on one now (Thin Gap, on in every look), so a
       // ferrofluid look carries its ferrofluid as a volume from its first
@@ -2706,11 +2716,14 @@ export class WebGPUFluid {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read, stand], none);
         this.phase.swap();
       }
-      if (maze <= 0.001) {
-        const sep = this.arg('phase sep', [Math.max(0, Math.min(1, (p.phaseSharp ?? 0.35) * 1.35)), 0, 0, 0]);
-        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read, stand], sep);
-        this.phase.swap();
-      }
+      /*
+        What the flux step spread of a moving edge, taken back along the
+        edge's normal at the flow's own speed (phaseCompress, PLAN 29c-1):
+        nothing where the ferrofluid is at rest.
+      */
+      this.run(pass, 'phaseCompress', this.phase.write, [this.phase.read, this.ride(), this.squeeze.read, stand],
+        this.arg('phase compress', [PHASE_COMPRESS, disp, volume, 0]));
+      this.phase.swap();
 
       /*
         Cahn–Hilliard keeps the two liquids apart, maze or not: it conserves

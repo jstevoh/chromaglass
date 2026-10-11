@@ -1085,6 +1085,92 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The edge of a moving drop, kept as sharp as the grid holds it
+    (PLAN 29c-1: a named shortcut, standing in for an interface the grid
+    cannot draw).
+
+    Ferrofluid and the clear liquid do not mix: a real drop's edge is a
+    molecule thick wherever the flow takes it, and the drop is carried as
+    a body. On the grid the edge is three cells of grey, and the flux step
+    that carries it (phaseAdvect: MUSCL with a minmod slope, the most
+    diffusive of the limiters, which falls back to upwind at every
+    extremum, and a drop a few cells across is all extremum) spreads it by
+    about half a cell times the cells it moves: a numerical diffusion of
+    ½|u|Δx. Cahn–Hilliard's own pull back toward 0 and 1 is M·W|f''|, a
+    fifth of that at Phase Edge 0.75, so a drop dragged 0.3 of the plate
+    in three seconds (\`npm run ferrodrag\`) came out a grey smear with no
+    cell past half full, and even steepening the double well 2.9 times
+    did not hold it (lab: 100 cells past half → 0, either way).
+
+    So what the flux step spreads is taken back where it spreads it:
+    interface compression (Weller's, as volume-of-fluid solvers carry an
+    immiscible edge), a flux c(1−c) along the edge's normal at the local
+    flow's own speed, |u|·n̂, toward the fuller side. In proportion to how
+    far the flow carried the edge this step, so it is exactly nothing on a
+    pool at rest (a look's resting ferrofluid is as it was, to the bit),
+    and it is no stronger than the advection's own spreading (C_α = 1).
+    Each face's exchange is one number read alike from both sides, and at
+    most a quarter of min(lo, 1 − hi), the emptier cell's share and the
+    fuller one's room, so it keeps the plate's total and every cell inside
+    0..1, as phaseSeparate's sharpening did. Unlike that sharpening (which
+    set a plate of drops at rest into blocky squares, and was replaced by
+    Cahn–Hilliard for it: docs/physics-plan.md) it acts along the edge's
+    normal, from the [1 2 1]-blurred field, not along each axis alike, and
+    only where the flow moves the edge.
+
+    Under Thin Gap the field is a share of the gap (phaseAdvect), so what
+    crosses a face is a volume, the exchange times the thinner gap, and
+    each cell divides by its own (as phaseGrid). Stepped aside under a
+    standing layer (STAND_ASIDE), whose film shapes the layer there.
+
+    A.a = (C_α, the flow's displacement per unit velocity this step,
+    volume form on, 0).
+  */
+  phaseCompress: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var stand: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<r32float, write>;
+${STAND_ASIDE}
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+${PHASE_MEAN3}
+fn gapOf(q: vec2i) -> f32 { return select(1.0, max(textureLoad(sq, q, 0).r, 0.004), A.a.z > 0.5); }
+// What flows into p from its neighbour q = p + e this step.
+fn compress(p: vec2i, e: vec2i, n: i32) -> f32 {
+  let q = p + e;
+  let a = raw(p);
+  let b = raw(q);
+  // The edge's normal, from the blurred field (mean3), across the face and along it.
+  let t = vec2i(e.y, e.x);
+  let sp = mean3(p, n);
+  let sq2 = mean3(q, n);
+  let across = sq2 - sp;
+  let along = 0.25 * ((mean3(p + t, n) - mean3(p - t, n)) + (mean3(q + t, n) - mean3(q - t, n)));
+  let normal = abs(across) / sqrt(across * across + along * along + 1e-8);
+  // How far the flow carried the edge this step, in cells.
+  let u = 0.5 * (textureLoad(vel, p, 0).xy + textureLoad(vel, q, 0).xy);
+  let moved = length(u) * A.a.y * f32(n);
+  let lo = min(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let hi = max(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let amount = 0.25 * min(A.a.x * moved * normal, 1.0) * min(lo, 1.0 - hi);
+  let toFuller = select(-amount, amount, sp > sq2);
+  return aside(p, q, S.n) * toFuller * min(gapOf(p), gapOf(q));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  var d = 0.0;
+  if (p.x > 0) { d += compress(p, vec2i(-1, 0), n); }
+  if (p.x < n - 1) { d += compress(p, vec2i(1, 0), n); }
+  if (p.y > 0) { d += compress(p, vec2i(0, -1), n); }
+  if (p.y < n - 1) { d += compress(p, vec2i(0, 1), n); }
+  let outVal = raw(p) + d / gapOf(p);
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
+}`,
+
+  /*
     phaseSeparate's grid-scale filter alone, for the ferrofluid carried as a
     volume under Thin Gap (phaseAdvect's A.a.x). The filter exchanges share
     between neighbours, which keeps Σc; but under a press the plate's
@@ -3347,8 +3433,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and pulled the fingers back in.
   */
   let close = spikesClose(A.a);
-  let sharpFrac = clamp((A.b.x - 0.006) / 0.012, 0.0, 1.0);
-  let wellNeed = max(1.0 + 2.5 * sharpFrac, mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close));
+  let wellNeed = mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close);
   let well = min(max(1.0, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
   let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap;
   let repel = A.b.y * chi * w;

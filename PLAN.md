@@ -6082,6 +6082,9 @@ the code's entry points, the checks to add and the scenes to match, in
   smoothly and never with the sound: the owner, 2026-10-11, is made sick by the frame
   moving with the beat, and the liquid's own motion must be what moves (the sway work's
   `frameSway`, default 0, stays the only way sound moves the frame).
+  - **29c-1. The phaseCompress shortcut.** To keep the drop's edge sharp while moving,
+    Weller's interface compression is used (a flux along the edge's normal at the flow's speed)
+    to precisely counter the grid's numerical diffusion, standing in for an interface the grid cannot draw.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the
