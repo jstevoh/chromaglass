@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
@@ -264,6 +264,8 @@ const api = {
   /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */
   stepSeconds: BASE.magnetSeconds ?? 1 / 60,
   ferroViscosity: FERRO_NU,
+  /** The dye's depth per unit (PLAN 18m), so `npm run slump` lays the drop it means to. */
+  dyeLayer: DYE_LAYER,
   /** A shipped look's settings and the shape it pours its ferrofluid in, as the app reads them. */
   look(id: string) {
     const p = PRESETS.find(q => q.id === id);

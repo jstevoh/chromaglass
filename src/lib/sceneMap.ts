@@ -71,6 +71,8 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   holes in on every bar. A pour is a hand's gesture.
 */
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
+  // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
+  'frameSway',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>

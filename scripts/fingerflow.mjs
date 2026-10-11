@@ -163,7 +163,7 @@ try {
 
   /*
     A full pool drawn as the pointer draws it, for check 7. The pool is as
-    full as the plate lets a pool be (5.5 at its middle; the plate cuts any
+    full as the plate lets a pool be (5.5 across its flat middle; the plate cuts any
     cell past 6, capDye), and the hand goes from its middle 0.16 of the
     plate as tools.mjs's stroke goes: thirty moves in a second and a half,
     so at sixty steps a second the hand jumps a cell on one step in three
@@ -182,7 +182,12 @@ try {
     for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
       const d = Math.hypot((i + 0.5) / L - 0.42, (j + 0.5) / L - 0.5);
       if (d > 0.05) continue;
-      const k = (i + j * L) * 4, v = 5.5 * (1 - (d / 0.05) ** 2);
+      // Flat-topped (a quartic, not a paraboloid): since PLAN 18m a pool
+      // this deep slumps under its own weight, and the paraboloid's middle
+      // ran down from 5.5 to 5.00 in the second before the stroke (Metal,
+      // #364), the edge of the "fullest cell 5 or more" this asks for. A
+      // flat top is as full and slumps from its rim, not its middle.
+      const k = (i + j * L) * 4, v = 5.5 * (1 - (d / 0.05) ** 4);
       lay[k] = v; lay[k + 3] = v;
     }
     lab.addDye(lay); lab.flush(DT);

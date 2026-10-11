@@ -28,6 +28,7 @@ import { DISH_METRES, DISH_GAP_RANGE, OPEN_RIM } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
 import { filmKernels } from './film';
+import { slumpKernels } from './slump';
 
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
@@ -4259,6 +4260,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.
   ...filmKernels(HEAD, W),
+  // A drop of ink slumps under its own weight (PLAN 18m): see wgsl/slump.ts.
+  ...slumpKernels(HEAD, W),
 };
 
 /*

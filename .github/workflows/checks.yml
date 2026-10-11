@@ -351,6 +351,13 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
+      # through a song's kicks, every shipped look and show stage slides the
+      # whole picture 0% a frame, against up to 1% with the cover glass free
+      # as #347 shipped it; the app's own frames are held to it in render-app.
+      - name: The frame holds still
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run framesway
       # Hold stays where the closeup is (PLAN.md QA-12): the real closeup
       # camera on a made-up plate, switched to Hold from Auto and from Follow,
       # moves the frame on main's Hold and not on this one.
@@ -629,6 +636,11 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # A drop of ink on a level plate slumps out along the lower glass as a
+      # viscous gravity current, its front where Huppert's law puts it (PLAN 18m).
+      - name: A drop slumps under its own weight
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run slump
       # A press goes down round and lifts into fingers, and a plain spring lift does not.
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}

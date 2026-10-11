@@ -40,6 +40,9 @@
  *   5. Evolve plays in a render (other frames than without it), and an
  *      Evolve render twice is still the same film;
  *   6. 60 fps renders twice the frames for the same song, at i/60;
+ *   (and between 2 and 3: the band's kicks move the liquid and not the frame,
+ *   the cover glass, the lamp and the beat holding still by default;
+ *   Frame Sway, lib/plateRock.ts);
  *   7. the app is given back as it was: the settings, the seed, the canvas's
  *      size, and the live loop drawing again; no fade or glide left running
  *      on the film's clock (one is started in the last half second of a
@@ -280,6 +283,25 @@ try {
   console.log(`   A against B (seed 7 twice): ${parting(A, B)}`);
   console.log(`   E1 against E2 (Evolve twice): ${parting(E1, E2)}`);
   check('the plate moves: the frames are not one picture', new Set(A.frameHashes ?? []).size > frames * 0.9, `${new Set(A.frameHashes ?? []).size} distinct of ${frames}`);
+  /*
+    The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts;
+    the owner, 2026-10-11, watching the whole plate slide under the camera on
+    every kick). Classic at its own settings, Plate Rock 0.45 and Frame Sway
+    at its default 0: on every frame of the song the cover glass the plate is
+    handed has not slid, the lamp has not followed the rock, and the beat
+    turns no kaleidoscope. And the kicks were heard and rocked the plate's
+    spring, so a zero here is the dial holding the frame still and not a
+    song that never kicked (the rock's swing is what slid the glass before).
+  */
+  {
+    const dA = A.frameDigests ?? [];
+    const moved = dA.filter((d) => d && (d.coverVx !== 0 || d.coverVy !== 0 || d.lampRock !== 0 || d.beatSway !== 0));
+    const swing = Math.max(0, ...dA.map((d) => Math.abs(d?.rockX ?? 0)));
+    const kicks = Math.max(0, ...dA.map((d) => d?.kicks ?? 0));
+    check('the band moves the liquid, not the frame: with the kicks rocking the plate, the cover glass, the lamp and the beat move the frame on no frame',
+      dA.length === frames && kicks >= 8 && swing > 0.05 && moved.length === 0,
+      `${dA.length} digests, ${kicks} kicks heard, the rock's swing up to ${swing.toFixed(3)}, ${moved.length} frames moved${moved[0] ? ` (first: cover ${moved[0].coverVx}, ${moved[0].coverVy}, lamp ${moved[0].lampRock}, beat ${moved[0].beatSway})` : ''}`);
+  }
   check('the same seed twice draws the same frames', (A.frameHashes?.length ?? 0) === frames && differ(A, B) === 0, `${differ(A, B)} of ${frames} frames differ`);
   const bytesB = B.bytes ? Buffer.from(B.bytes, 'base64') : Buffer.alloc(0);
   console.log(`   the same seed twice: ${bytesA.equals(bytesB) ? 'byte-identical files' : 'the files differ (the encoder, not the plate: the frames that went in are compared above)'} (${sha(bytesA)} / ${sha(bytesB)})`);
