@@ -1297,3 +1297,17 @@ phone and an iPad (Draw is the screen it opens on).
 3. Lock the phone for ten seconds and unlock it: the picture comes back on its own.
 4. Say if the lag reads as a delay under the finger; if it does, the size or the rate
    (`lib/padPicture.ts`) is the trade to revisit.
+
+## 51. Evolve changes slowly with the song (PLAN §10 step 8)
+
+On the Mac, a look you know (Classic, then a ferrofluid look), Evolve on at its default
+speed, ten minutes with a song that has builds and drops, then five with nothing playing.
+
+1. The look should change by itself in slow moves you can follow: the oil thickening,
+   the glass going glossier, the chemistry coming up. One thing at a time, never a jump,
+   and never anything that sways, spins or presses the whole picture.
+2. After a drop it should lean busier over the next half minute; through a breakdown it
+   should settle. The colours of new drops change at a drop or a breakdown.
+3. With nothing playing it should still wander, more slowly.
+4. Say if a minute's glide reads as nothing happening (the moves are too small) or as
+   the look drifting away from itself (too big).

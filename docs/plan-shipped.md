@@ -1582,6 +1582,44 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
      and `applySquish` round every centre now, so the next fractional caller lands on
      the nearest cell instead of laying nothing (`npm run lift`).
 
+8. **Evolve changes slowly with the song** (2026-10-11). The owner: "I want evolve to
+   focus on more slowly changing settings (as opposed to directly reacting to frequency
+   and bouncing around). It should consider the music in longer changing ways, and
+   slowly changes the visuals in creative and interesting ways. If there is no music,
+   it can do basically the same thing and slowly change across time."
+
+   What it was: every six seconds two unrelated dials picked at random, each glided over
+   four seconds (`driftLook`), with no ear at all; the hands (a drop or a puff about
+   every seven seconds) sized each drop by the frame's energy, heated it by the frame's
+   treble and chose drop or air by the frame's spectral centroid; the palette re-rolled
+   on a one-in-ten-thousand chance every frame; the closeup's aim jumped ±0.12 over four
+   seconds every twelve; under Evolve the plate's pace heard eight seconds of loudness and
+   slewed over three. And `DRIFTABLE` let it drift Plate Rock, Beat Squeeze, the
+   kaleidoscope's spin and the turntable on a look that had them.
+
+   What it is (`src/lib/slowEvolve.ts`, `src/lib/drift.ts`): one move at a time, a few
+   dials from one theme (flow, dye, surface, heat, glass, chemistry, ferrofluid, film)
+   going the same way, glided over 30–90 s, then a rest. Which way is a lean from the
+   song shape tracker's intensity averaged over 30 s against the song's own 4-minute
+   level, pushed livelier through a build and for 30 s after a drop, calmer through a
+   breakdown; a section change during a rest starts the next move. The palette turns at
+   a drop or a breakdown (at most every 75 s), for the dye still to come
+   (`evolvePalette` on the visualizer's handle). With no music the lean is an
+   Ornstein–Uhlenbeck walk on three minutes and the palette turns every 3–5 minutes.
+   The hands hear the 30 s level and the section (a build reaches for the air, a
+   breakdown halves them), never the frame. The pace hears 30 s and slews over 20 under
+   Evolve. The aim moves ±0.08 over a whole move. `FRAME_MOTION` holds every
+   frame-moving dial out.
+
+   Measured (`npm run slowevolve`, Classic, default Evolve Speed), before → after:
+   moves started 10/min → 0.9/min with a song, 0.6/min without; glide 4 s → 46–86 s;
+   fastest dial 0.78 → 0.23 %/s of its travel; the aim's fastest 45 → 2.8 thousandths
+   of the plate a second (at full speed); change over 1 min 0.37 → 0.36 % and over 10
+   min 1.21 → 1.21 % (RMS of the dials' travel), so the same amount of change, made as
+   one slow move instead of twenty twitches; the lean 0.57 after drops and −0.13 in
+   breakdowns (it heard nothing before); a level shaken ±0.3 every half second leans
+   within 0.04 of the steady song.
+
 ### 11. The mixer
 
 5. **The mixer on a narrow desk**, *shipped* (#196). At 1024 px the docked sheet
