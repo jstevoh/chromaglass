@@ -51,9 +51,8 @@
  *  11. the slump makes and loses no dye: the water drop's total over 30 s
  *      is what it was to within 0.1%
  *
- * Not covered here: the oil's share (a cell of oil holds no current), the
- * substeps planned from the measured peak (the lab never measures, so the
- * plan always reads the dye's cap), and a step other than 1/60 s.
+ * Not covered here: the oil's share (a cell of oil holds no current) and a
+ * step other than 1/60 s.
  *
  * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on every look
  * with no Diffusion Rate) is off in every run here. Left on, it moved the

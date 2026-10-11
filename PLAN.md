@@ -3828,7 +3828,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
-| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (this PR); 18m-1 to 18m-5 after |
+| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); 18m-1 to 18m-5 after |
 
 ### 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 **Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -4481,7 +4481,7 @@ its frame rate live. "Free" means no new passes or texture reads.
   depth is not clamped.
 
 ### 18m. A drop slumps under its own weight (replaces a drop that sits or blurs)
-**Shipped** (this PR): a pool of dye on a level plate runs out along the lower glass as a
+**Shipped** (#364): a pool of dye on a level plate runs out along the lower glass as a
 viscous gravity current (`wgsl/slump.ts`, its own stage in the dye's step, apart from
 18h's blur), measured against Huppert's law by `npm run slump`. How it was found, built and
 measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:

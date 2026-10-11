@@ -3500,11 +3500,12 @@ export class WebGPUFluid {
    *
    * `rate` is g′Δt/(3νΔx²) for one substep, in 1/m³: K Δt/Δx² is it times
    * η³(1 − η/b)³ and the dye's strength, cell by cell, on the GPU. The
-   * substeps are as many as the deepest layer the plate can hold asks for,
-   * up to SLUMP_SUBSTEPS: the dye's cap, or the plate's own thickest cell
-   * when the measure has read one (it is a frame or two old, which only sets
-   * how many substeps; the face's cap in the kernel is what keeps a fresh
-   * pour stable). On a thick liquid nothing moves (the rate goes as 1/ν: in
+   * substeps are as many as the deepest layer the plate can hold asks for
+   * (the dye's cap), up to SLUMP_SUBSTEPS. Not the plate's own thickest cell
+   * from the measure: that lands a frame or two late, whenever its readback
+   * does, so the substeps (and the plate) would differ between two renders of
+   * the same seed (`node scripts/render-app.mjs`: 221 of 240 frames differed
+   * from frame 20 when they were planned from it). On a thick liquid nothing moves (the rate goes as 1/ν: in
    * glycerine a pool takes minutes to spread a millimetre), and the pass is
    * skipped.
    */
@@ -3517,8 +3518,7 @@ export class WebGPUFluid {
     const dx = PLATE_METRES / this.N;
     const perStep = gPrime * seconds / (3 * nu * dx * dx);
     if (!(perStep > 0) || !Number.isFinite(perStep)) return null;
-    const measured = this.statsLatest.at >= 0 ? this.statsLatest.maxDensity : DYE_CAP;
-    const eta = Math.max(0, Math.min(DYE_CAP, measured)) * DYE_LAYER;
+    const eta = DYE_CAP * DYE_LAYER;
     const b = REST_GAP * PLATE_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
