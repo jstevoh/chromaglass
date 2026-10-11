@@ -243,6 +243,16 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run kicks
 
+      # A breakdown is quieter on the plate (PLAN 28d): the band's chorus, its
+      # verse 8 dB down, the chorus, through the ear a render uses. The old
+      # bass press changes more a second in the breakdown (the control, as on
+      # the showreel), the new one at most three quarters as much as in the
+      # groove, the hands fall with the passage, and a song quiet all through
+      # or a volume turned down is learned as the new level. Ten seconds.
+      - name: The breakdown
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run breakdown
+
       # A click is not a beat (PLAN.md 14x): the ear in arithmetic, a click a
       # tick and a thump, in a quiet room and under the band. With no gesture
       # marked it takes the clicks for kicks (the control); marked, no onset in

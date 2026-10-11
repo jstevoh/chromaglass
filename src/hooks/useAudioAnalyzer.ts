@@ -18,6 +18,13 @@ export interface AudioData {
   spectralCentroid: number;
   timbre: number;
   complexity: number;
+  /**
+   * How loud this passage of the music is against its loud passages, as an
+   * amplitude, 0 to 1 (lib/soundLevels.ts, `Passage`): what the music's hands
+   * on the plate are scaled by, so a breakdown is quieter on the plate too.
+   * Absent from a producer that cannot hear it, and read as 1 there.
+   */
+  passage?: number;
   /** Room calibration state — null when auto-calibration is off. */
   calibration: RoomCalibration | null;
   /**

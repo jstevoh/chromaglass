@@ -523,6 +523,27 @@ export class KickRelease {
   between 0.8 and 0.3 each second moves 0.25 of the plate's colour as it
   comes in and gives back all but 0.04 as it goes (`npm run musicforce`).
 */
+/*
+  The route's level as the hand reads it: the band's own ceiling is full
+  depth. The routes read bands over 70 (levels01), and a calibrated band runs
+  to 85 at the default Sensitivity, so a loud groove's bass sat at full more
+  than half the time: measured on the showreel's minute, 0.55 of every second
+  of the groove pinned at 1. Pinned, the glass is held down flat (the flow is
+  the gap's rate, above) and the groove's kicks moved nothing, while a
+  breakdown's bass, under the line, rose and fell with every note and moved
+  the plate more than the band at full (the showreel's busier breakdowns, PLAN
+  28d; `npm run breakdown`). Over 85 the band's loudest is the hand's deepest,
+  and the kicks of a loud groove press and let go. Energy is already 0 to 1,
+  held under 0.85 calibrated, so it is read over 0.85.
+
+  The burst on a thick gap keeps its old scale: it pushes on the level, not
+  on the level's change, so a pinned bass is a full push there, as it was.
+*/
+/** The velocity route's reading (`getAudioValue`, 0–1) as the depth's level: 85, a band's ceiling, is full. */
+export function bassPressLevel(routeValue: number, energyRoute: boolean): number {
+  const v = Number.isFinite(routeValue) ? routeValue : 0;
+  return Math.max(0, Math.min(1, energyRoute ? v / 0.85 : v * (100 / 85)));
+}
 export const BASS_PRESS = 0.004;
 /** The bass's depth for the velocity route's level (0–1) and Sound Drive (`impact`): see above. */
 export function bassPressDepth(level01: number, impact: number): number {

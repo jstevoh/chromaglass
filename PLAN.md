@@ -5935,6 +5935,25 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - Then: a gallery of stills and clips, the controls ranked by how much each visibly
     changes the plate (`controls.yml`), and a ranked list of looks to fix or retire and
     controls to bring forward, for the owner to pick; each pick its own PR.
+- **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
+  #PRNUM; the showreel's first two findings). The music's hands follow how loud the passage
+  is, as an amplitude (`Passage`), and the bass's press reads the band over its ceiling:
+  on the showreel's minute the press changed 1.44× as much a second in the breakdown as
+  in the groove, now 0.54× (`npm run breakdown`). Classic: Dye Budget 0.45, Bubbles 0.05.
+  Story in docs/plan-shipped.md §28e.
+- **28f. Open from 28e.**
+  - The sound mappings (a look's `sceneMappings` with source `sound`, sound learn's
+    triggers) and Evolve's automation read the levels, which are ranged against ceilings
+    that fall back in 8 to 18 s, so a breakdown still turns them back up. Scale the ones
+    that move the liquid by the passage too, look by look, measured on the showreel.
+  - A render's room tracker seeds its floor at -140 dB from the first frame, which is
+    silence (the analyser's window has no samples yet), and a floor only rises from
+    levels near it, so it stays there for the whole render: the analyser window a render
+    hears through is -120 dB wide at the bottom, where live it fits the room. Seed the
+    floor from the first frame with sound, and check a render's window against live's
+    (`npm run render`).
+  - Re-render the showreel after 28e lands (and after Antigravity's #348, #352, #353,
+    #355), and re-score Classic and the 28 busier looks against the same minute.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

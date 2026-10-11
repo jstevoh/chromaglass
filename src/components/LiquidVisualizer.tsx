@@ -59,7 +59,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, bassPressLevel, type Presser, type Stroke } from '../lib/squish';
 import { levels01 } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -8233,10 +8233,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
                   // At impact=1.0 + auto → ~4.9x baseline
                   const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
+                  /*
+                    How loud this passage is against the song's loud ones, as an
+                    amplitude (lib/soundLevels.ts, Passage): 1 in the groove,
+                    about 0.4 in a breakdown 8 dB down. Every hand below is
+                    scaled by it, the pours, the bursts and the bass's press,
+                    because the levels they read are each ranged against their
+                    own ceiling and read a breakdown at 0.6 to 0.76 of the
+                    groove, and the press, which moves the plate on the bass's
+                    swing, read it busier than the groove (PLAN 28d,
+                    `npm run breakdown`). Absent (a producer that cannot hear
+                    it), it is 1, the plate as it was.
+                  */
+                  const passage = Math.max(0, Math.min(1, currentAudioData.passage ?? 1));
                   // Evolve used to multiply every music reaction by 2.2 — dye,
                   // heat, bursts — which is most of why it read as massive. It
                   // leaves the music's own reactions as the look sets them now.
-                  const autoAmp = impactMul;
+                  const autoAmp = impactMul * passage;
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
@@ -8290,7 +8303,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bassPressAt = {
                     x: bassX, y: bassY,
                     r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-                    depth: bassPressDepth(vel01, currentSettings.audioImpact ?? 0.45),
+                    depth: bassPressDepth(bassPressLevel(velRaw, velRoute === 'energy'), currentSettings.audioImpact ?? 0.45) * passage,
                   };
                   // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
                   if (vel01 > 0.25 && !activeFluid.thinGap) {
@@ -8374,7 +8387,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const sparkCol = trebleArea ? areaCycle(activeLayerRef.current, trebleArea, areaTime + 1.55) : colFor(3.1);
                     // Fewer, larger droplets: a cloud of one-cell specks blurs
                     // into fog, a handful of real drops stays drops.
-                    const sparks = Math.floor(treble01 * 2 * impactMul);
+                    // As many as the passage is loud (autoAmp carries it): a breakdown glitters less.
+                    const sparks = Math.floor(treble01 * 2 * autoAmp);
                     for (let s = 0; s < sparks; s++) {
                       const sp = trebleArea ? pointInArea(trebleArea, GRID_SIZE, DICE.music) : null;
                       const sx = sp ? Math.floor(sp.x) : DICE.music.int(GRID_SIZE - 20) + 10;
