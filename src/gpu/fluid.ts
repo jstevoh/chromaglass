@@ -166,11 +166,13 @@ const OIL_TENSION = 4e-4;
 */
 const OIL_CELLS = 0.5;
 const SOAP_PULL = 0.5;
-const THERMAL_MARANGONI = 0.015;
 const DYE_WEIGHT = 0.12;
 const HEAT_LIFT = 0.06;
-/** The lamp heating rate: absorbed lamp light turning into heat per second (PLAN §18f). */
-const LAMP_HEATING = 1.5;
+/**
+ * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
+ * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
+ */
+const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 const LAMP_HEAT = 6;
 /** Vorticity confinement's push, as a fraction of the local spin, per step. */
@@ -2586,22 +2588,20 @@ export class WebGPUFluid {
     }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
-      away from soap and hot spots along the surface, conservatively (PLAN §18f).
-      The mix goes second, reading the same fields the dye was moved by.
+      away from soap along the surface, conservatively. The mix goes second,
+      reading the same soap the dye was moved by.
     */
-    const lamp = typeof p.dimmer === 'number' && Number.isFinite(p.dimmer) ? p.dimmer : 1.0;
-    const pullHeat = THERMAL_MARANGONI * lamp * (p.magnetSeconds ?? 1 / 60) * N;
     stage('marangoni', (pass) => {
       const pull = soap * SOAP_PULL * (p.magnetSeconds ?? 1 / 60) * N;
-      const k = this.arg('marangoni', [pull, 0, pullHeat, 0]);
-      const kMix = this.arg('marangoni mix', [pull, 1, pullHeat, 0]);
+      const k = this.arg('marangoni', [pull, 0, 0, 0]);
+      const kMix = this.arg('marangoni mix', [pull, 1, 0, 0]);
       for (let s2 = 0; s2 < 2; s2++) {
-        this.run(pass, 'marangoniFlux', this.dye.write, [this.dye.read, mix!.read, this.vel.read], k);
+        this.run(pass, 'marangoniFlux', this.dye.write, [this.dye.read, mix!.read], k);
         this.dye.swap();
-        this.run(pass, 'marangoniFlux', mix!.write, [mix!.read, mix!.read, this.vel.read], kMix);
+        this.run(pass, 'marangoniFlux', mix!.write, [mix!.read, mix!.read], kMix);
         mix!.swap();
       }
-    }, !!mix && this.mixLive && (soap > 0.001 || pullHeat > 0.001));
+    }, !!mix && this.mixLive && soap > 0.001);
 
     /*
       Where air is, dye is not (H6 · A).

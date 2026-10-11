@@ -6,9 +6,9 @@
  *
  * Checks:
  *   1. Beer-Lambert absorption: dark dye heats up under the lamp, clear water stays cold
- *   2. Lamp dimmer: dimmer at 0 produces no heat even with dark dye
+ *   2. Lamp dimmer: dimmer at 0 produces no heat, scales linearly at 0.5
  *   3. Newton cooling: decay is per-second (dt-independent), so 60 steps at dt=1/60
- *      and 120 steps at dt=1/120 cool to the same temperature (within 5%, vs 336% per-step)
+ *      and 120 steps at dt=1/120 cool to the same temperature (within 2%, vs 336% per-step)
  *   4. Thermal buoyancy: on a level plate in-plane buoyancy is zero; on an upright
  *      plate warm liquid forms an upward plume along S.up
  *   5. Linear Boussinesq: thermal buoyancy is linear in temperature (tanh removed),
@@ -17,7 +17,8 @@
  *      terminal speed under gravity rises with heat (~1.5x at 30°C)
  *   7. Oil density: mix layer (oil, rho ~ 0.85) is lighter than water, so oil experiences
  *      upward buoyancy on an upright plate while heavy wax sinks, and level plate has zero
- *   8. Packed velocity export: channel z preserves fluid temperature
+ *   8. Per-channel spectral absorption: dark dye absorbs significantly more heat than pale dye
+ *      of equal volume/density (Beer-Lambert decode via lampThrough)
  */
 import { openLab } from './lab.mjs';
 
@@ -56,19 +57,27 @@ try {
     const vB = await lab.field('vel');
     const tempCenterB = vB[midIdx + 2];
 
-    return { tempCenterA, tempCornerA, tempCenterB };
+    // Test C: Dimmer at half (dimmer: 0.5)
+    await lab.create(N, N);
+    lab.dye(0.5, 0.5, 0.25, [1, 1, 1], 1.0);
+    lab.flush();
+    await lab.step(30, { dimmer: 0.5, dt: 1 / 60 });
+    const vC = await lab.field('vel');
+    const tempCenterC = vC[midIdx + 2];
+
+    return { tempCenterA, tempCornerA, tempCenterB, tempCenterC };
   });
 
   check(
     'Beer-Lambert absorption: dark dye heats under lamp while clear water stays cold',
-    heating.tempCenterA > 0.2 && heating.tempCornerA < 0.001,
-    `dark dye ${heating.tempCenterA.toFixed(4)}, clear water ${heating.tempCornerA.toFixed(4)}`
+    heating.tempCenterA > 0.03 && heating.tempCornerA < 0.0001,
+    `dark dye ${heating.tempCenterA.toFixed(4)} K, clear water ${heating.tempCornerA.toFixed(4)} K`
   );
 
   check(
-    'lamp dimmer at zero produces no heat',
-    heating.tempCenterB === 0,
-    `center temperature ${heating.tempCenterB.toFixed(4)} with dimmer 0`
+    'lamp dimmer at zero produces no heat and scales linearly at 0.5',
+    heating.tempCenterB === 0 && Math.abs(heating.tempCenterC / Math.max(heating.tempCenterA, 1e-6) - 0.5) < 0.05,
+    `dimmer 0: ${heating.tempCenterB.toFixed(4)} K, dimmer 0.5: ${heating.tempCenterC.toFixed(4)} K (${(heating.tempCenterC / Math.max(heating.tempCenterA, 1e-6)).toFixed(3)}x of dimmer 1)`
   );
 
   // ── 3: Newton cooling is per-second, not per-step ──
@@ -78,21 +87,21 @@ try {
 
     // Run A: 60 steps at dt = 1/60 (total time = 1.0s)
     await lab.create(N, N);
-    lab.vel(0.5, 0.5, 0.15, [0, 0, 10.0, 0]);
+    lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
     lab.flush();
-    await lab.step(60, { dimmer: 0.0, heatDecay: 0.98, dt: 1 / 60, diff: 0, nu: 0, advection: 0 });
+    await lab.step(60, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 60, diff: 0, nu: 0, advection: 0 });
     const vA = await lab.field('vel');
     const tempA = vA[mid + 2];
 
     // Run B: 120 steps at dt = 1/120 (total time = 1.0s)
     await lab.create(N, N);
-    lab.vel(0.5, 0.5, 0.15, [0, 0, 10.0, 0]);
+    lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
     lab.flush();
-    await lab.step(120, { dimmer: 0.0, heatDecay: 0.98, dt: 1 / 120, diff: 0, nu: 0, advection: 0 });
+    await lab.step(120, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 120, diff: 0, nu: 0, advection: 0 });
     const vB = await lab.field('vel');
     const tempB = vB[mid + 2];
 
-    const theory = 9.9765625 * Math.pow(0.98, 60);
+    const theory = 9.9765625 * Math.pow(0.98, 4.0);
     return { tempA, tempB, theory, ratio: tempA / Math.max(tempB, 1e-6) };
   });
 
@@ -228,22 +237,32 @@ try {
     `oil vy +${oilForces.vyOil.toFixed(5)}, wax vy ${oilForces.vyWax.toFixed(5)}, level vy ${oilForces.vyLevel.toFixed(6)}`
   );
 
-  // ── 8: Packed velocity export preserves temperature in channel z ──
-  const packTemp = await page.evaluate(async () => {
+  // ── 8: Per-channel spectral absorption (Beer-Lambert decode via lampThrough) ──
+  const spectralHeating = await page.evaluate(async () => {
     const N = 128;
     const midIdx = (Math.floor(N * 0.5) + Math.floor(N * 0.5) * N) * 4;
+
+    // Dark black dye: absorbances [1, 1, 1], density 1.0
     await lab.create(N, N);
-    lab.vel(0.5, 0.5, 0.2, [0.001, -0.002, 24.5, 0]);
+    lab.dye(0.5, 0.5, 0.25, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(1, { dt: 1 / 60, heatDecay: 1.0 });
-    const v = await lab.field('vel');
-    return v[midIdx + 2];
+    await lab.step(30, { dimmer: 1.0, dt: 1 / 60 });
+    const tempDark = (await lab.field('vel'))[midIdx + 2];
+
+    // Pale dye: absorbances [0.05, 0.05, 0.05], same density 1.0
+    await lab.create(N, N);
+    lab.dye(0.5, 0.5, 0.25, [0.05, 0.05, 0.05], 1.0);
+    lab.flush();
+    await lab.step(30, { dimmer: 1.0, dt: 1 / 60 });
+    const tempPale = (await lab.field('vel'))[midIdx + 2];
+
+    return { tempDark, tempPale, ratio: tempDark / Math.max(tempPale, 1e-6) };
   });
 
   check(
-    'packed-texture export preserves temperature in channel z',
-    Math.abs(packTemp - 24.5) < 0.2,
-    `temperature in channel z: ${packTemp.toFixed(2)} (expected 24.5)`
+    'per-channel spectral absorption: dark dye absorbs significantly more heat than pale dye',
+    spectralHeating.ratio > 8.0,
+    `dark dye ${spectralHeating.tempDark.toFixed(4)} K, pale dye ${spectralHeating.tempPale.toFixed(4)} K, ratio ${spectralHeating.ratio.toFixed(2)} (total density alone would give 1.00x)`
   );
 
   check('no GPU pass failed validation', gpuErrors.length === 0, gpuErrors.join(', '));

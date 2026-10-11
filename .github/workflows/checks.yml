@@ -824,6 +824,12 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,
+      # warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,
+      # and Newton cooling decays per-second with a tens-of-seconds time constant.
+      - name: The heat
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run heat
       # More colours (PLAN 18l): most looks carry five dyes and five are on the
       # plate; a dye is paler thin than deep and a deep yellow turns orange; two
       # neighbouring dyes meeting walk between their hues; the grade keeps hue.

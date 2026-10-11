@@ -88,7 +88,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var dst: texture_storage_2d<${PACKED_VEL_FORMAT}, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
-  let v = textureLoad(vel, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(v.xy, vec2f(-60000.0), vec2f(60000.0)), v.z, 1.0));
+  let v = textureLoad(vel, vec2i(id.xy), 0).xy;
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), 0.0, 1.0));
 }`,
 };

@@ -3059,18 +3059,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   marangoniFlux: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
-@group(0) @binding(4) var vel: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
 fn gm(p: vec2i, n: i32) -> f32 { return textureLoad(mix, clamp(p, vec2i(0), vec2i(n - 1)), 0).g; }
-fn tm(p: vec2i, n: i32) -> f32 { return textureLoad(vel, clamp(p, vec2i(0), vec2i(n - 1)), 0).z; }
 fn face(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec4f(0.0); }
   let dg = gm(b, n) - gm(a, n);
-  let dt_ = tm(b, n) - tm(a, n);
-  // σ(Γ, T): surface tension falls with surfactant (soap) and with temperature (thermocapillary flow).
-  // Marangoni stress pulls liquid toward higher surface tension: away from soap and away from hot spots.
-  let c = clamp(-(A.a.x * dg + A.a.z * dt_), -0.24, 0.24);
+  let c = clamp(-A.a.x * dg, -0.24, 0.24);
   var f = c * select(textureLoad(src, b, 0), textureLoad(src, a, 0), c >= 0.0);
   // The soap's own spread is a diffusion (flux kΓ∇Γ) and, explicit, it is
   // stable only below a quarter of the difference a face (a checkerboard
@@ -3690,6 +3685,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+
+// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
+fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
+  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
@@ -3698,13 +3699,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  // Newton cooling per second (PLAN §18f):
-  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 60.0);
+  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
+  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
   var temp = v.z * cool;
-  // Heat source ∝ lamp intensity × absorbed fraction (Beer-Lambert, 18b):
+  // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
   let d = textureLoad(dye, vec2i(id.xy), 0);
-  let absorbed = 1.0 - exp(-max(d.a, 0.0));
-  // Central hotspot of the lamp:
+  var absorbed = 0.0;
+  if (d.a > 1e-4) {
+    let norm = 1.0 / d.a;
+    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
+    let through = lampThrough(unit, d.a);
+    absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+  }
+  // Central hotspot of the lamp (shortcut: 1 / (1 + 2.5 r²)):
   let toCenter = uvOf(id) - vec2f(0.5);
   let r2 = dot(toCenter, toCenter);
   let hotspot = 1.0 / (1.0 + r2 * 2.5);
