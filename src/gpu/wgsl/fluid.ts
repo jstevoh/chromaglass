@@ -24,7 +24,7 @@
  */
 
 import { SPIKES_WGSL } from './spikes';
-import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
+import { DISH_METRES, DISH_GAP_RANGE, OPEN_RIM } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
 import { filmKernels } from './film';
@@ -45,7 +45,7 @@ struct Sim {
   turbScale: f32,
   spin: f32,
   tension: f32,
-  free9: f32,          // was the fingering push's strength (forcesB)
+  thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
   vibF: f32,
   drip: f32,
@@ -464,7 +464,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
   let soap = textureLoad(liquids0, p, 0).r;
-  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  // PLAN 18g: On a thin gap, colour moves by Marangoni stress / surfactant flow, not by soap destroying dye via a multiply.
+  let soapMul = select(1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0), 1.0, S.thinGap > 0.5);
   textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
 }`,
 
@@ -3673,11 +3674,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  var d = textureLoad(dye, vec2i(id.xy), 0) * S.evap;
-  // Before the clamp: an infinity through it is inf * 0, a NaN.
+  let p = vec2i(id.xy);
+  var d = textureLoad(dye, p, 0);
+  // PLAN 18g: Colour leaves by flushing over the open rim (OPEN_RIM = 0.5), not by fading.
+  // Liquid and dye carried past the circular dish rim spill into the overflow trough and leave the plate.
+  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    d = vec4f(0.0);
+  } else {
+    d *= S.evap;
+  }
+  // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  textureStore(dst, vec2i(id.xy), max(d, vec4f(0.0)));
+  textureStore(dst, p, max(d, vec4f(0.0)));
 }`,
 
   decayVel: `${HEAD}

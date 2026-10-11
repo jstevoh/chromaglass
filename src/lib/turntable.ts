@@ -52,6 +52,9 @@ export const DISH_METRES = 0.2;
 export const DISH_REST_GAP = 0.03;
 /** The narrowest and widest the squeeze lets the gap go, in plate widths (gapRest, squeezeUpdate). */
 export const DISH_GAP_RANGE = [0.004, 0.06] as const;
+/** The open circular rim of the dish (radius in plate uv coordinates from centre). Liquid and dye reaching it spill into the overflow trough (PLAN 18a, 18c, 18g). */
+export const OPEN_RIM = 0.5;
+
 
 /**
  * The liquids' kinematic viscosities, m²/s.

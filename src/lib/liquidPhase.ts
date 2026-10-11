@@ -737,8 +737,8 @@ export class LiquidPhase {
         addVy[idx] += clamp(fy);
 
         // Soap thins the film it broke, which is what leaves the clear disc
-        // a drop of it opens in a plate of dye.
-        if (mul && soap > 0) mul[idx] *= 1 - Math.min(0.5, soap * 0.22 * dt * 60);
+        // a drop of it opens in a plate of dye (PLAN 18g: bypassed on thin gap where Marangoni flow moves the dye).
+        if (mul && soap > 0 && !this.thickOnGpu) mul[idx] *= 1 - Math.min(0.5, soap * 0.22 * dt * 60);
       }
     }
   }
