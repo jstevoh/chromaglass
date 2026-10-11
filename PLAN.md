@@ -6041,6 +6041,30 @@ Turing Print" work (#331), which also made the reaction grow at all.
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
 
+- **28f. Every look answers the music through its own patches** (the owner, 2026-10-11:
+  use the patch bay so the looks answer the music more by default; the whole plate may
+  move with the music on a small named set of looks, never as the default).
+  - ~~28f-1 the dead patches and the named looks~~, ~~28f-2 the song as a patch source,
+    desk, phone and Sound learn~~ (**shipped**, this PR; `docs/plan-shipped.md` 28f).
+  - **28f-3, open (Antigravity, from `docs/sound-patches.md`).** Two or three liquid
+    patches per look, section sources first, judged on a fresh showreel.
+  - **28f-4, open.** The showreel's song (Funkorama) has a breakdown from 104 to 120 s:
+    the kick's region 22 dB down and 12 kicks in 14 s against 30. The song's shape hears
+    neither it nor the beat's return (`SONG=… npm run songpatch` prints it): only the
+    drop at 7.2 s, steady after, Section intensity 0.92 → 0.73 through it. So on a funk
+    band the In a breakdown, Build tension and Drop swell patches never move; only
+    Section intensity does. `songShape.ts` is tuned on made-up songs (27e-2); a sparse
+    kick under a breakdown must read as the beat gone.
+  - **28f-5, open.** Ten looks still sway the dish's turn with the music through the old
+    `audioMappings.rotation` slot (27a-8). The owner's rule now says which: whole-plate
+    motion from the music only on the named looks (`FRAME_MOVING_LOOKS`). Read it with
+    the owner (a slow turn is the oil wheel's move), then move them off or onto the list,
+    and count the slot in `npm run framesway`.
+  - **28f-6, open.** Pitch is mostly the bass line on a band (72% of Funkorama's frames
+    in the octave above C1): a patch on it walks with the bass, not the melody. A lead's
+    pitch needs the analyser to find the strongest note above the bass.
+
+## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more

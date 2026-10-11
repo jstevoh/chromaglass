@@ -367,6 +367,13 @@ jobs:
       - name: The frame holds still
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run framesway
+      # The looks' sound patches read something, and a patch can hear the
+      # song's shape (PLAN 28f): every shipped patch moves its control (four
+      # named a drum on a source without one and read 0), and the song's
+      # sections reach a patch eased over seconds, not on a frame.
+      - name: The looks' sound patches
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run songpatch
       # Hold stays where the closeup is (PLAN.md QA-12): the real closeup
       # camera on a made-up plate, switched to Hold from Auto and from Follow,
       # moves the frame on main's Hold and not on this one.

@@ -1313,3 +1313,20 @@ speed, ten minutes with a song that has builds and drops, then five with nothing
 3. With nothing playing it should still wander, more slowly.
 4. Say if a minute's glide reads as nothing happening (the moves are too small) or as
    the look drifting away from itself (too big).
+
+## 52. Bass Drop moves the frame, and nothing else does (PLAN 28f)
+
+On the Mac, a song with a drop (the showreel's, or anything with the beat taken out and
+brought back).
+
+1. Bass Drop is the one look whose picture moves with the music: the plate rocks on the
+   kick and harder for a phrase after the drop, the frame sliding a little with it (Frame
+   Sway 0.35). Say if it is too much, or not enough to be worth having on one look.
+2. Oil Wheel turns at its motor's speed whatever the band does; its cells drift a little
+   livelier through loud sections. Microscopic Chaos shakes beads on the hats; Aurora's
+   comets quicken with the note, and its colours walk faster through a loud section.
+3. Any other look: the frame holds still with the music.
+4. On the desk, Settings → Patches: add a patch, Source "Song", In a breakdown on
+   Turbulence at −50%. Through a breakdown the plate should calm over a couple of
+   seconds, not snap; it comes back the same way.
+

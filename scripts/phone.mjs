@@ -908,7 +908,7 @@ try {
       const patchAt = patchesBefore ?? 0;
       const featureSelect = page.getByTestId(`patch-feature-${patchAt}`);
       const featurePicked = [];
-      let featureFits = false;
+      let featureFits = false, songPicked = null;
       if (await visible(page, `patch-feature-${patchAt}`)) {
         const fb = await box(page, `patch-feature-${patchAt}`);
         featureFits = !!fb && fb.x >= 0 && fb.x + fb.width <= (page.viewportSize()?.width ?? 0);
@@ -917,6 +917,19 @@ try {
           await page.waitForTimeout(200);
           featurePicked.push((await mappings())?.[patchAt]?.feature ?? null);
         }
+        /*
+          And the song's shape (PLAN 28f): the same patch switched to the Song
+          source and pointed at a section, read back from the show's patch as
+          the source and the feature together, since a select that changed
+          only its own words, or a source left on the room with a song name,
+          would read nothing at all.
+        */
+        await page.getByTestId(`patch-source-${patchAt}`).selectOption('song');
+        await page.waitForTimeout(200);
+        await featureSelect.selectOption('inBreakdown');
+        await page.waitForTimeout(200);
+        const m = (await mappings())?.[patchAt];
+        songPicked = m ? `${m.source}:${m.feature}` : null;
         await page.getByLabel('Remove mapping').nth(patchAt).tap();
         await page.waitForTimeout(250);
       }
@@ -926,6 +939,8 @@ try {
       check('the room\'s How sudden and How busy, lately are patched from the phone\'s Settings: each lands in the show\'s patch, the select inside the screen, and the patch comes off again',
         patchesBefore !== null && featureFits && featurePicked.join() === 'motionHighFreq,motionOverTime' && patchesAfter === patchesBefore,
         `${patchesBefore} patches before; ${featureFits ? 'the select fits' : 'the select is off the screen or missing'}; the show's patch says ${featurePicked.join(', ') || 'nothing'}; ${patchesAfter} patches after`);
+      check('and the song\'s shape is patched from the phone too: the Song source, In a breakdown, lands in the show\'s patch as both',
+        songPicked === 'song:inBreakdown', `the show's patch says ${songPicked ?? 'nothing'}`);
 
       /*
         A back plate added and taken off from the Play sheet, on a look with

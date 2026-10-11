@@ -58,6 +58,7 @@ import { BackLook } from '../lib/backLook';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
+import { SongSource } from '../lib/songSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, type Presser, type Stroke } from '../lib/squish';
 import { levels01 } from '../lib/soundLevels';
@@ -5173,6 +5174,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     frame they are heard, and are kept, numbered, for the app to poll.
   */
   const songShapeRef = useRef(new SongShape());
+  /*
+    And the same, as something a patch can listen to (lib/songSource.ts):
+    each section eased over seconds, the hit and the note. Fed right after
+    the shape, read by the patch bay's fold on the next frame.
+  */
+  const songSourceRef = useRef(new SongSource());
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
@@ -6466,6 +6473,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         film: clockIsFixed() ? null : filmSenseRef?.current ?? null,
         sound: currentAudioData,
         shape: modRef.current,
+        song: songSourceRef.current,
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
@@ -6725,6 +6733,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
+          songSourceRef.current.update(songShapeRef.current.now, songEvents, heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
@@ -9551,6 +9560,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // starts again at zero: its history and references belong to the song
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
+      songSourceRef.current.reset();
       // The bar too, for the same reason: its beats are on the old clock.
       barGridRef.current.reset();
       accentRef.current.reset();

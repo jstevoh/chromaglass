@@ -109,7 +109,13 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.5,
       sceneMappings: [
         { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
-        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 45 }
+        /*
+          45 was meant as degrees, and a depth is a share of the dial's travel
+          (0..360 for the angle): at 45 the comet's heading was thrown to its
+          clamp by any timbre above 0.003. An eighth of the travel is the 45°
+          that was meant (28f).
+        */
+        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 0.125 }
       ],
       audioMappings: {
         velocity: 'bass',
@@ -336,8 +342,23 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 1.0,
       dropHeight: 0.9,
       beatSqueeze: 0.8,
+      // The one look whose music moves the frame (FRAME_MOVING_LOOKS): a
+      // third of Frame Sway's travel, so the rock carries the picture without
+      // the full slide #347 had on every look.
+      frameSway: 0.35,
       sceneMappings: [
-        { source: 'sound', feature: 'kick', setting: 'plateRock', depth: 0.5 },
+        /*
+          The kick throws the plate, and the drop throws it harder for a
+          phrase. The kick's patch was written on the `sound` source, whose
+          features are the hook's loudness, bass, mid and treble: `kick` was
+          not one of them, so it read 0 and never moved anything (28f). The
+          kick by name is the `bands` source's. Bass Drop is the one look that
+          may move the frame with the music (FRAME_MOVING_LOOKS,
+          lib/plateRock.ts): its Frame Sway below lets the rock carry the
+          picture, as nothing else on the shelf does.
+        */
+        { source: 'bands', feature: 'kick', setting: 'plateRock', depth: 0.4 },
+        { source: 'song', feature: 'dropSwell', setting: 'plateRock', depth: 0.3 },
         { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
       ],
       audioMappings: {
@@ -426,7 +447,8 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.15,
       dyeBudget: 0.55,
       sceneMappings: [
-        { source: 'sound', feature: 'hats', setting: 'beads', depth: 0.5 }
+        // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.5 }
       ],
       audioMappings: {
         velocity: 'complexity',
@@ -473,8 +495,17 @@ export const PRESETS: Preset[] = [
       ledColor: '#020818',
       secondLamp: 0.35,
       sceneMappings: [
-        { source: 'sound', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
-        { source: 'sound', feature: 'tonalMid', setting: 'hueJourney', depth: 0.5 }
+        /*
+          Both read 0 until 28f: `note` and `tonalMid` are the `bands`
+          source's names, not `sound`'s. The note keeps its patch. The hue's
+          was the tonal mids on the journey's minutes per step, which would
+          have changed its pace every frame a chord came and went; the song's
+          section moves it instead, and the other way: the colours walk
+          faster through the loud sections (a minute a step quicker at full)
+          and slower in the quiet ones, over bars.
+        */
+        { source: 'bands', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
+        { source: 'song', feature: 'intensity', setting: 'hueJourney', depth: -0.1 }
       ],
       audioMappings: {
         velocity: 'bass',
@@ -955,7 +986,15 @@ export const PRESETS: Preset[] = [
       dishVignette: 0.7,
       spinDrag: 0.08,
       sceneMappings: [
-        { source: 'sound', feature: 'mid', setting: 'rotationSpeed', depth: 0.03 }
+        /*
+          This was the band's mid on the dish's motor, which turned the whole
+          wheel faster with the music. A real oil wheel turns at its motor's
+          speed whatever the band plays (the owner, 2026-10-11: the music
+          moves the liquid, not the frame), so the music goes into the oil
+          instead: the lamp-warmed cells rise a little livelier through the
+          loud sections, over bars (28f).
+        */
+        { source: 'song', feature: 'intensity', setting: 'buoyancy', depth: 0.075 }
       ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }

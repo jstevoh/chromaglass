@@ -199,7 +199,8 @@
     "mac-app": "npm run build && npm --prefix desktop run dist",
     "lampjudge": "node scripts/lampjudge.mjs",
     "clicks": "esbuild scripts/clicks.mjs --bundle --platform=node --format=esm --external:playwright --log-level=warning --outfile=node_modules/.cache/clicks.mjs && node node_modules/.cache/clicks.mjs",
-    "framesway": "node scripts/framesway.mjs"
+    "framesway": "node scripts/framesway.mjs",
+    "songpatch": "esbuild scripts/songpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/songpatch.mjs && node node_modules/.cache/songpatch.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
