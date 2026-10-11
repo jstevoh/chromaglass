@@ -1,10 +1,11 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
+import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
+import { isPadPicture, type PadPictureMessage } from '../lib/padPicture';
 import { MARK_URL } from '../brand';
 
 /**
@@ -67,6 +68,75 @@ function useScreen(): { tablet: boolean; side: boolean } {
   return screen;
 }
 
+/** A wall's shape as people say it: 16:9, 4:3; otherwise to two places. */
+export function ratioName(aspect: number): string {
+  const known: [number, number][] = [[16, 9], [16, 10], [4, 3], [3, 2], [5, 4], [1, 1], [21, 9], [9, 16], [10, 16], [3, 4]];
+  for (const [w, h] of known) if (Math.abs(aspect - w / h) <= 0.01 * (w / h)) return `${w}:${h}`;
+  return `${aspect.toFixed(2)}:1`;
+}
+
+/** A picture older than this is a laptop that stopped drawing (a hidden window, an older build): the frame dims. */
+const STALE_MS = 2000;
+
+/**
+ * The wall in Draw's frame: the laptop's picture, painted as it lands.
+ *
+ * By hand on a canvas, not through React: fifteen pictures a second through
+ * state would re-render Draw, and through Draw all of RemoteControl, under
+ * every finger. Decoding is latest-wins: while one picture decodes, only the
+ * newest that arrived meanwhile waits, so a slow phone shows the wall late
+ * by one picture rather than by a queue of them. The frame takes the
+ * picture's shape (`onAspect`), which is the wall's, so a circle drawn on the
+ * pad is a circle on a 4:3 wall too.
+ */
+function useWallPicture(sink: DrawScreenProps['pictureSink'], onAspect: (a: number) => void) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const aspectRef = useRef(onAspect);
+  aspectRef.current = onAspect;
+  useEffect(() => {
+    let busy = false;
+    let next: PadPictureMessage | null = null;
+    let frames = 0;
+    let at = 0;
+    const decode = (m: PadPictureMessage) => {
+      busy = true;
+      const img = new Image();
+      const done = (ok: boolean) => {
+        const canvas = canvasRef.current;
+        if (ok && canvas) {
+          if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+          }
+          canvas.getContext('2d')?.drawImage(img, 0, 0);
+          frames++;
+          at = performance.now();
+          canvas.dataset.frames = String(frames);
+          canvas.style.opacity = '1';
+          aspectRef.current(m.aspect);
+        }
+        busy = false;
+        if (next) { const n = next; next = null; decode(n); }
+      };
+      img.onload = () => done(true);
+      img.onerror = () => done(false);
+      img.src = m.src;
+    };
+    sink.current = (m) => {
+      if (!isPadPicture(m)) return;
+      if (busy) { next = m; return; }
+      decode(m);
+    };
+    // A picture that stops coming is said, not passed off as the wall now.
+    const stale = setInterval(() => {
+      const canvas = canvasRef.current;
+      if (canvas && frames > 0 && performance.now() - at > STALE_MS) canvas.style.opacity = '0.35';
+    }, 500);
+    return () => { sink.current = null; clearInterval(stale); };
+  }, [sink]);
+  return canvasRef;
+}
+
 export interface DrawScreenProps {
   connected: boolean;
   /** The link's own words for why it is not linked yet (finding the laptop, a refused key). */
@@ -89,6 +159,8 @@ export interface DrawScreenProps {
   setAmount: (v: number) => void;
   /** Where the wall is: the pad handlers map a touch into this box. */
   wallRef: RefObject<HTMLDivElement | null>;
+  /** Where RemoteControl hands the laptop's pictures (lib/padPicture.ts); Draw sets it while it is up. */
+  pictureSink: MutableRefObject<((m: PadPictureMessage) => void) | null>;
   onPadDown: (e: ReactPointerEvent) => void;
   onPadMove: (e: ReactPointerEvent) => void;
   onPadUp: (e: ReactPointerEvent) => void;
@@ -107,6 +179,11 @@ export function DrawScreen(p: DrawScreenProps) {
     844-wide screen (`npm run draw`); in one row it is a third larger.
   */
   const foot = side ? 76 : 148;
+  // The wall's shape: 16:9 (the design's) until the laptop's first picture says otherwise.
+  const [aspect, setAspect] = useState(16 / 9);
+  const pictureRef = useWallPicture(p.pictureSink, (a) => {
+    setAspect(prev => (Math.abs(prev - a) > 0.002 * prev ? a : prev));
+  });
   const bottle = DEFAULT_LIQUID_TYPES.find(l => l.id === p.liquid);
   /*
     The ring a touch draws, in the dye it drops. Drawn by hand on the DOM, not
@@ -185,7 +262,8 @@ export function DrawScreen(p: DrawScreenProps) {
       data-testid="remote-pad"
     >
       {/*
-        The wall's box: the largest 16:9 that fits, from the container's own
+        The wall's box: the largest frame of the wall's shape (16:9 until the
+        laptop's picture says) that fits, from the container's own
         size (cqw/cqh), because a phone's pad is tall and the wall is wide and
         neither the width nor the height alone gives the frame. A touch is
         mapped into this box, not the screen: on a portrait phone the old full
@@ -195,13 +273,27 @@ export function DrawScreen(p: DrawScreenProps) {
       <div className={`pointer-events-none absolute flex items-center justify-center ${tablet ? 'inset-3' : 'inset-x-4 inset-y-0'}`} style={{ containerType: 'size' }}>
         <div
           ref={p.wallRef}
-          className={`relative border border-dashed ${tablet ? 'rounded-lg' : ''} ${p.connected ? 'border-white/30' : 'border-white/10'}`}
-          style={{ width: 'min(100cqw, calc(100cqh * 16 / 9))', aspectRatio: '16 / 9' }}
+          className={`relative overflow-hidden border border-dashed ${tablet ? 'rounded-lg' : ''} ${p.connected ? 'border-white/30' : 'border-white/10'}`}
+          style={{ width: `min(100cqw, calc(100cqh * ${aspect}))`, aspectRatio: String(aspect) }}
           data-testid="draw-wall"
+          data-aspect={aspect.toFixed(4)}
         >
+          {/*
+            The wall itself, stretched to the frame: the picture is the canvas
+            the laptop drew, so where a finger is on it is the point the
+            laptop maps onto the plate (`wall: true`). Gone while unlinked, so
+            a last picture never stands in for a laptop that is not there.
+          */}
+          <canvas
+            ref={pictureRef}
+            className="absolute inset-0 h-full w-full transition-opacity duration-300"
+            style={{ opacity: 0, visibility: p.connected ? 'visible' : 'hidden' }}
+            data-testid="draw-picture"
+            data-frames="0"
+          />
           {/* On the phone the dye rail lies over the frame's left edge, so the label starts past it. */}
-          <span className={`absolute top-2 font-mono text-[10px] text-muted ${tablet ? 'left-2.5' : 'left-11'}`}>
-            {tablet ? 'wall 16:9 · every touch lands on the wall' : 'wall 16:9'}
+          <span className={`absolute top-2 font-mono text-[10px] text-muted [text-shadow:0_1px_2px_#000] ${tablet ? 'left-2.5' : 'left-11'}`}>
+            {tablet ? `wall ${ratioName(aspect)} · every touch lands on the wall` : `wall ${ratioName(aspect)}`}
           </span>
           {!p.connected && (
             <span className={`pointer-events-auto absolute inset-0 flex flex-col items-center justify-center gap-3 text-center ${tablet ? 'px-6' : 'px-16'} text-[13px] text-text-2`}>

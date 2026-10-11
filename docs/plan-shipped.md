@@ -1126,6 +1126,53 @@ Measured (cloud): `draw` 76/76 (phone, phone on its side, iPad both ways, wrong 
 `applink` 49/49, `remotemix` 17/17. Pictures: the project's draw-8 folder.
 
 
+
+#### 8-draw-a. The wall under Draw's pad, and touches that land under the finger (2026-10-10)
+
+`src/lib/padPicture.ts` (new), `DrawScreen.tsx`, `RemoteControl.tsx`, `App.tsx`,
+`LiquidVisualizer.tsx` (the frame task's tap and `wallToPlate`), `remoteProtocol.ts`.
+Check: `npm run drawwall` (new; Measure's browser part) and `drawwall -- --app` (the
+Mac's tools shard).
+
+Reported: Draw's frame was black, so a hand drew blind on the phone. The laptop now
+sends what it drew: in the frame task (the only place a presented WebGPU canvas can be
+read; the projector window is drawn the same way), a copy as wide as the pad's frame
+(160–480 px) is encoded as a JPEG in a worker and sent over the relay, at most 15 a
+second, up to three in flight. Not the canvas's `toBlob`: Chromium runs it in the page's
+idle time, and the Mac's show, drawing every frame, got 2 pictures a second from it. Not one
+in flight: each round trip (bitmap, worker, answer) waits for gaps between the show's frames,
+and one at a time came to 4.3 a second at 18 frames. On WebGPU, not from the canvas at all:
+a 2D canvas's copy is the GPU's too, and its readback waited behind the plate, 6.3 a second
+at 30 frames with three in flight. The engine shrinks the frame's texture in one small pass
+on its own device and reads it back a frame or two behind, as the flash probe does
+(`gpu/padGrab.ts`), and the worker encodes the bytes on the CPU. Not a WebRTC video track: that needs signalling through
+the relay, ICE on a show network that may not route between two Wi-Fi clients, and a
+decoder that buffers, which is latency a hand feels. Nothing is sent until a remote on
+Draw asks; it renews a three-second lease every second, so a phone that locks or leaves
+Draw stops the pictures without saying goodbye, and the relay stays stateless. The pad
+paints each picture by hand on a canvas (no React render per picture), latest-wins,
+dims it when pictures stop for 2 s, hides it while unlinked, and takes its shape.
+
+Found while building it: the pad's touches were the plate's points, and the wall shows
+the middle of a plate half again as wide (1/1.5 of it across a 16:9 wall, 0.375 of it
+up), turned with the dish. A touch at the frame's top went to plate y = 1, off the wall,
+and on a turned dish (Classic's was about 110° round in the cloud probe) a touch away
+from the middle landed round from the finger. Pad
+messages now carry `wall: true` and the laptop maps them through its own pointer's
+camera (`wallToPlate`: overscan, the dish's turn, the closeup, layer 2's view); a stroke
+maps both ends, a pen's lean is turned and keeps its length, and Spin leaves the dish's
+turn out (it reads the hand's angle as the room sees it). Without the flag (OSC, an
+older remote) the point is the plate's, as before.
+
+Measured (cloud): `drawwall` 16/16 (15.0 pictures/s, 6.2 kB each on a textured 4:3
+test card; quarters the right way up; frame 333×250 = 4:3); controls: a lease that never
+lapses fails "stops sending" (161 → 176), a frame that ignores the picture's shape fails
+"4:3" (444×250). `draw` 76/76, `phone` 351, `layout` 58, `applink` 49, `remotemix` 17,
+`panel` 180. On the Mac (`drawwall --app`): the pad's picture is the plate's colour
+(159,53,82 against grabFrame's 159,53,82); on a dish turned a radian, four drops from
+the pad changed the finger's cell by 287 (median cell 4, drift 5, centre 0.69,0.58 for
+0.69,0.58); the same point without the dish's turn changed it by 11 (it landed at
+0.56,0.82), and the old plate point by 3.
 #### 8-play. Play: the phone's listening screen (2026-10-10)
 
 `src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`
@@ -1160,6 +1207,66 @@ tool and the hands the plate's loop holds, need the plate; without it they are r
 not run, and the Mac shard requires them). `saves` 33 → 38 (Play's Save), `layout` 58/58,
 `applink` 48/48 (Play here now lands on Play, and the Laptop remote is reached through All
 controls, 8-play-a), `intro` 12/12, `panel` 180/180, `desk` 27/27.
+
+#### 8b. Preview builds on a copy (2026-10-10)
+
+`App.tsx` (`drafting`, `wallLook`, `sendDraftToWall`, `wallRef`), `LiquidVisualizer.tsx`
+(`draft`, `hidden`), `desk/Desk.tsx` and `deskProps.ts` (`onOpenWall`), `scripts/draftwall.mjs` (new).
+
+What was wrong: Preview held the sequencer, a song's show and a new song's look, but the
+plate being built was the plate on the wall. The projector window is painted from the
+show's one canvas (`__chromaglassMirror`, in the frame task), so every slider tried while
+choosing the next look was on the wall as it was tried, under a plate bar that said
+"preview · not on wall".
+
+What it does now: while Preview is on and a wall is up (the projector window, a cast
+receiver or a network display), App mounts a second visualizer, `draft`, in the desk's
+preview. The first carries on drawing the wall, hidden from the desk (`visibility`, so it
+keeps its size and its frames), with the look it had when Preview took the desk off it.
+The desk edits go to the copy without each call knowing: `visualizerRef` is the copy then,
+and the show's calls (the music's harmony and triggers, the sequencer, a song's show, the
+remote's hands, the projector's size, the render) go through `wallRef`. The room's
+settings (the dimmer, the mixer, the logo's and the film's levels, `RIG_KEYS`) still reach
+the wall from the desk, and so does the music. The desk's clears, seeds and drains do not.
+A receiver that draws its own plate is sent the wall's look too.
+
+Send to wall (⌘⏎) hands the copy's look to the wall as a Go does: the dyes and pours
+adopted, the colours handed over, the settings faded over the Go's fade. With no wall up,
+Send to wall opens the projector window as before, and the header's Wall dot always does.
+Live puts the desk back on the wall's look, counters and all, so switching to Live never
+changes what the room sees; the copy's unsaved changes are dropped. The wall closing
+mid-Preview takes the copy down, and the desk carries on from the copy's look on the one
+engine.
+
+Why a whole second engine and not a third plate in the first: the frame loop walks every
+plate it holds (tilt, stir, evolve, pours, the hands), so a draft plate there would be
+moved with the live ones and drawn into the wall's frame. A second engine is its own
+device, solvers and passes; it leaves alone what is the show's (the projector's paint
+hook and frame asks, the debug hooks, the crash log's providers and heartbeat, the
+recorder's `#liquid-canvas`). With no wall up Preview stays one engine, so a Build session
+on a laptop pays for one solver, not two.
+
+The pre-push review found the edges, all fixed and measured: in the render where Preview
+ends the copy is gone before the desk is put back, and the wall's engine and a receiver
+were handed the copy's plates and counters for that one render (a plate dropped in front
+of the room; a receiver kept the copy's look). The wall's engine and a receiver now follow
+`wallLook` while it is held, not `drafting`. Live in the middle of a Send's fade landed
+halfway; it lands on the look being sent. The copy is composed at the wall's shape
+(`setStage`), the palette lock and the mark reach both engines, a film goes to the wall,
+the desk's Spin to the copy, Live puts back the saved look that was open and the wall's
+back plate, and a built-in's id is never handed a null contract (the plate tables are
+module constants both engines read).
+
+Measured: `npm run draftwall` 20/20 (new; Measure's browser part, and the Mac's open
+shard with `--frames`, where the line on what the projector window draws from must see
+frames). It reads every plate count and clear an engine was handed and every state sent to
+a receiver (`handed` on the debug hook, `sent` on the cast hook), because a value handed
+for one render is gone before a poll can see it. Controls: the wall's engine handed the
+desk's settings fails "and not the wall's engine" and "across the fade" (16/18); the wall
+following `drafting` instead of `wallLook` fails "nor for a render" (plates 1/2/1/2, clears
+2/0/2/0); the clear line's own control is in the run (with one engine the same clear
+reaches the wall, 0 → 1). `layout` 72/72, `phone` 352/352, `panel` 180/180, `desk` 40/40,
+`desklayout` 40/40. Found along the way: 8b-1 to 8b-5.
 
 #### 8g. A panel in a window of its own (2026-10-10)
 
@@ -1244,6 +1351,34 @@ the header clear of the switch at 1024 with a seventh dot in it, folding and unf
 the dots fit, and a take's Rec dot folding a full header and unfolding it when the take stops; the "every status dot is labelled" check opens the fold and counts the five dots inside
 it, not the one button); `phone` 369/369 with Play's double tap back to the look's speed; `panel` 180/180; `wgsl`;
 `desklayout` 40/40.
+
+**8i, shipped 2026-10-10: fewer panels, each usable at any size.** Three asks from the
+owner in one evening, with screenshots. *No setting alone on a panel*: a knobs panel draws
+the numbers of its section, so Sound Mappings (Sound Drive and four band pickers) was a
+panel of one knob and Heat Slide one of two. Sound Mappings went into Sound (Sound Drive
+first, the bands under "What the sound moves"), where Room Drive and Film Drive already
+sit with their sources; Heat Slide went into Fluid Physics beside Heat Spread and
+Buoyancy. `MERGED_SECTIONS` in `settingsMap.ts` sends the old ids on: a saved layout
+naming them opens the merged panel in the same place (`sanitizeLayout`), and
+`openSettingsAt` follows them. Build's deck has Sound where Sound Mappings was. MIDI maps
+and presets name settings, not sections, so nothing in them moved. *Fade and Go
+smaller*: the strip under the cue list went from 140px to 68px (a fade row that fills the
+column, so 8s no longer ran past it, and a 36px Go); Back and Freeze are off it, and
+stay on ⌫ and F, ⌘K, and their MIDI actions. *Panels as windows resize*: the frame
+clips its rounded corners, and the Dyes body did not scroll, so on Gig's 236px deck
+Palette, Image and Video were out of reach; and the palette list opened below its button
+whatever was there. Every panel body now scrolls (never sideways), the swatch grid fits
+as many 28px swatches a row as there is room for, the palette list opens over its button
+when there is no room under it and is never taller than the window, and the Sound
+section's source switch and the Video section's source buttons narrow or wrap to a
+312px panel. Measured: `desklayout` 40/45 on main → 45/45 (no knobs panel under three,
+the old ids landing on the merged panels, never twice); `layout`'s new reach check
+(every control in every panel, scrolled into view only by what a hand can scroll, then
+hit with a pointer: the three shipped layouts at 1024, 1280, 1440, 1920 and an iPad's
+1180, every panel in the deck, in a column and floating) is red on main (Gig's Dyes
+panel: Image and Video out of reach, and the palette list 667–1087px in a 700px window;
+Load-in's Sound: Band cut off) and 4,162 controls in 255 panels over 23 desks reachable
+after. `layout` 72 → 73. It takes the run from about one minute to under three.
 
 ### 9. Ferrofluid after the references
 

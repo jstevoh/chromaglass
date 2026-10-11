@@ -85,7 +85,7 @@ export function Button({
 // ── Segmented control ────────────────────────────────────────────────
 
 export function Segmented<T extends string>({
-  value, options, onChange, height = 36, testId, compact = false, divideBefore, tight = false,
+  value, options, onChange, height = 36, testId, compact = false, divideBefore, tight = false, fill = false,
 }: {
   value: T;
   options: readonly (readonly [T, string] | readonly [T, string, string])[];
@@ -116,9 +116,15 @@ export function Segmented<T extends string>({
   divideBefore?: T;
   /** Narrower items, for a header that has to fit at 1024. */
   tight?: boolean;
+  /**
+   * Across the whole of its row, the options sharing it evenly and narrowing
+   * with it: the cue list's Fade, which at 15px a side per option ran its 8s
+   * past a 272px column.
+   */
+  fill?: boolean;
 }) {
   return (
-    <div className={`inline-flex items-center rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''}`} role="tablist" data-testid={testId}>
+    <div className={`${fill ? 'flex w-full min-w-0' : 'inline-flex'} items-center rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''}`} role="tablist" data-testid={testId}>
       {options.map(([id, label, kbd]) => (
         <span key={id} className="contents">
         {divideBefore === id && <span className="mx-1 h-5 w-px shrink-0 bg-white/10" aria-hidden />}
@@ -130,7 +136,7 @@ export function Segmented<T extends string>({
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
           title={compact && kbd ? `${label} (${kbd})` : undefined}
-          className={`inline-flex items-center gap-1.5 rounded-sm ${compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
+          className={`inline-flex items-center gap-1.5 rounded-sm ${fill ? 'min-w-0 flex-1 justify-center px-1 text-[12px]' : compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
             value === id ? 'bg-active text-text' : 'text-muted hover:text-text-2'
           }`}
         >
@@ -689,7 +695,17 @@ export function PanelFrame({
           </button>
         )}
       </header>
-      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col px-3 pb-2.5 ${bodyClassName}`}>{children}</div>}
+      {/*
+        The body scrolls when what is in it is taller than the room it was
+        given. It did not, and the frame clips (`overflow-hidden`, for its
+        rounded corners), so on Gig's deck, 236px tall, the Dyes panel's
+        Palette, Image and Video were under the deck's edge with no way to
+        reach them (the owner, 2026-10-10). The bodies that keep their own
+        scroller inside (the cue list, the knobs) still do: this one only
+        moves when theirs cannot. Never sideways: a body is laid out to its
+        panel's width, and `npm run layout` holds every control to it.
+      */}
+      {!collapsed && <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden scrollbar-hide px-3 pb-2.5 ${bodyClassName}`} data-panel-body>{children}</div>}
       {floating && !collapsed && onResizeDown && (
         <span
           onPointerDown={onResizeDown}

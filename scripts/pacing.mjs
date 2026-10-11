@@ -780,7 +780,9 @@ console.log('\nWiring');
   // since the last tick. Without it Follow the Song is a slider that does nothing.
   check('the app hands the sequencer the song\'s new events, its section and its tension, through the songCueFrom checked above',
     /import \{ songCueFrom \} from '\.\/lib\/scenePacing'/.test(app)
-    && /songCue: \(\) => \{[^}]*const \{ cue, seq \} = songCueFrom\(visualizerRef\.current\?\.songShape\(\), songCueSeqRef\.current\);\s*songCueSeqRef\.current = seq;\s*return cue;/.test(app));
+    // The wall's engine (`wallRef`): in Preview with a wall up the desk's
+    // engine is a copy (PLAN.md 8b), and the song the set paces is the room's.
+    && /songCue: \(\) => \{[^}]*const \{ cue, seq \} = songCueFrom\(wallRef\.current\?\.songShape\(\), songCueSeqRef\.current\);\s*songCueSeqRef\.current = seq;\s*return cue;/.test(app));
   check('the app hands moments and pace to the plate', /v\.pace\(sample\); return true;/.test(app)
     && /case 'pour': v\?\.pour\(\)/.test(app) && /case 'burst': v\?\.applyGesture/.test(app)
     && /case 'dyes': v\?\.stepDyes\(\)/.test(app) && /case 'drain': runActionRef\.current\?\.\('drain'\)/.test(app));
