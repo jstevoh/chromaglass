@@ -135,6 +135,14 @@ export class QualityGovernor {
     return this.rungs[this.index];
   }
 
+  get rungIndex(): number {
+    return this.index;
+  }
+
+  get failedCount(): number {
+    return this.failed.size;
+  }
+
   /**
    * The rung this machine opens a show on, below any this device has failed
    * at for good (out of memory, or a solver that would not start): a

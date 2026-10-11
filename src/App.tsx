@@ -44,7 +44,7 @@ import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
-import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
+import { relayInfo, parseRemoteGesture, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
 import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
@@ -426,8 +426,9 @@ export default function App() {
         // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
         return settingsRef.current;
       };
-    (window as unknown as { chromaglassGovernor?: unknown }).chromaglassGovernor =
-      () => (wallRef.current as unknown as { governor?: unknown })?.governor ?? null;
+    (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
+      () => wallRef.current?.governor?.() ?? null;
+    (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
@@ -2093,7 +2094,11 @@ export default function App() {
   ride.observe(settings as unknown as Record<string, unknown>);
   const rideFrame = useRef(0);
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
-    ride.write(String(key), value);
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    const clean = sanitizePatch({ [key]: value });
+    if (!Object.prototype.hasOwnProperty.call(clean, key)) return;
+    const sanitizedVal = clean[key] as number;
+    ride.write(String(key), sanitizedVal);
     setDocDirty(true);
     laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
@@ -2101,7 +2106,9 @@ export default function App() {
     rideFrame.current = requestAnimationFrame(() => {
       rideFrame.current = 0;
       const patch = ride.drain();
-      if (patch) setSettings(prev => ({ ...prev, ...patch }));
+      if (patch) {
+        setSettings(prev => ({ ...prev, ...patch }));
+      }
     });
   }, [ride]);
   useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
@@ -3772,7 +3779,6 @@ export default function App() {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {
             updateLiquidColor(selectedLiquidId, color);
-            
           }
           break;
         }
@@ -3818,55 +3824,36 @@ export default function App() {
           }
           break;
         case 'blow': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
-          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'blow') break;
           // A pen's lean is a direction, not a stroke: turned with the dish, its length kept.
-          wallRef.current?.applyGesture({ tool: 'blow', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'lean') });
+          wallRef.current?.applyGesture({ tool: 'blow', layer: g.layer, amount: g.amount, ...onWall(g.wall, g.x, g.y, g.layer, g.dx, g.dy, 'lean') });
           break;
         }
         case 'drop': {
-          if (message.color !== undefined && (typeof message.color !== 'string' || message.color.length > 9)) {
-            break;
-          }
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const color = typeof message.color === 'string' ? message.color : undefined;
-          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(message.wall, x, y, layer), layer, amount, ...laidColour(selectedLiquid, color) });
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'drop') break;
+          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
           break;
         }
         case 'press': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          wallRef.current?.applyGesture({ tool: 'press', ...onWall(message.wall, x, y, layer), layer, amount });
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'press') break;
+          wallRef.current?.applyGesture({ tool: 'press', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount });
           break;
         }
         case 'finger': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
-          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
-          wallRef.current?.applyGesture({ tool: 'finger', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'stroke') });
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'finger') break;
+          wallRef.current?.applyGesture({ tool: 'finger', layer: g.layer, amount: g.amount, ...onWall(g.wall, g.x, g.y, g.layer, g.dx, g.dy, 'stroke') });
           break;
         }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
         case 'spin': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'spin') break;
           // Untouched by the dish's turn: Spin reads the hand's angle as the room sees it.
-          wallRef.current?.applyGesture({ tool: 'spin', ...onWall(message.wall, x, y, layer, undefined, undefined, 'stroke', false), layer, amount, id });
+          wallRef.current?.applyGesture({ tool: 'spin', ...onWall(g.wall, g.x, g.y, g.layer, undefined, undefined, 'stroke', false), layer: g.layer, amount: g.amount, id: g.id });
           break;
         }
         // A remote on Draw asking for the wall (lib/padPicture.ts).
@@ -3874,9 +3861,9 @@ export default function App() {
           padPictureRef.current?.want(message.width);
           break;
         case 'tilt': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
-          wallRef.current?.setExternalTilt(x, y);
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'tilt') break;
+          wallRef.current?.setExternalTilt(g.x, g.y);
           break;
         }
         /*
