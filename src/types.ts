@@ -723,6 +723,16 @@ export interface VisualizerSettings {
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
+  /**
+   * How far the music may move the frame itself rather than the liquid
+   * (lib/plateRock.ts): Plate Rock's cover glass sliding the whole picture,
+   * the lamp following the rock, a kaleidoscope's turn and breath on the
+   * beat. 0, the default, holds the frame still and leaves the music to the
+   * liquid (the owner, 2026-10-11: watching the plate slide under the camera
+   * on every kick was nauseating). Optional so a look saved before it reads
+   * as the default.
+   */
+  frameSway?: number;
   lumia: number;              // a Wilfred lumia layer: slow folded sheets of light under the dye (or over it, by the Mixer's order), no beat, no dye
   chemistry: number;          // a reaction-diffusion field grows patterns that deposit dye — Boyle's bench, not a clock face
   chemistryPattern: number;
@@ -1054,6 +1064,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lacing: 0,
   bubbles: 0.2,
   plateRock: 0.45,
+  frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
   layerScaleVariety: 0.5,
   hueJourney: 3,
   beatSqueeze: 0.0,
