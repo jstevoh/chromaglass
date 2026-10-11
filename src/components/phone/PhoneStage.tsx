@@ -9,6 +9,7 @@ import {
   Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
+import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
@@ -264,11 +265,8 @@ export interface PhoneStageProps {
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
 function PhoneSheet({ title, onClose, children, testId }: { title: string; onClose: () => void; children: ReactNode; testId: string }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // As the desk's Sheet: listened for once, or the key can be dropped (useEscape).
+  useEscape(onClose);
   return (
     // pointer-events-auto: the stage around it is click-through so the plate
     // under it takes fingers, and a sheet inherited that and took none.
