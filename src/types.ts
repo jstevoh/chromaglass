@@ -265,6 +265,9 @@ export type ViscosityMode = (typeof VISCOSITY_MODES)[number];
 export const MACRO_CAMERA_MODES = ['hold', 'follow', 'auto'] as const;
 export type MacroCameraMode = (typeof MACRO_CAMERA_MODES)[number];
 
+export const RENDER_STYLES = ['show', 'photo'] as const;
+export type RenderStyle = (typeof RENDER_STYLES)[number];
+
 export interface AudioMappings {
   velocity: AudioFeature;
   density: AudioFeature;
@@ -851,7 +854,7 @@ export interface VisualizerSettings {
   iridescence: number;        // thin-film colour running round bubble rims
 
   // Photograph — the macro shot of oil on water rather than the projected show
-  renderStyle: 'show' | 'photo'; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
+  renderStyle: RenderStyle; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
   paperA: string;             // the backdrop's two colours
   paperB: string;
   camera: number;             // the camera pass as a whole (0 = off): refraction, depth of field, bloom, chromatic aberration, the sensor's roll-off
