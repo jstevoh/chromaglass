@@ -25,7 +25,15 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
-import { driftLook } from '../src/lib/drift.ts';
+import { THEMES, moveTargets } from '../src/lib/drift.ts';
+/*
+  One of Evolve's moves (lib/slowEvolve.ts plans when and which way): a theme
+  picked by the roll, its dials sent somewhere in their windows. The checks
+  below were written against the old two-dial nudge; they hold every move to
+  the same rules.
+*/
+const driftLook = (current, anchor, amount, roll) =>
+  moveTargets(THEMES[Math.floor(roll() * THEMES.length)], current, anchor, roll() * 2 - 1, amount, roll);
 import { lookSpeed, musicPace, tempoMultiplier } from '../src/lib/tempoPace.ts';
 import { finishTake, takeSong, replayPosition, dueGestures, songStartMs } from '../src/lib/performanceTake.ts';
 import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/lib/autoMap.ts';

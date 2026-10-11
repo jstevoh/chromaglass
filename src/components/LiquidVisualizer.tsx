@@ -859,6 +859,12 @@ export interface LiquidVisualizerHandle {
   setHarmony: (indices: number[]) => void;
   /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
   setHarmonyLock: (indices: number[] | null) => void;
+  /**
+   * Evolve turns the palette for the dye still to come (lib/slowEvolve.ts: at a
+   * drop or a breakdown, or every few minutes with no music). Nothing already
+   * on the plate changes colour; a palette lock or a hue journey keeps its own.
+   */
+  evolvePalette: () => void;
   /** Fire a themed dye burst for a lyric word-trigger. */
   triggerTheme: (theme: string, energy?: number) => void;
   /** Re-fire a recorded manual gesture (performance replay). Normalized coords; `layer` defaults to the active one. */
@@ -5132,6 +5138,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const soapAtRef = useRef(0);
   const liesSeedAtRef = useRef(0);
   const loudnessRef = useRef(0);
+  /** The music's level over the last half minute, for Evolve's hands (lib/slowEvolve.ts). */
+  const evolveLoudRef = useRef(0);
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
@@ -5247,7 +5255,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     another. Two integers make the difference between "the plate moved" and
     "evolving thinned it twice and drew a finger through it once".
   */
-  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0 });
+  const autoEventsRef = useRef({ thinned: 0, stroked: 0, poured: 0, palettes: 0 });
   /*
     A finger the automation is drawing, over frames rather than in one.
 
@@ -5314,6 +5322,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const filmGainRef = useRef(4.5);
 
   const drawnRectRef = useRef<(() => DOMRect) | null>(null);
+  /** A window point on the lead plate, in plate units, as a hand there would land (`chromaglassDebug().plateAt`). */
+  const plateAtRef = useRef<((clientX: number, clientY: number) => { x: number; y: number }) | null>(null);
   const wallPointRef = useRef<((u: number, v: number, layer: number, turned: boolean) => { x: number; y: number }) | null>(null);
   /**
    * A gesture from any hand, applied to the plate.
@@ -6106,6 +6116,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       harmonyLockRef.current = indices;
       if (indices) harmonyRef.current = indices;
     },
+    evolvePalette: () => {
+      if (harmonyLockRef.current || (settingsRef.current.hueJourney ?? 0) > 0) return;
+      harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
+      autoEventsRef.current.palettes = (autoEventsRef.current.palettes ?? 0) + 1;
+    },
     triggerTheme: (theme: string, energy = 0.6) => {
       const af = fluidsRef.current[activeLayerRef.current];
       if (!af || drainFrameRef.current > 0) return;
@@ -6766,11 +6781,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // and a render does not follow it: its pace is the song's own, heard.
           const bpm = (clockIsFixed() ? 0 : tempoRef?.current?.bpm) || heard;
           const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
-          loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / 8));
+          /*
+            Under Evolve the pace hears the song over half a minute and eases
+            over twenty seconds, not eight and three: Evolve leans hardest on
+            the music's pace (tempoPace.ts), so it was the one place the plate's
+            speed still swung with a loud few bars. A song's pace is its
+            tempo and its sections, and those last minutes.
+          */
+          const evolving = isAutomatedRef.current;
+          loudnessRef.current += (energy - loudnessRef.current) * (1 - Math.exp(-realDt / (evolving ? 30 : 8)));
+          // Evolve's hands hear the same half minute (the automation below).
+          evolveLoudRef.current += (energy - evolveLoudRef.current) * (1 - Math.exp(-realDt / 30));
           const playing = isActiveRef.current && !!currentAudioData && loudnessRef.current > 0.01;
           const want = tempoMultiplier(lookSpeed(currentSettings), musicPace(bpm, loudnessRef.current, playing),
-            currentSettings.tempoSync ?? 0.5, isAutomatedRef.current);
-          tempoMulRef.current += (want - tempoMulRef.current) * (1 - Math.exp(-realDt / 3));
+            currentSettings.tempoSync ?? 0.5, evolving);
+          tempoMulRef.current += (want - tempoMulRef.current) * (1 - Math.exp(-realDt / (evolving ? 20 : 3)));
           for (const f of fluidsRef.current) if (f) f.tempoMul = tempoMulRef.current;
         }
         dynamicSpeed *= tempoMulRef.current;
@@ -7790,9 +7815,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
             const rate = Math.max(0, Math.min(1, currentSettings.automateRate ?? 0.12));
-            const energy = currentAudioData ? Math.min(1, currentAudioData.energy) : 0;
-            const trebleBoost = currentAudioData ? currentAudioData.treble / 255 : 0;
-            const spectralCentroid = currentAudioData ? currentAudioData.spectralCentroid : 0;
+            /*
+              What the hands hear: the song over the last half minute, and its
+              section. Not the frame's energy, treble and spectral centroid,
+              which they used to read for every drop: the size of a drop, the
+              heat under it and whether it was a drop or a puff of air all
+              followed the moment, and the owner saw Evolve "directly reacting
+              to frequency and bouncing around" (2026-10-11). The kick and the
+              bands still reach the plate through the look's own sound
+              settings; Evolve is the slow hand, and now it is only that.
+
+              A build reaches for the air more (a riser is a held breath) and a
+              little more often; a breakdown leaves the dish alone more.
+            */
+            const energy = evolveLoudRef.current;
+            const section = songShapeRef.current.now.section;
+            const sectionRate = section === 'breakdown' ? 0.5 : section === 'build' ? 1.25 : 1;
+            const airShare = section === 'build' ? 0.45 : 0.25;
 
             /*
               The rate scales everything: at the default it is one small drop
@@ -7857,7 +7896,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // about one a second at full — against two or three a
             // second before, each of them large.
             // A paced scene's rests are rests for the automation's hands too.
-            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * ph.drive * paceNowRef.current.activity) {
+            if (DICE.evolve.float() < rate * (0.012 + energy * 0.03) * sectionRate * ph.drive * paceNowRef.current.activity) {
               const af = DICE.evolve.pick(fluidsRef.current);
               if (af) {
                 // A look built on areas tends them: the drop lands in one of
@@ -7868,7 +7907,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const at = area ? pointInArea(area, GRID_SIZE, DICE.evolve) : null;
                 const rx = at ? Math.floor(at.x) : DICE.evolve.int(GRID_SIZE - 20) + 10;
                 const ry = at ? Math.floor(at.y) : DICE.evolve.int(GRID_SIZE - 20) + 10;
-                const isBlow = DICE.evolve.float() > 0.75 - (spectralCentroid / 128) * 0.4;
+                const isBlow = DICE.evolve.float() < airShare;
                 if (af === fluidsRef.current[0] && (currentSettings.bubbles ?? 0) > 0) {
                   bubblesRef.current.disturb(rx, ry, (isBlow ? 5 : 4) * GRID_SCALE, isBlow ? 'air' : 'dye', 0.8);
                 }
@@ -7887,7 +7926,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
                   af.autoInject(style, rx, ry, 1.5 + energy * 4, color.r, color.g, color.b, energy);
-                  af.addTemp(rx, ry, 0.3 + trebleBoost * 1.5);
+                  af.addTemp(rx, ry, 0.3 + energy * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
                   // At an area, the bottle is the one kept there.
@@ -7897,13 +7936,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
 
-            // With no hue journey set, an evolving plate re-picks its palette at
-            // random every ~3 min (it was ~45 s). Only the dye still to come
-            // takes the new colours, so with small drops this is a drift, not
-            // a change of scene. The journey itself runs below, evolving or not.
-            if (!harmonyLockRef.current && (currentSettings.hueJourney ?? 0) <= 0 && DICE.evolve.float() < 0.0001) {
-              harmonyRef.current = presetContractRef.current ? harmonyFromContract(presetContractRef.current, false) : pickHarmony();
-            }
+            // The palette turns at the song's drops and breakdowns now, or every
+            // few minutes with no music, from App (lib/slowEvolve.ts, and
+            // `evolvePalette` on the handle): it used to be a one-in-ten-thousand
+            // roll every frame, so how often it came depended on the frame rate
+            // and when had nothing to do with the song.
 
             /*
               And dye leaves, which nothing here used to do.
@@ -9525,6 +9562,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       simAccumRef.current = 0;
       wanderClockRef.current = 0;
       loudnessRef.current = 0;
+      evolveLoudRef.current = 0;
       tempoMulRef.current = 1;
       kickRef.current = { kick: false, predicted: false };
       kickCountRef.current = 0;
@@ -10876,6 +10914,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           /** The second phase (H7), for the harness. */
           /** Where the hand holds the magnet (plate units), while it does. */
           magnetHand: () => magnetHandRef.current,
+          /**
+           * Where on the plate a hand at this window point would land (plate
+           * units, unrounded): the pointer's own mapping, turn and closeup and
+           * all, so `npm run magnet` can lay its drag out on the plate rather
+           * than across the window.
+           */
+          plateAt: (clientX: number, clientY: number) => plateAtRef.current?.(clientX, clientY) ?? null,
           magnetNow: () => lastMagnetRef.current,
           phaseLays: () => phaseLaysRef.current,
           readPhase: async () => {
@@ -11047,6 +11092,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         fy = ((fy / GRID_SIZE - 0.5) / view.zoom + 0.5 + view.dy) * GRID_SIZE;
       }
       return { x: fx, y: fy };
+    };
+    plateAtRef.current = (clientX, clientY) => {
+      const p = fluidPointAt(clientX, clientY, drawnRect());
+      return { x: p.x / GRID_SIZE, y: p.y / GRID_SIZE };
     };
     const getTransformedMousePos = (clientX: number, clientY: number, rect: DOMRect) => {
       const p = fluidPointAt(clientX, clientY, rect);
