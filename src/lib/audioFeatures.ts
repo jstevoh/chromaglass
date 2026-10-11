@@ -157,8 +157,8 @@ export interface OnsetState {
    * `strength` is on the one reading the hit landed on, like `hit`, and the
    * show's loop is handed the newest reading once a frame: a plate drawing at
    * twenty frames a second never sees two readings in three. Whatever reads a
-   * hit's strength by seeing `at` move (the patch bay's Hit strength,
-   * `songSource.ts`) reads it here.
+   * hit's strength by seeing `at` move (the patch bay's Hits source,
+   * `hitSource.ts`) reads it here.
    */
   last: number;
 }

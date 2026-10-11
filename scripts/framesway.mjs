@@ -117,7 +117,7 @@ function song(S) {
 const pc = (x) => `${(100 * x).toFixed(3)}%`;
 
 // ── 1. Every look and every show stage, as shipped ────────────────────
-const looks = L.PRESETS.map((p) => ({ id: p.id, name: p.name ?? p.id, S: { ...L.DEFAULT_SETTINGS, ...p.settings } }));
+const looks = L.PRESETS.map((p) => ({ id: p.id, preset: p, name: p.name ?? p.id, S: { ...L.DEFAULT_SETTINGS, ...p.settings } }));
 looks.unshift({ id: null, name: 'the defaults', S: { ...L.DEFAULT_SETTINGS } });
 for (const seq of L.builtInSequences()) {
   for (const st of seq.stages ?? []) {
@@ -126,13 +126,18 @@ for (const seq of L.builtInSequences()) {
   }
 }
 const named = (l) => l.id !== null && L.FRAME_MOVING_LOOKS.has(l.id);
-const moved = [], namedMoved = [];
+const moved = [], namedMoved = [], namedSlid = new Set();
 let worstBefore = { slidePeak: 0 }, rocked = 0, held = 0;
 for (const l of looks) {
   const { name, S } = l;
   const now = song(S), was = song({ ...S, frameSway: 1 });
   const moves = now.slidePeak > 0 || now.lampPeak > 0 || now.beat > 0;
-  if (named(l)) { if (moves) namedMoved.push(`${name} (slide ${pc(now.slidePeak)} peak, lamp ${pc(now.lampPeak)}, beat ${now.beat})`); continue; }
+  if (named(l)) {
+    if (moves) namedMoved.push(`${name} (slide ${pc(now.slidePeak)} peak, lamp ${pc(now.lampPeak)}, beat ${now.beat})`);
+    // The look itself, not a show stage that plays it, and the picture slid, not merely a dial set.
+    if (L.PRESETS.some((p) => p === l.preset) && now.slidePeak >= 0.0005) namedSlid.add(l.id);
+    continue;
+  }
   held++;
   if (moves) moved.push(`${name} (slide ${pc(now.slidePeak)}, lamp ${pc(now.lampPeak)}, beat ${now.beat})`);
   if (was.slidePeak > worstBefore.slidePeak) worstBefore = { ...was, name };
@@ -154,7 +159,7 @@ check('every shipped look and show stage not named to move the frame holds it st
   motor. A scene patch (the room camera) is a different matter, read by the
   room's own checks, and is not counted.
 */
-const SOUND = new Set(['sound', 'bands', 'song']);
+const SOUND = new Set(['sound', 'bands', 'hits']);
 const frameRoutes = (S) => (S.sceneMappings ?? []).filter((m) => m && SOUND.has(m.source ?? 'room') && L.FRAME_MOTION.has(m.setting)).map((m) => `${m.source}:${m.feature} on ${m.setting}`);
 const outside = [];
 for (const l of looks) {
@@ -173,8 +178,8 @@ console.log(`   named to move the frame: ${list.join(', ') || 'none'}; on the so
 check(`only the named looks move the frame with the music, and they are a handful (at most ${L.FRAME_MOVING_MOST}) of shipped looks that use it`,
   outside.length === 0 && list.length <= L.FRAME_MOVING_MOST && unknown.length === 0 && unused.length === 0,
   `${outside.length ? `outside the list: ${outside.join('; ')}` : 'nothing outside the list'}; ${list.length} named${unknown.length ? `, not shipped: ${unknown.join(', ')}` : ''}${unused.length ? `, not using it: ${unused.join(', ')}` : ''}`);
-check('and a look on the list does move the frame on the song (its Frame Sway carries the rock), so the opt-in is a real one',
-  list.length === 0 || namedMoved.length >= list.length, namedMoved.join('; ') || 'none moved');
+check('and each look on the list, as shipped, does slide the picture on the song (0.05% of the plate a frame or more at its peak), so the opt-in is a real one',
+  list.every((id) => namedSlid.has(id)), `${namedSlid.size} of ${list.length} slid: ${namedMoved.join('; ') || 'none moved'}`);
 
 /*
   And nothing but a hand turns it on (the owner, 2026-10-11: "It's fine if

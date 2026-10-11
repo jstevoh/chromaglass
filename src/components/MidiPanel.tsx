@@ -1,3 +1,4 @@
+import { HIT_FEATURES } from '../lib/hitSource';
 import { useRef, useState } from 'react';
 import { Sheet } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
@@ -77,7 +78,9 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
   const [source, setSource] = useState<MusicSource>(existing[0]?.source ?? 'kick');
   const [depth, setDepth] = useState<number>(existing.find(b => b.source === source)?.depth ?? 0.5);
   // "the kick", but "Band 4 · 378–800 Hz" keeps its capitals: it is a name and a unit.
-  const name = source.startsWith('band') ? MUSIC_SOURCE_LABELS[source] : `the ${MUSIC_SOURCE_LABELS[source].toLowerCase()}`;
+  // And a hit ("Kick hit", "Any hit (kick or snare)") is a name too: "the any hit" is not English.
+  const name = source.startsWith('band') || (HIT_FEATURES as readonly string[]).includes(source)
+    ? MUSIC_SOURCE_LABELS[source] : `the ${MUSIC_SOURCE_LABELS[source].toLowerCase()}`;
   return (
     <div className="mb-2 mt-1 rounded-lg border border-amber-300/30 bg-amber-300/5 p-2" data-testid="sound-editor">
       <div className="flex flex-wrap items-center gap-2">

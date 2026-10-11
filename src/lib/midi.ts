@@ -15,7 +15,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types.ts';
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
-import { SONG_FEATURES, SONG_FEATURE_LABELS, type SongFeature } from './songSource.ts';
+import { HIT_FEATURES, HIT_FEATURE_LABELS, type HitFeature } from './hitSource.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
@@ -155,17 +155,16 @@ export interface MidiBinding {
  * coming except the build, which is exactly what a performer bound to the
  * build is there to answer).
  */
-export type MusicSource = SourceName | SongFeature | 'beat' | 'bar' | SongEventKind;
+export type MusicSource = SourceName | HitFeature | 'beat' | 'bar' | SongEventKind;
 /** The sources a trigger can fire on: everything with a moment. */
 export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', 'bar', ...SONG_EVENTS];
 /**
  * The sources a mapping can follow: everything with a level. The named
- * sources and the bands, and the song's shape as a level (`songSource.ts`):
- * how intense the section is, how far into a build, the swell after a drop,
- * whether it is in a breakdown, the last hit's strength, the note. Those are
- * levels and not triggers: a drop as a *moment* is `drop` above, and fires.
+ * sources and the bands, and the hits as levels (`hitSource.ts`): how hard
+ * each drum's last hit was, falling over a quarter second, and the note.
+ * Levels and not triggers: a kick as a *moment* is `kick` above, and fires.
  */
-export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...SONG_FEATURES];
+export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES];
 
 const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 0 : 1)}k` : `${Math.round(f)}`);
 /**
@@ -179,7 +178,7 @@ export const MUSIC_SOURCE_LABELS: Record<MusicSource, string> = {
   ...Object.fromEntries(BAND_SOURCES.map((b, i) => [b, `Band ${i + 1} · ${hz(BAND_EDGES_HZ[i])}–${hz(BAND_EDGES_HZ[i + 1])} Hz`])) as Record<typeof BAND_SOURCES[number], string>,
   beat: 'Every beat', bar: 'Every bar',
   build: 'Each build', drop: 'Each drop', breakdown: 'Each breakdown',
-  ...SONG_FEATURE_LABELS,
+  ...HIT_FEATURE_LABELS,
 };
 
 /**

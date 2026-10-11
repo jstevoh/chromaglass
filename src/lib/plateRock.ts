@@ -206,7 +206,7 @@ export function frameSway(v: number | undefined): number {
   look to be a default across all presets.").
 
   So a look may, by name, and only these: a look on this list may set Frame
-  Sway above 0 and may patch the sound (the `sound`, `bands` or `song`
+  Sway above 0 and may patch the sound (the `sound`, `bands` or `hits`
   source) onto a dial that moves the whole frame (`FRAME_MOTION`,
   lib/drift.ts: the rock, the press, the kaleidoscope, the turntable, the
   lamp's swing). Every other look holds the frame still and the music moves

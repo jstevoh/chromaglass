@@ -1,5 +1,5 @@
 import type { SourceName } from './lib/audioFeatures';
-import type { SongFeature } from './lib/songSource';
+import type { HitFeature } from './lib/hitSource';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -319,13 +319,12 @@ export type SceneFeature =
  * start reading the other. It shares `sound`'s master, Sound Impact, because
  * it is the same microphone.
  *
- * `song` is the microphone a third time, at the song's own scale: how intense
- * the section is, how far into a build, the swell after a drop, whether it is
- * in a breakdown (each eased over seconds), and the hit and the note
- * (`lib/songSource.ts`). Its own source because its features are its own
+ * `hits` is the microphone a third time, by its moments: how hard each
+ * drum's last hit was, held and let fall over a quarter second, and the note
+ * (`lib/hitSource.ts`). Its own source because its features are its own
  * names, and Sound Impact is its master too.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'song' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -339,7 +338,7 @@ export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName | SongFeature;
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature;
   /** Any numeric setting — the same list a MIDI fader can learn. */
   setting: keyof VisualizerSettings;
   /** How far the feature moves it, as a share of the setting's travel. −1..1. */

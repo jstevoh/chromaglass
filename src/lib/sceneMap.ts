@@ -31,7 +31,7 @@ import { getSceneValue, type SceneReading } from './sceneSense.ts';
 import { getAudioValue, type AudioFeatureKey } from '../constants.ts';
 import { SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
 import type { ModulatorFeature, Modulators } from './modulators';
-import type { SongSource } from './songSource.ts';
+import type { HitSource } from './hitSource.ts';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
 import { PINNABLE, onStep } from './deskPins.ts';
@@ -156,11 +156,11 @@ export interface PatchContext {
    */
   shape: Modulators | null;
   /**
-   * The song's shape (`songSource.ts`): its sections, eased over seconds, and
-   * the hit and the note. The same microphone as `sound` and `bands`, so the
-   * same master, Sound Impact.
+   * The hits and the note (`hitSource.ts`): how hard each drum's last hit
+   * was, held and let fall. The same microphone as `sound` and `bands`, so
+   * the same master, Sound Impact.
    */
-  song?: SongSource | null;
+  hits?: HitSource | null;
   /** Master depth per source, so a whole source can be pulled down on a fader. */
   roomImpact: number;
   filmImpact: number;
@@ -199,11 +199,11 @@ function liveValue(
     if (ctx.soundImpact <= 0 || !reading || !NAMED.has(feature)) return null;
     return { value: sourceValue(reading, feature as SourceName), impact: ctx.soundImpact };
   }
-  // The song's shape. Read whether or not the song has a beat yet: a source
-  // that has heard nothing reads 0, which is already "nothing to say".
-  if (source === 'song') {
-    if (ctx.soundImpact <= 0 || !ctx.song) return null;
-    return { value: ctx.song.value(feature), impact: ctx.soundImpact };
+  // The hits, read as `bands` is: nothing to say with no reading this frame
+  // (the source has let its values fall by then anyway).
+  if (source === 'hits') {
+    if (ctx.soundImpact <= 0 || !ctx.hits || !ctx.sound?.features) return null;
+    return { value: ctx.hits.value(feature), impact: ctx.soundImpact };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".
