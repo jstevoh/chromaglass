@@ -1599,6 +1599,16 @@ export default function App() {
   const driftGlide = useRef(new Map<string, { from: number; to: number; at: number; seconds: number }>());
   /** Evolve's planner: when the next move starts, which dials, which way (lib/slowEvolve.ts). */
   const slowEvolveRef = useRef<SlowEvolve | null>(null);
+  /*
+    A look laid, opened, faded to or taken back: Evolve lets go of the move it
+    is making. A glide lasts up to a minute and a half now, and each half
+    second it writes its dials from where they were on the old look to where
+    they were going on it, so a move left running dragged two or three dials
+    of the new look back toward the old one for the rest of its length (found
+    in review). The planner starts again too, so its first move on the new
+    look comes after a short rest rather than wherever the old rest was.
+  */
+  const evolveLetsGo = () => { driftGlide.current.clear(); slowEvolveRef.current = null; };
 
   /*
     The Mixer's take buttons (lib/mixFade.ts), declared here because both of
@@ -1667,6 +1677,7 @@ export default function App() {
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
     lookTakesLevels();
+    evolveLetsGo();
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
     // (the microphone's calibration, the dimmer, the logo, the grid) stays.
     setSettings(prev => {
@@ -1690,6 +1701,7 @@ export default function App() {
     // was saved comes from the base rather than from whatever was playing,
     // and like any other it stops a take on the gel and the lumia.
     lookTakesLevels();
+    evolveLetsGo();
     setSettings(prev => targetLook(prev, p.settings));
     setPinnedPresetId(p.id);
     // Your own look, opened: the save sheet's Replace, and the look menu's
@@ -2594,6 +2606,7 @@ export default function App() {
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
+    evolveLetsGo();
     const from = settingsRef.current;
     const step = lookFadeStep(back);
     if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
@@ -2714,6 +2727,7 @@ export default function App() {
     const prev = previousLook.current;
     if (!prev) return;
     previousLook.current = null;
+    evolveLetsGo();
     if (prev.id) adoptPreset(prev.id);
     visualizerRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(prev.settings));
     // A take still walking stops where it is: the Back puts every row's level

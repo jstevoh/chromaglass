@@ -1612,13 +1612,16 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
    frame-moving dial out.
 
    Measured (`npm run slowevolve`, Classic, default Evolve Speed), before → after:
-   moves started 10/min → 0.9/min with a song, 0.6/min without; glide 4 s → 46–86 s;
-   fastest dial 0.78 → 0.23 %/s of its travel; the aim's fastest 45 → 2.8 thousandths
-   of the plate a second (at full speed); change over 1 min 0.37 → 0.36 % and over 10
-   min 1.21 → 1.21 % (RMS of the dials' travel), so the same amount of change, made as
-   one slow move instead of twenty twitches; the lean 0.57 after drops and −0.13 in
-   breakdowns (it heard nothing before); a level shaken ±0.3 every half second leans
-   within 0.04 of the steady song.
+   moves started 10/min → 0.7/min with a song, 0.6/min without, each followed by a rest
+   of at least 6 s; glide 4 s → 57–81 s; fastest dial 0.78 → 0.13 %/s of its travel;
+   the aim's fastest 45 → 2.5 thousandths of the plate a second (at full speed); change
+   over 1 min 0.37 → 0.31 % and over 10 min 1.21 → 1.37 % (RMS of the dials' travel),
+   so about the same amount of change, made as one slow move instead of twenty
+   twitches; the lean 0.57 after drops and −0.13 in breakdowns (it heard nothing
+   before); a level shaken ±0.3 every half second leans within 0.04 of the steady song.
+   Review found a glide carrying the old look's dials into a new one (a look laid,
+   opened, faded to or taken back now stops the move) and cues kept through a glide
+   starting the next move with no rest; both fixed and checked.
 
 ### 11. The mixer
 

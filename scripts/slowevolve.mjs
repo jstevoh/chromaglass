@@ -13,7 +13,8 @@
  * ten minutes of silence in node, half a second a step as App does, glides
  * each move exactly as App's glide does, and asserts:
  *
- *   - one move at a time, each glided over 30 to 90 seconds, and about one
+ *   - one move at a time, each glided over 30 to 90 seconds with a rest of at
+ *     least six after it (a move, then the dish left alone), and about one
  *     move a minute at the default Evolve Speed, with music and without (it
  *     was ten a minute, each over four seconds);
  *   - the look changes slowly: no dial faster than 0.5 % of its travel a
@@ -22,8 +23,9 @@
  *     second (it was 45 at the top of its four-second glide), and the change
  *     over ten minutes at least twice the change over one, so it keeps
  *     wandering rather than settling into a jitter. The amount of change in
- *     a minute is about what it was (0.36 % of the dials' travel, RMS, against
- *     0.37 %): the same change, made as one slow move instead of twenty
+ *     a minute is a little under what it was (0.31 % of the dials' travel,
+ *     RMS, against 0.37 %) and over ten a little over (1.37 % against 1.21):
+ *     about the same change, made as one slow move instead of twenty
  *     twitches;
  *   - the music steers it: the lean is livelier through builds and the half
  *     minute after a drop than through breakdowns, the moves that start
@@ -44,7 +46,7 @@
  * (docs/judging.md).
  */
 import { readFileSync } from 'node:fs';
-import { SlowEvolve, GLIDE_MIN, GLIDE_MAX } from '../src/lib/slowEvolve.ts';
+import { SlowEvolve, GLIDE_MIN, GLIDE_MAX, MIN_REST } from '../src/lib/slowEvolve.ts';
 import { DRIFTABLE, FRAME_MOTION, THEMES } from '../src/lib/drift.ts';
 import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -112,17 +114,21 @@ function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, see
   let glide = null;
   const moves = [], palettes = [], hist = [], leans = [];
   let overlap = 0, peak = 0, aimPeak = 0, touched = new Set();
+  const rests = [];
+  let endedAt = null;
   for (let t = 0; t < seconds; t += DT) {
     const ear = earAt(t, shakeRand);
     const out = ev.step(DT, ear, cur, base, rate);
     if (out.palette) palettes.push({ t, section: ear.section, sinceDrop: ear.lastDrop !== null ? t - ear.lastDrop : Infinity });
     if (out.move) {
       if (glide && glide.at < 1) overlap++;
+      if (endedAt !== null) rests.push(t - endedAt);
       const from = {};
       for (const k of Object.keys(out.move.to)) { from[k] = cur[k]; touched.add(k); }
       if (out.move.aim) { from.macroAimX = cur.macroAimX ?? 0.5; from.macroAimY = cur.macroAimY ?? 0.5; }
       glide = { move: out.move, from, at: 0, wasResting: !glide || glide.at >= 1 };
-      moves.push({ t, ...out.move, section: ear.section, resting: glide.wasResting });
+      moves.push({ t, ...out.move, section: ear.section, resting: glide.wasResting,
+        sinceDrop: ear.lastDrop !== null ? t - ear.lastDrop : Infinity });
     }
     if (glide && glide.at < 1) {
       const e = (a) => a * a * (3 - 2 * a);
@@ -141,6 +147,7 @@ function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, see
       }
       void a0;
       cur = next;
+      if (glide.at >= 1) endedAt = t + DT;
     }
     leans.push({ t, lean: ev.lean, section: ear.section, sinceDrop: ear.lastDrop !== null ? t - ear.lastDrop : Infinity });
     if (Math.abs(t - Math.round(t)) < 1e-9) hist.push({ ...cur });
@@ -150,7 +157,7 @@ function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, see
     for (let i = lag; i < hist.length; i += 10) { s += dist(hist[i], hist[i - lag]); n++; }
     return n ? s / n : 0;
   };
-  return { moves, palettes, hist, leans, overlap, peak, aimPeak, touched, change, base, end: cur };
+  return { moves, palettes, hist, leans, overlap, peak, aimPeak, touched, change, base, end: cur, rests };
 }
 
 // ── Pace: one move at a time, 30–90 s, about one a minute ──────────
@@ -161,9 +168,10 @@ for (const [id, anchor] of LOOKS) {
     const g = r.moves.map(m => m.seconds);
     const perMin = r.moves.length / 10;
     const gMin = Math.min(...g), gMax = Math.max(...g), gMean = g.reduce((a, b) => a + b, 0) / g.length;
-    check(`${id}, ${label}: one move at a time, each glided ${GLIDE_MIN}–${GLIDE_MAX} s, about one a minute`,
-      r.overlap === 0 && gMin >= GLIDE_MIN && gMax <= GLIDE_MAX && perMin >= 0.4 && perMin <= 1.5,
-      `${perMin.toFixed(1)} moves/min, glides ${gMin.toFixed(0)}–${gMax.toFixed(0)} s (mean ${gMean.toFixed(0)}), ${r.overlap} overlapping`);
+    const restMin = Math.min(...r.rests);
+    check(`${id}, ${label}: one move at a time, each glided ${GLIDE_MIN}–${GLIDE_MAX} s, a rest after it, about one a minute`,
+      r.overlap === 0 && gMin >= GLIDE_MIN && gMax <= GLIDE_MAX && perMin >= 0.4 && perMin <= 1.5 && restMin >= MIN_REST - DT,
+      `${perMin.toFixed(1)} moves/min, glides ${gMin.toFixed(0)}–${gMax.toFixed(0)} s (mean ${gMean.toFixed(0)}), shortest rest ${restMin.toFixed(1)} s, ${r.overlap} overlapping`);
     const c1 = r.change(60), c10 = r.change(600 - 1);
     check(`${id}, ${label}: slow, and still wandering after ten minutes`,
       r.peak <= 0.005 && c10 >= c1 * 2,
@@ -176,21 +184,28 @@ for (const [id, anchor] of LOOKS) {
   const r = run(look('classic'), (t, rr) => songEar(t, 0, rr), 600, { rate: 1 });
   const g = r.moves.map(m => m.seconds);
   check('at full Evolve Speed: more moves, still one at a time and never under 30 s',
-    r.moves.length / 10 > 0.9 && r.overlap === 0 && Math.min(...g) >= GLIDE_MIN && r.peak <= 0.008,
-    `${(r.moves.length / 10).toFixed(1)} moves/min, shortest ${Math.min(...g).toFixed(0)} s, fastest dial ${(r.peak * 100).toFixed(2)} %/s`);
+    r.moves.length / 10 > 0.9 && r.overlap === 0 && Math.min(...g) >= GLIDE_MIN && r.peak <= 0.008 && Math.min(...r.rests) >= MIN_REST - DT,
+    `${(r.moves.length / 10).toFixed(1)} moves/min, shortest glide ${Math.min(...g).toFixed(0)} s, shortest rest ${Math.min(...r.rests).toFixed(1)} s, fastest dial ${(r.peak * 100).toFixed(2)} %/s`);
 }
 
 // ── The music steers it ─────────────────────────────────────────────
 console.log('\nThe music steers it, over minutes');
 {
-  let lively = [], calm = [], cued = 0, rested = 0, palOk = true, palGap = Infinity, pals = 0;
+  let lively = [], calm = [], cued = 0, rested = 0, stale = 0, palOk = true, palGap = Infinity, pals = 0;
   for (const [, anchor] of LOOKS) for (const seed of [1, 2, 3]) {
     const r = run(anchor, (t, rr) => songEar(t, 0, rr), songLength, { seed });
     for (const l of r.leans) {
       if (l.sinceDrop >= 5 && l.sinceDrop < 30) lively.push(l.lean);
       else if (l.section === 'breakdown' && l.t > 0) calm.push(l.lean);
     }
-    for (const m of r.moves) if (m.resting && m.t > 1) { rested++; if (m.cue !== 'clock') cued++; }
+    for (const m of r.moves) if (m.resting && m.t > 1) {
+      rested++;
+      if (m.cue === 'clock') continue;
+      cued++;
+      // On the section it names, as it is heard (or once the rest has had its
+      // six seconds): not one kept from a glide long over.
+      if (m.cue === 'drop' ? !(m.sinceDrop <= MIN_REST + DT + 1e-9) : m.section !== m.cue) stale++;
+    }
     let last = -Infinity;
     for (const p of r.palettes) {
       pals++;
@@ -201,8 +216,9 @@ console.log('\nThe music steers it, over minutes');
   const mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
   check('livelier after a drop than through a breakdown',
     mean(lively) - mean(calm) >= 0.5, `lean ${mean(lively).toFixed(2)} after drops, ${mean(calm).toFixed(2)} in breakdowns`);
-  check('a move that starts in a rest starts on a section change',
-    rested > 0 && cued / rested >= 0.25, `${cued} of ${rested} moves out of a rest were cued by the song`);
+  check('a section change in a rest starts the next move then, on that section',
+    rested > 0 && cued / rested >= 0.25 && stale === 0,
+    `${cued} of ${rested} moves were cued by the song, ${stale} of them on a section already over`);
   check('the palette turns at a drop or a breakdown, never twice in 75 s',
     pals > 0 && palOk && palGap >= 75, `${pals} palette changes, the closest ${palGap.toFixed(0)} s apart`);
 }
@@ -290,6 +306,12 @@ console.log('\nThe pieces are connected');
 {
   const app = readFileSync('src/App.tsx', 'utf8');
   check('App drives the planner and glides its moves', /new SlowEvolve\(/.test(app) && /\.step\(/.test(app) && /evolvePalette/.test(app));
+  // A glide lasts up to 90 s, so a look laid, opened, faded to or taken back must stop it.
+  const lets = ['const applyPreset', 'const applyUserPreset', 'const fadeSettingsTo', 'const revertLook'].filter(f => {
+    const at = app.indexOf(f);
+    return at > 0 && app.slice(at, at + 1500).includes('evolveLetsGo();');
+  });
+  check('a new look stops the move in flight', lets.length === 4, `${lets.length} of 4 ways to change the look let go`);
   const viz = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
   const start = viz.indexOf('// ── Automation logic');
   const end = viz.indexOf('The hue journey: a set drifts', start);

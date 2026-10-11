@@ -37,10 +37,12 @@ import { stream } from './rng';
  *     glides a little quicker (the square root of the tempo, so 174 bpm is
  *     four fifths of 110's length, not two thirds).
  *   - **Sections cue the moves.** A section change during a rest ends the
- *     rest, so the next move starts with the new section rather than at a
- *     time that has nothing to do with it. A move under way is never cut
- *     short: a glide that jumped to its end on the drop would be exactly the
- *     lurch this is here to remove.
+ *     rest (once it has lasted six seconds), so the next move starts with the
+ *     new section rather than at a time that has nothing to do with it. A move
+ *     under way is never cut short, and a section heard during one is let go:
+ *     a glide that jumped to its end on the drop would be exactly the lurch
+ *     this is here to remove, and a cue kept for its end would start the next
+ *     move with no rest at all.
  *   - **The palette changes at a drop or a breakdown**, at most once every
  *     seventy-five seconds. Only dye still to come takes the new colours
  *     (LiquidVisualizer's `evolvePalette`), so the plate turns over to them
@@ -106,6 +108,8 @@ export const GLIDE_MIN = 30;
 export const GLIDE_MAX = 90;
 /** A palette change at most this often, seconds, so a run of short sections does not flicker colours. */
 const PALETTE_GAP = 75;
+/** The shortest rest between two moves, seconds, at full Evolve Speed: a move, then the dish left alone to show it. */
+export const MIN_REST = 6;
 /** Seconds of silence before Evolve stops listening for sections and runs on its clock. */
 const DEAF_AFTER = 12;
 
@@ -118,6 +122,8 @@ export class SlowEvolve {
   /** Seconds left of the move under way, or of the rest after it. */
   private left = 4;
   private gliding = false;
+  /** Seconds since the last glide ended (a fresh planner has rested as long as it likes). */
+  private restedFor = MIN_REST;
   private lastTheme = '';
   /** The song's level over the last half minute, and over four. */
   loud = 0;
@@ -134,6 +140,9 @@ export class SlowEvolve {
   private sincePalette = 0;
   private nextClockPalette = 240;
 
+  /** Whether it has heard a first reading (see the cues). */
+  private primed = false;
+
   constructor(private rand: () => number = stream('show.drift').float) {}
 
   /**
@@ -145,6 +154,7 @@ export class SlowEvolve {
     const out: EvolveStep = {};
     if (r <= 0 || dt <= 0) return out;
     this.sincePalette += dt;
+    if (!this.primed) { this.primed = true; this.lastDrop = ear.lastDrop; this.lastSection = ear.section; }
 
     const hearing = ear.playing && ear.section !== 'quiet';
     this.silentFor = hearing ? 0 : this.silentFor + dt;
@@ -158,7 +168,9 @@ export class SlowEvolve {
         at the start of a song set the four-minute level for minutes (measured
         here: a lean 0.15 off from the same song heard without the shake).
       */
-      const lvl = clamp(ear.intensity, 0, 1);
+      // A reading that is not a number is no reading: a NaN carried into the
+      // averages would hold every later target at NaN, and Evolve would stop.
+      const lvl = Number.isFinite(ear.intensity) ? clamp(ear.intensity, 0, 1) : this.loud;
       this.heardTotal += dt;
       const toward = (tau: number) => Math.max(1 - Math.exp(-dt / tau), dt / this.heardTotal);
       this.loud += (lvl - this.loud) * toward(30);
@@ -166,17 +178,28 @@ export class SlowEvolve {
       let want = clamp((this.loud - this.loudLong) * 3, -0.6, 0.6);
       const sinceDrop = ear.lastDrop !== null ? ear.time - ear.lastDrop : Infinity;
       if (sinceDrop >= 0 && sinceDrop < 30) want = 0.8;
-      else if (ear.section === 'build') want = Math.max(want, 0.3 + 0.5 * clamp(ear.tension, 0, 1));
+      else if (ear.section === 'build') want = Math.max(want, 0.3 + 0.5 * (Number.isFinite(ear.tension) ? clamp(ear.tension, 0, 1) : 0));
       else if (ear.section === 'breakdown') want = Math.min(want, -0.6);
       this.lean += (want - this.lean) * (1 - Math.exp(-dt / 20));
 
-      // The section cues: a new build or breakdown, or a drop the tracker has just heard.
+      /*
+        The section cues: a new build or breakdown, or a drop the tracker has
+        just heard. A cue is for a rest only. One heard during a glide is let
+        go rather than kept for the glide's end: kept, it started the next
+        move the moment the last one finished, so in a song there was never a
+        rest at all (8 of 9 gaps under half a second, in review), and the cue
+        it acted on could be a minute and a half stale.
+
+        A planner made mid-song (Evolve switched on, the show unpaused, a
+        render's start) takes the drop the tracker already knows as heard,
+        not as one that has just happened.
+      */
       if (ear.lastDrop !== null && ear.lastDrop !== this.lastDrop) {
         this.lastDrop = ear.lastDrop;
-        this.pendingCue = 'drop';
+        if (!this.gliding) this.pendingCue = 'drop';
         if (this.sincePalette >= PALETTE_GAP) { out.palette = true; this.sincePalette = 0; }
       } else if (ear.section !== this.lastSection && (ear.section === 'build' || ear.section === 'breakdown')) {
-        this.pendingCue = ear.section;
+        if (!this.gliding) this.pendingCue = ear.section;
         if (ear.section === 'breakdown' && this.sincePalette >= PALETTE_GAP) { out.palette = true; this.sincePalette = 0; }
       }
       this.lastSection = ear.section;
@@ -196,14 +219,17 @@ export class SlowEvolve {
     }
 
     this.left -= dt;
-    // A section change ends a rest; a glide always runs to its end.
-    const cued = !this.gliding && this.pendingCue !== null;
+    if (!this.gliding) this.restedFor += dt;
+    // A section change ends a rest once the dish has had its few seconds; a glide always runs to its end.
+    const cued = !this.gliding && this.pendingCue !== null && this.restedFor >= MIN_REST;
     if (this.left > 0 && !cued) return out;
 
     if (this.gliding) {
       this.gliding = false;
-      this.left = (6 + 30 * (1 - r)) * (0.7 + 0.6 * this.rand());
-      if (this.pendingCue === null) return out;
+      this.pendingCue = null;
+      this.restedFor = 0;
+      this.left = MIN_REST + (30 * (1 - r)) * (0.7 + 0.6 * this.rand());
+      return out;
     }
 
     const cue = this.pendingCue ?? 'clock';
