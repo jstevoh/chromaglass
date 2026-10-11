@@ -234,6 +234,16 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run shape
 
+      # Following a known song played live (PLAN.md 28g): a map made from one
+      # recording, as the app makes it, followed through takes 15% slower and
+      # faster on other instruments, with the bridge left out, the last chorus
+      # twice, the solo twice as long and a jam the song never had: within a
+      # bar of the true place, the tempo within 5%, back within four bars of a
+      # change, and confidence falling in the jam. Arithmetic only, so `logic`.
+      - name: Following a song
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run songfollow
+
       # The kicks (PLAN.md §14d): the show's own band, its score rendered to
       # samples at 48 and 44.1 kHz and heard through the live ear, with the
       # plate at 60, 30 and 20 fps and frames late, and the ear reading at
@@ -529,6 +539,14 @@ jobs:
       - name: The remote's Mixer
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # The Phone · iPad panel's link (scripts/phonelink.mjs, PLAN.md 8f-1): on
+      # the show server, the code of the relay's address whenever no phone is
+      # linked, the phones counted by the relay, Link another while they are;
+      # on a static host, the code of the page's own address. No GPU; dist/ is
+      # the phone step's build.
+      - name: The phone link
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/phonelink.mjs
       # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
       # stand-in laptop on the show server's relay hears every touch, tool,
       # dye and button a phone and an iPad send, and where a touch lands in
