@@ -1193,7 +1193,9 @@ Perform desk and on the phone:
   be plain without being a lurch; say if full is too much;
 - **Plate Rock** from 0 to the top: the colours should slosh one way on a kick and swing
   back, the thicker colour sliding through the thinner. At 0 nothing sloshes. Say if full
-  pours the colour off the dish;
+  pours the colour off the dish. The picture as a whole should not move: since 27a-7 the
+  cover glass sloshes the whole picture only with **Frame Sway** up (0 by default), so an
+  evenly coloured look barely moves with Plate Rock alone;
 - **Turbulence** from 0 to the top: at a look's own value it should look as it did; past
   the middle it should start churning, and at the top stir the plate into streaks within
   a second or two. Say where on the slider it stops being pleasant.

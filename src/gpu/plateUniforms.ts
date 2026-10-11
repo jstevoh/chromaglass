@@ -89,7 +89,7 @@ export interface PlateView {
     video: { readyState: number; videoWidth: number; videoHeight: number } | null;
   };
   /** Audio features passed from the frame clock. */
-  audio?: { pitchClass: number; brightness: number; beatPhase: number; };
+  audio?: { pitchClass: number; brightness: number; beatPhase: number; beatSway?: number };
 }
 
 /**
@@ -392,10 +392,12 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('pitchClass', view.audio.pitchClass);
     pack.set('brightness', view.audio.brightness);
     pack.set('beatPhase', view.audio.beatPhase);
+    pack.set('beatSway', view.audio.beatSway ?? 0);
   } else {
     pack.set('pitchClass', 0);
     pack.set('brightness', 0);
     pack.set('beatPhase', 0);
+    pack.set('beatSway', 0);
   }
 
   /*
