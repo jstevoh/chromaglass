@@ -57,7 +57,7 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
   'comet':              [18, 20, 23, 7, 16, 2],
-  'galaxy':             [18, 23, 10, 8, 16, 7],
+  'galaxy':             [7, 18, 20, 17, 23, 8],  // ice-blue arms, ultramarine, magenta knots, an amber core's glow; it was six blues and violets, one hue on the wall
   'deep-ocean':         [16, 19, 7, 9, 22, 18],
   'cyberpunk':          [20, 2, 10, 18, 16, 6],
   'acid-trip':          [18, 20, 2, 21, 17, 6],
@@ -84,7 +84,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // The three that show off a part of the app nothing else used.
   'oil-and-water':      [17, 16],             // amber oil, teal water
   'red-cabbage':        [23, 10],             // the indicator itself: violet, and its deep purple
-  'chemical-clock':     [7, 15],              // a pale dish for the reaction's own red and blue
+  // A dish of gel is clear: the ferroin is its only colour. Icy blue under
+  // the red reads as brown blots (the showreel's "muddy red-green marble").
+  'chemical-clock':     [15],                 // clear gel: the reaction's own red and blue are the colour
   'agate':              [12, 13, 17, 4],      // an agate's browns, its amber and its red bands
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
@@ -109,7 +111,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 17, 2, 20, 8, 16, 6],
-  'soap-film':          [23, 20, 10, 7, 16, 17],
+  // A soap film is clear: its colour is interference, and its dye is only
+  // its thickness. Lavender, magenta and the rest drew the sheet itself.
+  'soap-film':          [15],
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
