@@ -108,14 +108,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let md = vec2i(textureDimensions(mixT));
   let mq = clamp(vec2i((vec2f(p) + 0.5) / S.n * vec2f(md)), vec2i(0), md - 1);
   let water = 1.0 - clamp(textureLoad(mixT, mq, 0).r, 0.0, 1.0);
-  var k = A.a.x * strength * water * eta * eta * eta * open * open * open;
+  let sw = strength * water;
+  var k = A.a.x * sw * eta * eta * eta * open * open * open;
+  let kInert = A.b.x * sqrt(max(0.0, sw * eta * open));
+  k = min(k, kInert);
   if (!(k >= 0.0 && k < 1e30)) { k = 0.0; }
   textureStore(dst, p, vec4f(k, 0.0, 0.0, 0.0));
 }`,
     /*
-      One substep: each face moves min(mean K, A.a.x) of the amount's
-      difference across it, carrying the colour of the cell it leaves. At
-      the plate's edge the neighbour is the cell itself, so nothing crosses.
+      One substep: each face moves the amount's difference across it at the
+      mean of its two cells' rates (lagged K), carrying the colour of the
+      cell it leaves. At the plate's edge the neighbour is the cell itself, so
+      nothing crosses.
     */
     slump: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -131,7 +135,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let o = select(select(vec2i(0, -1), vec2i(0, 1), f == 2), select(vec2i(-1, 0), vec2i(1, 0), f == 0), f < 2);
     let q = clampP(p + o, S.n);
     let cq = textureLoad(dye, q, 0);
-    let a = min(0.5 * (k + textureLoad(rate, q, 0).r), A.a.x);
+    let a = 0.5 * (k + textureLoad(rate, q, 0).r);
     let flux = a * (cq.a - c.a);
     let up = select(c, cq, flux > 0.0);
     if (up.a > 1e-6) { out += flux * up / up.a; }
