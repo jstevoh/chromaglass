@@ -383,6 +383,14 @@ jobs:
       - name: Hold keeps the closeup
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run holdjump
+      # The closeup holds still (PLAN.md 27a-8, QA-30): the real closeup camera
+      # through a song at 6x gives the same centre and zoom as in silence on
+      # every shipped look with Frame Sway at 0, and sways and pumps with it at
+      # full; a kick's press under the drop no longer throws the lead; a drop on
+      # still paint does not shiver.
+      - name: The closeup holds still
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run steadycam
       # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
       # src draws from Math.random outside a short allowlist of ids, and the
       # beads, bubbles, closeup camera, chemistry, palette and automation run
