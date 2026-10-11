@@ -5941,7 +5941,9 @@ of the plate in four seconds; with one strong enough to drag it (0.5 at 0.2) it 
 through the yellow, parting it round itself and leaving it behind, and then spread into a
 brown smear with no cell left half full within two seconds.
 
-One PR each, in this order:
+One PR each, in this order. The steps after 29a are handed to Antigravity, with the physics,
+the code's entry points, the checks to add and the scenes to match, in
+`docs/handoff-macro-ferro-drop.md`.
 
 - ~~**29a. The drop as a bead with the light on it.**~~ **Shipped** (this PR; the story in
   `docs/plan-shipped.md` §29a). Its shortcuts, each still open:
