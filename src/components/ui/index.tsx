@@ -202,6 +202,7 @@ export function Swatch({ hex, selected, onClick, midiKey, className = '', gap = 
       onClick={onClick}
       title={title}
       aria-label={title ?? hex}
+      aria-pressed={selected}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       className={`rounded-md transition-transform active:scale-95 ${className} ${hit ? MIDI_HIT : ''}`}
@@ -377,16 +378,21 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
 
 // ── Toggle ───────────────────────────────────────────────────────────
 
-export function Toggle({ label, on, onChange, testId }: {
-  label: string; on: boolean; onChange: (v: boolean) => void; testId?: string;
+export function Toggle({ label, on, onChange, testId, title, disabled }: {
+  label: string; on: boolean; onChange: (v: boolean) => void; testId?: string; title?: string; disabled?: boolean;
 }) {
   return (
     <button
+      type="button"
+      disabled={disabled}
       onClick={() => onChange(!on)}
       role="switch"
       aria-checked={on}
       data-testid={testId}
-      className="flex min-h-[36px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover"
+      title={title}
+      className={`flex min-h-[36px] w-full items-center justify-between rounded-md px-1 text-left transition-colors hover:bg-hover ${
+        disabled ? 'opacity-50 cursor-not-allowed' : ''
+      }`}
     >
       <span className="text-[13px] text-text-2">{label}</span>
       <span

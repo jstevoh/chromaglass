@@ -112,7 +112,9 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
   return (
     <button onClick={onPress} aria-label={label} aria-pressed={pressed} data-testid={testId}
       className="pointer-events-auto flex h-12 min-w-12 items-center justify-center">
-      <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[14px] font-medium text-text ${GLASS_PILL}`}>
+      <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[14px] font-medium ${
+        pressed ? 'border border-accent-border bg-accent-bg text-accent-text backdrop-blur-[16px]' : `text-text ${GLASS_PILL}`
+      }`}>
         {children}
       </span>
     </button>
@@ -120,7 +122,7 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
 }
 
 export function PhonePlay(p: PhonePlayProps) {
-  const [sheet, setSheet] = useState(false);
+  const [sheet, setSheet] = useState(() => typeof window !== 'undefined' && window.location.pathname.includes('play') && window.innerWidth < 600 && new URLSearchParams(window.location.search).has('debug'));
   const [picked, setPicked] = useState<PlayTool>('dropper');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState(false);

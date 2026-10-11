@@ -13,7 +13,7 @@ import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet } from './ui';
+import { Segmented, Sheet, Toggle } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
@@ -565,18 +565,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* The same switch as the one at the bottom of Wall → Output, where it
             used to live alone: the last control of the longest section. */}
         {output && onOutput && (
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[13px] font-medium text-text">Flash Limit</span>
-            <button
-              onClick={() => onOutput({ ...output, flashGuard: !output.flashGuard })}
-              className={`w-10 h-5 rounded-full relative transition-colors ${output.flashGuard ? 'bg-white' : 'bg-white/20'}`}
+          <div className="mb-4">
+            <Toggle
+              label="Flash Limit"
+              on={output.flashGuard}
+              onChange={v => onOutput({ ...output, flashGuard: v })}
               title="Hold the whole screen below three flashes a second (photosensitivity)"
-              aria-label="Flash Limit"
-              aria-pressed={output.flashGuard}
-              data-testid="flash-limit-master"
-            >
-              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${output.flashGuard ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
+              testId="flash-limit-master"
+            />
           </div>
         )}
 
@@ -721,15 +717,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
 
         {/* Room calibration */}
-        <div className="mb-3 mt-2 flex items-center justify-between">
-          <span className="text-[13px] font-medium text-text">Auto Calibrate</span>
-          <button
-            onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
-            className={`w-11 h-6 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
+        <div className="mb-3 mt-2">
+          <Toggle
+            label="Auto Calibrate"
+            on={settings.autoCalibrate !== false}
+            onChange={v => onUpdate({ autoCalibrate: v })}
             title="Learn this room's noise floor and dynamics, and drive the visuals from where the music sits between them"
-          >
-            <div className={`w-5 h-5 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-          </button>
+            testId="auto-calibrate-toggle"
+          />
         </div>
         {/* The beat, ahead of the microphone */}
         <Slider
@@ -838,14 +833,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               <div className="text-[12px] text-muted">Listen for which song is playing, so set items, song shows and looks made for a song go up on their own.</div>
             </div>
             <button
+              type="button"
               role="switch"
               aria-checked={!!songDetection}
               onClick={() => onSongDetection(!songDetection)}
-              className={`h-6 w-11 shrink-0 rounded-full relative transition-colors ${songDetection ? 'bg-white' : 'bg-white/20'}`}
+              className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1"
               title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
               data-testid="song-detection-toggle"
             >
-              <div className={`w-5 h-5 rounded-full bg-black absolute top-0.5 transition-transform ${songDetection ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+              <span
+                className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
+                style={{ background: songDetection ? 'var(--color-accent)' : 'var(--color-track)' }}
+              >
+                <span
+                  className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
+                  style={{ left: songDetection ? 18 : 2, background: songDetection ? '#fff' : 'var(--color-muted)' }}
+                />
+              </span>
             </button>
           </div>
         )}
@@ -3503,14 +3507,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ spinDrag: v })}
           settingKey="spinDrag"
         />
-        <div className="flex items-center justify-between mb-4 mt-4">
-          <span className="text-[13px] font-medium text-text">LED Platform</span>
-          <button
-            onClick={() => onUpdate({ ledPlatform: !settings.ledPlatform })}
-            className={`w-10 h-5 rounded-full relative transition-colors ${settings.ledPlatform ? 'bg-white' : 'bg-white/20'}`}
-          >
-            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.ledPlatform ? 'translate-x-5' : 'translate-x-0.5'}`} />
-          </button>
+        <div className="mb-4 mt-4">
+          <Toggle
+            label="LED Platform"
+            on={!!settings.ledPlatform}
+            onChange={v => onUpdate({ ledPlatform: v })}
+            testId="led-platform-toggle"
+          />
         </div>
         {settings.ledPlatform && (
           <div className="flex flex-col gap-4 mb-4">

@@ -840,15 +840,25 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
             <button
+              type="button"
+              role="switch"
+              aria-checked={!!settings?.macroMode}
               onClick={() => patch({ macroMode: !settings?.macroMode })}
               disabled={!connected}
+              data-testid="remote-macro-toggle"
               className="flex w-full items-center justify-between disabled:opacity-30"
             >
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <span className={`h-6 w-11 rounded-full transition-colors ${settings?.macroMode ? 'bg-white' : 'bg-white/20'}`}>
-                <span className={`mt-0.5 block h-5 w-5 rounded-full bg-black transition-transform ${settings?.macroMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              <span
+                className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
+                style={{ background: settings?.macroMode ? 'var(--color-accent)' : 'var(--color-track)' }}
+              >
+                <span
+                  className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
+                  style={{ left: settings?.macroMode ? 18 : 2, background: settings?.macroMode ? '#fff' : 'var(--color-muted)' }}
+                />
               </span>
             </button>
             {settings?.macroMode && (
