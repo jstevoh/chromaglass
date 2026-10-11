@@ -54,7 +54,7 @@ await build({
       "export { DEFAULT_SETTINGS } from './src/types.ts';",
       "export { PRESETS } from './src/presets.ts';",
       "export { builtInSequences } from './src/lib/sequencer.ts';",
-      "export { DRIFTABLE, driftLook } from './src/lib/drift.ts';",
+      "export { DRIFTABLE, THEMES, moveTargets } from './src/lib/drift.ts';",
       "export { luckyLook } from './src/lib/lucky.ts';",
       "export { soundMappable } from './src/lib/midi.ts';",
       "export { PATCH_TARGETS } from './src/lib/sceneMap.ts';",
@@ -133,18 +133,25 @@ check('every shipped look and show stage holds the frame still: no cover slide, 
   And nothing but a hand turns it on (the owner, 2026-10-11: "It's fine if
   this is a setting, but this should never be the default experience"): no
   look routes a sound or a scene to it, Evolve never drifts it (a hundred
-  drifts of the default look leave it at 0), and Lucky never rolls it (a
-  hundred rolls from the defaults).
+  of Evolve's moves from the default look, every theme in turn, half of them
+  livelier and half calmer, leave it at 0), and Lucky never rolls it (a
+  hundred rolls from the defaults). The moves must change something, or a
+  planner that moved nothing would pass this for free.
 */
 const routed = L.PRESETS.filter((p) => [...(p.settings.sceneMappings ?? []), ...(p.settings.soundMappings ?? [])].some((m) => m?.setting === 'frameSway')).map((p) => p.id);
-let drifted = { ...L.DEFAULT_SETTINGS }, driftOn = 0;
-for (let i = 0; i < 100; i++) { drifted = { ...drifted, ...L.driftLook(drifted, L.DEFAULT_SETTINGS, 1) }; if ((drifted.frameSway ?? 0) !== 0) driftOn++; }
+let drifted = { ...L.DEFAULT_SETTINGS }, driftOn = 0, driftMoved = 0;
+for (let i = 0; i < 100; i++) {
+  const to = L.moveTargets(L.THEMES[i % L.THEMES.length], drifted, L.DEFAULT_SETTINGS, i % 2 ? 1 : -1, 1);
+  driftMoved += Object.keys(to).length;
+  drifted = { ...drifted, ...to };
+  if ((drifted.frameSway ?? 0) !== 0) driftOn++;
+}
 let luckyOn = 0;
 for (let i = 0; i < 100; i++) { let r = i + 1; const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647); if ((L.luckyLook({ ...L.DEFAULT_SETTINGS }, ['#ff0000'], rand).frameSway ?? 0) !== 0) luckyOn++; }
 const patchable = L.soundMappable('frameSway') || L.PATCH_TARGETS.some((t) => t.key === 'frameSway');
 check('and only a hand turns it on: no look routes sound or a scene to it, no patch can, Evolve never drifts it, Lucky never rolls it',
-  routed.length === 0 && !patchable && L.soundMappable('plateRock') && !L.DRIFTABLE.includes('frameSway') && driftOn === 0 && luckyOn === 0,
-  `routed by ${routed.length ? routed.join(', ') : 'no look'}; a patch target ${patchable} (Plate Rock ${L.soundMappable('plateRock')}); driftable ${L.DRIFTABLE.includes('frameSway')}; on after ${driftOn} of 100 drifts, ${luckyOn} of 100 rolls`);
+  routed.length === 0 && !patchable && L.soundMappable('plateRock') && !L.DRIFTABLE.includes('frameSway') && driftOn === 0 && driftMoved > 0 && luckyOn === 0,
+  `routed by ${routed.length ? routed.join(', ') : 'no look'}; a patch target ${patchable} (Plate Rock ${L.soundMappable('plateRock')}); driftable ${L.DRIFTABLE.includes('frameSway')}; on after ${driftOn} of 100 moves (${driftMoved} dials moved), ${luckyOn} of 100 rolls`);
 
 // ── 2. The dial, and the liquid's own rock ─────────────────────────────
 const base = { ...L.DEFAULT_SETTINGS };
