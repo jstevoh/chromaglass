@@ -932,8 +932,11 @@ fn macroWarpOffset(fuv: vec2f) -> vec2f {
   var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
   w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
   
-  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat
-  let beatPulse = sin(U.beatPhase * 3.14159265);
+  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat,
+  // as far as Frame Sway lets the beat move the frame (0 by default: the
+  // whole closeup's silhouette throbbing on every beat reads as the camera
+  // shaking, not the liquid moving; lib/plateRock.ts).
+  let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
   let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.4);
   
   // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
@@ -2103,8 +2106,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var a = modf2(ang, wedge);
     if (a > wedge * 0.5) { a = wedge - a; }
     
-    // BPM-Synced LFOs: Smoothly pulse the kaleidoscope rotation and zoom with the beat phase!
-    let beatPulse = sin(U.beatPhase * 3.14159265);
+    // BPM-Synced LFOs: pulse the kaleidoscope's rotation and zoom with the
+    // beat phase, as far as Frame Sway lets them. At 0, the default, the
+    // rig turns on its own clock (kaleidoPhase) and holds its zoom: a whole
+    // frame turning a seventh of a wedge and pulling in a tenth on every
+    // beat is the frame moving with the music, which the owner asked to be
+    // rid of (2026-10-11; lib/plateRock.ts).
+    let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
     a += U.kaleidoPhase + (beatPulse * wedge * 0.15); // Slight rhythmic rotation
     
     let breathingZoom = U.kaleidoZoom * (1.0 - beatPulse * 0.1); // Rhythmic zoom

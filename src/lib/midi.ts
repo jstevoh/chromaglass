@@ -457,6 +457,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
+  { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },
