@@ -246,7 +246,9 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
-- **7.5** Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
+- **7.5** Accounts first (the owner, 2026-10-11, ahead of Wave 1): **23.9** and **23.13**
+  *(owner)*, **23.10**, then **23.14** (after #380), **23.12**, **23.11**, **23.15**.
+  Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
   **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
   **23.7**.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
@@ -5422,7 +5424,8 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
 version. The owner chose the split below the same day. Nothing is gated yet; this
 section is the order to build it in.*
 
-**The rule.** The website keeps the whole plate and is the demo: anyone who opens it
+**The rule.** The website keeps the whole plate and is the demo: anyone who signs in
+(free, with Google, Apple or an emailed link; the owner's choice 2026-10-11, below)
 sees the best ChromaGlass there is, on their own laptop and one projector. Home is
 what a listener wants for an evening with their own music (whatever the computer plays,
 the TV with no click, full recordings); Pro is what turns the plate into a show rig, and most of that is what a page cannot
@@ -5445,6 +5448,7 @@ sit behind the key.
 
 | Feature | Free website | Home app | Pro app | Why |
 |---|---|---|---|---|
+| Signing in (Google, Apple or an emailed link) | required, once a browser | once, then offline for good with a key | once, then offline for good with a key | The owner's choice (2026-10-11). The account holds the key and links the devices (23.10–23.14). |
 | Every look, preset and photograph | ✓ | ✓ | ✓ | The look is what sells it; a weaker demo loses the sale. |
 | Solver quality, grid and governor | ✓ | ✓ | ✓ | Hobbling the picture makes the site a worse advert. |
 | Every tool and every liquid | ✓ | ✓ | ✓ | Playing with the liquid is a first visit's "wow". |
@@ -5478,8 +5482,9 @@ sit behind the key.
 ### How it unlocks
 
 - **Bought once through a merchant of record** (Paddle or Lemon Squeezy), which runs
-  the checkout, VAT and sales tax and emails a licence key. No accounts and no
-  logins; those wait until something syncs to the cloud (presets, set lists).
+  the checkout, VAT and sales tax and emails a licence key. The key is also held
+  by the buyer's account (23.12), so it can be restored and moved without digging
+  out the email. (Until 2026-10-11 this said no accounts; the owner then chose them.)
 - **The key is a signed token** the app checks against a public key built into it, so
   it works with no internet at the gig: activated once online, two machines per key,
   moved from a settings page.
@@ -5495,6 +5500,47 @@ sit behind the key.
   The exact Home price is the owner's, in 23.1. A subscription would need the key to
   expire and the app to call home, which fights the offline promise; if the owner
   wants one, it is a separate decision. Prices read 2026-10-04 from the vendors' pages.
+
+### Accounts (the owner's choice, 2026-10-11)
+
+*Asked 2026-10-11: "time we have logins & accounts … I really do like using SSO through
+google — but we could do our own?" Recommended and chosen the same day: Firebase
+Authentication with Google, Apple and an emailed link, and the free site behind the
+sign-in. Then: "a more streamlined approach to connecting phones/tablets/computers"
+once the login works (23.14).*
+
+- **Why Firebase and not our own.** The site is already on Firebase Hosting, so the
+  sign-in is the same project, free at this size, and Google's sign-in is the one the
+  owner likes. Our own would mean storing passwords, resets, breaches and two-factor
+  ourselves, in a public repository, for nothing a player sees. **Why not Google
+  only:** it shuts out everyone without a Google account, and Apple requires Sign in
+  with Apple in any iPhone app that offers Google's (App Store guideline 4.8).
+- **What a login wall costs, and what pays it back.** A first visitor and a shared
+  link now meet a sign-in before the plate, which loses some of the demo's first
+  "wow". So the sign-in sits over the intro `index.html` already paints, and a link
+  to a look survives it (the emailed link lands back on the page asked for).
+- **A show never locks out.** A browser that has signed in keeps a flag saying so,
+  and with it the plate starts at once while Firebase finishes in the background.
+  Firebase alone is not enough: it confirms a cached user with Google before it
+  answers, and on a network that hangs rather than refuses (a venue's captive Wi-Fi)
+  a prototype took 19.3 s to start against today's 0.6 s (`npm run signin` line 7). Once the plate is up nothing about the account takes it down: not
+  the internet going, not a session expiring, not a sign-out in another tab, not the
+  account deleted. Only the next load asks again. An explicit sign-out from the
+  account sheet in the same window is the one exception, and it asks first.
+- **What is never asked.** The phone remote (`?remote`) and a cast (`?cast`): they
+  belong to a show that is already signed in. The Mac app with a key: the key works
+  offline for good (23.4). A build with no Firebase config (`npm run dev`, every
+  check, a fork's own copy) has no sign-in at all; the source is public and BUSL lets
+  anyone run it, so the wall is the hosted site's, as the paid gates are.
+- **Measured by** `npm run signin` (`scripts/signin.mjs`, written before the build):
+  the Firebase Auth emulator stands in for Google's servers, so the real SDK runs in
+  a cloud session and on CI with no project or secret. Fourteen lines, from "no
+  Firebase in a build without the config" to "a sign-out in another tab and the
+  account deleted leave a running plate up". On today's site it is red from line 3.
+  Run against a throwaway sign-in in the session that wrote it, every line went
+  green, so each line can pass; the same sign-in made to drop the show when the
+  account signs out failed line 8, and one that waited on Firebase alone failed
+  line 7.
 
 ### Steps
 
@@ -5526,6 +5572,44 @@ sit behind the key.
   drives the plate (docs/judging.md, next free number at merge).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
+- **23.9** *(owner)*: in the Firebase console, turn on Authentication with Google, Apple
+  and the emailed link; add the site's domains as authorised. Apple's half needs a
+  Services ID and a key from the Apple Developer account (12.2's). The web config is
+  public (it names the project, it grants nothing) and goes into `deploy.yml` as
+  `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID`.
+- **23.13** *(owner, before 23.10 goes live)*: a privacy page and terms, since the site
+  now keeps an email per person: what is kept (the email, the account's id, later its
+  keys and its devices), that it is not sold, and that deleting the account deletes it.
+  The App Store asks for both.
+- **23.10** (one PR, lane B; Antigravity builds, brief `docs/handoff-signin.md`): the
+  sign-in on the hosted site, on the desk and the phone, and the account sheet (the
+  email, sign out, delete the account) on each. *Measure:* `npm run signin`, 14/14,
+  and `startup` on the Mac: a returning visit's first step no later than today's bar.
+- **23.11** (one PR, `desktop/`, with 23.4): the Mac app with no key asks for the
+  same sign-in once, online, then runs as the site does; with a key it never asks.
+  *Measure:* `npm run desktop` with a key, with none and signed in, and with none and
+  signed out.
+- **23.12** (one PR, a Worker in the manner of `server/report-worker.js`): accounts
+  hold the keys. The merchant's webhook files each key under the buyer's email in
+  Workers KV; a signed-in app asks the Worker for its keys with its Firebase ID token,
+  checked against Google's public keys. Then 23.4's key arrives by signing in, not by
+  pasting. A Worker rather than Firestore keeps every server piece in the one pattern
+  the repo already deploys and checks. *Measure:* in the manner of
+  `npm run report-worker`: a bad webhook signature refused, a bad token refused, a
+  good token given its own keys and no one else's, a refunded key gone.
+- **23.14** (one PR, after 23.10 and the QR link of PR #380): linking devices by
+  account. A phone, tablet or laptop signed in to the same account sees the account's
+  running shows in a list and joins one with a tap: the account hands over the
+  show's address and key, which #380's QR carries today. The QR stays for a guest's
+  phone or one not signed in, and for a venue whose Wi-Fi has no internet. Once
+  linked, control stays on the local network either way, so the internet going never
+  drops the remote. *Measure:* in the manner of `npm run phone` with the emulator: two
+  signed-in pages, one a show and one a phone, the show listed and joined with no
+  address typed; a third page on another account sees nothing.
+- **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
+  deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
+  laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
+  `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
