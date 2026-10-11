@@ -2114,8 +2114,8 @@ export default function App() {
     const k = String(key);
     ride.write(k, value);
     driftGlide.current.delete(k);
-    laterWrites.mark([k], showNow());
-    if (rowFades.handOn([k])) setRowFading(rowFades.running());
+    laterWrites.mark([String(key)], showNow());
+    if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
     castNudgeRef.current();
     if (rideFlush.current) return;
     rideFlush.current = setTimeout(() => { rideFlush.current = null; flushRide(); }, RIDE_VIEW_MS);
