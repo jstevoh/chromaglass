@@ -5043,7 +5043,7 @@ film, whose own stretching viscosity 4ηh resists its retraction (a Trouton shee
 a thin film dragged over the glass. Two ways to get it, in order:
 
 1. **On 18a (shipped behind Thin Gap, on in every look):** the film as a phase of high
-   viscosity in the Hele-Shaw solver. The
+   viscosity in the Hele-Shaw solver. The oil film against the glass with water beside it is modeled as two stratified layers in series across the gap (harmonic mean of viscosities, 1 / (1 - fm + fm / 50) for clear light mineral oil at 50 cSt, `OIL_NU = 5e-5` m²/s). The
    hole is water invading a viscous liquid under capillary pressure, resisted by
    Darcy drag. This needs 18a's variable mobility and 18d's per-liquid viscosity, and
    costs nothing beyond them.
