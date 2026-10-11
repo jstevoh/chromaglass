@@ -798,6 +798,13 @@ jobs:
       - name: The Press on the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferropress
+      # The closeup's ferrofluid drop (PLAN 29a): its surface the sessile
+      # balance's for its contact angle and size, leaned toward a magnet with
+      # its volume kept, lit from the key's side, coloured by the dye over it;
+      # the plate at 1x the same to the byte. In the open shard, beside the Press.
+      - name: The ferrofluid drop in the closeup
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferrodrop
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye

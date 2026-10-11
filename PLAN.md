@@ -225,6 +225,9 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
+- **6.8b** The closeup's ferrofluid drop (§29, the owner, 2026-10-11): ~~**29a**~~ the drop
+  as a lit bead, then **29c** it follows the hand, **29b** the dye on it, **29d** its
+  wake, **29e** the look, **29f** its controls.
 - **6.9** Several areas of interest (§25, lane G): ~~**25a**~~ areas of the dish, with Velvet
   Underground, Lumia and Cell Bloom, then **25b** the next looks in its order, **25e**,
   **25c**, **25f** (after 18f and 18d).
@@ -5914,6 +5917,74 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
+
+## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
+
+The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
+3d drops. I want to see a drop of ferro fluid with light reflecting off of it, with some
+dye on top of it as it gets pulled through dyes, causing the dye to spread as the drop
+gets pulled through dyes. At some point the dye rolls off of the ferrofluid drip,
+leaving some dye around and then the ferrofluid keeps getting pulled through the dye and
+making waves of sorts. [...] Calm details and control."
+
+What the closeup drew, rendered in the lab (a drop 0.03 of the plate across, Ferro Paint's
+settings, a magnet walked through three dyes; pictures in the project's shared files,
+`macro-ferro-drop/`): a flat black disc with a brown line round it and one painted dot;
+the drop's inside one value of black to the byte. The solver carries the ferrofluid as a
+layer of one depth (a full cell 0.3 l_c, FILM_H0), so there was no surface to light. And
+with the look's own magnet walked at a tenth of the plate a second, the drop crept 0.05
+of the plate in four seconds; with one strong enough to drag it (0.5 at 0.2) it plowed
+through the yellow, parting it round itself and leaving it behind, and then spread into a
+brown smear with no cell left half full within two seconds.
+
+One PR each, in this order:
+
+- ~~**29a. The drop as a bead with the light on it.**~~ **Shipped** (this PR; the story in
+  `docs/plan-shipped.md` §29a). Its shortcuts, each still open:
+  - **29a-1.** A drop smaller than l_c comes out lower than its spherical cap: P is one
+    value for every drop (set by the contact angle on a wide drop), not each drop's own
+    from its contact angle. Per-drop P (a drop's slope at its line set to tan θ).
+  - **29a-2.** The small-slope curvature (∇²h, not the full mean curvature), with the
+    plateau set exact: the slope at the contact line is not θ.
+  - **29a-3.** The picture's drop is taller than the solver's layer (0.3 l_c a full
+    cell); carry the drop's volume in the solver as the bead's thickness, so the drop the
+    flow moves is the drop the picture draws.
+  - **29a-4.** The magnet's volume shift is held to its mean over all the ferrofluid on
+    the plate, not drop by drop.
+  - **29a-5.** The magnets' radius is the default Magnet Size's in the solve (the plate's
+    uniforms carry no radius).
+  - **29a-6.** The top glass's own reflection of the room (4% of the tent over everything)
+    and the exit losses through the glass are left out, as a photographer's flag and
+    polariser would leave them; the reflected plate past total reflection is the plate
+    decoded plainly, without the closeup's cells or lacing.
+  - **29a-7.** Its cost read on the Mac (`npm run stages` with the closeup in over a
+    drop): about 18 million texel reads a frame on 384², 24 sweeps warm and 200 from cold.
+- **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
+  drop is the gap less the drop's height and is dragged with the drop's surface (no slip
+  on the drop, no shear at the top glass's far side through the thin film), so its dye
+  rides along, thins as the column does where the drop is tall, and is left at the rear
+  stagnation point as the drop moves on: trails. Today `phaseDisplace` pushes the dye out
+  of the ferrofluid as though the drop filled the gap. The dye's own passes belong to
+  other threads (18h, the dye's spread along the flow; 18m, a pour's slump): this one
+  changes only how the dye is carried where the ferrofluid is, after coordinating.
+- **29c. The drop follows the hand and holds together.** Measured above: a look's magnet
+  leaves the drop behind, and one strong enough to drag it spreads it thin. A real drop
+  under a dragged magnet holds together and heaps (the Kelvin force on a 6 mm drop is
+  about 10⁴ times its drag at 2 cm/s). Find which of the pull's cap (MAGNET_CELLS), the
+  standing film's window and the phase's own relaxation thins it, and fix that; a check
+  that a dragged drop keeps its half-full area.
+- **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
+  gap the flow round a moving drop is the potential flow round a cylinder, so the dye
+  parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the
+  magnet rings at its capillary frequency, waves on its surface damped by the
+  ferrofluid's viscosity. The second needs the drop's surface to carry momentum (a wave
+  equation on h), not only the static balance 29a solves.
+- **29e. A Ferro Drop look.** One drop, three dyes, a calm magnet walk, the closeup
+  following the drop, the cells off: the owner's description as a look, on the desk and
+  the phone.
+- **29f. Calm control.** The drop's controls where a performer reaches them on the desk
+  and the phone: how much it beads up (today Relief / 3D), where the light is, how big
+  the drop is.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

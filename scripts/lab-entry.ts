@@ -62,6 +62,7 @@ type Lab = {
 };
 let lab: Lab | null = null;
 
+let lastDrop: { n: number; h: Float32Array } | null = null;
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
@@ -559,6 +560,8 @@ const api = {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
+    // The closeup's drop kernels, built behind the show in the app; here before the one frame drawn (PLAN §29a).
+    await plate.drop.prepare();
     const zoom = cam.zoom ?? 1;
     // The beads' mask, as the app uploads it: a BeadField's render(), square
     // for rings and twice as wide for drops.
@@ -640,9 +643,13 @@ const api = {
       buf.unmap(); buf.destroy(); tex.destroy();
       pictures[kind] = Array.from(out);
     }
+    // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
+    lastDrop = await plate.drop.read();
     plate.dispose();
     return cam.sources ? pictures : pictures.wall;
   },
+  /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
+  dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

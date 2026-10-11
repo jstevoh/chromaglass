@@ -3077,3 +3077,31 @@ to within 0.001 of its reservoir: half floats left it 0.0039, 0.0029 and 0.0051 
 the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% and
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
+
+## 29. The closeup's ferrofluid drop
+
+### 29a. The drop as a bead with the light on it (this PR)
+
+Asked 2026-10-11 ("I want to see much more 3d drops ... a drop of ferro fluid with light
+reflecting off of it"). The closeup drew a flat black disc, its inside one value of black to
+the byte: the solver carries the ferrofluid as a layer of one depth, so there was no surface
+to light.
+
+Built: the ferrofluid's surface solved each frame of the closeup (`src/gpu/ferroDrop.ts`,
+`wgsl/ferroDrop.ts`): the ferrohydrostatic Young–Laplace balance h − ∇²h = P + K in l_c
+(Rosensweig §5.2), the contact line the solver's own half-full line, the plateau
+2 sin(θ/2) from the contact angle, the magnet's Kelvin pressure moving the volume
+toward it. Drawn as a camera sees it: Fresnel off the ferrofluid from under the water
+(n 1.52, 0.45% straight on), a softbox and a strip light and a dim tent through the top
+glass by Snell, total reflection past 48.6° showing the plate round the drop, and the
+dye over the drop filtering the reflection as the column above it, 2(gap − h). Relief /
+3D is the contact angle (0 flat as before, 1 a bead at 160°; 0.7 is 112°). Only in the
+closeup, only on the lead plate; the projected plate is unchanged to the byte (`npm run
+ferrodrop`). Its shortcuts are open as 29a-1 to 29a-7 in `PLAN.md`.
+
+Measured (`npm run ferrodrop`, 10 checks): the middle 1.460 l_c against the balance's 1.510
+for a drop 4 l_c across at 112°; one l_c in from the edge 61% of the top; a magnet off the
+right side stands that shoulder 138% and the far one 78%, the volume 101.8%; the light's
+spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up and left; a
+yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
+bytes different at any relief.
