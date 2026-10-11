@@ -2564,9 +2564,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           the film's slope alone; this is the same light off the surface the
           liquid makes, so it takes their place where the camera looks. What
           the lamp gets through the drop's thin edge stays (the amber
-          sliver). Relief / 3D at 0 is the flat drawing as it was.
+          sliver). Relief / 3D at 0 is the flat drawing as it was, and so
+          is any frame no surface was solved for (the kernels still building,
+          a plate that is not the lead).
         */
-        let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief);
+        let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
           let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);

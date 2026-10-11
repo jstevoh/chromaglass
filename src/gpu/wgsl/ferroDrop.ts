@@ -167,7 +167,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   The packed flow (pack.ts, packVel) with the drop's height in its third
   channel, which the display reads (FERRO_DROP_WGSL): the solve's height,
   and on it the standing film's domes, a cell past full being a dome that
-  much taller than the layer (FILM_H0 l_c a full cell).
+  much taller than the layer (FILM_H0 l_c a full cell). Its fourth channel
+  is 2 where packVel writes 1: the display draws the drop only where a
+  surface was solved this frame (dropSolved). Without it, the first frames
+  into the closeup while the kernels build behind the show would light a
+  flat surface (z 0), which reflects almost nothing, and the drop would go
+  flat black where the old glint used to be.
 */
 const PACK = /* wgsl */ `
 struct PackArgs { n: f32, pad0: f32, pad: vec2f };
@@ -182,7 +187,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let v = textureLoad(vel, q, 0).xy;
   let phase = unpack2x16unorm(textureLoad(view, q, 0).x).x * ${PHASE_VIEW_TOP}.0;
   let z = textureLoad(h, q, 0).x + ${FILM_H0} * max(phase - 1.0, 0.0);
-  textureStore(dst, q, vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), z, 1.0));
+  textureStore(dst, q, vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), z, 2.0));
 }`;
 
 export const DROP_KERNELS = { dropSource: SOURCE, dropMean: MEAN, dropRelax: RELAX, packVelDrop: PACK } as const;
@@ -254,6 +259,9 @@ fn dropHeight(uv: vec2f) -> f32 {
   let c = tex2(vel0, vec2f(h0.x, h1.y)).z; let d = tex2(vel0, vec2f(h1.x, h1.y)).z;
   return g0.y * (g0.x * a + g1.x * b) + g1.y * (g0.x * c + g1.x * d);
 }
+
+/* 1 where this frame's flow was packed with a solved surface (packVelDrop writes 2 in .w, packVel 1), else 0. */
+fn dropSolved(uv: vec2f) -> f32 { return clamp(tex2(vel0, uv).w - 1.0, 0.0, 1.0); }
 
 /*
   Fresnel's reflectance for unpolarised light at a dielectric, from the side

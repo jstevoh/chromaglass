@@ -5972,7 +5972,10 @@ One PR each, in this order:
   under a dragged magnet holds together and heaps (the Kelvin force on a 6 mm drop is
   about 10⁴ times its drag at 2 cm/s). Find which of the pull's cap (MAGNET_CELLS), the
   standing film's window and the phase's own relaxation thins it, and fix that; a check
-  that a dragged drop keeps its half-full area.
+  that a dragged drop keeps its half-full area. If the closeup's camera follows the drop, it follows
+  smoothly and never with the sound: the owner, 2026-10-11, is made sick by the frame
+  moving with the beat, and the liquid's own motion must be what moves (the sway work's
+  `frameSway`, default 0, stays the only way sound moves the frame).
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the
