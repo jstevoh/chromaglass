@@ -2725,7 +2725,7 @@ by accident (19w-1 does it a file at a time). Why its own job: after the body ga
 section, re-running the failed jobs re-reads the body from the API without a push or the
 Mac queue; `Measure` needs it, so the branch rule's required check covers it.
 
-Measured. `npm run checkguard`: 51 self-tests. #362's two real moves (the bar found as
+Measured. `npm run checkguard`: 52 self-tests. #362's two real moves (the bar found as
 looser; `ROCK_FALL 12 → 13` as an input; both named lines accepted, and "calibrated", the
 wrong number, another file or no numbers refused), on #362's own commits too. The ways round
 it the check-skeptic's pass found in the first version, each now red: a bar's quantity
@@ -2733,7 +2733,7 @@ swapped, widened with an "or", scaled by `* 0.8`, compared after rounding; an in
 while its call was renamed; a dye pour deleted; a value in the app's URL; a WGSL constant;
 `ROCK_FALL = BASE_FALL` or renamed. And what it must not fire on: a number in a comment, a
 check's name, a multi-line template string, a regex, `toFixed` digits, a moved line, a new
-check, a bar wrapped onto two lines, a panel's width in `src/components` no script reads.
+check, a bar wrapped onto two lines, a loop rewritten around the same run length, a panel's width in `src/components` no script reads.
 `npm run checkguard -- --history 50` over the 50 merges before it: 9 would have had to name
 something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s rewritten fade
 line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven checks taken

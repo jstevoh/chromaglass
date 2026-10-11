@@ -64,8 +64,10 @@
 // whose only difference is a number is exactly one, and a hunk that only
 // reflowed its lines is none. A line that cannot be paired and is not
 // elsewhere in the new file unchanged was rewritten or deleted: each of its
-// comparisons with a number counts (`>= 0.05` widened to `>= 0.05 || !gpu`
-// keeps the operator and the number and is a different bar), and so does
+// comparisons with a number counts unless the lines that replaced it hold
+// the same comparison of the same thing with the same clause after it
+// (`>= 0.05` widened to `>= 0.05 || !gpu`, or `peakMoved >= 0.05` for
+// `moved >= 0.05`, is a different bar), and so does
 // each other number the lines that replaced it no longer carry. The
 // check-skeptic's review of the first version found each of those ways
 // round it; they are in the self-test.
@@ -206,6 +208,20 @@ const shape = (code) => clean(code).replace(NUM, '#').replace(/\s+/g, '');
 const numbers = (code) => [...clean(code).matchAll(NUM)].map((m) => ({ text: m[0], at: m.index }));
 const value = (t) => Number(String(t).replace(/_/g, ''));
 
+// What follows a comparison's number up to the end of its clause (a `;` or
+// `,` at its own depth, or a bracket closing past it): `|| !r.gpu` after
+// `>= 0.05`, `* 0.8`, or nothing after the `100` of `i < 100; i++`.
+function tailOf(c, from) {
+  let depth = 0;
+  let i = from;
+  for (; i < c.length; i++) {
+    const ch = c[i];
+    if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) { if (depth === 0) break; depth--; } else if ((ch === ';' || ch === ',') && depth === 0) break;
+  }
+  return c.slice(from, i).replace(/\s+/g, '');
+}
+
 // Every comparison of something with a number written into the code, as
 // `{ key, op, num }`: `key` is what is compared, the twenty characters of code
 // before the operator (or after it, when the number is on the left), so the
@@ -218,7 +234,7 @@ function comparisons(code) {
     const op = m[1];
     if (op.includes('=') && op.length >= 2 && op[0] !== '<' && op[0] !== '>') continue;   // == and != are not bars
     const key = c.slice(Math.max(0, m.index - 20), m.index).replace(/\s+/g, '');
-    out.push({ key, op, num: m[2] });
+    out.push({ key, op, num: m[2], tail: tailOf(c, m.index + m[0].length) });
   }
   const left = new RegExp(`(?<![\\w$.])(-?${NUM.source})\\s*${CMP.source}`, 'gi');
   for (const m of c.matchAll(left)) {
@@ -379,10 +395,14 @@ export function changesIn(file, oldText, newText, hunks, scriptsText = '') {
     // asked to be named. A 0 or 1 changed in place (paired above) still counts.
     const left = values(h.added.filter((a) => !used.has(a)).map((a) => after[a] ?? ''));
     const trivial = (t) => value(t) === 0 || value(t) === 1;
+    // The same comparison, of the same thing, with the same number and the
+    // same clause after it, on the lines that replaced it (a loop's `i < 100`
+    // kept while its body was rewritten), is the same bar.
+    const kept = new Set(h.added.filter((a) => !used.has(a)).flatMap((a) => comparisons(after[a] ?? '')).filter((c) => c.tail !== undefined).map((c) => `${c.key}|${c.op}|${value(c.num)}|${c.tail}`));
     for (const r of loose) {
       const rc = before[r];
       const cmps = comparisons(rc).filter((c) => !trivial(c.num));
-      for (const c of cmps) found.push({ file, line: r, kind: 'bar', what: `${c.op} ${c.num} on a rewritten or deleted line (was line ${r})`, from: c.num, to: '', words: [base], need: [c.num], code: clean(rc), old: true });
+      for (const c of cmps) if (!kept.has(`${c.key}|${c.op}|${value(c.num)}|${c.tail}`)) found.push({ file, line: r, kind: 'bar', what: `${c.op} ${c.num} on a rewritten or deleted line (was line ${r})`, from: c.num, to: '', words: [base], need: [c.num], code: clean(rc), old: true });
       for (const x of numbers(rc)) {
         if (trivial(x.text) || cmps.some((c) => value(c.num) === value(x.text))) continue;
         const k = left.indexOf(value(x.text));
@@ -612,6 +632,7 @@ function selftest() {
   same('a number inside a regular expression', s.replace('\\d{3}', '\\d{4}'));
   same('a line moved, unchanged', [s.split('\n')[7], ...s.split('\n').slice(0, 7)].join('\n'));
   same('a new check added', `${s}\ncheck('and a new one', x < 0.2, '');`);
+  same('a loop\'s body rewritten around the same run length (#372\'s framesway)', s.replace('t < 60; t++) step();', 't < 60; t++) { stepAll(); n++; }'));
   same('a bar wrapped onto two lines, unchanged', s.replace('cells >= 5, `', 'cells >=\n    5, `'));
   same('a line with a stir and a run length moved elsewhere, unchanged', `${s.split('\n').slice(2).join('\n')}\n${s.split('\n').slice(0, 2).join('\n')}`);
 
