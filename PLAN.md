@@ -423,6 +423,26 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   cuts named in its label; keep both. Desk (`src/App.tsx`, the zoom chip) and phone
   (`PhoneStage.tsx`, the same three buttons).
 
+**Checks that went red on a tree they do not measure.** Not seen by the room, but each
+holds a deploy until someone re-runs it, so they rank by how often they cost one; Wave
+0's step 0.3 is their home and its rule holds: root cause, never loosen. Found on #338's
+own deploy, which went red on five Mac checks #338 does not touch and green on the next
+run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
+
+- **QA-21** Same-seed render determinism failed: two renders of one seed differed
+  slightly, then matched on the re-run. Either the check reads a frame before the
+  plate is settled or something in the step is not seeded.
+- **QA-22** Beat Squeeze failed, then passed.
+- **QA-23** The ferrofluid ring drifting with the band failed, then passed.
+- **QA-24** Startup missed its 2 s limit by 0.02 s: a near miss, so find whether
+  startup grew or the Mac runner was slow, before touching the limit.
+- **QA-25** One of the ear's checks missed narrowly; which line, and by how much, is
+  still to be read from the run.
+- **QA-26** The phone's clean-screen check is flaky; a fix is proposed in a comment on
+  #339 (from the Wall reconnect thread), not yet pushed.
+- **QA-27** The phone's two-finger Drop (19h-2) is instrumented and waits for its next
+  failure to show where the dye goes; read that run before changing anything.
+
 ## Running order
 
 The batches, and where each stands. This table is the ledger: a PR that ships a step
