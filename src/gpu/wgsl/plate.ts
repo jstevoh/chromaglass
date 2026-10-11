@@ -25,6 +25,7 @@ import { PLATE_STRUCT } from './plateFields';
 import { SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
 import { filmTableWgsl } from '../../lib/filmTable';
+import { FERRO_DROP_WGSL } from './ferroDrop';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -1192,7 +1193,8 @@ export function plateWgsl(main: string, bindings = DISPLAY_BINDINGS): string {
   // MACRO because WGSL wants a function declared before it is called and
   // `decodeFluidDof`, which it falls back to, is declared in there.
   const particles = bindings === DISPLAY_BINDINGS ? PARTICLE_FOLD : '';
-  const view = bindings === DISPLAY_BINDINGS ? VIEW : '';
+  // The closeup's ferrofluid drop reads the packed flow and the dye, so it comes with the display's own bindings.
+  const view = bindings === DISPLAY_BINDINGS ? VIEW + FERRO_DROP_WGSL : '';
   return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${particles}${view}${FINISH_WGSL}${VERT}${main}`;
 }
 
@@ -2568,6 +2570,25 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
                        + viewAt(fuvBase + vec2f(0.0, cell)).phase + viewAt(fuvBase - vec2f(0.0, cell)).phase - 4.0 * view.phase) / (cell * cell);
           let curv = -lapView * ${FILM_H0 * (SPIKE_PITCH / (2 * Math.PI)) ** 2};
           pc += vec3f(1.0, 0.98, 0.95) * smoothstep(0.35, 0.1, length(lean)) * smoothstep(0.5, 1.2, rise) * smoothstep(0.05, 0.2, curv) * 0.9 * amt;
+        }
+        /*
+          In the closeup, the drop as a camera sees it (PLAN §29a,
+          wgsl/ferroDrop.ts): its own surface, stood up off the glass by
+          surface tension and the magnet, reflecting the room, the key and
+          the plate round it, through the dyed water above it. The glint and
+          the domes' light above were drawn by the distance to the edge and
+          the film's slope alone; this is the same light off the surface the
+          liquid makes, so it takes their place where the camera looks. What
+          the lamp gets through the drop's thin edge stays (the amber
+          sliver). Relief / 3D at 0 is the flat drawing as it was, and so
+          is any frame no surface was solved for (the kernels still building,
+          a plate that is not the lead).
+        */
+        let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
+        if (drop3d > 0.001) {
+          let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
+          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);
+          pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 
         /*

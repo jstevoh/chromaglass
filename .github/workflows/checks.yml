@@ -277,6 +277,15 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run pacing
 
+      # Slow Evolve (PLAN.md §10, step 8): one move at a time, each glided 30 to 90 s,
+      # about one a minute; the lean livelier after drops than in breakdowns,
+      # the palette turning only at a drop or a breakdown (or every few
+      # minutes with no music); a level shaken every half second leaning as
+      # the steady song does; and nothing that moves the whole picture moved.
+      - name: Slow Evolve
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run slowevolve
+
       # A song render's arithmetic (PLAN.md §6): the show clock is the frame
       # number while rendering and the browser's own clock live; the song's
       # track is the same bytes twice and hears the kicks at the same moments
@@ -810,6 +819,13 @@ jobs:
       - name: The Press on the ferrofluid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferropress
+      # The closeup's ferrofluid drop (PLAN 29a): its surface the sessile
+      # balance's for its contact angle and size, leaned toward a magnet with
+      # its volume kept, lit from the key's side, coloured by the dye over it;
+      # the plate at 1x the same to the byte. In the open shard, beside the Press.
+      - name: The ferrofluid drop in the closeup
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferrodrop
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye

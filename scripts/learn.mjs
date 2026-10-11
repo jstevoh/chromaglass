@@ -493,6 +493,26 @@ const M = (source, depth, key = 'turbulenceScale') => {
   check('a hand-edited file keeps only what the show can act on',
     bad.sound.length === 1 && bad.sound[0].id === 'x6' && bad.sound[0].depth === 1 && bad.sound[0].target.max === 1,
     `of 13 entries kept ${bad.sound.map(b => `${b.id} depth ${b.depth} travel ${b.target.min}..${b.target.max}`).join(', ')}`);
+
+  // Setting bindings in MIDI map: keep only keys in LEARNABLE_BY_KEY, and clamp to today's travel
+  const badBindings = parseMidiMap(JSON.stringify({
+    format: 'chromaglass-midi', version: 1, name: 'BadBindings',
+    bindings: [
+      { id: 'b1', source: { kind: 'cc', channel: 0, number: 1 }, target: { kind: 'setting', key: 'globalSpeed', min: -50, max: 50 } },
+      { id: 'b2', source: { kind: 'cc', channel: 0, number: 2 }, target: { kind: 'setting', key: 'blendMode', min: 0, max: 1 } },
+      { id: 'b3', source: { kind: 'cc', channel: 0, number: 3 }, target: { kind: 'setting', key: 'constructor', min: 0, max: 1 } },
+      { id: 'b4', source: { kind: 'cc', channel: 0, number: 4 }, target: { kind: 'setting', key: '__proto__', min: 0, max: 1 } },
+      { id: 'b5', source: { kind: 'cc', channel: 0, number: 5 }, target: { kind: 'setting', key: 'notReal', min: 0, max: 1 } },
+      { id: 'b6', source: { kind: 'cc', channel: 0, number: 6 }, target: { kind: 'action', action: 'play' } },
+    ]
+  }));
+  check('setting bindings keep only keys in LEARNABLE_BY_KEY with today\'s travel',
+    badBindings.bindings.length === 2 &&
+    badBindings.bindings[0].id === 'b1' &&
+    badBindings.bindings[0].target.min === 0 &&
+    badBindings.bindings[0].target.max === 0.3 &&
+    badBindings.bindings[1].id === 'b6',
+    `kept ${badBindings.bindings.map(b => b.id).join(', ')}`);
 }
 
 // ── What a trigger may press ──────────────────────────────────────────────
