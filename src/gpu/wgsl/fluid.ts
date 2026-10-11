@@ -45,7 +45,7 @@ struct Sim {
   turbScale: f32,
   spin: f32,
   tension: f32,
-  free9: f32,          // was the fingering push's strength (forcesB)
+  lampHeat: f32,       // lamp intensity scaled by heating rate (PLAN 18f)
   vibI: f32,
   vibF: f32,
   drip: f32,
@@ -2145,14 +2145,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var c = textureLoad(cur, q, 0).xy;
   let temp = bilerpN(vel, uv, S.n).z;
   /*
-    tanh with its argument held in range: some GPUs take tanh as a ratio of
-    exponentials, and past about 88 the exponential is infinite and the
-    ratio is NaN. A plate anywhere hotter than 4.4 (the lamp under a standing
-    plate reaches that) turned the whole current NaN, and the flow was
-    wiped every step after it. tanh is ±1 to float precision well before 10.
+    Buoyancy is linear with temperature (Boussinesq, PLAN §18f), with the tanh
+    removed so plumes have a strength proportional to their heat rather than
+    saturating at once. S.up is gated on upright, so a level plate has no in-plane
+    buoyancy.
   */
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.up * (S.curBuoy * tanh(min(max(temp, 0.0) * 20.0, 10.0)));
+  var f = S.up * (S.curBuoy * clamp(temp, 0.0, 50.0));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -3060,13 +3059,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   marangoniFlux: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var vel: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 fn gm(p: vec2i, n: i32) -> f32 { return textureLoad(mix, clamp(p, vec2i(0), vec2i(n - 1)), 0).g; }
+fn tm(p: vec2i, n: i32) -> f32 { return textureLoad(vel, clamp(p, vec2i(0), vec2i(n - 1)), 0).z; }
 fn face(a: vec2i, e: vec2i, n: i32) -> vec4f {
   let b = a + e;
   if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return vec4f(0.0); }
   let dg = gm(b, n) - gm(a, n);
-  let c = clamp(-A.a.x * dg, -0.24, 0.24);
+  let dt_ = tm(b, n) - tm(a, n);
+  // σ(Γ, T): surface tension falls with surfactant (soap) and with temperature (thermocapillary flow).
+  // Marangoni stress pulls liquid toward higher surface tension: away from soap and away from hot spots.
+  let c = clamp(-(A.a.x * dg + A.a.z * dt_), -0.24, 0.24);
   var f = c * select(textureLoad(src, b, 0), textureLoad(src, a, 0), c >= 0.0);
   // The soap's own spread is a diffusion (flux kΓ∇Γ) and, explicit, it is
   // stable only below a quarter of the difference a face (a checkerboard
@@ -3228,7 +3232,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let cl = length(capillary);
   if (cl > A.a.y) { capillary *= A.a.y / cl; }
   let wax = textureLoad(dye, p, 0).a;
-  let rho = wax - S.meanD;
+  let oil = textureLoad(mix, p, 0).r;
+  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
+  let rho = wax - S.meanD - 0.15 * oil;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
   var heat = v.z;
   if (A.a.z > 0.0) {
@@ -3682,7 +3688,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   decayVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
@@ -3691,7 +3698,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  v.z *= S.heatDecay;
+  // Newton cooling per second (PLAN §18f):
+  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 60.0);
+  var temp = v.z * cool;
+  // Heat source ∝ lamp intensity × absorbed fraction (Beer-Lambert, 18b):
+  let d = textureLoad(dye, vec2i(id.xy), 0);
+  let absorbed = 1.0 - exp(-max(d.a, 0.0));
+  // Central hotspot of the lamp:
+  let toCenter = uvOf(id) - vec2f(0.5);
+  let r2 = dot(toCenter, toCenter);
+  let hotspot = 1.0 / (1.0 + r2 * 2.5);
+  temp += S.lampHeat * hotspot * absorbed * S.dt;
+  v.z = temp;
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 

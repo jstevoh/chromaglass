@@ -212,7 +212,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
-  it), then **18f** heat from the lamp (in progress, Antigravity; which unblocks 10.6
+  it), then ~~**18f** heat from the lamp~~ #352 (which unblocks 10.6
   and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   **18g** colour leaves by flushing and **18k-spray**.
@@ -3791,7 +3791,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
-| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | In progress (Antigravity) |
+| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
@@ -4261,6 +4261,8 @@ its frame rate live. "Free" means no new passes or texture reads.
   it was not in the plan.
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
+
+**Shipped (#352):** Lamp dimmer heating with Beer-Lambert absorption (1 - exp(-d.a)), Newton cooling per second (heatDecay^(60*dt)), in-plane buoyancy strictly gated on upright with tanh removed, oil buoyant density below water in mixForce, temperature-dependent water viscosity dropping ~2%/K in thin gap, thermal Marangoni in marangoniFlux, and packed velocity exporting temperature in channel z. Verified with `npm run heat` (9/9 checks).
 
 - **Where:** `currentForces` pushes heat along `S.up` (the gravity direction, whatever
   `plateUpright` says), saturated by tanh(20T). Heat is injected in spots by pours and

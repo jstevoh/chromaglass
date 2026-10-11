@@ -161,6 +161,8 @@ export interface GpuStepParams {
   air: number;          // airVelocity (0 = off)
   evapFactor: number;
   time: number;
+  /** Master dimmer / lamp brightness (0 blackout to 1 full brightness), scaling lamp heat (PLAN 18f). */
+  dimmer?: number;
   /**
    * The lasting current (see `stepCurrent`). Everything here is per second in
    * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.

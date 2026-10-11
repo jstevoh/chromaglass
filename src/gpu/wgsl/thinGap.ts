@@ -342,7 +342,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let sp = textureLoad(species, min(q, vec2i(textureDimensions(species)) - 1), 0);
   let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
   let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
-  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured;
+  /*
+    Water's viscosity falls about 2% per K (PLAN §18f).
+    Warm liquid is less viscous, reducing drag and increasing mobility M.
+  */
+  let tempVisc = exp(-0.02 * clamp(uf.z, 0.0, 50.0));
+  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * tempVisc;
   var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
