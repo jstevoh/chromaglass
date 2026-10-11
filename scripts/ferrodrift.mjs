@@ -131,7 +131,18 @@ try {
     }
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(9000);
-    const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    // A cold Mac takes longer than nine seconds to open the stage, as bottles.mjs
+    // found: PR #370 moved depth and the flick off the tools shard, so this became
+    // the first check its runner ran, on an empty shader cache, and silence's page
+    // read no engine at all at nine seconds (its two later pages, on the same
+    // machine a minute on, were on the GPU at once). So the read waits up to
+    // twenty seconds more for the GPU solver, as bottles.mjs does, and still fails
+    // if it never comes. A warm machine reads it at nine seconds, as it always did.
+    let engine = null;
+    for (let k = 0; k < 10 && !isGpuEngine(engine); k++) {
+      engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+      if (!isGpuEngine(engine)) await page.waitForTimeout(2000);
+    }
     if (!isGpuEngine(engine)) {
       check(`${pg.name}: the GPU solver is the one being measured`, false, engine ?? 'no debug hook');
       await page.close();

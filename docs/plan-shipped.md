@@ -2594,6 +2594,15 @@ matrix holds, so the ruleset needed no change. A shard's own setup is about half
 so a run costs that much more Mac time and wants five runners at once, but holds each for
 three or four minutes less.
 
+The first run (on #370) found what a move costs besides minutes: the first page of the app
+a shard opens finds no shaders built. `ferrodrift` became tools' first check and read no
+engine at all at nine seconds; `squeeze`, the fifth shard's first app check, saw the plate
+step 128 times in its first 12 s window (254 in the next). Both had always followed a
+warmed app. Neither bar moved: `ferrodrift` now waits up to twenty seconds more for the
+GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate its line
+asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
+and fifth 13.5.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
