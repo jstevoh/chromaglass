@@ -169,6 +169,7 @@
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
     "backplate": "node scripts/backplate.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",
+    "phonelink": "npm run build && node --experimental-strip-types scripts/phonelink.mjs",
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
     "finger": "npm run build && node scripts/finger.mjs",

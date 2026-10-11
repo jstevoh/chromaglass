@@ -1125,6 +1125,16 @@ Open from Desk v2, each its own thread (the UI lane):
     differ by layout.
 - ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
   `npm run qr`, `npm run layout`).
+  - **8f-1** (S) The code whenever nothing is linked, and Link another while phones are
+    (the owner, 2026-10-11, from the hosted site's panel: words and no code). Found on the
+    way: the desk never knew whether a phone was linked. `status.phone` was the display's
+    own socket to the relay, so the Mac app's panel said "linked" with no phone in the
+    room. The relay counts phones for the display (`controllers`, as `mirrors` counts
+    network displays) and tells a display the count on its hello; the panel counts them,
+    puts the code away while one is on and brings it back on Link another; with no show
+    server behind the page the code is the page's own address, which opens the show on
+    the phone itself. Check `npm run phonelink` (written first, red on main until the
+    build lands); the build is Antigravity's, brief in `docs/handoff-phone-link-qr.md`.
 - ~~**8g** A panel in a window of its own, for a laptop and a monitor at a gig~~ (shipped;
   check `npm run layout`).
   - **8g-1** (S) The keys in a panel's window. ⌘1–3, ⌘P, Tab and the show's keys (Go,
