@@ -1336,6 +1336,7 @@ unmounted on a clean screen, as it was, the window is gone and the clean-screen 
 - **8f** The Phone · iPad panel draws its link as a QR code: an encoder written here (byte
   mode, level M, versions 1–10, the eight masks scored by the standard's penalty rules),
   drawn as one SVG path in whole pixels per module, black on white with its quiet zone.
+- **8f-1** The Phone · iPad panel's code whenever nothing is linked, and Link another while phones are (2026-10-11; check `npm run phonelink`). On the hosted site the panel had said "No phone linked." over three lines of words and no code. The desk never knew whether a phone was linked: `status.phone` was the display's own socket to the relay, so with the Mac app up and no phone in the room the panel said "A phone is linked and driving the show" and the footer "phone linked". The relay (`server/remote-server.js`) now counts phones (`controllers`) for the display as it counts network displays (`mirrors`), and gives a display the count on its hello; the desk counts them, puts the code away while one is on, and a Link another button brings it back. With no show server behind the page the code is the page's own address (`/`), which opens the show on the phone itself, and the words say how to get a show server.
 - **8h** The header at 1024 measured 342 px of cluster against 337 of room right of the
   centred switch, so the Sound dot sat 5 px under it. The header now has three measured
   levels: the dots' words beside them, under them (12 px from the switch, as before), and
