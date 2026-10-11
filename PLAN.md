@@ -226,7 +226,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 - **6.8b** The closeup's ferrofluid drop (§29, the owner, 2026-10-11): ~~**29a**~~ the drop
-  as a lit bead, then **29c** (in progress, antigravity/29c-drop-follows-hand) it follows the hand, **29b** the dye on it, **29d** its
+  as a lit bead, then ~~**29c**~~ #373 it follows the hand, **29b** the dye on it, **29d** its
   wake, **29e** the look, **29f** its controls.
 - **6.9** Several areas of interest (§25, lane G): ~~**25a**~~ areas of the dish, with Velvet
   Underground, Lumia and Cell Bloom, then **25b** the next looks in its order, **25e**,
@@ -6092,7 +6092,7 @@ the code's entry points, the checks to add and the scenes to match, in
   of the ferrofluid as though the drop filled the gap. The dye's own passes belong to
   other threads (18h, the dye's spread along the flow; 18m, a pour's slump): this one
   changes only how the dye is carried where the ferrofluid is, after coordinating.
-- **29c. The drop follows the hand and holds together.** (In progress, antigravity/29c-drop-follows-hand) Measured above: a look's magnet
+- ~~**29c. The drop follows the hand and holds together.**~~ (#373) Measured above: a look's magnet
   leaves the drop behind, and one strong enough to drag it spreads it thin. A real drop
   under a dragged magnet holds together and heaps (the Kelvin force on a 6 mm drop is
   about 10⁴ times its drag at 2 cm/s). Find which of the pull's cap (MAGNET_CELLS), the

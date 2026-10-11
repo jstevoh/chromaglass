@@ -965,7 +965,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                    magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
   // None under a standing layer: the film has the magnet's pull in its own
   // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
-  var f = (1.0 - textureLoad(stand, p, 0).r) * phs(p, n) * gpsi * A.b.x;
+  let aside = 1.0 - textureLoad(stand, p, 0).r;
+  let dropMask = smoothstep(0.01, 0.2, phs(p, n));
+  var f = aside * dropMask * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
@@ -3345,7 +3347,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and pulled the fingers back in.
   */
   let close = spikesClose(A.a);
-  let wellNeed = mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close);
+  let sharpFrac = clamp((A.b.x - 0.006) / 0.012, 0.0, 1.0);
+  let wellNeed = max(1.0 + 2.5 * sharpFrac, mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close));
   let well = min(max(1.0, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
   let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap;
   let repel = A.b.y * chi * w;

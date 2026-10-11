@@ -1991,7 +1991,7 @@ export class WebGPUFluid {
     const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
     const m2f = 0.16 + (HAND_SCREEN - 0.16) * spikeAmt;
     const mazeK = { m2: m2f * kk, alpha: ((1 + m2f) * kk) ** 2 };
-    if (maze <= 0.001 && !spikes) this.mazeReady = false;
+    if (maze <= 0.001 && !spikes && !this.phaseLive) this.mazeReady = false;
     const thin = this.thinGapOn(p);
     if (!thin) this.hsPrimed = false;
     if (!this.phaseLive) this.phaseGapPrimed = false;
@@ -2706,6 +2706,12 @@ export class WebGPUFluid {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read, stand], none);
         this.phase.swap();
       }
+      if (maze <= 0.001) {
+        const sep = this.arg('phase sep', [Math.max(0, Math.min(1, (p.phaseSharp ?? 0.35) * 1.35)), 0, 0, 0]);
+        this.run(pass, 'phaseSeparate', this.phase.write, [this.phase.read, stand], sep);
+        this.phase.swap();
+      }
+
       /*
         Cahn–Hilliard keeps the two liquids apart, maze or not: it conserves
         and it rounds. The pairwise sharpening that stood in for it without
@@ -2751,7 +2757,7 @@ export class WebGPUFluid {
           this.phase.swap();
         });
       }
-      if (maze > 0.001 || spikes) {
+      if (this.phaseLive) {
         // Once more on where the phase ended, for the next step's force.
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         this.mazeReady = true;
