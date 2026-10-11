@@ -1442,6 +1442,93 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, (textureLoad(x0, p, 0) + A.a * s) * A.b);
 }`,
 
+  /*
+    18h. Dye spreads along the flow (Taylor–Aris dispersion):
+    D_L ≈ Dm + h²|u|²/(210 Dm).
+    Dye streaks along the depth-mean flow and stays sharp where it is still.
+    Transverse to flow, D = Dm, preserving crisp edges across streamlines.
+    Conservative face-flux finite volume update ensures exact dye conservation.
+  */
+  dyeDisperse: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+fn getDye(p: vec2i, n: i32) -> vec4f {
+  return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1)), 0);
+}
+
+fn getDisp(p: vec2i, n: i32) -> vec3f {
+  let q = clamp(p, vec2i(0), vec2i(n - 1));
+  let v = textureLoad(vel, q, 0).xy * A.a.w;
+  let gapVal = clamp(textureLoad(sq, q, 0).r, 0.004, 0.06);
+  let gapRel = gapVal / A.a.z;
+  let dm = A.a.x;
+  let kappaT = A.a.y;
+  let v2 = dot(v, v);
+  let taylor = kappaT * gapRel * gapRel * v2;
+  let taylorLim = min(taylor, max(0.0, A.b.x - dm));
+  let fac = select(0.0, taylorLim / max(v2, 1e-9), v2 > 1e-9);
+  return vec3f(
+    dm + fac * v.x * v.x,
+    dm + fac * v.y * v.y,
+    fac * v.x * v.y
+  );
+}
+
+fn fluxX(p: vec2i, n: i32) -> vec4f {
+  if (p.x < 0 || p.x >= n - 1 || p.y < 0 || p.y >= n) {
+    return vec4f(0.0);
+  }
+  let pR = p + vec2i(1, 0);
+  let DL = getDisp(p, n);
+  let DR = getDisp(pR, n);
+  let Dxx = 0.5 * (DL.x + DR.x);
+  let Dxy = 0.5 * (DL.z + DR.z);
+  let cL = getDye(p, n);
+  let cR = getDye(pR, n);
+  let dc_dx = cR - cL;
+  let dc_dy = 0.25 * (
+    (getDye(p + vec2i(0, 1), n) - getDye(p - vec2i(0, 1), n)) +
+    (getDye(pR + vec2i(0, 1), n) - getDye(pR - vec2i(0, 1), n))
+  );
+  return -(Dxx * dc_dx + Dxy * dc_dy);
+}
+
+fn fluxY(p: vec2i, n: i32) -> vec4f {
+  if (p.y < 0 || p.y >= n - 1 || p.x < 0 || p.x >= n) {
+    return vec4f(0.0);
+  }
+  let pT = p + vec2i(0, 1);
+  let DB = getDisp(p, n);
+  let DT = getDisp(pT, n);
+  let Dyx = 0.5 * (DB.z + DT.z);
+  let Dyy = 0.5 * (DB.y + DT.y);
+  let cB = getDye(p, n);
+  let cT = getDye(pT, n);
+  let dc_dy = cT - cB;
+  let dc_dx = 0.25 * (
+    (getDye(p + vec2i(1, 0), n) - getDye(p - vec2i(1, 0), n)) +
+    (getDye(pT + vec2i(1, 0), n) - getDye(pT - vec2i(1, 0), n))
+  );
+  return -(Dyx * dc_dx + Dyy * dc_dy);
+}
+
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let fE = fluxX(p, n);
+  let fW = fluxX(p - vec2i(1, 0), n);
+  let fN = fluxY(p, n);
+  let fS = fluxY(p - vec2i(0, 1), n);
+  let netFlux = -(fE - fW + fN - fS);
+  let here = getDye(p, n);
+  let out = max(here + netFlux, vec4f(0.0));
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
+}`,
+
   // The velocity's divergence, with the wall's ghost cells (velG in the GLSL).
   /*
     The divergence the projection solves, with the air pushing on it (H6 · A).

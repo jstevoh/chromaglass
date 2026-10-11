@@ -218,7 +218,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
   **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
-- **6.6** **18h** (in progress, antigravity/18h-dye-dispersion), ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
+- **6.6** ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
 - **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
@@ -3803,7 +3803,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
-| 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | **In progress** |
+| 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | **Shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
 | 18k | Smaller ones | Small | Free to small | See each |
@@ -4326,23 +4326,29 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
 
-- **Where:** Jacobi dye diffusion with one constant for every colour (about 1000× the
-  molecular rate where it is on); the MacCormack Jacobian clamp and neighbourhood cap
-  (`fluid.ts` advection), which lose the excess; `sharpenDye`, retired (0 by default)
-  but still in the step.
+- **Where:** Jacobi dye diffusion with one constant for every colour (the Diffusion Rate
+  blur at default 0.0002 measured an effective D of about 1.7e-5 m²/s in the lab, roughly
+  40,000× food dye in water ~4e-10 m²/s, not "about 1000×" as originally written; heat
+  previously shared the dye's number, leaving 12 looks with 0 heat spreading); the
+  MacCormack Jacobian clamp and neighbourhood cap (`fluid.ts` advection), which lose
+  the excess; `sharpenDye`, retired (0 by default) but still in the step.
 - **The real phenomenon:** molecular diffusion is negligible at this scale. The blur in
   a Hele-Shaw cell is Taylor–Aris dispersion along the flow,
   D_L ≈ D_m + h²|u|²/(210 D_m). Edges stay sharp where the liquid is still and streak
-  where it moves.
+  where it moves. Heat spreads at water's own thermal diffusivity (κ ≈ 1.4e-7 m²/s, Le ≈ 350).
 - **What it takes:** the dye moved in flux form (`bodyAdvect` exists), and one or two
   explicit passes of dispersion with a tensor built from u⊗u. The Jacobian patch exists
   because the transport field is divergent (the noise after the projection and the
   depth multiply), so it can go with 18a.
 - **Cost:** about the same as today's diffusion (1.3 ms where it runs), or 0.3–0.6 ms
-  explicit.
+  explicit. Single explicit pass measured at 0.39 ms (2.0% share), saving ~0.9 ms vs Jacobi.
 - **Gain:** streaks along the flow, and conserved dye. Honest: a minmod flux carries
   fine threads a little softer than MacCormack, and the plate's detail table
   (`npm run detail`) has to hold.
+- **Shipped (#357):** replaced 10-iteration Jacobi dye diffusion with single explicit conservative
+  finite-volume Taylor dispersion (`dyeDisperse`) with molecular diffusion D_m = 4e-10 m²/s and
+  longitudinal dispersion along depth-mean flow; decoupled heat diffusion to real water thermal
+  diffusivity κ = 1.4e-7 m²/s in viscosity stage. Checked by `npm run dispersion`.
 
 ### 18i. Bubbles and beads live by physics, not timers
 

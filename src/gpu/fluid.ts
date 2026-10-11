@@ -383,6 +383,19 @@ const MAX_SPEED = 0.002;
 const PLATE_METRES = DISH_METRES;
 const REST_GAP = 0.03;
 /*
+  Real molecular diffusion of food dye in water (PLAN 18h).
+  Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an
+  effective D ≈ 1.7e-5 m²/s in the lab (~40,000× real food dye in water ~4e-10 m²/s,
+  not "about 1000×").
+*/
+const D_MOLECULAR = 4.0e-10; // m²/s
+/*
+  Thermal diffusivity of water (PLAN 18h): kappa ≈ 1.4e-7 m²/s (Lewis number
+  Le ≈ 350 against dye). Heat gets its own physical diffusivity so the 12
+  presets with diffusionRate at 0 still spread heat.
+*/
+const KAPPA_WATER = 1.4e-7; // m²/s
+/*
   The dish's rim, in plate widths from the middle: the plate's inscribed
   circle, which is all the picture ever shows of it (plate.ts keeps both
   dishes inside it). Past it the liquid is open to the air.
@@ -980,6 +993,7 @@ export class WebGPUFluid {
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
+      ['dyeDisperse', [dye], true],
       ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye], true],
       ['forcesB', [VEL], true],
       ['currentForces', [VEL], true],
@@ -1166,6 +1180,7 @@ export class WebGPUFluid {
       [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
       [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
+      [`dyeDisperse:${dye}`, kernel('dyeDisperse', dye)],
     ];
   }
 
@@ -2128,12 +2143,15 @@ export class WebGPUFluid {
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
     /*
-      Heat diffuses through water about a hundred times faster than a dye or
-      a salt does (a Lewis number near 100). The two used to share one
-      diffusivity, which rules out the double-diffusive instabilities (salt
-      fingers) altogether. doubleDiffusion raises the heat's alone.
+      Heat diffuses through water with thermal diffusivity kappa ≈ 1.4e-7 m²/s,
+      about 350 times faster than a dye or salt does (Lewis number Le ≈ 350).
+      Heat previously shared the dye's diffusionRate, leaving the 12 presets
+      with diffusionRate at 0 with no heat spreading at all. Now heat has its
+      own physical diffusivity term. doubleDiffusion raises the heat's alone
+      to simulate double-diffusive convection (salt fingers).
     */
-    const heatDiff = p.diff * (1 + 99 * Math.max(0, Math.min(1, p.doubleDiffusion ?? 0)));
+    const doubleDiff = Math.max(0, Math.min(1, p.doubleDiffusion ?? 0));
+    const heatDiff = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff);
     const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * heatDiff * n2, 0];
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
@@ -2377,38 +2395,36 @@ export class WebGPUFluid {
         this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
-    // 9. Dye: diffuse, then advect through the forced velocity
-    const a = p.dt * p.diff * n2;
-    stage('dye diffuse', (pass) => {
-      this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye');
-      /*
-        With Oil Bodies on, only the water's colour diffuses. The oil's
-        share is diffused too, but only to know how much of the whole's
-        diffusion was the oil's (the diffusion is linear, so the water's
-        part of it is the whole's less the oil's); bodyUnspread then keeps
-        the water's part and puts the oil's colour back where it was.
-        Diffusing only the whole spread the oil's colour into the water as
-        the water's own, where nothing could tell it apart again: a green
-        haze of amber in teal round every body. Diffusing both alike, as
-        this first did, spread it into the water as the oil's, a cell or
-        two a second past the edge's tail, where the evening-out has no oil
-        to carry it back to: the oil's colour in open water grew from 1.1%
-        to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
-        not stop. The oil's colour does mix inside a body, slowly
-        (bodyPartition's inside rate), as two dyed oils do. (A share begun
-        this step is skipped here: the transport below starts it from the
-        plate as it is.)
-      */
+    // 9. Dye: dispersion along the flow (Taylor–Aris dispersion) plus molecular diffusion
+    /*
+      Replaces isotropic Jacobi diffusion with real Taylor–Aris dispersion along
+      the depth-mean flow (PLAN 18h). Transverse to the flow, diffusion is
+      purely molecular (Dm ~ 4e-10 m²/s), so dye stays sharp where it is still
+      and holds crisp edges across streamlines. Along the flow, shear across the
+      gap spreads dye as D_L ≈ Dm + h²|u|²/(210 Dm), forming natural streaks.
+      Discretised as a conservative finite-volume face flux, exactly conserving dye.
+    */
+    const diffScale = p.diff > 0 ? p.diff / 0.0002 : 0;
+    const dm = (D_MOLECULAR / (PLATE_METRES * PLATE_METRES)) * p.dt * n2 * diffScale;
+    const dispCells = disp * (N - 2);
+    const kappaT = 0.5 * diffScale;
+    stage('dye disperse', (pass) => {
+      this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
+        this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, 0.35, 0, 0, 0]));
+      this.dye.swap();
       if (bodiesOn && !bodiesFresh) {
         const od = this.oilDye!;
-        this.jacobi(pass, od, [a, a, a, a], DYE_ITERS, 'oil dye');
-        // The oil's share before the diffusion is the Jacobi's x0, still in scratchB.
+        // Keep oil's pre-dispersion share in scratchB for bodyUnspread
+        this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
+        this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
+          this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, 0.35, 0, 0, 0]));
+        od.swap();
         this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
         this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
         this.dye.swap();
         od.swap();
       }
-    }, a > 0);
+    }, p.diff > 0);
     /*
       The poured liquids' species rides the colour's carry when it can (PLAN
       18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found
@@ -2567,7 +2583,7 @@ export class WebGPUFluid {
       what the diffusion leaves short, and is not run at all where it leaves
       nothing: the looks the diffusion already clears are as they were.
     */
-    const gridDiff = (8 * a) / (1 + 8 * a);
+    const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
