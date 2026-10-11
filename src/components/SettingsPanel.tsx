@@ -1071,6 +1071,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="plateRock"
         />
         <Slider
+          label="Frame Sway"
+          value={settings.frameSway ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ frameSway: v })}
+          settingKey="frameSway"
+        />
+        <Slider
           label="Layer Scale Variety"
           disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.layerScaleVariety ?? 0.5}

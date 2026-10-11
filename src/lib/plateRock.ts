@@ -138,7 +138,7 @@ export function coverDrag(thickness: number, density = 1000): number {
  * The drag is taken implicitly, so glycerine's 30 per second is as steady
  * as the oil's 0.7 at any step.
  */
-export function stepCover(c: CoverGlass, tiltX: number, tiltY: number, drag: number, dt: number): void {
+export function stepCover(c: CoverGlass, tiltX: number, tiltY: number, drag: number, dt: number, room = COVER_ROOM): void {
   /*
     A tilt that is not a number (a phone's reading gone bad) is level, and a
     glass that has become one starts again at rest: the cover integrates
@@ -148,16 +148,67 @@ export function stepCover(c: CoverGlass, tiltX: number, tiltY: number, drag: num
   if (!Number.isFinite(tiltX)) tiltX = 0;
   if (!Number.isFinite(tiltY)) tiltY = 0;
   if (![c.x, c.y, c.vx, c.vy].every(Number.isFinite)) { c.x = 0; c.y = 0; c.vx = 0; c.vy = 0; }
+  /*
+    A cover with no room is seated in the bottom glass's rim: it cannot slide
+    and drags nothing (Frame Sway at 0, `coverRoom`). Held at rest outright,
+    so not even a rounding error's drift reaches the film.
+  */
+  if (!(room > 0)) { c.x = 0; c.y = 0; c.vx = 0; c.vy = 0; return; }
   const w2 = G / BOWL_RADIUS;
   c.vx = (c.vx + dt * (G * tiltX - w2 * c.x)) / (1 + dt * drag);
   c.vy = (c.vy + dt * (G * tiltY - w2 * c.y)) / (1 + dt * drag);
   c.x += c.vx * dt; c.y += c.vy * dt;
   const r = Math.hypot(c.x, c.y);
-  if (r > COVER_ROOM) {
+  if (r > room) {
     // Against the rim: held there, and what was going outward stops.
     const nx = c.x / r, ny = c.y / r;
-    c.x = nx * COVER_ROOM; c.y = ny * COVER_ROOM;
+    c.x = nx * room; c.y = ny * room;
     const out = c.vx * nx + c.vy * ny;
     if (out > 0) { c.vx -= out * nx; c.vy -= out * ny; }
   }
+}
+
+/*
+  Frame Sway (the owner, 2026-10-11): "I'm getting nauseous watching the
+  visuals. It moves around the x/y axis with sounds ... like the whole plate
+  moves around under the camera. Make the liquids and their interactions the
+  main focus, not the overall movement of the plates or cameras."
+
+  What moved was the cover glass above. On a thin gap it drags the film at
+  half its slide, and the film is the whole picture: every kick at the
+  default Plate Rock slid all of it a few cells one way and swung it back at
+  the bowl's 1.5 Hz (`npm run framesway` measures it, per frame, on a song's
+  kicks). That is a real clock glass rocked by a hand, and it is also exactly
+  a camera shake, which is what a viewer's stomach reads it as. The tilt
+  itself stays: it moves only the colour heavier than the plate's mean, a
+  pool sliding downhill through clear liquid while the rest holds still,
+  which is the liquid's own motion and what the rock is for (27a).
+
+  So the cover sits seated by default and the dial says how loose it is: the
+  room between the two glasses' rims, from none (the cover held in the
+  bottom glass's rim, as a clamped clock glass is) to the 4 cm `COVER_ROOM`
+  the cover had. The other things that moved the whole frame with the beat
+  ride the same dial (LiquidVisualizer: the lamp following the rock; the
+  plate shader: a kaleidoscope's turn and breath on the beat, the closeup's
+  crinkle pulsing with it), so one dial, off by default, is everything that
+  moves the frame rather than the liquid.
+*/
+/** The Frame Sway dial's default: the frame holds still and the liquid moves. */
+export const FRAME_SWAY_DEFAULT = 0;
+/** The dial, clamped, with a NaN read as off. */
+export function frameSway(v: number | undefined): number {
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : FRAME_SWAY_DEFAULT;
+}
+/** The room the cover has to slide in for the dial: none seated, `COVER_ROOM` at full. */
+export function coverRoom(sway: number | undefined): number {
+  return COVER_ROOM * frameSway(sway);
+}
+/**
+ * How far the plate's rock moves the lamp, in plate widths across and up: a
+ * tipped plate lit from a new side, a twentieth of the plate at the spring's
+ * full swing, for Plate Rock and Frame Sway (none by default; above).
+ */
+export function lampRock(rock: { x: number; y: number }, plateRock: number | undefined, sway: number | undefined): [number, number] {
+  const k = (Number.isFinite(plateRock) ? Math.max(0, Math.min(1, plateRock as number)) : 0) * frameSway(sway);
+  return [rock.x * 0.05 * k, rock.y * 0.05 * k];
 }
