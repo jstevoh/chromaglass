@@ -4989,6 +4989,27 @@ commit. *Size:* S.
 ### 19u. Nothing reaches main without the checks
 **Shipped** (2026-10-10, a branch ruleset on `main`, not code): nothing lands on `main` without a pull request and green `Measure` and `WebGPU (macOS)`, and the admin's bypass works only on a pull request, never on a push. The ruleset, why those two checks, and what is left are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+### 19v. Two checks that could not tell what they were asked
+**Shipped** (2026-10-10): the magnet's drag is laid out on the plate, off its middle row, and the Stage sheet's Esc is listened for once (`hooks/useEscape.ts`). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+
+- **19v-1. The show keys' listener comes off and goes back 11 times a second.** App's
+  keydown effect for Space, Backspace, 1–9 and the tool letters is keyed on `goLook`,
+  `cueAny` and the rest, which App makes afresh as the sound re-renders it (measured: 11
+  re-adds a second with nothing open). The same dispatch rule that could drop the Stage
+  sheet's Esc (19v) could drop a Space meant to send a look, if an earlier window listener
+  sets state on that key. Nothing ahead of it does today, so not seen; read its handlers
+  through a ref and listen once, as `desk/Desk.tsx` and `useEscape` do.
+- **19v-2. A ferrofluid pool dragged to the rim comes back with more ferrofluid.** Found
+  by #349's first planned drag on the Mac (`npm run magnet`, run 38089915722): the magnet
+  dragged a pool of 3.48% of the plate from 0.23,0.44 to 0.30,0.90, about 0.45 from the
+  middle with the pool 0.157 across, and the plate then held 170% of what was poured,
+  with nothing laid (phaseLays 0 → 0). The phase moves in flux form and should neither
+  make nor lose it. Not known yet whether the rim makes it (the wall's boundary on the
+  phase's flux, or the magnet's pull against it) or `readPhase` counts the field past the
+  dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
+  so the rim needs a check of its own: a pool held against the rim by the magnet, its
+  total read every second. Physics lane.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show

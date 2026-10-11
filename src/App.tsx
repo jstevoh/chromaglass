@@ -758,8 +758,12 @@ export default function App() {
         `afterEscape=1`, same run, same sequence.
 
         One list, every panel, so Esc means the same thing everywhere.
+        The Stage sheet (⌘,) came with Desk v2 and was left off it, so only
+        its own listener closed it, and that one could miss the key
+        (hooks/useEscape.ts, `npm run layout`'s "the Stage sheet never closed").
       */
       setShowSettings(false);
+      setShowStage(false);
       setShowHelp(false);
       setShowTrackPanel(false);
       setShowMidi(false);
