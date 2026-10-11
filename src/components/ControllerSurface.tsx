@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useEscape } from '../hooks/useEscape';
 import { X, Printer, Eraser, Search } from 'lucide-react';
 import { ACTION_LABELS, LEARNABLE_SETTINGS, type MidiAction, type MidiTarget } from '../lib/midi';
 import { useMidiLastEvent, type MidiController } from '../hooks/useMidi';
@@ -282,11 +283,9 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [onClose]);
+  // Listened for once: this surface re-renders every 120 ms (above), and an
+  // effect keyed on onClose could drop the key (useEscape).
+  useEscape(onClose);
 
   const assign = (target: MidiTarget) => {
     if (!selected) return;

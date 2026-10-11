@@ -433,7 +433,7 @@ const SECTIONS: Section[] = [
         <Rows items={[
           ['Room Drive', <>The optical-flow lattice upsampled onto the grid and added as velocity every solver step. A wave of an arm reaches the plate about 100 ms after it happens.</>],
           ['Hands', <>Everyone the sensor holds becomes a projectionist: standing still is a palm on the top glass (so <Em>Fingering</Em> breaks it into spokes), moving is a puff of air the way they are going, arriving is a drop. A track keeps its identity, so the same dancer keeps the same dye across a set.</>],
-          ['Patches', <>How busy the floor is, how many people, how spread out, where they are, which way they are going, how light the room is and what colour — any of them on any control, each with its own depth, under one master <Em>Room Impact</Em>. The patch bay is a section of its own, Settings → Inputs → Patches, because it reads the film, the sound and the shapes as well.</>],
+          ['Patches', <>How busy the floor is, how suddenly it moves and how long it has been busy, how many people, how spread out, where they are, which way they are going, how light the room is and what colour — any of them on any control, each with its own depth, under one master <Em>Room Impact</Em>. The patch bay is a section of its own, Settings → Inputs → Patches, because it reads the film, the sound and the shapes as well.</>],
           ['Flip Camera', <>For a camera facing the room, so a hand moved left moves the dye left.</>],
           ['Deadzone / Smoothing', <>What counts as nothing, and how much the reading is smoothed before it is used. A room is a noisy sensor.</>],
         ]} />

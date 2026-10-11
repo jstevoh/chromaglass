@@ -927,18 +927,28 @@ const MACRO = /* wgsl */ `
 // structure. A uniform drift (never a per-pixel flow offset) keeps it stable.
 fn macroWarpOffset(fuv: vec2f) -> vec2f {
   if (U.macroEdge < 0.005) { return vec2f(0.0); }
+  let zoom = max(1.0, U.camZoom);
+  // The frequency of the noise must be tied to the physical plate, not the zoom!
+  // If we multiply by zoom, the noise becomes sub-pixel and aliases into chaotic black holes.
   let f = U.logicalGrid * 0.85;
-  let t = vec2f(U.time * 0.012, U.time * -0.009);
+  let t = vec2f(U.time * 0.003, U.time * -0.002);
   var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
   w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
   
-  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat
-  let beatPulse = sin(U.beatPhase * 3.14159265);
-  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.4);
-  
+  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat,
+  // as far as Frame Sway lets the beat move the frame (0 by default: the
+  // whole closeup's silhouette throbbing on every beat reads as the camera
+  // shaking, not the liquid moving; lib/plateRock.ts). At 0 it rests where it
+  // rests with no beat clock (the edge as set), on purpose: a pulse held at its
+  // average would still be a beat-locked level, and the look without music is the reference.
+  // At full sway the pulse is ±15% of the edge (20c), not the ±40% it was.
+  let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
+  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.15);
+
   // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
   // plate-wide frame is noise, and on a bead it is the silhouette.
-  return w * (pulseEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / U.logicalGrid);
+  // We divide the displacement by zoom so that the screen doesn't shake wildly when zoomed in.
+  return w * (pulseEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / (U.logicalGrid * zoom));
 }
 
 fn macroWarp(fuv: vec2f) -> vec2f { return fuv + macroWarpOffset(fuv); }
@@ -1043,12 +1053,12 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     fineRim = max(h0.rim, h1.rim) * gap * seeFine;
     cellSlope = (g0.slope + g1.slope) + (h0.slope + h1.slope) * 0.55 * gap * seeFine;
 
-    let dark = col * 0.03;
     let ring = mix(col, vec3f(1.0, 0.94, 0.74), 0.55) * (1.25 + id * 0.6);
-
-    // Cell cores are holes in the film, not a tint over it: darken them the
-    // whole way rather than scaling the darkening down with the patch mask.
-    col = mix(col, dark, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
+    // Cell cores are fluid lenses, not black holes! Instead of darkening them,
+    // we make them slightly deeper and richer in color, while preserving the
+    // specular rim. They act like oil bubbles revealing the paint underneath.
+    let coreLens = mix(col, col * vec3f(0.8, 0.9, 1.2), 0.5);
+    col = mix(col, coreLens, clamp(core + fineCore * 0.55, 0.0, 1.0) * min(1.0, k * 1.6));
     col += ring * clamp(rim * 1.1 + fineRim * 0.5, -0.5, 2.0) * k;
   }
 
@@ -1079,21 +1089,22 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // The grid normal is a gentle slope over many sim cells; scaled up it
     // becomes the dome of the bead, which is what carries the large-scale
     // sense of volume under the cell detail.
-    let n = normalize(vec3f(gridNormal.xy * 3.2 - tilt * r3, 1.0));
+    let n = normalize(vec3f(gridNormal.xy * 5.0 - tilt * r3 * 2.2, 1.0));
 
     let L = lampDir(fuv, U.lamp);
     let H = normalize(L + vec3f(0.0, 0.0, 1.0));
     let diff = max(0.0, dot(n, L));
-    let spec = pow(max(0.0, dot(n, H)), 46.0);
-    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 3.0);
+    
+    let spec = pow(max(0.0, dot(n, H)), 80.0);
+    let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.8);
     // Recessed cores and grooves sit in their own shadow.
     let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
 
     // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
     // without darkening it overall.
     col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
-    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 0.7;    // wet highlight on the domes
-    col += col * fres * r3 * paint * 0.35;                      // bright refracting edge
+    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 1.2;    // wet highlight on the domes
+    col += col * fres * r3 * paint * 0.4;                      // bright refracting edge
   }
 
   // ── Dome shading — thickness across the bead as a whole ─────────
@@ -2103,8 +2114,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var a = modf2(ang, wedge);
     if (a > wedge * 0.5) { a = wedge - a; }
     
-    // BPM-Synced LFOs: Smoothly pulse the kaleidoscope rotation and zoom with the beat phase!
-    let beatPulse = sin(U.beatPhase * 3.14159265);
+    // BPM-Synced LFOs: pulse the kaleidoscope's rotation and zoom with the
+    // beat phase, as far as Frame Sway lets them. At 0, the default, the
+    // rig turns on its own clock (kaleidoPhase) and holds its zoom: a whole
+    // frame turning a seventh of a wedge and pulling in a tenth on every
+    // beat is the frame moving with the music, which the owner asked to be
+    // rid of (2026-10-11; lib/plateRock.ts).
+    let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
     a += U.kaleidoPhase + (beatPulse * wedge * 0.15); // Slight rhythmic rotation
     
     let breathingZoom = U.kaleidoZoom * (1.0 - beatPulse * 0.1); // Rhythmic zoom
