@@ -2784,7 +2784,17 @@ fewer), and stamp the reading's time against the frame's.
 Still open here: the MIDI half. A fader still re-renders the App once a frame while
 it moves (`rideSetting`: the ride drains into `setSettings` on an animation frame), by
 design so the desk shows the value; reading the ride's shadow in the frame loop and
-showing the desk's value at ten a second is the same split, not yet done. And the
+showing the desk's value at ten a second is the same split, not yet done. #348 tried
+it (a 100 ms timer, the frame loop laying `ride.peek()` over the settings) and went
+back to the frame's flush in review, because of three faults a second try has to
+avoid: the overlay never stopped, since the shadow outlives the flush by design
+(3600 of 3600 frames a minute after one move still copied the whole settings
+object); it lay over the identified track's overrides of the same key, which then
+never reached the plate; and the loop's other direct reads of `settingsRef`
+(Room and Sound Impact, Magnet Size, Phase Amount) would still lag the fader by up
+to a tenth of a second. Overlay only keys the render has not caught up with and
+the overrides do not hold, into a reused object, and give the loop one settings
+object to read. And the
 reading's two byte arrays are still new each reading (about 60 KB a second), not
 reused: a listener may hold an older reading, so reusing them needs the readers
 checked first.
@@ -5183,7 +5193,7 @@ film, whose own stretching viscosity 4ηh resists its retraction (a Trouton shee
 a thin film dragged over the glass. Two ways to get it, in order:
 
 1. **On 18a (shipped behind Thin Gap, on in every look):** the film as a phase of high
-   viscosity in the Hele-Shaw solver. The
+   viscosity in the Hele-Shaw solver. The oil film against the glass with water beside it is modeled as two layers stacked across a pressure-driven Poiseuille gap (relative viscosity m = 50 for clear light mineral oil at 50 cSt, `OIL_NU = 5e-5` m²/s, with continuous velocity and shear stress at the interface; 4.15x drag at h=0.4, 15.95x drag at h=0.8). Stir impulse in `scripts/lace.mjs` scaled to [2.5, -1.5] / [-2.0, 2.0] so dye moves far enough under the ~16x drag to measure displacement (> 1 cell) without altering the 12% wave ratio bar. The
    hole is water invading a viscous liquid under capillary pressure, resisted by
    Darcy drag. This needs 18a's variable mobility and 18d's per-liquid viscosity, and
    costs nothing beyond them.
@@ -5195,6 +5205,11 @@ a thin film dragged over the glass. Two ways to get it, in order:
 the film's thickness at the edge over its far thickness, stays under 1.2, where the
 prototype's h³ film reaches about 2. A sheared hole stretches along the flow by at
 least 2:1 before it meets another.
+
+- **20c-1. Macro closeup cell field is a look-alike shortcut (retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
+
+- **20c-2. Settings tabs on the phone (shipped in #348's review).** The Settings rail is a strip across the top on a phone, and each tab took its group's whole width and lay under the next group: 13 of the 26 tabs took no tap, Patches among them, so the room's two new patch features (How sudden, How busy lately) could not be reached from a phone. The tabs are full width only in the desk's column now; `npm run phone` taps every tab where it is drawn, and patches each new feature from the phone.
+
 
 ### 20d. Hairline edges from the optical path (this is 18e)
 

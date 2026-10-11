@@ -119,11 +119,21 @@ try {
     A stir that lasts: a slow swirl kicked in again every second, as a
     performer's hand or the band would, round the plate's middle and one
     corner, so the film is carried and sheared the whole time.
+
+    Ten times the push it had before 20c (0.25/0.2), and why that is the
+    physics and not a looser bar: since 20c the film is a layer of clear oil
+    (50 times the water's viscosity) stacked against the glass, and two
+    layers across a Poiseuille gap drag 4.15 times the water alone at a
+    film of 0.4 and 15.95 times at 0.8. Under the old push the 0.8 film's
+    dye moved 0.1 of a cell in three seconds, too little to time a bump
+    against, and check 2 read nothing. The bar is unchanged (the bump's
+    travel within 12% of 6h(1 − h) of the dye's), and a harder stir only
+    makes "stays whole for 20 s" harder to pass.
   */
   const stir = async () => {
     await page.evaluate(() => {
-      lab.vel(0.4, 0.45, 0.3, [0.25, -0.15, 0, 0]);
-      lab.vel(0.65, 0.6, 0.25, [-0.2, 0.2, 0, 0]);
+      lab.vel(0.4, 0.45, 0.3, [2.5, -1.5, 0, 0]);
+      lab.vel(0.65, 0.6, 0.25, [-2.0, 2.0, 0, 0]);
       lab.flush();
     });
   };

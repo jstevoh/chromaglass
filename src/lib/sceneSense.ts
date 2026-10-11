@@ -72,6 +72,10 @@ export interface SceneReading {
 
   /** Motion energy normalised against the room's own recent range, 0..1. */
   energy: number;
+  /** Sudden, fast-changing movements, 0..1. */
+  motionHighFreq: number;
+  /** Slow, sustained movement integrated over time, 0..1. */
+  motionOverTime: number;
   /** The same before normalisation — what the meter in the panel shows. */
   raw: number;
   /** Where the motion is, 0..1 across the frame. Holds its last value when still. */
@@ -204,6 +208,11 @@ export class SceneSense {
 
   private readonly flowRaw = { x: new Float32Array(LATTICE * LATTICE), y: new Float32Array(LATTICE * LATTICE) };
   private readonly range = new RoomRange();
+  private readonly rangeHighFreq = new RoomRange();
+  private readonly rangeOverTime = new RoomRange();
+  private lastRaw = 0;
+  private rawHighFreq = 0;
+  private rawOverTime = 0;
   private tracks: (ScenePerson & { missing: number })[] = [];
   private nextId = 1;
 
@@ -212,7 +221,10 @@ export class SceneSense {
     flowX: new Float32Array(LATTICE * LATTICE),
     flowY: new Float32Array(LATTICE * LATTICE),
     motion: new Float32Array(LATTICE * LATTICE),
-    energy: 0, raw: 0,
+    energy: 0,
+    motionHighFreq: 0,
+    motionOverTime: 0,
+    raw: 0,
     centroidX: 0.5, centroidY: 0.5,
     dirX: 0, dirY: 0,
     spread: 0,
@@ -228,6 +240,11 @@ export class SceneSense {
   reset() {
     this.frames = 0;
     this.range.reset();
+    this.rangeHighFreq.reset();
+    this.rangeOverTime.reset();
+    this.lastRaw = 0;
+    this.rawHighFreq = 0;
+    this.rawOverTime = 0;
     this.tracks = [];
     this.out.people = [];
     this.out.ready = false;
@@ -397,6 +414,18 @@ export class SceneSense {
 
     out.raw = clamp(motionSum / ((width - 2) * (height - 2)) / 32, 0, 1);
     out.energy = this.range.normalise(out.raw, step);
+    
+    // High frequency motion (fast changes/flickers)
+    const dRaw = Math.abs(out.raw - this.lastRaw) / step;
+    this.lastRaw = out.raw;
+    const fastAlpha = 1 - Math.exp(-step / 0.1);
+    this.rawHighFreq += (dRaw - this.rawHighFreq) * fastAlpha;
+    out.motionHighFreq = clamp(this.rangeHighFreq.normalise(this.rawHighFreq, step), 0, 1);
+
+    // Sustained motion (smoothed over time)
+    const slowAlpha = 1 - Math.exp(-step / 2.5);
+    this.rawOverTime += (out.raw - this.rawOverTime) * slowAlpha;
+    out.motionOverTime = clamp(this.rangeOverTime.normalise(this.rawOverTime, step), 0, 1);
     if (wsum > 0.0001) {
       // The centroid keeps its last position through a still moment rather
       // than snapping to the middle, so anything riding it does not twitch.
@@ -595,6 +624,8 @@ export const SCENE_MAX_PEOPLE = MAX_PEOPLE;
 export function getSceneValue(r: SceneReading, feature: string): number {
   switch (feature) {
     case 'motion': return r.energy;
+    case 'motionHighFreq': return r.motionHighFreq;
+    case 'motionOverTime': return r.motionOverTime;
     case 'spread': return r.spread;
     case 'centroidX': return r.centroidX;
     case 'centroidY': return r.centroidY;
