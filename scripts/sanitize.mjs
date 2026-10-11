@@ -8,7 +8,10 @@
  * PLAN.md §14n: One sanitizePatch against the settings registry used by the
  * socket, the MIDI map loader and a loaded look alike.
  */
-import { DEFAULT_SETTINGS } from '../src/types.ts';
+import {
+  DEFAULT_SETTINGS, BLEND_MODES, LED_MODES, ON_NEW_SONG_MODES, VISCOSITY_MODES,
+  MACRO_CAMERA_MODES, MIX_BLENDS, AUDIO_FEATURES,
+} from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { sanitizePatch } from '../src/lib/sanitizeSettings.ts';
 import { parseRemoteGesture } from '../src/lib/remoteProtocol.ts';
@@ -86,6 +89,35 @@ const check = (name, ok, detail = '') => {
   // Valid enums survive
   const goodEnums = sanitizePatch({ blendMode: 'lighter', ledMode: 'cyberpunk', onNewSong: 'random', macroCamera: 'follow' });
   check('valid enums survive', goodEnums.blendMode === 'lighter' && goodEnums.ledMode === 'cyberpunk' && goodEnums.onNewSong === 'random' && goodEnums.macroCamera === 'follow');
+
+  /*
+    Every value each choice setting can take, not one value of each. The
+    first sanitizePatch kept its own hand-written lists, and they had already
+    drifted from the types when it landed on main (live from 2026-10-09 to
+    #322): Lighter and Exclusion on the blend menu, four of the five LED
+    modes, Off and Random for a new song and the mixer's Multiply and Key
+    were all dropped by updateSettings, the phone's patches and a saved look,
+    while the one-value check above passed. The lists are now the types' own
+    arrays; walking every value of every key that uses them is what catches
+    the next member added to a type and forgotten in the sanitiser.
+  */
+  const lists = [
+    ['blendMode', BLEND_MODES], ['ledMode', LED_MODES], ['onNewSong', ON_NEW_SONG_MODES],
+    ['viscosity', VISCOSITY_MODES], ['macroCamera', MACRO_CAMERA_MODES],
+    ...['ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend'].map(k => [k, MIX_BLENDS]),
+  ];
+  const lost = [];
+  for (const [key, values] of lists) {
+    for (const v of values) if (sanitizePatch({ [key]: v })[key] !== v) lost.push(`${key}=${v}`);
+  }
+  for (const slot of ['velocity', 'density', 'color', 'rotation']) {
+    for (const f of AUDIO_FEATURES) {
+      if (sanitizePatch({ audioMappings: { [slot]: f } }).audioMappings?.[slot] !== f) lost.push(`audioMappings.${slot}=${f}`);
+    }
+  }
+  const tried = lists.reduce((n, [, v]) => n + v.length, 0) + 4 * AUDIO_FEATURES.length;
+  check('every value of every choice setting survives', lost.length === 0 && tried > 60,
+    lost.length ? `${lost.length} dropped: ${lost.join(', ')}` : `${tried} values kept`);
 
   // Scene mappings validation: setting checked against SETTING_TRAVEL with own-property, depth clamped to -100..100
   const badMappings = sanitizePatch({
