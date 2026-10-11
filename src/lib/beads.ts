@@ -203,6 +203,7 @@ export class BeadField {
    * Viscosity ratio lambda = mu_drop / mu_carrier (PLAN 18i).
    * In a thin gap, an oil pancake drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
    * At default lambda = 1.5, 2 / (1 + 1.5) = 0.8, matching the measured light show mineral oil.
+   * This is a property on BeadField; per-bottle dynamic coupling awaits 18d-3 Cahn-Hilliard pinch-off.
    */
   viscosityRatio = 1.5;
   /** The drop mask's pixels and its scratch, kept between frames (see `rasterDrops`). */

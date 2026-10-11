@@ -53,6 +53,28 @@ export interface Bubble {
 export const MAX_BUBBLES = 128;
 
 /**
+ * Plate diameter in metres, matching turntable.ts and thinGap.
+ */
+export const DISH_METRES = 0.2;
+
+/**
+ * Rest plate gap in plate widths (6 mm at rest), matching turntable.ts and plate.ts.
+ */
+export const DISH_REST_GAP = 0.03;
+
+/**
+ * Dynamic viscosity μ of typical light show liquid (Pa·s):
+ * ~17 mPa·s for light mineral oil (THICK_NU = 2e-5 m²/s, ρ ≈ 850 kg/m³ in turntable.ts).
+ */
+export const LIQUID_MU = 0.017;
+
+/**
+ * Surface tension σ (N/m):
+ * ~30 mN/m (0.030 N/m) for air/mineral oil interface.
+ */
+export const LIQUID_SIGMA = 0.030;
+
+/**
  * How fast gas crosses from a small bubble to a large neighbour, in cells² a
  * second per unit of 1/r difference: a 3-cell bubble beside an 8-cell one
  * gives up its gas in about half a minute, which is slow enough to watch.
@@ -82,8 +104,25 @@ export class BubbleField {
   /** Things that happened this step, for the show to react to (a pop disturbs the dye). */
   readonly events: BubbleEvent[] = [];
   private nextId = 1;
-  /** Film drainage contact time (seconds) between touching bubble pairs (PLAN 18i). */
-  private readonly contactDrain = new Map<string, number>();
+
+  /**
+   * Liquid dynamic viscosity μ (Pa·s) of the carrier fluid.
+   * Defaults to light mineral oil (17 mPa·s).
+   */
+  liquidMu = LIQUID_MU;
+
+  /**
+   * Surface tension σ (N/m) at the liquid/air interface.
+   * Defaults to 0.030 N/m.
+   */
+  liquidSigma = LIQUID_SIGMA;
+
+  /**
+   * Film drainage contact time (seconds) between touching bubble pairs (PLAN 18i).
+   * Key: min(id1, id2) * 1000000 + max(id1, id2) to avoid string allocation.
+   */
+  private readonly contactDrain = new Map<number, number>();
+  private readonly touchingNow = new Set<number>();
 
   /**
    * Whether bubbles pop on a timer at the end of their life (pacing a show
@@ -110,6 +149,7 @@ export class BubbleField {
     this.events.length = 0;
     this.strawBubble = null;
     this.contactDrain.clear();
+    this.touchingNow.clear();
     this.nextId = 1;
   }
 
@@ -120,6 +160,7 @@ export class BubbleField {
   clearLooks(): void {
     for (let i = this.bubbles.length - 1; i >= 0; i--) if (!this.bubbles[i].straw) this.bubbles.splice(i, 1);
     this.contactDrain.clear();
+    this.touchingNow.clear();
   }
 
   /** Whether any bubble on the plate was blown by hand. */
@@ -252,15 +293,18 @@ export class BubbleField {
     // Fingers as long as the growth is fast, relaxing toward that.
     const want = Math.min(1, speed / (N * 0.03)) * 0.55;
     b.fing += (want - b.fing) * (1 - Math.exp(-dt / 0.25));
-    // Saffman-Taylor wavelength scaling: lambda ≈ pi * b / sqrt(Ca) (PLAN 18i).
+    // Saffman-Taylor wavelength scaling: lambda ≈ pi * b_eff / sqrt(Ca) (PLAN 18i).
     // An advancing air front in a Hele-Shaw cell destabilizes into fingers with
-    // wavelength lambda. The number of lobes around the perimeter 2 * pi * R is
-    // m ≈ (2 * pi * R) / lambda ≈ (2 * R / b) * sqrt(Ca).
+    // wavelength lambda (Saffman & Taylor 1958, Paterson 1981). The number of lobes
+    // around the perimeter 2 * pi * R is m ≈ (2 * pi * R) / lambda ≈ (2 * R / b_eff) * sqrt(Ca).
+    // Physical speed U (m/s) = speed * (DISH_METRES / N).
+    // Capillary number Ca = μ * U / σ.
     if (speed > 0.1) {
-      const gap = 0.45 * (N / 192);
-      const Ca = Math.max(1e-4, speed / 20.0);
-      const lambda = (Math.PI * gap) / Math.sqrt(Ca);
-      const m = Math.round((2 * Math.PI * b.r) / Math.max(0.5, lambda));
+      const uMps = speed * (DISH_METRES / N);
+      const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
+      // Effective meniscus neck gap b_eff ≈ 0.09 cells (0.094 mm).
+      // Lobe count scales as m ∝ R * sqrt(Ca) between the clamps.
+      const m = Math.round(22.0 * b.r * Math.sqrt(Ca));
       b.lobes = Math.min(18, Math.max(6, m));
     }
     // Held at the straw.
@@ -333,18 +377,24 @@ export class BubbleField {
       const [vx, vy] = velocity(b.x, b.y);
       // Bretherton lubrication: an air pancake in a Hele-Shaw cell runs ahead
       // of the depth-mean liquid velocity U_mean (Taylor & Saffman 1959, Bretherton 1961).
-      // With parabolic velocity profile in the gap, centerplane speed is ~1.5–2x mean.
-      // The thin wetting film left on the plates has thickness h_f / b ≈ 1.34 Ca^(2/3),
-      // giving bubble speed U_bubble = U_mean * (2.0 / (1 + 2.26 * Ca^(2/3))).
+      // Between parallel plates, planar Poiseuille centerline velocity is 1.5 U_mean.
+      // The thin wetting film left on the plates has thickness h_f / b ≈ 1.34 (Ca/2)^(2/3) ≈ 0.84 Ca^(2/3)
+      // (Park & Homsy 1984), reducing speedup to U_bubble = U_mean * (1.5 / (1 + 2.26 * Ca^(2/3))).
+      // Physical speed U (m/s) = vMag * (DISH_METRES / N).
+      // Capillary number Ca = μ * U / σ.
       const vMag = Math.hypot(vx, vy) * CELLS_PER_UNIT;
-      const Ca = Math.max(1e-5, vMag / 1000);
+      const uMps = vMag * (DISH_METRES / N);
+      const Ca = Math.max(1e-5, (this.liquidMu * uMps) / this.liquidSigma);
       const filmCorrection = 2.26 * Math.cbrt(Ca * Ca);
-      const speedRatio = Math.max(1.2, 2.0 / (1 + filmCorrection));
+      const speedRatio = Math.max(1.0, 1.5 / (1 + filmCorrection));
       // In the absence of audio agitation, millimeter air pancakes between plates
-      // have no artificial Brownian wander. Treble agitation provides physical vibration.
-      const wander = agitation > 0 ? this.rng.centred() * (0.5 + agitation * 1.5) : 0;
-      const dx = vx * CELLS_PER_UNIT * speedRatio - tiltX * 900 + b.kx + wander;
-      const dy = vy * CELLS_PER_UNIT * speedRatio - tiltY * 900 + b.ky + wander;
+      // have no artificial Brownian wander. Treble agitation provides physical vibration
+      // with two independent random draws for x and y.
+      const wanderScale = agitation > 0 ? (0.5 + agitation * 1.5) : 0;
+      const wx = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
+      const wy = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
+      const dx = vx * CELLS_PER_UNIT * speedRatio - tiltX * 900 + b.kx + wx;
+      const dy = vy * CELLS_PER_UNIT * speedRatio - tiltY * 900 + b.ky + wy;
       b.x += dx * dt;
       b.y += dy * dt;
       b.kx *= Math.exp(-dt / 0.22);
@@ -378,29 +428,34 @@ export class BubbleField {
         // A held bubble does not give: the other takes the whole of the move.
         const ka = heldNow.has(a) ? 0 : heldNow.has(c) ? 2 : 1;
         const kc = heldNow.has(c) ? 0 : heldNow.has(a) ? 2 : 1;
-        if (dist < touch * 0.98) {
-          // Overlapping: push apart to rest edge to edge.
-          const push = (touch * 0.98 - dist) * 0.5;
+        if (dist < touch * 0.95) {
+          // Overlapping: push apart to rest edge to edge with contact facet.
+          const push = (touch * 0.95 - dist) * 0.5;
           a.x -= (ddx / dist) * push * ka; a.y -= (ddy / dist) * push * ka;
           c.x += (ddx / dist) * push * kc; c.y += (ddy / dist) * push * kc;
         }
       }
     }
     // Merge: when two bubbles touch, the thin liquid lubrication film between
-    // them drains (Reynolds drainage equation). The drainage time t_drain scales
-    // with the effective radius R_e = (r_a * r_c) / (r_a + r_c) (PLAN 18i).
+    // them drains (Reynolds film drainage equation). The drainage time t_drain scales
+    // with the liquid's viscosity-to-tension ratio (μ / σ) and the effective radius
+    // R_e = (r_a * r_c) / (r_a + r_c) (PLAN 18i).
     // Once contact duration exceeds t_drain, the film ruptures and they merge area-conserving.
-    const touchingNow = new Set<string>();
+    // Freshly formed bubbles need time for their dynamic interfaces to stabilize (age > 2).
+    this.touchingNow.clear();
     for (let i = 0; i < bs.length; i++) {
       for (let j = bs.length - 1; j > i; j--) {
         const a = bs[i], c = bs[j];
         const ddx = a.x - c.x, ddy = a.y - c.y;
         const dist2 = ddx * ddx + ddy * ddy;
-        const touchR = (a.r + c.r) * 0.99;
-        if (dist2 < touchR * touchR) {
-          const key = a.id < c.id ? `${a.id}:${c.id}` : `${c.id}:${a.id}`;
-          touchingNow.add(key);
-          const tDrain = 0.4 + 0.2 * ((a.r * c.r) / (a.r + c.r));
+        const touchR2 = (a.r + c.r) * (a.r + c.r) * 0.92;
+        if (a.age > 2 && c.age > 2 && dist2 < touchR2) {
+          const key = Math.min(a.id, c.id) * 1000000 + Math.max(a.id, c.id);
+          this.touchingNow.add(key);
+          const Re = (a.r * c.r) / (a.r + c.r);
+          // Stefan-Reynolds drainage: t_drain ∝ (μ / σ) * R_e.
+          // In physical units with μ/σ ≈ 0.57 s/m, a 3-cell pair (Re = 1.5) drains in ~6-7 seconds.
+          const tDrain = 7.5 * (this.liquidMu / this.liquidSigma) * Re;
           const contact = (this.contactDrain.get(key) ?? 0) + dt;
           this.contactDrain.set(key, contact);
           if (contact >= tDrain) {
@@ -424,7 +479,7 @@ export class BubbleField {
       }
     }
     for (const key of this.contactDrain.keys()) {
-      if (!touchingNow.has(key)) this.contactDrain.delete(key);
+      if (!this.touchingNow.has(key)) this.contactDrain.delete(key);
     }
 
     /*
@@ -488,7 +543,7 @@ export class BubbleField {
       if (atEdge || shaken || timedPop) {
         this.events.push({ kind: 'pop', x: b.x, y: b.y, r: b.r });
         bs.splice(i, 1);
-        if (!atEdge && (shaken || timedPop)) {
+        if (!atEdge) {
           this.spawnDaughters(b, bs);
         }
       }
