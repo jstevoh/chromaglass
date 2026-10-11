@@ -175,6 +175,25 @@ fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t
 */
 var<private> lampBg: vec3f = vec3f(1.0);
 var<private> milkScatter: f32 = 0.0;
+var<private> milkGap: f32 = 1.0;
+
+/**
+ * Milky liquids scatter light (Mie / Kubelka-Munk, PLAN 18j).
+ *
+ * 1. Black Ground (diffuse backscatter):
+ *    In two-flux Kubelka-Munk theory, a non-absorbing scattering layer of
+ *    thickness d = d_0 * gap (rest gap d_0 = 6.0 mm from DISH_REST_GAP = 0.03
+ *    on a 0.2 m plate) has optical scattering depth Sd = sc * (6.0 * gap).
+ *    Diffuse reflectance is R_KM = Sd / (1.0 + Sd), exactly conserving energy
+ *    (R + T = 1.0). Large fat globules (1-10 um) scatter flat across visible
+ *    wavelengths (Mie), providing an opaque white body (R_KM) over the ground
+ *    for dyes to sit on as pastel or vibrant colour (PLAN §4).
+ */
+fn milkDiffuseReflectance(sc: f32, gap: f32) -> f32 {
+  if (sc <= 0.001) { return 0.0; }
+  let sd = sc * (6.0 * gap);
+  return sd / (1.0 + sd);
+}
 
 /*
   A decoded dye f over the ground bg, on the ground the look asks for
@@ -190,8 +209,8 @@ var<private> milkScatter: f32 = 0.0;
 fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
   var painted = mix(bg, f.rgb, f.a);
   if (milkScatter > 0.001) {
-    let rDiff = (1.0 - exp(-milkScatter * 2.0)) * vec3f(0.96, 0.95, 0.92);
-    let effBg = mix(bg, rDiff, 1.0 - exp(-milkScatter * 2.5));
+    let rKM = milkDiffuseReflectance(milkScatter, milkGap);
+    let effBg = mix(bg, vec3f(1.0), rKM);
     painted = mix(effBg, f.rgb, f.a);
   }
   if (U.lampGround <= 0.001) { return painted; }
@@ -545,12 +564,38 @@ fn fluidFlow(vtex: texture_2d<f32>, fuv: vec2f) -> vec2f {
  * A soft 4-tap blur of the packed scattering coefficient (vtex.a).
  */
 fn milkScatterHalo(vtex: texture_2d<f32>, fuv: vec2f) -> f32 {
-  let d = 0.012;
+  let d = 0.020;
   let s0 = tex2(vtex, fuv + vec2f(-d, -d)).a;
   let s1 = tex2(vtex, fuv + vec2f(d, -d)).a;
   let s2 = tex2(vtex, fuv + vec2f(-d, d)).a;
   let s3 = tex2(vtex, fuv + vec2f(d, d)).a;
   return (s0 + s1 + s2 + s3) * 0.25;
+}
+
+/**
+ * Projector lamp transmission with aperture loss and forward halo (PLAN 18j):
+ *
+ * Collimated beam extinction with projector aperture loss:
+ * T_direct = exp(-kappa * sc * f_loss * d_eff * gap).
+ * - kappa = vec3f(0.85, 0.95, 1.20): casein micelles (50-300 nm) exhibit
+ *   Rayleigh-Gans scattering (~lambda^-1.5), scattering blue more than red
+ *   and giving transmitted light a warm cast (tR > tB).
+ * - f_loss = 0.90: f/2.0 projector lens collects ~10% of forward-scattered
+ *   light, losing 90% out of the lens pupil (PLAN 18j).
+ * - d_eff = 1.0 mm: shortcut for the effective optical thickness of the
+ *   illuminated liquid layer in show conditions (diluted emulsion).
+ * Forward lobe halo: fwd = (halo * 0.08) * exp(-sc * 0.6) * vec3f(1.05, 1.0, 0.92)
+ * adds forward-scattered light collected by the lens. Just outside the pool
+ * boundary (sc ~ 0, halo > 0), this adds light on top of the unattenuated
+ * beam, forming a soft bright forward halo (T > 1.0).
+ */
+fn milkTransmission(tIn: vec3f, vtex: texture_2d<f32>, fuv: vec2f, gap: f32) -> vec3f {
+  let sc = max(0.0, tex2(vtex, fuv).a);
+  let halo = milkScatterHalo(vtex, fuv);
+  if (sc <= 0.001 && halo <= 0.001) { return tIn; }
+  let ext = exp(-vec3f(0.85, 0.95, 1.20) * (sc * 0.90) * gap);
+  let fwd = (halo * 0.08) * exp(-sc * 0.6) * vec3f(1.05, 1.0, 0.92);
+  return tIn * ext + fwd;
 }
 `;
 
@@ -2234,6 +2279,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     strength. With no film this is 1, exactly, and nothing changes.
   */
   gapScale *= 1.0 - view.film;
+  let layerGap0 = gapScale;
   filmWater = 1.0 - view.film;
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
@@ -2413,14 +2459,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     outColor += vec3f(0.95, 0.97, 1.0) * fres * a * 0.18;
   } else {
     let sc0 = max(0.0, tex2(vel0, fuv0).a);
-    var t0 = through0;
-    if (sc0 > 0.001) {
-      let ext0 = exp(-vec3f(0.85, 0.95, 1.20) * (sc0 * 0.90) * gapScale);
-      let halo0 = milkScatterHalo(vel0, fuv0);
-      let fwd0 = (halo0 * 0.08) * exp(-sc0 * 0.6) * vec3f(1.05, 1.0, 0.92);
-      t0 = t0 * ext0 + fwd0;
-    }
+    let t0 = milkTransmission(through0, vel0, fuv0, layerGap0);
     milkScatter = sc0;
+    milkGap = layerGap0;
     outColor = onGround(outColor, fluid0,
       throughScaled(t0, more0) * reliefOf(fluid0.rgb, tint0, alpha0));
     milkScatter = 0.0;
@@ -2854,17 +2895,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       var painted1 = mix(outColor, blended, fluid1.a);
       let sc1 = max(0.0, tex2(vel1, fuv1).a);
       if (sc1 > 0.001) {
-        let rDiff1 = (1.0 - exp(-sc1 * 2.0)) * vec3f(0.96, 0.95, 0.92);
-        let effBg1 = mix(outColor, rDiff1, 1.0 - exp(-sc1 * 2.5));
+        let rKM1 = milkDiffuseReflectance(sc1, layerGap0);
+        let effBg1 = mix(outColor, vec3f(1.0), rKM1);
         painted1 = mix(effBg1, blended, fluid1.a);
       }
-      var t1 = through1;
-      if (sc1 > 0.001) {
-        let ext1 = exp(-vec3f(0.85, 0.95, 1.20) * (sc1 * 0.90));
-        let halo1 = milkScatterHalo(vel1, fuv1);
-        let fwd1 = (halo1 * 0.08) * exp(-sc1 * 0.6) * vec3f(1.05, 1.0, 0.92);
-        t1 = t1 * ext1 + fwd1;
-      }
+      let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
         On a lamp ground the back plate is a second filter in the light's
         path, whatever the look's Blend Mode says (a mixer row's own blend,

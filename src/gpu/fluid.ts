@@ -3057,7 +3057,7 @@ export class WebGPUFluid {
    * reaches the rim leaves the dish over it. Its liquid, when it is one
    * that mixes with the clear one (glycerine, syrup, milk, alcohol: `sp`),
    * is added to the species field as that share of the column, with its
-   * ln(ν/ν_water), density and index (lib/liquidProps.ts, speciesOf);
+   * ln(ν/ν_water), scatter (μs′, traded from density until 18d-4a) and index (lib/liquidProps.ts, speciesOf);
    * a clear-liquid pour (water, a dye, soap) adds the volume and nothing
    * to the field, and so dilutes what it lands in by pushing it aside.
    * Added, not replaced: the liquid that was in the column is not deleted

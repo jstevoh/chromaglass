@@ -92,8 +92,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var species: texture_2d<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
-  let v = textureLoad(vel, vec2i(id.xy), 0).xy;
+  let v = textureLoad(vel, vec2i(id.xy), 0);
   let sp = textureLoad(species, min(vec2i(id.xy), vec2i(textureDimensions(species)) - 1), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), 0.0, max(0.0, sp.b)));
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(v.xy, vec2f(-60000.0), vec2f(60000.0)), v.z, max(0.0, sp.b)));
 }`,
 };

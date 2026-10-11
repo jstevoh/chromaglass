@@ -4168,6 +4168,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   as thick as the clear liquid round it. Take its share into hsPrep as the ferrofluid's is.
 - **18d-4** Density into the tilt's buoyancy. The species carries Σ share·ρ, and nothing
   reads it yet. It would replace the CPU's `weight` and SINK.
+- **18d-4a** Restore or pack density when 18d-4 buoyancy lands. In 18j, species channel 2
+  (formerly density, read by nothing yet) was traded for optical scatter $\mu_s'$ to avoid
+  adding a second species PingPong texture and preserve 18d-11a's 6.73 ms paired carry.
+  When 18d-4 lands, pack density alongside scatter (or into packed velocity/phase) or expand
+  species.
 - **18d-5** Soap and alcohol into the GPU's surfactant with a σ(Γ) law (the bottles now
   carry σ). Delete the CPU Marangoni force and the dye multiply, and give alcohol its burst
   and evaporation. Its description still says it "rises through water".
@@ -4391,23 +4396,14 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **The owner's call:** timed pops also pace a show (`lifeScale`), and the bead carpet is
   a look in its own right, so both stay available as looks.
 
-### 18j. Milky liquids scatter
-**Shipped** (#353): scattering packed into `vel.w` via `packVel` from `species.b` (conserved flux-form advection); two-flux forward extinction and forward halo on lamp ground (projector shadow, not white); Kubelka–Munk diffuse backscattering on black ground, allowing food dye to sit on white body as solid vibrant red (PLAN §4).
+### 18j. Milky liquids scatter (shipped)
 
-- **Where:** everything in the plate is a pure absorber. `colourBody` pushes opacity
-  and saturation up to imitate a body of colour, `granulation` modulates the dye's
-  optical depth with noise (1a), and the Liesegang precipitate is a lerp.
-- **The real phenomenon:** pigment and fat droplets scatter light (Mie), handled as
-  two-flux Kubelka–Munk. With a projector's small aperture almost all scattered light
-  misses the lens, so a milky liquid throws dark or grey with a soft forward halo. It
-  does not throw white. The "solid reds on milk" in the references are a reflected-light
-  look.
-- **What it takes:** a scattering coefficient per bottle (18d) and a scatter channel in
-  a repacked binding (the dye and `view0` are full). Extinction K + S·(the share the
-  aperture loses) in 18b's exponent, with an optional small blur for the halo.
-- **Cost:** free in the shader; +0.2–0.4 ms with the halo; the binding work.
-- **Gain:** milk, paint and latex look different from ink. This replaces §4's "milk's
-  opacity still owed" with its physics.
+Shipped in #353 (2026-10-10): optical scattering packed into `vel.w` from species channel 2
+with conserved flux-form advection; Kubelka–Munk diffuse backscattering on black ground
+yielding opaque white milk and pastel food dyes (PLAN §4); two-flux forward extinction
+with Rayleigh-Gans wavelength dependence and narrow aperture loss casting a warm dark
+projector shadow on lamp ground with a soft forward halo; byte-for-byte identity for
+zero-scatter liquids. Story and measurements in `docs/plan-shipped.md` §18j.
 
 ### 18k. Smaller ones
 
