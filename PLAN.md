@@ -1878,6 +1878,18 @@ The steps, most visible first. Each is one PR with its own check, and every step
      every seven seconds that turns the plate over in a minute or two; on a look with
      few drops it may read as no change at all. Measure how long the plate takes to
      carry half the new palette on the film table, per look.
+   - ~~**8d** the Evolve Speed dial sets the pace~~ Shipped: low creeps, high moves
+     quickly (the owner, 2026-10-11), measured from each look's own Evolve Speed, where
+     it plays as it did. Moves a minute from the bottom of the dial to the top 0.63 →
+     1.10 before, 0.20 → 4.87 now. Story in `docs/plan-shipped.md` §10 step 8d.
+     - **8d-1** (open): the looks set Evolve Speed from 0.02 to 0.3, and it is also the
+       hands' pour rate, so the same dial position is a different pace on each look. If
+       the owner would rather the number meant one pace everywhere, retune the looks'
+       own values first (14 of 41 would slow by 1.5 to 3.5 times).
+     - **8d-2** (open): App glides in half-second steps, so a full-speed glide of 5 to
+       11 s is 10 to 22 steps. Judge on the Mac whether a fast colour move looks stepped;
+       if so, step short glides faster (not the whole interval: `npm run renders`
+       counts App's renders).
 
 Small things that ride along with the steps: drops with a coloured rim lined up in
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase
