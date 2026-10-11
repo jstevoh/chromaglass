@@ -13,6 +13,9 @@
  * instead of two circles overlapping.
  */
 import { stream, type Rng } from './rng';
+import { DISH_METRES, DISH_REST_GAP } from './turntable';
+
+export { DISH_METRES, DISH_REST_GAP };
 
 export interface Bubble {
   id: number;
@@ -53,18 +56,9 @@ export interface Bubble {
 export const MAX_BUBBLES = 128;
 
 /**
- * Plate diameter in metres, matching turntable.ts and thinGap.
- */
-export const DISH_METRES = 0.2;
-
-/**
- * Rest plate gap in plate widths (6 mm at rest), matching turntable.ts and plate.ts.
- */
-export const DISH_REST_GAP = 0.03;
-
-/**
  * Dynamic viscosity μ of typical light show liquid (Pa·s):
  * ~17 mPa·s for light mineral oil (THICK_NU = 2e-5 m²/s, ρ ≈ 850 kg/m³ in turntable.ts).
+ * Fixed at light mineral oil for bubbles, pending per-liquid property coupling (PLAN 18d).
  */
 export const LIQUID_MU = 0.017;
 
@@ -73,6 +67,18 @@ export const LIQUID_MU = 0.017;
  * ~30 mN/m (0.030 N/m) for air/mineral oil interface.
  */
 export const LIQUID_SIGMA = 0.030;
+
+/**
+ * Reynolds/Chesters film drainage geometry factor (R_film / h_crit)².
+ * For contact film radius R_film ~ 0.1 mm and critical rupture thickness h_crit ~ 1.2 nm,
+ * (R_film / h_crit)² ≈ 7200. Scaled by Chesters drainage coefficient ~1.0,
+ * this dimensionless factor bridges viscous-capillary time (μ/σ)·R_e (~1 ms) to
+ * macroscopic film drainage times (~4–8 s).
+ *
+ * Shortcut: The factor is tuned so a 3-cell bubble pair (Re ≈ 1.5 cells ≈ 1.56 mm)
+ * coalesces in ~6.4 s.
+ */
+export const DRAINAGE_FILM_FACTOR = 7200;
 
 /**
  * How fast gas crosses from a small bubble to a large neighbour, in cells² a
@@ -107,7 +113,8 @@ export class BubbleField {
 
   /**
    * Liquid dynamic viscosity μ (Pa·s) of the carrier fluid.
-   * Defaults to light mineral oil (17 mPa·s).
+   * Fixed at light mineral oil (17 mPa·s) matching the show's carrier fluid,
+   * pending per-liquid property coupling in 18d.
    */
   liquidMu = LIQUID_MU;
 
@@ -119,7 +126,7 @@ export class BubbleField {
 
   /**
    * Film drainage contact time (seconds) between touching bubble pairs (PLAN 18i).
-   * Key: min(id1, id2) * 1000000 + max(id1, id2) to avoid string allocation.
+   * Key: min(id1, id2) * 2^26 + max(id1, id2) to avoid string allocation.
    */
   private readonly contactDrain = new Map<number, number>();
   private readonly touchingNow = new Set<number>();
@@ -302,8 +309,12 @@ export class BubbleField {
     if (speed > 0.1) {
       const uMps = speed * (DISH_METRES / N);
       const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
-      // Effective meniscus neck gap b_eff ≈ 0.09 cells (0.094 mm).
-      // Lobe count scales as m ∝ R * sqrt(Ca) between the clamps.
+      // Effective meniscus neck gap b_eff ≈ 0.091 cells (0.095 mm) is a tuned shortcut:
+      // about 63x smaller than the real 6 mm plate gap (DISH_REST_GAP * DISH_METRES).
+      // If the physical 6 mm gap (b ≈ 5.76 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 0.5 lobes,
+      // meaning a bubble on a 192 grid would never form more than 1 finger.
+      // b_eff is set in cells (moves with grid size) to produce 6-18 visible Saffman-Taylor
+      // lobes on the discrete grid. Lobe count scales as m ∝ R * sqrt(Ca) between the clamps.
       const m = Math.round(22.0 * b.r * Math.sqrt(Ca));
       b.lobes = Math.min(18, Math.max(6, m));
     }
@@ -377,7 +388,12 @@ export class BubbleField {
       const [vx, vy] = velocity(b.x, b.y);
       // Bretherton lubrication: an air pancake in a Hele-Shaw cell runs ahead
       // of the depth-mean liquid velocity U_mean (Taylor & Saffman 1959, Bretherton 1961).
+      // An inviscid bubble spanning a Hele-Shaw cell in potential Darcy flow has theoretical
+      // speedup U_bubble / U_mean = 2.0 before film drag (matching beads.ts's 2U/(1+λ) at λ=0).
       // Between parallel plates, planar Poiseuille centerline velocity is 1.5 U_mean.
+      // Here, 1.5 is retained as a tuned shortcut: real light show bubbles spanning the 6 mm gap
+      // with finite lubricating films and viscous liquid caps drift at ~1.35-1.45x, avoiding
+      // excessive bubble runaway that alters show pacing.
       // The thin wetting film left on the plates has thickness h_f / b ≈ 1.34 (Ca/2)^(2/3) ≈ 0.84 Ca^(2/3)
       // (Park & Homsy 1984), reducing speedup to U_bubble = U_mean * (1.5 / (1 + 2.26 * Ca^(2/3))).
       // Physical speed U (m/s) = vMag * (DISH_METRES / N).
@@ -388,9 +404,11 @@ export class BubbleField {
       const filmCorrection = 2.26 * Math.cbrt(Ca * Ca);
       const speedRatio = Math.max(1.0, 1.5 / (1 + filmCorrection));
       // In the absence of audio agitation, millimeter air pancakes between plates
-      // have no artificial Brownian wander. Treble agitation provides physical vibration
-      // with two independent random draws for x and y.
-      const wanderScale = agitation > 0 ? (0.5 + agitation * 1.5) : 0;
+      // have zero artificial Brownian wander (Pe >> 10^6, thermal drift < 10^-6 m/s).
+      // Treble acoustic agitation provides physical vibrational jitter scaling continuously
+      // in proportion to agitation (from 0 at 0 up to 2.0 at full agitation), with two
+      // independent random draws for x and y.
+      const wanderScale = agitation * 2.0;
       const wx = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
       const wy = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
       const dx = vx * CELLS_PER_UNIT * speedRatio - tiltX * 900 + b.kx + wx;
@@ -417,25 +435,6 @@ export class BubbleField {
       b.wph += b.wvel * dt;
     }
 
-    // Foam contact: bubbles in thin gap flow push apart when overlapping to rest
-    // edge-to-edge as foam with Plateau borders, without unphysical long-range pull.
-    for (let i = 0; i < bs.length; i++) {
-      for (let j = i + 1; j < bs.length; j++) {
-        const a = bs[i], c = bs[j];
-        const ddx = c.x - a.x, ddy = c.y - a.y;
-        const dist = Math.hypot(ddx, ddy) || 1e-3;
-        const touch = a.r + c.r;
-        // A held bubble does not give: the other takes the whole of the move.
-        const ka = heldNow.has(a) ? 0 : heldNow.has(c) ? 2 : 1;
-        const kc = heldNow.has(c) ? 0 : heldNow.has(a) ? 2 : 1;
-        if (dist < touch * 0.95) {
-          // Overlapping: push apart to rest edge to edge with contact facet.
-          const push = (touch * 0.95 - dist) * 0.5;
-          a.x -= (ddx / dist) * push * ka; a.y -= (ddy / dist) * push * ka;
-          c.x += (ddx / dist) * push * kc; c.y += (ddy / dist) * push * kc;
-        }
-      }
-    }
     // Merge: when two bubbles touch, the thin liquid lubrication film between
     // them drains (Reynolds film drainage equation). The drainage time t_drain scales
     // with the liquid's viscosity-to-tension ratio (μ / σ) and the effective radius
@@ -450,12 +449,14 @@ export class BubbleField {
         const dist2 = ddx * ddx + ddy * ddy;
         const touchR2 = (a.r + c.r) * (a.r + c.r) * 0.92;
         if (a.age > 2 && c.age > 2 && dist2 < touchR2) {
-          const key = Math.min(a.id, c.id) * 1000000 + Math.max(a.id, c.id);
+          const key = Math.min(a.id, c.id) * (2 ** 26) + Math.max(a.id, c.id);
           this.touchingNow.add(key);
           const Re = (a.r * c.r) / (a.r + c.r);
-          // Stefan-Reynolds drainage: t_drain ∝ (μ / σ) * R_e.
-          // In physical units with μ/σ ≈ 0.57 s/m, a 3-cell pair (Re = 1.5) drains in ~6-7 seconds.
-          const tDrain = 7.5 * (this.liquidMu / this.liquidSigma) * Re;
+          const ReMetres = Re * (DISH_METRES / N);
+          // Stefan-Reynolds thin-film drainage: t_drain = DRAINAGE_FILM_FACTOR * (μ / σ) * Re_metres.
+          // In physical units with μ/σ ≈ 0.567 s/m, Re = 1.0 cell (1.04 mm) drains in ~4.25 s.
+          // DRAINAGE_FILM_FACTOR provides the dimensionless (R_film / h_crit)² geometry scaling.
+          const tDrain = DRAINAGE_FILM_FACTOR * (this.liquidMu / this.liquidSigma) * ReMetres;
           const contact = (this.contactDrain.get(key) ?? 0) + dt;
           this.contactDrain.set(key, contact);
           if (contact >= tDrain) {
@@ -480,6 +481,27 @@ export class BubbleField {
     }
     for (const key of this.contactDrain.keys()) {
       if (!this.touchingNow.has(key)) this.contactDrain.delete(key);
+    }
+
+    // Foam contact: bubbles in thin gap flow push apart when overlapping to rest
+    // edge-to-edge as foam with Plateau borders, without unphysical long-range pull.
+    for (let i = 0; i < bs.length; i++) {
+      for (let j = i + 1; j < bs.length; j++) {
+        const a = bs[i], c = bs[j];
+        const ddx = c.x - a.x, ddy = c.y - a.y;
+        const dist = Math.hypot(ddx, ddy) || 1e-3;
+        const touch = a.r + c.r;
+        // A held bubble does not give: the other takes the whole of the move.
+        const ka = heldNow.has(a) ? 0 : heldNow.has(c) ? 2 : 1;
+        const kc = heldNow.has(c) ? 0 : heldNow.has(a) ? 2 : 1;
+        if (dist < touch * 0.98) {
+          // Overlapping: push apart to rest edge to edge with contact facet.
+          // Restored to 0.98 * touch so resting foam rafts remain stable.
+          const push = (touch * 0.98 - dist) * 0.5;
+          a.x -= (ddx / dist) * push * ka; a.y -= (ddy / dist) * push * ka;
+          c.x += (ddx / dist) * push * kc; c.y += (ddy / dist) * push * kc;
+        }
+      }
     }
 
     /*

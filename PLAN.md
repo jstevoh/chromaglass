@@ -4389,30 +4389,9 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18i. Bubbles and beads live by physics, not timers
 
-- **Bubbles** (`src/lib/bubbles.ts`) live 9–23 s and pop at the end. The soap film's
-  colour runs on age over life. A pop makes 2–3 random daughters, merges are random
-  (`rng < dt·0.12`), pairs are pulled together, and the drift has a random wander at a
-  fixed 1.4× the flow. A bubble trapped between glasses is an air pancake with no
-  draining film, so it does not pop on a timer. It ends at the rim, by dissolving (the
-  Ostwald ripening already there), by merging when the film between two drains, or
-  when a drop breaks it. With no free surface there is no pull between bubbles. A
-  bubble runs at about twice the flow, less a film correction.
-  The cheap version drops the timed pops, daughters and pull, drives merges by drainage
-  time and sets speed from the capillary number. The full one (air as a phase with
-  Laplace pressure in 18a's solve) lets bubbles finger and split. The Straw's finger
-  count is random (`lobes: 8 + rng(7)`); the real count follows the finger wavelength
-  λ ≈ πb/√Ca.
-- **Beads** (`src/lib/beads.ts`) are a carpet of particles born where a noise patch
-  allows, coloured from the look's palette, moving at a fixed 0.8× the flow with
-  jitter, merging at random. Nothing in the file knows about Oil Bodies. Real beads are
-  oil that broke up where threads pinched off (Rayleigh–Plateau), carrying the colour
-  they were poured with, and moving at about 2U/(1 + λ) for a viscosity ratio λ. What it
-  takes: beads handed down from the Cahn–Hilliard oil where it pinches, coloured from
-  the dye at birth, with speed from the bottle's λ.
-- **Cost:** CPU, plus a readback of the oil field for the beads.
-- **The owner's call:** timed pops also pace a show (`lifeScale`), and the bead carpet is
-  a look in its own right, so both stay available as looks.
-- **Partly shipped (#358):** Planar Hele-Shaw Bretherton lubrication ($U_b / U = 1.5 / (1 + 2.26\text{Ca}^{2/3})$ with $\text{Ca} = \mu U / \sigma$) running ahead of flow, unagitated Brownian wander removed (treble acoustic vibration drives isotropic 2D wander), Saffman-Taylor finger wavelength scaling $\lambda \approx \pi b_\text{eff} / \sqrt{\text{Ca}}$ with $m \propto R \sqrt{\text{Ca}}$ setting dynamic straw lobe counts between clamps, Reynolds thin-film drainage time $t_\text{drain} \propto (\mu / \sigma) R_e$ governing bubble merging with $R_e = (r_a r_c)/(r_a + r_c)$ and age > 2 dynamic stabilization, and bead Hele-Shaw viscous pancake speed lag $2U / (1 + \lambda)$ for viscosity ratio $\lambda$ on `BeadField` (default $\lambda = 1.5$ matching light show oil at $0.8\times$). Timed pops remain default to preserve show pacing under the owner's call; exposing physical-only pop mode as a setting and rim drainage remain open.
+**Partly shipped** (#358): Bretherton lubrication speedup ($U_b / U = 1.5 / (1 + 2.26\text{Ca}^{2/3})$ with ratio falling dynamically with flow speed $U$), unagitated Brownian wander removed (treble acoustic vibration drives isotropic 2D wander scaling with agitation), Saffman-Taylor finger wavelength scaling on the Straw ($m \propto R \sqrt{\text{Ca}}$), Reynolds/Chesters thin-film drainage merge ($t_\text{drain} \propto (\mu / \sigma) R_e$ with restored 0.98 resting push so foam rafts remain stable), and bead viscous pancake lag ($2U / (1 + \lambda)$ with default $\lambda = 1.5$ yielding $0.8\cdot U$). Measured by `npm run bubblephysics`. How it was modeled, tuned shortcuts ($1.5\cdot U$ premise, $b_\text{eff}$ gap scaling, and $t_\text{drain}$ film factor), and measurements are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
+- Expose physical-only pop mode as a user setting (`timedPops = false`).
+- Rim drainage when bubbles reach the dish boundary.
 
 
 ### 18j. Milky liquids scatter

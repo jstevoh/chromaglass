@@ -5,15 +5,16 @@
  *   node scripts/bubblephysics.mjs
  *
  * Checks:
- *   1. Bubble drift speedup follows Bretherton lubrication law U_b / U = 2 / (1 + c Ca^(2/3)),
- *      running ahead of depth-mean liquid velocity (~1.8-2.0x vs old constant 1.32x).
+ *   1. Bubble drift speedup follows Bretherton lubrication law with planar Poiseuille centerline shortcut
+ *      U_b / U = 1.5 / (1 + 2.26 Ca^(2/3)), running ahead of depth-mean liquid velocity (~1.35-1.50x vs old constant 1.32x),
+ *      and speedup ratio falls dynamically as flow speed U increases.
  *   2. Unagitated bubbles have no artificial Brownian wander.
  *   3. Straw finger count follows Saffman-Taylor wavelength scaling lambda ≈ pi * b / sqrt(Ca).
  *   4. Two bubbles in contact drain their thin liquid lubricating film over time t_drain ∝ R_e,
  *      merging deterministically after film drainage rather than on a random dice roll.
  *   5. Physical pancake bubbles (timedPops = false) do not pop on a timer, while timedPops = true
  *      preserves show pacing via lifeScale as called for by the owner.
- *   6. Beads drift at 2U / (1 + lambda) for viscosity ratio lambda.
+ *   6. Beads drift at 2U / (1 + lambda) for viscosity ratio lambda, with default speed 0.8·U.
  */
 import { build } from 'esbuild';
 
@@ -34,24 +35,23 @@ const N = 192, dt = 1 / 60;
 
 // ── 1. Bretherton lubrication speedup ─────────────────────────────────
 {
-  const f = new BubbleField(N);
-  // Spawn single bubble at center
-  f.spawn(96, 96, 4, 1, 0);
-  const b = f.bubbles[0];
-  const uFlow = 0.01; // solver velocity units
-  const flow = (x, y) => [uFlow, 0];
+  const measureSpeedRatio = (uFlow) => {
+    const f = new BubbleField(N);
+    f.spawn(96, 96, 4, 1, 0);
+    const b = f.bubbles[0];
+    const flow = () => [uFlow, 0];
+    const x0 = b.x;
+    for (let t = 0; t < 60; t++) f.step(dt, flow, 0, 0, 1, 0);
+    const cellsMoved = b.x - x0;
+    const baseFlowCells = uFlow * (0.05 * 190 * 60);
+    return cellsMoved / baseFlowCells;
+  };
+  const ratioSlow = measureSpeedRatio(0.01);
+  const ratioFast = measureSpeedRatio(0.04);
   
-  const x0 = b.x;
-  // Step 60 frames (1 second) with no agitation, no tilt
-  for (let t = 0; t < 60; t++) f.step(dt, flow, 0, 0, 1, 0);
-  const cellsMoved = b.x - x0;
-  // Base mean flow in cells per second: uFlow * CELLS_PER_UNIT = 0.01 * (0.05 * 190 * 60) = 5.7 cells/s
-  const baseFlowCells = uFlow * (0.05 * 190 * 60);
-  const speedRatio = cellsMoved / baseFlowCells;
-  
-  check('bubble runs ahead of flow via Bretherton lubrication in planar Hele-Shaw cell (speed ratio 1.35-1.50x)',
-    speedRatio >= 1.35 && speedRatio <= 1.50,
-    `speed ratio ${speedRatio.toFixed(3)}x (was fixed 1.32x, planar Hele-Shaw centerline profile with lubrication film)`);
+  check('bubble runs ahead of flow via Bretherton lubrication and ratio falls with flow speed U',
+    ratioSlow >= 1.35 && ratioSlow <= 1.50 && ratioFast >= 1.25 && (ratioSlow - ratioFast > 0.05),
+    `speed ratio ${ratioSlow.toFixed(3)}x (u=0.01) > ${ratioFast.toFixed(3)}x (u=0.04), delta ${(ratioSlow - ratioFast).toFixed(3)}`);
 }
 
 // ── 2. Zero artificial Brownian wander when unagitated ────────────────
@@ -100,7 +100,7 @@ const N = 192, dt = 1 / 60;
 
 // ── 4. Film drainage merge ───────────────────────────────────────────
 {
-  const still = () => [0, 0];
+  const compress = (x, y) => [x < 82.5 ? 0.02 : -0.02, 0];
   const measureDrain = (r1, r2, mu, sigma) => {
     const f = new BubbleField(N);
     f.timedPops = false;
@@ -115,7 +115,7 @@ const N = 192, dt = 1 / 60;
     b2.y = b1.y;
     let frames = 0;
     while (f.bubbles.length > 1 && frames < 1200) {
-      f.step(dt, still, 0, 0, 1, 0);
+      f.step(dt, compress, 0, 0, 1, 0);
       frames++;
     }
     return { time: frames * dt, merged: f.bubbles.length === 1, rFinal: f.bubbles[0]?.r ?? 0 };
@@ -128,8 +128,6 @@ const N = 192, dt = 1 / 60;
   // Viscous pair (Re=1.0, 2x viscosity)
   const viscous = measureDrain(2, 2, 0.034);
 
-  check('two bubbles touching start as two separate pancakes', true);
-  
   // Touching briefly (less than t_drain) does not merge
   const fBrief = new BubbleField(N);
   fBrief.timedPops = false;
@@ -139,7 +137,7 @@ const N = 192, dt = 1 / 60;
   fBrief.bubbles[0].age = 2.5; fBrief.bubbles[1].age = 2.5;
   fBrief.bubbles[1].x = fBrief.bubbles[0].x + (2 + 2) * 0.94;
   fBrief.bubbles[1].y = fBrief.bubbles[0].y;
-  for (let t = 0; t < 60; t++) fBrief.step(dt, still, 0, 0, 1, 0); // 1.0s < 4.25s
+  for (let t = 0; t < 60; t++) fBrief.step(dt, compress, 0, 0, 1, 0); // 1.0s < 4.25s
   check('bubbles touching briefly do not merge before thin film drains', fBrief.bubbles.length === 2);
 
   check('drainage time t_drain grows with effective radius R_e',
@@ -198,6 +196,12 @@ const N = 192, dt = 1 / 60;
   for (let t = 0; t < frames; t++) fDefault.step(dt, flow, 0, 0);
   const movedDefault = b0.x - x0;
   
+  const baseFlow = uFlow * (0.05 * 190 * 60) * dt * frames;
+  const defaultSpeedRatio = movedDefault / baseFlow;
+  check('default beads drift at 0.8·U matching tuned lambda = 1.5',
+    Math.abs(defaultSpeedRatio - 0.8) < 0.03,
+    `speed ratio ${defaultSpeedRatio.toFixed(3)} matches expected 0.800`);
+
   // Custom viscosity ratio lambda = 3.0 -> speed factor 2 / (1 + 3) = 0.5
   const fViscous = new BeadField(N);
   fViscous.viscosityRatio = 3.0;
