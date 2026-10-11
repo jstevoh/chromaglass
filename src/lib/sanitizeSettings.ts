@@ -11,6 +11,7 @@ import {
   type SimResolution,
 } from '../types.ts';
 import { PIN_RANGE, onStep } from './deskPins.ts';
+import { SETTING_TRAVEL } from './sceneMap.ts';
 
 const VALID_VISCOSITY = new Set<string>(VISCOSITY_MODES);
 const VALID_BLEND_MODE = new Set<string>(BLEND_MODES);
@@ -45,7 +46,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
   const out: Partial<VisualizerSettings> = {};
 
   for (const [key, value] of Object.entries(patch)) {
-    if (!(key in DEFAULT_SETTINGS)) continue; // Drop unknown keys
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) continue; // Drop unknown and inherited keys
     const def = (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[key];
 
     // Special case: simResolution ('auto' | number)
@@ -129,9 +130,13 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
         (m.source === undefined || typeof m.source === 'string') &&
         typeof m.feature === 'string' &&
         typeof m.setting === 'string' &&
+        Object.prototype.hasOwnProperty.call(SETTING_TRAVEL, m.setting) &&
         typeof m.depth === 'number' && Number.isFinite(m.depth) &&
         (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer)))
-      ).slice(0, 32);
+      ).map(m => ({
+        ...m,
+        depth: Math.max(-100, Math.min(100, m.depth)),
+      })).slice(0, 32);
       out.sceneMappings = validMappings;
       continue;
     }

@@ -802,17 +802,11 @@ export function parseMidiMap(text: string): MidiMap {
     }))
     .filter(b => {
       if (b.target.kind === 'setting') {
-        const key = b.target.key;
-        if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) return false;
-        if (typeof (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[key] !== 'number') return false;
-        if (typeof b.target.min !== 'number' || !Number.isFinite(b.target.min)) return false;
-        if (typeof b.target.max !== 'number' || !Number.isFinite(b.target.max)) return false;
-        const spec = LEARNABLE_BY_KEY.get(key);
-        if (spec) {
-          b.target.min = spec.min;
-          b.target.max = spec.max;
-        }
-        return b.target.min <= b.target.max;
+        const spec = LEARNABLE_BY_KEY.get(b.target.key);
+        if (!spec) return false;
+        b.target.min = spec.min;
+        b.target.max = spec.max;
+        return true;
       }
       return true;
     });
