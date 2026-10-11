@@ -1712,6 +1712,31 @@ and 93 of 93 phone), with React told 9.9–10.3 a second at 24 to 42 frames a se
 and the App rendering 10.9–11.6. The ear's reading for the plate's frame runs
 guarded, so a throw in it costs that frame its reading, not the plate its loop.
 
+**Shipped, the MIDI fader's half (2026-10-11).** A fader handed React every move on an
+animation frame (`rideSetting`), and the MIDI hook set its "last event" state twelve
+times a second and its clock lamp twice a second whatever it held, so with one fader
+swept at sixty messages a second (`npm run renders`, a stubbed controller on CC 7 bound
+to the Dimmer) the App rendered 121 times a second, laptop and phone, and at rest with
+MIDI on twice a second, against the desk clock's once. Now the plate reads the ride
+itself at the top of every frame (`ride` on `LiquidVisualizer`, `SettingRide.lay`), put
+where every reader in the frame loop reads, and React is handed the ride every 100 ms
+(`RIDE_VIEW_MS`), for the desk's number; the last event is a store only the MIDI panel
+and the on-screen controller subscribe to (`useMidiLastEvent`), and the lamp is set only
+when it changes. Measured: the desk's Dimmer changes 9.0 times a second (59.9 before),
+the App renders 10.0 a second, commits the same (121 before), where the fader stops is
+where the Dimmer lands, and a second after letting go the App renders its clock alone,
+1.0 a second (2.0 before). #348 had tried the split and taken it back for three faults,
+each answered: `lay` lays a key only while what React rendered disagrees with it, so
+once React has a move no frame copies anything (`npm run panel`: 0 of 3600 frames,
+where the first try copied all 3600); App's `ridePlate` keeps the ride off a key the
+identified track overrides, and off the wall's non-room keys while the desk builds on a
+copy; and the frame puts the result in the one `settingsRef` the whole loop reads. On
+the Mac `renders` also holds that at least half the frames during the sweep draw a move
+React has not rendered yet, and that none does once the fader is let go. The same PR
+treats a ride as a hand's write for Evolve (14t): a glide on the dial is dropped at the
+first message, the drift's anchor moves to where the fader put it, and the drift skips a
+dial a fader holds that React has not rendered yet.
+
 ### 14v. The show takes a long time to load on the web
 
 - **Shipped:** the opening's pipelines are built three at a time (`?lanes=N` to time
