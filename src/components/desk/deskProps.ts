@@ -83,6 +83,12 @@ export interface DeskProps {
   edited: boolean;
   dirty: boolean;
   onSendToWall: () => void;
+  /**
+   * Opens the projector window, for the header's Wall dot. Send to wall did
+   * that too until Preview had a copy to send (PLAN.md 8b); the dot still
+   * means the window, whatever the plate bar's button now does.
+   */
+  onOpenWall?: () => void;
   onSave: () => void;
   onSaveOver?: () => void;
   onNew: () => void;
@@ -120,7 +126,6 @@ export interface DeskProps {
   onGoBackPlate?: () => void;
   backLook?: string | null;
   onBackFollowsFront?: () => void;
-  onBack: (() => void) | null;
   fade: number;
   onFade: (s: number) => void;
   cuedLook: { id: string; name: string } | null;
@@ -128,8 +133,6 @@ export interface DeskProps {
   onCueSaved: (id: string) => void;
   onSendSaved: (id: string) => void;
   onAddSavedToSet: (id: string) => void;
-  onFreeze: () => void;
-  frozen: boolean;
   onDrain: () => void;
 
   // ── Controls: rides, the recipe, the sections' knobs ───────────────

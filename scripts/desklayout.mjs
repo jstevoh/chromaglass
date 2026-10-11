@@ -31,6 +31,7 @@ import {
 } from '../src/lib/deskLayout.ts';
 import { SETTINGS_SECTIONS } from '../src/lib/settingsMap.ts';
 import { PINNABLE } from '../src/lib/deskPins.ts';
+const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
 
 let total = 0, failed = 0;
@@ -193,6 +194,42 @@ console.log('\n The operations');
   check('and Open all unfolds them', l.collapsed.length === 0);
   check('a panel that does not exist is never added', dockPanel(l, 'no-such', 'left') === l && floatPanel(l, 'no-such') === l);
   check('and every step kept each panel in one place', placesOf(l).doubled.length === 0);
+}
+
+// ── No setting alone on a panel ───────────────────────────────────────
+/*
+  The owner, 2026-10-10, over a screenshot of Sound Mappings: a whole panel
+  for one knob, Sound Drive. A knobs panel draws the numbers of its section
+  (its switches and pickers are behind "All of…"), so a section with one or
+  two numbers was a panel of one or two knobs; Heat Slide was the other, with
+  Evaporation Rate and Heat Decay. Both are folded into the sections they
+  belong with, and the bar is three, so neither comes back by a section
+  being split again with too little in it.
+*/
+{
+  const counts = new Map();
+  for (const s of PINNABLE) counts.set(s.section, (counts.get(s.section) ?? 0) + 1);
+  const thin = PANELS.filter(p => p.kind === 'knobs').map(p => [p.id, counts.get(p.id) ?? 0]).filter(([, n]) => n < 3);
+  const knobPanels = PANELS.filter(p => p.kind === 'knobs').length;
+  check('no knobs panel holds fewer than three knobs', knobPanels >= 10 && thin.length === 0,
+    thin.length ? thin.map(([id, n]) => `${id} ${n}`).join(', ') : `${knobPanels} knobs panels, the smallest ${Math.min(...PANELS.filter(p => p.kind === 'knobs').map(p => counts.get(p.id) ?? 0))}`);
+  check('and the merged sections\' controls went with them',
+    PIN_SECTION('audioImpact') === 'audio-input' && PIN_SECTION('evaporationRate') === 'physics' && PIN_SECTION('heatDecay') === 'physics',
+    `audioImpact ${PIN_SECTION('audioImpact')}, evaporationRate ${PIN_SECTION('evaporationRate')}, heatDecay ${PIN_SECTION('heatDecay')}`);
+  /*
+    A layout saved before the merge names the old panels. It opens with the
+    panel they went into, in the same place, folded if it was folded; and
+    where that panel is out already, the old one is not a second copy.
+  */
+  const old = sanitizeLayout('build', { left: [], right: ['heat'], deck: ['recipe', 'audio-mappings', 'macro'], floating: [], collapsed: ['audio-mappings'], deckCollapsed: false, plateMode: 'preview' });
+  check('a saved layout\'s Sound Mappings opens Sound in its place, and Heat Slide opens Fluid Physics',
+    old.deck.join() === 'recipe,audio-input,macro' && old.right.join() === 'physics' && old.collapsed.join() === 'audio-input',
+    `deck ${old.deck.join()} · right ${old.right.join()} · folded ${old.collapsed.join()}`);
+  const both = sanitizeLayout('build', { left: ['physics'], right: [], deck: ['heat'], floating: [{ id: 'audio-mappings', x: 10, y: 10, w: 300, h: 300 }], collapsed: [], deckCollapsed: false, plateMode: 'preview' });
+  check('and one already out is not drawn twice; a floating one floats as the merged panel',
+    both.left.join() === 'physics' && both.deck.length === 0 && both.floating.map(f => f.id).join() === 'audio-input' && placesOf(both).doubled.length === 0,
+    `left ${both.left.join()} · deck ${both.deck.join()} · floating ${both.floating.map(f => f.id).join()}`);
+  check('the old ids are not panels any more', !PANEL_BY_ID.has('audio-mappings') && !PANEL_BY_ID.has('heat'));
 }
 
 console.log(`\n${total - failed}/${total} checks passed`);

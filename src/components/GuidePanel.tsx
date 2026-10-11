@@ -115,7 +115,7 @@ const SECTIONS: Section[] = [
         <H>When something is wrong</H>
         <Rows items={[
           ['Nothing is moving', <>In this order: is the plate playing; can the show hear anything (the level meter in the status line, or Settings → Inputs → Sound); is the <Em>Dimmer</Em> up. <C>B</C> is blackout and it is easy to leave on — the status line says <Em>Blackout</Em> in red when it is.</>],
-          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the mappings are set to <C>none</C> — Settings → Inputs → Sound Mappings.</>],
+          ['It moves but ignores the music', <>Raise <Em>Sound Drive</Em> (audioImpact). If it still will not, the bands are set to <C>none</C> — Settings → Inputs → Sound, under What the sound moves.</>],
           ['It is being thrown around', <>Lower <Em>Sound Drive</Em>. Turning Automation on roughly doubles every audio-driven push on top of it, so a plate tuned with it off will be about twice as emphatic once it is on.</>],
           ['The plate has gone flat', <>It is saturated: there are no boundaries left to see. Lower <Em>Dye Budget</Em> — counter-intuitively that makes it look fuller, because empty glass is what makes the colour read.</>],
           ['A slider does nothing', <>Two usual causes. <Em>Blob Surface Tension</Em> does nothing with <Em>Polarity</Em> at zero. And Focus, Aperture, Bloom, Chromatic Aberration and Refraction are the lens's — they do nothing with <Em>Lens</Em> (Settings → Look → Camera) at zero. A slider that cannot do anything says why in place of its value.</>],
@@ -271,11 +271,11 @@ const SECTIONS: Section[] = [
           ['Room calibration', <>Learns this room's noise floor and dynamics and drives the visuals from where the music sits between them, rather than from an absolute level. A quiet room and a loud one then look the same.</>],
           ['Beat Prediction', <>A phase-locked beat clock. The microphone hears a kick after it happens, so the clock learns the tempo and fires the next one <Em>early</Em>. <Em>Beat Lead</Em> is how early, in milliseconds.</>],
         ]} />
-        <H>Sound Mappings</H>
+        <H>What the sound moves</H>
         <P>
           Four destinations — velocity, density, colour, rotation — each fed by one of
           eight features: volume, bass, mid, treble, energy, timbre, complexity, or none.
-          This is the coarse wiring. <Em>Sound Drive</Em>, at the top of Sound Mappings, is how
+          This is the coarse wiring, at the foot of Settings → Inputs → Sound. <Em>Sound Drive</Em>, at the top of Sound, is how
           hard the result lands, and it is the slider to move when the plate is either ignoring
           the music or being shoved around by it. Any sound feature onto any other control is a
           patch, in Settings → Inputs → Patches.
@@ -346,10 +346,8 @@ const SECTIONS: Section[] = [
           ['Rain Drip', <>Occasional downward streaks.</>],
           ['Fingering', <>Settings → Show. With it up, a press does not thin evenly: the film thins more along a ring of spokes and the outflow follows them, so the front breaks into radial fingers instead of a smooth ring. The physics is Saffman–Taylor — thin liquid shooting through thick.</>],
         ]} />
-        <H>Heat Slide</H>
+        <H>Heat and polarity</H>
         <Rows items={[
-          ['Heat Intensity', <>How much warmth the lamp puts in.</>],
-          ['Boiling Point', <>How hard the plate is to boil. Low makes a churning cauldron; near 1 keeps it calm whatever the heat.</>],
           ['Evaporation Rate', <>How fast dye leaves the plate. Paired with Dye Budget — see the interaction section.</>],
           ['Heat Decay', <>How long warmth lingers. High keeps a gentle convection going between events.</>],
           ['Polarity', <>How strongly the dyes refuse to mix, plate-wide. This is the global setting; milk and silicone do the same thing <Em>locally</Em>, only where they are.</>],
