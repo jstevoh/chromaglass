@@ -1200,7 +1200,7 @@ fn calcOpl(d: f32, v: vec3f, dyeGain: f32) -> f32 {
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
-  let ts = 1.0 / U.logicalGrid;
+  let ts = 3.0 / U.logicalGrid;
   let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
   let d00 = decodeDensity(tex2(src, in.uv + vec2f(-ts, -ts)).a);
@@ -1216,6 +1216,15 @@ fn calcOpl(d: f32, v: vec3f, dyeGain: f32) -> f32 {
   let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
   let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
   let g = vec2f(gradX, gradY);
+
+  let macroAmt = clamp(U.macroOn, 0.0, 1.0);
+  let closeup = macroAmt > 0.001;
+  let isCamera = U.photo > 0.5 || closeup;
+  if (isCamera) {
+    var diff = 0.0;
+    if (U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
+    return vec4f(g, diff, 0.0);
+  }
 
   let vC = viewProps(in.uv);
   let oC = calcOpl(dC, vC, dyeGain);
@@ -1762,8 +1771,23 @@ struct RefractOptics {
   total: f32,
 };
 
+/*
+  Refraction optics across plate liquid interfaces (PLAN 18e):
+  Hairline dark rims from light deflected outside the projector pupil (aperture loss),
+  and shadowgraph Becke line intensity doublets under projector defocus.
+
+  Named shortcuts:
+  1. Small-angle deflection θ ≈ |∇density| · 0.015 · dyeGain is evaluated from the dye
+     gradient rather than ∇(n·h); it omits oil, film and gap thickness terms that the
+     Laplacian includes, and operates per-texel so it scales with grid resolution.
+  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the step.
+  3. Pupil overlap is modeled with a smoothstep with full physical extinction (floor 0.0).
+  4. The shadowgraph transport 1 - Δz · ∇²OPL is divided by local OPL, scaled by
+     boundaryContrast * 2 and masked by an edge-deflection smoothstep.
+*/
 fn refractionOptics(near: vec4f) -> RefractOptics {
-  if (U.edgeRelief <= 0.005) {
+  let strength = max(U.edgeRelief, select(0.0, U.boundaryContrast, U.boundaryContrast > 0.005));
+  if (strength <= 0.005) {
     return RefractOptics(1.0, 1.0, 1.0);
   }
   let grad = near.xy;
@@ -1775,14 +1799,14 @@ fn refractionOptics(near: vec4f) -> RefractOptics {
   let theta = length(grad) * 0.015 * dyeGain;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
   let overlap = 1.0 - smoothstep(0.0, 1.0, u);
-  let aperture = mix(0.15, 1.0, overlap);
+  let aperture = overlap;
 
-  let deltaZ = (U.focus - 0.5) * 1.5;
+  let deltaZ = (U.projectorFocus - 0.5) * 1.5;
   let shadowGain = max(1.0, U.boundaryContrast * 2.0);
   let edgeDeflect = smoothstep(0.005, 0.05, length(grad));
   let shadow = clamp(1.0 - deltaZ * (lap / opl) * shadowGain * edgeDeflect, 0.2, 2.5);
 
-  let total = mix(1.0, aperture * shadow, U.edgeRelief);
+  let total = mix(1.0, aperture * shadow, strength);
   return RefractOptics(aperture, shadow, total);
 }
 `;
@@ -2414,7 +2438,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (sharp0) {
     if (isCamera) {
       if (U.boundaryContrast > 0.005 && fluid0.a > 0.03) {
-        let edge0 = boundaryEdge(layer0, fuv0);
+        var edge0 = boundaryLine(near0.z);
+        if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
         fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
       }
     } else {
@@ -2898,7 +2923,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (sharp1) {
       if (isCamera) {
         if (U.boundaryContrast > 0.005 && fluid1.a > 0.03) {
-          let edge1 = boundaryEdge(layer1, fuv1);
+          var edge1 = boundaryLine(near1.z);
+          if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
           fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
         }
       } else {
@@ -2906,6 +2932,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           if (fluid1.a > 0.03) {
             let refract1 = refractionOptics(near1);
             fluid1 = vec4f(fluid1.rgb * refract1.total, fluid1.a);
+            if (U.boundaryContrast > 0.005) {
+              let edge1 = smoothstep(0.1, 0.6, length(near1.xy));
+              fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6, fluid1.a);
+            }
           }
         } else if (U.boundaryContrast > 0.005 && fluid1.a > 0.03) {
           let edge1 = boundaryEdge(layer1, fuv1);

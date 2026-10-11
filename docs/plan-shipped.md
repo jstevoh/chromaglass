@@ -2808,6 +2808,26 @@ sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
+### 18e. Edges come from refraction (replaces the painted rims and highlights)
+
+Shipped in #355 (2026-10-11): real optical boundary physics replaces painted surface-normal shading (Sobel gradients, Blinn-Phong specular, artificial dark meniscus rims, and unphysical bright boundary lines) on projected looks.
+
+- **Where:** in `plate.ts`, `calcOpl` builds optical path length OPL = n·h in the derive pass (`DERIVE_WGSL`), tracking water (1.333), oil (1.470) and species mixture indices. A 3-texel 9-tap bilinear stencil derives ∇OPL and the Laplacian ∇²OPL once per frame into the derive texture (`near.xy` = gradient, `near.z` = Laplacian for projected looks; camera looks encode `boundaryDiff` in `near.z` to avoid display-pass re-evaluation). The display pass evaluates aperture loss from light deflected outside the projection pupil and defocus shadowgraph intensity variations (Becke line doublets).
+- **Physical model and declared shortcuts:**
+  1. *Deflection angle:* approximated via small-angle deflection θ ≈ |∇density| · 0.015 · dyeGain from the density gradient (scaled by dyeGain = max(1, boundaryContrast · 3)), rather than full ∇(n·h); this captures the steep dye concentration step while remaining efficient, and is evaluated per-texel.
+  2. *Pupil overlap:* modeled via a smoothstep overlap function with full extinction floor at 0.0 against numeric aperture NA = 0.35.
+  3. *Shadowgraph transport:* ΔI/I ≈ -Δz · (∇²OPL / OPL) driven by `projectorFocus` (deltaZ = (projectorFocus - 0.5) · 1.5), modulated by boundaryContrast and masked by deflection.
+  4. *Projector focus control:* `projectorFocus` separated from camera `focus`, wired to SettingsPanel, phone/remote, desk pins, and MIDI.
+  5. *Boundary contrast on layer 1:* multi-layer boundary contrast evaluated from derived density gradient `smoothstep(0.1, 0.6, length(near1.xy))` without bare-glass leakage.
+- **Measured:**
+  - `npm run derive`: 4/4 passed (Laplacian min -0.408, max 0.713; max OPL 1.377 vs 1.378 expected).
+  - `npm run microscope`: 3/3 passed (structure at 9x 26.54, well above 22.66 bar).
+  - `npm run mixer`: 68/68 passed (Screen/Multiply gap: 10.2 > 10 bar; bare glass difference: 0; paper off-dye: 0).
+  - `npm run stages`: drawing pass at 768² 2 layers: 3.57 vs 3.46 ms base/branch, 4.26 vs 4.39 ms base/branch (watcher's alternating runs; +1.7 ms regression eliminated).
+  - `npm run panel`: 180/180 passed.
+  - `npm run desk`: 40/40 passed.
+  - `npm run qa`: 142/142 passed.
+
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 
 - **What was reported** (the owner, 2026-10-04): "in general there just aren't enough
