@@ -519,6 +519,14 @@ jobs:
       - name: The remote's Mixer
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # The Phone · iPad panel's link (scripts/phonelink.mjs, PLAN.md 8f-1): on
+      # the show server, the code of the relay's address whenever no phone is
+      # linked, the phones counted by the relay, Link another while they are;
+      # on a static host, the code of the page's own address. No GPU; dist/ is
+      # the phone step's build.
+      - name: The phone link
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/phonelink.mjs
       # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
       # stand-in laptop on the show server's relay hears every touch, tool,
       # dye and button a phone and an iPad send, and where a touch lands in

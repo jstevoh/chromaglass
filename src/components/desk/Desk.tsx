@@ -503,7 +503,7 @@ export function Desk(p: DeskProps) {
         <span className="truncate" data-testid="status-running">
           {`layout ${LAYOUT_LABEL[p.layoutName]} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
           {l.floating.length > 0 && ` · ${l.floating.length} floating`}
-          {p.status.phone ? ' · phone linked' : ''}
+          {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
           {p.status.rec ? ` · rec ${p.status.rec}` : ''}
           {p.status.engine ? ` · ${p.status.engine}` : ''}
         </span>

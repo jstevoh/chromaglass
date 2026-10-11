@@ -2587,8 +2587,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and the rim, in one kernel.
 
     A pour of volume (A.b.w 1, PLAN 18c) adds a share f of the column, a
-    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water), ρ,
-    n) in the four channels, each the share-weighted sum the carry
+    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water),
+    μs′ scatter, n) in the four channels, each the share-weighted sum the carry
     conserves. Added, not mixed in: the pour's volume goes into the thin
     solve as a source (pourVolume), and in that step the flow it makes
     carries f of the column out of the cell, which the flux-form carry
@@ -2606,7 +2606,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     middle has gone over the dish's open rim and is taken off.
 
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
-    density, index, the mode; the rim's radius for the rim).
+    scatter, index, the mode; the rim's radius for the rim).
   */
   liquidSplat0: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
