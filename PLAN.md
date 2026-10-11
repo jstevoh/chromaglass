@@ -134,7 +134,7 @@ Judged in this order, because these gate code:
 - **2.4** **10.0** the first `film.yml` baseline (a session gets 403 on dispatch): gates every
   §10 film judgment, then **10.1** Light Show Night with Pacing up.
 - **2.5** **14b-repeat** wall smoothness against cost; **H2b** 30 steps a second; **22h** the
-  look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** timed pops;
+  look's own turning (shipped, judge the eleven music looks against the last deploy before it); **21c** dots and zoom; **3-highlight**; **18i** #358 timed pops (partly shipped: Bretherton speedup, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; timed pops stay default pending physical pop setting);
   ~~**0-bandbubbles**~~ #251 (the owner asked for the fix, 2026-10-04: Audio Impact 0 drops no bubbles; its Classic line listens a minute since #346, having counted under its 15 chances on 6 of 38 Mac runs in 25 s).
 - **2.6** ~~**P7-cpu**, a decision rather than a look: delete the CPU solver's stepping (the
   roadmap and webgpu-plan say it is unreachable) or extend it (18a-9, 22d say so).~~
@@ -3853,7 +3853,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
-| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | The owner's call on pacing |
+| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
@@ -4399,29 +4399,10 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18i. Bubbles and beads live by physics, not timers
 
-- **Bubbles** (`src/lib/bubbles.ts`) live 9–23 s and pop at the end. The soap film's
-  colour runs on age over life. A pop makes 2–3 random daughters, merges are random
-  (`rng < dt·0.12`), pairs are pulled together, and the drift has a random wander at a
-  fixed 1.4× the flow. A bubble trapped between glasses is an air pancake with no
-  draining film, so it does not pop on a timer. It ends at the rim, by dissolving (the
-  Ostwald ripening already there), by merging when the film between two drains, or
-  when a drop breaks it. With no free surface there is no pull between bubbles. A
-  bubble runs at about twice the flow, less a film correction.
-  The cheap version drops the timed pops, daughters and pull, drives merges by drainage
-  time and sets speed from the capillary number. The full one (air as a phase with
-  Laplace pressure in 18a's solve) lets bubbles finger and split. The Straw's finger
-  count is random (`lobes: 8 + rng(7)`); the real count follows the finger wavelength
-  λ ≈ πb/√Ca.
-- **Beads** (`src/lib/beads.ts`) are a carpet of particles born where a noise patch
-  allows, coloured from the look's palette, moving at a fixed 0.8× the flow with
-  jitter, merging at random. Nothing in the file knows about Oil Bodies. Real beads are
-  oil that broke up where threads pinched off (Rayleigh–Plateau), carrying the colour
-  they were poured with, and moving at about 2U/(1 + λ) for a viscosity ratio λ. What it
-  takes: beads handed down from the Cahn–Hilliard oil where it pinches, coloured from
-  the dye at birth, with speed from the bottle's λ.
-- **Cost:** CPU, plus a readback of the oil field for the beads.
-- **The owner's call:** timed pops also pace a show (`lifeScale`), and the bead carpet is
-  a look in its own right, so both stay available as looks.
+**Partly shipped** (#358): Bretherton lubrication speedup ($U_b / U = 1.5 / (1 + 2.26\text{Ca}^{2/3})$ with ratio falling dynamically with flow speed $U$), unagitated Brownian wander removed (treble acoustic vibration drives isotropic 2D wander scaling with agitation), Saffman-Taylor finger wavelength scaling on the Straw ($m \propto R \sqrt{\text{Ca}}$), Reynolds/Chesters thin-film drainage merge ($t_\text{drain} \propto (\mu / \sigma) R_e$ with restored 0.98 resting push so foam rafts remain stable), and bead viscous pancake lag ($2U / (1 + \lambda)$ with default $\lambda = 1.5$ yielding $0.8\cdot U$). Measured by `npm run bubblephysics`. How it was modeled, tuned shortcuts ($1.5\cdot U$ premise, $b_\text{eff}$ gap scaling, and $t_\text{drain}$ film factor), and measurements are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
+- Expose physical-only pop mode as a user setting (`timedPops = false`).
+- Rim drainage when bubbles reach the dish boundary.
+
 
 ### 18j. Milky liquids scatter
 
