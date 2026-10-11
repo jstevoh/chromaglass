@@ -378,9 +378,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) / max(S.l * S.disp, 1e-9); }
   let c = 1.0 / (1.0 + kdt + grip);
   var mo = hsGap(g, A.a.z) * c;
-  // Past the rim the liquid is open to the air: p is held at zero there.
+  /*
+    Past the rim the liquid is open to the air: p is held at zero there.
+    And on the grid's own edge, which the rim touches at the middle of
+    each side: the inscribed circle leaves a strip of cells there, about
+    ten either side of the middle on a 192² solver, that were inside the
+    rim and walled by the grid. The dish has no wall there, only its open
+    rim, and walled, those cells turned every flow across the plate
+    sideways: under Plate Rock's cover glass, whose drag moves the whole
+    film together, the liquid against the wall went 3.4 times as fast as
+    the plate's middle (lab, full rock), the fastest faces on the plate,
+    so they and not the film's drift set the carries' substeps (fluid.ts,
+    driftCells; PLAN 27a-1).
+  */
   let d = uvOf(id) - vec2f(0.5);
-  if (length(d) >= A.a.w) { mo = -mo; }
+  if (length(d) >= A.a.w || q.x == 0 || q.y == 0 || q.x == n - 1 || q.y == n - 1) { mo = -mo; }
   mob[q.x + q.y * n] = mo;
   /*
     Under a hand what is stored is u* + K·Δt·U, which the gradient takes

@@ -1284,3 +1284,16 @@ the look it had, while the desk's preview shows the copy. Then press **Send to w
 - The copy is a second engine. Does the laptop keep its frame rate in Preview with a wall
   up, and does the wall's?
 - The wall's look stands still under the drift until it is sent (PLAN 8b-2). Noticeable?
+
+## 50. Draw shows the wall, and lands under the finger (PLAN 8-draw-a)
+
+With the show server running (`npm run show`) and the projector up, open the remote on a
+phone and an iPad (Draw is the screen it opens on).
+
+1. The frame shows the wall, moving, within a blink of the projector: drop with one
+   finger and the colour appears under it on the pad as it does on the wall.
+2. Drop near each corner of the frame and on the edges: the colour lands under the
+   finger on the wall too, with the dish turning (Classic) and with the closeup in.
+3. Lock the phone for ten seconds and unlock it: the picture comes back on its own.
+4. Say if the lag reads as a delay under the finger; if it does, the size or the rate
+   (`lib/padPicture.ts`) is the trade to revisit.
