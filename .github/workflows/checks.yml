@@ -629,6 +629,11 @@ jobs:
       - name: The straw bubble
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run straw
+      # A drop of ink on a level plate slumps out along the lower glass as a
+      # viscous gravity current, its front where Huppert's law puts it (PLAN 18m).
+      - name: A drop slumps under its own weight
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run slump
       # A press goes down round and lifts into fingers, and a plain spring lift does not.
       - name: The press and its lift
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}

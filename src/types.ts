@@ -520,7 +520,7 @@ export interface VisualizerSettings {
    * it. Moved while a film is on, the film is raised or lowered everywhere.
    */
   clearFilm?: number;
-  /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor). */
+  /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor); flat, a pool of it slumps out along the lower glass, further the heavier it is (PLAN 18m). */
   solutalBuoyancy: number;
   /** How far the plate stands up, from flat on the projector (0) to upright on the wall (1): what gravity can do in it. */
   plateUpright: number;
