@@ -303,7 +303,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   themselves updating). Cause: `useCastSession.ts` captures any `pointerdown`/`keydown`
   outside raw text inputs and delegates `fillWindow()`, forcing the performance receiver window
   fullscreen.
-- ~~**QA-26** The whole plate slides under the camera with the sound, a jolt on every
+- ~~**QA-28** The whole plate slides under the camera with the sound, a jolt on every
   kick: nauseating to watch (the owner, 2026-10-11).~~ **Fixed** (Frame Sway, 27a-7):
   #347's cover glass dragged the whole picture 0.39% of the plate a frame on average
   at the default Plate Rock (0.72% at the peak, a quarter of the plate a second);
