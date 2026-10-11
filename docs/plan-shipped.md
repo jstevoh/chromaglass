@@ -2839,6 +2839,24 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 **18g-1** (2026-10-11): flushing, not fading: the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim. Liquid carried past the circular dish rim spills into the overflow trough and leaves the plate, rather than fading away uniformly. The dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
 
+### 18i. Bubbles and beads live by physics, not timers
+
+- **What was reported** (PLAN.md §18i): bubbles live 9–23 s and pop on a timer; merges are a random dice roll (`rng < dt·0.12`), pairs are pulled together by an artificial long-range force, and drift has artificial Brownian wander. Real bubbles trapped between glasses are air pancakes with no draining soap film: they do not pop on a timer, experience no long-range attraction, and run ahead of the liquid flow due to lubricating wall films (Bretherton).
+- **Physical models implemented** (`src/lib/bubbles.ts`, `src/lib/beads.ts`, `scripts/bubblephysics.mjs`):
+  - **Bretherton lubrication speedup**: air pancakes in planar Hele-Shaw flow advance faster than depth-mean fluid velocity $U$, with speedup $U_b / U = 1.5 / (1 + 2.26\text{Ca}^{2/3})$ where $\text{Ca} = \mu U / \sigma$ is the capillary number. As flow speed increases, thicker wetting films on the glass plates exert more drag, dynamically reducing the speed ratio (~1.43× at $u=0.01$ down to ~1.33× at $u=0.04$).
+  - **Zero unagitated wander & acoustic jitter**: unagitated millimeter bubbles have high Péclet number ($Pe \gg 10^6$) and experience zero Brownian wander in quiescent fluid (drift $< 10^{-5}$ cells in 2 s). Treble acoustic agitation vibrates the plates, driving isotropic 2D wander scaling continuously with sound intensity ($2.0 \cdot \text{agitation}$).
+  - **Saffman-Taylor finger wavelength scaling on Straw**: rapidly advancing air fronts destabilize into fingers with wavelength $\lambda \approx \pi b_\text{eff} / \sqrt{\text{Ca}}$, producing lobe count $m \propto R \sqrt{\text{Ca}}$ strictly between [6, 18] clamps (7 vs 12 lobes across gentle vs fast blowing, theoretical ratio 1.715).
+  - **Stefan-Reynolds / Chesters thin-film drainage**: bubble coalescence is governed by thin liquid film drainage rather than random chance. Drainage time scales as $t_\text{drain} = \text{DRAINAGE\_FILM\_FACTOR} \cdot (\mu / \sigma) \cdot R_e$ with effective radius $R_e = (r_a r_c)/(r_a + r_c)$ and $(R_\text{film} / h_\text{crit})^2$ geometry factor. Resting push-apart is maintained at $0.98\cdot(a.r + c.r)$ so resting foam rafts remain stable, while hydrodynamic compressive contact ($dist < \sqrt{0.92}\cdot(a.r + c.r)$) drains and merges.
+  - **Bead viscous pancake lag**: oil drops in a thin gap lag the depth-mean flow: $U_\text{bead} / U = 2 / (1 + \lambda)$ for viscosity ratio $\lambda$ on `BeadField`.
+  - **Timed pops available**: per the owner's call, timed pops remain available (`timedPops = true`) to pace shows via `lifeScale`, while physical pancakes (`timedPops = false`) live without timer pops.
+- **Shortcuts honestly declared**:
+  - **$1.5\cdot U$ premise**: Taylor-Saffman potential flow gives $2.0\cdot U$ for an inviscid bubble spanning a Hele-Shaw cell (matching $2U/(1+\lambda)$ at $\lambda=0$). Centerline velocity of planar Poiseuille flow ($1.5\cdot U_\text{mean}$) was retained as a tuned shortcut: real light show bubbles spanning the 6 mm gap with finite lubricating films and viscous liquid caps drift at ~1.35–1.45×, avoiding excessive bubble runaway that alters show pacing.
+  - **$b_\text{eff} \approx 0.091\text{ cells}$ ($0.095\text{ mm}$)**: set in grid cells (moving with grid resolution), about $63\times$ smaller than the physical 6 mm gap (`DISH_REST_GAP * DISH_METRES`). If the physical 6 mm gap were used directly ($b \approx 5.76\text{ cells}$), $m \sim 0.5$ lobes—meaning a bubble on a 192 grid would never form more than 1 finger. $b_\text{eff}$ scales the finger count to produce 6–18 visible Saffman-Taylor lobes.
+  - **$t_\text{drain}$ units and $\text{DRAINAGE\_FILM\_FACTOR} = 7200$**: in real units $(\mu / \sigma) \cdot R_e$ is viscous-capillary time (~1 ms). $\text{DRAINAGE\_FILM\_FACTOR}$ represents the $(R_\text{film} / h_\text{crit})^2$ term from Chesters/Reynolds lubrication theory to bridge to macroscopic film drainage times (~4–8 s).
+  - **Viscosity $\mu$**: fixed at light mineral oil ($17\text{ mPa}\cdot\text{s}$) matching the show's carrier fluid, pending per-liquid coupling in 18d.
+  - **$\lambda = 1.5$ on beads**: solved back from tuned $0.8\times$ flow speed.
+- **Measured** (`npm run bubblephysics`): 11/11 checks pass. Foam stability test over 3600 frames on a resting raft yields 0 merges (stable foam).
+
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 
 - **What was reported** (the owner, 2026-10-04): "in general there just aren't enough
@@ -3234,3 +3252,31 @@ to within 0.001 of its reservoir: half floats left it 0.0039, 0.0029 and 0.0051 
 the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% and
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
+
+## 29. The closeup's ferrofluid drop
+
+### 29a. The drop as a bead with the light on it (this PR)
+
+Asked 2026-10-11 ("I want to see much more 3d drops ... a drop of ferro fluid with light
+reflecting off of it"). The closeup drew a flat black disc, its inside one value of black to
+the byte: the solver carries the ferrofluid as a layer of one depth, so there was no surface
+to light.
+
+Built: the ferrofluid's surface solved each frame of the closeup (`src/gpu/ferroDrop.ts`,
+`wgsl/ferroDrop.ts`): the ferrohydrostatic Young–Laplace balance h − ∇²h = P + K in l_c
+(Rosensweig §5.2), the contact line the solver's own half-full line, the plateau
+2 sin(θ/2) from the contact angle, the magnet's Kelvin pressure moving the volume
+toward it. Drawn as a camera sees it: Fresnel off the ferrofluid from under the water
+(n 1.52, 0.45% straight on), a softbox and a strip light and a dim tent through the top
+glass by Snell, total reflection past 48.6° showing the plate round the drop, and the
+dye over the drop filtering the reflection as the column above it, 2(gap − h). Relief /
+3D is the contact angle (0 flat as before, 1 a bead at 160°; 0.7 is 112°). Only in the
+closeup, only on the lead plate; the projected plate is unchanged to the byte (`npm run
+ferrodrop`). Its shortcuts are open as 29a-1 to 29a-7 in `PLAN.md`.
+
+Measured (`npm run ferrodrop`, 10 checks): the middle 1.460 l_c against the balance's 1.510
+for a drop 4 l_c across at 112°; one l_c in from the edge 61% of the top; a magnet off the
+right side stands that shoulder 138% and the far one 78%, the volume 101.8%; the light's
+spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up and left; a
+yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
+bytes different at any relief.
