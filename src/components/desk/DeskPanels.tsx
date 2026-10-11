@@ -857,47 +857,90 @@ function MixerBody({ p }: { p: DeskProps }) {
 // ── Phone · iPad ─────────────────────────────────────────────────────
 
 /*
-  The address a phone or an iPad opens to drive this show. Only the show
-  server knows it (`relayInfo`: its LAN addresses and the show key, given to
-  this machine alone), so on a page with no show server behind it, the
-  hosted site, there is no address to give and the panel says how to get one.
+  The address a phone or an iPad opens to link to this show.
+
+  With a show server behind the page (the Mac app, or `npm run remote`), the
+  address is the relay's on the local network (`http://<lan-host>:<port>/?remote=1&key=<key>`),
+  which turns the device into a low-latency control surface for this show.
+  On the hosted site or a static preview with no show server behind it, the
+  address is the page's own origin (`/`), opening the standalone visualizer on
+  the phone itself, and the text explains how to run a show server.
+
+  Whether a phone is linked is counted by the relay itself (how many controller
+  sockets have said hello with the show key), not by whether the display has a
+  socket open to the relay: the display connects as soon as the relay starts,
+  long before any phone is in the room. When no phone is linked (count 0), the
+  QR code, address, and Copy button are up and ready to scan. When one or more
+  phones are linked, they are tucked away so the panel stays clean, replaced
+  by a "Link another" button to bring them back when another device joins.
+  When the last phone disconnects and the count returns to 0, the toggle resets
+  and the code is displayed again automatically.
 */
 function PhoneBody({ p }: { p: DeskProps }) {
   const [info, setInfo] = useState<RelayInfo | null | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
   useEffect(() => {
     let live = true;
     void relayInfo().then(r => { if (live) setInfo(r); });
     return () => { live = false; };
   }, []);
-  const url = info && info.hosts[0]
+
+  useEffect(() => {
+    if (p.status.phone === 0) setMoreOpen(false);
+  }, [p.status.phone]);
+
+  const hasRelay = Boolean(info && info.hosts && info.hosts.length > 0 && info.hosts[0]);
+  const url = hasRelay && info
     ? `http://${info.hosts[0]}:${info.port}/?remote=1${info.key ? `&key=${info.key}` : ''}`
-    : null;
+    : `${window.location.origin}/`;
+
+  const showCode = p.status.phone === 0 || moreOpen;
+
   return (
     <div className="flex flex-col gap-2 text-[13px]" data-testid="phone-link">
-      <p className="flex items-center gap-2 text-text-2">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: p.status.phone ? 'var(--color-ok)' : 'var(--color-faint)' }} />
-        {p.status.phone ? 'A phone is linked and driving the show.' : 'No phone linked.'}
+      <p className="flex items-center gap-2 text-text-2" data-testid="phone-link-status">
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: p.status.phone > 0 ? 'var(--color-ok)' : 'var(--color-faint)' }}
+        />
+        {p.status.phone === 0 ? 'No phone linked.' : `${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked.`}
       </p>
       {info === undefined ? (
         <p className="text-dim">Looking for the show server…</p>
-      ) : url ? (
-        <>
-          <p className="text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
-          <QrCodeImage text={url} />
-          <code className="break-all rounded-md bg-elevated px-2 py-1.5 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
-          <Button
-            height={32}
-            onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
-            testId="phone-link-copy"
-          >
-            {copied ? 'Copied' : 'Copy the address'}
-          </Button>
-        </>
       ) : (
-        <p className="leading-relaxed text-dim">
-          A phone links through the show server, which runs with the Mac app (or <span className="font-mono text-[12px]">npm run remote</span> on this machine). This page has none behind it.
-        </p>
+        <>
+          {p.status.phone > 0 && (
+            <Button
+              height={32}
+              onClick={() => setMoreOpen(v => !v)}
+              testId="phone-link-more"
+            >
+              {moreOpen ? 'Put the code away' : 'Link another'}
+            </Button>
+          )}
+          {showCode && (
+            <>
+              {hasRelay ? (
+                <p className="text-dim">Point a phone or an iPad on the same Wi-Fi at this, or open the address:</p>
+              ) : (
+                <p className="leading-relaxed text-dim">
+                  This page has no show server behind it, so the code opens the show on the phone itself. A phone that drives this show links through the show server, which runs with the Mac app (or <span className="font-mono text-[12px]">npm run remote</span> on this machine).
+                </p>
+              )}
+              <QrCodeImage text={url} />
+              <code className="break-all rounded-md bg-elevated px-2 py-1.5 font-mono text-[12px] text-text-2" data-testid="phone-link-url">{url}</code>
+              <Button
+                height={32}
+                onClick={() => { void navigator.clipboard?.writeText(url).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1400); }); }}
+                testId="phone-link-copy"
+              >
+                {copied ? 'Copied' : 'Copy the address'}
+              </Button>
+            </>
+          )}
+        </>
       )}
     </div>
   );
@@ -967,7 +1010,7 @@ export function panelMeta(id: string, p: DeskProps): string | null {
     case 'bottles': return [...p.dyeBottles, ...p.behaviourBottles].find(l => l.id === p.bottleId)?.name.toLowerCase() ?? null;
     case 'dyes': return p.paletteLock === null ? 'auto' : null;
     case 'tools': return `layer ${p.layer + 1}`;
-    case 'phone': return p.status.phone ? 'linked' : 'not linked';
+    case 'phone': return p.status.phone === 0 ? 'not linked' : `${p.status.phone} linked`;
   }
   const spec = PANEL_BY_ID.get(id);
   if (spec?.kind === 'knobs') return ccs(SECTION_KEYS.get(id) ?? []);
