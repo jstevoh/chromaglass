@@ -3080,7 +3080,7 @@ full ones (26d-5).
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
-### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#PRNUM)
+### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
 
 Reported by the showreel (28d, 2026-10-11): every look rendered on the Mac to the same
 minute of Funkorama, which grooves at about -17 dB, drops 7 to 8 dB into a breakdown from

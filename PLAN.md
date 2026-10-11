@@ -5936,7 +5936,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     changes the plate (`controls.yml`), and a ranked list of looks to fix or retire and
     controls to bring forward, for the owner to pick; each pick its own PR.
 - **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
-  #PRNUM; the showreel's first two findings). The music's hands follow how loud the passage
+  #368; the showreel's first two findings). The music's hands follow how loud the passage
   is, as an amplitude (`Passage`), and the bass's press reads the band over its ceiling:
   on the showreel's minute the press changed 1.44× as much a second in the breakdown as
   in the groove, now 0.54× (`npm run breakdown`). Classic: Dye Budget 0.45, Bubbles 0.05.
