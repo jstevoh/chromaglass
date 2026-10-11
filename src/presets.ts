@@ -1623,6 +1623,12 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.45,
       iridescence: 0.6,
       thinFilm: 1.0,
+      // No pigment grain: a soap film is clear water and soap, and its colour
+      // is all interference (Film Physics above), so there is no pigment to
+      // granulate. At the default 0.5 the grain had nothing to texture once
+      // the film was drawn as its own light, and npm run grainedge read
+      // none in its bodies.
+      granulation: 0,
       // The soap film's own colours (Airy's sum through the eye's matching
       // functions, lib/filmTable.ts) drawn as the film's reflected light, its
       // thickness the dye's amount: black, silver, straw, purple, blue,
