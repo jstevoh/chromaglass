@@ -42,7 +42,7 @@ import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFra
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -4540,7 +4540,7 @@ interface FrameView {
    * (gpu/plateUniforms.ts), which is where the shader's `pitchClass`,
    * `brightness` and `beatPhase` come from.
    */
-  audio: { pitchClass: number; brightness: number; beatPhase: number };
+  audio: { pitchClass: number; brightness: number; beatPhase: number; beatSway: number };
   /**
    * The oil beads' mask, on the frames the beads moved and it was redrawn —
    * null on every other frame, and whenever the beads are off. The show
@@ -8518,10 +8518,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               drag is the look's own liquid's: it swings on a light oil and
               creeps on glycerine. It is tipped as the solver's plate is
               (plateSin, as the step's rockX below).
+
+              Only as far as Frame Sway lets it: the glass drags the whole
+              picture, which is the frame moving rather than the liquid, and
+              by default it sits seated in the rim and drags nothing
+              (coverRoom, lib/plateRock.ts; `npm run framesway`).
             */
             const cover = coverRef.current;
             stepCover(cover, plateSin(tiltX, rockX), plateSin(tiltY, rockY),
-              coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS);
+              coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS,
+              coverRoom(currentSettings.frameSway));
             for (const fluid of fluidsRef.current) {
               fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
               fluid.coverX = cover.vx; fluid.coverY = cover.vy;
@@ -9171,15 +9177,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // See the note in the fragment source.
         if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
 
-        // The lamp wanders slowly under the plate, and the plate's own rock
-        // moves it too — a tilted plate is lit from a new side.
+        // The lamp wanders slowly under the plate, and with Frame Sway up
+        // the plate's own rock moves it too — a tilted plate is lit from a
+        // new side. Off by default: the lamp jumping a twentieth of the plate
+        // on every kick lights the whole frame from somewhere else in time
+        // with the beat, which reads as the frame moving (lib/plateRock.ts).
         {
           const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
           const rock = rockRef.current;
           const lamp = lampRef.current;
-          const rockK = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
-          lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rock.x * 0.05 * rockK;
-          lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rock.y * 0.05 * rockK;
+          const [rockLx, rockLy] = lampRock(rock, currentSettings.plateRock, currentSettings.frameSway);
+          lamp.x = 0.5 + noise2D(time * 0.021, 11.3) * 0.34 * motion + rockLx;
+          lamp.y = 0.5 + noise2D(13.7, time * 0.017) * 0.34 * motion + rockLy;
           lamp.x2 = 0.5 - (lamp.x - 0.5) * 0.7 + noise2D(time * 0.019, 27.1) * 0.3 * motion;
           lamp.y2 = 0.5 - (lamp.y - 0.5) * 0.7 + noise2D(29.3, time * 0.023) * 0.3 * motion;
         }
@@ -9255,6 +9264,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             audioBass: currentAudioData?.bass ?? -1,
             kick: kickRef.current.kick,
             kicks: kickCountRef.current,
+            // What moves the whole frame rather than the liquid (Frame Sway,
+            // lib/plateRock.ts): the cover glass's slide handed to the plate
+            // (m/s; the liquid goes at half of it), the lamp's share of the
+            // rock, and how far the beat turns a kaleidoscope. `npm run render-app` holds them at 0 by default.
+            coverVx: coverRef.current.vx,
+            coverVy: coverRef.current.vy,
+            lampRock: Math.hypot(...lampRock(rockRef.current, currentSettings.plateRock, currentSettings.frameSway)),
+            beatSway: frameSway(currentSettings.frameSway),
             loudness: loudnessRef.current,
             tempoMul: tempoMulRef.current,
             phraseDrive: phraseRef.current.drive,
@@ -9332,7 +9349,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             brightness: audioDataRef.current?.features?.brightness ?? 0, 
             beatPhase: beatClockRef.current?.period > 0 
                 ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
-                : 0 
+                : 0,
+            // How far the beat may turn and breathe the frame (Frame Sway, lib/plateRock.ts).
+            beatSway: frameSway(currentSettings.frameSway),
           },
           beadMask,
           outputCfg: rendering ? DEFAULT_OUTPUT : outputCfgRef.current,

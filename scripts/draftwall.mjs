@@ -189,17 +189,49 @@ try {
     FRAMES ? fromWall > 0 && fromCopy === 0 : !anyPainted || (fromWall > 0 && fromCopy === 0),
     `${fromWall} frames from the wall's, ${fromCopy} from the copy's${Object.keys(painted).length ? ` (${JSON.stringify(painted)})` : ''}`);
 
-  // Send to wall.
+  /*
+    Send to wall, watched for the whole fade rather than read at one moment.
+
+    The first version read the wall once, 0.4 s after the key, and asked that
+    it be neither the old look nor the new. On the Mac that one reading found
+    the fade 20%, 14%, 6% and 3% of the way along on four green runs and 0% on
+    main's deploy after #339 (2026-10-10): how far a fade has got 0.4 s after
+    a key is how soon a loaded runner's page gets round to the key and its
+    first step, not whether it fades. What the line promises is that the wall
+    passes through the looks in between, over the fade, instead of jumping: so
+    the wall is read over and over until it lands, and the line asks for at
+    least three readings strictly between the two looks, and at least half the
+    fade (DEFAULT_FADE_SECONDS is 2) from the last reading still on the old
+    look to the first on the new. That gap, and not the span of the readings
+    in between, because the readings and the fade share the page's thread: a
+    second's stall just after the key bunches every reading into the fade's
+    last part, while the fade itself, timed on the clock, still took its two
+    seconds (the check's review). A jump has no readings between and its two
+    sides one poll apart; a fade cut to 0.3 s fails on the gap. How long after
+    the key the first reading in between came is printed, so a Send that
+    starts late shows in the log.
+  */
+  const lo = Math.min(before.wall.speed, newSpeed), hi = Math.max(before.wall.speed, newSpeed);
+  const sentAt = await page.evaluate(() => performance.now());
   await page.keyboard.press('Control+Enter');
-  await page.waitForTimeout(400);
-  s = await state();
-  const midway = s.wall.speed;
-  await page.waitForTimeout(2600);   // DEFAULT_FADE_SECONDS is 2
+  const between = [];
+  let lastOld = 0, firstNew = null;
+  for (;;) {
+    const r = await page.evaluate(() => ({ at: performance.now(), v: window.chromaglassDebug().settings.globalSpeed }));
+    const at = r.at - sentAt;
+    if (r.v > lo + 1e-9 && r.v < hi - 1e-9) between.push(at);
+    else if (near(r.v, before.wall.speed)) lastOld = at;
+    else if (near(r.v, newSpeed) && firstNew === null) firstNew = at;
+    if ((firstNew !== null && at > 3000) || at > 8000) break;
+    await page.waitForTimeout(50);
+  }
   s = await state();
   check('Send to wall moves the wall to the copy\'s look', near(s.wall.speed, newSpeed) && near(s.cast.speed, newSpeed),
     `wall ${s.wall.speed}, sent ${s.cast.speed}, desk ${s.desk.speed}`);
-  check('across the fade, not at once', !near(midway, newSpeed) && Math.abs(midway - before.wall.speed) > 0,
-    `0.4 s in: ${midway} (from ${before.wall.speed} to ${newSpeed})`);
+  const fade = firstNew === null ? 0 : (firstNew - lastOld) / 1000;
+  check('across the fade, not at once', between.length >= 3 && fade >= 1,
+    `${between.length} readings between ${before.wall.speed} and ${newSpeed}; ${fade.toFixed(2)} s from the last on the old look to the first on the new` +
+    (between.length ? `, the first between ${(between[0] / 1000).toFixed(2)} s after the key` : ''));
   check('and the copy stays up for the next look', !!s.draft && !s.draft.hidden);
 
   // More changes on the copy (a look setting, a clear, a plate), then Live: the desk goes back to the wall.
