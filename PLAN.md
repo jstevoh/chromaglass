@@ -438,6 +438,10 @@ run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
   startup grew or the Mac runner was slow, before touching the limit.
 - **QA-25** One of the ear's checks missed narrowly; which line, and by how much, is
   still to be read from the run.
+- **QA-26** The phone's clean-screen check is flaky; a fix is proposed in a comment on
+  #339 (from the Wall reconnect thread), not yet pushed.
+- **QA-27** The phone's two-finger Drop (19h-2) is instrumented and waits for its next
+  failure to show where the dye goes; read that run before changing anything.
 
 ## Running order
 
