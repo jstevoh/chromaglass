@@ -47,6 +47,7 @@
 // either.
 import { AutoRange } from './audioCalibration.ts';
 import { fft } from './fft.ts';
+import { ChromaEar } from './chroma.ts';
 
 /**
  * The live analyser's settings, owned here so the hook and the offline path
@@ -168,6 +169,12 @@ export interface AudioReading {
   tonalHigh: number;
   pitch: number;
   pitchClass: number;
+  /**
+   * The twelve notes sounding, C first, summed to 1 (all zero in silence):
+   * the harmony, whatever plays it (`chroma.ts`). The song follower matches
+   * a known song by it (PLAN.md 28g).
+   */
+  chroma: number[];
   brightness: number;
   timbre: number;
   complexity: number;
@@ -487,6 +494,7 @@ export class AudioFeatures {
   private specRing: Float64Array[] = [];
   private specRingPos = 0;
 
+  private readonly chromaEar = new ChromaEar();
   pitch = 0;
   pitchClass = 0;
   brightness = 0;
@@ -504,6 +512,7 @@ export class AudioFeatures {
     this.detectors.forEach(d => d.reset());
     this.specRing.forEach(r => r.fill(ABS_FLOOR_DB));
     this.specRingPos = 0;
+    this.chromaEar.reset();
     this.pitch = 0;
     this.pitchClass = 0;
     this.brightness = 0;
@@ -714,6 +723,9 @@ export class AudioFeatures {
       onsets[SOURCE_NAMES[r]] = { hit, strength, at: det.at };
     }
 
+    const chroma = new Array<number>(12);
+    this.chromaEar.push(db, this.hzPerBin, time, chroma);
+
     return {
       time,
       level: values[0], kick: values[1], bass: values[2], snare: values[3], hats: values[4],
@@ -723,6 +735,7 @@ export class AudioFeatures {
       db: Array.from(this.levelDb.subarray(0, SOURCE_NAMES.length)),
       pitch: this.pitch,
       pitchClass: this.pitchClass,
+      chroma,
       brightness: this.brightness,
       timbre: this.timbre,
       complexity: this.complexity,

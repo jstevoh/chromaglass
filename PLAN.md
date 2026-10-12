@@ -216,7 +216,7 @@ Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels*
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
   it), then **18f** heat from the lamp (which unblocks 10.6
-  and the slide plan's S2) and **18j** milk (which replaces 4-milk), and **20a**.
+  and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d).
@@ -488,7 +488,7 @@ Where each batch stands, as of 2026-09-27:
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
-| 4 | Liquids that behave differently | **Shipped**; milk's opacity still owed |
+| 4 | Liquids that behave differently | **Shipped**; milk's opacity shipped (#353, 18j) |
 | 5 | Playing it | Sound learn **shipped** (#155, on #154's bands); shutter and look link **not started** |
 | 6 | Render a song | **Shipped** (#153 seed, #154 offline bands, #156 render); the 3-minute 1080p gate is unmeasured |
 | 7 | The room in the plate | **Shipped** |
@@ -831,13 +831,9 @@ Found with it, open:
 
 ### 4. Liquids that behave differently
 
-**Shipped**, with milk's opacity still owed (below). How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**, with milk's opacity shipped in 18j (#353). How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-**Still owed: milk's opacity.** What ships is behaviour, not optics. Colour still
-transmits through milk rather than sitting on it, because the dye texture's RGBA is
-already fully spent — three log-absorptions and a density — and there is no channel
-left for an opaque ground. That is the part of the reference's solid reds this does
-not yet reach, and it needs a render change rather than a solver one.
+**Milk's opacity shipped (#353, 18j).** Optical scattering (Kubelka–Munk diffuse backscattering on black ground, two-flux forward extinction and forward halo on lamp ground) packed into `vel.w` from the advected `species.b` field. Colour sits on the opaque white body of milk as solid vibrant red (reference §4).
 
 ### 4a. What is in each preset's dish
 
@@ -1125,6 +1121,7 @@ Open from Desk v2, each its own thread (the UI lane):
     differ by layout.
 - ~~**8f** A QR code on the Phone · iPad panel, drawn without a library~~ (shipped; checks
   `npm run qr`, `npm run layout`).
+  - ~~**8f-1** The code whenever nothing is linked, and Link another while phones are~~ (shipped; check `npm run phonelink`).
 - ~~**8g** A panel in a window of its own, for a laptop and a monitor at a gig~~ (shipped;
   check `npm run layout`).
   - **8g-1** (S) The keys in a panel's window. ⌘1–3, ⌘P, Tab and the show's keys (Go,
@@ -3907,7 +3904,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
 | 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
-| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | A freed binding |
+| 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
 | 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); 18m-1 to 18m-5 after |
@@ -4250,6 +4247,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   as thick as the clear liquid round it. Take its share into hsPrep as the ferrofluid's is.
 - **18d-4** Density into the tilt's buoyancy. The species carries Σ share·ρ, and nothing
   reads it yet. It would replace the CPU's `weight` and SINK.
+- **18d-4a** Restore or pack density when 18d-4 buoyancy lands. In 18j, species channel 2
+  (formerly density, read by nothing yet) was traded for optical scatter $\mu_s'$ to avoid
+  adding a second species PingPong texture and preserve 18d-11a's 6.73 ms paired carry.
+  When 18d-4 lands, pack density alongside scatter (or into packed velocity/phase) or expand
+  species.
 - **18d-5** Soap and alcohol into the GPU's surfactant with a σ(Γ) law (the bottles now
   carry σ). Delete the CPU Marangoni force and the dye multiply, and give alcohol its burst
   and evaporation. Its description still says it "rises through water".
@@ -4457,22 +4459,14 @@ its frame rate live. "Free" means no new passes or texture reads.
 - Rim drainage when bubbles reach the dish boundary.
 
 
-### 18j. Milky liquids scatter
+### 18j. Milky liquids scatter (shipped)
 
-- **Where:** everything in the plate is a pure absorber. `colourBody` pushes opacity
-  and saturation up to imitate a body of colour, `granulation` modulates the dye's
-  optical depth with noise (1a), and the Liesegang precipitate is a lerp.
-- **The real phenomenon:** pigment and fat droplets scatter light (Mie), handled as
-  two-flux Kubelka–Munk. With a projector's small aperture almost all scattered light
-  misses the lens, so a milky liquid throws dark or grey with a soft forward halo. It
-  does not throw white. The "solid reds on milk" in the references are a reflected-light
-  look.
-- **What it takes:** a scattering coefficient per bottle (18d) and a scatter channel in
-  a repacked binding (the dye and `view0` are full). Extinction K + S·(the share the
-  aperture loses) in 18b's exponent, with an optional small blur for the halo.
-- **Cost:** free in the shader; +0.2–0.4 ms with the halo; the binding work.
-- **Gain:** milk, paint and latex look different from ink. This replaces §4's "milk's
-  opacity still owed" with its physics.
+Shipped in #353 (2026-10-10): optical scattering packed into `vel.w` from species channel 2
+with conserved flux-form advection; Kubelka–Munk diffuse backscattering on black ground
+yielding opaque white milk and pastel food dyes (PLAN §4); two-flux forward extinction
+with Rayleigh-Gans wavelength dependence and narrow aperture loss casting a warm dark
+projector shadow on lamp ground with a soft forward halo; byte-for-byte identity for
+zero-scatter liquids. Story and measurements in `docs/plan-shipped.md` §18j.
 
 ### 18k. Smaller ones
 
@@ -6087,6 +6081,48 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
+
+- **28g. Follow a known song played live, by what is heard, not by the clock** (the owner,
+  2026-10-11: "if we pre record the shape of the song, how can we map that to a different
+  sounding and sometimes improvisational version of the same song?"). A song map
+  (`songMap.ts`) is read by playback position, so it fits only the recording it was made
+  from. Instead keep the map's harmony, follow the room by it whatever the tempo and the
+  instruments, let the form change (a chorus twice, a verse left out, a solo that runs
+  long), and fall back on the live song shape when the match is weak. What it buys: the
+  show knows the chorus is next and can lean into the build before it is heard. Not a
+  preset patch source (28f: patches use fast readings only).
+  - **28g-1. The follower and its check** (**shipped**, this PR). `chroma.ts`: a twelve-
+    note profile, read from the analyser's tonal peaks (parabolic-refined) on a per-bin
+    quarter-second median (drums dropped), the same arithmetic in the ear
+    (`AudioReading.chroma`) and in the map (`mapChroma`, stored with every new map as
+    `SongMap.chroma`). `songFollow.ts`: the forward algorithm over a place × tempo grid
+    (0.6–1.6×), the form as transitions at the map's section ends, a leak for jumps the
+    form did not offer, a start prior, and confidence = match quality × agreement.
+    `npm run songfollow` (Measure, logic): takes 15% slower and faster on other
+    instruments 100% of hops within a bar of the very place, tempo within 3%; a band
+    speeding up 100 to 140 bpm with a bar of silence, 100%; bridge skipped, chorus
+    repeated, solo doubled, a 16-bar jam: back within 0.7–1.8 bars; joined at the second
+    verse, found in 1.9 bars; confidence 0.07 in the jam against 0.92 where followed.
+    `anchor(mapSec)` is the score's nudge (28h). The ear's frame costs 5 µs more (237 to
+    242 in node). Not wired into the show yet (28g-2).
+  - **28g-2. Use it live, with the fallback.** Run the follower in the frame loop when a
+    map with `chroma` is followed; when confidence is under about a third, the show leans
+    on `songShape.ts`; desk and phone show which map is followed and its confidence.
+  - **28g-3. The show leans into what the map says is next** (Pacing/sequencer), and a map
+    made from a file (the band's rehearsal, last night's set; §17 "hear the set ahead").
+  - **28g-4. Found along the way: the worker's sections are coarse.** On the check's song
+    `segment()` (`songMapAnalysis.ts`) found six sections where nine were played, one
+    "chorus" spanning verse, chorus, verse, chorus (18–73 s). The follower survives it
+    (the leak finds what the form did not offer) but its jumps land best on true section
+    starts; segment by the map's harmony at bar scale. Measured: on today's sections the
+    jumps do nothing (no jumps, same numbers); on the record's true sections a repeated
+    chorus is found 1.2 bars in against the leak's 1.4. Keep the jumps if better sections
+    make them earn more, else remove them.
+  - **28g-5. Found along the way: another key.** A band that tunes down a half step, or
+    plays the song in another key, rotates the whole profile; the follower would read it
+    as a jam. Try the twelve rotations when confidence stays low and the profile is tonal.
+  - **28g-6. Found along the way: maps made before 28g-1 have no harmony.** They follow
+    nothing until the song is heard again and its map remade.
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
