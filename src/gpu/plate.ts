@@ -134,6 +134,8 @@ export class WebGPUPlate {
   private readonly blank: GPUTexture;
   /** The same, for the packed view (unsigned integers). */
   private readonly blankU: GPUTexture;
+  /** The same, for the species field (rgba32float). */
+  private readonly blankSpecies: GPUTexture;
 
   /**
    * Everything a frame of the plate draws with, built before the show opens
@@ -184,6 +186,11 @@ export class WebGPUPlate {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     }));
     device.queue.writeTexture({ texture: this.blankU }, new Uint32Array(4), { bytesPerRow: 16 }, [1, 1]);
+    this.blankSpecies = this.disposer.track(device.createTexture({
+      label: 'blank species', size: [1, 1], format: 'rgba32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    }));
+    device.queue.writeTexture({ texture: this.blankSpecies }, new Float32Array(4), { bytesPerRow: 16 }, [1, 1]);
   }
 
   // ── What the frame is drawn from ──────────────────────────────────
@@ -261,7 +268,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -313,20 +320,30 @@ export class WebGPUPlate {
       }
     }
     for (let i = 0; i < fields.length; i++) {
-      for (const [name, src, dst] of [
-        ['packDye', fields[i].dye, this.layers[i].dye],
-        ['packVel', fields[i].velForced, this.layers[i].vel],
-      ] as const) {
-        if (name === 'packVel' && i === 0 && height) continue;
-        const pipe = this.pipelines.computePipeline(name, PACK_KERNELS[name]);
-        if (!pipe) continue;
-        packPass.setPipeline(pipe);
+      const pipeDye = this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
+      if (pipeDye) {
+        packPass.setPipeline(pipeDye);
         packPass.setBindGroup(0, this.device.createBindGroup({
-          layout: pipe.getBindGroupLayout(0),
+          layout: pipeDye.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: { buffer: this.packArgs } },
-            { binding: 1, resource: src.createView() },
-            { binding: 2, resource: dst.createView() },
+            { binding: 1, resource: fields[i].dye.createView() },
+            { binding: 2, resource: this.layers[i].dye.createView() },
+          ],
+        }));
+        packPass.dispatchWorkgroups(groups, groups);
+      }
+      if (i === 0 && height) continue;
+      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
+      if (pipeVel) {
+        packPass.setPipeline(pipeVel);
+        packPass.setBindGroup(0, this.device.createBindGroup({
+          layout: pipeVel.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: this.packArgs } },
+            { binding: 1, resource: fields[i].velForced.createView() },
+            { binding: 2, resource: this.layers[i].vel.createView() },
+            { binding: 3, resource: (fields[i].species ?? this.blankSpecies).createView() },
           ],
         }));
         packPass.dispatchWorkgroups(groups, groups);
@@ -400,7 +417,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -431,7 +448,7 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
