@@ -4,12 +4,14 @@
  *
  *   node scripts/lampwhere.mjs [lookId]     (default fillmore-1969)
  *
- * `npm run lamp`'s first check asks every look at Lamp Ground 0 to draw the
- * plate as it was before the lamp, byte for byte, against a second lab built
- * with the lamp's lines taken out (lampcontrol.mjs). When it fails it names
- * the look and the worst byte; this says where and why, on the GPU it failed
- * on (what a shader compiler makes of a branch the frame never takes differs
- * by GPU, so run it where the check went red, not where it is green):
+ * `npm run lampzero` asks every look at Lamp Ground 0 to draw the plate as
+ * it was before the lamp, byte for byte, against a second lab built with the
+ * lamp's lines taken out (lampcontrol.mjs), on the CPU rasteriser. This runs
+ * the same comparison on whatever draws here (a Mac's GPU, unless
+ * `PW_SOFTWARE`-style flags say otherwise) and says where and why the two
+ * differ: what a shader compiler makes of a branch the frame never takes
+ * differs by GPU, which is why the check itself left the GPU (2026-10-11,
+ * one pixel of Fillmore on an M4; the story is in lampzero.mjs):
  *
  *   - whether the plain lab draws the look the same twice (a render that
  *     differs from itself is a race or a read of something unset, not the
@@ -83,9 +85,15 @@ for (const [x, y, w, p, q] of base.slice(0, 12)) {
 if (base.length > 12) console.log(`    … and ${base.length - 12} more`);
 const names = Object.keys(a.variants);
 const rows = names.map((n) => [n, differing(a.variants[n], b.variants[n])]);
-const gone = rows.filter(([, d]) => d.length === 0);
-const changed = rows.filter(([, d]) => d.length && (worst(d) !== worst(base) || d.length !== base.length));
-console.log(`  with one setting off (${names.length} tried):`);
-console.log(`    the difference gone: ${gone.length ? gone.map(([n]) => n).join(', ') : 'none'}`);
-console.log(`    changed: ${changed.length ? changed.map(([n, d]) => `${n} (${f(d)})`).join('; ') : 'none'}`);
-console.log(`    the same: ${rows.length - gone.length - changed.length}`);
+if (!base.length) {
+  // Nothing to explain: say whether any setting brings a difference instead.
+  const brings = rows.filter(([, d]) => d.length);
+  console.log(`  with one setting off (${names.length} tried): ${brings.length ? `a difference with ${brings.map(([n, d]) => `${n} (${f(d)})`).join('; ')}` : 'none different either'}`);
+} else {
+  const gone = rows.filter(([, d]) => d.length === 0);
+  const changed = rows.filter(([, d]) => d.length && (worst(d) !== worst(base) || d.length !== base.length));
+  console.log(`  with one setting off (${names.length} tried):`);
+  console.log(`    the difference gone: ${gone.length ? gone.map(([n]) => n).join(', ') : 'none'}`);
+  console.log(`    changed: ${changed.length ? changed.map(([n, d]) => `${n} (${f(d)})`).join('; ') : 'none'}`);
+  console.log(`    the same: ${rows.length - gone.length - changed.length}`);
+}

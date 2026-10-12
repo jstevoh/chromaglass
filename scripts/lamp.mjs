@@ -18,13 +18,14 @@
  * Asked here, through the real plate shader on lab plates:
  *
  *   1. at 0 the picture is the plate as it was before the lamp, byte for
- *      byte: every look, its Lamp Ground set to 0, against a second lab built
- *      from today's plate.ts with the lamp's lines taken out (loud if one is
- *      not where it was), on a plate of five pools and a two-dye overlap,
- *      a back plate drawn where a look has one. And the looks that ship on
- *      the lamp (PLAN 18b-1, `npm run lampjudge`) draw on it: as shipped
- *      each differs from itself at 0 by more than the ground not reaching
- *      it, and none is black
+ *      byte, every look, and the looks that ship on the lamp draw on it: that
+ *      is `npm run lampzero`, on the CPU rasteriser, since 2026-10-11. It
+ *      compares two compiled programs (today's plate.ts against the same
+ *      with the lamp's lines taken out, lampcontrol.mjs), and a GPU's
+ *      compiler may round the two differently where their text is the same:
+ *      the owner's M4 read one pixel of Fillmore 2 levels off. Its header
+ *      has the story. The numbering here stays, so the lines below keep
+ *      their names in the run logs.
  *   2. a clear pool on the lamp ground throws at least 90% of the lamp (PLAN
  *      §20a), read in a hole in a ring of dye against the bare lamp at the
  *      same pixels; the same pool on the black ground is the control, and
@@ -51,10 +52,10 @@
  * Checks 2 to 5 render with the grade and the plate's painted texture
  * (saturation, grain, boundary glow, meniscus, beads) at their neutral
  * values, so what is read is the light through the dye and nothing laid on
- * it; check 1 renders each look with its own settings.
+ * it (lampzero renders each look with its own settings).
  */
 import { openLab } from './lab.mjs';
-import { BEFORE_LAMP, POOLS, RED, YELLOW, BLUE, TEAL } from './lampcontrol.mjs';
+import { RED, YELLOW, BLUE, TEAL } from './lampcontrol.mjs';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -66,28 +67,9 @@ const check = (name, ok, detail = '') => {
 const S = 192;
 const NEUTRAL = { saturationBoost: 1, granulation: 0, boundaryContrast: 0, edgeRelief: 0, beads: 0, lacing: 0, cells: 0, glossiness: 0, microDroplets: 0, thinFilm: 0 };
 
-/** Every look on the pools plate, at its own settings with Lamp Ground 0:
- *  [id, its own Lamp Ground, pixels at 0, pixels as shipped (only when that
- *  is not 0)]. */
-const everyLook = (lab) => lab.page.evaluate(async ([pools, S]) => {
-  await lab.create(128);
-  for (const p of pools) lab.dye(...p);
-  lab.flush(); await lab.step(2);
-  const out = [];
-  for (const id of lab.lookIds()) {
-    const s = lab.look(id).settings;
-    const back = (s.layerCount ?? 1) > 1;
-    const cam = { backPlate: back, backRotation: back ? 1.1 : 0 };
-    const lg = s.lampGround ?? 0;
-    out.push([id, lg, await lab.render(S, { ...s, lampGround: 0 }, cam), lg > 0 ? await lab.render(S, s, cam) : null]);
-  }
-  return out;
-}, [POOLS, S]);
-
 const now = await openLab();
-let looksNow, shots;
+let shots;
 try {
-  looksNow = await everyLook(now);
   shots = await now.page.evaluate(async ([S, N, RED, YELLOW, BLUE, TEAL]) => {
     const flat = async (dyes, amount) => {
       const { L } = await lab.create(128);
@@ -152,10 +134,6 @@ try {
   }, [S, NEUTRAL, RED, YELLOW, BLUE, TEAL]);
 } finally { await now.close(); }
 
-const then = await openLab({ plugins: [BEFORE_LAMP], tag: 'before-lamp' });
-let looksThen;
-try { looksThen = await everyLook(then); } finally { await then.close(); }
-
 // ── Reading ───────────────────────────────────────────────────────────
 const px = (img, x, y) => { const k = (y * S + x) * 4; return [img[k], img[k + 1], img[k + 2]]; };
 /** The pixels within radius r (in plate units, 0–1) of the centre, or between r0 and r. */
@@ -175,40 +153,6 @@ const mean = (img, pts) => {
 const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
 const f2 = (v) => v.toFixed(2);
 const r0 = (c) => c.map(v => Math.round(v)).join(',');
-
-// ── 1. At 0, the plate as it was ─────────────────────────────────────
-{
-  const litOf = (px) => { let t = 0; for (let k = 0; k < px.length; k += 4) t += px[k] + px[k + 1] + px[k + 2]; return t / (px.length / 4); };
-  const rows = looksNow.map(([id, lg, a, own], i) => {
-    const [idThen, , b] = looksThen[i];
-    if (idThen !== id || a.length !== S * S * 4 || b.length !== a.length) return { id, lg, worst: NaN, lit: 0 };
-    let worst = 0;
-    for (let k = 0; k < a.length; k++) { if (k % 4 !== 3) worst = Math.max(worst, Math.abs(a[k] - b[k])); }
-    let moved = 0;
-    if (own) for (let k = 0; k < a.length; k++) { if (k % 4 !== 3) moved += Math.abs(own[k] - a[k]); }
-    return { id, lg, worst, lit: litOf(a), litOwn: own ? litOf(own) : null, moved: own ? moved / (a.length * 0.75) / 255 : null };
-  });
-  const off = rows.filter(r => !(r.worst === 0));
-  const dark = rows.filter(r => r.lit < 5);
-  check(`every look at Lamp Ground 0 draws the plate as it was before the lamp, byte for byte (${rows.length} looks)`,
-    !off.length && !dark.length && rows.length >= 30,
-    `${off.length ? `different: ${off.map(r => `${r.id} ${r.worst}`).join(', ')}; ` : ''}${dark.length ? `black: ${dark.map(r => r.id).join(', ')}` : 'none different'}`);
-  // A look turned up draws a different picture from the same look at 0, by
-  // more than the 6% `npm run lampjudge` calls the ground not reaching it, and
-  // not a black one. Not "brighter": a look whose own light already glows on
-  // the black ground (Timbre Shifter's rainbow LED ring) has that light
-  // filtered by the dye on the lamp, and reads darker there; the first
-  // version of this line asked for brighter and found four of the ten darker
-  // (Timbre Shifter 449 to 200 summed over the plate).
-  // Equal would mean the setting never reached the plate; black, that the
-  // lamp is dimmed to nothing.
-  const up = rows.filter(r => r.lg > 0);
-  const flat = up.filter(r => !(r.moved > 0.06) || r.litOwn < 5);
-  // At least one: with none on the lamp the line would pass on nothing.
-  check(`the looks that ship on the lamp draw on it (${up.length}: each differs from itself at 0 by over 6%, none black)`,
-    up.length > 0 && !flat.length,
-    up.length ? up.map(r => `${r.id} ${(r.moved * 100).toFixed(0)}%`).join(', ') : 'none ship on the lamp');
-}
 
 // ── 2. A clear pool throws the lamp ──────────────────────────────────
 {

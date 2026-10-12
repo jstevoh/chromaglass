@@ -180,6 +180,17 @@ jobs:
       - name: The panel
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
+      # Lamp Ground 0 is the plate as it was before the lamp, byte for byte,
+      # every look (PLAN 18b): two labs, one built with the lamp's lines taken
+      # out, compared on SwiftShader. Here and not on the Mac because it
+      # compares two compiled programs: Metal on an M4 fused a multiply-add
+      # on the back plate's painted path differently in the two, and one
+      # pixel of Fillmore read 2 levels off (2026-10-11, main at b2ca7d7),
+      # while the CPU rasteriser's arithmetic is the shader's text. About
+      # five minutes; the lamp's physics stay on the open shard (`lamp`).
+      - name: Lamp Ground 0 is the plate before the lamp
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run lampzero
 
       # The workflows' own wiring: closed.yml cancels a merged PR's runs by
       # joining their concurrency groups, which it spells by hand, and the
@@ -855,10 +866,12 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run grating
-      # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
-      # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
+      # Lamp Ground (PLAN 18b): on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter
       # through the dye. In the open shard: the plate shard is near its timeout.
+      # "Every look at 0 is the plate as it was before the lamp, byte for byte"
+      # is Measure's (lampzero): it compares two compiled programs, which a
+      # GPU's compiler rounds differently (one pixel of Fillmore on an M4).
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp

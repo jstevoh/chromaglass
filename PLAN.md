@@ -4146,7 +4146,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     `hsCycles` from cold should converge on a grid that is not a power of two.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
-**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19w). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 - **18b-8. The dishes too deep for the lamp.** Eighteen looks are dishes by their own
   description but fail the rule with the dye they were given for black: on the lamp the
@@ -5031,6 +5031,14 @@ commit. *Size:* S.
   dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
   so the rim needs a check of its own: a pool held against the rim by the magnet, its
   total read every second. Physics lane.
+
+### 19w. A check that compares two compiled programs on a GPU asks the compiler
+**Shipped** (2026-10-11): `npm run lamp`'s first line, every look at Lamp Ground 0 byte for byte against a lab built with the lamp's lines taken out, read "different: fillmore-1969 2" on the owner's M4 on main at b2ca7d7, the same one pixel on every run, 2 levels of blue, gone with the back plate or its grade off (`node scripts/lampwhere.mjs`), none different on software WebGPU and on the GitHub runner's Mac for the same tree, and none different on the M4 again once #353 had moved the shader. Metal fuses a multiply-add into one FMA when the product has one use; the lamp's back-plate branch keeps a second use of the back plate's values alive in the plain lab and is dead code in the control, so the two programs round the painted path differently, and one ulp crossed a threshold in the grain. The line is now `npm run lampzero`, two labs on SwiftShader (which has drawn them the same on every tree since 2026-10-04 and, as a conformance rasteriser, keeps the operations as written rather than fusing them by use count), in Measure on every PR; the lamp's physics stay on the Mac. The story is in the scripts' own comments.
+
+- **19w-1. `npm run beams` compares two programs the same way, on the Mac.** Its first line
+  holds the projector's pass against a lab built from the old pass, byte for byte, in the
+  `tools` shard on Metal. It has not flipped, and the pass is small; when it does, move
+  that line to Measure as lampzero was, with `openLab({ software: true })`.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
