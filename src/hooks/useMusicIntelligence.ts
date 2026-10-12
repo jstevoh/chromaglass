@@ -215,14 +215,20 @@ export function useMusicIntelligence(
   //
   // Keyed on the identification's own numbers, not the track object, which
   // is replaced for other reasons (a title filled in): a resync to the clock
-  // would undo what the follower had heard since.
+  // for nothing would undo what the follower had heard since. A new
+  // identification of the same song (a local match every twelve seconds, the
+  // service every thirty-five) is news, though: its offset is where the
+  // recording is, and a recording played back is where its fingerprint says.
+  // While the follower is sure it is not moved by it (a band live is not the
+  // recording, and its offset is the record's, not the band's); unsure, it
+  // is the best place there is.
   const trackIsrc = track?.isrc ?? null, identifiedAtMs = track?.identifiedAtMs ?? null, offsetSec = track?.offsetSec ?? 0;
   useEffect(() => {
     if (trackIsrc === null || identifiedAtMs === null) { placeRef.current = null; setFollow(null); return; }
     let held = placeRef.current;
     if (!held || held.map !== songMap || held.isrc !== trackIsrc) {
       held = placeRef.current = { place: new FollowedPlace(songMap), map: songMap, isrc: trackIsrc };
-    }
+    } else if (held.place.at(performance.now() / 1000).sure) return;
     held.place.resync(offsetSec, identifiedAtMs / 1000, performance.now() / 1000);
   }, [trackIsrc, identifiedAtMs, offsetSec, songMap]);
   // Under ?debug, which map the place reads and whether it is hearing, for

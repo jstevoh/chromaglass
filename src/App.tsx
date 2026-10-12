@@ -6052,7 +6052,7 @@ export default function App() {
               : null,
             phone: livePhoneCount,
             rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
-            song: followLine(musicIntel.state.follow, musicIntel.state.track?.title),
+            song: audioSource === 'none' ? null : followLine(musicIntel.state.follow, musicIntel.state.track?.title),
           }}
           onBlackout={toggleBlackout}
           blackout={blackout}

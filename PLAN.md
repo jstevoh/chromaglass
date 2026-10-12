@@ -6207,8 +6207,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     chorus" still fires on the guess. Decide whether a show's section actions wait for the
     place to be sure, and say so on the Songs panel.
   - **28g-8. Found along the way: the score's nudge.** When 28h's nudge lands (#375), it
-    calls `FollowedPlace.resync(mapSec, now)`, which starts the clock there and anchors the
-    follower; nothing else is needed.
+    calls `FollowedPlace.resync(mapSec, now)` (its third argument, the time it is now,
+    defaults to the second), which starts the clock there and anchors the follower. A
+    re-identification of the same song does not move a place that is sure; a nudge is the
+    performer's word and should, so the nudge calls it directly, not through the hook's
+    identification effect.
   - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
     is held (the check's intro, four bars of A minor into a verse that opens on it), no
     place in it sounds different from another, and the follower slid 1.4 bars behind into
