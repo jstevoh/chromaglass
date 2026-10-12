@@ -324,18 +324,27 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
-- **QA-30** A switch that is on looks like one that is off: the Record panel's Include
+- ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
-  are drawn in all, one of them the design's (the owner, 2026-10-11, with a screenshot).
-  Desk, phone, remote. **Check first** (`npm run switches`, #381): every control
-  that says a state is read in both states, on the desk, every Settings section, the
-  phone's sheets, Play and the remote; a knob against its track at 3:1, on against off at
-  ΔE 20, a switch's on track the accent, and the switch saying its state. 429 controls,
-  16 under the bar. The fix is Antigravity's, briefed in `docs/handoff-switches.md`: the
-  shared `Toggle` for every switch, the phone dock's lit sheet button, and `aria` on what
-  changes its look without saying so (the swatches, the Wall chips, the sequencer's cards,
-  the Record panel's buttons and tabs, the Play screen's Save pill).
+  are drawn in all, one of them the design's (the owner, 2026-10-11, with a screenshot).~~
+  **Fixed, #381** (the check first, then Antigravity's build, briefed in
+  `docs/handoff-switches.md`): `npm run switches` reads every control that says a state in
+  both states, on the desk's five layouts, every Settings section, the panels the palette
+  opens, the phone with each sheet open, Play with its sheet and the remote, and holds a
+  knob against its track to 3:1, on against off to ΔE 20, a switch's on track to the
+  accent and the switch to saying its state; a switch that will not flip is red, and each
+  surface needs a floor of controls that changed state when clicked. 429 controls and 16
+  under the bar before; after, 451 assertions green, 0 under the bar, 498 controls found
+  (403 on the desk, 86 on the phone, 9 on the remote) and 374 of the desk's flipped.
+  Every switch is now the one `SwitchPill` (`ui/index.tsx`),
+  in `Toggle`'s row or in a row of its own; the phone dock's lit sheet button, the Play
+  screen's pressed pills and the mixer's Graded take the accent trio; the Wall's chips
+  keep their white-when-on style and now say their state; the swatches, the sequencer's
+  stages, the Record panel's tabs and options and the MIDI panel's banks and tabs say
+  theirs with `aria`. Two undeclared changes in the build were put back in review: the
+  desk's tab order, and a Play sheet that opened itself on a `?debug` visit (the check's
+  URL; the app must not know it).
 - ~~**QA-20** Blow amount isn't sensitive enough.~~ **Fixed, #346**: the moving wind
   laid two bubbles every sixth step whatever the Amount (ten spawns a second at 60
   steps, twenty at 120), and each bubble pumps the colour out from under it; the

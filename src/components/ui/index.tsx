@@ -378,6 +378,34 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
 
 // ── Toggle ───────────────────────────────────────────────────────────
 
+/**
+ * The switch itself, a track with a knob at one end or the other, drawn
+ * once here for every switch in the app. Toggle is the row (a label and
+ * this); the Record panel's Include Audio Track, Settings' Song Detection
+ * and the remote's Macro Closeup sit the pill in rows of their own and
+ * take it from here, so its colours live in one place. On is the accent
+ * track under a white knob, off the track grey under a muted knob: 4.2:1
+ * and 5.8:1 knob against track, ΔE 94 between the states (`npm run
+ * switches`). Before this (QA-30, 2026-10) a switch was drawn eight
+ * ways, one of them the design's; the one the owner reported was a white
+ * track under a white knob, 1.0:1, which said nothing about which end
+ * the knob was at. A switch drawn by hand somewhere else is how that
+ * happens again, so none should be.
+ */
+export function SwitchPill({ on }: { on: boolean }) {
+  return (
+    <span
+      className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
+      style={{ background: on ? 'var(--color-accent)' : 'var(--color-track)' }}
+    >
+      <span
+        className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
+        style={{ left: on ? 18 : 2, background: on ? '#fff' : 'var(--color-muted)' }}
+      />
+    </span>
+  );
+}
+
 export function Toggle({ label, on, onChange, testId, title, disabled }: {
   label: string; on: boolean; onChange: (v: boolean) => void; testId?: string; title?: string; disabled?: boolean;
 }) {
@@ -395,15 +423,7 @@ export function Toggle({ label, on, onChange, testId, title, disabled }: {
       }`}
     >
       <span className="text-[13px] text-text-2">{label}</span>
-      <span
-        className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
-        style={{ background: on ? 'var(--color-accent)' : 'var(--color-track)' }}
-      >
-        <span
-          className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
-          style={{ left: on ? 18 : 2, background: on ? '#fff' : 'var(--color-muted)' }}
-        />
-      </span>
+      <SwitchPill on={on} />
     </button>
   );
 }

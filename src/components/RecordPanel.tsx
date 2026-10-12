@@ -14,7 +14,7 @@ import {
   Sliders,
   History,
 } from 'lucide-react';
-import { Sheet, Button } from './ui';
+import { Sheet, Button, SwitchPill } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
@@ -246,15 +246,7 @@ export function RecordPanel({
                         recorder.recording ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
-                      <span
-                        className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
-                        style={{ background: videoOpts.includeAudio ? 'var(--color-accent)' : 'var(--color-track)' }}
-                      >
-                        <span
-                          className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
-                          style={{ left: videoOpts.includeAudio ? 18 : 2, background: videoOpts.includeAudio ? '#fff' : 'var(--color-muted)' }}
-                        />
-                      </span>
+                      <SwitchPill on={videoOpts.includeAudio} />
                     </button>
                   </div>
                 </div>

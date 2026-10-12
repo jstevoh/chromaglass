@@ -122,7 +122,7 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
 }
 
 export function PhonePlay(p: PhonePlayProps) {
-  const [sheet, setSheet] = useState(() => typeof window !== 'undefined' && window.location.pathname.includes('play') && window.innerWidth < 600 && new URLSearchParams(window.location.search).has('debug'));
+  const [sheet, setSheet] = useState(false);
   const [picked, setPicked] = useState<PlayTool>('dropper');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState(false);

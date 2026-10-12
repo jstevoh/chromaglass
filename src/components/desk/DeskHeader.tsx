@@ -315,7 +315,7 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           */}
           <Segmented
             value={mode}
-            options={[['perform', 'Gig'], ['design', 'Build'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']] as const}
+            options={[['design', 'Build'], ['perform', 'Gig'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']] as const}
             onChange={onMode}
             height={32}
             divideBefore="sequence"

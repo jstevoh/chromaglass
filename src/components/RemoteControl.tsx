@@ -6,6 +6,7 @@ import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
+import { SwitchPill } from './ui';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
@@ -851,15 +852,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <span
-                className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
-                style={{ background: settings?.macroMode ? 'var(--color-accent)' : 'var(--color-track)' }}
-              >
-                <span
-                  className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
-                  style={{ left: settings?.macroMode ? 18 : 2, background: settings?.macroMode ? '#fff' : 'var(--color-muted)' }}
-                />
-              </span>
+              <SwitchPill on={!!settings?.macroMode} />
             </button>
             {settings?.macroMode && (
               <div className="mt-4">

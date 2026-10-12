@@ -2,6 +2,9 @@
 
 <!-- Lives in the repo so a session without the project's shared files can read it. -->
 
+Shipped in #381 (Antigravity's build, reviewed and finished in the same PR). Kept as the
+record of the audit, the bar and the fix order; `PLAN.md` QA-30 has what landed.
+
 The owner's ask (2026-10-11, with a screenshot of the Record panel's Include Audio Track
 switch): "This switch doesn't look right. Go through all switches and controls and make
 sure they are clear when things are turned on/off."

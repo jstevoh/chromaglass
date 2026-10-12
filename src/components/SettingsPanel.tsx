@@ -13,7 +13,7 @@ import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet, Toggle } from './ui';
+import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
@@ -841,15 +841,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
               data-testid="song-detection-toggle"
             >
-              <span
-                className="relative inline-block h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-[120ms]"
-                style={{ background: songDetection ? 'var(--color-accent)' : 'var(--color-track)' }}
-              >
-                <span
-                  className="absolute top-0.5 h-4 w-4 rounded-full transition-all duration-[120ms]"
-                  style={{ left: songDetection ? 18 : 2, background: songDetection ? '#fff' : 'var(--color-muted)' }}
-                />
-              </span>
+              <SwitchPill on={!!songDetection} />
             </button>
           </div>
         )}
