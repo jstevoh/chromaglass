@@ -499,6 +499,7 @@ export function Desk(p: DeskProps) {
         <span className="truncate" data-testid="status-hearing">
           {p.status.audio}
           {p.status.sequence && ` · ${p.status.sequence}`}
+          {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
         </span>
         <span className="truncate" data-testid="status-running">
           {`layout ${LAYOUT_LABEL[p.layoutName]} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}

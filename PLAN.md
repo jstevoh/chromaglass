@@ -6172,23 +6172,14 @@ Turing Print" work (#331), which also made the reaction grow at all.
   long), and fall back on the live song shape when the match is weak. What it buys: the
   show knows the chorus is next and can lean into the build before it is heard. Not a
   preset patch source (28f: patches use fast readings only).
-  - **28g-1. The follower and its check** (**shipped**, this PR). `chroma.ts`: a twelve-
-    note profile, read from the analyser's tonal peaks (parabolic-refined) on a per-bin
-    quarter-second median (drums dropped), the same arithmetic in the ear
-    (`AudioReading.chroma`) and in the map (`mapChroma`, stored with every new map as
-    `SongMap.chroma`). `songFollow.ts`: the forward algorithm over a place × tempo grid
-    (0.6–1.6×), the form as transitions at the map's section ends, a leak for jumps the
-    form did not offer, a start prior, and confidence = match quality × agreement.
-    `npm run songfollow` (Measure, logic): takes 15% slower and faster on other
-    instruments 100% of hops within a bar of the very place, tempo within 3%; a band
-    speeding up 100 to 140 bpm with a bar of silence, 100%; bridge skipped, chorus
-    repeated, solo doubled, a 16-bar jam: back within 0.7–1.8 bars; joined at the second
-    verse, found in 1.9 bars; confidence 0.07 in the jam against 0.92 where followed.
-    `anchor(mapSec)` is the score's nudge (28h). The ear's frame costs 5 µs more (237 to
-    242 in node). Not wired into the show yet (28g-2).
-  - **28g-2. Use it live, with the fallback.** Run the follower in the frame loop when a
-    map with `chroma` is followed; when confidence is under about a third, the show leans
-    on `songShape.ts`; desk and phone show which map is followed and its confidence.
+  - **28g-1. The follower and its check** (**shipped**, #378; the story in
+    `docs/plan-shipped.md` §28). `chroma.ts`, `songFollow.ts`, `npm run songfollow`.
+  - **28g-2. Use it live, with the fallback** (**shipped**, this PR; the story in
+    `docs/plan-shipped.md` §28). `followedPlace.ts`: the place the show reads a map at is
+    the follower's when sure and the clock run on from the last sure place when not, with
+    no map section then (the show leans on the song's shape); the desk's status bar, the
+    track panel and the phone's Sound sheet say which song is followed and how sure.
+    `npm run songfollow` (the place, 16 more checks), `npm run followview` (the browser).
   - **28g-3. The show leans into what the map says is next** (Pacing/sequencer), and a map
     made from a file (the band's rehearsal, last night's set; §17 "hear the set ahead").
   - **28g-4. Found along the way: the worker's sections are coarse.** On the check's song
@@ -6198,12 +6189,33 @@ Turing Print" work (#331), which also made the reaction grow at all.
     starts; segment by the map's harmony at bar scale. Measured: on today's sections the
     jumps do nothing (no jumps, same numbers); on the record's true sections a repeated
     chorus is found 1.2 bars in against the leak's 1.4. Keep the jumps if better sections
-    make them earn more, else remove them.
+    make them earn more, else remove them. Agreement (half of confidence) counts the weight
+    on the same place in a section of the same label, so with these sections two copies of
+    the chorus that the worker put in one "chorus" do not agree, and confidence after a
+    jam stays near 0.5 while the follower hops between them. Agreement by the map's own
+    harmony (the last four seconds the same) was tried in 28g-2 and changed no number on
+    these takes; try it again with better sections.
   - **28g-5. Found along the way: another key.** A band that tunes down a half step, or
     plays the song in another key, rotates the whole profile; the follower would read it
     as a jam. Try the twelve rotations when confidence stays low and the profile is tonal.
   - **28g-6. Found along the way: maps made before 28g-1 have no harmony.** They follow
     nothing until the song is heard again and its map remade.
+  - **28g-7. Found along the way: a song's show while the place is unsure.** A song show's
+    actions (`useSongShows`) fire by the place, and while the follower is unsure the place
+    is the clock run on from the last sure one: a guess. The map's section is withheld then
+    (the sequencer runs a section stage on its own clock), but a show's "at the second
+    chorus" still fires on the guess. Decide whether a show's section actions wait for the
+    place to be sure, and say so on the Songs panel.
+  - **28g-8. Found along the way: the score's nudge.** When 28h's nudge lands (#375), it
+    calls `FollowedPlace.resync(mapSec, now)`, which starts the clock there and anchors the
+    follower; nothing else is needed.
+  - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
+    is held (the check's intro, four bars of A minor into a verse that opens on it), no
+    place in it sounds different from another, and the follower slid 1.4 bars behind into
+    the verse before the next chord put it right; the place, steered rather than set,
+    held the identification's clock meanwhile and jumped once. A rehearsal map made from a
+    file (28g-3) can carry bar positions from the beat grid, which would fix the place
+    inside a held chord.
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 

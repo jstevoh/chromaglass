@@ -45,6 +45,18 @@
  *   - the same take followed twice reports the same places, to the bit;
  *   - the take at 30 fps (a render's rate, or a slow laptop's) as at 60.
  *
+ * And the place the show reads (PLAN.md 28g-2, `followedPlace.ts`): on the
+ * takes 15% slower and faster, identified as they begin, within a bar of the
+ * song nine hops in ten where the old clock is over four bars out by the
+ * last chorus, the map's section the song's where sure, at most three steps
+ * between frames (each from further to within a bar), at most two switches
+ * between sure and not once settled; in the jam not sure and no section,
+ * running on without a jump, then sure of the chorus within four bars; a map
+ * with no harmony read exactly as the old clock; identified at the second
+ * chorus, sure and within a bar from its third bar to its twelfth, where the
+ * clock alone drifts over a bar out; nothing but the map's readers reading
+ * the follower, and no patch source that is the song's place or section.
+ *
  * Each take is a different seed, so the drums' humanising and the noise
  * floor differ from the record's as well. The song is in A minor, with a
  * verse that is not its chorus (Am F C G; Dm G C E), a bridge on B flat and
@@ -55,6 +67,7 @@
 
 import { analysePcm } from '../src/lib/audioFeatures.ts';
 import { SongFollower, mapChroma, storedChroma, FOLLOW_RATE } from '../src/lib/songFollow.ts';
+import { FollowedPlace, readSection } from '../src/lib/followedPlace.ts';
 import { analyze, segment } from '../src/lib/songMapAnalysis.ts';
 import { arrange, SR } from './arrangement.mjs';
 
@@ -174,8 +187,14 @@ function errorBars(pos, truth) {
   check('the song: places its score cannot tell apart are few (within a bar of one: under a fifth of it on average, under 30% anywhere)', share < 0.2 && most < 0.3, `${(100 * share).toFixed(1)}% on average, at most ${(100 * most).toFixed(1)}%`);
 }
 
+/** The ear's readings of a take, at `fps`, made once (the place's checks below hear them again). */
+function hearTake(tk, fps = 60) {
+  tk.readings ??= {};
+  return (tk.readings[fps] ??= analysePcm(tk.pcm, SR, fps));
+}
+
 function follow(tk, fps = 60, withMap = map) {
-  const readings = analysePcm(tk.pcm, SR, fps);
+  const readings = hearTake(tk, fps);
   const f = new SongFollower(withMap);
   const out = [];
   const t0 = performance.now();
@@ -417,7 +436,7 @@ check('silence before the song reports no place', lead.length > 0 && lead.every(
 // start of, it is there at once; told a wrong place, what it hears brings it
 // back within four bars.
 {
-  const readings = analysePcm(fast.pcm, SR, 60);
+  const readings = hearTake(fast);
   const at = fast.spans[4].start + 0.25;
   const told = (f, place) => {
     let i = 0;
@@ -446,6 +465,152 @@ check('silence before the song reports no place', lead.length > 0 && lead.every(
     if (wrong.filter(o => o.t >= wrong[i].t && o.t <= until).every(o => o.ok)) back = (wrong[i].t - at) / fast.bar;
   }
   check('told a wrong place: back within a bar within four bars of hearing', back <= 4, `${Number.isFinite(back) ? back.toFixed(1) : 'never'} bars`);
+}
+
+// ── The place the show reads (PLAN.md 28g-2, `followedPlace.ts`) ─────────
+//
+// The show reads the map at a place: before 28g-2 a clock from the moment the
+// song was identified, now the follower's place when it is sure and the clock
+// on from its last sure place when not. These play the same takes through
+// `FollowedPlace` exactly as `useMusicIntelligence` does (every reading heard,
+// the place read on the reading's own clock), identified as the song begins,
+// and read it at every hop.
+{
+  /** Each hop of a take: the place read, the old clock's place, the truth, the section read. */
+  const readPlace = (tk, withMap = map) => {
+    const readings = hearTake(tk);
+    const p = new FollowedPlace(withMap);
+    const t0 = tk.spans[0].start;
+    p.resync(off, t0);
+    const out = [];
+    let next = 0, last = null;
+    const steps = [];
+    for (const r of readings) {
+      if (r.time < t0) continue;
+      p.hear(r, r.time);
+      const at = p.at(r.time);
+      // A step: the place moving between frames by a tenth of a bar more than the tempo moves it.
+      if (last !== null && at.sure && Math.abs(at.positionSec - last.positionSec - (r.time - last.t) * at.tempo) > 0.1 * mapBar) {
+        const tr = truthAt(tk, r.time);
+        steps.push({ t: r.time, from: last.positionSec, to: at.positionSec, lands: tr ? errorBars(at.positionSec, tr).any : null, before: tr ? errorBars(last.positionSec, tr).any : null });
+      }
+      last = { ...at, t: r.time };
+      if (r.time < next) continue;
+      next = r.time + 1 / FOLLOW_RATE;
+      out.push({ t: r.time, ...at, clock: off + r.time - t0, truth: truthAt(tk, r.time), section: readSection(withMap.sections, at) });
+    }
+    let switches = 0;
+    for (let i = 1; i < out.length; i++) if (out[i].sure !== out[i - 1].sure && out[i].t >= tk.spans[0].start + 12 * tk.bar) switches++;
+    return { out, switches, steps, place: p };
+  };
+  /** Where the song begins in the map: what an identification as it begins says. */
+  const off = recordAt[I.intro].start;
+  const settled = (tk, o) => o.truth && o.t >= tk.spans[0].start + 12 * tk.bar;
+  const mapSectionAt = (t) => map.sections.findIndex(s => t >= s.start && t < s.end);
+
+  for (const [name, tk] of [['the take 15% slower', slow], ['the take 15% faster', fast]]) {
+    const run = readPlace(tk);
+    const hops = run.out.filter(o => settled(tk, o));
+    const within = hops.filter(o => errorBars(o.positionSec, o.truth).any <= 1).length;
+    const lastChorus = tk.spans[I.chorus3];
+    const clockOut = errorBars(off + lastChorus.start + 0.5 * tk.bar - tk.spans[0].start, truthAt(tk, lastChorus.start + 0.5 * tk.bar)).exact;
+    const stepText = run.steps.map(st => `${st.t.toFixed(1)} s: ${f2(st.before)} to ${f2(st.lands)} bars from the song`).join('; ');
+    console.log(`  ${name}: the place read within a bar of the song ${(100 * within / Math.max(1, hops.length)).toFixed(0)}% of ${hops.length} hops; the old clock ${clockOut.toFixed(1)} bars out at the last chorus; ${run.switches} switches between sure and not once settled; ${run.steps.length} steps (${stepText || 'none'})`);
+    check(`${name}, identified as it begins: the place the show reads within a bar of the song, nine hops in ten`, hops.length > 0 && within / hops.length >= 0.9, `${(100 * within / Math.max(1, hops.length)).toFixed(0)}%`);
+    check(`… where the old clock is more than four bars out by the last chorus (the case needs following)`, clockOut > 4, `${clockOut.toFixed(1)} bars`);
+    const sure = hops.filter(o => o.sure);
+    const sameSection = sure.filter(o => {
+      const want = new Set(sameAs(o.truth.pos).map(mapSectionAt));
+      return o.section !== null && want.has(map.sections.indexOf(o.section));
+    }).length;
+    check(`… the map's section it reads is the song's, nine hops in ten where sure`, sure.length > 0.8 * hops.length && sameSection / sure.length >= 0.9, `${(100 * sameSection / Math.max(1, sure.length)).toFixed(0)}% of ${sure.length} sure hops (of ${hops.length})`);
+    const good = run.steps.filter(st => st.lands !== null && st.lands <= 1 && st.lands < st.before);
+    check(`… and it moves smoothly: at most three steps over a tenth of a bar between frames, each from further to within a bar of the song`, run.steps.length <= 3 && good.length === run.steps.length, `${run.steps.length} steps, ${good.length} of them closer and within a bar`);
+    check(`… sure or not switching at most twice once settled`, run.switches <= 2, `${run.switches}`);
+  }
+
+  // The jam: not sure, so no section from the map (the show leans on the
+  // song's shape), the place running on at the band's pace; then the chorus.
+  {
+    const run = readPlace(jam);
+    const inJam = run.out.filter(o => o.t >= jamSpan.start + 2 * jam.bar && o.t < jamSpan.end);
+    const unsure = inJam.filter(o => !o.sure && o.section === null).length;
+    let jump = 0;
+    for (let i = 1; i < inJam.length; i++) jump = Math.max(jump, Math.abs(inJam[i].positionSec - inJam[i - 1].positionSec - (inJam[i].t - inJam[i - 1].t) * inJam[i].tempo));
+    check('in the jam, from its third bar: not sure, and no section read from the map, nine hops in ten', inJam.length > 0 && unsure / inJam.length >= 0.9, `${unsure} of ${inJam.length}`);
+    check('… and the place runs on from the last sure one, no jump between hops', inJam.length >= 2 && jump < 1e-6, `${(jump / mapBar).toFixed(3)} bars`);
+    const chorus = jam.spans[8];
+    const back = run.out.find(o => o.t >= chorus.start && o.sure && o.truth && errorBars(o.positionSec, o.truth).any <= 1
+      && run.out.filter(q => q.t >= o.t && q.t <= o.t + 2 * jam.bar).every(q => q.sure && q.truth && errorBars(q.positionSec, q.truth).any <= 1));
+    const bars = back ? (back.t - chorus.start) / jam.bar : Infinity;
+    check('… then sure of the chorus after it, within a bar, within four bars', bars <= 4, `${Number.isFinite(bars) ? bars.toFixed(1) : 'never'} bars`);
+  }
+
+  // A map made before 28g-1 (no harmony): the clock, as before 28g-2, to the bit.
+  {
+    const old = { sections: map.sections };
+    const run = readPlace(slow, old);
+    const t0 = slow.spans[0].start;
+    const exact = run.out.every(o => o.positionSec === off + (o.t - t0) * 1 && o.confidence === null && !o.sure);
+    const sections = run.out.every(o => o.section === (map.sections.find(s => o.clock >= s.start && o.clock < s.end) ?? null));
+    check('a map with no harmony: the place is the clock from identification, to the bit, and its sections are the clock\'s', run.out.length > 0 && exact && sections, `${run.out.length} hops`);
+  }
+
+  // Identified (or nudged) part way in: the clock starts there and the
+  // follower is told. Twelve bars of the faster take from its second chorus:
+  // long enough that the clock alone is over a bar out by the end (the map
+  // with no harmony, the control, must fail where the follower holds).
+  {
+    const readings = hearTake(fast);
+    const at = fast.spans[I.chorus2].start + 0.25;
+    const place = recordAt[I.chorus2].start + 0.25 * mapBar / fast.bar;
+    const run = (withMap) => {
+      const p = new FollowedPlace(withMap);
+      let i = 0;
+      for (; i < readings.length && readings[i].time < at; i++);
+      p.resync(place, readings[i].time);
+      const hops = [];
+      let next = 0;
+      for (; i < readings.length && readings[i].time < at + 12 * fast.bar; i++) {
+        p.hear(readings[i], readings[i].time);
+        if (readings[i].time < next) continue;
+        next = readings[i].time + 1 / FOLLOW_RATE;
+        const tr = truthAt(fast, readings[i].time), here = p.at(readings[i].time);
+        hops.push({ bar: (readings[i].time - at) / fast.bar, sure: here.sure, err: tr ? errorBars(here.positionSec, tr).any : Infinity });
+      }
+      return hops;
+    };
+    const followed = run(map), clock = run({ sections: map.sections });
+    const late = followed.filter(h => h.bar >= 2);
+    const held = late.filter(h => h.sure && h.err <= 1).length;
+    const clockEnd = clock.at(-1)?.err ?? NaN;
+    check('identified at the second chorus: sure and within a bar of the song from its third bar to its twelfth', late.length > 30 && held === late.length, `${held} of ${late.length} hops`);
+    check('… where the clock alone, from the same start, is over a bar out by the twelfth', clockEnd > 1, `${f2(clockEnd)} bars`);
+  }
+
+  // Not a source for a look's sound patches (PLAN.md 28g: patches read fast
+  // readings only). What reads the followed place is the map's own readers:
+  // the music hook, and the desk's and phone's line about it.
+  {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const walk = (d) => readdirSync(d).flatMap(f => { const p = `${d}/${f}`; return statSync(p).isDirectory() ? walk(p) : [p]; });
+    const allowed = new Set(['src/lib/followedPlace.ts', 'src/lib/songMapWorker.ts', 'src/hooks/useMusicIntelligence.ts', 'src/components/TrackPanel.tsx', 'src/components/phone/PhoneStage.tsx', 'src/App.tsx']);
+    const reads = /(?:from\s*|import\s*\(\s*)["'][^"']*\/(songFollow|followedPlace)(\.[jt]sx?)?["']/;
+    const readers = walk('src').filter(f => /\.(ts|tsx)$/.test(f) && reads.test(readFileSync(f, 'utf8')));
+    const stray = readers.filter(f => !allowed.has(f));
+    check('only the map\'s readers read the follower: not the plate, sound learn or a look\'s patches', readers.includes('src/hooks/useMusicIntelligence.ts') && stray.length === 0, stray.length ? stray.join(', ') : readers.join(', '));
+    // And at the patches' own boundary: what may drive a patch (`PatchSource`)
+    // names no song, map, place or section, and the patch evaluator reads
+    // nothing of the song map or the music hook, where the place leaves.
+    const types = readFileSync('src/types.ts', 'utf8');
+    const sources = /export type PatchSource\s*=([^;]+);/.exec(types)?.[1] ?? '';
+    const named = [...sources.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    const evaluator = readFileSync('src/lib/sceneMap.ts', 'utf8');
+    const songish = named.filter(n => /song|map|place|section|follow/i.test(n));
+    const reached = /["'][^"']*\/(songFollow|followedPlace|songMap|useMusicIntelligence)(\.[jt]sx?)?["']/.test(evaluator);
+    check('… and a patch\'s sources are fast readings: none of them the song\'s place or section, nor the evaluator reading the map', named.length >= 3 && songish.length === 0 && !reached,
+      `sources ${named.join(', ') || 'none found'}${songish.length ? `; song-ish: ${songish.join(', ')}` : ''}${reached ? '; sceneMap.ts reads the map' : ''}`);
+  }
 }
 
 // The same take twice.
