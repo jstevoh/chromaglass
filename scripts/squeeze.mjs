@@ -83,6 +83,22 @@ try {
   // Settle into the look and let the band start before counting anything.
   await page.waitForTimeout(8000);
   /*
+    And let the plate come up to speed. On the show shard this ran after the
+    show night and found the app's shaders built; PR #370 moved it to the
+    fifth shard, where it is the first page of the app the runner opens, and
+    on that cold machine the plate stepped 128 times in the first window
+    (eleven a second) and 254 in the next, every other line green. The bar
+    below is the plate stepping throughout, 200 steps a window: so wait,
+    a second at a time and at most thirty, until one second holds that
+    rate (200 in 12 s). A plate that never gets there is still read and
+    still fails that line; a warm one passes this at once.
+  */
+  for (let k = 0; k < 30; k++) {
+    const a = (await read()).steps;
+    await page.waitForTimeout(1000);
+    if ((await read()).steps - a >= 200 / 12) break;
+  }
+  /*
     The beat, tapped in at 150 bpm, four taps a beat apart (the Tap Tempo
     action, as a pad or the Tap button sends it). Not the band's 122: a
     clock that locked onto the band by ear would also beat every 492 ms, so

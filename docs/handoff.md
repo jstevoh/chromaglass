@@ -77,7 +77,7 @@ Left: the next concrete step, if the work stops here
 
 **Check changes.** CI fails a PR that moves what a check measures against or with and does
 not say so (`npm run checkguard`, the "Check changes named" job, under the required
-`Measure`; PLAN.md 19w). That is any number a check compares against (`>= 0.05` to
+`Measure`; PLAN.md 19x). That is any number a check compares against (`>= 0.05` to
 `>= 0.04`), a comparison turned round, a check or its bar deleted or rewritten, any other
 number on a code line under `scripts/` (a stir strength, a seed, a duration, a run count,
 where a drop is poured, a `?stir=0.3` in a URL), and a SHOUTING_CASE number constant under

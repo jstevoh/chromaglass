@@ -114,6 +114,7 @@ interface WorkerResult {
   energyCurve: number[];
   frameRate: number;
   durationSec: number;
+  chroma?: number[];
   fpHashes?: Uint32Array;
   fpFrames?: Uint32Array;
   fpDurationSec?: number;
@@ -185,6 +186,7 @@ export async function generateSongMap(
     pitchCurve: result.pitchCurve,
     energyCurve: result.energyCurve,
     frameRate: result.frameRate,
+    chroma: result.chroma,
     generatedAt: Date.now(),
   };
   

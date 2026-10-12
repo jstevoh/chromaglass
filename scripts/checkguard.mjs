@@ -1,4 +1,4 @@
-// A pull request that moves a check's bar or input says so (PLAN.md 19w).
+// A pull request that moves a check's bar or input says so (PLAN.md 19x).
 // Run with `npm run checkguard` (the self-test), or against a branch:
 //
 //   npm run checkguard -- --base origin/main --body-file body.md
@@ -83,7 +83,7 @@
 // (`moved *= 1.3`) with nothing removed; a 0 or a 1 on a rewritten line (left
 // out on purpose, see below); arguments in package.json's scripts or a
 // workflow's steps; a check that stops being run because its caller changed;
-// a physics constant that is not SHOUTING_CASE (PLAN.md 19w-2). A bar
+// a physics constant that is not SHOUTING_CASE (PLAN.md 19x-2). A bar
 // computed from a variable two lines up whose own number changed shows as an
 // input: still named, just called an input. `--history` measures how often
 // it fires on ordinary work; over the 50 merges before it shipped, 9 would
