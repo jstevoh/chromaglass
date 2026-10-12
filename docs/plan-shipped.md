@@ -1336,6 +1336,7 @@ unmounted on a clean screen, as it was, the window is gone and the clean-screen 
 - **8f** The Phone · iPad panel draws its link as a QR code: an encoder written here (byte
   mode, level M, versions 1–10, the eight masks scored by the standard's penalty rules),
   drawn as one SVG path in whole pixels per module, black on white with its quiet zone.
+- **8f-1** The Phone · iPad panel's code whenever nothing is linked, and Link another while phones are (2026-10-11; check `npm run phonelink`). On the hosted site the panel had said "No phone linked." over three lines of words and no code. The desk never knew whether a phone was linked: `status.phone` was the display's own socket to the relay, so with the Mac app up and no phone in the room the panel said "A phone is linked and driving the show" and the footer "phone linked". The relay (`server/remote-server.js`) now counts phones (`controllers`) for the display as it counts network displays (`mirrors`), and gives a display the count on its hello; the desk counts them, puts the code away while one is on, and a Link another button brings it back. With no show server behind the page the code is the page's own address (`/`), which opens the show on the phone itself, and the words say how to get a show server.
 - **8h** The header at 1024 measured 342 px of cluster against 337 of room right of the
   centred switch, so the Sound dot sat 5 px under it. The header now has three measured
   levels: the dots' words beside them, under them (12 px from the switch, as before), and
@@ -2690,6 +2691,37 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+### 19w. A fifth Mac shard: every shard well inside its timeout
+
+**Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
+20-minute timeout, and #353's was killed at 20:16 on a slow runner after every check in it
+had passed (main's own deploy took 19:32). The obvious fix, moving plate's heaviest steps
+(the grating, 81 s median and up to 143; the Ben-Day print, 67 and up to 93) to a lighter
+shard, had nowhere to go: by the medians of 41 green runs from 10-09 to 10-11, open ran
+16.4 minutes, tools 15.9 and show 15.3 beside plate's 16.7. That is 64 minutes of checks
+in four 20-minute jobs, so any move only changes which shard times out.
+
+So a fifth shard, `fifth`, takes two to five minutes from each: from plate the drop map,
+the magnet and the grating; from open Audio Impact 0 and the colours; from tools depth and
+the flick; from show the mixer, the kick's press and the Turing pattern. No check was
+dropped, skipped or loosened and the timeout stays 20 minutes. Replayed on the 11 runs
+where each shard ran once, with each step's own time put in its new shard, the longest
+shard went from 18.4 minutes to 15.0 (plate 10.7 median, 13.7 at most; open 13.4, 15.0;
+tools 13.6, 14.1; show 13.2, 14.2; fifth 12.8, 13.4). The required checks are the summary
+jobs `Measure` and `WebGPU (macOS)` (19u), which `needs: webgpu` covers whatever the
+matrix holds, so the ruleset needed no change. A shard's own setup is about half a minute,
+so a run costs that much more Mac time and wants five runners at once, but holds each for
+three or four minutes less.
+
+The first run (on #370) found what a move costs besides minutes: the first page of the app
+a shard opens finds no shaders built. `ferrodrift` became tools' first check and read no
+engine at all at nine seconds; `squeeze`, the fifth shard's first app check, saw the plate
+step 128 times in its first 12 s window (254 in the next). Both had always followed a
+warmed app. Neither bar moved: `ferrodrift` now waits up to twenty seconds more for the
+GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate its line
+asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
+and fifth 13.5.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -2856,6 +2888,21 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
   - **Viscosity $\mu$**: fixed at light mineral oil ($17\text{ mPa}\cdot\text{s}$) matching the show's carrier fluid, pending per-liquid coupling in 18d.
   - **$\lambda = 1.5$ on beads**: solved back from tuned $0.8\times$ flow speed.
 - **Measured** (`npm run bubblephysics`): 11/11 checks pass. Foam stability test over 3600 frames on a resting raft yields 0 merges (stable foam).
+
+### 18j. Milky liquids scatter
+
+**Shipped** (2026-10-10, #353): milky liquids scatter light, turning milk into an opaque white body under diffuse backscatter and casting a warm dark projector shadow with a soft forward halo.
+- **Where:** everything in the plate was previously treated as a pure absorber. `colourBody` pushed opacity and saturation up to imitate a body of colour, `granulation` modulated dye optical depth with noise, and milk was rendered as dye tinting.
+- **The real phenomenon:** milk is an emulsion of sub-micron fat globules and casein micelles (~100 nm) that undergo Mie and Rayleigh-Gans scattering without significant intrinsic absorption in visible wavelengths.
+  - *On black ground (diffuse backscatter):* multiple scattering produces a bright, white diffuse body. Modeled using non-absorbing Kubelka–Munk theory: $Sd = \mu_s' \cdot 6.0 \cdot d_{gap}$, $R_{KM} = \frac{Sd}{1.0 + Sd}$. Strictly energy conserving ($R_{KM} + T_{KM} \equiv 1.0$) with equal RGB scattering, giving pure white reflectance ($R=G=B \approx 98.8\%$ luminance). Absorbing food dyes sit on top of this white reflective substrate, creating vibrant opaque pastel tints (e.g. pinks/reds rather than dark mud on black ground, fulfilling PLAN §4).
+  - *On lamp ground (projector transmission):* a projector collection aperture (f/2–f/4 lens) collects only unscattered or forward-scattered light within a narrow pupil angle ($\sim 10^\circ$). Over $90\%$ of scattered light misses the lens entirely. Consequently, milk casts a dark shadow (mean transmission $\approx 25.4\% \le 30\%$). Casein micelle scattering follows Rayleigh-Gans $\lambda^{-1.5}$ wavelength dependence ($\vec{\kappa}_{casein} = (0.85, 0.95, 1.20)$), scattering blue light more strongly than red, causing the projector shadow to appear warm/amber ($t_R > t_B$).
+  - *Forward halo:* light scattered at small forward angles forms a soft forward halo around the pool boundary, glowing slightly above bare plate transmission (+0.46%) in an annulus just outside the pool core.
+  - *Zero-scatter species (control):* liquids with zero scattering coefficient ($\mu_s' = 0$, e.g. glycerine, water) render byte-for-byte identical to the bare plate across all pixels on both black ground and lamp ground.
+- **Conserved transport & packing:**
+  - Optical scattering coefficient $\mu_s'$ is carried in the GPU species field (channel 2, `species.b`) and advected via the existing conserved flux-form pairing (`bodyAdvectPairSub`, PLAN 18d-11a).
+  - Because `view0` and `dye` textures were full, $\mu_s'$ is packed into `vel.w` via `packVel` during velocity packing (`max(0.0, sp.b)` in `.w`), alongside temperature in `v.z` (PLAN 18f / #352) and clamped velocities in `.xy`.
+  - Species channel 2 was traded from density $\rho$ (which is read by nothing yet in the solver) to avoid allocating an extra PingPong texture and doubling advection bandwidth, maintaining 18d-11a's 6.73 ms paired carry. When 18d-4 buoyancy lands, density can be packed or restored (PLAN 18d-4a).
+- **Verification:** `npm run milk` enforces 9 automated checks including dark warm shadow, halo glow, white diffuse backscatter, dye-on-milk pastel reflectance, conserved species advection, and zero-diff glycerine control against bare plate.
 
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 

@@ -273,7 +273,7 @@ export interface PlateSolver {
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
    * its share into the species field. Plate units.
    */
-  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number } | null, volume?: boolean): void;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume?: boolean): void;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
   /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
