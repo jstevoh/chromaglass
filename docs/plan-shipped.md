@@ -2691,6 +2691,37 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+### 19w. A fifth Mac shard: every shard well inside its timeout
+
+**Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
+20-minute timeout, and #353's was killed at 20:16 on a slow runner after every check in it
+had passed (main's own deploy took 19:32). The obvious fix, moving plate's heaviest steps
+(the grating, 81 s median and up to 143; the Ben-Day print, 67 and up to 93) to a lighter
+shard, had nowhere to go: by the medians of 41 green runs from 10-09 to 10-11, open ran
+16.4 minutes, tools 15.9 and show 15.3 beside plate's 16.7. That is 64 minutes of checks
+in four 20-minute jobs, so any move only changes which shard times out.
+
+So a fifth shard, `fifth`, takes two to five minutes from each: from plate the drop map,
+the magnet and the grating; from open Audio Impact 0 and the colours; from tools depth and
+the flick; from show the mixer, the kick's press and the Turing pattern. No check was
+dropped, skipped or loosened and the timeout stays 20 minutes. Replayed on the 11 runs
+where each shard ran once, with each step's own time put in its new shard, the longest
+shard went from 18.4 minutes to 15.0 (plate 10.7 median, 13.7 at most; open 13.4, 15.0;
+tools 13.6, 14.1; show 13.2, 14.2; fifth 12.8, 13.4). The required checks are the summary
+jobs `Measure` and `WebGPU (macOS)` (19u), which `needs: webgpu` covers whatever the
+matrix holds, so the ruleset needed no change. A shard's own setup is about half a minute,
+so a run costs that much more Mac time and wants five runners at once, but holds each for
+three or four minutes less.
+
+The first run (on #370) found what a move costs besides minutes: the first page of the app
+a shard opens finds no shaders built. `ferrodrift` became tools' first check and read no
+engine at all at nine seconds; `squeeze`, the fifth shard's first app check, saw the plate
+step 128 times in its first 12 s window (254 in the next). Both had always followed a
+warmed app. Neither bar moved: `ferrodrift` now waits up to twenty seconds more for the
+GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate its line
+asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
+and fifth 13.5.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
