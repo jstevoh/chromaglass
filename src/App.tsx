@@ -1483,6 +1483,7 @@ export default function App() {
   }, [settings, pinnedPresetId, userPresets.presets]);
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
+  const [phoneCount, setPhoneCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
   useEffect(() => { if (castMenu) void relayInfo().then(setRelay); }, [castMenu]);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
@@ -3864,6 +3865,9 @@ export default function App() {
         case 'mirrors':
           setMirrorCount(message.count);
           break;
+        case 'controllers':
+          setPhoneCount(message.count);
+          break;
         case 'request-cast':
           relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
           break;
@@ -4487,16 +4491,21 @@ export default function App() {
    */
   const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
 
+  const livePhoneCount = remoteLink.status === 'connected' ? phoneCount : 0;
+  useEffect(() => {
+    if (remoteLink.status !== 'connected') setPhoneCount(0);
+  }, [remoteLink.status]);
+
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
     video: isVideoPlaying,
     mic: audioSource !== 'none',
     wall: isCasting,
     midi: midi.enabled,
-    phone: remoteLink.status === 'connected',
+    phone: livePhoneCount > 0,
     rec: recorder.recording ? String(recorder.seconds) : null,
     perf: perfClock,
-  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, livePhoneCount, recorder.recording, recorder.seconds, perfClock]);
 
   /*
     Where each status dot goes.
@@ -6131,7 +6140,7 @@ export default function App() {
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
-            phone: remoteLink.status === 'connected',
+            phone: livePhoneCount,
             rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
           }}
           onBlackout={toggleBlackout}
