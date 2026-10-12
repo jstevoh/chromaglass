@@ -91,6 +91,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'lacing', type: 'f32' },
   { name: 'lampWarmth', type: 'f32', note: 'halogen grade' },
   { name: 'layerCount', type: 'i32' },
+  { name: 'twoProjectors', type: 'f32' },
   { name: 'layerZoom1', type: 'f32', note: 'second layer viewed magnified about the centre' },
   { name: 'ledAngle', type: 'f32' },
   { name: 'ledMode', type: 'i32' },

@@ -3606,6 +3606,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </select>
         </div>
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-[13px] font-medium text-text">Two Projectors</span>
+          <div className="flex items-center gap-2">
+            <PinChips settingKey="twoProjectors" />
+            <button
+              onClick={() => onUpdate({ twoProjectors: settings.twoProjectors > 0.5 ? 0 : 1 })}
+            className={`w-10 h-5 rounded-full relative transition-colors ${settings.twoProjectors > 0.5 ? 'bg-white' : 'bg-white/20'}`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.twoProjectors > 0.5 ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+          </div>
+        </div>
       </section>
       )}
 

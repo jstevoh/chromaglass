@@ -4175,11 +4175,15 @@ its frame rate live. "Free" means no new passes or texture reads.
   through 0.16 of the green where Beer–Lambert says 0.09). On the lamp only its blur
   counts. A look on the lamp that wants crisp blobs needs them from the liquid (18a's
   surface tension, 18d), not from a curve.
-- ~~**18b-5. The back plate's mixer blends on the lamp.**~~ With its own blend (the look's
+- **18b-5. The back plate's mixer blends on the lamp.** With its own blend (the look's
   Blend Mode) the back plate filters the lamp; a mixer row set to screen, add, multiply
   or key still lays its dye as it did. Decide whether a row blend means anything under
   the lamp, or the lamp overrides it.
-- **18b-6. Light through a film, not the whole gap (for 20b).** *Shipped with 20b
+- **18b-6. Two projectors.** The Two Projectors setting models two projectors aimed at the
+  same screen, each filtered by its own plate. Shortcut: each projector's exposure is
+  simply halved (exposure normalisation). Outside the back plate's disc, the second
+  projector still lights the screen there.
+- **18b-7. Light through a film, not the whole gap (for 20b).** *Shipped with 20b
   (#259) for the dye: the front plate's dye path is the gap less the clear film
   (`gapScale *= 1 − film` in the plate, from the packed view).* The path is the dye's
   amount times the gap (Layer Depth). Once a film of clear liquid sits in the gap
@@ -4188,7 +4192,7 @@ its frame rate live. "Free" means no new passes or texture reads.
   colour (the lamp through the clear gap, `through` in the bubbles) is still the old
   tint-towards-white estimate, read off the ring round it (which is on the lamp
   ground now).
-- **18b-7. What `npm run lamp` does not read yet.** The closeup's and the particles'
+- **18b-8. What `npm run lamp` does not read yet.** The closeup's and the particles'
   decode (`decodeFluidRaw`, which has no Colour Body factor where `decodeFluid` has
   one), the spectral branch, the chemistry as filters, and the bubbles' rim and lens on
   the lamp. And the Second Lamp is not held to the lamp as the hot-spot is: near its

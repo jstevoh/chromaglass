@@ -214,8 +214,8 @@ try {
     */
     await lab.create(128); lab.dye(0.4, 0.5, 0.15, BLUE, 0.5); lab.flush(); await lab.step(1);
     out.offOne = await r({ lampGround: 1 });
-    out.offTwo = await r({ lampGround: 1, layerCount: 2, blendMode: 'multiply' }, { backPlate: true, backRotation: Math.PI });
-    out.offTwoAdd = await r({ lampGround: 1, layerCount: 2, blendMode: 'screen' }, { backPlate: true, backRotation: Math.PI });
+    out.offTwo = await r({ lampGround: 1, layerCount: 2 }, { backPlate: true, backRotation: Math.PI });
+    out.offTwoAdd = await r({ lampGround: 1, layerCount: 2, twoProjectors: 1 }, { backPlate: true, backRotation: Math.PI });
 
     // 6. The photograph.
     // With both lamps up: the hot-spots are the one lamp-ground line the
@@ -380,7 +380,8 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
     if (tH < 0.7 && tT > 0.95) front++; else if (tT < 0.7 && tH > 0.95) back++; else if (tH < 0.7 && tT < 0.7) both++;
     for (let c = 0; c < 3; c++) {
       err += Math.abs(got[c] - lampHere[c] * tHere[c] * tThere[c]);
-      errAdd += Math.abs(gotAdd[c] - (lampHere[c] * tHere[c] + lampThere[c] * tThere[c]) * 0.5);
+      let expected = (lampHere[c] * tHere[c] + lampHere[c] * tThere[c]) * 0.5;
+      errAdd += Math.abs(gotAdd[c] - expected);
       n++;
     }
   }
@@ -390,6 +391,7 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
   check('two projectors add their light: each filtered by its own plate, from a lamp dimmed to half',
     n > 0 && errAdd / n <= 2,
     `mean error ${f2(errAdd / Math.max(1, n))} over ${n} readings`);
+
 }
 
 // ── 6. Halfway ───────────────────────────────────────────────────────

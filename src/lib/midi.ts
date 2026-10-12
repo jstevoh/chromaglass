@@ -456,6 +456,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
   { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
   { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3, curve: 3 },
+  { key: 'twoProjectors',   label: 'Two Projectors',   min: 0, max: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },

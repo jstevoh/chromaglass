@@ -591,6 +591,7 @@ export interface VisualizerSettings {
   // Mixer
   layerCount: number;
   blendMode: BlendMode;
+  twoProjectors: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -1004,6 +1005,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
+  twoProjectors: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second

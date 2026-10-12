@@ -2229,7 +2229,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     only: divided at the hot-spot instead, the paint's half of a fader was
     divided too, and halfway was not half of each (3 bytes off).
   */
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * mix(1.0, 0.5, f32(U.layerCount > 1 && U.blendMode <= 1)); }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * mix(1.0, 0.5, f32(U.layerCount > 1 && U.twoProjectors > 0.5)); }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2928,14 +2928,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
-        On a lamp ground, when the look's Blend Mode is 'screen' or 'lighter', the
-        plates are separate projectors: their light adds on the screen (each filtered
-        by its own plate, from a lamp dimmed to half). For other modes ('multiply'),
-        they are stacked dishes on one lamp: a second filter in the light's path.
-        A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
+        On a lamp ground, when Two Projectors is on, the plates are separate projectors:
+        their light adds on the screen (each filtered by its own plate, from a lamp
+        dimmed to half). For other looks, they are stacked dishes on one lamp: a second
+        filter in the light's path.
+        A mixer row's own blend, above, still lays it as it did: PLAN 18b-6.
       */
       if (U.lampGround > 0.001) {
-        if (U.blendMode <= 1) {
+        if (U.twoProjectors > 0.5 && U.layerCount > 1) {
           let lampBgHere = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * 0.5;
           let lit1 = lampBgHere * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
           outColor = mix(painted1, outColor + lit1, U.lampGround);
