@@ -65,7 +65,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 |---|---|
 | anything | `npm run lint` (typecheck) |
 | `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
-| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), and a `look` render |
+| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
 | Preview's copy (`drafting`, `wallRef` in `App.tsx`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
@@ -93,7 +93,7 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
 deploy:
 
-- **Measure** (ubuntu, three parts side by side, ~5 min each): typecheck, every script
+- **Measure** (ubuntu, four parts side by side, 4–12 min each): typecheck, every script
   parsing, the shaders compiling on SwiftShader, and the node harnesses.
 - **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
   `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts

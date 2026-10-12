@@ -24,6 +24,9 @@ import { readFileSync } from 'node:fs';
  * a control drawn by a shader without the thing it asks about (`npm run
  * filmlook` draws the film with the rainbow alone): the plugins are
  * esbuild's, and the tag names the bundle so it is never the plain lab's.
+ * `js` is the bundle's text, for a check to see that its control really is
+ * another program (`npm run lampzero`: a plugin whose filter matched no file
+ * would hand back the plain shader, and two plain labs agree on any GPU).
  */
 export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], tag = '', software = false } = {}) {
   const base = entry === 'scripts/lab-entry.ts' ? 'lab-page'
@@ -54,5 +57,5 @@ export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], ta
   page.on('pageerror', (e) => console.log('  [lab error]', e.message.slice(0, 300)));
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => window.labReady === true);
-  return { page, close: async () => { await browser.close(); server.close(); } };
+  return { page, js, close: async () => { await browser.close(); server.close(); } };
 }

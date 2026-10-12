@@ -2,7 +2,7 @@
 /**
  * Lamp Ground 0 is the plate before the lamp (PLAN.md 18b).
  *
- *   npm run lampzero     (the lab on the CPU rasteriser; CI runs it in Measure)
+ *   npm run lampzero     (the lab on the CPU rasteriser; CI runs it as Measure's `lab` part)
  *
  * The lamp's first claim: at 0 the picture is the plate as it was before
  * the lamp, byte for byte, every look. Asked through the real plate shader
@@ -14,6 +14,15 @@
  * ground not reaching it, and none is black. The lamp's physics (a clear
  * pool, Beer and Lambert, a gel, two plates, the fade, the photograph) are
  * `npm run lamp`, on whatever GPU runs it.
+ *
+ * Two lines hold the measurement itself. Both labs drew on the CPU
+ * rasteriser, read back from the adapter rather than trusted from the
+ * flags: on a Mac the lab asks Chromium for SwiftShader's adapter, and one
+ * that answered with Metal would make this the old check, with its old
+ * flip. And the control's bundle is another program from the plain lab's:
+ * the control's edits throw when a line has moved, but a plugin whose
+ * filter matched no file (plate.ts renamed) would edit nothing, and two
+ * plain labs agree byte for byte on any GPU.
  *
  * Why this one runs on the CPU rasteriser and not the Mac's GPU, where it
  * was until 2026-10-11: it compares two compiled programs, and a GPU's
@@ -49,9 +58,9 @@ const check = (name, ok, detail = '') => {
 
 const S = 192;
 
-/** Every look on the pools plate, at its own settings with Lamp Ground 0:
- *  [id, its own Lamp Ground, pixels at 0, pixels as shipped (only when that
- *  is not 0)]. */
+/** Who drew, and every look on the pools plate, at its own settings with
+ *  Lamp Ground 0: [id, its own Lamp Ground, pixels at 0, pixels as shipped
+ *  (only when that is not 0)]. */
 const everyLook = (lab) => lab.page.evaluate(async ([pools, S]) => {
   await lab.create(128);
   for (const p of pools) lab.dye(...p);
@@ -64,15 +73,29 @@ const everyLook = (lab) => lab.page.evaluate(async ([pools, S]) => {
     const lg = s.lampGround ?? 0;
     out.push([id, lg, await lab.render(S, { ...s, lampGround: 0 }, cam), lg > 0 ? await lab.render(S, s, cam) : null]);
   }
-  return out;
+  return { drew: lab.adapter(), looks: out };
 }, [POOLS, S]);
 
 const now = await openLab({ software: true });
-let looksNow;
-try { looksNow = await everyLook(now); } finally { await now.close(); }
+let drewNow, looksNow;
+try { ({ drew: drewNow, looks: looksNow } = await everyLook(now)); } finally { await now.close(); }
 const then = await openLab({ software: true, plugins: [BEFORE_LAMP], tag: 'before-lamp' });
-let looksThen;
-try { looksThen = await everyLook(then); } finally { await then.close(); }
+let drewThen, looksThen;
+try { ({ drew: drewThen, looks: looksThen } = await everyLook(then)); } finally { await then.close(); }
+
+// SwiftShader reports itself as google / swiftshader (read 2026-10-12 on
+// software WebGPU); a Mac's Metal as Apple's. A lab that drew on anything
+// but the rasteriser fails here, loudly, whatever the bytes said.
+const who = (d) => d ? `${d.vendor} ${d.architecture}`.trim() : 'no adapter';
+const cpu = (d) => d?.architecture === 'swiftshader';
+check('both labs drew on the CPU rasteriser', cpu(drewNow) && cpu(drewThen), `${who(drewNow)}, ${who(drewThen)}`);
+// The plain lab reads its ground in the lamp's own lines, which the control
+// has taken out; the control keeps only the uncalled composites' reads (11
+// against 6 on 2026-10-12). Equal bundles would be the plugin's filter
+// matching nothing.
+const reads = (js) => js.match(/U\.lampGround/g)?.length ?? 0;
+check('the control is another program: the plain lab reads Lamp Ground where the control does not',
+  now.js !== then.js && reads(now.js) > reads(then.js), `${reads(now.js)} reads against ${reads(then.js)}`);
 
 const litOf = (px) => { let t = 0; for (let k = 0; k < px.length; k += 4) t += px[k] + px[k + 1] + px[k + 2]; return t / (px.length / 4); };
 const rows = looksNow.map(([id, lg, a, own], i) => {

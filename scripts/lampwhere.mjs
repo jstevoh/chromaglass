@@ -41,7 +41,7 @@ const renderAll = (lab) => lab.page.evaluate(async ([id, pools, S]) => {
     const back = (v.layerCount ?? 1) > 1;
     return lab.render(S, v, { backPlate: back, backRotation: back ? 1.1 : 0 });
   };
-  const out = { base: await draw(s), again: await draw(s), variants: {} };
+  const out = { drew: lab.adapter(), base: await draw(s), again: await draw(s), variants: {} };
   const offs = [];
   for (const [k, v] of Object.entries(s)) {
     if (k === 'lampGround') continue;
@@ -74,7 +74,9 @@ const differing = (p, q) => {
 const worst = (d) => d.reduce((m, r) => Math.max(m, r[2]), 0);
 const f = (d) => `worst ${worst(d)}, ${d.length} pixel${d.length === 1 ? '' : 's'} differ`;
 
+const who = (d) => d ? `${d.vendor} ${d.architecture}`.trim() : 'no adapter';
 console.log(`${id} at Lamp Ground 0, ${S}x${S}, on the lamp check's plate`);
+console.log(`  drawn by ${who(a.drew)} (the plain lab) and ${who(b.drew)} (before-lamp)`);
 console.log(`  the plain lab twice: ${f(differing(a.base, a.again))}`);
 console.log(`  the before-lamp lab twice: ${f(differing(b.base, b.again))}`);
 const base = differing(a.base, b.base);
