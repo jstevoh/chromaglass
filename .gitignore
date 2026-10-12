@@ -28,6 +28,8 @@ coverage/
 
 # Unminified build used for profiling
 dist-dev/
+dist-signin/
+dist-signin-off/
 
 # Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
 scratch/
