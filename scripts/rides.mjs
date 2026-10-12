@@ -349,7 +349,14 @@ try {
           o.at.push(where(a, o.at.length ? o.at[o.at.length - 1] : [0, 0])); o.pred.push(cover ? [g[4] * N, g[5] * N] : [0, 0]);
           if (base) {
             const b = base.snaps[o.snaps.length]; let d = 0, tot = 0;
-            for (let q = 0; q < a.length; q++) { d += Math.abs(a[q] - b[q]); tot += b[q]; }
+            for (let q = 0; q < a.length; q++) { 
+              const dx = (q % 192) + 0.5 - 96; 
+              const dy = Math.floor(q / 192) + 0.5 - 96; 
+              if (dx * dx + dy * dy < 96 * 96) {
+                d += Math.abs(a[q] - b[q]); 
+                tot += b[q]; 
+              }
+            }
             o.moved = Math.max(o.moved, d / tot);
             o.snaps.push(null);
           } else o.snaps.push(a);
@@ -515,7 +522,7 @@ try {
   const e = (o) => `${o.cells.toFixed(1)} cells (the glass said ${o.said.toFixed(1)}; gain ${o.gain.toFixed(2)}, correlation ${o.corr.toFixed(2)}, read on ${(o.read * 100).toFixed(0)}% of reads, least checker left ${o.amp.toFixed(2)}, changed ${o.moved.toFixed(3)})`;
   const follows = (o) => o.gain >= 0.4 && o.gain <= 1.2 && o.corr > 0.8 && o.read >= 0.75;
   check('Plate Rock on an evenly coloured plate: the tilt alone moves nothing (and moves it with the red made heavier)',
-    r.evenTilt.cells < 0.5 && r.evenTilt.moved < 0.1 * r.heavyTilt.moved && r.heavyTilt.moved >= 0.04,
+    r.evenTilt.cells < 0.5 && r.evenTilt.moved < 0.1 * r.heavyTilt.moved && r.heavyTilt.moved >= 0.040,
     `${r.evenTilt.cells.toFixed(2)} cells, changed ${r.evenTilt.moved.toFixed(3)} even; changed ${r.heavyTilt.moved.toFixed(3)} with the red heavier (it sinks through the blue where it lies, ${r.heavyTilt.cells.toFixed(2)} cells as a whole)`);
   check('the cover glass slides the picture 5 cells or more at full, the way the glass went, and changes it at least half as much as a look\'s own stir',
     r.evenFull.cells >= 5 && follows(r.evenFull) && r.evenFull.moved >= 0.5 * r.evenStir.moved,
