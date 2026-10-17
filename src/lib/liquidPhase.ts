@@ -65,6 +65,7 @@ export interface LiquidDeposit {
   density?: number;
   tension?: number;
   index?: number;
+  scatter?: number;
 }
 
 /**

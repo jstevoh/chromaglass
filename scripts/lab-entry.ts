@@ -62,6 +62,7 @@ type Lab = {
 };
 let lab: Lab | null = null;
 
+let lastDrop: { n: number; h: Float32Array } | null = null;
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
@@ -561,6 +562,8 @@ const api = {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
     const plate = new WebGPUPlate(device, 'rgba8unorm');
+    // The closeup's drop kernels, built behind the show in the app; here before the one frame drawn (PLAN §29a).
+    await plate.drop.prepare();
     const zoom = cam.zoom ?? 1;
     // The beads' mask, as the app uploads it: a BeadField's render(), square
     // for rings and twice as wide for drops.
@@ -598,7 +601,7 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view };
+    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
@@ -642,9 +645,13 @@ const api = {
       buf.unmap(); buf.destroy(); tex.destroy();
       pictures[kind] = Array.from(out);
     }
+    // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
+    lastDrop = await plate.drop.read();
     plate.dispose();
     return cam.sources ? pictures : pictures.wall;
   },
+  /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
+  dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
 };
 (window as unknown as { lab: typeof api }).lab = api;
 (window as unknown as { labReady: boolean }).labReady = true;

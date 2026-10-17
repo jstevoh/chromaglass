@@ -122,6 +122,8 @@ export type RemoteMessage =
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
   | { type: 'mirrors'; count: number }
+  /** Relay → display: how many phones (controllers) are connected. */
+  | { type: 'controllers'; count: number }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**
@@ -265,3 +267,74 @@ export async function relayInfo(): Promise<RelayInfo | null> {
     return null;
   }
 }
+
+export type ParsedRemoteGesture =
+  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string; wall?: boolean }
+  | { type: 'press'; x: number; y: number; layer: number; amount?: number; wall?: boolean }
+  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number; wall?: boolean }
+  | { type: 'tilt'; x: number; y: number };
+
+/**
+ * Pure parser for incoming remote gestures and tilt.
+ *
+ * Drops malformed gestures (non-finite coordinates, invalid color strings)
+ * and clamps tilt to [-1, 1]. Returns null if the gesture is malformed or
+ * of an unknown gesture type.
+ */
+export function parseRemoteGesture(raw: unknown): ParsedRemoteGesture | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const msg = raw as Record<string, unknown>;
+  const type = msg.type;
+  if (typeof type !== 'string') return null;
+
+  if (type === 'tilt') {
+    if (typeof msg.x !== 'number' || !Number.isFinite(msg.x)) return null;
+    if (typeof msg.y !== 'number' || !Number.isFinite(msg.y)) return null;
+    return {
+      type: 'tilt',
+      x: Math.max(-1, Math.min(1, msg.x)),
+      y: Math.max(-1, Math.min(1, msg.y)),
+    };
+  }
+
+  if (type !== 'blow' && type !== 'drop' && type !== 'press' && type !== 'finger' && type !== 'spin') {
+    return null;
+  }
+
+  if (typeof msg.x !== 'number' || !Number.isFinite(msg.x)) return null;
+  if (typeof msg.y !== 'number' || !Number.isFinite(msg.y)) return null;
+
+  const layer = typeof msg.layer === 'number' && Number.isFinite(msg.layer) ? msg.layer : 0;
+  const amount = typeof msg.amount === 'number' && Number.isFinite(msg.amount) ? msg.amount : undefined;
+  const wall = msg.wall === true ? true : undefined;
+
+  switch (type) {
+    case 'blow': {
+      const dx = typeof msg.dx === 'number' && Number.isFinite(msg.dx) ? msg.dx : undefined;
+      const dy = typeof msg.dy === 'number' && Number.isFinite(msg.dy) ? msg.dy : undefined;
+      return { type: 'blow', x: msg.x, y: msg.y, layer, amount, dx, dy, wall };
+    }
+    case 'drop': {
+      if (msg.color !== undefined && (typeof msg.color !== 'string' || msg.color.length > 9)) {
+        return null;
+      }
+      const color = typeof msg.color === 'string' ? msg.color : undefined;
+      return { type: 'drop', x: msg.x, y: msg.y, layer, amount, color, wall };
+    }
+    case 'press': {
+      return { type: 'press', x: msg.x, y: msg.y, layer, amount, wall };
+    }
+    case 'finger': {
+      const dx = typeof msg.dx === 'number' && Number.isFinite(msg.dx) ? msg.dx : undefined;
+      const dy = typeof msg.dy === 'number' && Number.isFinite(msg.dy) ? msg.dy : undefined;
+      return { type: 'finger', x: msg.x, y: msg.y, layer, amount, dx, dy, wall };
+    }
+    case 'spin': {
+      const id = typeof msg.id === 'number' && Number.isInteger(msg.id) ? msg.id : undefined;
+      return { type: 'spin', x: msg.x, y: msg.y, layer, amount, id, wall };
+    }
+  }
+}
+

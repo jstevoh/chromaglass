@@ -22,8 +22,10 @@
  * whole app per second to move one bar by a pixel.
  *
  * So the ride keeps its own value. Writes are answered instantly and truthfully
- * from here, and handed to React once a frame — which is as often as a number
- * can be looked at anyway.
+ * from here. The plate reads them here on every frame (`lay`), and React, whose
+ * only job left is the number on the desk, is handed them ten times a second.
+ * Once a frame was the first answer, and it still rendered the whole app sixty
+ * times a second while a fader moved (PLAN.md §14f).
  *
  * The part that needs care is knowing when to stop believing itself. The
  * shadow must survive a render that has not caught up yet, or the lateness is
@@ -36,15 +38,74 @@
 /** What the app's settings look like from here: names to numbers. */
 type Live = Record<string, unknown>;
 
+/**
+ * One reader's last answer from `lay`, so a frame whose base and ride have not
+ * changed is handed the same object again rather than a new copy.
+ */
+export interface RideSlot { base: Live | null; version: number; out: Live | null }
+export const rideSlot = (): RideSlot => ({ base: null, version: -1, out: null });
+
 export class SettingRide {
   /** What the fader last asked for. The truth, until React catches up. */
   private shadow = new Map<string, number>();
   /** What has actually been handed to React, for spotting other people's edits. */
   private flushed = new Map<string, number>();
+  /** Bumped whenever the shadow changes, for `lay`'s reuse. */
+  private version = 0;
 
   /** The fader moved. */
   write(key: string, value: number): void {
+    if (this.shadow.get(key) === value) return;
     this.shadow.set(key, value);
+    this.version++;
+  }
+
+  /** Is this setting under a fader the app has not finished hearing from? */
+  holds(key: string): boolean {
+    return this.shadow.has(key);
+  }
+
+  /**
+   * What a frame should draw: `base` with every ridden value it has not yet
+   * caught up with laid over it (PLAN.md §14f).
+   *
+   * React is told about a ride ten times a second, so a plate that drew only
+   * what React rendered would move in tenth-of-a-second steps under a fader.
+   * The plate asks here instead, at the top of every frame. #348 tried the
+   * same split and took it back for three faults, and each is answered here:
+   *
+   * - **It never stopped.** The shadow outlives the flush by design (soft
+   *   takeover reads it), so laying the whole shadow over every frame copied
+   *   the settings sixty times a second forever after one touch. A key is laid
+   *   only while `base` still disagrees with it, and once React has rendered
+   *   every ridden value this returns `base` itself: no copy, no allocation.
+   * - **It sat over the identified track's overrides.** The fader writes the
+   *   look's setting, and a track that overrides the same key wins in what is
+   *   drawn (App's `effectiveSettings`); a ride laid over the drawn settings
+   *   undid that for good. `keep` is the caller's say over which keys this
+   *   reader may take, and App leaves out what the overrides hold.
+   * - **Half the loop still read the old object.** The frame loop reads its
+   *   settings in more places than the fold; the caller puts what this
+   *   returns where all of them read, once, at the top of the frame.
+   *
+   * The copy, when there is one, is made once per change of the ride or of
+   * `base` (kept in `slot`), not once per frame: a new object only when a
+   * value in it is new, which is also what anything comparing settings by
+   * identity expects.
+   */
+  lay(base: Live, keep: (key: string) => boolean, slot: RideSlot): Live {
+    let behind = false;
+    for (const [k, v] of this.shadow) {
+      if (base[k] !== v && keep(k)) { behind = true; break; }
+    }
+    if (!behind) return base;
+    if (slot.out && slot.base === base && slot.version === this.version) return slot.out;
+    const out: Live = { ...base };
+    for (const [k, v] of this.shadow) if (keep(k)) out[k] = v;
+    slot.base = base;
+    slot.version = this.version;
+    slot.out = out;
+    return out;
   }
 
   /** Where the setting is, as the fader should understand it. */
@@ -96,6 +157,7 @@ export class SettingRide {
       if (live[k] === undefined) continue;
       this.flushed.delete(k);
       this.shadow.delete(k);
+      this.version++;
     }
   }
 
@@ -103,5 +165,6 @@ export class SettingRide {
   reset(): void {
     this.shadow.clear();
     this.flushed.clear();
+    this.version++;
   }
 }

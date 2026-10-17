@@ -135,7 +135,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'hello']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello']);
 
 wss.on('connection', (socket) => {
   roles.set(socket, 'unknown');
@@ -168,10 +168,19 @@ wss.on('connection', (socket) => {
       console.log(`  ${role} connected (${count} now)`);
       // A joining phone needs the current state before it can show anything;
       // a joining network display needs the show itself.
-      if (role === 'controller') broadcastTo('display', JSON.stringify({ type: 'request-state' }));
+      if (role === 'controller') {
+        broadcastTo('display', JSON.stringify({ type: 'request-state' }));
+        broadcastTo('display', JSON.stringify({ type: 'controllers', count }));
+      }
       if (role === 'mirror') {
         broadcastTo('display', JSON.stringify({ type: 'request-cast' }));
         broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
+      }
+      if (role === 'display') {
+        const phoneCount = [...wss.clients].filter(c => roles.get(c) === 'controller').length;
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify({ type: 'controllers', count: phoneCount }));
+        }
       }
       return;
     }
@@ -202,6 +211,10 @@ wss.on('connection', (socket) => {
   socket.on('close', () => {
     const role = roles.get(socket);
     if (role && role !== 'unknown') console.log(`  ${role} disconnected`);
+    if (role === 'controller') {
+      const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'controller').length;
+      broadcastTo('display', JSON.stringify({ type: 'controllers', count }));
+    }
     if (role === 'mirror') {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));

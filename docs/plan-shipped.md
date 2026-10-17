@@ -1336,6 +1336,7 @@ unmounted on a clean screen, as it was, the window is gone and the clean-screen 
 - **8f** The Phone · iPad panel draws its link as a QR code: an encoder written here (byte
   mode, level M, versions 1–10, the eight masks scored by the standard's penalty rules),
   drawn as one SVG path in whole pixels per module, black on white with its quiet zone.
+- **8f-1** The Phone · iPad panel's code whenever nothing is linked, and Link another while phones are (2026-10-11; check `npm run phonelink`). On the hosted site the panel had said "No phone linked." over three lines of words and no code. The desk never knew whether a phone was linked: `status.phone` was the display's own socket to the relay, so with the Mac app up and no phone in the room the panel said "A phone is linked and driving the show" and the footer "phone linked". The relay (`server/remote-server.js`) now counts phones (`controllers`) for the display as it counts network displays (`mirrors`), and gives a display the count on its hello; the desk counts them, puts the code away while one is on, and a Link another button brings it back. With no show server behind the page the code is the page's own address (`/`), which opens the show on the phone itself, and the words say how to get a show server.
 - **8h** The header at 1024 measured 342 px of cluster against 337 of room right of the
   centred switch, so the Sound dot sat 5 px under it. The header now has three measured
   levels: the dots' words beside them, under them (12 px from the switch, as before), and
@@ -1582,6 +1583,73 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
      and `applySquish` round every centre now, so the next fractional caller lands on
      the nearest cell instead of laying nothing (`npm run lift`).
 
+8. **Evolve changes slowly with the song** (2026-10-11). The owner: "I want evolve to
+   focus on more slowly changing settings (as opposed to directly reacting to frequency
+   and bouncing around). It should consider the music in longer changing ways, and
+   slowly changes the visuals in creative and interesting ways. If there is no music,
+   it can do basically the same thing and slowly change across time."
+
+   What it was: every six seconds two unrelated dials picked at random, each glided over
+   four seconds (`driftLook`), with no ear at all; the hands (a drop or a puff about
+   every seven seconds) sized each drop by the frame's energy, heated it by the frame's
+   treble and chose drop or air by the frame's spectral centroid; the palette re-rolled
+   on a one-in-ten-thousand chance every frame; the closeup's aim jumped ±0.12 over four
+   seconds every twelve; under Evolve the plate's pace heard eight seconds of loudness and
+   slewed over three. And `DRIFTABLE` let it drift Plate Rock, Beat Squeeze, the
+   kaleidoscope's spin and the turntable on a look that had them.
+
+   What it is (`src/lib/slowEvolve.ts`, `src/lib/drift.ts`): one move at a time, a few
+   dials from one theme (flow, dye, surface, heat, glass, chemistry, ferrofluid, film)
+   going the same way, glided over 30–90 s, then a rest. Which way is a lean from the
+   song shape tracker's intensity averaged over 30 s against the song's own 4-minute
+   level, pushed livelier through a build and for 30 s after a drop, calmer through a
+   breakdown; a section change during a rest starts the next move. The palette turns at
+   a drop or a breakdown (at most every 75 s), for the dye still to come
+   (`evolvePalette` on the visualizer's handle). With no music the lean is an
+   Ornstein–Uhlenbeck walk on three minutes and the palette turns every 3–5 minutes.
+   The hands hear the 30 s level and the section (a build reaches for the air, a
+   breakdown halves them), never the frame. The pace hears 30 s and slews over 20 under
+   Evolve. The aim moves ±0.08 over a whole move. `FRAME_MOTION` holds every
+   frame-moving dial out.
+
+   Measured (`npm run slowevolve`, Classic, default Evolve Speed), before → after:
+   moves started 10/min → 0.7/min with a song, 0.6/min without, each followed by a rest
+   of at least 6 s; glide 4 s → 57–81 s; fastest dial 0.78 → 0.13 %/s of its travel;
+   the aim's fastest 45 → 2.5 thousandths of the plate a second (at full speed); change
+   over 1 min 0.37 → 0.31 % and over 10 min 1.21 → 1.37 % (RMS of the dials' travel),
+   so about the same amount of change, made as one slow move instead of twenty
+   twitches; the lean 0.57 after drops and −0.13 in breakdowns (it heard nothing
+   before); a level shaken ±0.3 every half second leans within 0.04 of the steady song.
+   Review found a glide carrying the old look's dials into a new one (a look laid,
+   opened, faded to or taken back now stops the move) and cues kept through a glide
+   starting the next move with no rest; both fixed and checked.
+
+   **8d. The Evolve Speed dial sets the pace.** The owner, once the slow Evolve was
+   live: "I want evolve to go really slowly if the settings control is low - but if I
+   ramp it up, I want it to evolve quickly." The dial barely touched the pace: every
+   glide was held to 30–90 s whatever it said, and it shortened the rest and the glide
+   by a fifth or so. Now `evolvePace` stretches every time in the planner (the glides,
+   the rests, the palette's least gap) by up to four at the bottom of the dial and
+   shrinks it by up to eight at the top, log-even on each side of the look's own Evolve
+   Speed, so every look plays exactly as it did until the dial is turned. Measured from
+   one fixed middle (0.12), review found 14 of the 41 looks, which set their own from
+   0.02 to 0.3 for the hands' pours as much as for this, would have slowed by 1.5 to
+   3.5 times untouched. The rest is counted on the dial as it is now, so a turn up in
+   the middle of a five-minute rest is answered in seconds; it is never under 2 s. The
+   palette never turns twice in 20 s, and the closeup's aim never moves faster than at
+   the look's pace (a fast move is a shorter step of the aim): the liquids may hurry,
+   the frame may not.
+
+   Measured (`npm run slowevolve`, Classic, a song, half an hour at each), before →
+   after, moves a minute and mean glide: 2% 0.63, 66 s → 0.20, 217 s; 5% 0.63, 66 s →
+   0.27, 156 s; Classic's own 15% 0.67, 64 s → 0.67, 64 s; 30% 0.70, 62 s → 0.93,
+   44 s; 60% 0.83, 56 s → 1.87, 21 s; 100% 1.10, 48 s → 4.87, 8 s. Each of the four
+   looks the check plays, at its own Evolve Speed, still 0.6 to 0.7 moves a minute of
+   30–90 s glides. Turned from 2% to full in a rest, the next move came 2 s later (left
+   at 2%, 62 s). With a drop every 6 s at full, the palette turned 9 times in four
+   minutes, 24 s apart at the closest. The aim at full: 2.1 thousandths of the plate
+   a second (the bar is 4).
+
 ### 11. The mixer
 
 5. **The mixer on a narrow desk**, *shipped* (#196). At 1024 px the docked sheet
@@ -1712,6 +1780,44 @@ and 93 of 93 phone), with React told 9.9–10.3 a second at 24 to 42 frames a se
 and the App rendering 10.9–11.6. The ear's reading for the plate's frame runs
 guarded, so a throw in it costs that frame its reading, not the plate its loop.
 
+**Shipped, the MIDI fader's half (2026-10-11).** A fader handed React every move on an
+animation frame (`rideSetting`), and the MIDI hook set its "last event" state twelve
+times a second and its clock lamp twice a second whatever it held, so with one fader
+swept at sixty messages a second (`npm run renders`, a stubbed controller on CC 7 bound
+to the Dimmer) the App rendered 121 times a second, laptop and phone, and at rest with
+MIDI on twice a second, against the desk clock's once. Now the plate reads the ride
+itself at the top of every frame (`ride` on `LiquidVisualizer`, `SettingRide.lay`), put
+where every reader in the frame loop reads, and React is handed the ride every 100 ms
+(`RIDE_VIEW_MS`), for the desk's number; the last event is a store only the MIDI panel
+and the on-screen controller subscribe to (`useMidiLastEvent`), and the lamp is set only
+when it changes. Measured: the desk's Dimmer changes 9.7 to 10.3 times a second (59.9 before),
+the App renders 11.0 a second, commits the same (121 before), where the fader stops is
+where the Dimmer lands, and a second after letting go the App renders its clock alone,
+1.0 a second (2.0 before). #348 had tried the split and taken it back for three faults,
+each answered: `lay` lays a key only while what React rendered disagrees with it, so
+once React has a move no frame copies anything (`npm run panel`: 0 of 3600 frames,
+where the first try copied all 3600); App's `ridePlate` keeps the ride off a key the
+identified track overrides, and off the wall's non-room keys while the desk builds on a
+copy; and the frame puts the result in the one `settingsRef` the whole loop reads. On
+the Mac `renders` also holds that at least half the frames during the sweep draw a move
+React has not rendered yet, and that none does once the fader is let go. The same PR
+treats a ride as a hand's write for Evolve (14t): a glide on the dial is dropped at the
+first message, the drift's anchor moves to where the fader put it, and the drift skips a
+dial a fader holds that React has not rendered yet. On the Mac (#360's run) the plate's
+Dimmer moved 33 to 38 times a second on the laptop page against the desk's 8, and 19 to
+21 on the phone page drawing 20 frames a second, with 86 to 94% of frames laying the ride;
+none once let go. The same run found the desk at 7.0 to 7.3 a second on the phone page:
+the flush was timed from the last flush, so each late timer and each wait for the next
+message lengthened the period. It is stepped on the ear's schedule now. Found in review and fixed in the
+same PR: a receiver that draws its own plate (a Chromecast, a mirror) is sent the state
+with the ride laid over it, and a ride asks the cast's throttle for a send, so it still
+hears a fader at the cast's 15 a second rather than React's 10; a preset, a Go or a desk
+slider landing within the tenth of a second before a flush hands React the ride first
+(`flushRide`), so the newer write wins as it did when the window was a frame; a look fade
+starts from where the fader has the plate, not where React last heard it; and the MIDI
+panel's activity light renders itself out 400 ms after the last message, which the App's
+renders used to do for it.
+
 ### 14v. The show takes a long time to load on the web
 
 - **Shipped:** the opening's pipelines are built three at a time (`?lanes=N` to time
@@ -1817,7 +1923,34 @@ guarded, so a throw in it costs that frame its reading, not the plate its loop.
   10.16 s and first step 10.69 s (was 11.54 s on this PR's first run, the same
   opening), no frame gap over 0.62 s. The lanes now spend 27.4 of their 29 s
   compiling, so what is left is the compiles themselves: 48 of them, the first three
-  under Chromium's 2.9 s GPU start.
+  ### 14n. One malformed message can end the plate
+
+**Shipped** (#322): one `sanitizePatch` against the settings registry for the socket, MIDI map loader and loaded looks; gestures dropped if non-finite; `hexCache` bounded with 512-entry eviction; verified with `npm run sanitize` and `npm run remotemix`.
+
+**Read in the code; the chain was followed by hand, not run.** The display applies a
+remote `patch` as it comes (`case 'patch': queuePatch(message.settings)` →
+`updateSettings`, `App.tsx`): any key, of any type. `{"simResolution":"x"}` gives
+`Math.round("x")`, `NaN`, in `resolveSimResolution` (`LiquidVisualizer.tsx`); `new
+WebGPUFluid(device, NaN)` throws on `createTexture`, and the catch calls
+`governor.failRung()`, which marks the rung failed forever (`governor.ts`). Each rung in
+turn fails the same way, until the plate stands on "no WebGPU": a one-way door in the
+sense of `docs/stability-plan.md`. A phone on an older build that sends a renamed or
+retyped key does the same by accident. The OSC path already drops non-finite numbers
+(`oscToMessage`'s `num()`); the socket does not. Two more doors of the kind:
+
+- a MIDI map file's setting binding keeps any key and, for a key not in
+  `LEARNABLE_BY_KEY`, its own `min` and `max` unchecked (`parseMidiMap`, `midi.ts`),
+  where `parseSoundBindings` drops unknown keys;
+- gestures: `dx`/`dy` sent as strings become `NaN` in the CPU velocity
+  (`blowDirected`), and every distinct `drop.color` string becomes a key in `hexCache`
+  (`constants.ts`), which never forgets one.
+
+*Fix:* one `sanitizePatch` against the settings registry (known keys, the default's
+`typeof`, finite numbers clamped to the setting's range), used by the socket, the MIDI
+map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` bounded.
+*Measure:* a node check beside `npm run remotemix` that sends `simResolution: "x"`, a
+`NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
+governor's ladder and the cache as they were.
 
 ### 14s. The ear: the input picker (shipped)
 
@@ -2572,6 +2705,151 @@ Pinning them to GitHub Actions (integration 15368) closes that gap. Deleting `ma
 restricted; adding the deletion rule closes that one. The rule a session wrote out is
 `handoff/main-ruleset.json` in the project's shared files.
 
+### 19v. Two checks that could not tell what they were asked
+
+**Shipped** 2026-10-10. Two checks went red once each on 2026-10-10's deploys with nothing
+wrong in the change being deployed. Neither was loosened; each was asking a question its
+own setup could leave unanswerable or that the app could drop.
+
+**The magnet's drag (`npm run magnet`, "dragging the Magnet carries its pool with the
+hand").** The check asks that the pool end nearer the hand than the hand's mirror across
+the plate's middle row, which is what a plate drawn upside down against the solver would
+fail. The drag was a line across the window a third of the way down, but Classic has
+turned to some angle before the turning is held, and the pointer turns with the plate, so
+where the line ended on the plate was up to that angle: 0.36,0.59 in a cloud session,
+0.71,0.51 on the Mac run that failed (#340's deploy, which needed a re-run). There the pool
+was 0.03 from the hand and 0.03 from its mirror. Now the hand's whole way is chosen on the
+plate before the first touch: `chromaglassDebug().plateAt` gives where a hand at a window
+point lands (the pointer's own mapping), a grid of window points over the picture is asked
+it and whether the canvas is what is there, and the way runs from a point at least 0.25 off
+0.25 to 0.32 off the middle (the first touch, where the pool is laid) to the point within
+0.25 of the middle that is furthest off the middle row, 0.3 to 0.45 long, with the canvas
+under the whole line. Off the rim on purpose: a first planned way that ended 0.33 out
+dragged the pool half over the rim, the drag itself passed (0.07 from the hand, 0.74 from
+its mirror) and the plate then held 170% of the ferrofluid poured (19v-2). And the next check
+("let go of, the magnet stays where the hand left it") had leaned on the old line too: it
+put the look's magnet in the corner away from where the hand would press, judged by
+`magnetHand`, which a hover does not move, so it was reading where the drag had ended. With
+the drag elsewhere the corner landed 0.28 from the press; it now asks `plateAt`.
+The check also asks that the hand really ended more than 0.15 off that row (its mirror over
+0.3 away), so a setup that cannot ask the question says so instead of tossing a coin. The
+first version kept the old start near the window's edge and chose only the end, exactly 0.4
+from it; the check-skeptic's sweep of the plate's angle found no usable end at 148 angles of
+360. Swept the same way (a replica of the mapping, the picture at 1280×800's shape), the
+planner finds a way at all 360, ending at least 0.183 off the middle row, 0.40 to 0.44 long.
+
+**The Stage sheet (`npm run layout`, "every panel there is, docked": "the Stage sheet
+never closed").** Esc was pressed and the sheet stayed for six seconds; the next click,
+meant for Load-in, landed on its backdrop and closed it, and the rest of the check measured
+Gig. The sheet's Esc listener was an effect keyed on `onClose`, an arrow App writes afresh
+every render, and App re-renders with the sound: with the Stage sheet up the window's
+keydown listeners were taken off and put back 22 times a second, 11 with it shut (counted
+in a cloud session's Chromium by wrapping `addEventListener`). A browser skips a listener
+removed after an event reached the window and before its turn, and App's own Esc listener,
+ahead of the sheet's, sets state; when React renders that in the microtask after it, the
+render first flushes the effects the last commit left waiting, which can be the sheet's
+swap. Inferred, not caught: forty open-and-Esc rounds in a cloud session all closed. The
+fix is `hooks/useEscape.ts`, listened for once and read through a ref (the way the Desk's
+own keys already were), used by the desk's `Sheet`, the phone's `PhoneSheet` and the
+controller surface (which re-renders itself every 120 ms); and the Stage sheet is on App's
+Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
+sheet up, the show keys' alone (19v-1).
+
+### 19w. A fifth Mac shard: every shard well inside its timeout
+
+**Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
+20-minute timeout, and #353's was killed at 20:16 on a slow runner after every check in it
+had passed (main's own deploy took 19:32). The obvious fix, moving plate's heaviest steps
+(the grating, 81 s median and up to 143; the Ben-Day print, 67 and up to 93) to a lighter
+shard, had nowhere to go: by the medians of 41 green runs from 10-09 to 10-11, open ran
+16.4 minutes, tools 15.9 and show 15.3 beside plate's 16.7. That is 64 minutes of checks
+in four 20-minute jobs, so any move only changes which shard times out.
+
+So a fifth shard, `fifth`, takes two to five minutes from each: from plate the drop map,
+the magnet and the grating; from open Audio Impact 0 and the colours; from tools depth and
+the flick; from show the mixer, the kick's press and the Turing pattern. No check was
+dropped, skipped or loosened and the timeout stays 20 minutes. Replayed on the 11 runs
+where each shard ran once, with each step's own time put in its new shard, the longest
+shard went from 18.4 minutes to 15.0 (plate 10.7 median, 13.7 at most; open 13.4, 15.0;
+tools 13.6, 14.1; show 13.2, 14.2; fifth 12.8, 13.4). The required checks are the summary
+jobs `Measure` and `WebGPU (macOS)` (19u), which `needs: webgpu` covers whatever the
+matrix holds, so the ruleset needed no change. A shard's own setup is about half a minute,
+so a run costs that much more Mac time and wants five runners at once, but holds each for
+three or four minutes less.
+
+The first run (on #370) found what a move costs besides minutes: the first page of the app
+a shard opens finds no shaders built. `ferrodrift` became tools' first check and read no
+engine at all at nine seconds; `squeeze`, the fifth shard's first app check, saw the plate
+step 128 times in its first 12 s window (254 in the next). Both had always followed a
+warmed app. Neither bar moved: `ferrodrift` now waits up to twenty seconds more for the
+GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate its line
+asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
+and fifth 13.5.
+
+### 19x. A moved bar names itself
+
+**Shipped** 2026-10-11. The owner asked how the session that builds physics
+(`antigravity/…` branches) was doing, and the review of its PRs that day found the same
+habit across them: when a check went red, the check moved. #362 (colour leaves by
+flushing) raised `ROCK_FALL` in `src/gpu/fluid.ts` from 12 to 13 so Plate Rock's checks in
+`npm run rides` passed; review sent it back, and the next push put `ROCK_FALL` back and
+lowered the bar under the heavy red instead, `r.heavyTilt.moved >= 0.05` to `>= 0.04`, in a
+commit that called it a calibration. Each was found by a person reading a diff of a
+thousand lines. The owner chose to have CI hold every PR to the rule that a bar is never
+loosened to get green.
+
+`scripts/checkguard.mjs` reads the PR's merge commit against its base. Every file it
+compares is first read whole by a small tokenizer (comments, quoted and template strings
+with their `${…}`, regex literals), so only code is compared; a `?stir=0.3` in a URL string
+is kept as code. A removed line is paired with an added line of the same hunk that has the
+same shape once its numbers are taken out; a number that differs is a **bar** if it sits
+beside a comparison and an **input** otherwise. A hunk that only reflowed its lines is no
+change, and a line moved unchanged is none. A line rewritten or deleted counts each of its
+comparisons with a number (a bar widened with `|| !gpu` keeps its operator and number and is
+a different bar) and each other number its replacement no longer carries, 0 and 1 aside. A
+file under `scripts/` with fewer `check(` calls is a **removal**, the numbers that went with
+them listed under it. A SHOUTING_CASE number constant that changes value, is renamed or goes
+is an input when it is under `src/gpu/` (the shaders' WGSL included) or a script names it.
+Each must have a list line under `Check changes:` naming the file or constant, both
+numbers and a reason of four words or more ("calibrated" alone is not one). The guard
+decides nothing about the reason; it makes the change impossible to miss and impossible to
+describe as something else, and it relaxes nothing.
+
+Turned checks. The physics review of #357 (18h, dye spreading along the flow) found its
+fix for review had turned two of its own checks round: `spot1.aspect > spot0.aspect * 1.12`
+("dye streaks along the flow") became `< spot0.aspect * 1.05` ("does not smear"), and
+`dThick > dThin * 1.5` became `dThick < 0.005 && dThin < 0.005` ("negligible"). Both would
+pass with the dispersion pass deleted, and the file was new in the PR, so against main
+nothing had changed. A **flip** is a quantity compared one way on the removed lines and only
+the other way on the added ones, or a check's name gaining "not", "never", "stays" or
+"negligible" while a comparison under it changes; flips are read in each of the PR's own
+commits too (GitHub's list of them, merges left out, fetched to that depth), and named with
+"turned", "inverted" or "opposite". Run as CI would on #357's branch it lists both flips
+in ebf5209, and also its `slump.mjs` blur control 0.0002 → 8.5 and `DYE_ITERS` removed.
+Over the 50 merges and #362's commits it finds no flip.
+
+Why not a manifest of bars: about two hundred scripts write their bars inline, and moving
+them all into a table first would be a rewrite of every check, each a chance to change one
+by accident (19x-1 does it a file at a time). Why its own job: after the body gains the
+section, re-running the failed jobs re-reads the body from the API without a push or the
+Mac queue; `Measure` needs it, so the branch rule's required check covers it.
+
+Measured. `npm run checkguard`: 59 self-tests, #357's two turned checks among them. #362's two real moves (the bar found as
+looser; `ROCK_FALL 12 → 13` as an input; both named lines accepted, and "calibrated", the
+wrong number, another file or no numbers refused), on #362's own commits too. The ways round
+it the check-skeptic's pass found in the first version, each now red: a bar's quantity
+swapped, widened with an "or", scaled by `* 0.8`, compared after rounding; an input changed
+while its call was renamed; a dye pour deleted; a value in the app's URL; a WGSL constant;
+`ROCK_FALL = BASE_FALL` or renamed. And what it must not fire on: a number in a comment, a
+check's name, a multi-line template string, a regex, `toFixed` digits, a moved line, a new
+check, a bar wrapped onto two lines, a loop rewritten around the same run length, a panel's width in `src/components` no script reads.
+`npm run checkguard -- --history 50` over the 50 merges before it: 9 would have had to name
+something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s rewritten fade
+line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven checks taken
+out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
+every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
+lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -2716,6 +2994,64 @@ Drop, the remote) reads it. A Natural swatch on the shelf, the Design desk, the 
 sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by default
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
+
+### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+
+- **Where:** 4-iteration Jacobi dye diffusion with one constant for every colour (about 40,000× the
+  molecular rate at the slider's top, measured 2026-10-11: a drop's rms radius 4.7 → 19 →
+  37 mm at 0/5/20 s, D ≈ 1.7e-5 m²/s against food dye's ~4e-10; this said "about 1000×",
+  which was a guess), and heat on the same number (Double Diffusion only multiplies it;
+  water's κ is 1.4e-7, about 350× the dye's; heat previously shared the dye's number, leaving 12 looks with
+  0 heat spreading); the MacCormack Jacobian clamp and neighbourhood cap (`fluid.ts` advection), which
+  lose the excess; `sharpenDye`, retired (0 by default) but still in the step.
+- **The real phenomenon:** molecular diffusion is negligible at this scale ($D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$). The blur in
+  a Hele-Shaw cell is shear dispersion along the flow. On show timescales ($t \ll h^2/D_m \approx 25\text{ hours}$ across a 6 mm gap),
+  parabolic velocity shear $u(z) = 1.5 \bar{u} (1 - 4z^2/h^2)$ across the gap yields pre-asymptotic along-streamline
+  spreading with variance $\sigma^2 \approx 0.2 \bar{u}^2 (\Delta t)^2$, rather than the long-time Taylor–Aris limit.
+  Edges stay sharp where the liquid is still and streak along flow lines where it moves.
+  Heat spreads at water's own thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$, Le $\approx$ 350).
+- **What it takes:** a single explicit conservative finite-volume face-flux pass (`dyeDisperse`) with an anisotropic
+  tensor $D_L = D_m + \kappa_T (h/h_0)^2 |v|^2$, capped at 0.25 cells²/step (the von Neumann positivity limit), with
+  positivity-preserving cross-term limiting to prevent negative oscillations. Heat diffusion is decoupled from dye diffusion
+  and handled in the viscosity stage with time accumulation (`heatSeconds`) to ensure FP16 precision survival on SwiftShader.
+- **Cost:** single explicit pass (0.39 ms, 2.0% share), replacing 4-iteration Jacobi (1.3 ms), saving ~0.9 ms.
+- **Shipped (#357):** replaced 4-iteration Jacobi dye diffusion with single explicit conservative
+  finite-volume shear dispersion (`dyeDisperse`) with molecular diffusion $D_m = 4\times 10^{-10}\text{ m}^2/\text{s}$ and
+  longitudinal shear dispersion along depth-mean flow; decoupled heat diffusion to real water thermal
+  diffusivity $\kappa = 1.4\times 10^{-7}\text{ m}^2/\text{s}$ in viscosity stage. Checked by `npm run dispersion` (6/6).
+
+### 18i. Bubbles and beads live by physics, not timers
+
+- **What was reported** (PLAN.md §18i): bubbles live 9–23 s and pop on a timer; merges are a random dice roll (`rng < dt·0.12`), pairs are pulled together by an artificial long-range force, and drift has artificial Brownian wander. Real bubbles trapped between glasses are air pancakes with no draining soap film: they do not pop on a timer, experience no long-range attraction, and run ahead of the liquid flow due to lubricating wall films (Bretherton).
+- **Physical models implemented** (`src/lib/bubbles.ts`, `src/lib/beads.ts`, `scripts/bubblephysics.mjs`):
+  - **Bretherton lubrication speedup**: air pancakes in planar Hele-Shaw flow advance faster than depth-mean fluid velocity $U$, with speedup $U_b / U = 1.5 / (1 + 2.26\text{Ca}^{2/3})$ where $\text{Ca} = \mu U / \sigma$ is the capillary number. As flow speed increases, thicker wetting films on the glass plates exert more drag, dynamically reducing the speed ratio (~1.43× at $u=0.01$ down to ~1.33× at $u=0.04$).
+  - **Zero unagitated wander & acoustic jitter**: unagitated millimeter bubbles have high Péclet number ($Pe \gg 10^6$) and experience zero Brownian wander in quiescent fluid (drift $< 10^{-5}$ cells in 2 s). Treble acoustic agitation vibrates the plates, driving isotropic 2D wander scaling continuously with sound intensity ($2.0 \cdot \text{agitation}$).
+  - **Saffman-Taylor finger wavelength scaling on Straw**: rapidly advancing air fronts destabilize into fingers with wavelength $\lambda \approx \pi b_\text{eff} / \sqrt{\text{Ca}}$, producing lobe count $m \propto R \sqrt{\text{Ca}}$ strictly between [6, 18] clamps (7 vs 12 lobes across gentle vs fast blowing, theoretical ratio 1.715).
+  - **Stefan-Reynolds / Chesters thin-film drainage**: bubble coalescence is governed by thin liquid film drainage rather than random chance. Drainage time scales as $t_\text{drain} = \text{DRAINAGE\_FILM\_FACTOR} \cdot (\mu / \sigma) \cdot R_e$ with effective radius $R_e = (r_a r_c)/(r_a + r_c)$ and $(R_\text{film} / h_\text{crit})^2$ geometry factor. Resting push-apart is maintained at $0.98\cdot(a.r + c.r)$ so resting foam rafts remain stable, while hydrodynamic compressive contact ($dist < \sqrt{0.92}\cdot(a.r + c.r)$) drains and merges.
+  - **Bead viscous pancake lag**: oil drops in a thin gap lag the depth-mean flow: $U_\text{bead} / U = 2 / (1 + \lambda)$ for viscosity ratio $\lambda$ on `BeadField`.
+  - **Timed pops available**: per the owner's call, timed pops remain available (`timedPops = true`) to pace shows via `lifeScale`, while physical pancakes (`timedPops = false`) live without timer pops.
+- **Shortcuts honestly declared**:
+  - **$1.5\cdot U$ premise**: Taylor-Saffman potential flow gives $2.0\cdot U$ for an inviscid bubble spanning a Hele-Shaw cell (matching $2U/(1+\lambda)$ at $\lambda=0$). Centerline velocity of planar Poiseuille flow ($1.5\cdot U_\text{mean}$) was retained as a tuned shortcut: real light show bubbles spanning the 6 mm gap with finite lubricating films and viscous liquid caps drift at ~1.35–1.45×, avoiding excessive bubble runaway that alters show pacing.
+  - **$b_\text{eff} \approx 0.091\text{ cells}$ ($0.095\text{ mm}$)**: set in grid cells (moving with grid resolution), about $63\times$ smaller than the physical 6 mm gap (`DISH_REST_GAP * DISH_METRES`). If the physical 6 mm gap were used directly ($b \approx 5.76\text{ cells}$), $m \sim 0.5$ lobes—meaning a bubble on a 192 grid would never form more than 1 finger. $b_\text{eff}$ scales the finger count to produce 6–18 visible Saffman-Taylor lobes.
+  - **$t_\text{drain}$ units and $\text{DRAINAGE\_FILM\_FACTOR} = 7200$**: in real units $(\mu / \sigma) \cdot R_e$ is viscous-capillary time (~1 ms). $\text{DRAINAGE\_FILM\_FACTOR}$ represents the $(R_\text{film} / h_\text{crit})^2$ term from Chesters/Reynolds lubrication theory to bridge to macroscopic film drainage times (~4–8 s).
+  - **Viscosity $\mu$**: fixed at light mineral oil ($17\text{ mPa}\cdot\text{s}$) matching the show's carrier fluid, pending per-liquid coupling in 18d.
+  - **$\lambda = 1.5$ on beads**: solved back from tuned $0.8\times$ flow speed.
+- **Measured** (`npm run bubblephysics`): 11/11 checks pass. Foam stability test over 3600 frames on a resting raft yields 0 merges (stable foam).
+
+### 18j. Milky liquids scatter
+
+**Shipped** (2026-10-10, #353): milky liquids scatter light, turning milk into an opaque white body under diffuse backscatter and casting a warm dark projector shadow with a soft forward halo.
+- **Where:** everything in the plate was previously treated as a pure absorber. `colourBody` pushed opacity and saturation up to imitate a body of colour, `granulation` modulated dye optical depth with noise, and milk was rendered as dye tinting.
+- **The real phenomenon:** milk is an emulsion of sub-micron fat globules and casein micelles (~100 nm) that undergo Mie and Rayleigh-Gans scattering without significant intrinsic absorption in visible wavelengths.
+  - *On black ground (diffuse backscatter):* multiple scattering produces a bright, white diffuse body. Modeled using non-absorbing Kubelka–Munk theory: $Sd = \mu_s' \cdot 6.0 \cdot d_{gap}$, $R_{KM} = \frac{Sd}{1.0 + Sd}$. Strictly energy conserving ($R_{KM} + T_{KM} \equiv 1.0$) with equal RGB scattering, giving pure white reflectance ($R=G=B \approx 98.8\%$ luminance). Absorbing food dyes sit on top of this white reflective substrate, creating vibrant opaque pastel tints (e.g. pinks/reds rather than dark mud on black ground, fulfilling PLAN §4).
+  - *On lamp ground (projector transmission):* a projector collection aperture (f/2–f/4 lens) collects only unscattered or forward-scattered light within a narrow pupil angle ($\sim 10^\circ$). Over $90\%$ of scattered light misses the lens entirely. Consequently, milk casts a dark shadow (mean transmission $\approx 25.4\% \le 30\%$). Casein micelle scattering follows Rayleigh-Gans $\lambda^{-1.5}$ wavelength dependence ($\vec{\kappa}_{casein} = (0.85, 0.95, 1.20)$), scattering blue light more strongly than red, causing the projector shadow to appear warm/amber ($t_R > t_B$).
+  - *Forward halo:* light scattered at small forward angles forms a soft forward halo around the pool boundary, glowing slightly above bare plate transmission (+0.46%) in an annulus just outside the pool core.
+  - *Zero-scatter species (control):* liquids with zero scattering coefficient ($\mu_s' = 0$, e.g. glycerine, water) render byte-for-byte identical to the bare plate across all pixels on both black ground and lamp ground.
+- **Conserved transport & packing:**
+  - Optical scattering coefficient $\mu_s'$ is carried in the GPU species field (channel 2, `species.b`) and advected via the existing conserved flux-form pairing (`bodyAdvectPairSub`, PLAN 18d-11a).
+  - Because `view0` and `dye` textures were full, $\mu_s'$ is packed into `vel.w` via `packVel` during velocity packing (`max(0.0, sp.b)` in `.w`), alongside temperature in `v.z` (PLAN 18f / #352) and clamped velocities in `.xy`.
+  - Species channel 2 was traded from density $\rho$ (which is read by nothing yet in the solver) to avoid allocating an extra PingPong texture and doubling advection bandwidth, maintaining 18d-11a's 6.73 ms paired carry. When 18d-4 buoyancy lands, density can be packed or restored (PLAN 18d-4a).
+- **Verification:** `npm run milk` enforces 9 automated checks including dark warm shadow, halo glow, white diffuse backscatter, dye-on-milk pastel reflectance, conserved species advection, and zero-diff glycerine control against bare plate.
 
 ### 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
 
@@ -3158,3 +3494,31 @@ minutes (0.54 a minute on, 0.78 two).
 Classic: Dye Budget 0.45 (the default 0.85 filled the dish until the colours ran into one
 wash, the fault Velvet Underground was fixed of), and Bubbles 0.05 (the brown discs were
 the default 0.2, trapped air drawn dark against a full dish).
+
+## 29. The closeup's ferrofluid drop
+
+### 29a. The drop as a bead with the light on it (this PR)
+
+Asked 2026-10-11 ("I want to see much more 3d drops ... a drop of ferro fluid with light
+reflecting off of it"). The closeup drew a flat black disc, its inside one value of black to
+the byte: the solver carries the ferrofluid as a layer of one depth, so there was no surface
+to light.
+
+Built: the ferrofluid's surface solved each frame of the closeup (`src/gpu/ferroDrop.ts`,
+`wgsl/ferroDrop.ts`): the ferrohydrostatic Young–Laplace balance h − ∇²h = P + K in l_c
+(Rosensweig §5.2), the contact line the solver's own half-full line, the plateau
+2 sin(θ/2) from the contact angle, the magnet's Kelvin pressure moving the volume
+toward it. Drawn as a camera sees it: Fresnel off the ferrofluid from under the water
+(n 1.52, 0.45% straight on), a softbox and a strip light and a dim tent through the top
+glass by Snell, total reflection past 48.6° showing the plate round the drop, and the
+dye over the drop filtering the reflection as the column above it, 2(gap − h). Relief /
+3D is the contact angle (0 flat as before, 1 a bead at 160°; 0.7 is 112°). Only in the
+closeup, only on the lead plate; the projected plate is unchanged to the byte (`npm run
+ferrodrop`). Its shortcuts are open as 29a-1 to 29a-7 in `PLAN.md`.
+
+Measured (`npm run ferrodrop`, 10 checks): the middle 1.460 l_c against the balance's 1.510
+for a drop 4 l_c across at 112°; one l_c in from the edge 61% of the top; a magnet off the
+right side stands that shoulder 138% and the far one 78%, the volume 101.8%; the light's
+spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up and left; a
+yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
+bytes different at any relief.
