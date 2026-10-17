@@ -429,8 +429,34 @@ export function Desk(p: DeskProps) {
             <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">
               <span className="hidden xl:inline">Send to&nbsp;</span>wall
             </Button>
-            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
-              {p.dirty ? 'Save •' : 'Save'}
+            {/*
+              The dirty mark takes no width. It used to be "Save •", 11 px
+              wider than "Save", and at 1280 in Build this bar is one row with
+              0–1 px to spare: the first change to a look wrapped it to two
+              rows, the plate's hole dropped 42 px and the canvas went with it,
+              so a hand (or the magnet check's second press, PLAN.md 19v-3)
+              aimed at the plate's top landed on the bar. Nothing in this bar
+              may change width with state; the dot hangs in the button's own
+              padding instead, and is only hidden when the look is clean.
+            */}
+            <Button
+              height={32}
+              variant="primary"
+              kbd="⌘S"
+              onClick={p.onSave}
+              testId="save-look"
+              title={p.dirty ? 'The look has changed since it was last saved' : undefined}
+            >
+              <span className="relative">
+                Save
+                <span
+                  aria-hidden
+                  data-testid="save-dirty"
+                  className={`absolute -right-[10px] top-0 leading-none ${p.dirty ? '' : 'invisible'}`}
+                >
+                  •
+                </span>
+              </span>
             </Button>
           </span>
         </div>

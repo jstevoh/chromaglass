@@ -110,7 +110,9 @@ jobs:
   measure-part:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The browser part ran 11:47 on main before the switches step (two to three
+    # minutes in CI); 15 left it no headroom.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -506,6 +508,14 @@ jobs:
       - name: Saving presets
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/saves.mjs
+      # Every switch and chosen state reads on and off (scripts/switches.mjs,
+      # PLAN.md QA-30): on the desk, every Settings section, the phone's sheets,
+      # Play and the remote, each control that says it has a state is read in
+      # both, from computed styles. A knob against its track at 3:1, on against
+      # off at ΔE 20. Colours, so no GPU; the site the steps above built.
+      - name: Switches read on and off
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/switches.mjs
       # The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served
       # with Brotli over a slowed network, and the page asks for the app's
       # chunks alongside its entry and for the GPU before the app has
@@ -904,6 +914,11 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run grating
+      # Dye spreads along the flow via shear dispersion (PLAN 18h): streaks
+      # along flow lines while holding sharp cross-stream edges, conserved exactly.
+      - name: Dye dispersion along the flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run dispersion
       # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
       # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter

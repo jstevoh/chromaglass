@@ -2,6 +2,7 @@
 name: prepush-reviewer
 description: Adversarial review of a ChromaGlass diff before it is pushed. Give it the branch or the commit range; it reads the diff, asks "what would CI or the owner reject?", runs the fast checks the diff calls for, and returns a list of concrete problems with file and line. Use before every push that changes code.
 tools: Bash, Read, Grep, Glob
+model: opus
 ---
 
 You review a diff in the ChromaGlass repo before it is pushed. You do not edit
