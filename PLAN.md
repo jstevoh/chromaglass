@@ -6219,6 +6219,31 @@ Turing Print" work (#331), which also made the reaction grow at all.
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
 
+- **28f. Every look answers the music through its own patches** (the owner, 2026-10-11:
+  use the patch bay so the looks answer the music more by default; the whole plate may
+  move with the music on a small named set of looks, never as the default; and "only use
+  things that we can detect quickly and make changes that are appropriate for the music",
+  so no song-shape sources for the looks). Brief: `docs/sound-patches.md`.
+  - ~~28f-1 the dead patches, the named looks, the hits as a patch source (desk, phone,
+    Sound learn), the first three looks as the pattern~~ (**shipped**, this PR;
+    `docs/plan-shipped.md` 28f).
+  - **28f-2, open (Antigravity, from `docs/sound-patches.md`).** Two or three liquid
+    patches per look from the bands and the hits, following Cyberpunk, Fillmore East and
+    Lava Lamp; judged on a fresh showreel.
+  - **28f-3, open.** Ten looks still sway the dish's turn with the music through the old
+    `audioMappings.rotation` slot (27a-8). The owner's rule now says which: whole-plate
+    motion from the music only on the named looks (`FRAME_MOVING_LOOKS`). Read it with
+    the owner (a slow turn is the oil wheel's move), then move them off or onto the list,
+    and count the slot in `npm run framesway`.
+  - **28f-4, open.** Pitch is mostly the bass line on a band (72% of the showreel song's
+    frames in the octave above C1): a patch on it walks with the bass, not the melody. A
+    lead's pitch needs the analyser to find the strongest note above the bass.
+  - **28f-5, open (found here, for 27e-2).** The song's shape does not hear the showreel
+    song's breakdown (Funkorama, 104–120 s: the kick's region 22 dB down, 12 kicks in
+    14 s against 30) nor the beat's return: one drop at 7.2 s and steady after. Nothing
+    patches it now, but Follow the Song and Evolve read it. `songShape.ts` is tuned on
+    made-up songs; a sparse kick under a breakdown must read as the beat gone.
+
 - **28g. Follow a known song played live, by what is heard, not by the clock** (the owner,
   2026-10-11: "if we pre record the shape of the song, how can we map that to a different
   sounding and sometimes improvisational version of the same song?"). A song map

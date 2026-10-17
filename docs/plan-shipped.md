@@ -3468,6 +3468,48 @@ the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% 
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
 
+## 28f. Every look answers the music through its own patches
+
+### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
+
+Asked 2026-10-11 in the gallery review: the show hears the music well now, so the looks
+should answer it more by default, through the patch bay; "it's ok if the whole plate
+moves (or other global changes) with a small subset of presets. I just don't want this
+kind of look to be a default across all presets"; and "only use things that we can
+detect quickly and make changes that are appropriate for the music".
+
+Found: four of the shelf's 17 patches never moved anything. They named a drum or a note
+(`kick`, `hats`, `note`, `tonalMid`) on the `sound` source, whose features are the hook's
+loudness, bass, mid, treble, energy, timbre and complexity, and the fold reads a name its
+source lacks as 0: Bass Drop's kick on Plate Rock, Microscopic Chaos's hats on Beads,
+Aurora's note on Comet Speed and its mids on the hue journey. Comet's timbre was patched
+at a depth of 45 (meant as degrees; a depth is a share of the dial's 0..360), which threw
+its heading to the clamp at any timbre. Oil Wheel's band patched onto the dish's motor,
+the frame and not the liquid, and nothing held a look to the owner's rule. And a patch
+could read each drum's level but not its hits: a level is loud between hits too.
+
+Built: the four read their names from the `bands` source (Aurora's held chord now turns
+the hue sooner); comet's depth is 0.125, the 45° meant. `FRAME_MOVING_LOOKS`
+(lib/plateRock.ts) names the looks that may move the frame with the music: Bass Drop
+alone, at Frame Sway 0.35, its kick's hit on Plate Rock. Oil Wheel's mids went into the
+oil (Buoyancy). The hits are a patch source (`hits`, lib/hitSource.ts): Kick, Snare and
+Hats hit, Any hit (how hard the last one landed, falling over a quarter second; read when
+the onset's time moves, at the strength it was given, `OnsetState.last`, so a plate
+drawing twenty frames a second still sees them) and Pitch, on the desk's patch bay, the
+phone's (the same sheet) and Sound learn, with Sound Impact as its master. Beat phase
+was already patchable: the Shapes source's LFOs run on the bar. Cyberpunk (kick, snare,
+hats), Fillmore East (bass on the pour, a hit's stir) and Lava Lamp (the bass on the
+wax's buoyancy, a held chord on the hue) are the pattern the rest follow (28f-2).
+
+Measured: `npm run soundpatch` (new, in Measure): every patch on the shelf moves its
+control (before: 4 of 17 read nothing, comet at 45; after 24 of 24); each of 160 kicks is
+in Kick hit on its own frame at its strength, under a tenth of its peak 0.6 s on, over
+half on 11% of a drop's frames; at one reading in three, Any hit rose for 200 of 225 hits
+where the hit's own reading reached the loop for 72. `npm run framesway`: only the named
+looks move the frame (before: Oil Wheel and the two show stages that play it patched
+sound onto the motor), the list one of at most four, and Bass Drop's picture slides
+0.53% of the plate at its peak.
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)
