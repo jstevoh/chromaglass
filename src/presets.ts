@@ -72,6 +72,22 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,           // flat backlit dye — the projector look
       postBlurRadius: 0.35,
       secondLamp: 0.2,
+      /*
+        28d (the showreel, 2026-10-11): the default look scored 4 of 10. On a
+        minute of a real song it was a full-frame gradient of magenta, red,
+        yellow and blue, slowly stirred, with big brown bubble discs and no
+        bodies at all: nothing like the blobs its name promises. The plate ran
+        at the default budget (0.85), which fills the dish until the colours
+        meet everywhere and run into one wash, the same fault Velvet
+        Underground was fixed of (0.45, dark between its pools). At 0.45 the
+        regulator holds about half the colour, so the blobs stay blobs with
+        the lamp between them, which is the overhead projector's own picture.
+        And the brown discs were the default Bubbles (0.2): trapped air
+        drawn dark against a dish this full. A few, not none, because a clock
+        glass on a projector always has some.
+      */
+      dyeBudget: 0.45,
+      bubbles: 0.05,
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
         density: 'volume',       // louder = more color, but mapped gently
@@ -109,7 +125,13 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.5,
       sceneMappings: [
         { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
-        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 45 }
+        /*
+          45 was meant as degrees, and a depth is a share of the dial's travel
+          (0..360 for the angle): at 45 the comet's heading was thrown to its
+          clamp by any timbre above 0.003. An eighth of the travel is the 45°
+          that was meant (28f).
+        */
+        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 0.125 }
       ],
       audioMappings: {
         velocity: 'bass',
@@ -153,6 +175,10 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
+      // A galaxy is mostly void: at the default 0.85 the regulator kept the
+      // plate full and the whorl filled the frame. Near black 9% to 19% in
+      // the lab on the seeded spiral.
+      dyeBudget: 0.35,
       glossiness: 0.0,
       postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
       ledMode: 'single',
@@ -180,7 +206,12 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.087,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.8,
       ledPlatform: true,
-      ledMode: 'ocean',
+      // A deep blue platform, as the description has it. The 'ocean' wheel
+      // runs up to cyan (0, 0.6, 0.8), and it lit every clear patch: an
+      // empty plate read luma 0.23 with 19% of it near black; this one 0.07,
+      // all of it dark blue, so the fluids carry the light.
+      ledMode: 'single',
+      ledColor: '#04122e',
       ledSpeed: 0.05,
       diffusionRate: 0.0001,
       buoyancy: 0.2,
@@ -240,6 +271,18 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
       chromaticAberration: 0.35,
+      /*
+        The pattern for a look's own patches (28f), for a look about hits:
+        each kick churns the neon, a hard one harder; the snare's crack curls
+        the eddies tight; the hats raise fine beads. Each hit is how hard it
+        landed, falling over a quarter second (the `hits` source), so the
+        liquid takes the push and carries it, and nothing moves between hits.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.3 },
+        { source: 'hits', feature: 'hatsHit', setting: 'beads', depth: 0.2 },
+      ],
       audioMappings: {
         velocity: 'energy',
         density: 'treble',
@@ -336,8 +379,23 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 1.0,
       dropHeight: 0.9,
       beatSqueeze: 0.8,
+      // The one look whose music moves the frame (FRAME_MOVING_LOOKS): a
+      // third of Frame Sway's travel, so the rock carries the picture without
+      // the full slide #347 had on every look.
+      frameSway: 0.35,
       sceneMappings: [
-        { source: 'sound', feature: 'kick', setting: 'plateRock', depth: 0.5 },
+        /*
+          The kick throws the plate, a hard kick harder. The patch was written
+          on the `sound` source, whose features are the hook's loudness, bass,
+          mid and treble: `kick` was not one of them, so it read 0 and never
+          moved anything (28f). It is the kick's hit now (the `hits` source:
+          how hard it landed, falling over a quarter second), not the kick's
+          level, which is loud between kicks too. Bass Drop is the one look
+          that may move the frame with the music (FRAME_MOVING_LOOKS,
+          lib/plateRock.ts): its Frame Sway above lets the rock carry the
+          picture, as nothing else on the shelf does.
+        */
+        { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5 },
         { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
       ],
       audioMappings: {
@@ -351,7 +409,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'timbre-shifter',
     name: 'Timbre Shifter',
-    description: 'The brightness of the sound controls the color and rotation of the fluid.',
+    description: 'The brightness of the sound picks the colour of what pours in: a dark sound lavender and violet, a bright one teal, ice and amber.',
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
@@ -384,7 +442,10 @@ export const PRESETS: Preset[] = [
         velocity: 'mid',
         density: 'volume',
         color: 'timbre',
-        rotation: 'timbre',
+        // Not the dish: a turn of the whole plate on the sound is the frame
+        // moving with the music, which the owner does not want by default.
+        // The motor above still turns it.
+        rotation: 'none',
       },
     }
   },
@@ -426,7 +487,8 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.15,
       dyeBudget: 0.55,
       sceneMappings: [
-        { source: 'sound', feature: 'hats', setting: 'beads', depth: 0.5 }
+        // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.5 }
       ],
       audioMappings: {
         velocity: 'complexity',
@@ -473,8 +535,18 @@ export const PRESETS: Preset[] = [
       ledColor: '#020818',
       secondLamp: 0.35,
       sceneMappings: [
-        { source: 'sound', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
-        { source: 'sound', feature: 'tonalMid', setting: 'hueJourney', depth: 0.5 }
+        /*
+          Both read 0 until 28f: `note` and `tonalMid` are the `bands`
+          source's names, not `sound`'s. The note keeps its patch. The hue's
+          was the tonal mids lengthening the journey's minutes per step, so a
+          held chord slowed the colours; it is the other way now, a held
+          chord turning the hue sooner (a step a minute and a half quicker
+          at full). The journey steps when its minutes are up, so a chord
+          coming and going moves when the next step lands, never the colour
+          on the frame.
+        */
+        { source: 'bands', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
+        { source: 'bands', feature: 'tonalMid', setting: 'hueJourney', depth: -0.15 }
       ],
       audioMappings: {
         velocity: 'bass',
@@ -911,12 +983,21 @@ export const PRESETS: Preset[] = [
     settings: {
       globalSpeed: 0.0084,
       surge: 0.35,
-      layerCount: 2,
+      // One wheel: an Optikinetics wheel is one sealed disc in one gate. Two
+      // plates screened over each other were a full plate twice, a wash.
+      layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.7,
-      rotationSpeed: 0.137,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
+      // Half a revolution a minute, as its description says: lookMotorRate(0.232)
+      // is 0.053 rad/s. At 0.137 it was 0.005 rad/s, a turn every twenty
+      // minutes, and the film read the wheel as still (motion 0.003). The
+      // wheel's own motor, not the frame moving to the music.
+      rotationSpeed: 0.232,
       centerGravity: 0.15,
-      ledPlatform: true,
+      // No LED under the wheel: a brown one ('#3a2408', luma 0.14) lit every
+      // clear patch, so the dish was a brown disc with no dark in it (an
+      // empty plate: 84% of it above near black; off, 1%).
+      ledPlatform: false,
       ledMode: 'single',
       ledColor: '#3a2408',
       ledSpeed: 0.0,
@@ -946,7 +1027,10 @@ export const PRESETS: Preset[] = [
       bubbles: 0.17,
       plateRock: 0,
       layerScaleVariety: 0.35,
-      lampWarmth: 0.75,
+      // A halogen's warmth, not a brown filter: at 0.75 the grade took a
+      // quarter of the blue (x 0.78) and a tenth of the green from the
+      // whole frame, and the wheel's blues and greens went olive.
+      lampWarmth: 0.3,
       lampHotspot: 0.6,
       lampMotion: 0.2,
       lightPlay: 0.7,
@@ -955,7 +1039,16 @@ export const PRESETS: Preset[] = [
       dishVignette: 0.7,
       spinDrag: 0.08,
       sceneMappings: [
-        { source: 'sound', feature: 'mid', setting: 'rotationSpeed', depth: 0.03 }
+        /*
+          This was the band's mid on the dish's motor, which turned the whole
+          wheel faster with the music. A real oil wheel turns at its motor's
+          speed whatever the band plays (the owner, 2026-10-11: the music
+          moves the liquid, not the frame), so the same mids go into the oil
+          instead: the lamp-warmed cells rise a little livelier while the band
+          is in them (28f). Buoyancy pushes through the heat the oil carries,
+          so the cells answer over a second or two, not on the frame.
+        */
+        { source: 'sound', feature: 'mid', setting: 'buoyancy', depth: 0.05 }
       ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
@@ -1134,8 +1227,14 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.35,
       edgeRelief: 0.6,
       bubbles: 0.35,
-      paperA: '#2a9aa3',
-      paperB: '#ff9a4a',
+      // The gradient deeper, so the drops are the light: at teal '#2a9aa3' to
+      // orange '#ff9a4a' the paper alone was luma 0.58 and the frame a milky
+      // wash with no dark anywhere; this one is 0.36. Not darker: at 0.15
+      // ('#0b2f38' to '#4a1f0a') the dye lit by it is so dim that its
+      // pigment grain is under a level, twice the grain only 1.5x the
+      // texture (`npm run grainedge`: 0.133, x2 0.205); here 0.258, x2 0.575.
+      paperA: '#1c626a',
+      paperB: '#a0582a',
       lightPlay: 1.0,
       lampMotion: 0.4,
       lampHotspot: 0.6,
@@ -1346,6 +1445,7 @@ export const PRESETS: Preset[] = [
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
+      twoProjectors: 1,
       gooeyEffect: 0.5,
       rotationSpeed: 0.0,
       centerGravity: 0.0,
@@ -1399,6 +1499,21 @@ export const PRESETS: Preset[] = [
       lampWarmth: 0.2,
       iridescence: 0.1,
       secondLamp: 0.2,
+      /*
+        The pattern for a look's own patches (28f). The Joshua Light Show was
+        hands on the plates in time with the band: the operator squeezed in
+        more colour on the bass and stirred on the hits. So the bass thickens
+        the pour (Dye Budget: the plate holds more colour while the bass is
+        in, and the pours and the evaporation carry it there over seconds, not
+        on the frame) and each kick or snare stirs the oil a little, harder
+        for a harder hit, gone in a quarter second and carried on by the
+        liquid. Never the plates' press itself: that moves the whole frame
+        (FRAME_MOVING_LOOKS).
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'dyeBudget', depth: 0.15 },
+        { source: 'hits', feature: 'anyHit', setting: 'turbulenceScale', depth: 0.15 },
+      ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -2225,6 +2340,20 @@ export const PRESETS: Preset[] = [
       beatSqueeze: 0.0,
       dyeBudget: 0.6,
       bubbles: 0,
+      /*
+        The pattern for a look's own patches (28f, the owner: "only use things
+        that we can detect quickly and make changes that are appropriate for
+        the music"). A lava lamp answers nothing but its lamp, so the music
+        reaches it the way the lamp does, through the wax's heat and slowly:
+        the bass warms the plumes a little livelier (buoyancy pushes through
+        the heat the wax carries, so it answers over seconds, not on the
+        kick), and a held chord turns the colours a step sooner. No hits: a
+        lamp does not jump on the snare.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'buoyancy', depth: 0.05 },
+        { source: 'bands', feature: 'tonalMid', setting: 'hueJourney', depth: -0.15 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },

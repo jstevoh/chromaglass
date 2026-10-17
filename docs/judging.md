@@ -1313,3 +1313,36 @@ speed, ten minutes with a song that has builds and drops, then five with nothing
 3. With nothing playing it should still wander, more slowly.
 4. Say if a minute's glide reads as nothing happening (the moves are too small) or as
    the look drifting away from itself (too big).
+
+## 52. Bass Drop moves the frame, nothing else does, and three looks answer the hits (PLAN 28f)
+
+On the Mac, a song with a band's drums (the showreel's, or anything with a kick and a snare).
+
+1. Bass Drop is the one look whose picture moves with the music: the plate rocks on each
+   kick, a hard kick harder, the frame sliding a little with it (Frame Sway 0.35). Say if
+   it is too much, or not enough to be worth having on one look.
+2. Cyberpunk: each kick churns the neon, the snare curls it tight, the hats raise fine
+   beads, and between the hits it settles. Fillmore East: more colour while the bass is
+   in, a small stir on each hit. Lava Lamp: the plumes a little livelier under the bass,
+   the colours turning sooner on a held chord, nothing jumping on a hit.
+3. Oil Wheel turns at its motor's speed whatever the band does. Any look not named: the
+   frame holds still with the music.
+4. Say whether each of the three answers the music the way an operator's hand would, or
+   twitches. They are the pattern the other looks will follow.
+
+## 53. The closeup holds still through the song (PLAN 27a-8, QA-31)
+
+On the Mac, Macro Bead or Ferro Paint pushed in to 6x, a song with a hard kick, Frame Sway
+at 0 (the default).
+
+1. In Hold, Follow and Auto the frame should not punch, pump or shiver with the music: the
+   drop drifts, the dye moves round it, and nothing else moves. Turn Frame Sway up to 1
+   and the punch-in on the kick, the push and the treble tremor come back; at 0 they are
+   gone to the pixel.
+2. In Auto a cut should land on the drop's middle and stay, not slide the last stretch to
+   it. In Follow a drop drifting fast should sit near the middle of the frame, not trail
+   behind it.
+3. With nothing playing, a drop on still paint should sit dead still at 6x: no shimmer at
+   its edge from frame to frame.
+4. Say whether Auto's slow breathing zoom, which is not from the sound, is a signature
+   worth keeping or one more move the rig should not make (27a-8-1).

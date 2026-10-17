@@ -43,7 +43,8 @@ export interface SimulatedMusic {
    * it plays only the tail of its envelope, or nothing. For `npm run kicks`'s
    * question about a busy page, read under `?debug` as `window.__band()`.
    */
-  stats(): { kicks: number; late: number; worstLateMs: number };
+  /** `at`: where in its score the band is sounding now, seconds from its top (`npm run followview` sets a song map's playhead against it). */
+  stats(): { kicks: number; late: number; worstLateMs: number; at: number };
   stop(): void;
 }
 
@@ -248,7 +249,7 @@ export function startSimulatedMusic(): SimulatedMusic {
       return sum / bins.length / 255;
     },
     section: () => current,
-    stats: () => ({ kicks, late, worstLateMs }),
+    stats: () => ({ kicks, late, worstLateMs, at: step * secondsPerStep - Math.max(0, nextAt - ctx.currentTime) }),
     async resume() {
       await ctx.resume().catch(() => {});
       start();

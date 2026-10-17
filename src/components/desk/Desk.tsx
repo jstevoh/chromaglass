@@ -394,8 +394,8 @@ export function Desk(p: DeskProps) {
           layers, Live | Preview, Send to wall and Save.
         */}
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
-          {/* The name gives way first, so the bar is one row wherever the plate is wider than about 940 px. */}
-          <span className="flex min-w-[120px] flex-1 items-center gap-2">
+          {/* The name gives way first, so the bar is one row wherever the plate is wider than about 930 px. */}
+          <span className="flex min-w-[100px] flex-1 items-center gap-2">
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
             <span className="truncate text-[16px] font-medium" data-testid="plate-name">{plateName}</span>
             <span className="hidden shrink-0 whitespace-nowrap font-mono text-[12px] text-dim 2xl:inline">
@@ -429,8 +429,34 @@ export function Desk(p: DeskProps) {
             <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">
               <span className="hidden xl:inline">Send to&nbsp;</span>wall
             </Button>
-            <Button height={32} variant="primary" kbd="⌘S" onClick={p.onSave} testId="save-look">
-              {p.dirty ? 'Save •' : 'Save'}
+            {/*
+              The dirty mark takes no width. It used to be "Save •", 11 px
+              wider than "Save", and at 1280 in Build this bar is one row with
+              0–1 px to spare: the first change to a look wrapped it to two
+              rows, the plate's hole dropped 42 px and the canvas went with it,
+              so a hand (or the magnet check's second press, PLAN.md 19v-3)
+              aimed at the plate's top landed on the bar. Nothing in this bar
+              may change width with state; the dot hangs in the button's own
+              padding instead, and is only hidden when the look is clean.
+            */}
+            <Button
+              height={32}
+              variant="primary"
+              kbd="⌘S"
+              onClick={p.onSave}
+              testId="save-look"
+              title={p.dirty ? 'The look has changed since it was last saved' : undefined}
+            >
+              <span className="relative">
+                Save
+                <span
+                  aria-hidden
+                  data-testid="save-dirty"
+                  className={`absolute -right-[10px] top-0 leading-none ${p.dirty ? '' : 'invisible'}`}
+                >
+                  •
+                </span>
+              </span>
             </Button>
           </span>
         </div>
@@ -499,6 +525,7 @@ export function Desk(p: DeskProps) {
         <span className="truncate" data-testid="status-hearing">
           {p.status.audio}
           {p.status.sequence && ` · ${p.status.sequence}`}
+          {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
         </span>
         <span className="truncate" data-testid="status-running">
           {`layout ${LAYOUT_LABEL[p.layoutName]} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}

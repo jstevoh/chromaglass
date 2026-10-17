@@ -33,7 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -316,6 +316,21 @@ const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
 /*
+  The Oregonator's own time a second of show (the bz stage). A real dish of
+  ferroin BZ turns its spirals once in tens of seconds and its waves crawl a
+  few millimetres a minute. The reaction ran twelve steps of 0.01 a solver
+  step, 7.2 of its units a second at sixty steps, and one turn of the model's
+  spiral is 5.3 units (the lab: the oxidised catalyst at a point peaked every
+  0.73 s; the showreel saw blue rings pulse every 0.75 s, a metronome). At
+  0.26 a turn takes 20 s, the quick end of a real dish. The shortcut, named:
+  the model's wavelength is a fifth of the plate, so the plate is a patch of
+  the dish about 6 mm across, as under a magnifier, and at the real period
+  its waves cross it at the real speed for their wavelength (about 0.01 of
+  the plate a second). On the show's clock (seconds a step), not a count of
+  steps, so the governor's step rate does not change the chemistry's.
+*/
+const BZ_PER_SECOND = 0.26;
+/*
   The grid the reaction's diffusion lengths are given on (stepChemistry): the
   middle rung, so the coral and the print keep about the size the looks were
   judged at on the Mac, now on every rung. CHEM_STABLE is the explicit step's
@@ -394,12 +409,6 @@ const D_MOLECULAR = 4.0e-10; // m²/s
   presets with diffusionRate at 0 still spread heat.
 */
 const KAPPA_WATER = 1.4e-7; // m²/s
-/*
-  The dish's rim, in plate widths from the middle: the plate's inscribed
-  circle, which is all the picture ever shows of it (plate.ts keeps both
-  dishes inside it). Past it the liquid is open to the air.
-*/
-const OPEN_RIM = 0.5;
 /*
   The forces' own physics on a thin gap (PLAN 18a-2, wgsl/thinGap.ts's
   hsBody, hsPrep and hsDivergence).
@@ -1535,15 +1544,17 @@ export class WebGPUFluid {
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
     const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
+    const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
-    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = 0;
+    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
     f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
       neither damps nor clamps it: only the heat decays there.
+      PLAN 18g: on a thin gap, colour leaves by flushing over the open rim.
+      p.evapFactor is retained as a named safety cap (regulator) and for evaporation.
     */
-    const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
@@ -2994,8 +3005,13 @@ export class WebGPUFluid {
     const rxn = this.rxn;
     stage('bz', (pass) => {
       const r = rxn!;
-      const args = this.arg('bz step', [0.01, 0, BZ_GRID, 1.0]);
-      const steps = Math.max(1, Math.round(12 * bz));
+      // The reaction's own time this step, in substeps of at most 0.01 (the
+      // Oregonator is stiff). BZ Reaction is how strongly it is drawn, not
+      // how fast the chemistry runs: it scaled the steps, so the one knob
+      // that shows the reaction also sped it up twelvefold.
+      const units = BZ_PER_SECOND * Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+      const steps = Math.max(1, Math.ceil(units / 0.01));
+      const args = this.arg('bz step', [units / steps, 0, BZ_GRID, 1.0]);
       for (let k = 0; k < steps; k++) {
         this.run(pass, 'rxnStep', r.write, [r.read], args, BZ_GRID);
         r.swap();
@@ -4723,6 +4739,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const enc = this.device.createCommandEncoder({ label: 'measure' });
     const pass = enc.beginComputePass({ label: 'measure' });
@@ -4736,7 +4753,7 @@ export class WebGPUFluid {
     this.statsFresh = !!data;
     if (data && this.statsRing.landed > this.statsLatest.at) {
       const f = new Float32Array(data);
-      const area = this.N * this.N;
+      const area = this.thinLive ? this.dishArea : this.N * this.N;
       this.statsLatest = {
         meanDensity: f[3] / area,
         meanColor: [f[0] / area, f[1] / area, f[2] / area],
@@ -4750,6 +4767,23 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
+  private dishAreaCells = 0;
+  /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
+  private get dishArea(): number {
+    if (this.dishAreaCells) return this.dishAreaCells;
+    let count = 0;
+    const n = this.N;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n - 0.5;
+        const v = (j + 0.5) / n - 0.5;
+        if (Math.hypot(u, v) < OPEN_RIM) count++;
+      }
+    }
+    this.dishAreaCells = count;
+    return count;
+  }
+
   /**
    * The same measurement, waiting for the GPU. For harnesses, not the show:
    * it answers about the plate as it is now rather than as it was two frames
@@ -4759,6 +4793,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const out = this.device.createBuffer({ label: 'stats now', size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'measure now' });
@@ -4772,7 +4807,7 @@ export class WebGPUFluid {
     const f = new Float32Array(out.getMappedRange().slice(0));
     out.unmap();
     out.destroy();
-    const area = this.N * this.N;
+    const area = this.thinLive ? this.dishArea : this.N * this.N;
     return {
       meanDensity: f[3] / area,
       meanColor: [f[0] / area, f[1] / area, f[2] / area],

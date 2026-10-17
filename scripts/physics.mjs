@@ -212,11 +212,37 @@ try {
   check('vorticity confinement keeps the eddies spinning', swirl > calm * 3, `|curl| ${calm.toFixed(1)} → ${swirl.toFixed(1)}`);
 
   // ── 8: the BZ reaction ──
+  /*
+    The reaction runs on the show's clock (BZ_PER_SECOND in fluid.ts, a
+    spiral's turn in 20 s, as a real dish), so a wave crawls about a
+    hundredth of the plate a second: 120 steps of a tenth of a second (the
+    longest step the app takes) are twelve seconds of it, where 40 steps were
+    4.8 of the reaction's units when it ran twelvefold a step.
+  */
   await page.evaluate(() => lab.create(128));
   await page.evaluate(() => lab.solver().addRxn(0.5, 0.5, 0.04, { bz: 0.9 }));
-  const front = async () => { await page.evaluate(() => lab.step(40, { bzReaction: 1, dt: 0.004 })); return page.evaluate(async () => { const f = await lab.solver().readChemistry('rxn'); const n = f.n; let far = 0; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (f.data[(x + y * n) * 4] > 0.3) far = Math.max(far, Math.hypot((x + 0.5) / n - 0.5, (y + 0.5) / n - 0.5)); return far; }); };
+  const front = async (steps = 120, seconds = 0.1) => { await page.evaluate(([k, s]) => lab.step(k, { bzReaction: 1, dt: 0.004, magnetSeconds: s }), [steps, seconds]); return page.evaluate(async () => { const f = await lab.solver().readChemistry('rxn'); const n = f.n; let far = 0; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (f.data[(x + y * n) * 4] > 0.3) far = Math.max(far, Math.hypot((x + 0.5) / n - 0.5, (y + 0.5) / n - 0.5)); return far; }); };
   const f1 = await front(), f2 = await front();
-  check('a BZ wave travels out from where it was started', f1 > 0.08 && f2 > f1 + 0.05, `front at ${f1.toFixed(3)}, then ${f2.toFixed(3)} of the plate`);
+  /*
+    Where the front is, not only that it moved. Twelve seconds at a
+    hundredth of the plate a second carry it 0.08 to 0.18 of the plate (0.132
+    in the lab), and after 24 s it is still inside 0.4. The reaction at the
+    old twelve steps a frame put it at 0.58 and 0.70 (a CPU copy of the
+    reaction step), at twice the speed 0.29 and 0.53, at half 0.09 and 0.16:
+    each fails here, where lower bounds alone passed every one of them.
+  */
+  check('a BZ wave travels out from where it was started, at the dish\'s pace', f1 > 0.08 && f2 < 0.4 && f2 - f1 > 0.08 && f2 - f1 < 0.18,
+    `front at ${f1.toFixed(3)}, then ${f2.toFixed(3)} of the plate (12 s apart; want 0.08-0.18 between)`);
+  /*
+    And on the clock, not the step count: the same twelve seconds as 240
+    steps of a twentieth reach the same place. Counted in steps, as before,
+    they went twice as far.
+  */
+  await page.evaluate(() => lab.create(128));
+  await page.evaluate(() => lab.solver().addRxn(0.5, 0.5, 0.04, { bz: 0.9 }));
+  const fine = await front(240, 0.05);
+  check('and the same seconds in smaller steps take it the same way', Math.abs(fine - f1) < 0.02,
+    `${f1.toFixed(3)} in 120 steps of 0.1 s, ${fine.toFixed(3)} in 240 of 0.05 s`);
 
   // ── 9: Liesegang rings ──
   await page.evaluate(() => lab.create(128));

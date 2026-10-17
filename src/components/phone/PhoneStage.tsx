@@ -161,6 +161,11 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /**
+   * Following a known song's map by ear (PLAN.md 28g-2, lib/followedPlace.ts
+   * `followLine`): which song, and how sure; null with no map to follow.
+   */
+  mapLine: string | null;
   /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
   deaf: boolean;
   /*
@@ -238,6 +243,13 @@ export interface PhoneStageProps {
    */
   lampGround: number;
   onLampGround: (v: number) => void;
+  /**
+   * Two Projectors (PLAN 18b-10): each plate has its own overhead projector
+   * aimed at the screen, so its clear parts throw its lamp onto the screen
+   * and wash the other plate's colour. On the Looks sheet beside Lamp Ground.
+   */
+  twoProjectors: number;
+  onTwoProjectors: (v: number) => void;
   /**
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
@@ -566,7 +578,7 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={sheet === 'dye'}
             aria-label={`Dye: ${liquid?.name ?? 'none'}. Choose a bottle and its colour`}
             data-testid="phone-open-dye"
-            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-border-strong bg-active text-text' : 'border-transparent text-text-2 active:bg-active'}`}
+            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'}`}
           >
             <span className="h-5 w-5 rounded-full border-2 border-white/40" style={liquid ? bottleSwatch(liquid) : { backgroundColor: '#fff' }} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
@@ -585,7 +597,7 @@ export function PhoneStage(p: PhoneStageProps) {
               onClick={() => open(name)}
               aria-pressed={sheet === name}
               data-testid={`phone-open-${name}`}
-              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? 'bg-active text-text' : 'text-text-2 active:bg-active'}`}
+              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? 'border border-accent-border bg-accent-bg text-accent-text' : 'border border-transparent text-text-2 active:bg-active'}`}
             >
               <Icon size={18} />
               <span>{label}</span>
@@ -742,6 +754,11 @@ export function PhoneStage(p: PhoneStageProps) {
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
+          <div className="mt-3">
+            <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
+              display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">Each plate has its own lamp on the screen, so its clear parts wash the other's colour.</p>
+          </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
               <Slider label="Ben-Day Dots" value={p.benDay} min={0} max={1} step={0.05} onChange={p.onBenDay}
@@ -845,6 +862,14 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-3 text-[13px] leading-snug text-muted" data-testid="phone-song-shape">
               {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
             </p>
+          )}
+          {/*
+            The desk's track panel says the same under its playhead: whether
+            the show reads the song's map where the band is heard to be, or,
+            unsure, follows the song's shape above.
+          */}
+          {p.audioSource !== 'none' && p.mapLine && (
+            <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
           )}
           {p.audioSource !== 'none' && (
             <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>

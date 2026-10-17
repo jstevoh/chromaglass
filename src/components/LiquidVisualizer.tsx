@@ -38,7 +38,7 @@ import { grabPadPicture, padPictureSender, padPictureWanted, tapPadPicture } fro
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
-import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
+import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
@@ -58,9 +58,10 @@ import { BackLook } from '../lib/backLook';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
+import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, type Presser, type Stroke } from '../lib/squish';
-import { levels01 } from '../lib/soundLevels';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
+import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -1616,17 +1617,47 @@ class FluidSimulation {
     if (this.carry) { this.carry.destroy(); this.carry = null; }
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
-    for (let i = 0; i < GRID_AREA; i++) {
-      const d = dye[i * 4 + 3];
-      this.rbDensity[i] = d;
-      this.rbVx[i] = vel[i * 4];
-      this.rbVy[i] = vel[i * 4 + 1];
-      sum += d;
-      sr += dye[i * 4]; sg += dye[i * 4 + 1]; sb += dye[i * 4 + 2];
+    const isThin = this.thinGap;
+    const S = this.size;
+    let count = 0;
+    for (let j = 0; j < S; j++) {
+      for (let i = 0; i < S; i++) {
+        const idx = i + j * S;
+        const d = dye[idx * 4 + 3];
+        this.rbDensity[idx] = d;
+        this.rbVx[idx] = vel[idx * 4];
+        this.rbVy[idx] = vel[idx * 4 + 1];
+        if (isThin) {
+          const u = (i + 0.5) / S - 0.5;
+          const v = (j + 0.5) / S - 0.5;
+          if (u * u + v * v >= OPEN_RIM * OPEN_RIM) continue;
+        }
+        sum += d;
+        sr += dye[idx * 4]; sg += dye[idx * 4 + 1]; sb += dye[idx * 4 + 2];
+        count++;
+      }
     }
-    this.meanDensity = sum / GRID_AREA;
-    this.meanColor = [sr / GRID_AREA, sg / GRID_AREA, sb / GRID_AREA];
+    const area = count > 0 ? count : GRID_AREA;
+    this.meanDensity = sum / area;
+    this.meanColor = [sr / area, sg / area, sb / area];
     this.rbSeq++;
+  }
+
+  private dishAreaCells = 0;
+  /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
+  private get dishArea(): number {
+    if (this.dishAreaCells) return this.dishAreaCells;
+    let count = 0;
+    const S = this.size;
+    for (let j = 0; j < S; j++) {
+      for (let i = 0; i < S; i++) {
+        const u = (i + 0.5) / S - 0.5;
+        const v = (j + 0.5) / S - 0.5;
+        if (u * u + v * v < OPEN_RIM * OPEN_RIM) count++;
+      }
+    }
+    this.dishAreaCells = count;
+    return count;
   }
 
   private pullStateFromGpu() {
@@ -3613,10 +3644,26 @@ class FluidSimulation {
         this.vx[i] *= factor;
         this.vy[i] *= factor;
       }
-      this.density[i]  *= p.evapFactor;
-      this.densityR[i] *= p.evapFactor;
-      this.densityG[i] *= p.evapFactor;
-      this.densityB[i] *= p.evapFactor;
+      if (!this.thinGap) {
+        this.density[i]  *= p.evapFactor;
+        this.densityR[i] *= p.evapFactor;
+        this.densityG[i] *= p.evapFactor;
+        this.densityB[i] *= p.evapFactor;
+      } else {
+        const x = (i % this.size + 0.5) / this.size - 0.5;
+        const y = (Math.floor(i / this.size) + 0.5) / this.size - 0.5;
+        if (x * x + y * y >= OPEN_RIM * OPEN_RIM) {
+          this.density[i] = 0;
+          this.densityR[i] = 0;
+          this.densityG[i] = 0;
+          this.densityB[i] = 0;
+        } else {
+          this.density[i]  *= p.evapFactor;
+          this.densityR[i] *= p.evapFactor;
+          this.densityG[i] *= p.evapFactor;
+          this.densityB[i] *= p.evapFactor;
+        }
+      }
       // Per-cell soft cap — keeps color ratios but stops runaway thickness,
       // so fresh dye can always shift a cell's hue
       if (this.density[i] > 6) {
@@ -3640,8 +3687,9 @@ class FluidSimulation {
       if (isNaN(this.vx[i]))      this.vx[i]       = 0;
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
-    this.meanDensity = densSum / GRID_AREA;
-    this.meanColor = [colR / GRID_AREA, colG / GRID_AREA, colB / GRID_AREA];
+    const area = this.thinGap ? this.dishArea : GRID_AREA;
+    this.meanDensity = densSum / area;
+    this.meanColor = [colR / area, colG / area, colB / area];
   }
 
   /**
@@ -3824,6 +3872,8 @@ class FluidSimulation {
       exactly nothing however steep it is. The only thing a bigger number can
       do is stop a plate exceeding what it was asked for.
     */
+    // PLAN 18g: Kept as a named safety cap until PLAN 18c-2 (pours add volume): prevents
+    // runaway saturation on looks where colour is injected without added volume.
     const regulatorEvap = Math.min(0.12, over * over * 0.6);
     /*
       Only ever upward, and H6 tried the other direction and took it out
@@ -5196,6 +5246,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     frame they are heard, and are kept, numbered, for the app to poll.
   */
   const songShapeRef = useRef(new SongShape());
+  /*
+    The hits and the note, as something a patch can listen to
+    (lib/hitSource.ts): each drum's last hit, held and let fall over a
+    quarter second. Fed with the shape, read by the patch bay's fold on the
+    next frame.
+  */
+  const hitSourceRef = useRef(new HitSource());
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
@@ -6507,6 +6564,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         film: clockIsFixed() ? null : filmSenseRef?.current ?? null,
         sound: currentAudioData,
         shape: modRef.current,
+        hits: hitSourceRef.current,
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
@@ -6767,6 +6825,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
+          hitSourceRef.current.update(heard, songClockRef.current);
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
@@ -8302,7 +8361,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 
                 // Each audio feature carries a different color from the harmony,
                 // offset by the true musical pitch so chords paint distinct colors!
-                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.1 + pitchAngle + colorMod * Math.PI + off);
+                /*
+                  Routed to timbre, the sound's brightness is the colour, and
+                  nothing else is. Its 0..0.85 turned the cycle by up to 2.7
+                  dyes, on top of the pitch class's 0..6.3 (a whole circle in
+                  radians read as dyes, more than the five on the plate, and a
+                  jump at every chord), the clock's drift, and each feature's
+                  own offset of up to three dyes: every hue of the set was in
+                  every bar whatever the timbre, and Timbre Shifter's plate
+                  stayed its set's cyan-violet mean ("hue never shifts", the
+                  showreel). Here the timbre walks the set, dull to bright
+                  (in proportion: a timbre of 0.85 sits 85% of the way along it),
+                  and the features keep a quarter of their offsets so the
+                  pulse and the sparks are still told apart. Every look whose
+                  colour follows timbre takes this (Cyberpunk Neon,
+                  Microscopic Chaos and Jellyfish Bloom too); the other
+                  routes, Classic's treble among them, are as they were.
+                */
+                const timbreColour = currentSettings.audioMappings.color === 'timbre';
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), timbreColour
+                  ? colorMod * (harmonyOf(activeLayerRef.current).length - 1) + off * 0.25
+                  : time * 0.1 + pitchAngle + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
@@ -8314,10 +8393,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
                   // At impact=1.0 + auto → ~4.9x baseline
                   const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
+                  /*
+                    How loud this passage is against the song's loud ones, as an
+                    amplitude (lib/soundLevels.ts, Passage): near 1 in the
+                    groove, about 0.4 in a breakdown 8 dB down. The music's
+                    hands in this block are scaled by it (through autoAmp: the
+                    pulse, the burst, the kick's ring, the mid's stream, the
+                    sparks, the swell; and the bass's press), because the
+                    levels they read are each ranged against their own ceiling
+                    and read a breakdown at 0.6 to 0.76 of the groove, and the
+                    press, which moves the plate on the bass's swing, read it
+                    busier than the groove (PLAN 28d, `npm run breakdown`).
+                    Beat Squeeze and Plate Rock ride the kicks, which a
+                    breakdown mostly drops, and are left as they were. Absent
+                    (a producer that cannot hear it), it is 1, the plate as it
+                    was.
+                  */
                   // Evolve used to multiply every music reaction by 2.2 — dye,
                   // heat, bursts — which is most of why it read as massive. It
                   // leaves the music's own reactions as the look sets them now.
-                  const autoAmp = impactMul;
+                  const autoAmp = musicHands(currentSettings.audioImpact ?? 0.45, currentAudioData.passage);
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
@@ -8371,7 +8466,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bassPressAt = {
                     x: bassX, y: bassY,
                     r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-                    depth: bassPressDepth(vel01, currentSettings.audioImpact ?? 0.45),
+                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage),
                   };
                   // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
                   if (vel01 > 0.25 && !activeFluid.thinGap) {
@@ -8408,7 +8503,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const rx2 = Math.floor(bassX + Math.cos(a) * rad);
                       const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * impactMul;
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * autoAmp;
                         activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward expansion with natural fluid swirl
                         const swirl = 0.2 * (DICE.music.float() - 0.5);
@@ -8455,7 +8550,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const sparkCol = trebleArea ? areaCycle(activeLayerRef.current, trebleArea, areaTime + 1.55) : colFor(3.1);
                     // Fewer, larger droplets: a cloud of one-cell specks blurs
                     // into fog, a handful of real drops stays drops.
-                    const sparks = Math.floor(treble01 * 2 * impactMul);
+                    // As many as the passage is loud (autoAmp carries it): a breakdown glitters less.
+                    const sparks = Math.floor(treble01 * 2 * autoAmp);
                     for (let s = 0; s < sparks; s++) {
                       const sp = trebleArea ? pointInArea(trebleArea, GRID_SIZE, DICE.music) : null;
                       const sx = sp ? Math.floor(sp.x) : DICE.music.int(GRID_SIZE - 20) + 10;
@@ -9134,6 +9230,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 floor: filmLevelRef.current,
                 energy: currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
                 sync: currentSettings.macroSync ?? 0,
+                // How far the music may move the frame (Frame Sway, lib/plateRock.ts):
+                // the sync's punch-in, push and tremor ride it, as the plate's own
+                // sway does; 0 by default, so the song times the cuts and moves nothing.
+                sway: frameSway(currentSettings.frameSway),
                 bass: camBass,
                 beat: kickRef.current.kick,
                 treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,
@@ -9592,6 +9692,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // starts again at zero: its history and references belong to the song
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
+      hitSourceRef.current.reset();
       // The bar too, for the same reason: its beats are on the old clock.
       barGridRef.current.reset();
       accentRef.current.reset();
