@@ -975,6 +975,9 @@ export class WebGPUFluid {
   private phaseGap: GPUBuffer | null = null;
   private phaseGapPrimed = false;
   private mazeReady = false;
+  /** The ferrofluid's own velocity for its carry (phaseVelocity), made with the phase's stage; the mixture's when the step runs without it. */
+  private phaseVelT: GPUTexture | null = null;
+  private phaseOwnVel = false;
   /** For the harness: whether the phase stage is running at all. */
   get phaseIsLive(): boolean { return this.phaseLive; }
   private airCover = 0;
@@ -1149,6 +1152,7 @@ export class WebGPUFluid {
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
       ['phaseMomentum', [VEL], open.phase],
+      ['phaseVelocity', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
       ['phaseDisplace', [dye], open.displace],
@@ -1471,7 +1475,7 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const ride = this.ride();
+    const ride = this.phaseRide();
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1513,10 +1517,10 @@ export class WebGPUFluid {
     const there = this.phase.read, back = this.phase.write;
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
       const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
-      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.phaseRide().label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, this.ride(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, this.phaseRide(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
@@ -2745,6 +2749,18 @@ export class WebGPUFluid {
         press drew the ferrofluid into the middle), the filter moving volume
         too (phaseGrid, and why).
       */
+      // By the ferrofluid's own velocity (phaseVelocity, and why); the lab's
+      // control (phaseMomentum 0) carries it by the mixture's, as before.
+      this.phaseOwnVel = (p.phaseMomentum ?? 1) > 0;
+      if (this.phaseOwnVel) {
+        if (!this.phaseVelT) {
+          this.phaseVelT = this.disposer.track(this.device.createTexture({
+            label: 'phase vel', size: [this.N, this.N], format: this.vel.read.format,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        this.run(pass, 'phaseVelocity', this.phaseVelT, [this.ride(), this.phase.read], none);
+      }
       if (volume) this.runPhasePlanned(pass, subs, disp, stand);
       else for (let k = 0; k < subs; k++) {
         this.runPhaseAdvect(pass, adv(k));
@@ -4387,6 +4403,11 @@ export class WebGPUFluid {
   /** The flow the thin carries ride: the forced flow, less the glass's drift when it has one (driftCells). */
   private ride(): GPUTexture {
     return this.riding ? this.velRide : this.velForced;
+  }
+
+  /** What the ferrofluid's share is carried by: its own velocity (phaseVelocity) once the phase's stage has made it, else the flow the colour rides. */
+  private phaseRide(): GPUTexture {
+    return this.phaseOwnVel && this.phaseVelT ? this.phaseVelT : this.ride();
   }
 
   /**

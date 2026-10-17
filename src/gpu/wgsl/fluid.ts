@@ -1066,6 +1066,49 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The ferrofluid's own velocity, for its carry (29c-4, the rim's drift). The
+    step has one velocity a cell, the mixture's: where a cell is part
+    ferrofluid and part oil it is the two liquids' momentum together, and at
+    a moving drop's edge that is the drop's speed blended with the oil
+    slipping back past it. The ferrofluid there is the drop's own liquid and
+    goes with it (the real interface is sharp, and the oil slips along it),
+    so carrying the share by the mixture's velocity left the rim behind: the
+    crescent, and once the momentum travelled (phaseMomentum) a faint wake
+    shed from the edge (ferrodrag's scene: cells over 0.01 of ferrofluid 352
+    to 972 in 3 s, the half-full area 100 to 82). So the share is carried by
+    the ferrofluid's own velocity: the cell's where it is all ferrofluid, and
+    at its edge the velocity of the ferrofluid round it, the nine cells'
+    weighted by their share through a [1 2 1]² window; the mixture's where
+    there is next to none round it. Its divergence is not the mixture's,
+    which is the two liquids' continuity: the share rises where the
+    ferrofluid's own flow converges, as a drop's edge is drawn in.
+  */
+  phaseVelocity: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let v = textureLoad(vel, p, 0);
+  let own = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (own >= 0.9) { textureStore(dst, p, v); return; }
+  var m = vec2f(0.0);
+  var s = 0.0;
+  for (var j = -1; j <= 1; j++) {
+    for (var i = -1; i <= 1; i++) {
+      let q = clampP(p + vec2i(i, j), n);
+      let w = f32((2 - abs(i)) * (2 - abs(j))) * clamp(textureLoad(phase, q, 0).r, 0.0, 1.0);
+      m += w * textureLoad(vel, q, 0).xy;
+      s += w;
+    }
+  }
+  let u = select(v.xy, m / max(s, 1e-6), s > 0.05);
+  textureStore(dst, p, safeVel(vec4f(u, v.z, v.w)));
+}`,
+
+  /*
     And never past full: the pressure inside the ferrofluid.
 
     The flux step conserves the liquid exactly, but the flow it rides is only
