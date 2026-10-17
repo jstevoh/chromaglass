@@ -677,6 +677,15 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run inputpick
 
+      # Following a known song by ear (PLAN.md 28g-2): the app's own band
+      # playing, its map made from its score, and the Perform desk's status
+      # bar, the track panel and the phone's Sound sheet each saying which
+      # song is followed and how sure, the track panel's section the band's.
+      # The ear and the DOM, not the plate, so no GPU; on the same dist/.
+      - name: Following a song, on the desk and the phone
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run followview
+
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
   # cannot present a canvas (measured in the P0 spike, spike/webgpu-p0).

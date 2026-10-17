@@ -3749,6 +3749,69 @@ looks move the frame (before: Oil Wheel and the two show stages that play it pat
 sound onto the motor), the list one of at most four, and Bass Drop's picture slides
 0.53% of the plate at its peak.
 
+## 28g. Following a known song played live
+
+### 28g-1. The follower and its check (#378)
+
+The owner, 2026-10-11: "if we pre record the shape of the song, how can we map that to a
+different sounding and sometimes improvisational version of the same song?" `chroma.ts`:
+a twelve-note profile, read from the analyser's tonal peaks (parabolic-refined) on a
+per-bin quarter-second median (drums dropped), the same arithmetic in the ear
+(`AudioReading.chroma`) and in the map (`mapChroma`, stored with every new map as
+`SongMap.chroma`). `songFollow.ts`: the forward algorithm over a place × tempo grid
+(0.6–1.6×), the form as transitions at the map's section ends, a leak for jumps the form
+did not offer, a start prior, and confidence = match quality × agreement. `npm run
+songfollow` (Measure, logic): takes 15% slower and faster on other instruments 100% of
+hops within a bar of the very place, tempo within 3%; a band speeding up 100 to 140 bpm
+with a bar of silence, 100%; bridge skipped, chorus repeated, solo doubled, a 16-bar jam:
+back within 0.7–1.8 bars; joined at the second verse, found in 1.9 bars; confidence 0.07
+in the jam against 0.92 where followed. `anchor(mapSec)` is the score's nudge (28h). The
+ear's frame costs 5 µs more (237 to 242 in node). Online time warping and a particle
+filter were tried first and dropped (the reasons in `songFollow.ts`'s header).
+
+### 28g-2. The follower live, with the fallback (this PR)
+
+Before, the place the show read a song map at was a clock from the moment the song was
+identified. `followedPlace.ts` makes it the follower's place when the follower is sure,
+and the clock run on from the last sure place, at the last sure tempo, when it is not;
+while unsure the map's section is withheld (`section` null), so the sequencer runs a
+section stage on its own clock and the show has the song's shape heard live. A map made
+before 28g-1 (no harmony) is the old clock, to the bit. `useMusicIntelligence` builds one
+per song and map, resyncs it when the song is identified (the fingerprint's offset starts
+the clock and anchors the follower), feeds it every reading of the ear (`onReading`), and
+reads it on its tick. Measured by `npm run songfollow`, 16 checks on the place:
+
+- Identified as each take begins, the place read is within a bar of the song on 100% of
+  hops on the takes 15% slower and faster, where the old clock is 9.3 and 6.8 bars out by
+  the last chorus; the map's section read is the song's on every sure hop.
+- Set to the follower's every answer, the place stepped by up to 0.27 and 1.29 bars between
+  frames; steered (the difference closed over a second, a jump only after a second of
+  being over a bar out), it makes no step on the slower take and one on the faster, from
+  1.42 bars out to 0.03 (the intro's held chord).
+- Deciding on the follower's confidence hop by hop, a third and a quarter made the jam
+  sure for moments and the place jump 24 bars with it; 0.5 and 0.4 switched the slower
+  take fifteen times. Held over 1.5 s (rising over 0.75 s), sure at 0.5, unsure under
+  0.35: no switch once settled on either take, the jam unsure on 107 of its 112 hops from
+  its third bar, the place running on through it without a jump.
+- Two changes to the follower the place's checks found. In a jam the weight ran to the
+  slowest tempo (0.99 going in, 0.62 at the chorus after): while lost (confidence under
+  0.2) each place's weight is now spread over the tempos as the band was last known to
+  play, and the tempo is 0.95 through the jam (without it the place was sure on 17 of the
+  jam's hops and jumped 5.3 bars). And quality now rises over 1.5 s where it falls over
+  3: the place was sure of the chorus after the jam 5.4 bars in, now 1.8. The follower's
+  own numbers: confidence where followed 0.87–0.98 (was 0.74–0.93), in the jam 0.11 (was
+  0.07), every place and relock number the same; 1.0–1.5 ms a second of sound.
+- Agreement by the map's harmony instead of its section labels was tried and changed no
+  number; left as it was (28g-4).
+
+`npm run followview` (Measure, browser): the app's own band is the song, its score
+rendered as Web Audio plays it and its map made from that. Tagged by name, the Perform
+desk's status bar says "Following “…”: 87% sure"; the track panel (the laptop without a
+desk), tagged twenty seconds into the band's verse, shows the verse while a clock from the
+tag says intro, five samples of five; the phone's Sound sheet says the desk's line under
+the song's shape. A song in C sharp the band never plays: "Not sure where in “…” (0%):
+following its sound", the playhead keeping time. A map with no harmony: no line.
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)

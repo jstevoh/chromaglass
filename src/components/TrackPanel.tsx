@@ -4,6 +4,7 @@ import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, H
 import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence';
 import { clockText } from '../lib/performanceTake';
 import { MusicSettings } from '../lib/musicTypes';
+import { followLine } from '../lib/followedPlace';
 import { Toggle } from './ui';
 
 interface TrackPanelProps {
@@ -69,9 +70,9 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
             <div className="text-sm font-bold">{track.title}</div>
             <div className="text-xs opacity-60 mt-0.5">{track.artist}{track.album ? ` — ${track.album}` : ''}</div>
             <div className="flex items-center gap-2 mt-2 text-[9px] uppercase tracking-wider opacity-50">
-              <span>{fmtTime(positionSec)}</span>
+              <span data-testid="track-position">{fmtTime(positionSec)}</span>
               {section && (
-                <span className="px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: `${SECTION_COLORS[section.label] ?? '#888'}40`, color: SECTION_COLORS[section.label] ?? '#ccc' }}>
+                <span data-testid="track-section" className="px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: `${SECTION_COLORS[section.label] ?? '#888'}40`, color: SECTION_COLORS[section.label] ?? '#ccc' }}>
                   {section.label}
                 </span>
               )}
@@ -105,6 +106,18 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
                     style={{ left: `${Math.min(100, (positionSec / songMap.durationSec) * 100)}%` }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/*
+              Following the map by ear (PLAN.md 28g-2, lib/followedPlace.ts):
+              whether the playhead above is where the band is heard to be, and
+              how sure. Not shown for a map made before following (it has no
+              harmony to follow): its playhead is the clock, as it always was.
+            */}
+            {state.follow && (
+              <div className={`mt-2 text-[10px] leading-snug ${state.follow.sure ? 'text-emerald-300/80' : 'text-amber-300/80'}`} data-testid="track-follow" role="status">
+                {followLine(state.follow)}
               </div>
             )}
 

@@ -161,6 +161,11 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /**
+   * Following a known song's map by ear (PLAN.md 28g-2, lib/followedPlace.ts
+   * `followLine`): which song, and how sure; null with no map to follow.
+   */
+  mapLine: string | null;
   /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
   deaf: boolean;
   /*
@@ -857,6 +862,14 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-3 text-[13px] leading-snug text-muted" data-testid="phone-song-shape">
               {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
             </p>
+          )}
+          {/*
+            The desk's track panel says the same under its playhead: whether
+            the show reads the song's map where the band is heard to be, or,
+            unsure, follows the song's shape above.
+          */}
+          {p.audioSource !== 'none' && p.mapLine && (
+            <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
           )}
           {p.audioSource !== 'none' && (
             <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
