@@ -105,6 +105,17 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
             // the laptop takes the show key, as a phone does.
             const key = role === 'display' ? info.displayKey : info.key;
             if (key) keyRef.current = key;
+            // The relay gives the display key only to the laptop at its own
+            // name (localhost). The laptop's page opened at its Wi-Fi address
+            // is told no key, and a display hello with none can only be
+            // refused, so it stays off the relay and looks again later, as a
+            // page with no relay does. (It used to say hello anyway, and
+            // every try was a wrong key against the room's address.)
+            if (role === 'display' && !keyRef.current) {
+              setStatus('offline');
+              timerRef.current = setTimeout(connect, PROBE_INTERVAL);
+              return;
+            }
             openSocket();
           } else if (seenRef.current) {
             // The relay was here and is gone: the show server restarting, or the

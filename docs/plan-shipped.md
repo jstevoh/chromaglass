@@ -1963,8 +1963,15 @@ governor's ladder and the cache as they were.
 - Only the laptop is handed a key: `/remote-info.json` answers `key` and `displayKey`
   to a loopback socket with a localhost Host and no forwarding headers. The display has
   its own 32-hex key, new each launch, so a phone's key cannot take the display role.
-- Three wrong keys from an address lock it out for 5 minutes (`denied` with `reason:
-  'locked'`, which the phone shows and waits out); the upgrade checks Origin (none, from
+- Three wrong keys from an address, each within 5 minutes of the last, lock it out for
+  5 minutes (`denied` with `reason: 'locked'`, which the phone shows and waits out); a
+  good key no longer clears the count, so a guest's own join cannot reset a guesser on a
+  shared address. Past 30 wrong keys a minute across all addresses, new joins from all
+  but the laptop are refused for 60 s, so a guesser spread over a /48 of IPv6 needs
+  years (PLAN 14m-budget). A display hello with no key is not a guess and is not counted,
+  and the laptop's page at its Wi-Fi address, which is given no display key, no longer
+  knocks. At most 4 sockets per address may be open without having said hello. The
+  upgrade checks Origin (none, from
   the native apps and the checks; a page this server served; the iPhone app; a page on
   this machine); `maxPayload` is 512 KiB (close 1009); a socket
   has 5 s to say hello; 16 sockets per address and 200 in all.
@@ -1974,7 +1981,7 @@ governor's ladder and the cache as they were.
 - Art-Net: an input universe (`artnetInUniverse`) and the `ARTNET_*` numbers falling
   back to their defaults when they are not numbers (`npm run lights`, 30 of 30).
 
-*Measured:* `npm run showkey` on the old server 8 of 24, now 27 of 27. With the server
+*Measured:* `npm run showkey` on the old server 11 of 33, now 33 of 33. With the server
 down for 4 s under a linked phone and laptop, a change on the laptop had not reached
 the phone in 25 s before; now it does in 3.6 s. `applink`, `draw`, `drawwall` read the
 display's key from `/remote-info.json`, and `remotemix`, `phonelink`, `panel` pass.
@@ -2032,9 +2039,10 @@ Origin from the site, a localhost, the show server on a private address or the i
 app (403 otherwise, and for none); its counter store bound (503); a `Content-Length` of
 at most 2 MB read before `formData()` (411 / 413), and the file measured again after;
 30 an hour per address, per /64 on IPv6 (429); 1000 a day across everyone, or
-`FINGERPRINT_DAILY_LIMIT` (503 `busy`). The app reads any refusal as no match.
+`FINGERPRINT_DAILY_LIMIT` (503 `busy`), and a counter store that throws is `busy` too,
+with CORS, not a bare 500. The app reads any refusal as no match.
 `wrangler.toml` binds `FINGERPRINT_LIMITS`, which the owner creates before redeploying.
-*Measured:* `npm run fingerprint-worker`, 7 of 18 on the old Worker, now 18 of 18; each
+*Measured:* `npm run fingerprint-worker`, 7 of 19 on the old Worker, now 19 of 19; each
 refusal also shows the service was not called.
 
 

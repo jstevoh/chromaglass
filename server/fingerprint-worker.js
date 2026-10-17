@@ -93,18 +93,27 @@ export default {
     if (Number(length) > MAX_BYTES) return json({ error: 'snippet too large' }, 413, cors);
 
     const hourKey = `rl:${addressOf(request)}:${Math.floor(Date.now() / 3_600_000)}`;
-    const hourCount = Number(await kv.get(hourKey)) || 0;
-    if (hourCount >= RATE_PER_HOUR) return json({ error: 'too many lookups' }, 429, cors);
     const dayKey = `day:${Math.floor(Date.now() / 86_400_000)}`;
-    const dayCount = Number(await kv.get(dayKey)) || 0;
     const ceiling = Number(env.FINGERPRINT_DAILY_LIMIT) || DAILY_LIMIT;
-    if (dayCount >= ceiling) return json({ error: 'busy' }, 503, cors);
-    // Counted before the lookup, so a request that fails after this still counts:
-    // what is bounded is what is asked of the service. KV is eventually consistent
-    // and has no increment, so two at once can both read n; the overshoot is a
-    // few lookups, not a loop's worth.
-    await kv.put(hourKey, String(hourCount + 1), { expirationTtl: 3700 });
-    await kv.put(dayKey, String(dayCount + 1), { expirationTtl: 2 * 86_400 });
+    // A counter that cannot be read or written is a refusal, not a pass: KV
+    // throws past its plan's writes for the day (a thousand on the free plan,
+    // two a lookup) and on a second write to one key inside a second, and a
+    // throw out of here was a 500 with no CORS, which the page cannot even read.
+    // Failing closed costs a lookup now and then; failing open is the bill.
+    try {
+      const hourCount = Number(await kv.get(hourKey)) || 0;
+      if (hourCount >= RATE_PER_HOUR) return json({ error: 'too many lookups' }, 429, cors);
+      const dayCount = Number(await kv.get(dayKey)) || 0;
+      if (dayCount >= ceiling) return json({ error: 'busy' }, 503, cors);
+      // Counted before the lookup, so a request that fails after this still counts:
+      // what is bounded is what is asked of the service. KV is eventually consistent
+      // and has no increment, so two at once can both read n; the overshoot is a
+      // few lookups, not a loop's worth.
+      await kv.put(hourKey, String(hourCount + 1), { expirationTtl: 3700 });
+      await kv.put(dayKey, String(dayCount + 1), { expirationTtl: 2 * 86_400 });
+    } catch {
+      return json({ error: 'busy' }, 503, cors);
+    }
 
     let file;
     try {

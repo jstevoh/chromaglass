@@ -98,8 +98,9 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 
 - **1.1** ~~**14m, then 14o**~~ (A, M then S): the show key to loopback only, long and timing-safe,
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
-  and limits. **Shipped, this PR** (`npm run showkey` 8 of 24 → 27 of 27, `npm run
-  fingerprint-worker` 7 → 18 of 18). Left: 14m-guest, 14m-tunnel, 14m-mark.
+  and limits. **Shipped, this PR** (`npm run showkey` 11 of 33 → 33 of 33, `npm run
+  fingerprint-worker` 7 → 19 of 19). Left: 14m-guest, 14m-tunnel, 14m-mark, 14m-lan,
+  14m-budget, 14o-count, 14o-smoke.
 - **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
@@ -3036,7 +3037,7 @@ the checks and the build §19.
 
 ### ~~14m. Anyone on the venue's network can drive the show~~
 
-**Shipped, this PR** (`npm run showkey`: 8 of 24 on the old server, 27 of 27 now). Story in `docs/plan-shipped.md`.
+**Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
 Left open from it:
 
 - **14m-guest** (*proposed*, M): a **guest key**, now that the server has roles: a key
@@ -3044,13 +3045,12 @@ Left open from it:
   a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
   tablet, a second projectionist, or at a party the audience's phones through a QR code
   on a card. *Measure:* `npm run showkey`: a guest socket's `patch` is dropped.
-- **14m-tunnel** (S, the Mac): every phone through `npm run tunnel` arrives from one
-  loopback address, so they share the 16-socket cap per address and one phone's three
-  wrong keys lock out every tunnel phone; and the upgrade's Origin check assumes the
-  tunnel passes the phone's Host and Origin through unchanged, which no cloud session
-  can confirm. *Measure:* on the Mac, a phone through the tunnel joins, and a fourth
-  wrong key from another tunnel phone is what the lock counts; if Cloudflare rewrites
-  either header, count by `cf-connecting-ip` behind the tunnel instead.
+- **14m-tunnel** (S, the Mac): behind `npm run tunnel` the server counts each phone by
+  `cf-connecting-ip`, so tunnel phones no longer share one address's caps and lock; but
+  the upgrade's Origin check assumes the tunnel passes the phone's Host and Origin through
+  unchanged, which no cloud session can confirm (`npm run showkey` asks it with the
+  headers cloudflared is documented to send). *Measure:* on the Mac, a phone through the
+  tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
 - **14m-mark** (S): the relay now closes a socket on a frame over 512 KB, so the laptop
   drops any message that large rather than lose its link (`useRemoteLink.ts`). The
   cast's `mark` carries the logo as a data URL, and a big PNG logo is over that: the
@@ -3058,13 +3058,36 @@ Left open from it:
   and send it as JPEG or WebP under 400 KB before casting. *Measure:* `npm run showkey`
   or `remotemix`: a 2 MB logo reaches the network display.
 
+- **14m-lan** (S): the laptop's own page opened at its Wi-Fi address (not `localhost`)
+  is not handed the display key, by design, so it stays off the relay and phones see no
+  laptop. It now stays quiet rather than knock with no key. *Fix:* the desk says "open
+  this page at localhost to link phones" when a relay answers and gives it no key.
+  *Measure:* `npm run phonelink`: that page shows the words and opens no socket.
+- **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
+  address, the server refuses new joins from everyone but the laptop for 60 s. That is
+  what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years
+  for an eight-digit key; the cost is that a script with a dozen addresses can keep new
+  phones out (phones already in, the laptop and its display are untouched). If a venue
+  ever meets that, the fix is a longer key for the tunnel, not a looser budget.
+
 ### ~~14n. One malformed message can end the plate~~
 
 **Shipped, #322.** Story in `docs/plan-shipped.md`.
 
 ### ~~14o. The song-ID Worker is open to anyone~~
 
-**Shipped, this PR.** Story in `docs/plan-shipped.md`.
+**Shipped, this PR** (`npm run fingerprint-worker`: 7 of 19 on the old Worker, 19 of 19 now).
+Story in `docs/plan-shipped.md`. Left open from it:
+
+- **14o-count** (S): the counters are in Workers KV, which takes one write a second per
+  key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
+  free plan meters about 500 lookups a day, and a second lookup from one address in the
+  same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
+  (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
+  plan's quota. *Measure:* the same harness with a store that allows one write a second.
+- **14o-smoke** (S, the owner): after creating `FINGERPRINT_LIMITS` and redeploying the
+  Worker, identify one song from the site and see it named. Nothing in CI reaches the
+  deployed Worker.
 
 ### 14p. Show night runs whatever merged last
 

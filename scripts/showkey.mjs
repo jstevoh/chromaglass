@@ -129,6 +129,22 @@ const hello = (ws, role, key, ms = 800) => new Promise((resolve) => {
   ws.send(JSON.stringify({ type: 'hello', role, key }));
 });
 
+/**
+ * `n` sockets from `ip` that join as phones, the way a room of them does: four
+ * at a time, each saying hello with the key as soon as it opens (the server
+ * holds an address to four that have not said hello yet).
+ */
+const joinMany = async (ip, n, key) => {
+  const out = [];
+  for (let i = 0; i < n; i += 4) {
+    const batch = await Promise.all(Array.from({ length: Math.min(4, n - i) }, () => open('127.0.0.1', { headers: { 'cf-connecting-ip': ip } })));
+    for (const s of batch) s.ws?.send(JSON.stringify({ type: 'hello', role: 'controller', key }));
+    out.push(...batch);
+    await wait(60);
+  }
+  return out;
+};
+
 /** Open a socket as if through the tunnel from `ip`, and say hello. */
 const tunnelHello = async (ip, role, key) => {
   const s = await open('127.0.0.1', { headers: { 'cf-connecting-ip': ip } });
@@ -196,6 +212,16 @@ try {
       check(`${who} is let through it`, Boolean(s.ws), s.ws ? origin : `answered ${s.refused}`);
       s.ws?.terminate();
     }
+    // A phone through the tunnel: cloudflared hands the server the tunnel's
+    // own name as Host and the page's Origin is that same name, which is the
+    // same-host rule, not the local one. (Whether cloudflared really passes
+    // Host through unchanged is for the Mac: PLAN 14m-tunnel.)
+    const tunnelled = await open('127.0.0.1', {
+      headers: { 'cf-connecting-ip': '203.0.113.30', host: 'show-example.trycloudflare.com' },
+      origin: 'https://show-example.trycloudflare.com',
+    });
+    check('a phone through the tunnel is let through it', Boolean(tunnelled.ws), tunnelled.ws ? 'opened' : `answered ${tunnelled.refused}`);
+    tunnelled.ws?.terminate();
   }
 
   // ── Wrong keys ───────────────────────────────────────────────────
@@ -209,6 +235,25 @@ try {
     check('and the phone is told for how long, a few minutes', right.retryMs >= 60_000 && right.retryMs <= 600_000, `retryMs ${right.retryMs}`);
     const other = await tunnelHello('203.0.113.11', 'controller', KEY);
     check('another address is not locked by it', other.verdict === 'in', other.verdict);
+    // The laptop's page opened at its Wi-Fi address is a display with no key
+    // (the relay gives the display key to localhost alone). It is refused, but
+    // it is not a guess, or an old page left open would lock out the room's
+    // address, the phones behind the same router with it.
+    const keyless = [];
+    for (let i = 0; i < 4; i++) keyless.push((await tunnelHello('203.0.113.12', 'display', undefined)).reason ?? 'none');
+    const after = await tunnelHello('203.0.113.12', 'controller', KEY);
+    check('a display with no key is refused but not counted as a guess', keyless.join(' ') === 'key key key key' && after.verdict === 'in',
+      `keyless: ${keyless.join(' ')}; then a phone from the same address: ${after.verdict}${after.reason ? ` (${after.reason})` : ''}`);
+    // And a good key does not wipe an address's wrong ones: two wrong, one
+    // right (the guest beside a stranger), then one more wrong locks it.
+    const shared = '203.0.113.13';
+    const two = [await tunnelHello(shared, 'controller', '00000001'), await tunnelHello(shared, 'controller', '00000002')];
+    const guest = await tunnelHello(shared, 'controller', KEY);
+    const third = await tunnelHello(shared, 'controller', '00000003');
+    const next = await tunnelHello(shared, 'controller', KEY);
+    check('a phone joining from an address does not hand it three fresh guesses',
+      two.every((r) => r.reason === 'key') && guest.verdict === 'in' && third.reason === 'key' && next.reason === 'locked',
+      `wrong, wrong: ${two.map((r) => r.reason).join(' ')}; the guest ${guest.verdict}; a third wrong ${third.reason}; then ${next.verdict}${next.reason ? ` (${next.reason})` : ''}`);
     const laptopTries = [];
     for (let i = 0; i < 4; i++) {
       const s = await open('127.0.0.1');
@@ -223,16 +268,26 @@ try {
 
   // ── How many ─────────────────────────────────────────────────────
   {
-    const one = await Promise.all(Array.from({ length: 20 }, () => open('127.0.0.1', { headers: { 'cf-connecting-ip': '198.51.100.9' } })));
+    const one = await joinMany('198.51.100.9', 20, KEY);
     const opened = one.filter((s) => s.ws).length;
     check('one address holds sixteen sockets and no more', opened === 16 && one.filter((s) => s.refused === 429).length === 4,
       `${opened} of 20 opened; refusals ${[...new Set(one.filter((s) => !s.ws).map((s) => s.refused))].join(', ')}`);
     one.forEach((s) => s.ws?.terminate());
     await wait(300);
-    const many = await Promise.all(Array.from({ length: 220 }, (_, i) => open('127.0.0.1', { headers: { 'cf-connecting-ip': `198.51.101.${Math.floor(i / 11)}` } })));
+    const many = (await Promise.all(Array.from({ length: 20 }, (_, a) => joinMany(`198.51.101.${a}`, 11, KEY)))).flat();
     const all = many.filter((s) => s.ws).length;
     check('and the server two hundred', all === 200, `${all} of 220 opened from 20 addresses`);
     many.forEach((s) => s.ws?.terminate());
+    await wait(300);
+    // Sockets that never say hello hold their address's slots for five
+    // seconds each; four at once is all an address gets of those, so a few
+    // dozen addresses opening nothing else cannot fill the server's two
+    // hundred, and the address's own phone still joins beside them.
+    const silent = await Promise.all(Array.from({ length: 6 }, () => open('127.0.0.1', { headers: { 'cf-connecting-ip': '198.51.102.1' } })));
+    const held = silent.filter((s) => s.ws).length;
+    check('an address holds four sockets that have not said hello, and no more', held === 4 && silent.filter((s) => s.refused === 429).length === 2,
+      `${held} of 6 opened; refusals ${[...new Set(silent.filter((s) => !s.ws).map((s) => s.refused))].join(', ')}`);
+    silent.forEach((s) => s.ws?.terminate());
     await wait(300);
   }
 
@@ -325,6 +380,25 @@ try {
         rejoined ? `in ${((Date.now() - t0) / 1000).toFixed(1)} s`
           : `the change on the laptop never reached the phone in 25 s (its rows read "${await readRows()}"); the server heard: ${server.said().split('\n').filter((l) => /connected|refused/.test(l)).map((l) => l.trim()).join(', ') || 'no one'}`);
     }
+  }
+
+  // ── Everyone's wrong keys ───────────────────────────────────────
+  // Last, since it shuts the door on every new phone for a minute. Twelve
+  // addresses, three wrong keys each: each address is locked on its own, but
+  // a script with a /48 has tens of thousands of them, so past thirty wrong
+  // keys in a minute the server takes no key from anyone new. The laptop is
+  // the show and is never shut out.
+  {
+    const wrongs = [];
+    for (let a = 0; a < 12; a++) for (let i = 0; i < 3; i++) wrongs.push((await tunnelHello(`192.0.2.${a + 1}`, 'controller', '00000000')).reason ?? 'none');
+    const fresh = await tunnelHello('192.0.2.200', 'controller', KEY);
+    check('past thirty wrong keys a minute from everyone, a new address with the right key is held off too',
+      wrongs.every((r) => r === 'key' || r === 'locked') && fresh.verdict === 'denied' && fresh.reason === 'locked' && fresh.retryMs > 0 && fresh.retryMs <= 60_000,
+      `${wrongs.filter((r) => r === 'key').length} wrong keys taken; then a new address: ${fresh.verdict}${fresh.reason ? ` (${fresh.reason}, retry ${Math.round((fresh.retryMs ?? 0) / 1000)} s)` : ''}`);
+    const s = await open('127.0.0.1');
+    const own = await hello(s.ws, 'display', (await info('127.0.0.1')).displayKey);
+    s.ws.terminate();
+    check('and the laptop is not', own.verdict === 'in', `${own.verdict}${own.reason ? ` (${own.reason})` : ''}`);
   }
 } catch (e) {
   check('the run finished', false, e.message);

@@ -38,9 +38,15 @@ const PORT = Number(process.env.PORT ?? 3000);
 // It used to be four digits, new at every launch: ten thousand guesses, with
 // nothing to stop a script making all of them in a few seconds (PLAN 14m). Now
 // it is eight, so a guess is one in ninety million, and three wrong ones lock
-// that address out for five minutes (`wrongKey` below): at that pace a script
-// needs centuries. It is also kept, in `server/.show-key` (readable by the
-// owner's account alone, and ignored by git), because a key that changes at
+// that address out for five minutes (`wrongKey` below). An address is not a
+// person, though: one IPv6 customer is handed a /48, sixty-five thousand of the
+// /64s counted below as one address each, so the lock is backed by a budget for
+// the whole server, thirty wrong keys a minute from everyone but the laptop
+// (`WRONG_BUDGET`). Past that the server takes no keys from anyone new for a
+// minute, so a script with any number of addresses makes about twenty thousand
+// guesses a day and needs years to find the key. It is also kept, in
+// `server/.show-key` (readable by the owner's account alone, and ignored by
+// git), because a key that changes at
 // every launch means every phone at the gig has to be re-scanned after a
 // restart in the middle of a set. SHOW_KEY in the environment still wins, for
 // a key the owner chooses; SHOW_KEY_FILE moves the file (the `showkey` check
@@ -205,6 +211,14 @@ const server = createServer((req, res) => {
 // laptop is counted by neither.
 const MAX_PER_ADDRESS = 16;
 const MAX_SOCKETS = 200;
+// And four an address that have not said who they are yet. A socket that
+// never says hello is closed at five seconds (HELLO_MS), but the two hundred
+// count it until then, and from a few dozen /64s a script could open nothing
+// but those and keep every new phone out (the review of PLAN 14m). A phone says
+// hello the moment its socket opens, so four is slack for a room full of
+// phones joining through one address at once; a fifth waits for its backoff.
+const MAX_UNNAMED = 4;
+const unnamedBy = new Map();
 const MAX_FRAME = 512 * 1024;
 const openBy = new Map();
 let openTotal = 0;
@@ -221,12 +235,16 @@ const verifyClient = ({ req }, done) => {
   req.address = clientAddress(req);
   if (req.laptop) { done(true); return; }
   const mine = openBy.get(req.address) ?? 0;
-  if (mine >= MAX_PER_ADDRESS || openTotal >= MAX_SOCKETS) { done(false, 429, 'Too many connections'); return; }
+  const unnamed = unnamedBy.get(req.address) ?? 0;
+  if (mine >= MAX_PER_ADDRESS || unnamed >= MAX_UNNAMED || openTotal >= MAX_SOCKETS) { done(false, 429, 'Too many connections'); return; }
   openBy.set(req.address, mine + 1);
+  unnamedBy.set(req.address, unnamed + 1);
+  req.unnamed = true;
   openTotal++;
   // Counted down when the TCP socket goes, however it goes: a refused
   // upgrade, a close, a terminate, or a phone that walked out of range.
   req.socket.once('close', () => {
+    named(req);
     openTotal--;
     const n = (openBy.get(req.address) ?? 1) - 1;
     if (n > 0) openBy.set(req.address, n); else openBy.delete(req.address);
@@ -237,26 +255,52 @@ const verifyClient = ({ req }, done) => {
 // arrives, rather than being read whole into memory and then thrown away,
 // which is what the old length check after `toString()` did. The biggest
 // thing the show sends is a cast frame, well under it.
+/** A socket that has said hello, or gone, no longer counts against its address's four. */
+const named = (req) => {
+  if (!req.unnamed) return;
+  req.unnamed = false;
+  const n = (unnamedBy.get(req.address) ?? 1) - 1;
+  if (n > 0) unnamedBy.set(req.address, n); else unnamedBy.delete(req.address);
+};
 const wss = new WebSocketServer({ server, path: WS_PATH, maxPayload: MAX_FRAME, verifyClient });
 const roles = new WeakMap();
 
 /**
- * Wrong keys, by address. Three in a row lock the address out for five
- * minutes, and while it is locked even the right key is refused, or the lock
- * would only slow a script down to the pace of its own retries. The laptop is
+ * Wrong keys, by address. Three, each within five minutes of the last, lock
+ * the address out for five minutes, and while it is locked even the right
+ * key is refused, or the lock would only slow a script down to the pace of
+ * its own retries. The laptop is
  * never locked out: a stale display key after a restart is a wrong key, and
  * the show must not lock itself out of its own relay.
  */
 const WRONG_KEYS = 3;
 const LOCKOUT_MS = 5 * 60_000;
 const wrongKeys = new Map();
-const lockedFor = (address, now = Date.now()) => Math.max(0, (wrongKeys.get(address)?.until ?? 0) - now);
+/**
+ * And the whole server's: past thirty wrong keys in a minute, from however
+ * many addresses, nobody new is let in for a minute (the key comment at the top
+ * says why). What that costs the show: a script with a dozen addresses can keep
+ * new phones out, a phone that drops can't rejoin until it clears, and the
+ * phones already in, the laptop and its display are never touched. A show being
+ * driven by a stranger is the worse of the two.
+ */
+const WRONG_BUDGET = 30;
+const BUDGET_MS = 60_000;
+const budget = { start: 0, count: 0, until: 0 };
+const lockedFor = (address, now = Date.now()) =>
+  Math.max(0, (wrongKeys.get(address)?.until ?? 0) - now, budget.until - now);
 const wrongKey = (address, now = Date.now()) => {
   const entry = wrongKeys.get(address) ?? { count: 0, until: 0, at: now };
+  if (now - entry.at > LOCKOUT_MS) entry.count = 0;
   entry.count++;
   entry.at = now;
   if (entry.count >= WRONG_KEYS) { entry.count = 0; entry.until = now + LOCKOUT_MS; }
   wrongKeys.set(address, entry);
+  if (now - budget.start > BUDGET_MS) { budget.start = now; budget.count = 0; }
+  if (++budget.count > WRONG_BUDGET) {
+    budget.until = now + BUDGET_MS;
+    console.log(`  more than ${WRONG_BUDGET} wrong keys in a minute: taking none for a minute`);
+  }
 };
 // A socket must say who it is within five seconds. One that never does is
 // either a scanner or something that will hold a slot until the heartbeat
@@ -326,15 +370,22 @@ wss.on('connection', (socket, req) => {
         return;
       }
       if (!keyIs(message.key, role === 'display' ? DISPLAY_KEY : SHOW_KEY)) {
-        if (!laptop) wrongKey(address);
+        // A display with no key is not a guess: it is the laptop's own page
+        // opened at an address the relay does not give the display key to
+        // (its Wi-Fi address, say), which the page no longer even sends
+        // (useRemoteLink). An old page that does must not lock the room out.
+        const guess = !(role === 'display' && (message.key === undefined || message.key === null || message.key === ''));
+        if (!laptop && guess) wrongKey(address);
         console.log(`  ${role} refused: wrong ${role === 'display' ? 'display' : 'show'} key`);
         socket.send(JSON.stringify({ type: 'denied', reason: 'key' }));
         socket.close();
         return;
       }
-      // Not for the laptop: its address is loopback, which a rebinding page
-      // shares, and the laptop joining must not hand that page fresh guesses.
-      if (!laptop) wrongKeys.delete(address);
+      // A good key does not wipe the address's wrong ones: an address can be a
+      // venue's whole Wi-Fi behind one router, and a guest joining must not
+      // hand the stranger beside them three fresh guesses. They lapse instead,
+      // five minutes after the last (`wrongKey`).
+      named(req);
       clearTimeout(deadline);
       roles.set(socket, role);
       const count = [...wss.clients].filter(c => roles.get(c) === role).length;

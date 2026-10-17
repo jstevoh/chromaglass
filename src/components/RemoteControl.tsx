@@ -144,11 +144,12 @@ export default function RemoteRoot() {
 const REMOTE_VIEW_KEY = 'chromaglass-remote-view';
 
 /**
- * What a phone says while the show server is refusing its address after three
- * wrong keys (PLAN 14m). The link tries again by itself when the lock is over, so
- * the words say to wait, and which key to have ready, rather than to reload.
+ * What a phone says while the show server is refusing it: three wrong keys from
+ * its address, or more than thirty a minute from everyone (PLAN 14m), so not
+ * "from this phone", which may have typed none. The link tries again by itself
+ * when the lock is over, so the words say to wait rather than to reload.
  */
-const LOCKED_WORDS = 'Too many wrong keys from this phone: trying again in a few minutes';
+const LOCKED_WORDS = 'The show is refusing new phones after too many wrong keys: trying again in a few minutes';
 
 function RemoteControl({ inApp }: { inApp: boolean }) {
   const [state, setState] = useState<RemoteState | null>(null);

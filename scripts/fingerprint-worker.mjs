@@ -23,7 +23,9 @@
  *      phone can take any of its 2^64 addresses;
  *   6. at the day's ceiling the Worker answers "busy" (503) rather than spend;
  *   7. a Worker deployed without its counter store refuses rather than run
- *      unmetered.
+ *      unmetered;
+ *   8. and one whose store throws (out of writes for the day) answers "busy"
+ *      with CORS on it, not a bare 500, and asks nothing.
  *
  * Each refusal is read twice: the status it answers, and that the service was
  * not called and the body not parsed. A status alone would pass on a Worker that
@@ -156,8 +158,10 @@ try {
     // A body over the cap that claims to be small: a Content-Length is the
     // sender's word, so the file's own size is still checked after parsing.
     const liar = await run(post({ form: snippet(2.5 * 1024 * 1024), headers: { 'Content-Length': '1000' } }), env);
-    check('and one that claims to be small is still measured', liar.status >= 400 && liar.spent === 0,
-      `${liar.status}, service called ${liar.spent}`);
+    // Read, so past the length gate, and then refused for its size: a status
+    // that is merely an error would pass on a body the parser threw on.
+    check('and one that claims to be small is still measured', liar.status === 413 && liar.read === 1 && liar.spent === 0,
+      `${liar.status}, body read ${liar.read}, service called ${liar.spent}`);
   }
 
   // ── 5. Per address ──
@@ -201,6 +205,19 @@ try {
     const r = await run(post(), { AUDD_API_TOKEN: 'test-token' });
     check('a Worker deployed without its counter store refuses rather than run unmetered', r.status === 503 && r.spent === 0,
       `${r.status} ${JSON.stringify(r.body)}, service called ${r.spent}`);
+  }
+
+  // ── 8. A counter store that throws ──
+  // KV throws past the plan's writes for the day and on a second write to a
+  // key inside a second. That must be a refusal the page can read (CORS on
+  // it), not a 500 without, and never a lookup.
+  {
+    const env = fresh();
+    env.FINGERPRINT_LIMITS.put = async () => { throw new Error('KV PUT failed: 429 Too Many Requests'); };
+    const r = await run(post(), env);
+    check('a counter store that refuses a write is a "busy" the page can read, not a lookup',
+      r.status === 503 && r.body?.error === 'busy' && r.headers.get('Access-Control-Allow-Origin') === SITE && r.spent === 0,
+      `${r.status} ${JSON.stringify(r.body)}, Allow-Origin ${r.headers.get('Access-Control-Allow-Origin')}, service called ${r.spent}`);
   }
 } catch (e) {
   check('the run finished', false, e.stack ?? e.message);

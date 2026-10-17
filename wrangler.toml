@@ -10,6 +10,11 @@ compatibility_date = "2026-07-01"
 # create the namespace before deploying this version:
 #   npx wrangler kv namespace create FINGERPRINT_LIMITS
 # and put the id it prints below.
+# On Cloudflare's free plan KV takes a thousand writes a day, and the Worker
+# writes two a lookup, so about five hundred lookups a day get through there and
+# the rest are answered "busy"; the paid plan lifts it. KV also takes one write
+# a second to a key, so two lookups in the same second can have one refused as
+# busy (PLAN 14o-count).
 [[kv_namespaces]]
 binding = "FINGERPRINT_LIMITS"
 id = "REPLACE_WITH_KV_NAMESPACE_ID"
