@@ -2980,12 +2980,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;
     var more1 = 1.0;   // throughScaled
-    var lampMore1 = 1.0;
     if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
       more1 *= dish1.x;
-      lampMore1 *= dish1.x;
     }
 
     let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
@@ -2995,13 +2993,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     }
 
     // The grain after the edge, not before it: see the front plate's.
+    let film1 = fluid1.a;
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      let gd1 = grainedDepth(bare1, grain);
-      fluid1.a = min(1.0, fluid1.a * gd1);
+      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
       more1 *= grain;
-      lampMore1 *= gd1;
     }
+    let grained1 = fluid1.a;
 
     let sharp1 = dof < 0.55;
     var near1 = vec4f(0.0);
@@ -3088,7 +3086,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         how much of its dye is in the path (throughScaled).
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(t1, lampMore1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let lit1 = outColor * throughScaled(t1, dish1.x * select(1.0, grained1 / max(film1, 1e-4), film1 > 0.004) * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
         outColor = painted1;
