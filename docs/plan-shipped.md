@@ -1952,6 +1952,114 @@ map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` boun
 `NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
 governor's ladder and the cache as they were.
 
+### 14m. Anyone on the venue's network can drive the show
+
+**Shipped** (this PR). What changed, in `server/remote-server.js` unless named:
+
+- The show key is eight digits from `crypto.randomInt`, compared with `timingSafeEqual`,
+  kept in `server/.show-key` (mode 600, ignored by git) so a restart keeps it, and the
+  Mac app's key is eight digits too (`desktop/main.js`; a four-digit key is replaced, so
+  each phone scans the new code once).
+- Only the laptop is handed a key: `/remote-info.json` answers `key` and `displayKey`
+  to a loopback socket with a localhost Host and no forwarding headers. The display has
+  its own 32-hex key, new each launch, so a phone's key cannot take the display role.
+- Three wrong keys from an address, each within 5 minutes of the last, lock it out for
+  5 minutes (`denied` with `reason: 'locked'`, which the phone shows and waits out); a
+  good key no longer clears the count, so a guest's own join cannot reset a guesser on a
+  shared address. Past 30 wrong keys a minute across all addresses, new joins from all
+  but the laptop are refused for 60 s, so a guesser spread over a /48 of IPv6 needs
+  years (PLAN 14m-budget). A display hello with no key is not a guess and is not counted,
+  and the laptop's page at its Wi-Fi address, which is given no display key, no longer
+  knocks. At most 4 sockets per address may be open without having said hello. The
+  upgrade checks Origin (none, from
+  the native apps and the checks; a page this server served; the iPhone app; a page on
+  this machine); `maxPayload` is 512 KiB (close 1009); a socket
+  has 5 s to say hello; 16 sockets per address and 200 in all.
+- `useRemoteLink.ts`: a relay that was there and went away is looked for on the short
+  backoff, not the 30 s probe, so a laptop and phone come back after a restart by
+  themselves; a frame over the cap is dropped with a warning rather than sent.
+- Art-Net: an input universe (`artnetInUniverse`) and the `ARTNET_*` numbers falling
+  back to their defaults when they are not numbers (`npm run lights`, 30 of 30).
+
+*Measured:* `npm run showkey` on the old server 11 of 33, now 33 of 33. With the server
+down for 4 s under a linked phone and laptop, a change on the laptop had not reached
+the phone in 25 s before; now it does in 3.6 s. `applink`, `draw`, `drawwall` read the
+display's key from `/remote-info.json`, and `remotemix`, `phonelink`, `panel` pass.
+
+
+**Read in the code** (`server/remote-server.js` unless named).
+
+- The show key is four random digits (`SHOW_KEY`), about 13 bits, compared with `!==`,
+  and a wrong `hello` only closes that socket: nothing counts failures or slows the next
+  try. Through `npm run tunnel` the 9,000 keys fall in minutes.
+- On the LAN it need not be guessed. `/remote-info.json` hands the key to any request
+  without `x-forwarded-for` or `cf-connecting-ip` (`isLocalRequest`), which is every
+  device on the venue's Wi-Fi, not only the machine `remoteProtocol.ts` says it is for.
+  The socket checks no Origin or Host either, so a web page open on any phone in the
+  room can reach `ws://<laptop>:3000/remote-ws`.
+- With the key, a `hello` as `display` receives every phone's commands, and can push
+  `state` and `cast` to the phones and to the network display on the wall, set the
+  Art-Net `lights`, and toggle Record and Blackout.
+- Frames are taken up to the `ws` default of 100 MiB (`new WebSocketServer({ server,
+  path })`); the 512 KB limit is checked after the frame is buffered and made a string.
+  A socket that never says hello is never closed, and nothing caps connections. A few
+  large frames stop the Node process, and every phone, network display, OSC and Art-Net
+  with it.
+- A restart with the generated key answers every phone and network display `denied`,
+  and `useRemoteLink.ts` stops retrying for good on that, though the server's comment
+  says it is restartable mid-show.
+- Art-Net in reads every universe but its own output (`packet.universe ===
+  artnet.universe` is the only filter) into one `seen` map, so on a rig with four
+  universes each mapped setting jumps between their values. A non-numeric `ARTNET_RATE`
+  makes the rate `NaN`, and `setInterval(…, NaN)` sends every millisecond.
+
+*Fix:* the key only to a loopback `req.socket.remoteAddress`, and an Origin check on the
+upgrade; a longer key from `crypto.randomInt`, compared with `timingSafeEqual`, and an
+address locked out after a few wrong hellos; a display key apart from the phones', so a
+phone's key cannot take the display role; `maxPayload: 512 * 1024`, a 5 s deadline for
+the hello and a cap per address; the generated key kept in a file beside the server, so
+a restart keeps it; an input universe, and the `ARTNET_*` numbers validated. The phone's
+join and the iPhone app's laptop remote (`appLink.ts`) must keep working.
+
+Once the server has roles, a **guest key** is a small step (*proposed*): a key whose
+socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto a
+chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
+tablet, a second projectionist, or at a party the audience's phones through a QR code
+on a card.
+
+*Measure:* extend `npm run remotemix`: a request from a LAN address gets no key; three
+wrong keys lock the address out; a 1 MB frame is refused without the process growing; a
+silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
+socket's `patch` is dropped.
+
+### 14o. The song-ID Worker is open to anyone
+
+**Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
+Origin from the site, a localhost, the show server on a private address or the iPhone
+app (403 otherwise, and for none); its counter store bound (503); a `Content-Length` of
+at most 2 MB read before `formData()` (411 / 413), and the file measured again after;
+30 an hour per address, per /64 on IPv6 (429); 1000 a day across everyone, or
+`FINGERPRINT_DAILY_LIMIT` (503 `busy`), and a counter store that throws is `busy` too,
+with CORS, not a bare 500. The app reads any refusal as no match.
+`wrangler.toml` binds `FINGERPRINT_LIMITS`, which the owner creates before redeploying.
+*Measured:* `npm run fingerprint-worker`, 7 of 19 on the old Worker, now 19 of 19; each
+refusal also shows the service was not called.
+
+
+**Read in the code.** `server/fingerprint-worker.js` answers any origin
+(`Access-Control-Allow-Origin: *`) with no key and no rate limit, and its URL is built
+into the public bundle (`VITE_FINGERPRINT_PROXY_URL`, `deploy.yml`). Anyone who reads
+the bundle can identify songs on the owner's AudD or ACRCloud account, from a script or
+from their own site. It also parses the whole multipart body (`request.formData()`)
+before its 2 MB check. The report Worker already has what this one lacks
+(`ALLOWED_ORIGINS`, a per-address limit in KV; `docs/crash-plan.md`).
+
+*Fix:* the same origin list and per-address limit (per /64 on IPv6), a refusal on
+`Content-Length` before parsing, and a daily ceiling that answers "busy" rather than
+spending. The show's own origins (the site, the show server, the Mac app) stay allowed.
+*Measure:* a node harness in the manner of `npm run report-worker`: a foreign origin
+refused, the 31st request in an hour refused, a 3 MB body refused before `formData()`.
+
 ### 14s. The ear: the input picker (shipped)
 
 **Shipped 2026-10-05.** `chooseAudioInput` (`App.tsx`) was memoised on `[audioSource]`
@@ -2755,6 +2863,25 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+**19v-3. The magnet check's second press landed on the plate bar.** Shipped 2026-10-17.
+Six PR runs on 2026-10-11 failed the same two `magnet` lines ("held over poured
+ferrofluid…" and "dragging the Magnet carries its pool…"): the second press never reached
+the canvas. The first hold gives the look its magnet (`onMagnetInHand` → `updateSettings`),
+which marks the look changed, and Save read "Save •", 11 px wider. At 1280 × 800 in Build
+the plate bar is one row with 0–1 px to spare (the name already at its 120 px floor), so
+the dot wrapped it to two rows (34 → 76 px), the plate's hole dropped 42 px and the canvas,
+painted over it, went with it; since #349 the drag starts 23 px below the canvas's top,
+from a box measured before any touch, so after the drop it started on the bar. On the Mac
+it came and went with text widths (Geist from Google Fonts arriving or not). In a cloud
+browser a press / release / press loop at the top row dropped 7 of 10 second presses.
+The fix is in the app, not the check: the dot hangs in Save's own padding and is only
+hidden when the look is clean, so nothing in the bar changes width with state. `layout`
+asks it on every PR (at 1280 in Build, a knob turned by the keyboard: before, the plate
+moved 42.0 px and Save 534 px; after, 0.0 and 0.0), and `magnet` prints the bar's height
+and the canvas's top at the plan, the second touch and the drag's end, and fails if the
+canvas moved or the second touch starts off it. The phone has no plate bar. Record's
+labels still change width in the same bar (19v-4).
+
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
 **Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
@@ -2994,6 +3121,35 @@ Drop, the remote) reads it. A Natural swatch on the shelf, the Design desk, the 
 sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by default
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
+
+### 18g. Colour leaves by flushing, not by fading
+
+**18g-1** (2026-10-11): flushing at the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim, and a still dish loses no colour through its rim (`evapFactor` 1). Base evaporation still fades colour inside the dish until 18g-3/18g-5, and the dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
+
+### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+
+- **Where:** 4-iteration Jacobi dye diffusion with one constant for every colour (about 40,000× the
+  molecular rate at the slider's top, measured 2026-10-11: a drop's rms radius 4.7 → 19 →
+  37 mm at 0/5/20 s, D ≈ 1.7e-5 m²/s against food dye's ~4e-10; this said "about 1000×",
+  which was a guess), and heat on the same number (Double Diffusion only multiplies it;
+  water's κ is 1.4e-7, about 350× the dye's; heat previously shared the dye's number, leaving 12 looks with
+  0 heat spreading); the MacCormack Jacobian clamp and neighbourhood cap (`fluid.ts` advection), which
+  lose the excess; `sharpenDye`, retired (0 by default) but still in the step.
+- **The real phenomenon:** molecular diffusion is negligible at this scale ($D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$). The blur in
+  a Hele-Shaw cell is shear dispersion along the flow. On show timescales ($t \ll h^2/D_m \approx 25\text{ hours}$ across a 6 mm gap),
+  parabolic velocity shear $u(z) = 1.5 \bar{u} (1 - 4z^2/h^2)$ across the gap yields pre-asymptotic along-streamline
+  spreading with variance $\sigma^2 \approx 0.2 \bar{u}^2 (\Delta t)^2$, rather than the long-time Taylor–Aris limit.
+  Edges stay sharp where the liquid is still and streak along flow lines where it moves.
+  Heat spreads at water's own thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$, Le $\approx$ 350).
+- **What it takes:** a single explicit conservative finite-volume face-flux pass (`dyeDisperse`) with an anisotropic
+  tensor $D_L = D_m + \kappa_T (h/h_0)^2 |v|^2$, capped at 0.25 cells²/step (the von Neumann positivity limit), with
+  positivity-preserving cross-term limiting to prevent negative oscillations. Heat diffusion is decoupled from dye diffusion
+  and handled in the viscosity stage with time accumulation (`heatSeconds`) to ensure FP16 precision survival on SwiftShader.
+- **Cost:** single explicit pass (0.39 ms, 2.0% share), replacing 4-iteration Jacobi (1.3 ms), saving ~0.9 ms.
+- **Shipped (#357):** replaced 4-iteration Jacobi dye diffusion with single explicit conservative
+  finite-volume shear dispersion (`dyeDisperse`) with molecular diffusion $D_m = 4\times 10^{-10}\text{ m}^2/\text{s}$ and
+  longitudinal shear dispersion along depth-mean flow; decoupled heat diffusion to real water thermal
+  diffusivity $\kappa = 1.4\times 10^{-7}\text{ m}^2/\text{s}$ in viscosity stage. Checked by `npm run dispersion` (6/6).
 
 ### 18i. Bubbles and beads live by physics, not timers
 
@@ -3486,6 +3642,48 @@ desk), tagged twenty seconds into the band's verse, shows the verse while a cloc
 tag says intro, five samples of five; the phone's Sound sheet says the desk's line under
 the song's shape. A song in C sharp the band never plays: "Not sure where in “…” (0%):
 following its sound", the playhead keeping time. A map with no harmony: no line.
+
+## 28f. Every look answers the music through its own patches
+
+### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
+
+Asked 2026-10-11 in the gallery review: the show hears the music well now, so the looks
+should answer it more by default, through the patch bay; "it's ok if the whole plate
+moves (or other global changes) with a small subset of presets. I just don't want this
+kind of look to be a default across all presets"; and "only use things that we can
+detect quickly and make changes that are appropriate for the music".
+
+Found: four of the shelf's 17 patches never moved anything. They named a drum or a note
+(`kick`, `hats`, `note`, `tonalMid`) on the `sound` source, whose features are the hook's
+loudness, bass, mid, treble, energy, timbre and complexity, and the fold reads a name its
+source lacks as 0: Bass Drop's kick on Plate Rock, Microscopic Chaos's hats on Beads,
+Aurora's note on Comet Speed and its mids on the hue journey. Comet's timbre was patched
+at a depth of 45 (meant as degrees; a depth is a share of the dial's 0..360), which threw
+its heading to the clamp at any timbre. Oil Wheel's band patched onto the dish's motor,
+the frame and not the liquid, and nothing held a look to the owner's rule. And a patch
+could read each drum's level but not its hits: a level is loud between hits too.
+
+Built: the four read their names from the `bands` source (Aurora's held chord now turns
+the hue sooner); comet's depth is 0.125, the 45° meant. `FRAME_MOVING_LOOKS`
+(lib/plateRock.ts) names the looks that may move the frame with the music: Bass Drop
+alone, at Frame Sway 0.35, its kick's hit on Plate Rock. Oil Wheel's mids went into the
+oil (Buoyancy). The hits are a patch source (`hits`, lib/hitSource.ts): Kick, Snare and
+Hats hit, Any hit (how hard the last one landed, falling over a quarter second; read when
+the onset's time moves, at the strength it was given, `OnsetState.last`, so a plate
+drawing twenty frames a second still sees them) and Pitch, on the desk's patch bay, the
+phone's (the same sheet) and Sound learn, with Sound Impact as its master. Beat phase
+was already patchable: the Shapes source's LFOs run on the bar. Cyberpunk (kick, snare,
+hats), Fillmore East (bass on the pour, a hit's stir) and Lava Lamp (the bass on the
+wax's buoyancy, a held chord on the hue) are the pattern the rest follow (28f-2).
+
+Measured: `npm run soundpatch` (new, in Measure): every patch on the shelf moves its
+control (before: 4 of 17 read nothing, comet at 45; after 24 of 24); each of 160 kicks is
+in Kick hit on its own frame at its strength, under a tenth of its peak 0.6 s on, over
+half on 11% of a drop's frames; at one reading in three, Any hit rose for 200 of 225 hits
+where the hit's own reading reached the loop for 72. `npm run framesway`: only the named
+looks move the frame (before: Oil Wheel and the two show stages that play it patched
+sound onto the motor), the list one of at most four, and Bass Drop's picture slides
+0.53% of the plate at its peak.
 
 ## 29. The closeup's ferrofluid drop
 

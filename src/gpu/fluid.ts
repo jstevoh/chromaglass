@@ -33,7 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -316,6 +316,21 @@ const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
 /*
+  The Oregonator's own time a second of show (the bz stage). A real dish of
+  ferroin BZ turns its spirals once in tens of seconds and its waves crawl a
+  few millimetres a minute. The reaction ran twelve steps of 0.01 a solver
+  step, 7.2 of its units a second at sixty steps, and one turn of the model's
+  spiral is 5.3 units (the lab: the oxidised catalyst at a point peaked every
+  0.73 s; the showreel saw blue rings pulse every 0.75 s, a metronome). At
+  0.26 a turn takes 20 s, the quick end of a real dish. The shortcut, named:
+  the model's wavelength is a fifth of the plate, so the plate is a patch of
+  the dish about 6 mm across, as under a magnifier, and at the real period
+  its waves cross it at the real speed for their wavelength (about 0.01 of
+  the plate a second). On the show's clock (seconds a step), not a count of
+  steps, so the governor's step rate does not change the chemistry's.
+*/
+const BZ_PER_SECOND = 0.26;
+/*
   The grid the reaction's diffusion lengths are given on (stepChemistry): the
   middle rung, so the coral and the print keep about the size the looks were
   judged at on the Mac, now on every rung. CHEM_STABLE is the explicit step's
@@ -353,7 +368,6 @@ const SWIRL_SPIN_MIN = 0.05;
 const SPIN_OIL_LIGHT = 0.12;
 const SQUEEZE_SWEEPS = 5;
 const VISC_ITERS = 4;
-const DYE_ITERS = 4;
 /*
   How much of the grid's checkerboard the dye loses a step, the diffusion's
   share included (dampGrid). A twentieth: the grating the closeup showed is
@@ -383,11 +397,18 @@ const MAX_SPEED = 0.002;
 const PLATE_METRES = DISH_METRES;
 const REST_GAP = 0.03;
 /*
-  The dish's rim, in plate widths from the middle: the plate's inscribed
-  circle, which is all the picture ever shows of it (plate.ts keeps both
-  dishes inside it). Past it the liquid is open to the air.
+  Real molecular diffusion of food dye in water (PLAN 18h).
+  Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an
+  effective D ≈ 1.7e-5 m²/s in the lab (~40,000× real food dye in water ~4e-10 m²/s,
+  not "about 1000×").
 */
-const OPEN_RIM = 0.5;
+const D_MOLECULAR = 4.0e-10; // m²/s
+/*
+  Thermal diffusivity of water (PLAN 18h): kappa ≈ 1.4e-7 m²/s (Lewis number
+  Le ≈ 350 against dye). Heat gets its own physical diffusivity so the 12
+  presets with diffusionRate at 0 still spread heat.
+*/
+const KAPPA_WATER = 1.4e-7; // m²/s
 /*
   The forces' own physics on a thin gap (PLAN 18a-2, wgsl/thinGap.ts's
   hsBody, hsPrep and hsDivergence).
@@ -692,6 +713,7 @@ export class WebGPUFluid {
   private readonly rbVel: Float32Array;
 
   private grainAge = 0;
+  private heatSeconds = 0;
   private disposed = false;
   /** Per-pass GPU times under ?debug. */
   readonly profiler: GpuProfiler;
@@ -1008,6 +1030,7 @@ export class WebGPUFluid {
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
+      ['dyeDisperse', [dye], true],
       ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye], true],
       ['forcesB', [VEL], true],
       ['currentForces', [VEL], true],
@@ -1194,6 +1217,7 @@ export class WebGPUFluid {
       [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       [`bodyAdvectSub:${dye}`, kernel('bodyAdvectSub', dye)],
       [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
+      [`dyeDisperse:${dye}`, kernel('dyeDisperse', dye)],
       // The dye's slump (PLAN 18m), which runs on every thin step of a liquid thin enough to let it.
       [`slumpRate:${R32}`, kernel('slumpRate', R32)],
       [`slump:${dye}`, kernel('slump', dye)],
@@ -1520,15 +1544,17 @@ export class WebGPUFluid {
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
     const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
+    const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
-    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = 0;
+    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
     f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
       neither damps nor clamps it: only the heat decays there.
+      PLAN 18g: on a thin gap, colour leaves by flushing over the open rim.
+      p.evapFactor is retained as a named safety cap (regulator) and for evaporation.
     */
-    const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
@@ -1554,6 +1580,7 @@ export class WebGPUFluid {
 
   /** Wipe the plate: no dye, no motion, the gap at rest. */
   clear(): void {
+    this.heatSeconds = 0;
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
@@ -2159,13 +2186,31 @@ export class WebGPUFluid {
     // 3. Viscous diffusion of momentum (xy) and heat (z)
     const n2 = (N - 2) * (N - 2);
     /*
-      Heat diffuses through water about a hundred times faster than a dye or
-      a salt does (a Lewis number near 100). The two used to share one
-      diffusivity, which rules out the double-diffusive instabilities (salt
-      fingers) altogether. doubleDiffusion raises the heat's alone.
+      Heat diffuses through water with thermal diffusivity kappa ≈ 1.4e-7 m²/s,
+      about 350 times faster than a dye or salt does (Lewis number Le ≈ 350).
+      Heat previously shared the dye's diffusionRate, leaving the 12 presets
+      with diffusionRate at 0 with no heat spreading at all. Now heat has its
+      own physical diffusivity term. doubleDiffusion raises the heat's alone
+      to simulate double-diffusive convection (salt fingers).
+
+      Precision: in rgba16float (FP16), heat's per-step change at real κ is below
+      half-float precision (~0.0009 cells²/step, truncating to 0.0% on SwiftShader).
+      The step's duration in physical seconds is `seconds` (from magnetSeconds).
+      We accumulate `heatSeconds` until the accumulated heat diffusion coefficient
+      reaches ≥ 0.02, where half-float changes survive quantization without loss,
+      or whenever doubleDiffusion is elevated.
     */
-    const heatDiff = p.diff * (1 + 99 * Math.max(0, Math.min(1, p.doubleDiffusion ?? 0)));
-    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, p.dt * heatDiff * n2, 0];
+    const doubleDiff = Math.max(0, Math.min(1, p.doubleDiffusion ?? 0));
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    this.heatSeconds += seconds;
+    const heatRate = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff) * n2;
+    const heatA = this.heatSeconds * heatRate;
+    let heatVisc = 0;
+    if (heatA >= 0.02 || doubleDiff > 0) {
+      heatVisc = heatA;
+      this.heatSeconds = 0;
+    }
+    const visc: [number, number, number, number] = [p.dt * p.nu * n2, p.dt * p.nu * n2, heatVisc, 0];
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
     }, visc.some((v) => v > 0));
@@ -2408,38 +2453,67 @@ export class WebGPUFluid {
         this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
     }, !thin);
 
-    // 9. Dye: diffuse, then advect through the forced velocity
-    const a = p.dt * p.diff * n2;
-    stage('dye diffuse', (pass) => {
-      this.jacobi(pass, this.dye, [a, a, a, a], DYE_ITERS, 'dye');
-      /*
-        With Oil Bodies on, only the water's colour diffuses. The oil's
-        share is diffused too, but only to know how much of the whole's
-        diffusion was the oil's (the diffusion is linear, so the water's
-        part of it is the whole's less the oil's); bodyUnspread then keeps
-        the water's part and puts the oil's colour back where it was.
-        Diffusing only the whole spread the oil's colour into the water as
-        the water's own, where nothing could tell it apart again: a green
-        haze of amber in teal round every body. Diffusing both alike, as
-        this first did, spread it into the water as the oil's, a cell or
-        two a second past the edge's tail, where the evening-out has no oil
-        to carry it back to: the oil's colour in open water grew from 1.1%
-        to 1.8% of it between 90 and 180 steps in \`npm run bodies\` and did
-        not stop. The oil's colour does mix inside a body, slowly
-        (bodyPartition's inside rate), as two dyed oils do. (A share begun
-        this step is skipped here: the transport below starts it from the
-        plate as it is.)
-      */
+    // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h, 18h-2)
+    /*
+      Molecular diffusion of food dye in water (Dm ≈ 4e-10 m²/s) is negligible
+      on show timescales, holding crisp edges across streamlines. Along the flow,
+      the Poiseuille parabolic velocity profile across the gap (u(z) = 1.5 ū (1 - 4z²/h²))
+      shears dye columns into parabolic sheets with variance σ² ≈ 0.2 |ū|² (Δt)².
+      On show timescales (t ≪ h²/Dm ≈ 25 hours), diffusion has not homogenized
+      across the 6 mm gap, so the flow is in the pre-asymptotic, unsteady shear
+      dispersion regime rather than the asymptotic Taylor–Aris limit.
+
+      In that pre-asymptotic regime, the parabolic shear is kinematically
+      reversible: when the flow stops or reverses, the sheared sheets fold back
+      up. A single 2D depth-averaged layer cannot resolve depth z, so modeling
+      shear spreading as an anisotropic diffusion tensor (D_L = Dm + κ_T |v|²)
+      acted as an irreversible diffusion proxy that smeared dye permanently
+      (failing reversibility checks). True reversible shear spreading is not
+      modelled here and is deferred to PLAN 18h-2 (e.g. multi-layer or profile
+      tracking).
+
+      In the app, shear dispersion is disabled (kappaT = 0.0), preserving sharp
+      edges across streamlines and physical reversibility under flow reversals.
+      kappaT is retained solely as a lab control for scripts/dispersion.mjs to
+      verify that an irreversible diffusion proxy fails the reversibility check.
+      Molecular diffusion Dm scales with the Diffusion Rate slider (p.diff).
+    */
+    const diffScale = p.diff > 0 ? p.diff / 0.0002 : 0;
+    const dm = (D_MOLECULAR / (PLATE_METRES * PLATE_METRES)) * p.dt * n2 * diffScale;
+    const dispCells = disp * (N - 2);
+    const kappaT = p.kappaT ?? 0.0;
+    const dispCap = 0.25;
+    /*
+      Skip the dye disperse pass when there is no plate displacement and physical
+      diffusion is negligible. `dm` is the step's molecular spread in cells²
+      ((D_m / plate_area) * dt * (N-2)² * diffScale).
+      At 0.0039 ≈ 1/256 (one 8-bit unorm quantum, 1/255 ≈ 0.00392), a step's
+      explicit Laplacian flux across a full-strength edge (|ΔC| = 1.0) produces
+      less than a single 8-bit quantization step of change.
+      At default show resolution (N = 256, dx ≈ 0.79 mm, dt = 1/60 s) with
+      p.diff = 0.0002, physical food dye diffusion in water (Dm ≈ 4e-10 m²/s)
+      yields dm ≈ 1.08e-5 cells²/step — ~360× below 1/256. Skipping this near
+      no-op pass saves ~0.4 ms/step on the GPU with zero visible change.
+      If dt or grid N changes, dm scales as dt * (N - 2)²; 0.0039 remains the
+      threshold where a step's diffusion alters an 8-bit level.
+    */
+    stage('dye disperse', (pass) => {
+      this.run(pass, 'dyeDisperse', this.dye.write, [this.dye.read, this.velForced, this.squeeze.read],
+        this.arg('dye disperse', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+      this.dye.swap();
       if (bodiesOn && !bodiesFresh) {
         const od = this.oilDye!;
-        this.jacobi(pass, od, [a, a, a, a], DYE_ITERS, 'oil dye');
-        // The oil's share before the diffusion is the Jacobi's x0, still in scratchB.
+        // Keep oil's pre-dispersion share in scratchB for bodyUnspread
+        this.run(pass, 'scaleDye', this.scratchB, [od.read], this.arg('scale one', [1, 0, 0, 0]));
+        this.run(pass, 'dyeDisperse', od.write, [od.read, this.velForced, this.squeeze.read],
+          this.arg('dye disperse oil', [dm, kappaT, REST_GAP, dispCells, dispCap, 0, 0, 0]));
+        od.swap();
         this.run(pass, 'bodyUnspread', this.dye.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread dye', [0, 0, 0, 0]));
         this.run(pass, 'bodyUnspread', od.write, [this.dye.read, od.read, this.scratchB], this.arg('unspread oil', [0, 0, 0, 1]));
         this.dye.swap();
         od.swap();
       }
-    }, a > 0);
+    }, dispCells > 0 || (kappaT > 0 ? dm > 0 : dm > 0.0039));
     /*
       The poured liquids' species rides the colour's carry when it can (PLAN
       18d-11a, bodyAdvectPairSub): the same faces in the same substeps, found
@@ -2589,16 +2663,13 @@ export class WebGPUFluid {
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Jacobi above removes about 8a/(1+8a)
-      of it a step (what a converged solve would; four sweeps take less at
-      large a, about 9% at 1024² and a ≈ 10, still above GRID_DAMP): most
-      of it in the looks with strong diffusion, none in the eleven with none (Red Cabbage, Classic,
-      Fillmore, Oil & Water, Agate, the ferrofluids…), and a few percent in
-      the slow ones with a little (Galaxy at 512², 3%). So this takes only
-      what the diffusion leaves short, and is not run at all where it leaves
-      nothing: the looks the diffusion already clears are as they were.
+      GRID_DAMP a step in every look. Previously, isotropic Jacobi diffusion
+      removed about 8a/(1+8a) of it a step. Now with physical molecular diffusion
+      Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
+      nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
+      elevated diffusion, keeping high-frequency grid modes smoothly damped.
     */
-    const gridDiff = (8 * a) / (1 + 8 * a);
+    const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
@@ -2934,8 +3005,13 @@ export class WebGPUFluid {
     const rxn = this.rxn;
     stage('bz', (pass) => {
       const r = rxn!;
-      const args = this.arg('bz step', [0.01, 0, BZ_GRID, 1.0]);
-      const steps = Math.max(1, Math.round(12 * bz));
+      // The reaction's own time this step, in substeps of at most 0.01 (the
+      // Oregonator is stiff). BZ Reaction is how strongly it is drawn, not
+      // how fast the chemistry runs: it scaled the steps, so the one knob
+      // that shows the reaction also sped it up twelvefold.
+      const units = BZ_PER_SECOND * Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+      const steps = Math.max(1, Math.ceil(units / 0.01));
+      const args = this.arg('bz step', [units / steps, 0, BZ_GRID, 1.0]);
       for (let k = 0; k < steps; k++) {
         this.run(pass, 'rxnStep', r.write, [r.read], args, BZ_GRID);
         r.swap();
@@ -4663,6 +4739,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const enc = this.device.createCommandEncoder({ label: 'measure' });
     const pass = enc.beginComputePass({ label: 'measure' });
@@ -4676,7 +4753,7 @@ export class WebGPUFluid {
     this.statsFresh = !!data;
     if (data && this.statsRing.landed > this.statsLatest.at) {
       const f = new Float32Array(data);
-      const area = this.N * this.N;
+      const area = this.thinLive ? this.dishArea : this.N * this.N;
       this.statsLatest = {
         meanDensity: f[3] / area,
         meanColor: [f[0] / area, f[1] / area, f[2] / area],
@@ -4690,6 +4767,23 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
+  private dishAreaCells = 0;
+  /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
+  private get dishArea(): number {
+    if (this.dishAreaCells) return this.dishAreaCells;
+    let count = 0;
+    const n = this.N;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n - 0.5;
+        const v = (j + 0.5) / n - 0.5;
+        if (Math.hypot(u, v) < OPEN_RIM) count++;
+      }
+    }
+    this.dishAreaCells = count;
+    return count;
+  }
+
   /**
    * The same measurement, waiting for the GPU. For harnesses, not the show:
    * it answers about the plate as it is now rather than as it was two frames
@@ -4699,6 +4793,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const out = this.device.createBuffer({ label: 'stats now', size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'measure now' });
@@ -4712,7 +4807,7 @@ export class WebGPUFluid {
     const f = new Float32Array(out.getMappedRange().slice(0));
     out.unmap();
     out.destroy();
-    const area = this.N * this.N;
+    const area = this.thinLive ? this.dishArea : this.N * this.N;
     return {
       meanDensity: f[3] / area,
       meanColor: [f[0] / area, f[1] / area, f[2] / area],

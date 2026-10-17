@@ -292,5 +292,7 @@ From a reading of the code, not from a report.
   records one) passes the tools shard having skipped the screenshot half of 2, and 3 and
   4. **Do:** `CRASH_GPU=1` on the shard, turning those skips into FAILs as `PHONE_GPU`
   and `SQUEEZE_GPU` do (`PLAN.md` 19c).
-- **The fingerprint Worker has none of this Worker's guards**: any origin, no limit, and
-  a paid API behind it (`PLAN.md` 14o).
+- ~~**The fingerprint Worker has none of this Worker's guards**~~: shipped (`PLAN.md`
+  14o). It has this Worker's origin list and hourly count, the count per /64 on IPv6,
+  a size refusal before parsing and a daily ceiling that answers "busy"; `npm run
+  fingerprint-worker` checks each, and that a refusal never reached the paid service.

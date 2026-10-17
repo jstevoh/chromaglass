@@ -5,6 +5,7 @@ import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence
 import { clockText } from '../lib/performanceTake';
 import { MusicSettings } from '../lib/musicTypes';
 import { followLine } from '../lib/followedPlace';
+import { Toggle } from './ui';
 
 interface TrackPanelProps {
   state: MusicIntelState;
@@ -35,17 +36,6 @@ function fmtTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
-  <div className="flex items-center justify-between mb-3">
-    <span className="text-xs font-bold uppercase tracking-widest opacity-70">{label}</span>
-    <button
-      onClick={() => onChange(!value)}
-      className={`w-10 h-5 rounded-full relative transition-colors ${value ? 'bg-purple-500' : 'bg-white/20'}`}
-    >
-      <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
-    </button>
-  </div>
-);
 
 export const TrackPanel: React.FC<TrackPanelProps> = ({
   state, musicSettings, onUpdateMusicSettings, onManualTag, onReplayListen, onStopReplay,
@@ -318,10 +308,10 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
       {/* ── Music settings ───────────────────────────────────────── */}
       <section className="mb-8">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4">Music Intelligence</h3>
-        <Toggle label="Enabled" value={musicSettings.enabled} onChange={v => onUpdateMusicSettings({ enabled: v })} />
-        <Toggle label="Lyric Triggers" value={musicSettings.lyricTriggers} onChange={v => onUpdateMusicSettings({ lyricTriggers: v })} />
-        <Toggle label="Sentiment Arc" value={musicSettings.sentimentArc} onChange={v => onUpdateMusicSettings({ sentimentArc: v })} />
-        <Toggle label="Lyrics Overlay" value={musicSettings.lyricsOverlay} onChange={v => onUpdateMusicSettings({ lyricsOverlay: v })} />
+        <Toggle label="Enabled" on={musicSettings.enabled} onChange={v => onUpdateMusicSettings({ enabled: v })} testId="track-enabled" />
+        <Toggle label="Lyric Triggers" on={musicSettings.lyricTriggers} onChange={v => onUpdateMusicSettings({ lyricTriggers: v })} testId="track-lyric-triggers" />
+        <Toggle label="Sentiment Arc" on={musicSettings.sentimentArc} onChange={v => onUpdateMusicSettings({ sentimentArc: v })} testId="track-sentiment-arc" />
+        <Toggle label="Lyrics Overlay" on={musicSettings.lyricsOverlay} onChange={v => onUpdateMusicSettings({ lyricsOverlay: v })} testId="track-lyrics-overlay" />
         <div className="flex flex-col gap-2 mt-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-widest opacity-70">Evolution Speed</span>

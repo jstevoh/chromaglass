@@ -1,3 +1,4 @@
+import { HIT_FEATURES } from '../lib/hitSource';
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
@@ -77,7 +78,9 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
   const [source, setSource] = useState<MusicSource>(existing[0]?.source ?? 'kick');
   const [depth, setDepth] = useState<number>(existing.find(b => b.source === source)?.depth ?? 0.5);
   // "the kick", but "Band 4 · 378–800 Hz" keeps its capitals: it is a name and a unit.
-  const name = source.startsWith('band') ? MUSIC_SOURCE_LABELS[source] : `the ${MUSIC_SOURCE_LABELS[source].toLowerCase()}`;
+  // And a hit ("Kick hit", "Any hit (kick or snare)") is a name too: "the any hit" is not English.
+  const name = source.startsWith('band') || (HIT_FEATURES as readonly string[]).includes(source)
+    ? MUSIC_SOURCE_LABELS[source] : `the ${MUSIC_SOURCE_LABELS[source].toLowerCase()}`;
   return (
     <div className="mb-2 mt-1 rounded-lg border border-amber-300/30 bg-amber-300/5 p-2" data-testid="sound-editor">
       <div className="flex flex-wrap items-center gap-2">
@@ -272,6 +275,8 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
           {FACTORY_MAPS.map(f => (
             <button
               key={f.id}
+              type="button"
+              aria-pressed={detected?.id === f.id}
               onClick={() => midi.loadFactory(f.id)}
               className={chip(detected?.id === f.id)}
               title={detected?.id === f.id ? `${f.name} is what is plugged in` : undefined}
@@ -376,10 +381,13 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
               {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Bank">
             {Array.from({ length: midi.banks }, (_, i) => (
               <button
                 key={i}
+                type="button"
+                role="radio"
+                aria-checked={midi.bank === i}
                 onClick={() => midi.setBank(i)}
                 data-testid={`midi-bank-${i}`}
                 title={i === 0 ? 'The base layer: bindings here are live on every bank' : `Shift layer ${i + 1}`}
@@ -421,9 +429,9 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       </div>
 
       {/* Learn targets */}
-      <div className="flex gap-1 mb-3">
+      <div className="flex gap-1 mb-3" role="tablist" aria-label="Learn targets">
         {(['settings', 'actions', 'presets', 'dyes'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
         ))}
       </div>
       {midi.learning && (

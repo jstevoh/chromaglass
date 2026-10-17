@@ -62,6 +62,7 @@
 
 import { SOURCE_NAMES, type AudioReading, type SourceName } from './audioFeatures.ts';
 import type { SongEvent } from './songShape.ts';
+import { HIT_FEATURES, type HitFeature } from './hitSource.ts';
 import { isMapping, triggerable, type MidiAction, type MusicSource, type SoundBinding } from './midi.ts';
 import type { SceneMapping } from '../types';
 
@@ -122,6 +123,7 @@ interface SourceState {
 // shape keeps: asked of the list of names, so the next kind of source added to
 // MusicSource is not taken for a band by a list here that forgot it.
 const isNamed = (s: MusicSource): s is SourceName => (SOURCE_NAMES as readonly string[]).includes(s);
+const isHit = (s: MusicSource): s is HitFeature => (HIT_FEATURES as readonly string[]).includes(s);
 
 export class SoundLearn {
   private sources = new Map<SourceName, SourceState>();
@@ -153,9 +155,11 @@ export class SoundLearn {
     if (!bindings || bindings.length === 0) return EMPTY;
     if (bindings === this.patchesFor) return this.patches;
     this.patchesFor = bindings;
-    this.patches = bindings.filter(b => isMapping(b) && isNamed(b.source) && b.target.kind === 'setting').map(b => ({
-      source: 'bands' as const,
-      feature: b.source as SourceName,
+    this.patches = bindings.filter(b => isMapping(b) && (isNamed(b.source) || isHit(b.source)) && b.target.kind === 'setting').map(b => ({
+      // A hit is the patch bay's `hits` source; everything else with a
+      // level is a named source or a band.
+      source: isHit(b.source) ? 'hits' as const : 'bands' as const,
+      feature: b.source as SourceName | HitFeature,
       setting: (b.target as { key: SceneMapping['setting'] }).key,
       depth: b.depth ?? 0,
       layer: 'all' as const,

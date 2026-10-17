@@ -2229,7 +2229,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     only: divided at the hot-spot instead, the paint's half of a fader was
     divided too, and halfway was not half of each (3 bytes off).
   */
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w); }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * mix(1.0, 0.5, f32(U.layerCount > 1 && U.twoProjectors > 0.5)); }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2369,7 +2369,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var film0 = fluid0.a;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
-    fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
+    let gd0 = grainedDepth(bare0, grain);
+    fluid0.a = min(1.0, fluid0.a * gd0);
     more0 *= grain;
   }
 
@@ -2434,11 +2435,16 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
+  // Keep the screen's lamp before the front plate's contact shadow darkens
+  // lampBg: a second projector's beam (PLAN 18b-10) meets the screen's fibre
+  // but never passes through the front plate.
+  var lampScreen = lampBg;
   if (closeup && U.macroDepth * macroAmt > 0.005) {
     let depth = U.macroDepth * macroAmt;
     let fiber = fbm3(uv * vec2f(aspect, 1.0) * 230.0);
     bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
     lampBg = mix(lampBg, lampBg * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
+    lampScreen = lampBg;
     let shA = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.008, -0.008), c0, s0)).a) * 2.6);
     let shB = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.022, -0.022), c0, s0)).a) * 1.6);
     let shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
@@ -2471,7 +2477,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     milkScatter = sc0;
     milkGap = layerGap0;
     outColor = onGround(outColor, fluid0,
-      throughScaled(t0, more0) * reliefOf(fluid0.rgb, tint0, alpha0));
+      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4), film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0));
     milkScatter = 0.0;
 
     /*
@@ -2778,20 +2784,45 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let rim = clamp(length(og) * 2.2, 0.0, 1.0);
       outColor = outColor * (1.0 - 0.55 * rim) + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
     }
-    // A pH indicator in the dye (red cabbage's anthocyanin): red-pink in
-    // acid, purple near neutral, green then yellow in base. Where there is no
-    // acid or base the dye keeps its own colour.
+    /*
+      A pH indicator in the dye (red cabbage's anthocyanin). The indicator
+      is the dye: acid and base do not lay a colour over it, they change
+      which light it takes out. Red below pH 4 (the flavylium cation
+      absorbs the green), purple near 7, blue at 8, green from 9 to 11 (the
+      blue anion with the yellow chalcone, together taking out red and
+      blue), yellow above 12.
+
+      It was drawn as a tint multiplied over the dye's own colour, at the
+      dye's opacity times a share of the acidity: a purple dye already takes
+      out nearly all the green, so no tint of it could ever be green (the
+      lab, a red-cabbage plate dosed +1, +0.35, -0.35 and -1: hue 269, 264,
+      273, 268 against the neutral's 260 — one purple field), and the pink
+      came out the purple again. Now the dye keeps its optical depth (its
+      strongest channel's absorbance, read back from what it lets through)
+      and takes the form's spectrum at that depth, Beer and Lambert, so a
+      thin wash goes pale pink and a deep pool crimson, as a dish does. The
+      forms' spectra are three-band shortcuts of the measured ones, each
+      normalised to its peak; the acidity's -1..1 is read as pH 1 to 13.
+    */
     if (U.phIndicator > 0.001) {
       let a = clamp(view.acid, -1.0, 1.0);
-      let neutral = vec3f(0.62, 0.35, 0.85);
-      let ind = select(mix(neutral, vec3f(0.45, 0.85, 0.25), clamp(-a * 1.4, 0.0, 1.0)),
-                       mix(neutral, vec3f(1.0, 0.25, 0.45), clamp(a * 1.4, 0.0, 1.0)), a >= 0.0);
-      let w = U.phIndicator * clamp(abs(a) * 2.5, 0.0, 1.0) * fluid0.a;
-      outColor = chemOnGround(outColor, mix(outColor, outColor * ind * 1.7 + ind * 0.05, w), ind, w);
+      let kPurple = vec3f(0.5, 1.0, 0.2);
+      let kAcid = mix(mix(kPurple, vec3f(0.1, 0.8, 0.3), smoothstep(0.0, 0.25, a)), vec3f(0.08, 1.0, 0.55), smoothstep(0.4, 0.9, a));
+      let b = -a;
+      let kBase = mix(mix(mix(kPurple, vec3f(1.0, 0.75, 0.15), smoothstep(0.0, 0.12, b)), vec3f(1.0, 0.3, 0.85), smoothstep(0.12, 0.3, b)), vec3f(0.1, 0.3, 1.0), smoothstep(0.6, 0.95, b));
+      let k = select(kBase, kAcid, a >= 0.0);
+      let own = -log(max(throughScaled(through0, more0), vec3f(1e-3)));
+      let depth = max(own.r, max(own.g, own.b));
+      let w = U.phIndicator * clamp(abs(a) * 10.0, 0.0, 1.0);
+      let tint = exp((own - depth * k) * w);
+      outColor = chemOnGround(outColor, min(outColor * tint, vec3f(1.0)), tint, 1.0);
     }
     // The BZ reaction in ferroin: red where the catalyst is reduced, blue
-    // where the wave has oxidised it, over a pale dish.
-    if (U.bzShow > 0.001 && (view.bz > 0.0005 || view.bzu > 0.0005)) {
+    // where the wave has oxidised it. The catalyst is in the whole dish, so
+    // the whole dish is red at rest: drawn only where a wave had been (either
+    // species over 0.0005), the dish was the look's own dye with red trails,
+    // the showreel's "muddy red-green marble".
+    if (U.bzShow > 0.001) {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
       outColor = chemOnGround(outColor, mix(outColor, col, U.bzShow * 0.85), col, U.bzShow * 0.85);
@@ -2844,10 +2875,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;
     var more1 = 1.0;   // throughScaled
+    var lampMore1 = 1.0;
     if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
       more1 *= dish1.x;
+      lampMore1 *= dish1.x;
     }
 
     let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
@@ -2859,8 +2892,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // The grain after the edge, not before it: see the front plate's.
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
+      let gd1 = grainedDepth(bare1, grain);
+      fluid1.a = min(1.0, fluid1.a * gd1);
       more1 *= grain;
+      lampMore1 *= gd1;
     }
 
     let sharp1 = dof < 0.55;
@@ -2928,14 +2963,21 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
-        On a lamp ground the back plate is a second filter in the light's
-        path, whatever the look's Blend Mode says (a mixer row's own blend,
-        above, still lays it as it did: PLAN 18b-5): the lamp through both dishes is
-        the product of what each lets through. Its level in the mixer is
-        how much of its dye is in the path (throughScaled).
+        On a lamp ground, when Two Projectors is on (PLAN 18b-10), the plates are
+        separate projectors: their light adds on the screen, each filtered by its
+        own plate from a lamp dimmed to half (lampScreen, kept before the front
+        plate's contact shadow). Halving each lamp is an exposure normalisation
+        shortcut so clear glass stays at one lamp's level; outside the back plate's
+        disc lampMore1 is 0, so the second projector still lights the screen there.
+        For other looks, they are stacked dishes on one lamp: a second filter in the
+        light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let filt1 = throughScaled(t1, lampMore1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        var lit1 = outColor * filt1;
+        if (U.twoProjectors > 0.5 && U.layerCount > 1) {
+          lit1 = outColor + lampScreen * filt1;
+        }
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
         outColor = painted1;

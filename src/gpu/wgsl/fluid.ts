@@ -24,7 +24,7 @@
  */
 
 import { SPIKES_WGSL } from './spikes';
-import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
+import { DISH_METRES, DISH_GAP_RANGE, OPEN_RIM } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
 import { filmKernels } from './film';
@@ -46,7 +46,7 @@ struct Sim {
   turbScale: f32,
   spin: f32,
   tension: f32,
-  free9: f32,          // was the fingering push's strength (forcesB)
+  thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
   vibF: f32,
   drip: f32,
@@ -1441,6 +1441,123 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let s = textureLoad(x, clampP(p - vec2i(1, 0), S.n), 0) + textureLoad(x, clampP(p + vec2i(1, 0), S.n), 0)
         + textureLoad(x, clampP(p - vec2i(0, 1), S.n), 0) + textureLoad(x, clampP(p + vec2i(0, 1), S.n), 0);
   textureStore(dst, p, (textureLoad(x0, p, 0) + A.a * s) * A.b);
+}`,
+
+  /*
+    18h. Dye spreads along the flow (pre-asymptotic shear dispersion) plus molecular diffusion:
+    In a Hele-Shaw cell on show timescales (t ≪ h²/Dm ≈ 25 hours), flow has not reached
+    the asymptotic Taylor–Aris regime. Parabolic Poiseuille shear across the gap creates
+    unsteady longitudinal spreading with variance σ² ≈ 0.2 |u|² Δt².
+    Shortcut: depth-averaged 2D solver models this as an anisotropic flux tensor along u⊗u
+    with cap 0.25 cells²/step (von Neumann stability limit).
+    Cross-term fluxes are limited to maintain strict positivity, exactly conserving dye mass.
+  */
+  dyeDisperse: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+fn inDish(p: vec2i) -> bool {
+  return S.thinGap < 0.5 || length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)};
+}
+
+fn getDye(p: vec2i, n: i32) -> vec4f {
+  return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1)), 0);
+}
+
+fn getDyeFrom(p: vec2i, c0: vec4f, n: i32) -> vec4f {
+  let q = clamp(p, vec2i(0), vec2i(n - 1));
+  if (!inDish(q)) { return c0; }
+  return textureLoad(dye, q, 0);
+}
+
+fn getDisp(p: vec2i, n: i32) -> vec3f {
+  let q = clamp(p, vec2i(0), vec2i(n - 1));
+  let v = textureLoad(vel, q, 0).xy * A.a.w;
+  let gapVal = clamp(textureLoad(sq, q, 0).r, 0.004, 0.06);
+  let gapRel = gapVal / A.a.z;
+  let dm = A.a.x;
+  let kappaT = A.a.y;
+  let v2 = dot(v, v);
+  let shear = kappaT * gapRel * gapRel * v2;
+  let shearLim = min(shear, max(0.0, A.b.x - dm));
+  let fac = select(0.0, shearLim / max(v2, 1e-9), v2 > 1e-9);
+  return vec3f(
+    dm + fac * v.x * v.x,
+    dm + fac * v.y * v.y,
+    fac * v.x * v.y
+  );
+}
+
+// Zero-flux Neumann condition across the circular dish rim (OPEN_RIM = 0.5) on a thin gap,
+// so molecular diffusion and shear dispersion do not bleed dye across the rim into the trough.
+fn fluxX(p: vec2i, DL: vec3f, DR: vec3f, n: i32) -> vec4f {
+  if (p.x < 0 || p.x >= n - 1 || p.y < 0 || p.y >= n) {
+    return vec4f(0.0);
+  }
+  let pR = p + vec2i(1, 0);
+  if (!inDish(p) || !inDish(pR)) {
+    return vec4f(0.0);
+  }
+  let Dxx = 0.5 * (DL.x + DR.x);
+  let Dxy = 0.5 * (DL.z + DR.z);
+  let cL = getDye(p, n);
+  let cR = getDye(pR, n);
+  let dc_dx = cR - cL;
+  let dc_dy = 0.25 * (
+    (getDyeFrom(p + vec2i(0, 1), cL, n) - getDyeFrom(p - vec2i(0, 1), cL, n)) +
+    (getDyeFrom(pR + vec2i(0, 1), cR, n) - getDyeFrom(pR - vec2i(0, 1), cR, n))
+  );
+  let prim = Dxx * dc_dx;
+  let cross = Dxy * dc_dy;
+  // Positivity-preserving cross-term limiter: bounds cross flux to 0.5 of primary flux magnitude,
+  // preventing cross-derivatives from pulling cell values negative or creating dye.
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
+}
+
+fn fluxY(p: vec2i, DB: vec3f, DT: vec3f, n: i32) -> vec4f {
+  if (p.y < 0 || p.y >= n - 1 || p.x < 0 || p.x >= n) {
+    return vec4f(0.0);
+  }
+  let pT = p + vec2i(0, 1);
+  if (!inDish(p) || !inDish(pT)) {
+    return vec4f(0.0);
+  }
+  let Dyx = 0.5 * (DB.z + DT.z);
+  let Dyy = 0.5 * (DB.y + DT.y);
+  let cB = getDye(p, n);
+  let cT = getDye(pT, n);
+  let dc_dy = cT - cB;
+  let dc_dx = 0.25 * (
+    (getDyeFrom(p + vec2i(1, 0), cB, n) - getDyeFrom(p - vec2i(1, 0), cB, n)) +
+    (getDyeFrom(pT + vec2i(1, 0), cT, n) - getDyeFrom(pT - vec2i(1, 0), cT, n))
+  );
+  let prim = Dyy * dc_dy;
+  let cross = Dyx * dc_dx;
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
+}
+
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let Dc = getDisp(p, n);
+  let De = getDisp(p + vec2i(1, 0), n);
+  let Dw = getDisp(p - vec2i(1, 0), n);
+  let Dn = getDisp(p + vec2i(0, 1), n);
+  let Ds = getDisp(p - vec2i(0, 1), n);
+
+  let fE = fluxX(p, Dc, De, n);
+  let fW = fluxX(p - vec2i(1, 0), Dw, Dc, n);
+  let fN = fluxY(p, Dc, Dn, n);
+  let fS = fluxY(p - vec2i(0, 1), Ds, Dc, n);
+  let netFlux = -(fE - fW + fN - fS);
+  let here = getDye(p, n);
+  let out = here + netFlux;
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   // The velocity's divergence, with the wall's ghost cells (velG in the GLSL).
@@ -2852,7 +2969,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
-    host's 'dye diffuse' stage). In: the whole dye and the oil's share, both
+    host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused
     with the oil's put back as it was (A.a.w = 0), or the oil's share as it
     was (A.a.w = 1).
@@ -3674,11 +3791,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  var d = textureLoad(dye, vec2i(id.xy), 0) * S.evap;
-  // Before the clamp: an infinity through it is inf * 0, a NaN.
+  let p = vec2i(id.xy);
+  var d = textureLoad(dye, p, 0);
+  // PLAN 18g: Colour leaves by flushing over the open rim (OPEN_RIM = 0.5), not by fading.
+  // Liquid and dye carried past the circular dish rim spill into the overflow trough and leave the plate.
+  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    d = vec4f(0.0);
+  } else {
+    d *= S.evap;
+  }
+  // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  textureStore(dst, vec2i(id.xy), max(d, vec4f(0.0)));
+  textureStore(dst, p, max(d, vec4f(0.0)));
 }`,
 
   decayVel: `${HEAD}
@@ -3769,6 +3894,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
+  let here = textureLoad(src, p, 0);
+  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    textureStore(dst, p, here);
+    return;
+  }
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
   var c = vec4f(0.0);
   var lo = vec4f(1e30);
@@ -3776,13 +3906,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   for (var j = 0; j < 5; j++) {
     var row = vec4f(0.0);
     for (var i = 0; i < 5; i++) {
-      let q = textureLoad(src, clampP(p + vec2i(i - 2, j - 2), S.n), 0);
+      let qp = clampP(p + vec2i(i - 2, j - 2), S.n);
+      var q = textureLoad(src, qp, 0);
+      if (S.thinGap > 0.5 && length((vec2f(qp) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { q = here; }
       row += k[i] * q;
       if (abs(i - 2) <= 1 && abs(j - 2) <= 1) { lo = min(lo, q); hi = max(hi, q); }
     }
     c += k[j] * row;
   }
-  let f = textureLoad(src, p, 0) - A.a.x * c * (1.0 / 256.0);
+  let f = here - A.a.x * c * (1.0 / 256.0);
   textureStore(dst, p, clamp(f, max(lo, vec4f(0.0)), max(hi, vec4f(0.0))));
 }`,
 
