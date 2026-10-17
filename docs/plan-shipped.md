@@ -3124,7 +3124,7 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 ### 18g. Colour leaves by flushing, not by fading
 
-**18g-1** (2026-10-11): flushing, not fading: the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim. Liquid carried past the circular dish rim spills into the overflow trough and leaves the plate, rather than fading away uniformly. The dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
+**18g-1** (2026-10-11): flushing at the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim, and a still dish loses no colour through its rim (`evapFactor` 1). Base evaporation still fades colour inside the dish until 18g-3/18g-5, and the dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
 
 ### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
 
