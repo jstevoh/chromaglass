@@ -1,6 +1,19 @@
 # Cloudflare Worker config for the fingerprint proxy.
-# Deploy:  npx wrangler deploy
+# Deploy:  npx wrangler deploy  (after the KV namespace below exists)
 # Secret:  npx wrangler secret put AUDD_API_TOKEN
 name = "chromaglass-fingerprint"
 main = "server/fingerprint-worker.js"
 compatibility_date = "2026-07-01"
+
+# The counters behind the Worker's hourly and daily limits (PLAN 14o). The Worker
+# refuses every lookup (503) when this is not bound, rather than run unmetered, so
+# create the namespace before deploying this version:
+#   npx wrangler kv namespace create FINGERPRINT_LIMITS
+# and put the id it prints below.
+[[kv_namespaces]]
+binding = "FINGERPRINT_LIMITS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Lookups a day across everyone; the Worker's own default is 1000.
+# [vars]
+# FINGERPRINT_DAILY_LIMIT = "1000"

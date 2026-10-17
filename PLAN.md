@@ -96,9 +96,10 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 
 ### Wave 1. Nothing at a gig can stop the show or hand it to a stranger
 
-- **1.1** **14m, then 14o** (A, M then S): the show key to loopback only, long and timing-safe,
+- **1.1** ~~**14m, then 14o**~~ (A, M then S): the show key to loopback only, long and timing-safe,
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
-  and limits, with the report Worker's (`docs/crash-plan.md`).
+  and limits. **Shipped, this PR** (`npm run showkey` 8 of 24 → 27 of 27, `npm run
+  fingerprint-worker` 7 → 18 of 18). Left: 14m-guest, 14m-tunnel, 14m-mark.
 - **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
@@ -201,7 +202,7 @@ Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back
 (M); **5-actions** (S); **11-pinch** (S).
 
 Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the load-in card
-(S); **14m-guest** (M, after 1.1); **31b** a warp grid for curved walls (M, §31).
+(S); **14m-guest** (M), **14m-tunnel** (S, the Mac), **14m-mark** (S); **31b** a warp grid for curved walls (M, §31).
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
@@ -3033,72 +3034,37 @@ step's cost `docs/webgpu-plan.md` H2c, the report Worker's limits `docs/crash-pl
 the room's lights, a load-in card and the show kit `docs/rig-plan.md` (R4, R5, R8), and
 the checks and the build §19.
 
-### 14m. Anyone on the venue's network can drive the show
+### ~~14m. Anyone on the venue's network can drive the show~~
 
-**Read in the code** (`server/remote-server.js` unless named).
+**Shipped, this PR** (`npm run showkey`: 8 of 24 on the old server, 27 of 27 now). Story in `docs/plan-shipped.md`.
+Left open from it:
 
-- The show key is four random digits (`SHOW_KEY`), about 13 bits, compared with `!==`,
-  and a wrong `hello` only closes that socket: nothing counts failures or slows the next
-  try. Through `npm run tunnel` the 9,000 keys fall in minutes.
-- On the LAN it need not be guessed. `/remote-info.json` hands the key to any request
-  without `x-forwarded-for` or `cf-connecting-ip` (`isLocalRequest`), which is every
-  device on the venue's Wi-Fi, not only the machine `remoteProtocol.ts` says it is for.
-  The socket checks no Origin or Host either, so a web page open on any phone in the
-  room can reach `ws://<laptop>:3000/remote-ws`.
-- With the key, a `hello` as `display` receives every phone's commands, and can push
-  `state` and `cast` to the phones and to the network display on the wall, set the
-  Art-Net `lights`, and toggle Record and Blackout.
-- Frames are taken up to the `ws` default of 100 MiB (`new WebSocketServer({ server,
-  path })`); the 512 KB limit is checked after the frame is buffered and made a string.
-  A socket that never says hello is never closed, and nothing caps connections. A few
-  large frames stop the Node process, and every phone, network display, OSC and Art-Net
-  with it.
-- A restart with the generated key answers every phone and network display `denied`,
-  and `useRemoteLink.ts` stops retrying for good on that, though the server's comment
-  says it is restartable mid-show.
-- Art-Net in reads every universe but its own output (`packet.universe ===
-  artnet.universe` is the only filter) into one `seen` map, so on a rig with four
-  universes each mapped setting jumps between their values. A non-numeric `ARTNET_RATE`
-  makes the rate `NaN`, and `setInterval(…, NaN)` sends every millisecond.
-
-*Fix:* the key only to a loopback `req.socket.remoteAddress`, and an Origin check on the
-upgrade; a longer key from `crypto.randomInt`, compared with `timingSafeEqual`, and an
-address locked out after a few wrong hellos; a display key apart from the phones', so a
-phone's key cannot take the display role; `maxPayload: 512 * 1024`, a 5 s deadline for
-the hello and a cap per address; the generated key kept in a file beside the server, so
-a restart keeps it; an input universe, and the `ARTNET_*` numbers validated. The phone's
-join and the iPhone app's laptop remote (`appLink.ts`) must keep working.
-
-Once the server has roles, a **guest key** is a small step (*proposed*): a key whose
-socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto a
-chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
-tablet, a second projectionist, or at a party the audience's phones through a QR code
-on a card.
-
-*Measure:* extend `npm run remotemix`: a request from a LAN address gets no key; three
-wrong keys lock the address out; a 1 MB frame is refused without the process growing; a
-silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
-socket's `patch` is dropped.
+- **14m-guest** (*proposed*, M): a **guest key**, now that the server has roles: a key
+  whose socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto
+  a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
+  tablet, a second projectionist, or at a party the audience's phones through a QR code
+  on a card. *Measure:* `npm run showkey`: a guest socket's `patch` is dropped.
+- **14m-tunnel** (S, the Mac): every phone through `npm run tunnel` arrives from one
+  loopback address, so they share the 16-socket cap per address and one phone's three
+  wrong keys lock out every tunnel phone; and the upgrade's Origin check assumes the
+  tunnel passes the phone's Host and Origin through unchanged, which no cloud session
+  can confirm. *Measure:* on the Mac, a phone through the tunnel joins, and a fourth
+  wrong key from another tunnel phone is what the lock counts; if Cloudflare rewrites
+  either header, count by `cf-connecting-ip` behind the tunnel instead.
+- **14m-mark** (S): the relay now closes a socket on a frame over 512 KB, so the laptop
+  drops any message that large rather than lose its link (`useRemoteLink.ts`). The
+  cast's `mark` carries the logo as a data URL, and a big PNG logo is over that: the
+  wall then shows no logo where it used to. *Fix:* scale the mark to the wall's size
+  and send it as JPEG or WebP under 400 KB before casting. *Measure:* `npm run showkey`
+  or `remotemix`: a 2 MB logo reaches the network display.
 
 ### ~~14n. One malformed message can end the plate~~
 
 **Shipped, #322.** Story in `docs/plan-shipped.md`.
 
-### 14o. The song-ID Worker is open to anyone
+### ~~14o. The song-ID Worker is open to anyone~~
 
-**Read in the code.** `server/fingerprint-worker.js` answers any origin
-(`Access-Control-Allow-Origin: *`) with no key and no rate limit, and its URL is built
-into the public bundle (`VITE_FINGERPRINT_PROXY_URL`, `deploy.yml`). Anyone who reads
-the bundle can identify songs on the owner's AudD or ACRCloud account, from a script or
-from their own site. It also parses the whole multipart body (`request.formData()`)
-before its 2 MB check. The report Worker already has what this one lacks
-(`ALLOWED_ORIGINS`, a per-address limit in KV; `docs/crash-plan.md`).
-
-*Fix:* the same origin list and per-address limit (per /64 on IPv6), a refusal on
-`Content-Length` before parsing, and a daily ceiling that answers "busy" rather than
-spending. The show's own origins (the site, the show server, the Mac app) stay allowed.
-*Measure:* a node harness in the manner of `npm run report-worker`: a foreign origin
-refused, the 31st request in an hour refused, a 3 MB body refused before `formData()`.
+**Shipped, this PR.** Story in `docs/plan-shipped.md`.
 
 ### 14p. Show night runs whatever merged last
 
@@ -5597,7 +5563,9 @@ once the login works (23.14).*
   local `npm run dev`. *Measure:* a check that loads the site build and the app
   build and lists which controls each shows, against the table.
 - **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
-  well as an allowed origin, and the site's manual tag stays. *Measure:* in the
+  well as an allowed origin, and the site's manual tag stays. 14o's gates come first
+  and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
+  fingerprint-worker`); a good key can raise the hour's count, not skip the day's. *Measure:* in the
   manner of `npm run report-worker`: no key refused, a bad signature refused, a good
   key answered.
 - **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation

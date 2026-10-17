@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  MAX_FRAME_BYTES,
   relayInfo,
   remoteSocketUrl,
   showKeyFromUrl,
@@ -7,8 +8,12 @@ import {
   type RemoteState,
 } from '../lib/remoteProtocol';
 
-/** 'denied' means the relay is there but this page's show key is wrong or missing. */
-export type RemoteStatus = 'connecting' | 'connected' | 'offline' | 'denied';
+/**
+ * 'denied' means the relay is there but this page's show key is wrong or missing.
+ * 'locked' means this address gave three wrong keys and the relay is refusing it
+ * for a few minutes (PLAN 14m); the link tries again by itself when that is over.
+ */
+export type RemoteStatus = 'connecting' | 'connected' | 'offline' | 'denied' | 'locked';
 
 interface UseRemoteLinkOptions {
   role: 'display' | 'controller' | 'mirror';
@@ -45,6 +50,9 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
   const retryRef = useRef(RETRY_MIN);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closedRef = useRef(false);
+  const lockedRef = useRef(false);
+  // Has a relay ever answered this page? Then one that stops answering is coming back.
+  const seenRef = useRef(false);
   // The show key: from the URL a phone or display was given, or — on the
   // machine the server runs on — from the relay itself.
   const keyRef = useRef<string | null>(showKeyFromUrl());
@@ -59,7 +67,17 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
   const send = useCallback((message: RemoteMessage) => {
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(message));
+      const raw = JSON.stringify(message);
+      // The relay closes a socket that sends more than MAX_FRAME_BYTES (PLAN 14m),
+      // so a message that large is dropped here and the link kept: losing one
+      // oversized patch is better than every phone losing the laptop while it
+      // reconnects. A string's UTF-8 is at most three bytes a character, so the
+      // encoder runs only for a message that could be over.
+      if (raw.length * 3 > MAX_FRAME_BYTES && new TextEncoder().encode(raw).length > MAX_FRAME_BYTES) {
+        console.warn(`Not sent to the show server: a ${message.type} message over ${MAX_FRAME_BYTES >> 10} KB`);
+        return;
+      }
+      socket.send(raw);
     }
   }, []);
 
@@ -69,6 +87,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       return;
     }
     closedRef.current = false;
+    lockedRef.current = false;
 
     const connect = () => {
       if (closedRef.current) return;
@@ -80,8 +99,21 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
         void relayInfo().then((info) => {
           if (closedRef.current) return;
           if (info) {
-            if (info.key) keyRef.current = info.key;
+            seenRef.current = true;
+            // The display takes its own key (PLAN 14m), asked for again on every
+            // connect since the server makes a new one each launch; a mirror on
+            // the laptop takes the show key, as a phone does.
+            const key = role === 'display' ? info.displayKey : info.key;
+            if (key) keyRef.current = key;
             openSocket();
+          } else if (seenRef.current) {
+            // The relay was here and is gone: the show server restarting, or the
+            // Mac app relaunching it. Look again on the short backoff, not the
+            // half-minute probe for a page that never had one: `npm run showkey`
+            // restarts the server under a linked phone and laptop, and on the
+            // probe interval the laptop came back after the phone had given up
+            // (a change on the laptop had not reached the phone in 25 s).
+            scheduleRetry();
           } else {
             setStatus('offline');
             timerRef.current = setTimeout(connect, PROBE_INTERVAL);
@@ -120,6 +152,18 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
           return;   // a malformed frame is not worth tearing the link down for
         }
         if (message.type === 'denied') {
+          if (message.reason === 'locked') {
+            // Locked out for a few minutes: knocking sooner is refused unread and
+            // only keeps the lock, so wait it out and try once more. The socket's
+            // close is ignored (lockedRef) so its retry does not come early.
+            lockedRef.current = true;
+            setStatus('locked');
+            timerRef.current = setTimeout(() => {
+              lockedRef.current = false;
+              connect();
+            }, Math.max(RETRY_MAX, message.retryMs ?? 5 * 60_000));
+            return;
+          }
           // Wrong key: no point retrying with the same one.
           closedRef.current = true;
           setStatus('denied');
@@ -134,7 +178,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
 
       socket.onclose = () => {
         socketRef.current = null;
-        if (closedRef.current) return;   // refused, or torn down on purpose: keep that status
+        if (closedRef.current || lockedRef.current) return;   // refused, locked out, or torn down on purpose: keep that status
         setStatus('connecting');
         scheduleRetry();
       };

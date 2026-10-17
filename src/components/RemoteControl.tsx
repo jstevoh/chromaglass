@@ -143,6 +143,13 @@ export default function RemoteRoot() {
 /** Which screen this device opens on (Draw or Controls), kept on the device. */
 const REMOTE_VIEW_KEY = 'chromaglass-remote-view';
 
+/**
+ * What a phone says while the show server is refusing its address after three
+ * wrong keys (PLAN 14m). The link tries again by itself when the lock is over, so
+ * the words say to wait, and which key to have ready, rather than to reload.
+ */
+const LOCKED_WORDS = 'Too many wrong keys from this phone: trying again in a few minutes';
+
 function RemoteControl({ inApp }: { inApp: boolean }) {
   const [state, setState] = useState<RemoteState | null>(null);
   /**
@@ -616,6 +623,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         connected={connected}
         waiting={status === 'denied'
           ? (inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key: open the address the show server printed, key included')
+          : status === 'locked' ? LOCKED_WORDS
           : status === 'connecting' ? 'Finding laptop' : 'Offline: is the show open on the laptop, on this network?'}
         /*
           In the app the way out of a wrong key or a laptop that is not there
@@ -680,6 +688,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${connected ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
           {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
           {status === 'denied' && <span className="ml-2 text-red-300">{inApp ? 'Wrong show key: tap Change laptop and enter the key the show server printed' : 'Wrong show key — open the address the show server printed, key included'}</span>}
+          {status === 'locked' && <span className="ml-2 text-red-300">{LOCKED_WORDS}</span>}
           {connected ? 'Linked' : status === 'connecting' ? 'Finding laptop' : 'Offline'}
         </div>
       </header>
