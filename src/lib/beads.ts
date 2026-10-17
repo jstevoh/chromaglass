@@ -424,9 +424,23 @@ export class BeadField {
     const dropSpeed = 2 / (1 + this.viscosityRatio);
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
-      // In a Hele-Shaw cell, a viscous drop lags the depth-mean flow: 2U / (1 + lambda)
-      b.x += (vx * CELLS_PER_UNIT * dropSpeed - tiltX * 500) * dt + this.rng.centred() * 0.15;
-      b.y += (vy * CELLS_PER_UNIT * dropSpeed - tiltY * 500) * dt + this.rng.centred() * 0.15;
+      /*
+        In a Hele-Shaw cell, a viscous drop lags the depth-mean flow: 2U / (1 + lambda).
+
+        And nothing else moves it. Each step used to add a random walk of
+        ±0.075 cells on each axis ("drift little on their own"), which on the
+        plate at 1x is half a pixel and invisible, and in the closeup at 6x on
+        a 1440 px frame is 4 px rms sixty times a second on every drop: the
+        drops shivered (the owner, 2026-10-11, "twitchier than before";
+        `npm run steadycam` measures it). A millimetre drop of oil in water
+        has no Brownian motion to see: the thermal walk of a 1 mm sphere in
+        water is a couple of microns in an hour (D = kT / 6πηR ≈ 4 × 10⁻¹⁶ m²/s),
+        and the bubbles already keep still on still paint for the same
+        reason (PLAN 18i, `npm run bubblephysics`). So a drop on still paint
+        stays exactly where it is, as the bubbles do.
+      */
+      b.x += (vx * CELLS_PER_UNIT * dropSpeed - tiltX * 500) * dt;
+      b.y += (vy * CELLS_PER_UNIT * dropSpeed - tiltY * 500) * dt;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
       if (b.sx !== undefined) {
