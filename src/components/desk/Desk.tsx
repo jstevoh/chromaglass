@@ -394,8 +394,8 @@ export function Desk(p: DeskProps) {
           layers, Live | Preview, Send to wall and Save.
         */}
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
-          {/* The name gives way first, so the bar is one row wherever the plate is wider than about 940 px. */}
-          <span className="flex min-w-[120px] flex-1 items-center gap-2">
+          {/* The name gives way first, so the bar is one row wherever the plate is wider than about 930 px. */}
+          <span className="flex min-w-[100px] flex-1 items-center gap-2">
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
             <span className="truncate text-[16px] font-medium" data-testid="plate-name">{plateName}</span>
             <span className="hidden shrink-0 whitespace-nowrap font-mono text-[12px] text-dim 2xl:inline">
