@@ -6080,19 +6080,56 @@ the code's entry points, the checks to add and the scenes to match, in
   of the ferrofluid as though the drop filled the gap. The dye's own passes belong to
   other threads (18h, the dye's spread along the flow; 18m, a pour's slump): this one
   changes only how the dye is carried where the ferrofluid is, after coordinating.
-- ~~**29c. The drop follows the hand and holds together.**~~ (#373) Measured above: a look's magnet
-  leaves the drop behind, and one strong enough to drag it spreads it thin. A real drop
-  under a dragged magnet holds together and heaps (the Kelvin force on a 6 mm drop is
-  about 10⁴ times its drag at 2 cm/s). Find which of the pull's cap (MAGNET_CELLS), the
-  standing film's window and the phase's own relaxation thins it, and fix that; a check
-  that a dragged drop keeps its half-full area. If the closeup's camera follows the drop, it follows
-  smoothly and never with the sound: the owner, 2026-10-11, is made sick by the frame
-  moving with the beat, and the liquid's own motion must be what moves (the sway work's
-  `frameSway`, default 0, stays the only way sound moves the frame).
-  - **29c-1. The phaseCompress shortcut.** To keep the drop's edge sharp while moving,
-    Weller's interface compression is used (a flux along the edge's normal at the flow's speed)
-    to precisely counter the grid's numerical diffusion, standing in for an interface the grid cannot draw.
-  - **29c-2. The MAGNET_GAIN factor.** Derived from first principles for a real ferrofluid (Ferrotec EFH1: susceptibility χ = 1.22, viscosity μ_ff = 0.006 Pa.s) and a hand-held N52 neodymium cylinder magnet (B_r = 1.48 T, 20x40mm) at the plate's distance. The Kelvin body force f = μ₀ M ∇H = ∇(½(χ/μ₀)B²) acts through the ferrofluid's Darcy mobility h²/(12μ_ff) in the gap (h = 6 mm). Converted to solver units (plate metres per second), the physical gain is 1.04e-4. With this derived gain, the pull is about 10x weaker than the tuned 10.8e-4, meaning the drop trails the hand smoothly rather than snapping to it instantly, but is still fast enough to follow (93% of the way in ferrodrag).
+- ~~**29c. The drop follows the hand and holds together.**~~ **Shipped** (#373; the story in
+  `docs/plan-shipped.md` §29c): the rim's force read against the ferrofluid's own drag, the
+  moving edge compressed back (29c-1), the gain derived and what is kept of it named (29c-2),
+  the check `npm run ferrodrag` and the derivation `npm run magnetgain`. If the closeup's
+  camera ever follows the drop, it follows smoothly and never with the sound (the sway work's
+  `frameSway`, default 0, stays the only way sound moves the frame). Still open:
+  - **29c-1. The moving edge is compressed back to the grid's width** (phaseCompress:
+    Weller's interface compression, a flux along the edge's normal at the flow's own speed,
+    read from the field blurred once a step). A shortcut standing in for an interface the
+    grid cannot draw: a real drop's edge is a molecule thick, the grid's three cells of grey,
+    and the flux step spreads a moving one by half a cell times the cells it moves. Nothing
+    at rest.
+  - **29c-2. The gain is a tenth of EFH1's, and the far pools sit by it.** `npm run
+    magnetgain` works the pull out in tesla, metres and seconds: the solver's ψ is the
+    Langevin energy of the ferrofluid in the rod's field, so GAIN_phys = (χ/2μ₀)(SPIKE_B_REF·Br)²
+    h₀² / (12 ρ ν_ref L² MAGNET_E) = 5.8e-5 s at Ferrotec's χ 2.64 (0.22 of it at the 1.2 some
+    papers give); MAGNET_GAIN is 6e-6. Nearer a magnet than 0.3 of the plate it makes no
+    difference (29c-5): the pull asks for more than a step can carry at any gain the plate has
+    had. The far field it sets: at the real pull Magnet Garden's and Ferro Paint's own magnets
+    gather the whole plate at the guard's speed, where today's pools sit as poured, and every
+    look with a magnet is tuned on that. A real plate's far pools sit for a reason the solver
+    lacks: the contact line's pinning on the glass. A drop does not move until the force on it
+    beats its contact angle's hysteresis, σ·2R·(cos θ_r − cos θ_a), of order 10⁻⁴ N for a 5 mm
+    drop against water, which a look's own magnet's far field (a few hundred N/m³ on that
+    drop) does not. Add the pinning as a yield on the phase's motion under the Kelvin force,
+    with the real σ and angles, then set the gain to the physics and re-read every look with
+    a magnet.
+  - **29c-3. The solver's saturation knee is at 9 mT, EFH1's at 17.** ψ = E b²/(1 + b/Bs)
+    meets its plateau at b = Bs/2, 9 mT; a Langevin EFH1 (Ms 440 G, χ 2.64) at μ₀Ms/χ =
+    16.7 mT, so nearer a magnet than that the solver's pull is under the real one, by about
+    twice at the hand's magnet. It never shows in the pull (the guard is the speed there,
+    29c-5), only in how saturated the maze reads the field (phaseMu's `sat`), which every
+    labyrinth look is tuned on: move Bs to the physics with the maze looks re-read.
+  - **29c-4. The ferrofluid in a rim cell rides the cell's mean velocity, not its own
+    column's.** Two liquids side by side in the gap go at their own Darcy speeds under the
+    one pressure (the rim's force now says so, phaseForce); the phase's flux step still
+    carries the cell's mean, which in a half-full cell is slower than the ferrofluid by the
+    clear liquid's share. The drift flux φ(1−φ)(u_ff − u_clear), with u_ff − u_clear =
+    M_ff·f − (M_ff − M_clear)·∇p from hsGradient's pressure, would carry it at its own.
+    Measured without it (`npm run magnetgain`, a drop eight cells across): the rim at 0.81 of
+    the core's speed, the drop at 0.68 of the sharp drop's Darcy speed at thirty steps.
+  - **29c-5. The hand's speed limit is the grid's.** A real drop under a hand's magnet is
+    pinned to it, its Darcy speed under the Kelvin force metres a second (`npm run magnetgain`
+    prints each magnet's); the solver's is MAGNET_CELLS, 2.4 cells a step, 0.375 of the plate
+    a second on 384² and 0.19 on 768², and the drop goes at about half of that (the rim,
+    29c-4), so a hand dragged faster than about 0.15 of the plate a second on 384² leaves it
+    behind. The hand's own carry already takes substeps for its speed (handSubs, up to
+    CARRY_SUBSTEPS at CARRY_COURANT of a cell each): the magnet's asked cells a step should set
+    the phase's substeps the same way, with the velocity's own advection checked at that
+    speed.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

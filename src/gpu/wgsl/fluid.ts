@@ -941,7 +941,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     This form puts the gradient on ψ, which is smooth everywhere, and has
     the same curl, which is all that survives the projection.
 
-    A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add.
+    And read against the ferrofluid's own drag where a cell holds both
+    liquids (PLAN 29c, the drop's rim). Under Thin Gap a body force is
+    the speed it drives the reference liquid to, and hsPrep's drag on the
+    cell is the two liquids' geometric mean by share (wgsl/thinGap.ts),
+    which is right for the pressure's flow across a mixed cell and wrong
+    for a force on one of the liquids alone: the two lie side by side in
+    the gap, each its own column, and the Kelvin force moves the
+    ferrofluid's column at the ferrofluid's own Darcy mobility whatever
+    share of the cell it fills, while the clear liquid beside it is moved
+    only by the pressure (two-phase Darcy flow, each liquid at its own
+    mobility). So a cell's force-driven speed is φ·f·h²/12μ_ff, where the
+    mixed drag gave φ·f·h²/12μ_mix: a half-full rim cell was driven at a
+    quarter of the full cells' speed per unit of ferrofluid (ν_clear/ν_ff
+    4.5, so 0.5·4.5^0.5 against 4.5), and the rim held the drop back and
+    fell behind it. Measured (handoff, dropdiag): a drop 8 cells across
+    went at 0.42 of the sharp drop's Darcy speed under a weak magnet and
+    0.29 under a strong one, its back rim drawn into a crescent, the
+    smear the owner saw. The factor (ν_clear/ν_ff)^(1−φ) on the force,
+    A.b.z the ratio, is the mixed drag over the ferrofluid's, so what
+    hsPrep's drag leaves is the ferrofluid's own speed, in proportion to
+    its share. 1 off Thin Gap, where there is no drag to read against.
+    What is still short of the real thing: the ferrofluid in a rim cell
+    rides the cell's mean velocity, not its own column's, which is
+    faster by the clear liquid's share (PLAN 29c-4, the drift flux).
+
+    A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add,
+    A.b.z = the clear liquid's viscosity over the ferrofluid's.
   */
   phaseForce: `${HEAD}${MAGNET_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -965,9 +991,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                    magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
   // None under a standing layer: the film has the magnet's pull in its own
   // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
-  let aside = 1.0 - textureLoad(stand, p, 0).r;
-  let dropMask = phs(p, n);
-  var f = aside * dropMask * gpsi * A.b.x;
+  let share = phs(p, n);
+  var f = (1.0 - textureLoad(stand, p, 0).r) * share * pow(max(A.b.z, 1.0), 1.0 - share) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
@@ -1115,8 +1140,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     0..1, as phaseSeparate's sharpening did. Unlike that sharpening (which
     set a plate of drops at rest into blocky squares, and was replaced by
     Cahn–Hilliard for it: docs/physics-plan.md) it acts along the edge's
-    normal, from the [1 2 1]-blurred field, not along each axis alike, and
+    normal, from the [1 2 1]²-blurred field, not along each axis alike, and
     only where the flow moves the edge.
+
+    The normal is read from the blurred field written once a step by
+    phaseBlur (the \`blur\` texture), not blurred here: each face needs the
+    blur at six cells, and blurring them in place read 54 cells a face, 216
+    a cell, which on the Mac cost every ferrofluid look a fifth of its step
+    (#373's review: 29.2 → 35.7 ms a step at 768²). Read from the texture
+    the four faces' six cells each are the nine cells round p, so the step
+    reads the blur once (9 cells) and the compression 9 more, with the
+    phase, velocity, gap and layer at p and its four neighbours.
 
     Under Thin Gap the field is a share of the gap (phaseAdvect), so what
     crosses a face is a volume, the exchange times the thinner gap, and
@@ -1128,25 +1162,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   phaseCompress: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var vel: texture_2d<f32>;
-@group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var stand: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(3) var blur: texture_2d<f32>;
+@group(0) @binding(4) var vel: texture_2d<f32>;
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var stand: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<r32float, write>;
 ${STAND_ASIDE}
 fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
-${PHASE_MEAN3}
+// The [1 2 1]²-blurred field (phaseBlur), read at the grid's edge as its edge cell.
+fn sm(p: vec2i, n: i32) -> f32 { return textureLoad(blur, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
 fn gapOf(q: vec2i) -> f32 { return select(1.0, max(textureLoad(sq, q, 0).r, 0.004), A.a.z > 0.5); }
 // What flows into p from its neighbour q = p + e this step.
 fn compress(p: vec2i, e: vec2i, n: i32) -> f32 {
   let q = p + e;
   let a = raw(p);
   let b = raw(q);
-  // The edge's normal, from the blurred field (mean3), across the face and along it.
+  // The edge's normal, from the blurred field, across the face and along it.
   let t = vec2i(e.y, e.x);
-  let sp = mean3(p, n);
-  let sq2 = mean3(q, n);
+  let sp = sm(p, n);
+  let sq2 = sm(q, n);
   let across = sq2 - sp;
-  let along = 0.25 * ((mean3(p + t, n) - mean3(p - t, n)) + (mean3(q + t, n) - mean3(q - t, n)));
+  let along = 0.25 * ((sm(p + t, n) - sm(p - t, n)) + (sm(q + t, n) - sm(q - t, n)));
   let normal = abs(across) / sqrt(across * across + along * along + 1e-8);
   // How far the flow carried the edge this step, in cells.
   let u = 0.5 * (textureLoad(vel, p, 0).xy + textureLoad(vel, q, 0).xy);
@@ -1168,6 +1204,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (p.y < n - 1) { d += compress(p, vec2i(0, 1), n); }
   let outVal = raw(p) + d / gapOf(p);
   textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
+}`,
+
+  // The ferrofluid blurred by [1 2 1]² (PHASE_MEAN3), once a step, for
+  // phaseCompress to read its edge's normal from (and why: above).
+  phaseBlur: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+${PHASE_MEAN3}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  textureStore(dst, p, vec4f(mean3(p, i32(S.n)), 0.0, 0.0, 0.0));
 }`,
 
   /*

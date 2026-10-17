@@ -280,7 +280,7 @@ try {
   const b2 = two.at[1], b1 = one.at[1];
   check('a second finger raises domes in its own pool, and lights them',
     b2.domes >= b1.domes + 6 && b2.domes >= 2 * b1.domes && b1.pieces >= 1 && b2.lit >= 4 && b1.lit <= 1,
-    `at the second finger ${b2.domes} domes and ${b2.lit} of them lit, against ${b1.domes} domes and ${b1.lit} lit with the first alone`);
+    `at the second finger ${b2.domes} domes and ${b2.lit} of them lit, against ${b1.domes} domes in ${b1.pieces} pieces and ${b1.lit} lit with the first alone`);
   const drift = (r) => Math.abs(r.mass / r.mass0 - 1);
   /*
     Past full only under a magnet's film, where a dome is a cell past full

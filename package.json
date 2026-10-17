@@ -128,6 +128,7 @@
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferrodrop": "node scripts/ferrodrop.mjs",
     "ferrodrag": "node scripts/ferrodrag.mjs",
+    "magnetgain": "node scripts/magnetgain.mjs",
     "ferropour": "node scripts/ferropour.mjs",
     "regrid": "node scripts/regrid.mjs",
     "pops": "node scripts/pops.mjs",

@@ -389,8 +389,8 @@ const MAX_SPEED = 0.002;
   The turntable's dish, because hsPrep reads the clear liquid's viscosity
   back out of 12ν/W² with that width (PLAN 18d) and the two must agree.
 */
-const PLATE_METRES = DISH_METRES;
-const REST_GAP = 0.03;
+export const PLATE_METRES = DISH_METRES;
+export const REST_GAP = 0.03;
 /*
   The dish's rim, in plate widths from the middle: the plate's inscribed
   circle, which is all the picture ever shows of it (plate.ts keeps both
@@ -406,7 +406,7 @@ const OPEN_RIM = 0.5;
   at the rest gap, so on the default Thickness nothing moves differently,
   and on any other the liquid answers as its viscosity says (hsPrep).
 */
-const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
+export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
 /*
   Rain Drip's weight: the speed a unit of dye over the plate's mean drives
   the reference liquid to at the rest gap, per unit of the slider, in the
@@ -499,7 +499,7 @@ const DYE_CAP = 6;
   liquids are water and oils, 0.8 to 1.26 of water's; the clear liquid is
   taken as water's, as liquidProps takes the poured ones' against it.
 */
-const LIQUID_DENSITY = 1000;
+export const LIQUID_DENSITY = 1000;
 /*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
@@ -519,17 +519,38 @@ export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
 }
 /*
   How hard the magnet pulls the liquid where the ferrofluid is, per unit of
-  magnetic energy gradient, in real seconds (phaseForce). Derived from first
-  principles for a real ferrofluid (Ferrotec EFH1: susceptibility χ = 1.22,
-  viscosity μ_ff = 0.006 Pa.s) and a hand-held N52 neodymium cylinder magnet
-  (B_r = 1.48 T, 20x40mm) at the plate's distance. The Kelvin body force
-  f = μ₀ M ∇H = ∇(½(χ/μ₀)B²) acts through the ferrofluid's Darcy mobility
-  h²/(12μ_ff) in the gap (h = 6 mm). Converted to solver units (plate metres
-  per second), the physical gain is 1.04e-4. (A pool a sixth of the plate off
-  is drawn much slower than the hand, making the drop trail the hand smoothly
-  rather than snap to it instantly, but still fast enough to follow.)
+  magnetic energy gradient, in real seconds (phaseForce): the speed, in
+  plate widths a second, that one unit of ∇ψ a plate width drives the
+  reference liquid to at the rest gap, which is how hsPrep reads a body
+  force (PLAN 18a-2). What that is in tesla, metres and seconds is worked
+  out and printed by `npm run magnetgain` (PLAN 29c-2): the solver's ψ is
+  the Langevin energy of a ferrofluid in the rod's field, so one unit of
+  it is (χ/2μ₀)(SPIKE_B_REF·Br)²/MAGNET_E joules a cubic metre, and
+  Darcy's speed for a force f between the glasses is f·h²/12μ, so the pull
+  of Ferrotec's EFH1 (χ 2.64 by its sheet) under an N52 rod comes to
+  GAIN_phys = (χ/2μ₀)(SPIKE_B_REF·Br)² h₀² / (12 ρ ν_ref L² MAGNET_E),
+  5.8e-5 seconds. This is 0.10 of it (0.22 at the χ of 1.2 some papers
+  give the same fluid).
+
+  Kept at a tenth of the real pull, and why. Nearer a magnet than 0.3 of
+  the plate the pull asks for more than a step can carry at any gain the
+  plate has had: the hand's magnet asks 7.8 plate widths a second at
+  this gain, against the 0.375 that MAGNET_CELLS allows on 384², so
+  there the guard is the drop's speed and the gain does not show (a
+  real drop under a hand's magnet is pinned to it, at metres a second;
+  the solver draws it following at the grid's own limit, PLAN 29c-5).
+  The gain sets only the far field: how fast a pool a third of the
+  plate off creeps toward a look's own magnet, which every look with a
+  magnet was tuned on, and at the real pull Magnet Garden's and Ferro
+  Paint's own would gather the whole plate at the guard's speed. A real
+  plate's far pools stay where they were poured for a reason the solver
+  does not have, the contact line's pinning on the glass, which holds a
+  small drop against a weak field's pull outright (PLAN 29c-6: add it,
+  then set the gain to the physics). Calibrated in the lab before any of
+  this was known: a hand-held magnet a fifth of the plate from a pool
+  draws it in at a quarter of the plate a second.
 */
-const MAGNET_GAIN = 1.04e-4;
+export const MAGNET_GAIN = 6e-6;
 /*
   The most one step of the magnet may add to a cell, in plate widths a
   second: a guard, not a limit on the pull. At half a plate a second it
@@ -537,7 +558,7 @@ const MAGNET_GAIN = 1.04e-4;
   flattened the pull, and a dragged magnet left the ferrofluid behind (CI:
   0.023 of the plate against a hand that crossed 0.65 of it).
 */
-const MAGNET_CAP = 3;
+export const MAGNET_CAP = 3;
 /*
   And never more than this many cells a step, whatever the look's clock.
 
@@ -554,7 +575,7 @@ const MAGNET_CAP = 3;
   second of pull), the flux step was asked for more than its limit and the
   plate lost an eighth of its ferrofluid in a few seconds (CI: 86% kept).
 */
-const MAGNET_CELLS = 2.4;
+export const MAGNET_CELLS = 2.4;
 
 /*
   Ferro Pushes Dye's two exchanges at full (phaseDisplace in wgsl/fluid.ts),
@@ -926,6 +947,8 @@ export class WebGPUFluid {
   private psi: PingPong | null = null;
   /** Its chemical potential (phaseMu), kept for the next step's maze force. */
   private phaseMuT: GPUTexture | null = null;
+  /** The ferrofluid blurred once a step (phaseBlur), for phaseCompress's edge normal. */
+  private phaseBlurT: GPUTexture | null = null;
   /*
     The ferrofluid standing up under a close magnet (standing.ts, PLAN §9t):
     the film, made the first time a magnet is that close, and the window the
@@ -1107,6 +1130,7 @@ export class WebGPUFluid {
       ['phaseAdvect', [R32], open.phase],
       ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
+      ['phaseBlur', [R32], open.phase],
       ['phaseCompress', [R32], open.phase],
       // The two volume forms (phaseGridPlan, phaseCHVolume) run only on a thin
       // gap. Every look opens on one now (Thin Gap, on in every look), so a
@@ -2005,7 +2029,7 @@ export class WebGPUFluid {
     const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
     const m2f = 0.16 + (HAND_SCREEN - 0.16) * spikeAmt;
     const mazeK = { m2: m2f * kk, alpha: ((1 + m2f) * kk) ** 2 };
-    if (maze <= 0.001 && !spikes && !this.phaseLive) this.mazeReady = false;
+    if (maze <= 0.001 && !spikes) this.mazeReady = false;
     const thin = this.thinGapOn(p);
     if (!thin) this.hsPrimed = false;
     if (!this.phaseLive) this.phaseGapPrimed = false;
@@ -2209,9 +2233,13 @@ export class WebGPUFluid {
         // rings round it rather than a maze (the gradient orders the
         // stripes across it). Still enough that the maze follows the hand.
         const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
+        // The clear liquid's viscosity over the ferrofluid's, for the rim's
+        // force to be read against the ferrofluid's own drag (phaseForce, and
+        // why); hsPrep reads the same two (thinProject).
+        const nuRatio = thin ? thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS) / (p.ferroViscosity ?? FERRO_NU) : 1;
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read, this.ensureStand()],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
-            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
+            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), nuRatio, 0]));
         this.vel.swap();
       });
     }
@@ -2723,9 +2751,17 @@ export class WebGPUFluid {
       /*
         What the flux step spread of a moving edge, taken back along the
         edge's normal at the flow's own speed (phaseCompress, PLAN 29c-1):
-        nothing where the ferrofluid is at rest.
+        nothing where the ferrofluid is at rest. The normal is read from
+        the field blurred once here (phaseBlur), not blurred face by face.
       */
-      this.run(pass, 'phaseCompress', this.phase.write, [this.phase.read, this.ride(), this.squeeze.read, stand],
+      if (!this.phaseBlurT) {
+        this.phaseBlurT = this.disposer.track(this.device.createTexture({
+          label: 'phase blur', size: [this.N, this.N], format: R32,
+          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+        }));
+      }
+      this.run(pass, 'phaseBlur', this.phaseBlurT, [this.phase.read], none);
+      this.run(pass, 'phaseCompress', this.phase.write, [this.phase.read, this.phaseBlurT, this.ride(), this.squeeze.read, stand],
         this.arg('phase compress', [PHASE_COMPRESS, disp, volume, 0]));
       this.phase.swap();
 
@@ -2774,7 +2810,7 @@ export class WebGPUFluid {
           this.phase.swap();
         });
       }
-      if (this.phaseLive) {
+      if (maze > 0.001 || spikes) {
         // Once more on where the phase ended, for the next step's force.
         this.run(pass, 'phaseMu', mu, [this.phase.read, psi.read], args);
         this.mazeReady = true;
