@@ -6,6 +6,7 @@ import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
+import { SwitchPill } from './ui';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
@@ -805,7 +806,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             worth a thumb from across the room.
           */}
           <Slider label="Lamp Ground" field="lampGround" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('lampGround') as number | undefined} {...sliderProps} connected={connected} />
-          {/* Two projectors (PLAN 18b-6), optionally combining lamp inputs. */}
+          {/* Two projectors (PLAN 18b-10), optionally combining lamp inputs. */}
           <Slider label="Two Projectors" field="twoProjectors" step={1} format={(v) => (v > 0.5 ? 'On' : 'Off')} value={(value('twoProjectors') ?? 0) as number} {...sliderProps} connected={connected} />
 
           {/*
@@ -843,16 +844,18 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
             <button
+              type="button"
+              role="switch"
+              aria-checked={!!settings?.macroMode}
               onClick={() => patch({ macroMode: !settings?.macroMode })}
               disabled={!connected}
+              data-testid="remote-macro-toggle"
               className="flex w-full items-center justify-between disabled:opacity-30"
             >
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <span className={`h-6 w-11 rounded-full transition-colors ${settings?.macroMode ? 'bg-white' : 'bg-white/20'}`}>
-                <span className={`mt-0.5 block h-5 w-5 rounded-full bg-black transition-transform ${settings?.macroMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
-              </span>
+              <SwitchPill on={!!settings?.macroMode} />
             </button>
             {settings?.macroMode && (
               <div className="mt-4">

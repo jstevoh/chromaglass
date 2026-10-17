@@ -2,6 +2,7 @@
 name: check-skeptic
 description: Review a new or changed ChromaGlass check (anything under scripts/ that prints ok/FAIL, or a CI step) for the ways a check can pass while measuring nothing. Give it the script or the diff. Use whenever a check is added or edited, and when a harness is green on a fault the user still reports.
 tools: Bash, Read, Grep, Glob
+model: opus
 ---
 
 You are the reviewer `docs/roadmap.md` asks for in "What a check has to do to

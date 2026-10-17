@@ -1058,7 +1058,7 @@ its post chain is written once, in WGSL. Its WebGL-only items disappear:
 
 | Part | Today (WebGL2) | WebGPU |
 |---|---|---|
-| **Solver** (`gpuFluid.ts`, about 1,400 lines) | 24 fragment programs; per layer per step, about 88 full-grid draws plus 13 at M² (`SQUEEZE_ITERS` 10, `VISC_ITERS` 4, `PRESSURE_ITERS` 24 ×2, `CURRENT_ITERS` 10, `DYE_ITERS` 4, MacCormack ×2) | Compute pipelines over ping-pong storage textures. Jacobi first for parity, then a better solver (H2) |
+| **Solver** (`gpuFluid.ts`, about 1,400 lines) | 24 fragment programs; per layer per step, about 88 full-grid draws plus 13 at M² (`SQUEEZE_ITERS` 10, `VISC_ITERS` 4, `PRESSURE_ITERS` 24 ×2, `CURRENT_ITERS` 10, MacCormack ×2) | Compute pipelines over ping-pong storage textures. Jacobi first for parity, then a better solver (H2) |
 | **CPU deltas** | Brushes, automation, `injectImage`, `pourText`, chemistry and the room stir write L² arrays; about 1.33 MB uploaded per dirty step | Each gesture is a small record in a buffer (`queue.writeBuffer`), and one compute pass stamps them all at full resolution. Images and text upload once, then stamp |
 | **Readbacks** (`readbackAsync`) | Two 192² RGBA32F `readPixels` per layer per frame, through PBOs and a fence | GPU reductions: mean density and colour, the exposure histogram, velocity range, `hasContent`. A few hundred bytes back by `mapAsync`, a frame or more late (as today) |
 | **The rest of the CPU side** | Beads, bubbles, the macro camera, `deriveStep`, liquid phase | Stays in TypeScript, reading the reduced data. Beads are drawn on the GPU (below) |

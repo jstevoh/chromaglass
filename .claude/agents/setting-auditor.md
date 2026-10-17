@@ -2,6 +2,7 @@
 name: setting-auditor
 description: Check that a new or changed ChromaGlass setting follows the operating rules in PLAN.md (MIDI-learnable, reachable from the phone and the desks, default keeps today's look) and is documented. Give it the branch or the setting's key. Use whenever a diff adds or changes a key in VisualizerSettings.
 tools: Bash, Read, Grep, Glob
+model: sonnet
 ---
 
 You audit settings. `PLAN.md` ("Operating rules") says every new setting is

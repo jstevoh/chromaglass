@@ -59,6 +59,7 @@
     "inputpick": "node scripts/inputpick.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
     "saves": "npm run build && node scripts/saves.mjs",
+    "switches": "npm run build && node scripts/switches.mjs",
     "draw": "npm run build && node --experimental-strip-types scripts/draw.mjs",
     "drawwall": "npm run build && node --experimental-strip-types scripts/drawwall.mjs",
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
@@ -115,6 +116,7 @@
     "wgsl": "node scripts/wgsl.mjs",
     "deploygate": "bash scripts/deploygate.sh",
     "closedruns": "node scripts/closedruns.mjs",
+    "checkguard": "node scripts/checkguard.mjs",
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
     "physics": "node scripts/physics.mjs",
@@ -158,6 +160,7 @@
     "flush": "node scripts/flush.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
+    "dispersion": "node scripts/dispersion.mjs",
     "benday": "node scripts/benday.mjs",
     "grainedge": "node scripts/grainedge.mjs",
     "turing": "node scripts/turing.mjs",
@@ -204,7 +207,8 @@
     "mac-app": "npm run build && npm --prefix desktop run dist",
     "lampjudge": "node scripts/lampjudge.mjs",
     "clicks": "esbuild scripts/clicks.mjs --bundle --platform=node --format=esm --external:playwright --log-level=warning --outfile=node_modules/.cache/clicks.mjs && node node_modules/.cache/clicks.mjs",
-    "framesway": "node scripts/framesway.mjs"
+    "framesway": "node scripts/framesway.mjs",
+    "soundpatch": "esbuild scripts/soundpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundpatch.mjs && node node_modules/.cache/soundpatch.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

@@ -287,6 +287,22 @@ try {
     return start ? { start, end } : { why: `of ${pts.length} points on the glass, ${ends.length} within 0.25 of the middle, no start 0.3 to 0.45 from one with the glass under the way (${tried} tried)` };
   }, box);
   const startW = plan.start?.w ?? at(0.05);
+  /*
+    Where the plate is, and what is under the hand's first point: the drag
+    below is aimed from the box measured here, before any touch. Six Mac runs
+    on 2026-10-11 lost the second press because the first hold changed the
+    look, Save grew a dot, the plate bar wrapped to two rows at 1280 and the
+    canvas dropped 42 px under the hand (PLAN.md 19v-3). The app no longer
+    moves; this says so on every run, with the bar's height and the canvas's
+    top at the plan, the second touch and the drag's end, so a plate that
+    moves again is named here and not read as the Magnet failing to draw.
+  */
+  const where = () => page.evaluate(([x, y]) => {
+    const c = document.getElementById('liquid-canvas')?.getBoundingClientRect();
+    const bar = document.querySelector('[data-testid="desk-preview"]')?.previousElementSibling?.getBoundingClientRect();
+    return { box: c ? { x: c.x, y: c.y, w: c.width, h: c.height } : null, bar: bar ? bar.height : null, under: document.elementFromPoint(x, y)?.id || document.elementFromPoint(x, y)?.getAttribute('data-testid') || document.elementFromPoint(x, y)?.tagName || 'nothing' };
+  }, startW);
+  const atPlan = await where();
   console.log(`     the hand's way on the plate: ${plan.start ? `${plan.start.q.x.toFixed(2)},${plan.start.q.y.toFixed(2)} → ${plan.end.q.x.toFixed(2)},${plan.end.q.y.toFixed(2)} ` +
     `(${plan.start.len.toFixed(2)}), in the window ${plan.start.w.map(Math.round)} → ${plan.end.w.map(Math.round)}` : `none (${plan.why}): from near the left edge, across the window`}`);
   await page.mouse.move(...startW);
@@ -328,6 +344,7 @@ try {
   await page.waitForTimeout(500);
   const poured = await phase(firstAt, 0.18), livePoured = await live();
   const sceneBefore = await scene();
+  const atTouch = await where();
   await page.mouse.move(...startW);
   await page.mouse.down();
   const early = [];
@@ -413,6 +430,7 @@ try {
   console.log(`     through the drag and the hold: ${fmtScene(sceneDrag, await scene())}`);
   const drag1 = await phase(spot ? { x: spot.x, y: spot.y } : null, 0.18);
   const after = { lays: await lays() };
+  const atEnd = await where();
   await page.mouse.up();
   console.log(`     the hand's path: ${trail.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')}`);
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
@@ -427,6 +445,14 @@ try {
   const apart = spot ? 2 * Math.abs(spot.y - 0.5) : 0;
   const once = after.lays === laysBefore;
   const counts = `laid as a look's ${laysBefore} → ${after.lays} times`;
+  {
+    const off = (u, v) => (u && v ? Math.max(Math.abs(u.x - v.x), Math.abs(u.y - v.y), Math.abs(u.w - v.w), Math.abs(u.h - v.h)) : Infinity);
+    const moved = Math.max(off(atPlan.box, atTouch.box), off(atPlan.box, atEnd.box));
+    const at3 = (w) => `bar ${w.bar === null ? '?' : w.bar.toFixed(0)} px, canvas top ${w.box ? w.box.y.toFixed(1) : '?'}`;
+    check('the plate stays where the hand found it: the canvas keeps its box through both touches, and the second starts on the canvas',
+      moved < 1 && atTouch.under === 'liquid-canvas',
+      `at the plan ${at3(atPlan)}; at the second touch ${at3(atTouch)}, under the hand ${atTouch.under}; at the drag's end ${at3(atEnd)}; moved ${moved.toFixed(1)} px`);
+  }
   check('dragging the Magnet carries its pool with the hand',
     sameGrid && once && !!spot && !!plan.end && apart > 0.3 && way > 0.2 && came > 0.5 && behind < mirrored && nearEnd > 0.5,
     `the pool's centre ${from.x.toFixed(2)},${from.y.toFixed(2)} → ${to.x.toFixed(2)},${to.y.toFixed(2)}, the hand ending at ` +

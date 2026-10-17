@@ -109,7 +109,13 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.5,
       sceneMappings: [
         { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
-        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 45 }
+        /*
+          45 was meant as degrees, and a depth is a share of the dial's travel
+          (0..360 for the angle): at 45 the comet's heading was thrown to its
+          clamp by any timbre above 0.003. An eighth of the travel is the 45°
+          that was meant (28f).
+        */
+        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 0.125 }
       ],
       audioMappings: {
         velocity: 'bass',
@@ -240,6 +246,18 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
       chromaticAberration: 0.35,
+      /*
+        The pattern for a look's own patches (28f), for a look about hits:
+        each kick churns the neon, a hard one harder; the snare's crack curls
+        the eddies tight; the hats raise fine beads. Each hit is how hard it
+        landed, falling over a quarter second (the `hits` source), so the
+        liquid takes the push and carries it, and nothing moves between hits.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.3 },
+        { source: 'hits', feature: 'hatsHit', setting: 'beads', depth: 0.2 },
+      ],
       audioMappings: {
         velocity: 'energy',
         density: 'treble',
@@ -336,8 +354,23 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 1.0,
       dropHeight: 0.9,
       beatSqueeze: 0.8,
+      // The one look whose music moves the frame (FRAME_MOVING_LOOKS): a
+      // third of Frame Sway's travel, so the rock carries the picture without
+      // the full slide #347 had on every look.
+      frameSway: 0.35,
       sceneMappings: [
-        { source: 'sound', feature: 'kick', setting: 'plateRock', depth: 0.5 },
+        /*
+          The kick throws the plate, a hard kick harder. The patch was written
+          on the `sound` source, whose features are the hook's loudness, bass,
+          mid and treble: `kick` was not one of them, so it read 0 and never
+          moved anything (28f). It is the kick's hit now (the `hits` source:
+          how hard it landed, falling over a quarter second), not the kick's
+          level, which is loud between kicks too. Bass Drop is the one look
+          that may move the frame with the music (FRAME_MOVING_LOOKS,
+          lib/plateRock.ts): its Frame Sway above lets the rock carry the
+          picture, as nothing else on the shelf does.
+        */
+        { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5 },
         { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
       ],
       audioMappings: {
@@ -426,7 +459,8 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.15,
       dyeBudget: 0.55,
       sceneMappings: [
-        { source: 'sound', feature: 'hats', setting: 'beads', depth: 0.5 }
+        // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.5 }
       ],
       audioMappings: {
         velocity: 'complexity',
@@ -473,8 +507,18 @@ export const PRESETS: Preset[] = [
       ledColor: '#020818',
       secondLamp: 0.35,
       sceneMappings: [
-        { source: 'sound', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
-        { source: 'sound', feature: 'tonalMid', setting: 'hueJourney', depth: 0.5 }
+        /*
+          Both read 0 until 28f: `note` and `tonalMid` are the `bands`
+          source's names, not `sound`'s. The note keeps its patch. The hue's
+          was the tonal mids lengthening the journey's minutes per step, so a
+          held chord slowed the colours; it is the other way now, a held
+          chord turning the hue sooner (a step a minute and a half quicker
+          at full). The journey steps when its minutes are up, so a chord
+          coming and going moves when the next step lands, never the colour
+          on the frame.
+        */
+        { source: 'bands', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
+        { source: 'bands', feature: 'tonalMid', setting: 'hueJourney', depth: -0.15 }
       ],
       audioMappings: {
         velocity: 'bass',
@@ -955,7 +999,16 @@ export const PRESETS: Preset[] = [
       dishVignette: 0.7,
       spinDrag: 0.08,
       sceneMappings: [
-        { source: 'sound', feature: 'mid', setting: 'rotationSpeed', depth: 0.03 }
+        /*
+          This was the band's mid on the dish's motor, which turned the whole
+          wheel faster with the music. A real oil wheel turns at its motor's
+          speed whatever the band plays (the owner, 2026-10-11: the music
+          moves the liquid, not the frame), so the same mids go into the oil
+          instead: the lamp-warmed cells rise a little livelier while the band
+          is in them (28f). Buoyancy pushes through the heat the oil carries,
+          so the cells answer over a second or two, not on the frame.
+        */
+        { source: 'sound', feature: 'mid', setting: 'buoyancy', depth: 0.05 }
       ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
@@ -1400,6 +1453,21 @@ export const PRESETS: Preset[] = [
       lampWarmth: 0.2,
       iridescence: 0.1,
       secondLamp: 0.2,
+      /*
+        The pattern for a look's own patches (28f). The Joshua Light Show was
+        hands on the plates in time with the band: the operator squeezed in
+        more colour on the bass and stirred on the hits. So the bass thickens
+        the pour (Dye Budget: the plate holds more colour while the bass is
+        in, and the pours and the evaporation carry it there over seconds, not
+        on the frame) and each kick or snare stirs the oil a little, harder
+        for a harder hit, gone in a quarter second and carried on by the
+        liquid. Never the plates' press itself: that moves the whole frame
+        (FRAME_MOVING_LOOKS).
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'dyeBudget', depth: 0.15 },
+        { source: 'hits', feature: 'anyHit', setting: 'turbulenceScale', depth: 0.15 },
+      ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -2226,6 +2294,20 @@ export const PRESETS: Preset[] = [
       beatSqueeze: 0.0,
       dyeBudget: 0.6,
       bubbles: 0,
+      /*
+        The pattern for a look's own patches (28f, the owner: "only use things
+        that we can detect quickly and make changes that are appropriate for
+        the music"). A lava lamp answers nothing but its lamp, so the music
+        reaches it the way the lamp does, through the wax's heat and slowly:
+        the bass warms the plumes a little livelier (buoyancy pushes through
+        the heat the wax carries, so it answers over seconds, not on the
+        kick), and a held chord turns the colours a step sooner. No hits: a
+        lamp does not jump on the snare.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'buoyancy', depth: 0.05 },
+        { source: 'bands', feature: 'tonalMid', setting: 'hueJourney', depth: -0.15 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },

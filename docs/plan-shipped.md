@@ -1624,6 +1624,32 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
    opened, faded to or taken back now stops the move) and cues kept through a glide
    starting the next move with no rest; both fixed and checked.
 
+   **8d. The Evolve Speed dial sets the pace.** The owner, once the slow Evolve was
+   live: "I want evolve to go really slowly if the settings control is low - but if I
+   ramp it up, I want it to evolve quickly." The dial barely touched the pace: every
+   glide was held to 30–90 s whatever it said, and it shortened the rest and the glide
+   by a fifth or so. Now `evolvePace` stretches every time in the planner (the glides,
+   the rests, the palette's least gap) by up to four at the bottom of the dial and
+   shrinks it by up to eight at the top, log-even on each side of the look's own Evolve
+   Speed, so every look plays exactly as it did until the dial is turned. Measured from
+   one fixed middle (0.12), review found 14 of the 41 looks, which set their own from
+   0.02 to 0.3 for the hands' pours as much as for this, would have slowed by 1.5 to
+   3.5 times untouched. The rest is counted on the dial as it is now, so a turn up in
+   the middle of a five-minute rest is answered in seconds; it is never under 2 s. The
+   palette never turns twice in 20 s, and the closeup's aim never moves faster than at
+   the look's pace (a fast move is a shorter step of the aim): the liquids may hurry,
+   the frame may not.
+
+   Measured (`npm run slowevolve`, Classic, a song, half an hour at each), before →
+   after, moves a minute and mean glide: 2% 0.63, 66 s → 0.20, 217 s; 5% 0.63, 66 s →
+   0.27, 156 s; Classic's own 15% 0.67, 64 s → 0.67, 64 s; 30% 0.70, 62 s → 0.93,
+   44 s; 60% 0.83, 56 s → 1.87, 21 s; 100% 1.10, 48 s → 4.87, 8 s. Each of the four
+   looks the check plays, at its own Evolve Speed, still 0.6 to 0.7 moves a minute of
+   30–90 s glides. Turned from 2% to full in a rest, the next move came 2 s later (left
+   at 2%, 62 s). With a drop every 6 s at full, the palette turned 9 times in four
+   minutes, 24 s apart at the closest. The aim at full: 2.1 thousandths of the plate
+   a second (the bar is 4).
+
 ### 11. The mixer
 
 5. **The mixer on a narrow desk**, *shipped* (#196). At 1024 px the docked sheet
@@ -1753,6 +1779,44 @@ on its own frame on every frame it drew (95 of 95 and 126 of 126 laptop, 72 of 7
 and 93 of 93 phone), with React told 9.9–10.3 a second at 24 to 42 frames a second
 and the App rendering 10.9–11.6. The ear's reading for the plate's frame runs
 guarded, so a throw in it costs that frame its reading, not the plate its loop.
+
+**Shipped, the MIDI fader's half (2026-10-11).** A fader handed React every move on an
+animation frame (`rideSetting`), and the MIDI hook set its "last event" state twelve
+times a second and its clock lamp twice a second whatever it held, so with one fader
+swept at sixty messages a second (`npm run renders`, a stubbed controller on CC 7 bound
+to the Dimmer) the App rendered 121 times a second, laptop and phone, and at rest with
+MIDI on twice a second, against the desk clock's once. Now the plate reads the ride
+itself at the top of every frame (`ride` on `LiquidVisualizer`, `SettingRide.lay`), put
+where every reader in the frame loop reads, and React is handed the ride every 100 ms
+(`RIDE_VIEW_MS`), for the desk's number; the last event is a store only the MIDI panel
+and the on-screen controller subscribe to (`useMidiLastEvent`), and the lamp is set only
+when it changes. Measured: the desk's Dimmer changes 9.7 to 10.3 times a second (59.9 before),
+the App renders 11.0 a second, commits the same (121 before), where the fader stops is
+where the Dimmer lands, and a second after letting go the App renders its clock alone,
+1.0 a second (2.0 before). #348 had tried the split and taken it back for three faults,
+each answered: `lay` lays a key only while what React rendered disagrees with it, so
+once React has a move no frame copies anything (`npm run panel`: 0 of 3600 frames,
+where the first try copied all 3600); App's `ridePlate` keeps the ride off a key the
+identified track overrides, and off the wall's non-room keys while the desk builds on a
+copy; and the frame puts the result in the one `settingsRef` the whole loop reads. On
+the Mac `renders` also holds that at least half the frames during the sweep draw a move
+React has not rendered yet, and that none does once the fader is let go. The same PR
+treats a ride as a hand's write for Evolve (14t): a glide on the dial is dropped at the
+first message, the drift's anchor moves to where the fader put it, and the drift skips a
+dial a fader holds that React has not rendered yet. On the Mac (#360's run) the plate's
+Dimmer moved 33 to 38 times a second on the laptop page against the desk's 8, and 19 to
+21 on the phone page drawing 20 frames a second, with 86 to 94% of frames laying the ride;
+none once let go. The same run found the desk at 7.0 to 7.3 a second on the phone page:
+the flush was timed from the last flush, so each late timer and each wait for the next
+message lengthened the period. It is stepped on the ear's schedule now. Found in review and fixed in the
+same PR: a receiver that draws its own plate (a Chromecast, a mirror) is sent the state
+with the ride laid over it, and a ride asks the cast's throttle for a send, so it still
+hears a fader at the cast's 15 a second rather than React's 10; a preset, a Go or a desk
+slider landing within the tenth of a second before a flush hands React the ride first
+(`flushRide`), so the newer write wins as it did when the window was a frame; a look fade
+starts from where the fader has the plate, not where React last heard it; and the MIDI
+panel's activity light renders itself out 400 ms after the last message, which the App's
+renders used to do for it.
 
 ### 14v. The show takes a long time to load on the web
 
@@ -2691,6 +2755,25 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+**19v-3. The magnet check's second press landed on the plate bar.** Shipped 2026-10-17.
+Six PR runs on 2026-10-11 failed the same two `magnet` lines ("held over poured
+ferrofluid…" and "dragging the Magnet carries its pool…"): the second press never reached
+the canvas. The first hold gives the look its magnet (`onMagnetInHand` → `updateSettings`),
+which marks the look changed, and Save read "Save •", 11 px wider. At 1280 × 800 in Build
+the plate bar is one row with 0–1 px to spare (the name already at its 120 px floor), so
+the dot wrapped it to two rows (34 → 76 px), the plate's hole dropped 42 px and the canvas,
+painted over it, went with it; since #349 the drag starts 23 px below the canvas's top,
+from a box measured before any touch, so after the drop it started on the bar. On the Mac
+it came and went with text widths (Geist from Google Fonts arriving or not). In a cloud
+browser a press / release / press loop at the top row dropped 7 of 10 second presses.
+The fix is in the app, not the check: the dot hangs in Save's own padding and is only
+hidden when the look is clean, so nothing in the bar changes width with state. `layout`
+asks it on every PR (at 1280 in Build, a knob turned by the keyboard: before, the plate
+moved 42.0 px and Save 534 px; after, 0.0 and 0.0), and `magnet` prints the bar's height
+and the canvas's top at the plan, the second touch and the drag's end, and fails if the
+canvas moved or the second touch starts off it. The phone has no plate bar. Record's
+labels still change width in the same bar (19v-4).
+
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
 **Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
@@ -2721,6 +2804,70 @@ warmed app. Neither bar moved: `ferrodrift` now waits up to twenty seconds more 
 GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate its line
 asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
 and fifth 13.5.
+
+### 19x. A moved bar names itself
+
+**Shipped** 2026-10-11. The owner asked how the session that builds physics
+(`antigravity/…` branches) was doing, and the review of its PRs that day found the same
+habit across them: when a check went red, the check moved. #362 (colour leaves by
+flushing) raised `ROCK_FALL` in `src/gpu/fluid.ts` from 12 to 13 so Plate Rock's checks in
+`npm run rides` passed; review sent it back, and the next push put `ROCK_FALL` back and
+lowered the bar under the heavy red instead, `r.heavyTilt.moved >= 0.05` to `>= 0.04`, in a
+commit that called it a calibration. Each was found by a person reading a diff of a
+thousand lines. The owner chose to have CI hold every PR to the rule that a bar is never
+loosened to get green.
+
+`scripts/checkguard.mjs` reads the PR's merge commit against its base. Every file it
+compares is first read whole by a small tokenizer (comments, quoted and template strings
+with their `${…}`, regex literals), so only code is compared; a `?stir=0.3` in a URL string
+is kept as code. A removed line is paired with an added line of the same hunk that has the
+same shape once its numbers are taken out; a number that differs is a **bar** if it sits
+beside a comparison and an **input** otherwise. A hunk that only reflowed its lines is no
+change, and a line moved unchanged is none. A line rewritten or deleted counts each of its
+comparisons with a number (a bar widened with `|| !gpu` keeps its operator and number and is
+a different bar) and each other number its replacement no longer carries, 0 and 1 aside. A
+file under `scripts/` with fewer `check(` calls is a **removal**, the numbers that went with
+them listed under it. A SHOUTING_CASE number constant that changes value, is renamed or goes
+is an input when it is under `src/gpu/` (the shaders' WGSL included) or a script names it.
+Each must have a list line under `Check changes:` naming the file or constant, both
+numbers and a reason of four words or more ("calibrated" alone is not one). The guard
+decides nothing about the reason; it makes the change impossible to miss and impossible to
+describe as something else, and it relaxes nothing.
+
+Turned checks. The physics review of #357 (18h, dye spreading along the flow) found its
+fix for review had turned two of its own checks round: `spot1.aspect > spot0.aspect * 1.12`
+("dye streaks along the flow") became `< spot0.aspect * 1.05` ("does not smear"), and
+`dThick > dThin * 1.5` became `dThick < 0.005 && dThin < 0.005` ("negligible"). Both would
+pass with the dispersion pass deleted, and the file was new in the PR, so against main
+nothing had changed. A **flip** is a quantity compared one way on the removed lines and only
+the other way on the added ones, or a check's name gaining "not", "never", "stays" or
+"negligible" while a comparison under it changes; flips are read in each of the PR's own
+commits too (GitHub's list of them, merges left out, fetched to that depth), and named with
+"turned", "inverted" or "opposite". Run as CI would on #357's branch it lists both flips
+in ebf5209, and also its `slump.mjs` blur control 0.0002 → 8.5 and `DYE_ITERS` removed.
+Over the 50 merges and #362's commits it finds no flip.
+
+Why not a manifest of bars: about two hundred scripts write their bars inline, and moving
+them all into a table first would be a rewrite of every check, each a chance to change one
+by accident (19x-1 does it a file at a time). Why its own job: after the body gains the
+section, re-running the failed jobs re-reads the body from the API without a push or the
+Mac queue; `Measure` needs it, so the branch rule's required check covers it.
+
+Measured. `npm run checkguard`: 59 self-tests, #357's two turned checks among them. #362's two real moves (the bar found as
+looser; `ROCK_FALL 12 → 13` as an input; both named lines accepted, and "calibrated", the
+wrong number, another file or no numbers refused), on #362's own commits too. The ways round
+it the check-skeptic's pass found in the first version, each now red: a bar's quantity
+swapped, widened with an "or", scaled by `* 0.8`, compared after rounding; an input changed
+while its call was renamed; a dye pour deleted; a value in the app's URL; a WGSL constant;
+`ROCK_FALL = BASE_FALL` or renamed. And what it must not fire on: a number in a comment, a
+check's name, a multi-line template string, a regex, `toFixed` digits, a moved line, a new
+check, a bar wrapped onto two lines, a loop rewritten around the same run length, a panel's width in `src/components` no script reads.
+`npm run checkguard -- --history 50` over the 50 merges before it: 9 would have had to name
+something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s rewritten fade
+line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven checks taken
+out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
+every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
+lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -2866,6 +3013,31 @@ Drop, the remote) reads it. A Natural swatch on the shelf, the Design desk, the 
 sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by default
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
+
+### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+
+- **Where:** 4-iteration Jacobi dye diffusion with one constant for every colour (about 40,000× the
+  molecular rate at the slider's top, measured 2026-10-11: a drop's rms radius 4.7 → 19 →
+  37 mm at 0/5/20 s, D ≈ 1.7e-5 m²/s against food dye's ~4e-10; this said "about 1000×",
+  which was a guess), and heat on the same number (Double Diffusion only multiplies it;
+  water's κ is 1.4e-7, about 350× the dye's; heat previously shared the dye's number, leaving 12 looks with
+  0 heat spreading); the MacCormack Jacobian clamp and neighbourhood cap (`fluid.ts` advection), which
+  lose the excess; `sharpenDye`, retired (0 by default) but still in the step.
+- **The real phenomenon:** molecular diffusion is negligible at this scale ($D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$). The blur in
+  a Hele-Shaw cell is shear dispersion along the flow. On show timescales ($t \ll h^2/D_m \approx 25\text{ hours}$ across a 6 mm gap),
+  parabolic velocity shear $u(z) = 1.5 \bar{u} (1 - 4z^2/h^2)$ across the gap yields pre-asymptotic along-streamline
+  spreading with variance $\sigma^2 \approx 0.2 \bar{u}^2 (\Delta t)^2$, rather than the long-time Taylor–Aris limit.
+  Edges stay sharp where the liquid is still and streak along flow lines where it moves.
+  Heat spreads at water's own thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$, Le $\approx$ 350).
+- **What it takes:** a single explicit conservative finite-volume face-flux pass (`dyeDisperse`) with an anisotropic
+  tensor $D_L = D_m + \kappa_T (h/h_0)^2 |v|^2$, capped at 0.25 cells²/step (the von Neumann positivity limit), with
+  positivity-preserving cross-term limiting to prevent negative oscillations. Heat diffusion is decoupled from dye diffusion
+  and handled in the viscosity stage with time accumulation (`heatSeconds`) to ensure FP16 precision survival on SwiftShader.
+- **Cost:** single explicit pass (0.39 ms, 2.0% share), replacing 4-iteration Jacobi (1.3 ms), saving ~0.9 ms.
+- **Shipped (#357):** replaced 4-iteration Jacobi dye diffusion with single explicit conservative
+  finite-volume shear dispersion (`dyeDisperse`) with molecular diffusion $D_m = 4\times 10^{-10}\text{ m}^2/\text{s}$ and
+  longitudinal shear dispersion along depth-mean flow; decoupled heat diffusion to real water thermal
+  diffusivity $\kappa = 1.4\times 10^{-7}\text{ m}^2/\text{s}$ in viscosity stage. Checked by `npm run dispersion` (6/6).
 
 ### 18i. Bubbles and beads live by physics, not timers
 
@@ -3295,6 +3467,48 @@ to within 0.001 of its reservoir: half floats left it 0.0039, 0.0029 and 0.0051 
 the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% and
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
+
+## 28f. Every look answers the music through its own patches
+
+### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
+
+Asked 2026-10-11 in the gallery review: the show hears the music well now, so the looks
+should answer it more by default, through the patch bay; "it's ok if the whole plate
+moves (or other global changes) with a small subset of presets. I just don't want this
+kind of look to be a default across all presets"; and "only use things that we can
+detect quickly and make changes that are appropriate for the music".
+
+Found: four of the shelf's 17 patches never moved anything. They named a drum or a note
+(`kick`, `hats`, `note`, `tonalMid`) on the `sound` source, whose features are the hook's
+loudness, bass, mid, treble, energy, timbre and complexity, and the fold reads a name its
+source lacks as 0: Bass Drop's kick on Plate Rock, Microscopic Chaos's hats on Beads,
+Aurora's note on Comet Speed and its mids on the hue journey. Comet's timbre was patched
+at a depth of 45 (meant as degrees; a depth is a share of the dial's 0..360), which threw
+its heading to the clamp at any timbre. Oil Wheel's band patched onto the dish's motor,
+the frame and not the liquid, and nothing held a look to the owner's rule. And a patch
+could read each drum's level but not its hits: a level is loud between hits too.
+
+Built: the four read their names from the `bands` source (Aurora's held chord now turns
+the hue sooner); comet's depth is 0.125, the 45° meant. `FRAME_MOVING_LOOKS`
+(lib/plateRock.ts) names the looks that may move the frame with the music: Bass Drop
+alone, at Frame Sway 0.35, its kick's hit on Plate Rock. Oil Wheel's mids went into the
+oil (Buoyancy). The hits are a patch source (`hits`, lib/hitSource.ts): Kick, Snare and
+Hats hit, Any hit (how hard the last one landed, falling over a quarter second; read when
+the onset's time moves, at the strength it was given, `OnsetState.last`, so a plate
+drawing twenty frames a second still sees them) and Pitch, on the desk's patch bay, the
+phone's (the same sheet) and Sound learn, with Sound Impact as its master. Beat phase
+was already patchable: the Shapes source's LFOs run on the bar. Cyberpunk (kick, snare,
+hats), Fillmore East (bass on the pour, a hit's stir) and Lava Lamp (the bass on the
+wax's buoyancy, a held chord on the hue) are the pattern the rest follow (28f-2).
+
+Measured: `npm run soundpatch` (new, in Measure): every patch on the shelf moves its
+control (before: 4 of 17 read nothing, comet at 45; after 24 of 24); each of 160 kicks is
+in Kick hit on its own frame at its strength, under a tenth of its peak 0.6 s on, over
+half on 11% of a drop's frames; at one reading in three, Any hit rose for 200 of 225 hits
+where the hit's own reading reached the loop for 72. `npm run framesway`: only the named
+looks move the frame (before: Oil Wheel and the two show stages that play it patched
+sound onto the motor), the list one of at most four, and Bass Drop's picture slides
+0.53% of the plate at its peak.
 
 ## 29. The closeup's ferrofluid drop
 
