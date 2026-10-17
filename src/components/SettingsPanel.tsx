@@ -3609,6 +3609,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </select>
         </div>
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-[13px] font-medium text-text">Two Projectors</span>
+          <div className="flex items-center gap-2">
+            <PinChips settingKey="twoProjectors" />
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.twoProjectors > 0.5}
+              aria-label="Two Projectors"
+              onClick={() => onUpdate({ twoProjectors: settings.twoProjectors > 0.5 ? 0 : 1 })}
+              className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1"
+              data-testid="two-projectors-toggle"
+            >
+              <SwitchPill on={settings.twoProjectors > 0.5} />
+            </button>
+          </div>
+        </div>
       </section>
       )}
 

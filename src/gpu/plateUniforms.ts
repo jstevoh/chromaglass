@@ -215,6 +215,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   pack.set('derivedOn', ctx.derived ? 1 : 0);
   pack.set('layerCount', fluids.length);
+  pack.set('twoProjectors', s.twoProjectors ?? 0);
   pack.set('rotation0', view.rotations[0] ?? 0);
   pack.set('rotation1', view.rotations[1] ?? 0);
   pack.set('resolution', width, height);

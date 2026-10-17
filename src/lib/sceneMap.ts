@@ -70,8 +70,10 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   Clear Film (PLAN §20b) likewise: moving it pours clear oil over the whole
   dish or draws it off, so a patch riding the beat would fill the lace's
   holes in on every bar. A pour is a hand's gesture.
+  Two Projectors (PLAN §18b-10) switches the rig between one lamp and two, so
+  a patch or LFO must not flip it mid-song.
 */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
   ...MIX_FADE_KEYS.map(String)]);

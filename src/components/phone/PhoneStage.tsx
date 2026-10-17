@@ -239,6 +239,13 @@ export interface PhoneStageProps {
   lampGround: number;
   onLampGround: (v: number) => void;
   /**
+   * Two Projectors (PLAN 18b-10): each plate has its own overhead projector
+   * aimed at the screen, so its clear parts throw its lamp onto the screen
+   * and wash the other plate's colour. On the Looks sheet beside Lamp Ground.
+   */
+  twoProjectors: number;
+  onTwoProjectors: (v: number) => void;
+  /**
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
    * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
@@ -741,6 +748,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Lamp Ground" value={p.lampGround} min={0} max={1} step={0.05} onChange={p.onLampGround}
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
+              display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">Each plate has its own lamp on the screen, so its clear parts wash the other's colour.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">

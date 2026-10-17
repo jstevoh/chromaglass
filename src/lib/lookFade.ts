@@ -260,6 +260,7 @@ export const STRUCTURE: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vi
   'ledPlatform', 'ledMode',
   'layerCount',
   'blendMode',
+  'twoProjectors',
   /*
     Both halves of the closeup, and holding only one of them is what put a
     spinning square over the plate three times.
