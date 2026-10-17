@@ -112,7 +112,9 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
   return (
     <button onClick={onPress} aria-label={label} aria-pressed={pressed} data-testid={testId}
       className="pointer-events-auto flex h-12 min-w-12 items-center justify-center">
-      <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[14px] font-medium text-text ${GLASS_PILL}`}>
+      <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[14px] font-medium ${
+        pressed ? 'border border-accent-border bg-accent-bg text-accent-text backdrop-blur-[16px]' : `text-text ${GLASS_PILL}`
+      }`}>
         {children}
       </span>
     </button>

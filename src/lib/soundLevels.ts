@@ -276,7 +276,7 @@ export class SoundLevels {
   volume knob, which is fair. The same holds live between songs: a render
   starts fresh with each song, but the live ear keeps one reference for its
   audio context, so a track mastered 10 dB quieter than the one before plays
-  its first minute or two with gentler hands (PLAN 28f: forget the
+  its first minute or two with gentler hands (PLAN 28e-2: forget the
   reference when a song ends, from the song-change clock).
 */
 /** Seconds of sound the passage's loudness is heard over: about a bar at 120 bpm. */

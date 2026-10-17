@@ -83,6 +83,8 @@
  * its Froude speed √(g′η) instead), so what is cut is the part the law
  * overstates anyway; the plan has an implicit solve to replace the cap.
  */
+import { OPEN_RIM } from '../../lib/turntable';
+
 export function slumpKernels(HEAD: string, W: string): Record<string, string> {
   return {
     /*
@@ -100,6 +102,10 @@ export function slumpKernels(HEAD: string, W: string): Record<string, string> {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
+  if (length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    textureStore(dst, p, vec4f(0.0));
+    return;
+  }
   let d = max(textureLoad(dye, p, 0), vec4f(0.0));
   let eta = d.a * A.a.y;
   let gap = max(textureLoad(sq, p, 0).r, 0.004) * A.a.z;
@@ -125,11 +131,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let c = textureLoad(dye, p, 0);
+  if (length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    textureStore(dst, p, c);
+    return;
+  }
   let k = textureLoad(rate, p, 0).r;
   var out = c;
   for (var f = 0; f < 4; f++) {
     let o = select(select(vec2i(0, -1), vec2i(0, 1), f == 2), select(vec2i(-1, 0), vec2i(1, 0), f == 0), f < 2);
     let q = clampP(p + o, S.n);
+    if (length((vec2f(q) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { continue; }
     let cq = textureLoad(dye, q, 0);
     let a = min(0.5 * (k + textureLoad(rate, q, 0).r), A.a.x);
     let flux = a * (cq.a - c.a);

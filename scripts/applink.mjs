@@ -115,10 +115,13 @@ await start(['server/remote-server.js'], { PORT: String(RELAY_PORT), SHOW_KEY: K
 // and writing down everything a controller sends it.
 const heard = [];
 let controllersSeen = 0;
+// The display role takes the relay's own display key (PLAN 14m), which the
+// relay gives only to the machine it runs on, as the laptop's page asks for it.
+const DISPLAY_KEY = (await (await fetch(`http://127.0.0.1:${RELAY_PORT}/remote-info.json`)).json()).displayKey;
 const laptop = new WebSocket(`ws://127.0.0.1:${RELAY_PORT}/remote-ws`);
 const snapshot = { settings: DEFAULT_SETTINGS, activePresetId: null, isActive: true, isAutomated: false, overlaysVisible: true };
 await new Promise((resolve, reject) => { laptop.once('open', resolve); laptop.once('error', reject); });
-laptop.send(JSON.stringify({ type: 'hello', role: 'display', key: KEY }));
+laptop.send(JSON.stringify({ type: 'hello', role: 'display', key: DISPLAY_KEY }));
 laptop.send(JSON.stringify({ type: 'state', state: snapshot }));
 laptop.on('message', (raw) => {
   const m = JSON.parse(String(raw));

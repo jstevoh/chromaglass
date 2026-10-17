@@ -14,11 +14,14 @@
  * stay small until the end, which keeps them accurate in 32-bit floats.
  */
 
+import { OPEN_RIM } from '../../lib/turntable';
+
 const HEAD = /* wgsl */ `
 struct StatsArgs {
   n: f32,              // the grid
   groups: u32,         // how many workgroups the first pass ran
-  pad: vec2f,
+  thinGap: f32,        // 1 on thin gap (measure inside the circular dish only), 0 on legacy plate
+  pad: f32,
 };
 @group(0) @binding(0) var<uniform> A: StatsArgs;
 
@@ -60,7 +63,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_id)
     let p = vec2i(i32(i % n), i32(i / n));
     let d = textureLoad(dye, p, 0);
     let v = textureLoad(vel, p, 0);
-    sum += d;
+    if (A.thinGap < 0.5 || length((vec2f(p) + 0.5) / A.n - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)}) {
+      sum += d;
+    }
     peak = max(peak, vec4f(d.a, abs(v.x), abs(v.y), length(v.xy)));
     i += stride;
   }

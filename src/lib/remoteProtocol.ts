@@ -116,8 +116,13 @@ export interface RemoteState {
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
   | { type: 'hello'; role: 'display' | 'controller' | 'mirror'; key?: string }
-  /** Relay → a client that presented the wrong show key, before it is closed. */
-  | { type: 'denied'; reason: 'key' }
+  /**
+   * Relay → a client it is turning away, before it closes it: the wrong key, or
+   * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
+   * minutes, `retryMs` from now. A locked phone waits that long rather than
+   * knocking again, since every knock while locked is refused unread.
+   */
+  | { type: 'denied'; reason: 'key' | 'locked'; retryMs?: number }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -244,7 +249,23 @@ export interface RelayInfo {
   hosts: string[];
   /** The show key, given only to the machine the server runs on; phones and displays carry it in their URL. */
   key: string | null;
+  /**
+   * The display's own key (PLAN 14m), also given only to the machine the server
+   * runs on. The display role sends the show to every network display and hears
+   * every phone, so it no longer takes the eight-digit key a phone carries: a
+   * phone that read the key off the QR code could otherwise say it was the laptop.
+   * It is a fresh 32-hex-digit key each launch, never shown or put in a URL.
+   */
+  displayKey: string | null;
 }
+
+/**
+ * The largest message the relay takes (PLAN 14m): it closes a socket that sends
+ * more (code 1009) rather than hold a stranger's megabytes. A patch with a few
+ * pictures in it is the largest thing a phone or the laptop sends, and is well
+ * under this; the sender drops anything over it rather than lose the link.
+ */
+export const MAX_FRAME_BYTES = 512 * 1024;
 
 /** The show key from this page's own URL (`?key=1234`), if it came with one. */
 export function showKeyFromUrl(): string | null {
@@ -260,9 +281,14 @@ export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
-    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null };
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null; displayKey?: string | null };
     if (body?.chromaglass !== 'relay') return null;
-    return { port: body.port ?? (Number(window.location.port) || 3000), hosts: Array.isArray(body.hosts) ? body.hosts : [], key: body.key ?? null };
+    return {
+      port: body.port ?? (Number(window.location.port) || 3000),
+      hosts: Array.isArray(body.hosts) ? body.hosts : [],
+      key: body.key ?? null,
+      displayKey: body.displayKey ?? null,
+    };
   } catch {
     return null;
   }
