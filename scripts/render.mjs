@@ -366,7 +366,11 @@ function song() {
       const want = old(db, (win) => bytesFromDb(db, win.minDb, win.maxDb, new Uint8Array(bins)), wave, dt, params);
       const win = moved.calibrate(db, dt, params.autoCalibrate);
       const raw = moved.levels(bytesFromDb(db, win.minDb, win.maxDb, new Uint8Array(bins)), wave, dt, params);
-      const got = { ...smoothLevels(prev, raw), calibration: raw.calibration };
+      // The passage (PLAN 28d) is a reading the hook never made: new, not
+      // moved, so it is held to its own check (`npm run breakdown`) and every
+      // field the hook did make is compared here as before.
+      const { passage: _passage, ...levels } = smoothLevels(prev, raw);
+      const got = { ...levels, calibration: raw.calibration };
       prev = got;
       if (JSON.stringify(got) !== JSON.stringify(want)) { differ++; firstDiff ||= `frame ${i}`; }
     }

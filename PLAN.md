@@ -6330,6 +6330,29 @@ Turing Print" work (#331), which also made the reaction grow at all.
       luminance 133 against 40, 4/9). Doing it means a new setting or a redefined Film
       Physics, with `filmlook` rewritten to the new contract (the check-skeptic on it), the
       desk and the phone. Not in this PR.
+- **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
+  #368; the showreel's first two findings). The music's hands follow how loud the passage
+  is, as an amplitude (`Passage`), and the bass's press reads the band over its ceiling:
+  on the showreel's minute the press changed 1.44× as much a second in the breakdown as
+  in the groove, now 0.54× (`npm run breakdown`). Classic: Dye Budget 0.45, Bubbles 0.05.
+  Story in docs/plan-shipped.md §28e.
+- **28e-2. Open from 28e.**
+  - The sound mappings (a look's `sceneMappings` with source `sound`, sound learn's
+    triggers) and Evolve's automation read the levels, which are ranged against ceilings
+    that fall back in 8 to 18 s, so a breakdown still turns them back up. Scale the ones
+    that move the liquid by the passage too, look by look, measured on the showreel.
+  - A render's room tracker seeds its floor at -140 dB from the first frame, which is
+    silence (the analyser's window has no samples yet), and a floor only rises from
+    levels near it, so it stays there for the whole render: the analyser window a render
+    hears through is -120 dB wide at the bottom, where live it fits the room. Seed the
+    floor from the first frame with sound, and check a render's window against live's
+    (`npm run render`).
+  - Live, the passage's reference is kept for the whole audio context, so a track
+    mastered 10 dB quieter than the one before plays its first minute or two with gentler
+    hands (0.54 a minute on, 0.78 two). Forget the reference when a song ends, from the
+    song-change clock (`useSongChange`), and hold it with `npm run breakdown`.
+  - Re-render the showreel after 28e lands (and after Antigravity's #348, #352, #353,
+    #355), and re-score Classic and the 28 busier looks against the same minute.
 - **28f. Every look answers the music through its own patches** (the owner, 2026-10-11: use
   the patch bay so the looks answer the music more by default; the whole plate may move with
   the music on a small named set of looks, never as the default). Brief and findings in

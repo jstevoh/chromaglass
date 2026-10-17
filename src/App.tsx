@@ -3431,6 +3431,7 @@ export default function App() {
       audio: a ? {
         volume: a.volume, bass: a.bass, mid: a.mid, treble: a.treble,
         energy: a.energy, spectralCentroid: a.spectralCentroid, timbre: a.timbre, complexity: a.complexity,
+        passage: a.passage,
       } : null,
     };
     if (castingRef.current && !stageRef.current) castSendRef.current(message);   // a mirror of this canvas needs no feed

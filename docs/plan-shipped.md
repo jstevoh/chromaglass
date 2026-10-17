@@ -3636,6 +3636,52 @@ its controls (the gate removed, the random walk restored, the snap removed) turn
 where there were 336). The desk and the phone share the camera, and Frame Sway is on
 both; the Guide's Music Sync line says what rides it.
 
+## 28. Preset palettes: the looks refreshed for what the plate does now
+
+### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
+
+Reported by the showreel (28d, 2026-10-11): every look rendered on the Mac to the same
+minute of Funkorama, which grooves at about -17 dB, drops 7 to 8 dB into a breakdown from
+26 to 44 s and comes back. On 28 of 41 looks the plate moved more in the breakdown than in
+the groove, and Classic, the default, scored 4 of 10: a full-frame wash with brown bubble
+discs and no bodies, its motion running backwards against the music (r -0.77 over 5 s).
+
+The suspect was the ear's auto-level chasing the quiet. Measured on that minute through
+the ear a render uses (`songAudioTrack`), it was part of it, not the cause: the band
+levels the hands read fell to 0.6 to 0.76 of the groove's in the breakdown while the
+song's amplitude fell to 0.4 (each a decibel reading ranged against a ceiling that falls
+back in 8 to 18 s), so the breakdown read quieter, just not quiet enough. The cause was
+Sound Drive's bass on a thin gap, a hand on the glass that moves the liquid by the change
+in its depth (the flow is the gap's rate). The route read the bass over 70 against a
+ceiling of 85, so a loud groove's bass sat at full 0.55 of every second: the glass was
+held flat and the kicks moved nothing. The breakdown's bass, under the line, rose and
+fell with every note. Its change per second was 1.44× the groove's, and per second it
+followed Classic's measured motion at r 0.74 (Roy, Red Cabbage, Clock Glass, Aurora 0.65
+to 0.68; the looks that did follow the band, Acid Trip, Solar Flare, Cell Bloom, read
+-0.11 to -0.44 against it). The plate's rock and cover glass, the other suspect, were
+calmer in the breakdown (cover speed 9.3 cm/s against 15.4) and ran against the motion.
+
+What changed. The ear reports how loud the passage is against the song's loud passages,
+as an amplitude (`Passage` in lib/soundLevels.ts: the waveform's mean square over 2 s
+against a reference that rises in 3 s and falls in 45 s), and the music's hands are
+scaled by it: the pours, the bursts, the sparks' count and the bass's press. A hand
+answers the sound's pressure, which is an amplitude. The levels themselves are left as
+they were, because the beat clock, the meters and the mappings read them. And the press
+reads the band over its own ceiling (`bassPressLevel`), so the loud groove's kicks press
+and let go. The cast wire carries the passage, so the wall calms with the laptop.
+
+Measured (`npm run breakdown`, the band's chorus, its verse 8 dB down, the chorus; and
+the showreel's minute with `BREAKDOWN_SONG`): the press's change per second in the
+breakdown against the groove, 1.36× before and 0.54× after on the band, 1.44× and 0.54×
+on Funkorama, where the groove's own press moves 1.4× more than before; the hands'
+levels 0.87× and 0.69× before, 0.37× and 0.36× after. A song quiet from its first bar
+reads 0.91 (not a breakdown); the volume turned down 10 dB is learned in under two
+minutes (0.54 a minute on, 0.78 two).
+
+Classic: Dye Budget 0.45 (the default 0.85 filled the dish until the colours ran into one
+wash, the fault Velvet Underground was fixed of), and Bubbles 0.05 (the brown discs were
+the default 0.2, trapped air drawn dark against a full dish).
+
 ## 28f. Every look answers the music through its own patches
 
 ### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
