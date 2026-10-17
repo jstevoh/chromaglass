@@ -316,6 +316,21 @@ const HAND_SCREEN = 0.04;
 /** The reactions' own grids (see gridSplat). */
 const BZ_GRID = 256;
 /*
+  The Oregonator's own time a second of show (the bz stage). A real dish of
+  ferroin BZ turns its spirals once in tens of seconds and its waves crawl a
+  few millimetres a minute. The reaction ran twelve steps of 0.01 a solver
+  step, 7.2 of its units a second at sixty steps, and one turn of the model's
+  spiral is 5.3 units (the lab: the oxidised catalyst at a point peaked every
+  0.73 s; the showreel saw blue rings pulse every 0.75 s, a metronome). At
+  0.26 a turn takes 20 s, the quick end of a real dish. The shortcut, named:
+  the model's wavelength is a fifth of the plate, so the plate is a patch of
+  the dish about 6 mm across, as under a magnifier, and at the real period
+  its waves cross it at the real speed for their wavelength (about 0.01 of
+  the plate a second). On the show's clock (seconds a step), not a count of
+  steps, so the governor's step rate does not change the chemistry's.
+*/
+const BZ_PER_SECOND = 0.26;
+/*
   The grid the reaction's diffusion lengths are given on (stepChemistry): the
   middle rung, so the coral and the print keep about the size the looks were
   judged at on the Mac, now on every rung. CHEM_STABLE is the explicit step's
@@ -2996,8 +3011,13 @@ export class WebGPUFluid {
     const rxn = this.rxn;
     stage('bz', (pass) => {
       const r = rxn!;
-      const args = this.arg('bz step', [0.01, 0, BZ_GRID, 1.0]);
-      const steps = Math.max(1, Math.round(12 * bz));
+      // The reaction's own time this step, in substeps of at most 0.01 (the
+      // Oregonator is stiff). BZ Reaction is how strongly it is drawn, not
+      // how fast the chemistry runs: it scaled the steps, so the one knob
+      // that shows the reaction also sped it up twelvefold.
+      const units = BZ_PER_SECOND * Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+      const steps = Math.max(1, Math.ceil(units / 0.01));
+      const args = this.arg('bz step', [units / steps, 0, BZ_GRID, 1.0]);
       for (let k = 0; k < steps; k++) {
         this.run(pass, 'rxnStep', r.write, [r.read], args, BZ_GRID);
         r.swap();

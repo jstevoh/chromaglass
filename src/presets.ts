@@ -159,6 +159,10 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
+      // A galaxy is mostly void: at the default 0.85 the regulator kept the
+      // plate full and the whorl filled the frame. Near black 9% to 19% in
+      // the lab on the seeded spiral.
+      dyeBudget: 0.35,
       glossiness: 0.0,
       postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
       ledMode: 'single',
@@ -186,7 +190,12 @@ export const PRESETS: Preset[] = [
       rotationSpeed: 0.087,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
       centerGravity: 0.8,
       ledPlatform: true,
-      ledMode: 'ocean',
+      // A deep blue platform, as the description has it. The 'ocean' wheel
+      // runs up to cyan (0, 0.6, 0.8), and it lit every clear patch: an
+      // empty plate read luma 0.23 with 19% of it near black; this one 0.07,
+      // all of it dark blue, so the fluids carry the light.
+      ledMode: 'single',
+      ledColor: '#04122e',
       ledSpeed: 0.05,
       diffusionRate: 0.0001,
       buoyancy: 0.2,
@@ -384,7 +393,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'timbre-shifter',
     name: 'Timbre Shifter',
-    description: 'The brightness of the sound controls the color and rotation of the fluid.',
+    description: 'The brightness of the sound picks the colour of what pours in: a dark sound lavender and violet, a bright one teal, ice and amber.',
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
@@ -417,7 +426,10 @@ export const PRESETS: Preset[] = [
         velocity: 'mid',
         density: 'volume',
         color: 'timbre',
-        rotation: 'timbre',
+        // Not the dish: a turn of the whole plate on the sound is the frame
+        // moving with the music, which the owner does not want by default.
+        // The motor above still turns it.
+        rotation: 'none',
       },
     }
   },
@@ -955,12 +967,21 @@ export const PRESETS: Preset[] = [
     settings: {
       globalSpeed: 0.0084,
       surge: 0.35,
-      layerCount: 2,
+      // One wheel: an Optikinetics wheel is one sealed disc in one gate. Two
+      // plates screened over each other were a full plate twice, a wash.
+      layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.7,
-      rotationSpeed: 0.137,      // the dish's motor; was 0.05 with a stir in the middle (PLAN 22j)
+      // Half a revolution a minute, as its description says: lookMotorRate(0.232)
+      // is 0.053 rad/s. At 0.137 it was 0.005 rad/s, a turn every twenty
+      // minutes, and the film read the wheel as still (motion 0.003). The
+      // wheel's own motor, not the frame moving to the music.
+      rotationSpeed: 0.232,
       centerGravity: 0.15,
-      ledPlatform: true,
+      // No LED under the wheel: a brown one ('#3a2408', luma 0.14) lit every
+      // clear patch, so the dish was a brown disc with no dark in it (an
+      // empty plate: 84% of it above near black; off, 1%).
+      ledPlatform: false,
       ledMode: 'single',
       ledColor: '#3a2408',
       ledSpeed: 0.0,
@@ -990,7 +1011,10 @@ export const PRESETS: Preset[] = [
       bubbles: 0.17,
       plateRock: 0,
       layerScaleVariety: 0.35,
-      lampWarmth: 0.75,
+      // A halogen's warmth, not a brown filter: at 0.75 the grade took a
+      // quarter of the blue (x 0.78) and a tenth of the green from the
+      // whole frame, and the wheel's blues and greens went olive.
+      lampWarmth: 0.3,
       lampHotspot: 0.6,
       lampMotion: 0.2,
       lightPlay: 0.7,
@@ -1187,8 +1211,14 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.35,
       edgeRelief: 0.6,
       bubbles: 0.35,
-      paperA: '#2a9aa3',
-      paperB: '#ff9a4a',
+      // The gradient deeper, so the drops are the light: at teal '#2a9aa3' to
+      // orange '#ff9a4a' the paper alone was luma 0.58 and the frame a milky
+      // wash with no dark anywhere; this one is 0.36. Not darker: at 0.15
+      // ('#0b2f38' to '#4a1f0a') the dye lit by it is so dim that its
+      // pigment grain is under a level, twice the grain only 1.5x the
+      // texture (`npm run grainedge`: 0.133, x2 0.205); here 0.258, x2 0.575.
+      paperA: '#1c626a',
+      paperB: '#a0582a',
       lightPlay: 1.0,
       lampMotion: 0.4,
       lampHotspot: 0.6,

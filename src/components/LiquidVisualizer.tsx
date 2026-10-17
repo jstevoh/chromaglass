@@ -8361,7 +8361,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 
                 // Each audio feature carries a different color from the harmony,
                 // offset by the true musical pitch so chords paint distinct colors!
-                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), time * 0.1 + pitchAngle + colorMod * Math.PI + off);
+                /*
+                  Routed to timbre, the sound's brightness is the colour, and
+                  nothing else is. Its 0..0.85 turned the cycle by up to 2.7
+                  dyes, on top of the pitch class's 0..6.3 (a whole circle in
+                  radians read as dyes, more than the five on the plate, and a
+                  jump at every chord), the clock's drift, and each feature's
+                  own offset of up to three dyes: every hue of the set was in
+                  every bar whatever the timbre, and Timbre Shifter's plate
+                  stayed its set's cyan-violet mean ("hue never shifts", the
+                  showreel). Here the timbre walks the set, dull to bright
+                  (in proportion: a timbre of 0.85 sits 85% of the way along it),
+                  and the features keep a quarter of their offsets so the
+                  pulse and the sparks are still told apart. Every look whose
+                  colour follows timbre takes this (Cyberpunk Neon,
+                  Microscopic Chaos and Jellyfish Bloom too); the other
+                  routes, Classic's treble among them, are as they were.
+                */
+                const timbreColour = currentSettings.audioMappings.color === 'timbre';
+                const colFor = (off: number) => harmonyCycle(harmonyOf(activeLayerRef.current), timbreColour
+                  ? colorMod * (harmonyOf(activeLayerRef.current).length - 1) + off * 0.25
+                  : time * 0.1 + pitchAngle + colorMod * Math.PI + off);
                 const audioCol = colFor(0);
 
                 const activeFluid = fluidsRef.current[activeLayerRef.current];
