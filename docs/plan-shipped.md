@@ -3580,7 +3580,151 @@ the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% 
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
 
-## 28. Following a known song played live (28g)
+## 27. Every control does something you can see
+
+### 27a-8. The closeup's camera holds still through the song (QA-31)
+
+The owner, 2026-10-11, the evening after Frame Sway seated the plate's own sway (27a-7):
+"the macro zoom is even bouncier and twitchier than before." What a real macro rig does:
+the camera sits on a copy stand or a rail over the dish, and the only thing that moves in
+the picture is the liquid. The microscope light shows and the macro references in the
+project's shared files are all locked off; a push or a pan in them is a hand on a rail
+over seconds, never a move with the beat.
+
+Measured with `npm run steadycam` (the camera driven through a 120 bpm song, a kick a beat
+and hats on the eighths, at 6x on a 1440 px frame, against the same run in silence), four
+things moved the frame that were not the liquid:
+
+- Macro Sync (0.5 by default) had three hands on the frame in every mode, outside Frame
+  Sway: a punch-in on the kick, a push with the energy and a "handheld" tremor from the
+  treble. The song swayed the frame 0.42% of its width (6 px) and pumped the zoom 3.2%
+  (the frame's edge 23 px); at Macro Bead's 0.85, 0.71% and 6.3% (46 px). And the ear
+  hears nearly every kick now where it once heard a third (`npm run kicks`), so the punch
+  landed on every beat: "even bouncier".
+- The lead aimed the camera ahead of its subject by the solver's velocity in the subject's
+  one cell, times up to sixteen cells. That velocity carries the music through the liquid
+  (Beat Squeeze's press, the kick's shove) and the noise of one cell of a turbulent field:
+  a press of half a cell a step under a drop drifting steadily threw the frame 0.95% (14
+  px) in a frame and 1.6% (24 px) over the beat, and left the drop 6.8% off centre.
+- A cut in Auto landed on the lattice cell that found the drop, not on the drop, and then
+  slid to it at 6 a second: 14% of the frame at 6x after a cut. In the check it was a
+  13.8% difference between the song and silence from one cut that fell a frame apart.
+- Each drop took a random walk of ±0.075 cells a step ("drift little on their own"), half
+  a pixel at 1x and 4 px rms sixty times a second at 6x: "twitchier". A millimetre drop
+  of oil in water has no Brownian motion to see (D = kT / 6πηR ≈ 4 × 10⁻¹⁶ m²/s, a couple
+  of microns an hour), and the bubbles already keep still on still paint (18i).
+
+Built: the punch, the push, the tremor and the rate's tightening in a loud passage ride
+Frame Sway (`move = sync × sway` in `macroCamera.ts`; `LiquidVisualizer.tsx` hands the
+camera `frameSway(settings.frameSway)`), so Macro Sync keeps what is an edit and not a
+move: the cut on a kick, and the hold spent faster in a loud passage. The lead is the
+tracked centroid's own motion smoothed over 0.6 s, from nothing on each new subject,
+scaled to cancel the rig's own two lags so a steady drift sits centred; the camera does
+not read the velocity field at all. A cut snaps to the drop's centroid, re-windowing about
+it until it stops moving. The drops' random walk is gone; the flow and the tilt alone move
+them.
+
+After, by the same check: the song's hand on the frame is 0.000% of the width and 0.000%
+of the zoom at Frame Sway 0 in Hold, Follow and Auto on every shipped look and show stage
+(70 of them), the same centre and zoom as in silence to the bit; at Frame Sway 1 the dial
+gives the 0.42% and 3.2% back, half of each at 0.5. The same half-cell press moves the
+frame 0.17% a frame with it and without, the drop 0.44% off centre; a drop drifting at 15
+cells a second sits 3.3% from the middle of the frame where it sat 27% off. A drop on
+still paint moves 0 cells a step. `npm run steadycam` runs in CI's logic part, and each of
+its controls (the gate removed, the random walk restored, the snap removed) turns it red.
+`npm run drops`' fingerprint is pinned again (the two rng draws a step gone: 341 drops
+where there were 336). The desk and the phone share the camera, and Frame Sway is on
+both; the Guide's Music Sync line says what rides it.
+
+## 28. Preset palettes: the looks refreshed for what the plate does now
+
+### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
+
+Reported by the showreel (28d, 2026-10-11): every look rendered on the Mac to the same
+minute of Funkorama, which grooves at about -17 dB, drops 7 to 8 dB into a breakdown from
+26 to 44 s and comes back. On 28 of 41 looks the plate moved more in the breakdown than in
+the groove, and Classic, the default, scored 4 of 10: a full-frame wash with brown bubble
+discs and no bodies, its motion running backwards against the music (r -0.77 over 5 s).
+
+The suspect was the ear's auto-level chasing the quiet. Measured on that minute through
+the ear a render uses (`songAudioTrack`), it was part of it, not the cause: the band
+levels the hands read fell to 0.6 to 0.76 of the groove's in the breakdown while the
+song's amplitude fell to 0.4 (each a decibel reading ranged against a ceiling that falls
+back in 8 to 18 s), so the breakdown read quieter, just not quiet enough. The cause was
+Sound Drive's bass on a thin gap, a hand on the glass that moves the liquid by the change
+in its depth (the flow is the gap's rate). The route read the bass over 70 against a
+ceiling of 85, so a loud groove's bass sat at full 0.55 of every second: the glass was
+held flat and the kicks moved nothing. The breakdown's bass, under the line, rose and
+fell with every note. Its change per second was 1.44× the groove's, and per second it
+followed Classic's measured motion at r 0.74 (Roy, Red Cabbage, Clock Glass, Aurora 0.65
+to 0.68; the looks that did follow the band, Acid Trip, Solar Flare, Cell Bloom, read
+-0.11 to -0.44 against it). The plate's rock and cover glass, the other suspect, were
+calmer in the breakdown (cover speed 9.3 cm/s against 15.4) and ran against the motion.
+
+What changed. The ear reports how loud the passage is against the song's loud passages,
+as an amplitude (`Passage` in lib/soundLevels.ts: the waveform's mean square over 2 s
+against a reference that rises in 3 s and falls in 45 s), and the music's hands are
+scaled by it: the pours, the bursts, the sparks' count and the bass's press. A hand
+answers the sound's pressure, which is an amplitude. The levels themselves are left as
+they were, because the beat clock, the meters and the mappings read them. And the press
+reads the band over its own ceiling (`bassPressLevel`), so the loud groove's kicks press
+and let go. The cast wire carries the passage, so the wall calms with the laptop.
+
+Measured (`npm run breakdown`, the band's chorus, its verse 8 dB down, the chorus; and
+the showreel's minute with `BREAKDOWN_SONG`): the press's change per second in the
+breakdown against the groove, 1.36× before and 0.54× after on the band, 1.44× and 0.54×
+on Funkorama, where the groove's own press moves 1.4× more than before; the hands'
+levels 0.87× and 0.69× before, 0.37× and 0.36× after. A song quiet from its first bar
+reads 0.91 (not a breakdown); the volume turned down 10 dB is learned in under two
+minutes (0.54 a minute on, 0.78 two).
+
+Classic: Dye Budget 0.45 (the default 0.85 filled the dish until the colours ran into one
+wash, the fault Velvet Underground was fixed of), and Bubbles 0.05 (the brown discs were
+the default 0.2, trapped air drawn dark against a full dish).
+
+## 28f. Every look answers the music through its own patches
+
+### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
+
+Asked 2026-10-11 in the gallery review: the show hears the music well now, so the looks
+should answer it more by default, through the patch bay; "it's ok if the whole plate
+moves (or other global changes) with a small subset of presets. I just don't want this
+kind of look to be a default across all presets"; and "only use things that we can
+detect quickly and make changes that are appropriate for the music".
+
+Found: four of the shelf's 17 patches never moved anything. They named a drum or a note
+(`kick`, `hats`, `note`, `tonalMid`) on the `sound` source, whose features are the hook's
+loudness, bass, mid, treble, energy, timbre and complexity, and the fold reads a name its
+source lacks as 0: Bass Drop's kick on Plate Rock, Microscopic Chaos's hats on Beads,
+Aurora's note on Comet Speed and its mids on the hue journey. Comet's timbre was patched
+at a depth of 45 (meant as degrees; a depth is a share of the dial's 0..360), which threw
+its heading to the clamp at any timbre. Oil Wheel's band patched onto the dish's motor,
+the frame and not the liquid, and nothing held a look to the owner's rule. And a patch
+could read each drum's level but not its hits: a level is loud between hits too.
+
+Built: the four read their names from the `bands` source (Aurora's held chord now turns
+the hue sooner); comet's depth is 0.125, the 45° meant. `FRAME_MOVING_LOOKS`
+(lib/plateRock.ts) names the looks that may move the frame with the music: Bass Drop
+alone, at Frame Sway 0.35, its kick's hit on Plate Rock. Oil Wheel's mids went into the
+oil (Buoyancy). The hits are a patch source (`hits`, lib/hitSource.ts): Kick, Snare and
+Hats hit, Any hit (how hard the last one landed, falling over a quarter second; read when
+the onset's time moves, at the strength it was given, `OnsetState.last`, so a plate
+drawing twenty frames a second still sees them) and Pitch, on the desk's patch bay, the
+phone's (the same sheet) and Sound learn, with Sound Impact as its master. Beat phase
+was already patchable: the Shapes source's LFOs run on the bar. Cyberpunk (kick, snare,
+hats), Fillmore East (bass on the pour, a hit's stir) and Lava Lamp (the bass on the
+wax's buoyancy, a held chord on the hue) are the pattern the rest follow (28f-2).
+
+Measured: `npm run soundpatch` (new, in Measure): every patch on the shelf moves its
+control (before: 4 of 17 read nothing, comet at 45; after 24 of 24); each of 160 kicks is
+in Kick hit on its own frame at its strength, under a tenth of its peak 0.6 s on, over
+half on 11% of a drop's frames; at one reading in three, Any hit rose for 200 of 225 hits
+where the hit's own reading reached the loop for 72. `npm run framesway`: only the named
+looks move the frame (before: Oil Wheel and the two show stages that play it patched
+sound onto the motor), the list one of at most four, and Bass Drop's picture slides
+0.53% of the plate at its peak.
+
+## 28g. Following a known song played live
 
 ### 28g-1. The follower and its check (#378)
 
@@ -3642,48 +3786,6 @@ desk), tagged twenty seconds into the band's verse, shows the verse while a cloc
 tag says intro, five samples of five; the phone's Sound sheet says the desk's line under
 the song's shape. A song in C sharp the band never plays: "Not sure where in “…” (0%):
 following its sound", the playhead keeping time. A map with no harmony: no line.
-
-## 28f. Every look answers the music through its own patches
-
-### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
-
-Asked 2026-10-11 in the gallery review: the show hears the music well now, so the looks
-should answer it more by default, through the patch bay; "it's ok if the whole plate
-moves (or other global changes) with a small subset of presets. I just don't want this
-kind of look to be a default across all presets"; and "only use things that we can
-detect quickly and make changes that are appropriate for the music".
-
-Found: four of the shelf's 17 patches never moved anything. They named a drum or a note
-(`kick`, `hats`, `note`, `tonalMid`) on the `sound` source, whose features are the hook's
-loudness, bass, mid, treble, energy, timbre and complexity, and the fold reads a name its
-source lacks as 0: Bass Drop's kick on Plate Rock, Microscopic Chaos's hats on Beads,
-Aurora's note on Comet Speed and its mids on the hue journey. Comet's timbre was patched
-at a depth of 45 (meant as degrees; a depth is a share of the dial's 0..360), which threw
-its heading to the clamp at any timbre. Oil Wheel's band patched onto the dish's motor,
-the frame and not the liquid, and nothing held a look to the owner's rule. And a patch
-could read each drum's level but not its hits: a level is loud between hits too.
-
-Built: the four read their names from the `bands` source (Aurora's held chord now turns
-the hue sooner); comet's depth is 0.125, the 45° meant. `FRAME_MOVING_LOOKS`
-(lib/plateRock.ts) names the looks that may move the frame with the music: Bass Drop
-alone, at Frame Sway 0.35, its kick's hit on Plate Rock. Oil Wheel's mids went into the
-oil (Buoyancy). The hits are a patch source (`hits`, lib/hitSource.ts): Kick, Snare and
-Hats hit, Any hit (how hard the last one landed, falling over a quarter second; read when
-the onset's time moves, at the strength it was given, `OnsetState.last`, so a plate
-drawing twenty frames a second still sees them) and Pitch, on the desk's patch bay, the
-phone's (the same sheet) and Sound learn, with Sound Impact as its master. Beat phase
-was already patchable: the Shapes source's LFOs run on the bar. Cyberpunk (kick, snare,
-hats), Fillmore East (bass on the pour, a hit's stir) and Lava Lamp (the bass on the
-wax's buoyancy, a held chord on the hue) are the pattern the rest follow (28f-2).
-
-Measured: `npm run soundpatch` (new, in Measure): every patch on the shelf moves its
-control (before: 4 of 17 read nothing, comet at 45; after 24 of 24); each of 160 kicks is
-in Kick hit on its own frame at its strength, under a tenth of its peak 0.6 s on, over
-half on 11% of a drop's frames; at one reading in three, Any hit rose for 200 of 225 hits
-where the hit's own reading reached the loop for 72. `npm run framesway`: only the named
-looks move the frame (before: Oil Wheel and the two show stages that play it patched
-sound onto the motor), the list one of at most four, and Bass Drop's picture slides
-0.53% of the plate at its peak.
 
 ## 29. The closeup's ferrofluid drop
 

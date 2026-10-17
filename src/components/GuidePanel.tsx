@@ -379,7 +379,7 @@ const SECTIONS: Section[] = [
         </P>
         <Rows items={[
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
-          ['Music Sync', <>The camera cuts on kicks, punches on bass, chases on energy and tremors on treble.</>],
+          ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
           ['Paint Cells / Cell Size', <>Synthesised cells at magnification — the rings a pour painting makes.</>],
           ['Macro Lacing / Edge Detail / Relief', <>The filaments, the fine boundary structure and the apparent thickness of the film.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],

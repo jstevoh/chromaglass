@@ -66,6 +66,17 @@ const SECONDS = Number(process.env.SHOWREEL_SECONDS ?? 60);
 const SEED = Number(process.env.SHOWREEL_SEED ?? 1);
 const [W, H] = (process.env.SHOWREEL_SIZE ?? '960x540').split('x').map(Number);
 const FPS = 30;
+/*
+ * SHOWREEL_SET='{"plateRock":0}' lays a patch of settings over every look before
+ * it renders (window.chromaglassSettings, the hook the controls check turns
+ * its knobs with). For a control render: 28e's first reel came back busier
+ * everywhere, the silence included, and the change it was testing can only
+ * calm the music's hands, so the question was which other change in the same
+ * render did it; the same look with one setting off answers that, where two
+ * branches would need a second branch. And for trying a look's settings on a
+ * real GPU before writing them into the preset.
+ */
+const SET = process.env.SHOWREEL_SET ? JSON.parse(process.env.SHOWREEL_SET) : null;
 const SHARD = process.env.SHOWREEL_SHARD ? process.env.SHOWREEL_SHARD.split('/').map(Number) : null;
 if (!(SECONDS >= 10 && FROM >= 0 && W > 0 && H > 0)) { console.error('SHOWREEL_SECONDS must be at least 10, SHOWREEL_FROM a second, SHOWREEL_SIZE WxH'); process.exit(2); }
 if (SHARD && !(SHARD.length === 2 && SHARD[0] >= 1 && SHARD[0] <= SHARD[1])) { console.error(`SHOWREEL_SHARD must be k/n (got "${process.env.SHOWREEL_SHARD}")`); process.exit(2); }
@@ -107,7 +118,7 @@ await new Promise(r => setTimeout(r, 2500));
 
 const reel = { song: { file: path.basename(SONG), from: FROM, seconds: SECONDS }, seed: SEED, size: [W, H], fps: FPS, looks: [] };
 const save = () => fs.writeFileSync(path.join(OUT, 'showreel.json'), JSON.stringify(reel, null, 1));
-console.log(`  ${looks.length} looks${SHARD ? ` (shard ${SHARD.join('/')})` : ''}, rendered at ${W}x${H} ${FPS} fps on seed ${SEED} to ${SECONDS} s of ${path.basename(SONG)} from ${FROM} s, into ${OUT}\n`);
+console.log(`  ${looks.length} looks${SET ? `, with ${JSON.stringify(SET)} laid over each` : ''}${SHARD ? ` (shard ${SHARD.join('/')})` : ''}, rendered at ${W}x${H} ${FPS} fps on seed ${SEED} to ${SECONDS} s of ${path.basename(SONG)} from ${FROM} s, into ${OUT}\n`);
 
 const browser = await launchChromium(chromium, { args: [AUTOPLAY] });
 try {
@@ -130,6 +141,11 @@ try {
       const running = await untilRunning(page);
       if (!running.ok) row.problems.push(`the show never ran steadily in ${(9 + running.waited).toFixed(0)} s after load`);
       else {
+        if (SET) {
+          await page.evaluate((p) => window.chromaglassSettings(p), SET);
+          await page.waitForTimeout(500);
+          row.set = SET;
+        }
         // The file comes back as base64 from the page. A minute at this size
         // is tens of megabytes, so it is left on the page and fetched in
         // slices rather than handed back in one message.
