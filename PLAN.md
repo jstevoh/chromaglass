@@ -222,7 +222,7 @@ style (§31).
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   **18g** colour leaves by flushing and **18k-spray**.
 - **6.4** ~~**18e**~~ #355 edges from refraction (replaces painted rims and highlights with projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **31a** the projector's
-  focus across the two dishes and **31d** colour at a defocused edge (§31).
+  focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then **18m-1** to **18m-5**), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
@@ -4328,7 +4328,9 @@ its frame rate live. "Free" means no new passes or texture reads.
   Extends 15e, which found these forces measured only on a stand-in plate.
 
 ### 18e. Edges come from refraction (replaces the painted rims and highlights)
-**Shipped** (#355): hairline edges from projector pupil aperture loss and shadowgraph Becke line doublets derived from optical path length (OPL = n·h) gradient and Laplacian in the derive pass; separate projectorFocus control. Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e.
+**Partly shipped** (#355): hairline edges from projector pupil aperture loss and shadowgraph Becke line doublets derived from optical path length (OPL = n·h) gradient and Laplacian in the derive pass; separate projectorFocus control. Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e. Open:
+
+- **18e-1. Layer 1's painted boundary line (a painted shortcut until 31a separates the two dishes' heights).** On projected looks with `derivedOn > 0.5`, Layer 1 keeps a painted boundary line (`edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`, gated on `fluid1.a > 0.03`) alongside `refractionOptics(near1)`. At default `projectorFocus = 0.5`, both dishes currently sit at Δz = 0 so the shadowgraph Becke term is 1 and `refractionOptics` only darkens by pupil loss; without the painted line on Layer 1, the back plate's Screen vs Multiply separation in `npm run mixer` falls to 9.9 (bar > 10, 11.0 on main, 10.1 with the line), while applying that brightening to Layer 0 clips the 90th-percentile thin-dye rim in `mixer`'s single-dish mid-grey contrast check (`129.5 → 136.4` without it, `130.9 → 134.7` with it). Replace the painted line when **31a** gives the upper dish its physical inter-dish focal offset Δz₁ in the projector cone.
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — edges from refraction, and Projector Focus (PLAN 18e)
+
+- On projected looks, dye and oil edges now come from refraction through the liquid
+  layer rather than painted surface-normal shading: hairline dark rims where steep
+  optical path length gradients ($\text{OPL} = n\cdot h$) bend light outside the
+  projector lens's aperture, and bright-and-dark shadowgraph Becke doublets where the
+  focal plane sits off the layer ($\Delta I / I \approx -\Delta z \cdot \nabla^2\text{OPL}/\text{OPL}$).
+  Painted specular highlights stay on camera and closeup looks only.
+- A new **Projector Focus** control (`projectorFocus`, Settings → Look, MIDI, the
+  desks, a sequence's stages, the remote and the phone's Looks sheet; 0.5 by default)
+  moves the projector lens's focal plane across the liquid layer, strengthening or
+  inverting the Becke line doublets at dye and oil fronts. `npm run derive` checks the
+  derived optical path length and Laplacian doublet.
+
 ### Changed — the frame holds still; the music moves the liquid
 
 - With the band playing, the whole plate no longer slides under the camera on every
