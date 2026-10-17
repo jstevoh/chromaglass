@@ -20,7 +20,7 @@ import { stream } from './rng';
  * value the look had when evolving started, so an hour of this wanders the
  * mood without ever arriving somewhere the look was not. When and which way
  * is lib/slowEvolve.ts: one move at a time, glided over half a minute to a
- * minute and a half, steered by the song's sections and its loudness over the
+ * minute and a half at the default Evolve Speed (the dial scales it), steered by the song's sections and its loudness over the
  * last half minute, or by a slow clock when nothing is playing.
  */
 

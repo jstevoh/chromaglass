@@ -181,6 +181,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
 
+      # The guard on a check's bars and inputs, against #362's two real cases
+      # and the things it must not fire on (comments, names, prose, printing).
+      - name: The check-change guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run checkguard
+
       # The workflows' own wiring: closed.yml cancels a merged PR's runs by
       # joining their concurrency groups, which it spells by hand, and the
       # gallery runs on its label rather than on every push (PLAN.md 19a).
@@ -1213,11 +1219,39 @@ jobs:
             test "${{ needs.reach.outputs.mac }}" = false &&
             test "${{ needs.webgpu.result }}" = skipped; }
 
-  # The one name for the three Measure parts: green only when all three are.
+  # A pull request that moves a check's bar or input names it (PLAN.md 19x,
+  # scripts/checkguard.mjs). Its own job so that it answers in seconds, and so
+  # that after the body gains its "Check changes:" section, re-running the
+  # failed jobs re-reads the body (the script asks the API for it, not the
+  # event the run started with) without a push or the Mac queue. It reads the
+  # merge commit against its first parent, as `reach` does, and passes with
+  # nothing to name against on a deploy.
+  check-changes:
+    name: Check changes named
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Every change to a check's bar or input is named in the PR's body
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/checkguard.mjs --diff
+
+  # The one name for the three Measure parts and the check-change guard: green
+  # only when all of them are. The guard is under this name because the branch
+  # rule requires Measure, so a PR cannot merge past an unnamed change.
   measure:
     name: Measure
-    needs: measure-part
+    needs: [measure-part, check-changes]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - run: test "${{ needs.measure-part.result }}" = success
+      - run: test "${{ needs.measure-part.result }}" = success && test "${{ needs.check-changes.result }}" = success
