@@ -576,6 +576,53 @@ try {
   await page.keyboard.press('Escape');
   await settle(500);
 
+  // ── The plate bar does not move when the look changes (PLAN.md 19v-3) ──
+  {
+    /*
+      The magnet check lost its second press on the Mac six times in a day
+      (2026-10-11). Its first hold gave the look its magnet, which marked the
+      look changed, and Save read "Save •": 11 px wider. At 1280 in Build the
+      plate bar is one row with 0–1 px to spare, so it wrapped to two, the
+      plate's hole dropped 42 px, and the canvas, painted over the hole, went
+      with it; the second press, aimed at the plate's top row from a box
+      measured before any touch, landed on the bar. A performer's hand aimed
+      at the plate would too. So: a clean look at 1280 × 800 in Build, the
+      plate's hole and Save measured; then the look changed by a real hand
+      (an arrow key on the first deck knob, which goes through the same
+      update a magnet hold does; `window.chromaglassSettings` would not mark
+      it changed), and both measured again. The mark has to show, or the
+      look never changed and nothing was asked; and the look has to start
+      clean, or both measures are of the same changed bar. On the old
+      "Save •" this line read a 42 px drop.
+    */
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pg = await ctx.newPage();
+    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* */ } });
+    await pg.goto(URL, { waitUntil: 'networkidle' });
+    for (let i = 0; i < 20 && !(await pg.getByTestId('desk-preview').count()); i++) await pg.waitForTimeout(300);
+    await pg.waitForTimeout(1500);
+    const measure = () => pg.evaluate(() => {
+      const box = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+      const mark = document.querySelector('[data-testid="save-dirty"]');
+      return { preview: box('desk-preview'), save: box('save-look'), marked: !!mark && getComputedStyle(mark).visibility === 'visible' };
+    });
+    const before = await measure();
+    const knob = pg.locator('[data-testid="desk-deck"] [data-knob] input[type="range"]').first();
+    let after = null;
+    if (await knob.count()) {
+      await knob.focus();
+      for (let i = 0; i < 4; i++) await pg.keyboard.press('ArrowRight');
+      for (let i = 0; i < 10; i++) { await pg.waitForTimeout(200); after = await measure(); if (after.marked) break; }
+    }
+    await ctx.close();
+    const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+    const dp = moved(before.preview, after?.preview), ds = moved(before.save, after?.save);
+    const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+    check('at 1280 in Build, changing the look does not move the plate: its hole and Save keep their boxes, and Save shows the look has changed',
+      !before.marked && !!after?.marked && dp <= 0.5 && ds <= 0.5,
+      `clean ${before.marked ? 'no (already marked)' : 'yes'}, marked after ${after?.marked ? 'yes' : 'no'}; plate ${fmt(before.preview)} → ${fmt(after?.preview)} (${dp.toFixed(1)} px); Save ${fmt(before.save)} → ${fmt(after?.save)} (${ds.toFixed(1)} px)`);
+  }
+
   // ── The rest of Desk v2 (PLAN.md 8c, 8e, 8f, 8h) ───────────────
   await page.setViewportSize({ width: 1440, height: 900 });
   await clickOn('mode-segmented-design');

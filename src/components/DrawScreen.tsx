@@ -328,8 +328,10 @@ export function DrawScreen(p: DrawScreenProps) {
       {/* The bottle with no dye in it: its own colour, or clear (the dashed tile, where the design's "+" sits). */}
       {bottle?.own && (
         <button
+          type="button"
           onClick={() => p.chooseColor(bottle.own!)}
           disabled={!p.connected}
+          aria-pressed={p.color?.toLowerCase() === bottle.own.toLowerCase()}
           className={`shrink-0 border-2 border-dashed disabled:opacity-40 ${p.color?.toLowerCase() === bottle.own.toLowerCase() ? 'border-text' : 'border-white/30'}`}
           style={{ width: dye, height: dye, borderRadius: 14, backgroundColor: isClearLiquid(bottle) ? 'transparent' : bottle.own }}
           title={`Natural: ${bottle.name.toLowerCase()} with no dye`}

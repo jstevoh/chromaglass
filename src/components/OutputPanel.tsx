@@ -334,6 +334,8 @@ const Switch = ({ label, on, onChange, hint, testId }: {
   label: string; on: boolean; onChange: (on: boolean) => void; hint?: string; testId?: string;
 }) => (
   <button
+    type="button"
+    aria-pressed={on}
     onClick={() => onChange(!on)}
     title={hint}
     data-testid={testId}

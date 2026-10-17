@@ -1313,3 +1313,19 @@ speed, ten minutes with a song that has builds and drops, then five with nothing
 3. With nothing playing it should still wander, more slowly.
 4. Say if a minute's glide reads as nothing happening (the moves are too small) or as
    the look drifting away from itself (too big).
+
+## 52. Bass Drop moves the frame, nothing else does, and three looks answer the hits (PLAN 28f)
+
+On the Mac, a song with a band's drums (the showreel's, or anything with a kick and a snare).
+
+1. Bass Drop is the one look whose picture moves with the music: the plate rocks on each
+   kick, a hard kick harder, the frame sliding a little with it (Frame Sway 0.35). Say if
+   it is too much, or not enough to be worth having on one look.
+2. Cyberpunk: each kick churns the neon, the snare curls it tight, the hats raise fine
+   beads, and between the hits it settles. Fillmore East: more colour while the bass is
+   in, a small stir on each hit. Lava Lamp: the plumes a little livelier under the bass,
+   the colours turning sooner on a held chord, nothing jumping on a hit.
+3. Oil Wheel turns at its motor's speed whatever the band does. Any look not named: the
+   frame holds still with the music.
+4. Say whether each of the three answers the music the way an operator's hand would, or
+   twitches. They are the pattern the other looks will follow.
