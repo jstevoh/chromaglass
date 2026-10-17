@@ -2914,20 +2914,45 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       outColor = outColor + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
     }
-    // A pH indicator in the dye (red cabbage's anthocyanin): red-pink in
-    // acid, purple near neutral, green then yellow in base. Where there is no
-    // acid or base the dye keeps its own colour.
+    /*
+      A pH indicator in the dye (red cabbage's anthocyanin). The indicator
+      is the dye: acid and base do not lay a colour over it, they change
+      which light it takes out. Red below pH 4 (the flavylium cation
+      absorbs the green), purple near 7, blue at 8, green from 9 to 11 (the
+      blue anion with the yellow chalcone, together taking out red and
+      blue), yellow above 12.
+
+      It was drawn as a tint multiplied over the dye's own colour, at the
+      dye's opacity times a share of the acidity: a purple dye already takes
+      out nearly all the green, so no tint of it could ever be green (the
+      lab, a red-cabbage plate dosed +1, +0.35, -0.35 and -1: hue 269, 264,
+      273, 268 against the neutral's 260 — one purple field), and the pink
+      came out the purple again. Now the dye keeps its optical depth (its
+      strongest channel's absorbance, read back from what it lets through)
+      and takes the form's spectrum at that depth, Beer and Lambert, so a
+      thin wash goes pale pink and a deep pool crimson, as a dish does. The
+      forms' spectra are three-band shortcuts of the measured ones, each
+      normalised to its peak; the acidity's -1..1 is read as pH 1 to 13.
+    */
     if (U.phIndicator > 0.001) {
       let a = clamp(view.acid, -1.0, 1.0);
-      let neutral = vec3f(0.62, 0.35, 0.85);
-      let ind = select(mix(neutral, vec3f(0.45, 0.85, 0.25), clamp(-a * 1.4, 0.0, 1.0)),
-                       mix(neutral, vec3f(1.0, 0.25, 0.45), clamp(a * 1.4, 0.0, 1.0)), a >= 0.0);
-      let w = U.phIndicator * clamp(abs(a) * 2.5, 0.0, 1.0) * fluid0.a;
-      outColor = chemOnGround(outColor, mix(outColor, outColor * ind * 1.7 + ind * 0.05, w), ind, w);
+      let kPurple = vec3f(0.5, 1.0, 0.2);
+      let kAcid = mix(mix(kPurple, vec3f(0.1, 0.8, 0.3), smoothstep(0.0, 0.25, a)), vec3f(0.08, 1.0, 0.55), smoothstep(0.4, 0.9, a));
+      let b = -a;
+      let kBase = mix(mix(mix(kPurple, vec3f(1.0, 0.75, 0.15), smoothstep(0.0, 0.12, b)), vec3f(1.0, 0.3, 0.85), smoothstep(0.12, 0.3, b)), vec3f(0.1, 0.3, 1.0), smoothstep(0.6, 0.95, b));
+      let k = select(kBase, kAcid, a >= 0.0);
+      let own = -log(max(throughScaled(through0, more0), vec3f(1e-3)));
+      let depth = max(own.r, max(own.g, own.b));
+      let w = U.phIndicator * clamp(abs(a) * 10.0, 0.0, 1.0);
+      let tint = exp((own - depth * k) * w);
+      outColor = chemOnGround(outColor, min(outColor * tint, vec3f(1.0)), tint, 1.0);
     }
     // The BZ reaction in ferroin: red where the catalyst is reduced, blue
-    // where the wave has oxidised it, over a pale dish.
-    if (U.bzShow > 0.001 && (view.bz > 0.0005 || view.bzu > 0.0005)) {
+    // where the wave has oxidised it. The catalyst is in the whole dish, so
+    // the whole dish is red at rest: drawn only where a wave had been (either
+    // species over 0.0005), the dish was the look's own dye with red trails,
+    // the showreel's "muddy red-green marble".
+    if (U.bzShow > 0.001) {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
       outColor = chemOnGround(outColor, mix(outColor, col, U.bzShow * 0.85), col, U.bzShow * 0.85);

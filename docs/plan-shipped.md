@@ -2755,6 +2755,25 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+**19v-3. The magnet check's second press landed on the plate bar.** Shipped 2026-10-17.
+Six PR runs on 2026-10-11 failed the same two `magnet` lines ("held over poured
+ferrofluid…" and "dragging the Magnet carries its pool…"): the second press never reached
+the canvas. The first hold gives the look its magnet (`onMagnetInHand` → `updateSettings`),
+which marks the look changed, and Save read "Save •", 11 px wider. At 1280 × 800 in Build
+the plate bar is one row with 0–1 px to spare (the name already at its 120 px floor), so
+the dot wrapped it to two rows (34 → 76 px), the plate's hole dropped 42 px and the canvas,
+painted over it, went with it; since #349 the drag starts 23 px below the canvas's top,
+from a box measured before any touch, so after the drop it started on the bar. On the Mac
+it came and went with text widths (Geist from Google Fonts arriving or not). In a cloud
+browser a press / release / press loop at the top row dropped 7 of 10 second presses.
+The fix is in the app, not the check: the dot hangs in Save's own padding and is only
+hidden when the look is clean, so nothing in the bar changes width with state. `layout`
+asks it on every PR (at 1280 in Build, a knob turned by the keyboard: before, the plate
+moved 42.0 px and Save 534 px; after, 0.0 and 0.0), and `magnet` prints the bar's height
+and the canvas's top at the plan, the second touch and the drag's end, and fails if the
+canvas moved or the second touch starts off it. The phone has no plate bar. Record's
+labels still change width in the same bar (19v-4).
+
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
 **Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
@@ -3014,6 +3033,10 @@ Shipped in #355 (2026-10-11): real optical boundary physics replaces painted sur
   - `npm run panel`: 190/190 passed.
   - `npm run desk`: 40/40 passed.
   - `npm run qa`: 142/142 passed.
+
+### 18g. Colour leaves by flushing, not by fading
+
+**18g-1** (2026-10-11): flushing, not fading: the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim. Liquid carried past the circular dish rim spills into the overflow trough and leaves the plate, rather than fading away uniformly. The dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
 
 ### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
 
@@ -3468,6 +3491,48 @@ to within 0.001 of its reservoir: half floats left it 0.0039, 0.0029 and 0.0051 
 the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% and
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
+
+## 28f. Every look answers the music through its own patches
+
+### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
+
+Asked 2026-10-11 in the gallery review: the show hears the music well now, so the looks
+should answer it more by default, through the patch bay; "it's ok if the whole plate
+moves (or other global changes) with a small subset of presets. I just don't want this
+kind of look to be a default across all presets"; and "only use things that we can
+detect quickly and make changes that are appropriate for the music".
+
+Found: four of the shelf's 17 patches never moved anything. They named a drum or a note
+(`kick`, `hats`, `note`, `tonalMid`) on the `sound` source, whose features are the hook's
+loudness, bass, mid, treble, energy, timbre and complexity, and the fold reads a name its
+source lacks as 0: Bass Drop's kick on Plate Rock, Microscopic Chaos's hats on Beads,
+Aurora's note on Comet Speed and its mids on the hue journey. Comet's timbre was patched
+at a depth of 45 (meant as degrees; a depth is a share of the dial's 0..360), which threw
+its heading to the clamp at any timbre. Oil Wheel's band patched onto the dish's motor,
+the frame and not the liquid, and nothing held a look to the owner's rule. And a patch
+could read each drum's level but not its hits: a level is loud between hits too.
+
+Built: the four read their names from the `bands` source (Aurora's held chord now turns
+the hue sooner); comet's depth is 0.125, the 45° meant. `FRAME_MOVING_LOOKS`
+(lib/plateRock.ts) names the looks that may move the frame with the music: Bass Drop
+alone, at Frame Sway 0.35, its kick's hit on Plate Rock. Oil Wheel's mids went into the
+oil (Buoyancy). The hits are a patch source (`hits`, lib/hitSource.ts): Kick, Snare and
+Hats hit, Any hit (how hard the last one landed, falling over a quarter second; read when
+the onset's time moves, at the strength it was given, `OnsetState.last`, so a plate
+drawing twenty frames a second still sees them) and Pitch, on the desk's patch bay, the
+phone's (the same sheet) and Sound learn, with Sound Impact as its master. Beat phase
+was already patchable: the Shapes source's LFOs run on the bar. Cyberpunk (kick, snare,
+hats), Fillmore East (bass on the pour, a hit's stir) and Lava Lamp (the bass on the
+wax's buoyancy, a held chord on the hue) are the pattern the rest follow (28f-2).
+
+Measured: `npm run soundpatch` (new, in Measure): every patch on the shelf moves its
+control (before: 4 of 17 read nothing, comet at 45; after 24 of 24); each of 160 kicks is
+in Kick hit on its own frame at its strength, under a tenth of its peak 0.6 s on, over
+half on 11% of a drop's frames; at one reading in three, Any hit rose for 200 of 225 hits
+where the hit's own reading reached the loop for 72. `npm run framesway`: only the named
+looks move the frame (before: Oil Wheel and the two show stages that play it patched
+sound onto the motor), the list one of at most four, and Bass Drop's picture slides
+0.53% of the plate at its peak.
 
 ## 29. The closeup's ferrofluid drop
 

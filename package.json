@@ -59,6 +59,7 @@
     "inputpick": "node scripts/inputpick.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
     "saves": "npm run build && node scripts/saves.mjs",
+    "switches": "npm run build && node scripts/switches.mjs",
     "draw": "npm run build && node --experimental-strip-types scripts/draw.mjs",
     "drawwall": "npm run build && node --experimental-strip-types scripts/drawwall.mjs",
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
@@ -81,6 +82,7 @@
     "watch": "node scripts/watch.mjs",
     "codecblip": "node scripts/codecblip.mjs",
     "moving": "npm run build && node scripts/moving.mjs",
+    "showreel": "npm run build && esbuild scripts/showreel.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/showreel.mjs && node node_modules/.cache/showreel.mjs",
     "film": "npm run build && esbuild scripts/film.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/film.mjs && node node_modules/.cache/film.mjs",
     "report-worker": "node scripts/report-worker.mjs",
     "signin": "PW_WEBGPU=1 node scripts/signin.mjs",
@@ -206,7 +208,8 @@
     "mac-app": "npm run build && npm --prefix desktop run dist",
     "lampjudge": "node scripts/lampjudge.mjs",
     "clicks": "esbuild scripts/clicks.mjs --bundle --platform=node --format=esm --external:playwright --log-level=warning --outfile=node_modules/.cache/clicks.mjs && node node_modules/.cache/clicks.mjs",
-    "framesway": "node scripts/framesway.mjs"
+    "framesway": "node scripts/framesway.mjs",
+    "soundpatch": "esbuild scripts/soundpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundpatch.mjs && node node_modules/.cache/soundpatch.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

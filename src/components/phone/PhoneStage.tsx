@@ -566,7 +566,7 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={sheet === 'dye'}
             aria-label={`Dye: ${liquid?.name ?? 'none'}. Choose a bottle and its colour`}
             data-testid="phone-open-dye"
-            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-border-strong bg-active text-text' : 'border-transparent text-text-2 active:bg-active'}`}
+            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'}`}
           >
             <span className="h-5 w-5 rounded-full border-2 border-white/40" style={liquid ? bottleSwatch(liquid) : { backgroundColor: '#fff' }} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
@@ -585,7 +585,7 @@ export function PhoneStage(p: PhoneStageProps) {
               onClick={() => open(name)}
               aria-pressed={sheet === name}
               data-testid={`phone-open-${name}`}
-              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? 'bg-active text-text' : 'text-text-2 active:bg-active'}`}
+              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? 'border border-accent-border bg-accent-bg text-accent-text' : 'border border-transparent text-text-2 active:bg-active'}`}
             >
               <Icon size={18} />
               <span>{label}</span>
