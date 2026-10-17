@@ -92,6 +92,16 @@ interface LiquidVisualizerProps {
    */
   hear?: () => AudioData | null;
   settings: VisualizerSettings;
+  /**
+   * The settings now, with a MIDI fader's moves that React has not rendered
+   * yet laid over them, asked for at the top of each frame (PLAN.md §14f).
+   * React is told about a ride ten times a second, for the desk's number, so a
+   * plate that drew only `settings` would step under a fader. Returns what it
+   * is given whenever nothing is riding, which is almost every frame. A plate
+   * without one (the cast receiver, whose settings arrive as messages) draws
+   * `settings`.
+   */
+  ride?: (base: VisualizerSettings) => VisualizerSettings;
   seedCount?: number;
   /**
    * A flick of one plate: spin it up and let it coast down.
@@ -4624,7 +4634,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, hear, settings, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
@@ -5047,9 +5057,22 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * React state) would hear a new one on about one frame in six.
    */
   const hearingRef = useRef({ frames: 0, fresh: 0, ownFrame: 0, last: null as AudioData | null });
+  /**
+   * For `npm run renders`: live frames, how many drew a fader's move React had
+   * not rendered yet, and what the last one drew (PLAN.md §14f). `drawn` is
+   * the object itself, not a copy, so keeping it costs nothing: the check
+   * reads a value out of it on every frame, so it can tell a plate that
+   * really moved with the fader from one handed a copy that never changed.
+   */
+  const ridingRef = useRef({ frames: 0, laid: 0, drawn: settings as VisualizerSettings });
   /** The animation frame the plate is drawing (its timestamp), null for a frame the wall asked for. */
   const plateTsRef = useRef<number | null>(null);
+  /** What React last rendered, before a fader's ride is laid over it (`ride`). */
+  const settingsPropRef = useRef(settings);
+  /** What the plate draws: `settingsPropRef` as of this frame's ride. Every reader in the loop reads this one. */
   const settingsRef = useRef(settings);
+  const rideRef = useRef(ride);
+  rideRef.current = ride;
   const selectedLiquidRef = useRef(selectedLiquid);
   const activeLayerRef = useRef(activeLayer);
   const activeToolRef = useRef(activeTool);
@@ -6193,7 +6216,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
   // Outside a render: a harness's `pour` between frames reads the ref too.
   useEffect(() => { if (!renderingRef.current) audioDataRef.current = liveHeard(); }, [audioData]);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => {
+    settingsPropRef.current = settings;
+    settingsRef.current = rideRef.current ? rideRef.current(settings) : settings;
+  }, [settings]);
 
   /**
    * Spin a plate up, in radians a second added to whatever it is already doing.
@@ -6452,6 +6478,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (plateTsRef.current !== null && audioDataRef.current?.frameTs === plateTsRef.current) h.ownFrame++;
       }
       const currentAudioData = audioDataRef.current;
+      /*
+        And the hands on the faders, this frame (PLAN.md §14f): React hears
+        about a ride ten times a second, the plate on every frame. Put where
+        every reader in the loop reads, so none of them is a tenth of a second
+        behind the rest (the fold below reads the Impacts from it, the magnet
+        its size, the ferrofluid its amount). A render's settings are its own:
+        it steps on the fixed clock, and a live fader is not part of the film.
+      */
+      if (!rendering) {
+        const lay = rideRef.current;
+        settingsRef.current = lay ? lay(settingsPropRef.current) : settingsPropRef.current;
+        ridingRef.current.frames++;
+        ridingRef.current.drawn = settingsRef.current;
+        if (settingsRef.current !== settingsPropRef.current) ridingRef.current.laid++;
+      }
       // ── The room, on the settings ─────────────────────────────
       // A scene mapping is a feature, a setting and a depth, the same shape
       // the music has used all along. Applied here, once, so everything
@@ -9869,6 +9910,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         heard: audioDataRef.current ? { volume: audioDataRef.current.volume, energy: audioDataRef.current.energy } : null,
         /** Live frames drawn, how many read a reading the frame before had not, and how many a reading taken on that same frame (§14f). */
         hearing: { frames: hearingRef.current.frames, fresh: hearingRef.current.fresh, ownFrame: hearingRef.current.ownFrame },
+        riding: { frames: ridingRef.current.frames, laid: ridingRef.current.laid },
         status: engineStatusRef.current,
         governor: governorRef.current,
         /** The solver's own timing: a step's cost, the rate it is managing, and the cap it is under. */
@@ -10036,6 +10078,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       });
     if (!isDraftRef.current && new URLSearchParams(window.location.search).has('debug')) {
       (window as unknown as { chromaglassDebug?: unknown }).chromaglassDebug = debugState;
+      // The ride's counters themselves, read on every frame by `npm run renders`:
+      // `chromaglassDebug()` builds its whole report, too much to call per frame.
+      (window as unknown as { __cgRiding?: unknown }).__cgRiding = ridingRef.current;
       // Turn the plates to given angles (radians), for scripts/mirror.mjs to
       // reproduce a report's plate exactly.
       (window as unknown as { chromaglassRotation?: unknown }).chromaglassRotation = (angles: number[]) => {

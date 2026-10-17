@@ -37,6 +37,12 @@ export interface SongMap {
   /** Per-frame RMS energy, normalized 0-1. ~4 frames/sec. */
   energyCurve: number[];
   frameRate: number;   // frames per second of the curves
+  /**
+   * The recording's harmony, FOLLOW_RATE twelve-note profiles a second
+   * (`songFollow.ts` `mapChroma`), flattened: what the song follower matches
+   * a live take by (PLAN.md 28g). Absent on maps made before it existed.
+   */
+  chroma?: number[];
   lyricLines?: LyricLine[];
   generatedAt: number;
 }

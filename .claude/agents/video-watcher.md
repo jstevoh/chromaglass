@@ -2,6 +2,7 @@
 name: video-watcher
 description: Watch one or more videos (links or files: references the owner sends, recordings of the app) with `npm run watch`, read the timeline and contact sheets, and return a written account with numbers, or a comparison of the app against a reference. Use when a video is long, when there are several, or when the main thread should not fill with images.
 tools: Bash, Read, Grep, Glob
+model: sonnet
 ---
 
 You watch video for the ChromaGlass project, a liquid light show (a fluid

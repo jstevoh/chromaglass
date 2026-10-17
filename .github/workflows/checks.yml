@@ -63,7 +63,7 @@ jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
   # push of only PLAN.md, the docs, the sessions' skills, a workflow that
   # never runs a Mac shard or the scripts that check the workflows does not
-  # queue the four Mac shards: it proves
+  # queue the Mac shards: it proves
   # nothing new there, and on 2026-10-03 each such push still waited twenty
   # to thirty minutes for a Mac and then held one for forty-five runner-minutes
   # in front of PRs that did change the plate. Measure always runs. A deploy
@@ -181,6 +181,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
 
+      # The guard on a check's bars and inputs, against #362's two real cases
+      # and the things it must not fire on (comments, names, prose, printing).
+      - name: The check-change guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run checkguard
+
       # The workflows' own wiring: closed.yml cancels a merged PR's runs by
       # joining their concurrency groups, which it spells by hand, and the
       # gallery runs on its label rather than on every push (PLAN.md 19a).
@@ -231,6 +237,16 @@ jobs:
       - name: The song's shape
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run shape
+
+      # Following a known song played live (PLAN.md 28g): a map made from one
+      # recording, as the app makes it, followed through takes 15% slower and
+      # faster on other instruments, with the bridge left out, the last chorus
+      # twice, the solo twice as long and a jam the song never had: within a
+      # bar of the true place, the tempo within 5%, back within four bars of a
+      # change, and confidence falling in the jam. Arithmetic only, so `logic`.
+      - name: Following a song
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run songfollow
 
       # The kicks (PLAN.md §14d): the show's own band, its score rendered to
       # samples at 48 and 44.1 kHz and heard through the live ear, with the
@@ -519,6 +535,14 @@ jobs:
       - name: The remote's Mixer
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/remotemix.mjs
+      # The Phone · iPad panel's link (scripts/phonelink.mjs, PLAN.md 8f-1): on
+      # the show server, the code of the relay's address whenever no phone is
+      # linked, the phones counted by the relay, Link another while they are;
+      # on a static host, the code of the page's own address. No GPU; dist/ is
+      # the phone step's build.
+      - name: The phone link
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/phonelink.mjs
       # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
       # stand-in laptop on the show server's relay hears every touch, tool,
       # dye and button a phone and an iPad send, and where a touch lands in
@@ -610,6 +634,24 @@ jobs:
   #
   # The tools shard also takes the Press's let-go on a thin gap with its two
   # controls (about 35 s more; #228).
+  #
+  # A fifth shard since 2026-10-11 (PLAN.md 19w). Checks had gathered on all
+  # four until, by the medians of 41 green runs from 10-09 to 10-11, plate ran
+  # 16.7 minutes (19.8 at most), open 16.4, tools 15.9 and show 15.3: 64
+  # minutes of work in four 20-minute jobs, so moving plate's heaviest steps
+  # to another shard would only have moved the timeout there. One plate run
+  # (#353's) was killed at 20:16 after every check in it had passed. `fifth`
+  # takes two to five minutes from each: from plate the drop map, the
+  # magnet and the grating (the noisiest step there, 81 s median and up to
+  # 143); from open Audio Impact 0 and the colours; from tools depth and the
+  # flick; from show the mixer, the kick's press and the Turing pattern.
+  # Replayed on the 11 of those runs where each shard ran once, the steps'
+  # own times put in their new shards: the longest shard went from 18.4
+  # minutes to 15.0 (plate 10.7 median, 13.7 at most; open 13.4, 15.0;
+  # tools 13.6, 14.1; show 13.2, 14.2; fifth 12.8, 13.4). A shard's own
+  # setup is about half a minute (checkout, Node, npm ci, Chromium, the
+  # build), so a run costs that much more Mac time and needs five runners
+  # at once rather than four, but holds each for less.
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     needs: reach
@@ -619,7 +661,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [show, tools, plate, open]
+        shard: [show, tools, plate, open, fifth]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -853,8 +895,13 @@ jobs:
       # No grating over the dye: the grid's one-cell checkerboard goes in a
       # second, in every look, and edges, blobs and fine diagonals stay.
       - name: No grating over the dye
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run grating
+      # Dye spreads along the flow via shear dispersion (PLAN 18h): streaks
+      # along flow lines while holding sharp cross-stream edges, conserved exactly.
+      - name: Dye dispersion along the flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run dispersion
       # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
       # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter
@@ -866,7 +913,7 @@ jobs:
       # plate; a dye is paler thin than deep and a deep yellow turns orange; two
       # neighbouring dyes meeting walk between their hues; the grade keeps hue.
       - name: Enough colours, and the hues between them
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run colours
       # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
       # ring of colour out by its volume, glycerine poured is all accounted
@@ -908,10 +955,10 @@ jobs:
       # passes the front plate from lamp to beam, every grade does what its
       # name says, and every one of the 31 controls changes the picture; the
       # gel wheel and the lumia in the lamp, over the lens and among the rest.
-      # On the show shard (a median 8.8 minutes) rather than the plate shard
-      # (11.2), to even them (PLAN.md 19h); it is the lab, so any shard will do.
+      # On the fifth shard since PLAN.md 19w (on show before that, to even it
+      # with plate, 19h); it is the lab, so any shard will do.
       - name: The mixer's order and grades
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run mixer
       # Beams: two projectors of different sources add where they cross, two
       # carrying one picture sum to it across their overlap with no seam
@@ -964,7 +1011,7 @@ jobs:
       # fraction of a cell off the grid and laid nothing, and no check
       # counted.
       - name: The rhythm plate presses on the kick
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: SQUEEZE_GPU=1 node scripts/squeeze.mjs
       # Render this song in the app itself (PLAN.md §6): a synthetic song
       # rendered ten ways through the visualizer's own frame loop, frame by
@@ -1012,10 +1059,10 @@ jobs:
       # with the colour and healed after a stir, grown only where it is fed,
       # and Turing Print black on white where the reaction is, not piling up.
       # The lab only; five or six minutes on SwiftShader, so on a Mac rather
-      # than in Measure, and on the show shard, which had the most room under
-      # the job's twenty minutes (13.2 against open's 16.8 on #331's run).
+      # than in Measure, and on the fifth shard (PLAN.md 19w; it went to show
+      # first, which had the most room then, 13.2 against open's 16.8 on #331's run).
       - name: The Turing pattern and its print
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run turing
       # The show keeps hearing while its window is hidden behind the wall's
       # (scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second
@@ -1038,17 +1085,16 @@ jobs:
       # On the laptop and the phone at 0, and at the default, where they still
       # must (listened to for a minute there, for enough chances). About three minutes.
       - name: Audio Impact 0 drops no bubbles
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: node scripts/kickbubbles.mjs
       # A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md
       # 22h): the look's own turning goes through the liquid's drag time like
       # the Spin tool's, the picture turns with the liquid, and the flick no
       # longer stirs the current with a term of its own. It reads the plate's
       # refs, not its frames, but the frame loop only steps on a GPU that
-      # draws. About twenty-five seconds, on the tools shard, the shortest by
-      # the medians above.
+      # draws. About twenty-five seconds, on the fifth shard (PLAN.md 19w).
       - name: A flicked plate's liquid trails the glass
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: node scripts/flick.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
@@ -1058,7 +1104,7 @@ jobs:
       # the gate asks for 10% — because what it guards is a sign and a place,
       # not a tuning.
       - name: Depth reaches the flow
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run depth
       # The Magnet in the hand (reported: "magnet tool isn't really
       # working", then "a giant black hole as soon as you pick it"): picked
@@ -1067,7 +1113,7 @@ jobs:
       # Size reaches the solver, and a new grid (the governor stepping down)
       # lays nothing but that pool, never the look's ring.
       - name: The magnet moves the ferrofluid
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run magnet
       # The ferrofluid poured round Classic's middle, watched with the band
       # playing and its bubbles on the plate (PLAN.md, found by #238): on the
@@ -1116,7 +1162,7 @@ jobs:
       # the cell under the hand changes and its mirror image across the middle
       # does not (reported: an echo of the gesture "in the mirrored section").
       - name: A drop lands only where it is dropped
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: node scripts/mirror.mjs
 
       # And the physics under it: the ferrofluid gathers where the magnet is
@@ -1169,11 +1215,39 @@ jobs:
             test "${{ needs.reach.outputs.mac }}" = false &&
             test "${{ needs.webgpu.result }}" = skipped; }
 
-  # The one name for the three Measure parts: green only when all three are.
+  # A pull request that moves a check's bar or input names it (PLAN.md 19x,
+  # scripts/checkguard.mjs). Its own job so that it answers in seconds, and so
+  # that after the body gains its "Check changes:" section, re-running the
+  # failed jobs re-reads the body (the script asks the API for it, not the
+  # event the run started with) without a push or the Mac queue. It reads the
+  # merge commit against its first parent, as `reach` does, and passes with
+  # nothing to name against on a deploy.
+  check-changes:
+    name: Check changes named
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Every change to a check's bar or input is named in the PR's body
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/checkguard.mjs --diff
+
+  # The one name for the three Measure parts and the check-change guard: green
+  # only when all of them are. The guard is under this name because the branch
+  # rule requires Measure, so a PR cannot merge past an unnamed change.
   measure:
     name: Measure
-    needs: measure-part
+    needs: [measure-part, check-changes]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - run: test "${{ needs.measure-part.result }}" = success
+      - run: test "${{ needs.measure-part.result }}" = success && test "${{ needs.check-changes.result }}" = success

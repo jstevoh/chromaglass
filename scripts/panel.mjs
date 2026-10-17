@@ -43,7 +43,7 @@ import { luckyLook } from '../src/lib/lucky.ts';
 import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
-import { SettingRide } from '../src/lib/ride.ts';
+import { SettingRide, rideSlot } from '../src/lib/ride.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
 import { SHIPPED } from '../src/lib/deskLayout.ts';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
@@ -830,6 +830,65 @@ check('nothing to hand over is no React update at all', new SettingRide().drain(
   ride.drain();
   check('and a value written twice is only handed over once',
     ride.write('dimmer', 0.4) === undefined && ride.drain() === null);
+}
+
+/*
+  The plate's own read of the ride (PLAN.md §14f, `lay`): what a frame draws
+  while React is told ten times a second. #348's first try laid the whole
+  shadow over every frame and went back for three faults; the first two are
+  the ride's to answer, and are held here (the third, every reader in the
+  frame loop reading one object, is the visualizer's, and `npm run renders`
+  holds it on the Mac by counting the frames that draw a ride).
+*/
+{
+  const all = () => true;
+  const ride = new SettingRide();
+  const slot = rideSlot();
+  let base = { dimmer: 0.5, bloom: 0.3 };
+  check('a plate with nothing ridden draws what React rendered, the same object', ride.lay(base, all, slot) === base);
+  ride.write('dimmer', 0.8);
+  const a = ride.lay(base, all, slot);
+  check('a move React has not rendered is drawn at once', a !== base && a.dimmer === 0.8 && a.bloom === 0.3 && base.dimmer === 0.5);
+  check('and the next frame with nothing new is handed the same object, not a copy', ride.lay(base, all, slot) === a);
+  ride.write('dimmer', 0.9);
+  const b = ride.lay(base, all, slot);
+  check('and a new move is a new object', b !== a && b.dimmer === 0.9);
+  // React renders the move: from then on, no frame copies anything.
+  ride.drain();
+  base = { ...base, dimmer: 0.9 };
+  ride.observe(base);
+  let copies = 0;
+  for (let i = 0; i < 3600; i++) if (ride.lay(base, all, slot) !== base) copies++;
+  check('once React has the move, a minute of frames lays nothing (it laid every frame for good)', copies === 0, `${copies} of 3600 frames copied`);
+  check('while the fader still answers for itself', ride.read('dimmer', base) === 0.9);
+}
+{
+  // The identified track overrides the key the fader moves: the track wins
+  // in what is drawn, as it does in what React renders (effectiveSettings).
+  const ride = new SettingRide();
+  const overridden = new Set(['dimmer']);
+  const notOverridden = (k) => !overridden.has(k);
+  const drawn = { dimmer: 0.9, bloom: 0.3 };   // the track asks 0.9
+  ride.write('dimmer', 0.6);
+  ride.write('bloom', 0.5);
+  const out = ride.lay(drawn, notOverridden, rideSlot());
+  check('a fader never lays over a key the track overrides', out.dimmer === 0.9, `drew ${out.dimmer}, the track asks 0.9`);
+  check('and still lays the keys the track leaves alone', out.bloom === 0.5);
+  check('and a ride on nothing but overridden keys copies nothing',
+    (() => { const r = new SettingRide(); r.write('dimmer', 0.6); return r.lay(drawn, notOverridden, rideSlot()) === drawn; })());
+}
+{
+  // A preset moving the setting takes it back from the fader, on the plate too.
+  const ride = new SettingRide();
+  const slot = rideSlot();
+  const live = { dimmer: 0.5 };
+  ride.write('dimmer', 0.8);
+  ride.drain();
+  Object.assign(live, { dimmer: 0.8 });
+  ride.observe(live);
+  const preset = { dimmer: 0.2 };
+  ride.observe(preset);
+  check('a preset that moves the setting is what the plate draws', ride.lay(preset, () => true, slot) === preset);
 }
 
 /*
