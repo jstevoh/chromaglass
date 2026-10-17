@@ -5636,6 +5636,8 @@ export default function App() {
             onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
+            twoProjectors={settings.twoProjectors ?? 0}
+            onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             barLine={audioSource === 'none' ? '' : barKnown}

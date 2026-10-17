@@ -98,18 +98,24 @@ const show = { port: 0, osc: 0, key: '' };
  * phone is set up in the same minute; an app that is quit and reopened
  * between soundcheck and doors would log every phone out. So the app picks
  * one on its first launch and keeps it, and SHOW_KEY still wins when set.
+ *
+ * Eight digits, not four (PLAN 14m): four are ten thousand guesses, which a
+ * script on the venue's Wi-Fi makes in seconds. The server now locks an address
+ * out for five minutes after three wrong keys, and the two together put a
+ * guessed key years away. A key kept from before is shorter than eight digits
+ * and is made again once, so each phone scans the code one more time.
  */
 function showKey() {
   if (process.env.SHOW_KEY) return String(process.env.SHOW_KEY);
   const file = join(app.getPath('userData'), 'show.json');
   try {
     const saved = JSON.parse(readFileSync(file, 'utf8'));
-    if (typeof saved.key === 'string' && /^\d{4,}$/.test(saved.key)) return saved.key;
+    if (typeof saved.key === 'string' && /^\d{8,}$/.test(saved.key)) return saved.key;
   } catch { /* first launch */ }
-  const key = String(randomInt(1000, 10000));
+  const key = String(randomInt(10_000_000, 100_000_000));
   try {
     mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, JSON.stringify({ key }, null, 2));
+    writeFileSync(file, JSON.stringify({ key }, null, 2), { mode: 0o600 });
   } catch { /* a key for this launch only */ }
   return key;
 }

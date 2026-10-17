@@ -1952,6 +1952,114 @@ map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` boun
 `NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
 governor's ladder and the cache as they were.
 
+### 14m. Anyone on the venue's network can drive the show
+
+**Shipped** (this PR). What changed, in `server/remote-server.js` unless named:
+
+- The show key is eight digits from `crypto.randomInt`, compared with `timingSafeEqual`,
+  kept in `server/.show-key` (mode 600, ignored by git) so a restart keeps it, and the
+  Mac app's key is eight digits too (`desktop/main.js`; a four-digit key is replaced, so
+  each phone scans the new code once).
+- Only the laptop is handed a key: `/remote-info.json` answers `key` and `displayKey`
+  to a loopback socket with a localhost Host and no forwarding headers. The display has
+  its own 32-hex key, new each launch, so a phone's key cannot take the display role.
+- Three wrong keys from an address, each within 5 minutes of the last, lock it out for
+  5 minutes (`denied` with `reason: 'locked'`, which the phone shows and waits out); a
+  good key no longer clears the count, so a guest's own join cannot reset a guesser on a
+  shared address. Past 30 wrong keys a minute across all addresses, new joins from all
+  but the laptop are refused for 60 s, so a guesser spread over a /48 of IPv6 needs
+  years (PLAN 14m-budget). A display hello with no key is not a guess and is not counted,
+  and the laptop's page at its Wi-Fi address, which is given no display key, no longer
+  knocks. At most 4 sockets per address may be open without having said hello. The
+  upgrade checks Origin (none, from
+  the native apps and the checks; a page this server served; the iPhone app; a page on
+  this machine); `maxPayload` is 512 KiB (close 1009); a socket
+  has 5 s to say hello; 16 sockets per address and 200 in all.
+- `useRemoteLink.ts`: a relay that was there and went away is looked for on the short
+  backoff, not the 30 s probe, so a laptop and phone come back after a restart by
+  themselves; a frame over the cap is dropped with a warning rather than sent.
+- Art-Net: an input universe (`artnetInUniverse`) and the `ARTNET_*` numbers falling
+  back to their defaults when they are not numbers (`npm run lights`, 30 of 30).
+
+*Measured:* `npm run showkey` on the old server 11 of 33, now 33 of 33. With the server
+down for 4 s under a linked phone and laptop, a change on the laptop had not reached
+the phone in 25 s before; now it does in 3.6 s. `applink`, `draw`, `drawwall` read the
+display's key from `/remote-info.json`, and `remotemix`, `phonelink`, `panel` pass.
+
+
+**Read in the code** (`server/remote-server.js` unless named).
+
+- The show key is four random digits (`SHOW_KEY`), about 13 bits, compared with `!==`,
+  and a wrong `hello` only closes that socket: nothing counts failures or slows the next
+  try. Through `npm run tunnel` the 9,000 keys fall in minutes.
+- On the LAN it need not be guessed. `/remote-info.json` hands the key to any request
+  without `x-forwarded-for` or `cf-connecting-ip` (`isLocalRequest`), which is every
+  device on the venue's Wi-Fi, not only the machine `remoteProtocol.ts` says it is for.
+  The socket checks no Origin or Host either, so a web page open on any phone in the
+  room can reach `ws://<laptop>:3000/remote-ws`.
+- With the key, a `hello` as `display` receives every phone's commands, and can push
+  `state` and `cast` to the phones and to the network display on the wall, set the
+  Art-Net `lights`, and toggle Record and Blackout.
+- Frames are taken up to the `ws` default of 100 MiB (`new WebSocketServer({ server,
+  path })`); the 512 KB limit is checked after the frame is buffered and made a string.
+  A socket that never says hello is never closed, and nothing caps connections. A few
+  large frames stop the Node process, and every phone, network display, OSC and Art-Net
+  with it.
+- A restart with the generated key answers every phone and network display `denied`,
+  and `useRemoteLink.ts` stops retrying for good on that, though the server's comment
+  says it is restartable mid-show.
+- Art-Net in reads every universe but its own output (`packet.universe ===
+  artnet.universe` is the only filter) into one `seen` map, so on a rig with four
+  universes each mapped setting jumps between their values. A non-numeric `ARTNET_RATE`
+  makes the rate `NaN`, and `setInterval(…, NaN)` sends every millisecond.
+
+*Fix:* the key only to a loopback `req.socket.remoteAddress`, and an Origin check on the
+upgrade; a longer key from `crypto.randomInt`, compared with `timingSafeEqual`, and an
+address locked out after a few wrong hellos; a display key apart from the phones', so a
+phone's key cannot take the display role; `maxPayload: 512 * 1024`, a 5 s deadline for
+the hello and a cap per address; the generated key kept in a file beside the server, so
+a restart keeps it; an input universe, and the `ARTNET_*` numbers validated. The phone's
+join and the iPhone app's laptop remote (`appLink.ts`) must keep working.
+
+Once the server has roles, a **guest key** is a small step (*proposed*): a key whose
+socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto a
+chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
+tablet, a second projectionist, or at a party the audience's phones through a QR code
+on a card.
+
+*Measure:* extend `npm run remotemix`: a request from a LAN address gets no key; three
+wrong keys lock the address out; a 1 MB frame is refused without the process growing; a
+silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
+socket's `patch` is dropped.
+
+### 14o. The song-ID Worker is open to anyone
+
+**Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
+Origin from the site, a localhost, the show server on a private address or the iPhone
+app (403 otherwise, and for none); its counter store bound (503); a `Content-Length` of
+at most 2 MB read before `formData()` (411 / 413), and the file measured again after;
+30 an hour per address, per /64 on IPv6 (429); 1000 a day across everyone, or
+`FINGERPRINT_DAILY_LIMIT` (503 `busy`), and a counter store that throws is `busy` too,
+with CORS, not a bare 500. The app reads any refusal as no match.
+`wrangler.toml` binds `FINGERPRINT_LIMITS`, which the owner creates before redeploying.
+*Measured:* `npm run fingerprint-worker`, 7 of 19 on the old Worker, now 19 of 19; each
+refusal also shows the service was not called.
+
+
+**Read in the code.** `server/fingerprint-worker.js` answers any origin
+(`Access-Control-Allow-Origin: *`) with no key and no rate limit, and its URL is built
+into the public bundle (`VITE_FINGERPRINT_PROXY_URL`, `deploy.yml`). Anyone who reads
+the bundle can identify songs on the owner's AudD or ACRCloud account, from a script or
+from their own site. It also parses the whole multipart body (`request.formData()`)
+before its 2 MB check. The report Worker already has what this one lacks
+(`ALLOWED_ORIGINS`, a per-address limit in KV; `docs/crash-plan.md`).
+
+*Fix:* the same origin list and per-address limit (per /64 on IPv6), a refusal on
+`Content-Length` before parsing, and a daily ceiling that answers "busy" rather than
+spending. The show's own origins (the site, the show server, the Mac app) stay allowed.
+*Measure:* a node harness in the manner of `npm run report-worker`: a foreign origin
+refused, the 31st request in an hour refused, a 3 MB body refused before `formData()`.
+
 ### 14s. The ear: the input picker (shipped)
 
 **Shipped 2026-10-05.** `chooseAudioInput` (`App.tsx`) was memoised on `[audioSource]`

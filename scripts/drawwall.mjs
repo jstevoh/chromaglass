@@ -115,6 +115,9 @@ const gridOf = (page, G = 8, H = 6) => page.getByTestId('draw-picture').evaluate
   return out;
 }, [G, H]);
 
+// The display role takes the relay's own display key (PLAN 14m), which the
+// relay gives only to the machine it runs on, as the laptop's page asks for it.
+const DISPLAY_KEY = (await (await fetch(`http://127.0.0.1:${PORT}/remote-info.json`)).json()).displayKey;
 try {
   if (!APP) {
     // ── The stand-in laptop's state, as `npm run draw` ─────────────────
@@ -122,7 +125,7 @@ try {
     const laptop = new WebSocket(`ws://127.0.0.1:${PORT}/remote-ws`);
     const snapshot = { settings: { ...DEFAULT_SETTINGS, layerCount: 1 }, activePresetId: 'classic', isActive: true, isAutomated: false, overlaysVisible: true, blackout: false };
     await new Promise((resolve, reject) => { laptop.once('open', resolve); laptop.once('error', reject); });
-    laptop.send(JSON.stringify({ type: 'hello', role: 'display', key: KEY }));
+    laptop.send(JSON.stringify({ type: 'hello', role: 'display', key: DISPLAY_KEY }));
     laptop.send(JSON.stringify({ type: 'state', state: snapshot }));
     laptop.on('message', (raw) => {
       const m = JSON.parse(String(raw));
@@ -209,7 +212,7 @@ try {
         requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
-    }, { url: `ws://localhost:${PORT}/remote-ws`, key: KEY });
+    }, { url: `ws://localhost:${PORT}/remote-ws`, key: DISPLAY_KEY });
     for (let t = 0; t < 10_000 && (await wall.evaluate(() => window.__ws.readyState)) !== 1; t += 200) await wait(200);
     check('the stand-in laptop is on the relay', (await wall.evaluate(() => window.__ws.readyState)) === 1);
     await wait(1500);

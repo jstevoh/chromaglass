@@ -1429,6 +1429,7 @@ export const PRESETS: Preset[] = [
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
+      twoProjectors: 1,
       gooeyEffect: 0.5,
       rotationSpeed: 0.0,
       centerGravity: 0.0,

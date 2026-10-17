@@ -2355,7 +2355,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     only: divided at the hot-spot instead, the paint's half of a fader was
     divided too, and halfway was not half of each (3 bytes off).
   */
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w); }
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w) * mix(1.0, 0.5, f32(U.layerCount > 1 && U.twoProjectors > 0.5)); }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2567,11 +2567,16 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Substrate grain + contact shadow ──────────────────────────────
+  // Keep the screen's lamp before the front plate's contact shadow darkens
+  // lampBg: a second projector's beam (PLAN 18b-10) meets the screen's fibre
+  // but never passes through the front plate.
+  var lampScreen = lampBg;
   if (closeup && U.macroDepth * macroAmt > 0.005) {
     let depth = U.macroDepth * macroAmt;
     let fiber = fbm3(uv * vec2f(aspect, 1.0) * 230.0);
     bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
     lampBg = mix(lampBg, lampBg * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
+    lampScreen = lampBg;
     let shA = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.008, -0.008), c0, s0)).a) * 2.6);
     let shB = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.022, -0.022), c0, s0)).a) * 1.6);
     let shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
@@ -3104,14 +3109,28 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
-        On a lamp ground the back plate is a second filter in the light's
-        path, whatever the look's Blend Mode says (a mixer row's own blend,
-        above, still lays it as it did: PLAN 18b-5): the lamp through both dishes is
-        the product of what each lets through. Its level in the mixer is
-        how much of its dye is in the path (throughScaled).
+        On a lamp ground, when Two Projectors is on (PLAN 18b-10), the plates are
+        separate projectors: their light adds on the screen, each filtered by its
+        own plate from a lamp dimmed to half (lampScreen, kept before the front
+        plate's contact shadow). Halving each lamp is an exposure normalisation
+        shortcut so clear glass stays at one lamp's level; outside the back plate's
+        disc its share of the lamp's path (dish1.x times the grain's factor, what
+        lampMore1 held before PLAN 18e) is 0, so the second projector still lights
+        the screen there.
+        For other looks, they are stacked dishes on one lamp: a second filter in the
+        light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
+        The grain's factor is recovered from the opacity before and after it
+        (grained1 / film1), as the front plate's is, so grainedDepth stays a
+        single-use expression on both plates: stored and used twice on this one,
+        Metal folded it in a different order when npm run lamp's before-lamp
+        surgery left it one use, 1 ULP that 18e's refraction pushed across a byte.
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(t1, dish1.x * select(1.0, grained1 / max(film1, 1e-4), film1 > 0.004) * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let filt1 = throughScaled(t1, dish1.x * select(1.0, grained1 / max(film1, 1e-4), film1 > 0.004) * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        var lit1 = outColor * filt1;
+        if (U.twoProjectors > 0.5 && U.layerCount > 1) {
+          lit1 = outColor + lampScreen * filt1;
+        }
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
         outColor = painted1;
