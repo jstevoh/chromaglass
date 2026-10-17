@@ -157,22 +157,59 @@ const CHORDS = [
  * so a change is heard as a change and not as a click. Written into `out`
  * between `t0` and `t1` at `gain` (a function of time, for fades).
  */
-function padSpan(out, t0, t1, bar, firstBar, gain, chordBars = 1) {
+function padSpan(out, t0, t1, bar, firstBar, gain, chordBars = 1, pick = null, voicing = null) {
   const s0 = Math.max(0, Math.round(t0 * SR)), s1 = Math.min(out.length, Math.round(t1 * SR));
   for (let i = s0; i < s1; i++) {
     const t = i / SR;
     const k = Math.floor((t - firstBar) / bar);
-    const at = (kk) => CHORDS[((Math.floor(kk / chordBars) % 4) + 4) % 4];
+    const at = pick ?? ((kk) => CHORDS[((Math.floor(kk / chordBars) % 4) + 4) % 4]);
     const chord = at(k);
     const into = t - firstBar - k * bar;
     const x = Math.min(1, into / (bar / 16));
     const prev = at(k - 1);
     let s = 0;
+    if (voicing) {
+      // Another instrument playing the same chords (see `arrange`'s
+      // `voicing`): its own partials, and its voices where it puts them.
+      for (const f of chord.notes) for (const [o, h, a] of voicing) s += x * a * Math.sin(2 * Math.PI * f * o * h * t);
+      if (x < 1) for (const f of prev.notes) for (const [o, h, a] of voicing) s += (1 - x) * a * Math.sin(2 * Math.PI * f * o * h * t);
+      out[i] += 0.02 * gain(t) * s;
+      continue;
+    }
     for (const f of chord.notes) for (const d of [0.998, 1.002]) for (let h = 1; h <= 4; h++) s += x * Math.sin(2 * Math.PI * f * d * h * t) / h;
     if (x < 1) for (const f of prev.notes) for (const d of [0.998, 1.002]) for (let h = 1; h <= 4; h++) s += (1 - x) * Math.sin(2 * Math.PI * f * d * h * t) / h;
     out[i] += 0.02 * gain(t) * s;
   }
 }
+
+/**
+ * Chords by name, for songs whose sections have their own progressions
+ * (`npm run songfollow`, PLAN.md 28g: a song the follower can find its place in
+ * has a verse that is not its chorus). Roots in the bass's octave, triads
+ * round middle C.
+ */
+const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);
+const triad = (root, third, fifth = 7) => ({
+  root: NOTE(33 + ((root - 9 + 12) % 12)),
+  notes: [NOTE(57 + root - 9), NOTE(57 + root - 9 + third), NOTE(57 + root - 9 + fifth)],
+});
+export const CHORD_BOOK = {
+  C: triad(0, 4), Dm: triad(2, 3), Em: triad(4, 3), E: triad(4, 4), F: triad(5, 4), G: triad(7, 4),
+  Am: triad(9, 3), Bb: triad(10, 4), D: triad(2, 4), A: triad(9, 4), B: triad(11, 4), Fsm: triad(6, 3),
+  Csm: triad(1, 3), Gsm: triad(8, 3), Eb: triad(3, 4), Ab: triad(8, 4),
+};
+
+/**
+ * Other instruments: [octave, partial, amplitude] per partial of each note.
+ * `organ` is odd partials only and every voice an octave up as well, a
+ * drawbar organ's; `keys` a bright electric piano's, the fundamental an
+ * octave down and the upper partials strong. Neither shares the pad's
+ * detuned pair or its 1/h fall.
+ */
+export const VOICINGS = {
+  organ: [[1, 1, 1], [1, 3, 0.45], [1, 5, 0.25], [2, 1, 0.6], [2, 3, 0.2]],
+  keys: [[0.5, 1, 0.8], [1, 1, 1], [1, 2, 0.7], [1, 3, 0.5], [1, 4, 0.4], [1, 6, 0.2]],
+};
 
 /** A riser: noise through a band-pass whose centre sweeps up, getting louder. */
 function riser(out, t0, t1, rand) {
@@ -207,6 +244,12 @@ const DITHER = 1.6e-5;
  *             are then the same to the sample as before it existed). At 2
  *             half the bar lines have no harmonic change on them, which is
  *             most pop music, and the downbeat finder's harder case.
+ *   voicing   a name in VOICINGS: the chords played on another instrument;
+ *
+ * and each section may carry `chords`, names in CHORD_BOOK, one a bar from
+ * the section's first, round again as needed: its own progression, as a
+ * real song's verse and chorus have. Without `chords` and `voicing` a song
+ * is the same to the sample as before either existed.
  *
  * Returns the samples and the truth:
  *
@@ -217,7 +260,7 @@ const DITHER = 1.6e-5;
  *   returns   where the kick comes back after two bars or more without it:
  *             the moments a light show would call a drop.
  */
-export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed = 1, buildKick = false, chordBars = 1 }) {
+export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed = 1, buildKick = false, chordBars = 1, voicing = null }) {
   const rand = rng(seed);
   const beat = 60 / bpm, bar = beat * 4;
   const lead = beat;                              // a beat of silence before the song starts
@@ -237,12 +280,14 @@ export function arrange({ bpm = 128, sections, style = 'club', gainDb = 0, seed 
     const padGain = kind === 'outro'
       ? (x) => Math.max(0, 1 - (x - start) / (end - start))
       : kind === 'intro' ? (x) => Math.min(1, (x - start) / 2) * 0.8 : () => (kind === 'drop' || kind === 'chorus' ? 1.1 : 1);
-    if (kind !== 'silence') padSpan(out, start, end, bar, lead, padGain, chordBars);
+    const firstBar = Math.round((start - lead) / bar);
+    const pick = sec.chords ? (k) => CHORD_BOOK[sec.chords[(((k - firstBar) % sec.chords.length) + sec.chords.length) % sec.chords.length]] : null;
+    if (kind !== 'silence') padSpan(out, start, end, bar, lead, padGain, chordBars, pick, voicing ? VOICINGS[voicing] : null);
     if (kind === 'build') riser(out, start, end, rand);
 
     for (let b = 0; b < sec.bars; b++) {
       const barAt = start + b * bar;
-      const chord = CHORDS[Math.floor(Math.round((barAt - lead) / bar) / chordBars) % 4];
+      const chord = pick ? pick(firstBar + b) : CHORDS[Math.floor(Math.round((barAt - lead) / bar) / chordBars) % 4];
       truth.downbeats.push(barAt);
       const fillBar = style !== 'loop' && (kind === 'verse' || kind === 'chorus' || kind === 'drop') && b % (style === 'band' ? 4 : 8) === (style === 'band' ? 3 : 7);
       if (fillBar) truth.fills.push(barAt + 2 * beat);
