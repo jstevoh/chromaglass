@@ -888,6 +888,20 @@ jobs:
       - name: The ferrofluid drop in the closeup
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferrodrop
+      # The closeup's ferrofluid drop dragged by hand (PLAN 29c): follows the
+      # magnet within 2 drop radii across 0.3 plate, holds together within 15%
+      # of start area, and does not move without a field.
+      - name: The ferrofluid drop follows the hand
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferrodrag
+      # The magnet's pull in tesla, metres and seconds (PLAN 29c-2): the
+      # shader's field against Biot–Savart, the gain against EFH1's, and a
+      # drop at the two-phase Darcy speed, its rim keeping up with its core.
+      # On the fifth shard, the lightest (19w), since the open one ran 17.8
+      # minutes of its 20 before the split.
+      - name: The magnet's pull, derived
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        run: npm run magnetgain
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye

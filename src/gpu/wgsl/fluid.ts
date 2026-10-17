@@ -941,7 +941,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     This form puts the gradient on ψ, which is smooth everywhere, and has
     the same curl, which is all that survives the projection.
 
-    A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add.
+    And read against the ferrofluid's own drag where a cell holds both
+    liquids (PLAN 29c, the drop's rim). Under Thin Gap a body force is
+    the speed it drives the reference liquid to, and hsPrep's drag on the
+    cell is the two liquids' geometric mean by share (wgsl/thinGap.ts),
+    which is right for the pressure's flow across a mixed cell and wrong
+    for a force on one of the liquids alone: the two lie side by side in
+    the gap, each its own column, and the Kelvin force moves the
+    ferrofluid's column at the ferrofluid's own Darcy mobility whatever
+    share of the cell it fills, while the clear liquid beside it is moved
+    only by the pressure (two-phase Darcy flow, each liquid at its own
+    mobility). So a cell's force-driven speed is φ·f·h²/12μ_ff, where the
+    mixed drag gave φ·f·h²/12μ_mix: a half-full rim cell was driven at a
+    quarter of the full cells' speed per unit of ferrofluid (ν_clear/ν_ff
+    4.5, so 0.5·4.5^0.5 against 4.5), and the rim held the drop back and
+    fell behind it. Measured (handoff, dropdiag): a drop 8 cells across
+    went at 0.42 of the sharp drop's Darcy speed under a weak magnet and
+    0.29 under a strong one, its back rim drawn into a crescent, the
+    smear the owner saw. The factor (ν_clear/ν_ff)^(1−φ) on the force,
+    A.b.z the ratio, is the mixed drag over the ferrofluid's, so what
+    hsPrep's drag leaves is the ferrofluid's own speed, in proportion to
+    its share. 1 off Thin Gap, where there is no drag to read against.
+    What is still short of the real thing: the ferrofluid in a rim cell
+    rides the cell's mean velocity, not its own column's, which is
+    faster by the clear liquid's share (PLAN 29c-4, the drift flux).
+
+    A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add,
+    A.b.z = the clear liquid's viscosity over the ferrofluid's.
   */
   phaseForce: `${HEAD}${MAGNET_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -965,10 +991,121 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                    magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
   // None under a standing layer: the film has the magnet's pull in its own
   // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
-  var f = (1.0 - textureLoad(stand, p, 0).r) * phs(p, n) * gpsi * A.b.x;
+  let share = phs(p, n);
+  var f = (1.0 - textureLoad(stand, p, 0).r) * share * pow(max(A.b.z, 1.0), 1.0 - share) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
+}`,
+
+  /*
+    The ferrofluid keeps its momentum (29c, the dragged drop). A thin gap does
+    not carry the velocity along itself (wgsl/thinGap.ts, "What the step no
+    longer does"): for the oils the drag takes a push in a few steps, so where
+    the liquid is by then is where the push was. The ferrofluid is thinner
+    (FERRO_NU, 5 cSt against the default oil's 22) and its drag time in the
+    rest gap is 0.6 s, 36 steps, while a drop dragged at the hand's speed,
+    0.1 of the plate a second, crosses its own width in 30. So every cell the
+    drop entered held the oil's velocity, part of the drop's, and the
+    magnet's pull brought it up at 2.8% of the shortfall a step. Measured in
+    the lab (ferrodrag's scene, 384²): the drop topped out at 0.09 of the
+    plate a second under a pull whose Darcy speed was 0.19 and its lag grew
+    without end, 2.78R at 3 s and 5.8R at 6 s, where under a weak magnet,
+    slow enough to keep up with its own momentum, it went at 0.95 of Darcy's.
+    Real ferrofluid carries its momentum: the term the gap's step drops is
+    ρ(u·∇)u, and weighed against the drag it is Uτ/R, 2.5 for this drop
+    against the oils' tenth.
+
+    So the velocity is carried along itself here by the ferrofluid's share of
+    the cell: the cell's momentum is φ of the ferrofluid's and 1 − φ of the
+    oil's, and only the ferrofluid's part travels (one backtrace; the oil's
+    part reads as it was). Before the step's forces, so hsPrep's snapshots
+    still read each force apart, and before the projection, which takes the
+    divergence the carry leaves out as the old plate's second projection did.
+    Only with ferrofluid on the plate: every other look's step is as it was.
+  */
+  phaseMomentum: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let share = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (share <= 0.001) { textureStore(dst, p, v); return; }
+  // Where this cell's liquid was a step ago, and the ferrofluid's own velocity
+  // there: its momentum φu over its share φ across the four cells round the
+  // point. Momentum arrives with ferrofluid, so where the trace lands on next
+  // to none (under a quarter of a cell across the four), the cell keeps the
+  // velocity it has: the first two forms read the mixture's velocity there,
+  // and a cell at the drop's back, whose trace lands in the faint wake the
+  // flux step leaves, read the oil's return flow and was left behind, so the
+  // drop shed ferrofluid into that wake (cells over 0.01 of ferrofluid 352
+  // to 954 in 3 s, its half-full area 100 to 82 cells).
+  let uv = uvOf(id);
+  let pos = clamp(uv - v.xy * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+  let f = pos * S.n - 0.5;
+  let fl = floor(f);
+  let t = f - fl;
+  let hiN = vec2f(S.n - 1.0);
+  let lo = vec2i(clamp(fl, vec2f(0.0), hiN));
+  let hi = vec2i(clamp(fl + 1.0, vec2f(0.0), hiN));
+  let w = vec4f((1.0 - t.x) * (1.0 - t.y), t.x * (1.0 - t.y), (1.0 - t.x) * t.y, t.x * t.y);
+  let q = array<vec2i, 4>(vec2i(lo.x, lo.y), vec2i(hi.x, lo.y), vec2i(lo.x, hi.y), vec2i(hi.x, hi.y));
+  var mom = vec2f(0.0);
+  var sh = 0.0;
+  for (var k = 0; k < 4; k++) {
+    let s = clamp(textureLoad(phase, q[k], 0).r, 0.0, 1.0);
+    let u = textureLoad(vel, q[k], 0).xy;
+    mom += w[k] * s * u;
+    sh += w[k] * s;
+  }
+  let back = select(v.xy, mom / max(sh, 1e-4), sh > 0.25);
+  textureStore(dst, p, safeVel(vec4f(mix(v.xy, back, share), v.z, v.w)));
+}`,
+
+  /*
+    The ferrofluid's own velocity, for its carry (29c-4, the rim's drift). The
+    step has one velocity a cell, the mixture's: where a cell is part
+    ferrofluid and part oil it is the two liquids' momentum together, and at
+    a moving drop's edge that is the drop's speed blended with the oil
+    slipping back past it. The ferrofluid there is the drop's own liquid and
+    goes with it (the real interface is sharp, and the oil slips along it),
+    so carrying the share by the mixture's velocity left the rim behind: the
+    crescent, and once the momentum travelled (phaseMomentum) a faint wake
+    shed from the edge (ferrodrag's scene: cells over 0.01 of ferrofluid 352
+    to 972 in 3 s, the half-full area 100 to 82). So the share is carried by
+    the ferrofluid's own velocity: the cell's where it is all ferrofluid, and
+    at its edge the velocity of the ferrofluid round it, the nine cells'
+    weighted by their share through a [1 2 1]² window; the mixture's where
+    there is next to none round it. Its divergence is not the mixture's,
+    which is the two liquids' continuity: the share rises where the
+    ferrofluid's own flow converges, as a drop's edge is drawn in.
+  */
+  phaseVelocity: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  let v = textureLoad(vel, p, 0);
+  let own = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (own >= 0.9) { textureStore(dst, p, v); return; }
+  var m = vec2f(0.0);
+  var s = 0.0;
+  for (var j = -1; j <= 1; j++) {
+    for (var i = -1; i <= 1; i++) {
+      let q = clampP(p + vec2i(i, j), n);
+      let w = f32((2 - abs(i)) * (2 - abs(j))) * clamp(textureLoad(phase, q, 0).r, 0.0, 1.0);
+      m += w * textureLoad(vel, q, 0).xy;
+      s += w;
+    }
+  }
+  let u = select(v.xy, m / max(s, 1e-6), s > 0.05);
+  textureStore(dst, p, safeVel(vec4f(u, v.z, v.w)));
 }`,
 
   /*
@@ -1080,6 +1217,116 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (p.y < n - 1) { d += exchange(p, p + vec2i(0, 1), sp, n); }
   let outVal = c + d;
   textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
+}`,
+
+  /*
+    The edge of a moving drop, kept as sharp as the grid holds it
+    (PLAN 29c-1: a named shortcut, standing in for an interface the grid
+    cannot draw).
+
+    Ferrofluid and the clear liquid do not mix: a real drop's edge is a
+    molecule thick wherever the flow takes it, and the drop is carried as
+    a body. On the grid the edge is three cells of grey, and the flux step
+    that carries it (phaseAdvect: MUSCL with a minmod slope, the most
+    diffusive of the limiters, which falls back to upwind at every
+    extremum, and a drop a few cells across is all extremum) spreads it by
+    about half a cell times the cells it moves: a numerical diffusion of
+    ½|u|Δx. Cahn–Hilliard's own pull back toward 0 and 1 is M·W|f''|, a
+    fifth of that at Phase Edge 0.75, so a drop dragged 0.3 of the plate
+    in three seconds (\`npm run ferrodrag\`) came out a grey smear with no
+    cell past half full, and even steepening the double well 2.9 times
+    did not hold it (lab: 100 cells past half → 0, either way).
+
+    So what the flux step spreads is taken back where it spreads it:
+    interface compression (Weller's, as volume-of-fluid solvers carry an
+    immiscible edge), a flux c(1−c) along the edge's normal at the local
+    flow's own speed, |u|·n̂, toward the fuller side. In proportion to how
+    far the flow carried the edge this step, so it is exactly nothing on a
+    pool at rest (a look's resting ferrofluid is as it was, to the bit),
+    and it is no stronger than the advection's own spreading (C_α = 1).
+    Each face's exchange is one number read alike from both sides, and at
+    most a quarter of min(lo, 1 − hi), the emptier cell's share and the
+    fuller one's room, so it keeps the plate's total and every cell inside
+    0..1, as phaseSeparate's sharpening did. Unlike that sharpening (which
+    set a plate of drops at rest into blocky squares, and was replaced by
+    Cahn–Hilliard for it: docs/physics-plan.md) it acts along the edge's
+    normal, from the [1 2 1]²-blurred field, not along each axis alike, and
+    only where the flow moves the edge.
+
+    The normal is read from the blurred field written once a step by
+    phaseBlur (the \`blur\` texture), not blurred here: each face needs the
+    blur at six cells, and blurring them in place read 54 cells a face, 216
+    a cell, which on the Mac cost every ferrofluid look a fifth of its step
+    (#373's review: 29.2 → 35.7 ms a step at 768²). Read from the texture
+    the four faces' six cells each are the nine cells round p, so the step
+    reads the blur once (9 cells) and the compression 9 more, with the
+    phase, velocity, gap and layer at p and its four neighbours.
+
+    Under Thin Gap the field is a share of the gap (phaseAdvect), so what
+    crosses a face is a volume, the exchange times the thinner gap, and
+    each cell divides by its own (as phaseGrid). Stepped aside under a
+    standing layer (STAND_ASIDE), whose film shapes the layer there.
+
+    A.a = (C_α, the flow's displacement per unit velocity this step,
+    volume form on, 0).
+  */
+  phaseCompress: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var blur: texture_2d<f32>;
+@group(0) @binding(4) var vel: texture_2d<f32>;
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var stand: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<r32float, write>;
+${STAND_ASIDE}
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+// The [1 2 1]²-blurred field (phaseBlur), read at the grid's edge as its edge cell.
+fn sm(p: vec2i, n: i32) -> f32 { return textureLoad(blur, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
+fn gapOf(q: vec2i) -> f32 { return select(1.0, max(textureLoad(sq, q, 0).r, 0.004), A.a.z > 0.5); }
+// What flows into p from its neighbour q = p + e this step.
+fn compress(p: vec2i, e: vec2i, n: i32) -> f32 {
+  let q = p + e;
+  let a = raw(p);
+  let b = raw(q);
+  // The edge's normal, from the blurred field, across the face and along it.
+  let t = vec2i(e.y, e.x);
+  let sp = sm(p, n);
+  let sq2 = sm(q, n);
+  let across = sq2 - sp;
+  let along = 0.25 * ((sm(p + t, n) - sm(p - t, n)) + (sm(q + t, n) - sm(q - t, n)));
+  let normal = abs(across) / sqrt(across * across + along * along + 1e-8);
+  // How far the flow carried the edge this step, in cells.
+  let u = 0.5 * (textureLoad(vel, p, 0).xy + textureLoad(vel, q, 0).xy);
+  let moved = length(u) * A.a.y * f32(n);
+  let lo = min(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let hi = max(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let amount = 0.25 * min(A.a.x * moved * normal, 1.0) * min(lo, 1.0 - hi);
+  let toFuller = select(-amount, amount, sp > sq2);
+  return aside(p, q, S.n) * toFuller * min(gapOf(p), gapOf(q));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  var d = 0.0;
+  if (p.x > 0) { d += compress(p, vec2i(-1, 0), n); }
+  if (p.x < n - 1) { d += compress(p, vec2i(1, 0), n); }
+  if (p.y > 0) { d += compress(p, vec2i(0, -1), n); }
+  if (p.y < n - 1) { d += compress(p, vec2i(0, 1), n); }
+  let outVal = raw(p) + d / gapOf(p);
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
+}`,
+
+  // The ferrofluid blurred by [1 2 1]² (PHASE_MEAN3), once a step, for
+  // phaseCompress to read its edge's normal from (and why: above).
+  phaseBlur: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+${PHASE_MEAN3}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  textureStore(dst, p, vec4f(mean3(p, i32(S.n)), 0.0, 0.0, 0.0));
 }`,
 
   /*

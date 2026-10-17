@@ -3495,3 +3495,51 @@ right side stands that shoulder 138% and the far one 78%, the volume 101.8%; the
 spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up and left; a
 yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
 bytes different at any relief.
+
+### 29c. The drop follows the hand and holds together (#373)
+
+Reported 2026-10-11 (the handoff's `drag-today.png`): a magnet at 0.35–0.5, height 0.2,
+walked at a tenth of the plate a second turned the closeup's drop into a crescent, then
+smeared it to brown with no cell over half full within two seconds; a look's own magnet
+left it behind. A real 6 mm drop under a dragged magnet holds together and heaps toward
+the field.
+
+Found, in three rounds of review and a takeover:
+- **The rim held the drop back.** The force on a cell is φ·∇ψ (the Kelvin force on the
+  ferrofluid's share) but hsPrep's drag is the two liquids' geometric mean by share, right
+  for the pressure's flow across a mixed cell and wrong for a force on one liquid alone: a
+  half-full rim cell was driven at a quarter of a full cell's speed per unit of ferrofluid
+  (ν_clear/ν_ff 4.5: 0.5·4.5^0.5 against 4.5). Measured in the lab (the handoff's
+  `dropdiag`, a drop eight cells across, 384², main's gain): the core went at Darcy's speed
+  for a sharp drop, 0.0123 of the plate a second under a weak magnet, the rim at 0.55 of
+  it, the centroid at 0.44 of the pull asked; under a strong one 0.085, 0.76 and 0.29, the
+  back rim drawn into the crescent. Two liquids side by side in the gap each go at their own
+  Darcy speed under the one pressure, so the force is now read against the ferrofluid's own
+  drag, (ν_clear/ν_ff)^(1−φ) on phaseForce's force: the rim at 0.81 of the core, the
+  centroid at 0.68 of the pull asked (0.83 of the sharp drop's) under the weak magnet, and
+  0.101 of the plate a second under the strong one where it was 0.075.
+- **The flux step spread the moving edge** (MUSCL with minmod, half a cell times the
+  cells moved): 100 cells past half → 0 over a 0.3-plate drag, which steepening the
+  double well 2.9 times did not hold. Weller's interface compression takes it back along
+  the edge's normal at the flow's own speed (phaseCompress, 29c-1), from the field blurred
+  once a step (phaseBlur; blurred face by face it read 216 cells a cell and cost every
+  ferrofluid look a fifth of its step on the Mac, 29.2 → 35.7 ms).
+- **The gain.** Antigravity's 1.04e-4 (17× main's) passed `ferrodrag` by running on the
+  per-step guard, which makes the force uniform over the drop (every cell at the cap, so the
+  drop moves as a body at 0.42 of the cap), and turned `fingers` 1/4, `ferrodye` 4/5 and
+  `ferropour` 7/8 red on the Mac. `npm run magnetgain` works the pull out in SI from the
+  shader's own field (held to Biot–Savart within 0.004%): EFH1's far-field gain is 5.8e-5
+  at Ferrotec's χ 2.64, and the near field is the guard at any gain the plate has had (the
+  hand's magnet asks 7.8 plate widths a second at 6e-6 against the guard's 0.375 on 384²).
+  MAGNET_GAIN stays 6e-6, a tenth of the physics, named with its reason (29c-2: the looks'
+  far pools, and the contact line's pinning the solver lacks); the guard is named as the
+  hand's speed limit (29c-5); the saturation knee (29c-3) and the rim's drift flux (29c-4)
+  are the shortcuts left.
+- phaseMu and mazeReady run as on main (maze and spikes only); the first rounds had them on
+  every ferrofluid look.
+
+Checks: `npm run ferrodrag` (new, lab; 3/3: lag LAG_PLACEHOLDER with the rim's force at main's
+gain, 5.88R without it, bar 2R; the half-full area within 15%; nothing moves without a
+magnet) and `npm run magnetgain` (new, lab; the field, the weak-field ratio, the drop at the
+two-phase Darcy speed and its rim at 0.7 of its core, the dragged magnet under the guard).
+Both on the Mac's `open` shard.
