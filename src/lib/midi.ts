@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types.ts';
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
+import { HIT_FEATURES, HIT_FEATURE_LABELS, type HitFeature } from './hitSource.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
@@ -154,10 +155,16 @@ export interface MidiBinding {
  * coming except the build, which is exactly what a performer bound to the
  * build is there to answer).
  */
-export type MusicSource = SourceName | 'beat' | 'bar' | SongEventKind;
+export type MusicSource = SourceName | HitFeature | 'beat' | 'bar' | SongEventKind;
+/** The sources a trigger can fire on: everything with a moment. */
 export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', 'bar', ...SONG_EVENTS];
-/** The sources a mapping can follow: everything with a level. */
-export const MAPPABLE_SOURCES: readonly SourceName[] = SOURCE_NAMES;
+/**
+ * The sources a mapping can follow: everything with a level. The named
+ * sources and the bands, and the hits as levels (`hitSource.ts`): how hard
+ * each drum's last hit was, falling over a quarter second, and the note.
+ * Levels and not triggers: a kick as a *moment* is `kick` above, and fires.
+ */
+export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES];
 
 const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 0 : 1)}k` : `${Math.round(f)}`);
 /**
@@ -171,6 +178,7 @@ export const MUSIC_SOURCE_LABELS: Record<MusicSource, string> = {
   ...Object.fromEntries(BAND_SOURCES.map((b, i) => [b, `Band ${i + 1} · ${hz(BAND_EDGES_HZ[i])}–${hz(BAND_EDGES_HZ[i + 1])} Hz`])) as Record<typeof BAND_SOURCES[number], string>,
   beat: 'Every beat', bar: 'Every bar',
   build: 'Each build', drop: 'Each drop', breakdown: 'Each breakdown',
+  ...HIT_FEATURE_LABELS,
 };
 
 /**
@@ -835,10 +843,17 @@ function parseSoundBindings(raw: unknown[]): SoundBinding[] {
   const out: SoundBinding[] = [];
   for (const r of raw) {
     const b = r as Partial<SoundBinding> | null;
-    if (!b || typeof b !== 'object' || !MUSIC_SOURCES.includes(b.source as MusicSource) || !b.target || typeof b.target !== 'object') continue;
+    if (!b || typeof b !== 'object' || !b.target || typeof b.target !== 'object') continue;
+    // A mapping follows a level and a trigger fires on a moment: each is
+    // held to its own list, so a trigger on a level (which has no moment and
+    // would never fire) is dropped like any other source the show lacks.
+    const level = MAPPABLE_SOURCES.includes(b.source as MusicSource);
+    const moment = MUSIC_SOURCES.includes(b.source as MusicSource);
+    if (!level && !moment) continue;
     const t = b.target as MidiTarget;
     let target: MidiTarget | null = null;
-    if (t.kind === 'setting' && soundMappable(t.key) && (MAPPABLE_SOURCES as readonly string[]).includes(b.source as string)) target = onTodaysTravel(t);
+    if (t.kind === 'setting' && soundMappable(t.key) && level) target = onTodaysTravel(t);
+    else if (!moment) target = null;
     else if (t.kind === 'action' && t.action in ACTION_LABELS && triggerable(t.action)) target = { kind: 'action', action: t.action };
     else if (t.kind === 'preset' && typeof t.presetId === 'string') target = { kind: 'preset', presetId: t.presetId };
     else if (t.kind === 'dye' && Number.isInteger(t.paletteIndex) && t.paletteIndex >= 0) target = { kind: 'dye', paletteIndex: t.paletteIndex };
