@@ -349,14 +349,7 @@ try {
           o.at.push(where(a, o.at.length ? o.at[o.at.length - 1] : [0, 0])); o.pred.push(cover ? [g[4] * N, g[5] * N] : [0, 0]);
           if (base) {
             const b = base.snaps[o.snaps.length]; let d = 0, tot = 0;
-            for (let q = 0; q < a.length; q++) { 
-              const dx = (q % 192) + 0.5 - 96; 
-              const dy = Math.floor(q / 192) + 0.5 - 96; 
-              if (dx * dx + dy * dy < 96 * 96) {
-                d += Math.abs(a[q] - b[q]); 
-                tot += b[q]; 
-              }
-            }
+            for (let q = 0; q < a.length; q++) { d += Math.abs(a[q] - b[q]); tot += b[q]; }
             o.moved = Math.max(o.moved, d / tot);
             o.snaps.push(null);
           } else o.snaps.push(a);
@@ -391,7 +384,7 @@ try {
         return fit(await run(glass, { ...opts, base }), base);
       };
       res.evenTilt = await go(glasses.full, { cover: false });
-      res.heavyTilt = await go(glasses.heavy, { cover: false, heavy: true });
+      res.heavyTilt = await go(glasses.full, { cover: false, heavy: true });
       res.evenFull = await go(glasses.full, { cost: true });
       res.evenDefault = await go(glasses.def, { cost: true });
       res.evenLow = await go(glasses.low);
@@ -468,7 +461,7 @@ try {
     return res;
   }, {
     KICK_RADII,
-    glasses: { full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }), heavy: covers({ R: 1.06 }) },
+    glasses: { full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
     kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
     stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
     rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
@@ -522,7 +515,7 @@ try {
   const e = (o) => `${o.cells.toFixed(1)} cells (the glass said ${o.said.toFixed(1)}; gain ${o.gain.toFixed(2)}, correlation ${o.corr.toFixed(2)}, read on ${(o.read * 100).toFixed(0)}% of reads, least checker left ${o.amp.toFixed(2)}, changed ${o.moved.toFixed(3)})`;
   const follows = (o) => o.gain >= 0.4 && o.gain <= 1.2 && o.corr > 0.8 && o.read >= 0.75;
   check('Plate Rock on an evenly coloured plate: the tilt alone moves nothing (and moves it with the red made heavier)',
-    r.evenTilt.cells < 0.5 && r.evenTilt.moved < 0.1 * r.heavyTilt.moved && r.heavyTilt.moved >= 0.050,
+    r.evenTilt.cells < 0.5 && r.evenTilt.moved < 0.1 * r.heavyTilt.moved && r.heavyTilt.moved >= 0.05,
     `${r.evenTilt.cells.toFixed(2)} cells, changed ${r.evenTilt.moved.toFixed(3)} even; changed ${r.heavyTilt.moved.toFixed(3)} with the red heavier (it sinks through the blue where it lies, ${r.heavyTilt.cells.toFixed(2)} cells as a whole)`);
   check('the cover glass slides the picture 5 cells or more at full, the way the glass went, and changes it at least half as much as a look\'s own stir',
     r.evenFull.cells >= 5 && follows(r.evenFull) && r.evenFull.moved >= 0.5 * r.evenStir.moved,
