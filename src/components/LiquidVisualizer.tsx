@@ -9230,6 +9230,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 floor: filmLevelRef.current,
                 energy: currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
                 sync: currentSettings.macroSync ?? 0,
+                // How far the music may move the frame (Frame Sway, lib/plateRock.ts):
+                // the sync's punch-in, push and tremor ride it, as the plate's own
+                // sway does; 0 by default, so the song times the cuts and moves nothing.
+                sway: frameSway(currentSettings.frameSway),
                 bass: camBass,
                 beat: kickRef.current.kick,
                 treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,

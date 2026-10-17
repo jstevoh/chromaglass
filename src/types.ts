@@ -892,7 +892,7 @@ export interface VisualizerSettings {
   /** Where the closeup camera is aimed, across and up the plate (0-1). */
   macroAimX?: number;
   macroAimY?: number;
-  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
+  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks; its punch with the bass, push with the energy and tremor from the treble move the frame, so they also need Frame Sway (lib/macroCamera.ts)
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries

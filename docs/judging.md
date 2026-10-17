@@ -1329,3 +1329,20 @@ On the Mac, a song with a band's drums (the showreel's, or anything with a kick 
    frame holds still with the music.
 4. Say whether each of the three answers the music the way an operator's hand would, or
    twitches. They are the pattern the other looks will follow.
+
+## 53. The closeup holds still through the song (PLAN 27a-8, QA-31)
+
+On the Mac, Macro Bead or Ferro Paint pushed in to 6x, a song with a hard kick, Frame Sway
+at 0 (the default).
+
+1. In Hold, Follow and Auto the frame should not punch, pump or shiver with the music: the
+   drop drifts, the dye moves round it, and nothing else moves. Turn Frame Sway up to 1
+   and the punch-in on the kick, the push and the treble tremor come back; at 0 they are
+   gone to the pixel.
+2. In Auto a cut should land on the drop's middle and stay, not slide the last stretch to
+   it. In Follow a drop drifting fast should sit near the middle of the frame, not trail
+   behind it.
+3. With nothing playing, a drop on still paint should sit dead still at 6x: no shimmer at
+   its edge from frame to frame.
+4. Say whether Auto's slow breathing zoom, which is not from the sound, is a signature
+   worth keeping or one more move the rig should not make (27a-8-1).

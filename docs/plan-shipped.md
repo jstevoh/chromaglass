@@ -3580,6 +3580,62 @@ the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% 
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
 
+## 27. Every control does something you can see
+
+### 27a-8. The closeup's camera holds still through the song (QA-31)
+
+The owner, 2026-10-11, the evening after Frame Sway seated the plate's own sway (27a-7):
+"the macro zoom is even bouncier and twitchier than before." What a real macro rig does:
+the camera sits on a copy stand or a rail over the dish, and the only thing that moves in
+the picture is the liquid. The microscope light shows and the macro references in the
+project's shared files are all locked off; a push or a pan in them is a hand on a rail
+over seconds, never a move with the beat.
+
+Measured with `npm run steadycam` (the camera driven through a 120 bpm song, a kick a beat
+and hats on the eighths, at 6x on a 1440 px frame, against the same run in silence), four
+things moved the frame that were not the liquid:
+
+- Macro Sync (0.5 by default) had three hands on the frame in every mode, outside Frame
+  Sway: a punch-in on the kick, a push with the energy and a "handheld" tremor from the
+  treble. The song swayed the frame 0.42% of its width (6 px) and pumped the zoom 3.2%
+  (the frame's edge 23 px); at Macro Bead's 0.85, 0.71% and 6.3% (46 px). And the ear
+  hears nearly every kick now where it once heard a third (`npm run kicks`), so the punch
+  landed on every beat: "even bouncier".
+- The lead aimed the camera ahead of its subject by the solver's velocity in the subject's
+  one cell, times up to sixteen cells. That velocity carries the music through the liquid
+  (Beat Squeeze's press, the kick's shove) and the noise of one cell of a turbulent field:
+  a press of half a cell a step under a drop drifting steadily threw the frame 0.95% (14
+  px) in a frame and 1.6% (24 px) over the beat, and left the drop 6.8% off centre.
+- A cut in Auto landed on the lattice cell that found the drop, not on the drop, and then
+  slid to it at 6 a second: 14% of the frame at 6x after a cut. In the check it was a
+  13.8% difference between the song and silence from one cut that fell a frame apart.
+- Each drop took a random walk of ±0.075 cells a step ("drift little on their own"), half
+  a pixel at 1x and 4 px rms sixty times a second at 6x: "twitchier". A millimetre drop
+  of oil in water has no Brownian motion to see (D = kT / 6πηR ≈ 4 × 10⁻¹⁶ m²/s, a couple
+  of microns an hour), and the bubbles already keep still on still paint (18i).
+
+Built: the punch, the push, the tremor and the rate's tightening in a loud passage ride
+Frame Sway (`move = sync × sway` in `macroCamera.ts`; `LiquidVisualizer.tsx` hands the
+camera `frameSway(settings.frameSway)`), so Macro Sync keeps what is an edit and not a
+move: the cut on a kick, and the hold spent faster in a loud passage. The lead is the
+tracked centroid's own motion smoothed over 0.6 s, from nothing on each new subject,
+scaled to cancel the rig's own two lags so a steady drift sits centred; the camera does
+not read the velocity field at all. A cut snaps to the drop's centroid, re-windowing about
+it until it stops moving. The drops' random walk is gone; the flow and the tilt alone move
+them.
+
+After, by the same check: the song's hand on the frame is 0.000% of the width and 0.000%
+of the zoom at Frame Sway 0 in Hold, Follow and Auto on every shipped look and show stage
+(70 of them), the same centre and zoom as in silence to the bit; at Frame Sway 1 the dial
+gives the 0.42% and 3.2% back, half of each at 0.5. The same half-cell press moves the
+frame 0.17% a frame with it and without, the drop 0.44% off centre; a drop drifting at 15
+cells a second sits 3.3% from the middle of the frame where it sat 27% off. A drop on
+still paint moves 0 cells a step. `npm run steadycam` runs in CI's logic part, and each of
+its controls (the gate removed, the random walk restored, the snap removed) turns it red.
+`npm run drops`' fingerprint is pinned again (the two rng draws a step gone: 341 drops
+where there were 336). The desk and the phone share the camera, and Frame Sway is on
+both; the Guide's Music Sync line says what rides it.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)

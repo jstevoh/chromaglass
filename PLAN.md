@@ -71,7 +71,13 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   on thin pools (0-finger)~~ #314, ~~the wall's gain (0-wallgain)~~ #131, ~~`qa` with no adapter
   (11-qaguard)~~ #316, ~~the other deploy reds (0-deployreds)~~ #194, ~~the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant)~~, ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
-  (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
+  (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314. And `magnet`'s second press
+  (11-magnetpress): held over the poured pool, some runs never see the press as a hold
+  (Ferrofluid stays 0, the hand's path reads one spot through the whole drag), 13/15 on
+  #382's merged head and three times on #376's branch, then green on the next run with
+  nothing changed. `held` is the hand's last pointer sample within 250 ms of the show's
+  clock (`LiquidVisualizer.tsx`): find what the second press lands on, or what stalls the
+  sample, and make the check say which.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
   docs/plan-shipped.md 19r).
 - **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
@@ -328,6 +334,18 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   five LED modes, Off and Random for a new song and the mixer's Multiply and Key were
   dropped by `updateSettings`, the phone's patches and a saved look. `npm run sanitize`
   now walks every value of every choice setting (80 kept) and runs in CI's logic part.
+- ~~**QA-31** The closeup is "even bouncier and twitchier than before": it punches,
+  pumps and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ **Fixed**
+  (27a-8, `npm run steadycam`): Macro Sync's punch-in on the kick, push with the energy
+  and treble tremor were on at its default of 0.5 outside Frame Sway, so at 6x on a 1440
+  px frame a 120 bpm song swayed the frame 0.42% of its width (6 px) and pumped the zoom
+  3.2% (the frame's edge 23 px) on every beat, and the ear now hears nearly every kick
+  where it heard a third; the lead read one cell's solver velocity, so a press of half a
+  cell a step threw the frame 0.95% (14 px) in a frame; a cut landed on a lattice cell and
+  slid 14% of the frame to the drop; and each drop random-walked 4 px rms a frame. All
+  four are 0 now: the song's hand on the frame is 0.000% at Frame Sway 0 in every mode on
+  all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
+  without, a cut lands on the drop's middle, and a drop on still paint moves 0.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
@@ -4158,7 +4176,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     `hsCycles` from cold should converge on a grid that is not a power of two.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
-**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 - **18b-8. The dishes too deep for the lamp.** Eighteen looks are dishes by their own
   description but fail the rule with the dye they were given for black: on the lamp the
@@ -5094,6 +5112,19 @@ percentage; to be confirmed on the first thread that reaches it). If the host's 
 still wins, the window has to move in the environment's own settings instead, which only
 the owner can change. Still open alongside it: 19m (PLAN.md as an index), now more
 pressing, as the file is about 500 KB.
+
+### 19z. A check that compares two compiled programs on a GPU asks the compiler
+**Shipped** (2026-10-11): `npm run lamp`'s first line, every look at Lamp Ground 0 byte for byte against a lab built with the lamp's lines taken out, read "different: fillmore-1969 2" on the owner's M4 on main at b2ca7d7, the same one pixel on every run, 2 levels of blue, gone with the back plate or its grade off (`node scripts/lampwhere.mjs`), none different on software WebGPU and on the GitHub runner's Mac for the same tree, and none different on the M4 again once #353 had moved the shader. Metal fuses a multiply-add into one FMA when the product has one use; the lamp's back-plate branch keeps a second use of the back plate's values alive in the plain lab and is dead code in the control, so the two programs round the painted path differently, and one ulp crossed a threshold in the grain. The line is now `npm run lampzero`, two labs on SwiftShader (which has drawn them the same on every tree since 2026-10-04 and, as a conformance rasteriser, keeps the operations as written rather than fusing them by use count), in Measure on every PR as its own part, `lab` (the `logic` part has no Chromium, so #386's first run failed there on the launch, and the `browser` part already runs twelve of its fifteen minutes). The line reads back from the adapter that SwiftShader drew both labs, and from the bundles that the control is another program, rather than trusting the flags and the plugin. The lamp's physics stay on the Mac. The story is in the scripts' own comments.
+
+- **19z-1. `npm run beams` compares two programs the same way, on the Mac.** Its first line
+  holds the projector's pass against a lab built from the old pass, byte for byte, in the
+  `tools` shard on Metal. It has not flipped, and the pass is small; when it does, move
+  that line to Measure as lampzero was, with `openLab({ software: true })`.
+- **19z-2. Measure's `browser` part is near its timeout again.** Found 2026-10-12 placing
+  lampzero: the part ran 12:16 of its 15 minutes (the layout 2:49, the phone 3:14, a click
+  in the app 1:04, the sound's renders 0:47, the intro 0:38, Chromium 0:30), the margin 19b
+  split Measure to get back. The next Chromium check goes in a part of its own or splits
+  this one as 19b did; until then a slow runner turns the part red with nothing wrong.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
@@ -6056,14 +6087,28 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     the liquid's motion. `framesway` holds every shipped look and show stage at 0; the
     Mac's `render-app` holds the app's own frames to it on Classic with the band.
     Evolve never drifts it.
-    - **27a-8, open.** What still turns or zooms the whole frame with the sound, each
-      off at the defaults: nine looks route a band to the dish's turn
+    - **27a-8, open in part.** What still turns or zooms the whole frame with the sound,
+      each off at the defaults: nine looks route a band to the dish's turn
       (`audioMappings.rotation`, about 0.02–0.05 rad/s, slow), Auto Spin's Tempo, and
-      the closeup camera's kick punch-in and energy push when zoomed (`macroSync`,
-      1.5–10% of zoom). Read each with the owner: a slow dish turn is the oil wheel's
-      own move; a punch-in on the kick is a camera move and may want Frame Sway too.
-      And Beat Squeeze's press spans the dish (Bass Drop at 0.8): measure its
+      ~~the closeup camera's kick punch-in and energy push when zoomed (`macroSync`,
+      1.5–10% of zoom)~~. Read each with the owner: a slow dish turn is the oil wheel's
+      own move. And Beat Squeeze's press spans the dish (Bass Drop at 0.8): measure its
       plate-wide radial part, which reads as a zoom on the kick.
+      - ~~**The closeup's camera** (QA-31).~~ **Shipped** (the story in
+        `docs/plan-shipped.md` §27a-8): Macro Sync's punch-in, push and treble tremor
+        ride Frame Sway (`move = sync × sway`, 0 by default; the cut on a kick stays,
+        an edit and not a move), the lead is the drop's own smoothed motion and not one
+        cell's solver velocity, a cut lands on the drop's centroid, and the drops no
+        longer random-walk. `npm run steadycam` holds every look and show stage to the
+        bit in CI's logic part.
+      - **27a-8-1.** Auto's own breathing zoom (two sines, up to 13% of the zoom on 17-
+        and 57-second cycles, `macroCamera.ts`) and the dolly-out through each whip are
+        camera moves with nothing behind them but the clock: a macro rig on a stand does
+        neither. The owner's call whether Auto keeps a slow breath as its signature or
+        sits as still as Hold and Follow (`docs/judging.md` §53).
+      - **27a-8-2.** The camera aims from a readback of the density a frame or two old
+        (`readbackAsync`), so Follow sits that far behind a fast drop. Measure the lag on
+        the Mac and, if it shows, lead by the readback's age.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
@@ -6441,6 +6486,14 @@ the code's entry points, the checks to add and the scenes to match, in
     decoded plainly, without the closeup's cells or lacing.
   - **29a-7.** Its cost read on the Mac (`npm run stages` with the closeup in over a
     drop): about 18 million texel reads a frame on 384², 24 sweeps warm and 200 from cold.
+  - **29a-8.** The drops' mask is 512 px across the plate (`beads.ts`), and at 6x the
+    closeup shows a ninth of the plate's width on a 1440 px frame, so the mask is
+    magnified about 25× and a drop 0.03 of the plate across is drawn from about fifteen
+    mask pixels: its edge reads blocky where the ferrofluid's surface is smooth. Draw the
+    edge from the solved surface (29a) or at the closeup's own resolution.
+  - **29a-9.** A drop reads the flow from its nearest cell (`beads.ts`), so its speed
+    steps as it crosses a cell's edge; sample the velocity bilinearly, as the solver's
+    advection does.
 - **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
   drop is the gap less the drop's height and is dragged with the drop's surface (no slip
   on the drop, no shear at the top glass's far side through the thin film), so its dye

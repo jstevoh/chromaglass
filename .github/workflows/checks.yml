@@ -97,16 +97,18 @@ jobs:
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 
-  # Measure, in three parts side by side. As one job it took a median 14.3
+  # Measure, in four parts side by side. As one job it took a median 14.3
   # minutes and at most 14.9 over 87 green runs on 2026-10-03 against its
   # 15-minute timeout, so the next slow runner would have turned it red with
   # nothing wrong; and its first red step skipped every step after it, so a
   # push with two things wrong found one (PLAN.md 19b). Split by what each
   # step needs: the arithmetic (`logic`, about four minutes, most of it the
-  # drops), the sound harnesses that want ffmpeg (`sound`, about six), and
-  # the ones that want Chromium (`browser`, about five). Every step runs
-  # whatever failed before it in its part. GitHub's ubuntu runners are not
-  # the queue the Mac's are, so three at once cost the queue nothing.
+  # drops), the sound harnesses that want ffmpeg (`sound`, about six), the
+  # ones that want Chromium (`browser`, about twelve), and the lab on the
+  # CPU rasteriser (`lab`, about six: Chromium, then `lampzero` drawing every
+  # look in two labs). Every step runs whatever failed before it in its part.
+  # GitHub's ubuntu runners are not the queue the Mac's are, so four at once
+  # cost the queue nothing.
   measure-part:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
@@ -116,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [logic, sound, browser]
+        part: [logic, sound, browser, lab]
     steps:
       - uses: actions/checkout@v5
       # 22, not 20: `music`, `scene`, `liquids` and `wall` all run their
@@ -418,6 +420,14 @@ jobs:
       - name: Hold keeps the closeup
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run holdjump
+      # The closeup holds still (PLAN.md 27a-8, QA-30): the real closeup camera
+      # through a song at 6x gives the same centre and zoom as in silence on
+      # every shipped look with Frame Sway at 0, and sways and pumps with it at
+      # full; a kick's press under the drop no longer throws the lead; a drop on
+      # still paint does not shiver.
+      - name: The closeup holds still
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run steadycam
       # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
       # src draws from Math.random outside a short allowlist of ids, and the
       # beads, bubbles, closeup camera, chemistry, palette and automation run
@@ -492,7 +502,7 @@ jobs:
       # night on macOS; here they fail in two minutes rather than fifteen, and
       # before the GPU shards have a chance to hide them behind another step.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
         run: npx playwright install --with-deps chromium
       # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
       # It runs again on the Mac's show shard, against Metal; here it is found
@@ -500,6 +510,21 @@ jobs:
       - name: The shaders compile
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run wgsl
+      # Lamp Ground 0 is the plate as it was before the lamp, byte for byte,
+      # every look (PLAN 18b, 19z): two labs, one built with the lamp's lines
+      # taken out, compared on SwiftShader, which lampzero reads back from the
+      # adapter rather than trusting the flags. Here and not on the Mac
+      # because it compares two compiled programs: Metal on an M4 fused a
+      # multiply-add on the back plate's painted path differently in the two,
+      # and one pixel of Fillmore read 2 levels off (2026-10-11, main at
+      # b2ca7d7), while the CPU rasteriser's arithmetic is the shader's text.
+      # Its own part: `logic` has no Chromium (this step's first run failed
+      # there on the launch, 2026-10-12), and `browser` already runs twelve of
+      # its fifteen minutes. About five minutes; the lamp's physics stay on
+      # the open shard (`lamp`).
+      - name: Lamp Ground 0 is the plate before the lamp
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run lampzero
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
@@ -950,10 +975,12 @@ jobs:
       - name: Dye dispersion along the flow
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run dispersion
-      # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
-      # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
+      # Lamp Ground (PLAN 18b): on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter
       # through the dye. In the open shard: the plate shard is near its timeout.
+      # "Every look at 0 is the plate as it was before the lamp, byte for byte"
+      # is Measure's (lampzero): it compares two compiled programs, which a
+      # GPU's compiler rounds differently (one pixel of Fillmore on an M4).
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
@@ -1289,7 +1316,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/checkguard.mjs --diff
 
-  # The one name for the three Measure parts and the check-change guard: green
+  # The one name for the four Measure parts and the check-change guard: green
   # only when all of them are. The guard is under this name because the branch
   # rule requires Measure, so a PR cannot merge past an unnamed change.
   measure:
