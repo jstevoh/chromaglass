@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
 import {
@@ -6,7 +6,7 @@ import {
   MAPPABLE_SOURCES, MUSIC_SOURCES, MUSIC_SOURCE_LABELS, isMapping, triggerable, soundMappable,
   type MidiAction, type MidiTarget, type MusicSource, type SoundBinding,
 } from '../lib/midi';
-import type { MidiController } from '../hooks/useMidi';
+import { useMidiLastEvent, type MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
 import { livePresetId } from '../presets';
 import { ControllerSurface } from './ControllerSurface';
@@ -131,6 +131,18 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
 
 export function MidiPanel({ midi, presets, activity, onActivity, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
+  const lastEvent = useMidiLastEvent(midi);
+  /*
+    The activity light goes out 400 ms after the last message, and the panel
+    has to render then to show it: the App used to render it there, many
+    times a second while anything moved, and no longer does (PLAN.md §14f).
+  */
+  const [, lightOut] = useState(0);
+  useEffect(() => {
+    if (!lastEvent) return;
+    const t = setTimeout(() => lightOut(n => n + 1), Math.max(0, lastEvent.at + 420 - performance.now()));
+    return () => clearTimeout(t);
+  }, [lastEvent]);
   // The controller drawn to scale: the fastest way to make a map, and the
   // cheat sheet to read during a show. Falls back to the first surface we
   // know so a map can be built before the hardware arrives.
@@ -228,7 +240,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         >
           <Radio size={14} /> {midi.enabled ? 'MIDI on' : 'Turn MIDI on'}
         </button>
-        <span className={`h-2.5 w-2.5 rounded-full ${midi.lastEvent && performance.now() - midi.lastEvent.at < 400 ? 'bg-emerald-400' : midi.enabled ? 'bg-white/20' : 'bg-white/5'}`} title="Activity" data-testid="midi-activity" />
+        <span className={`h-2.5 w-2.5 rounded-full ${lastEvent && performance.now() - lastEvent.at < 400 ? 'bg-emerald-400' : midi.enabled ? 'bg-white/20' : 'bg-white/5'}`} title="Activity" data-testid="midi-activity" />
       </div>
       {midi.error && <p className="text-[12px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
       {midi.enabled && (
@@ -247,7 +259,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
             </select>
           </label>
           {midi.inputs.length === 0 && <p className="col-span-2 text-[12px] text-white/40">No controller found. Plug one in; it appears here by itself.</p>}
-          {midi.lastEvent && <p className="col-span-2 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(midi.lastEvent.source)} = {midi.lastEvent.value}</p>}
+          {lastEvent && <p className="col-span-2 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(lastEvent.source)} = {lastEvent.value}</p>}
         </div>
       )}
 
@@ -260,6 +272,8 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
           {FACTORY_MAPS.map(f => (
             <button
               key={f.id}
+              type="button"
+              aria-pressed={detected?.id === f.id}
               onClick={() => midi.loadFactory(f.id)}
               className={chip(detected?.id === f.id)}
               title={detected?.id === f.id ? `${f.name} is what is plugged in` : undefined}
@@ -364,10 +378,13 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
               {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Bank">
             {Array.from({ length: midi.banks }, (_, i) => (
               <button
                 key={i}
+                type="button"
+                role="radio"
+                aria-checked={midi.bank === i}
                 onClick={() => midi.setBank(i)}
                 data-testid={`midi-bank-${i}`}
                 title={i === 0 ? 'The base layer: bindings here are live on every bank' : `Shift layer ${i + 1}`}
@@ -409,9 +426,9 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       </div>
 
       {/* Learn targets */}
-      <div className="flex gap-1 mb-3">
+      <div className="flex gap-1 mb-3" role="tablist" aria-label="Learn targets">
         {(['settings', 'actions', 'presets', 'dyes'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
         ))}
       </div>
       {midi.learning && (

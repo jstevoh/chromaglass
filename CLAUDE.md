@@ -7,7 +7,7 @@ driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 Before starting anything that is not a bug fix, read `PLAN.md`'s **Order of work**
 (its first section: which step is next, in which lane) and then only the section your
 step names: `grep -n '^##' PLAN.md` for the map, then `sed -n` the section. Not the
-whole file: `PLAN.md` is about 60k tokens, and see "Keeping a session small" for why
+whole file: `PLAN.md` is about 124k tokens (500 KB, 2026-10-17), and see "Keeping a session small" for why
 that matters. What shipped is in `docs/plan-shipped.md`, under the same section numbers:
 `PLAN.md` keeps a one-line stub per shipped item and only the open work, so read the
 archive only when an open item needs the history behind it. When an item ships, move its
@@ -44,6 +44,14 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 - Waiting on CI, the PR subscription wakes the session when the suite completes. Set
   one fallback check-in, not a chain of half-hourly ones: each wake re-reads the whole
   context even when all it finds is "still running".
+- Batch independent tool calls into one step: each step re-sends the context, so three
+  reads in one step cost a third of three steps. A wide listing (triggers, a session's
+  events, every run of a workflow) goes to a subagent, never into the thread.
+- `.claude/settings.json` compacts every session at a 200k window
+  (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`; the cloud host's own default is 500k), and
+  runs helper agents on a cheaper model unless an agent's `model:` line says otherwise.
+  An agent that reviews or judges a check names its model; a lookup or an audit that
+  only reads and lists does not need the parent's.
 - One thread per PR (the owner, 2026-09-27). When a thread's PR has merged, its next
   piece starts in a new thread, not this one: say what it is in the closing reply.
 
@@ -77,12 +85,13 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | `scripts/recorder.mjs` | `moving` and `film` record through it (Mac only; a PR touching it films three looks in `film.yml`) |
 | the mixer (`src/lib/mixer.ts`, `MixerPanel.tsx`) | `mixer`, `rowfade` (the take buttons), `panel`, `phone`, `remotemix` (the remote's) |
 | the projector's pass (`src/gpu/output.ts`, `src/gpu/wgsl/output.ts`, `src/lib/outputConfig.ts`, `src/lib/plateSources.ts`, `OutputPanel.tsx`) | `map`, `beams`, `wallpattern` and `mixer` (the lab, `PW_WEBGPU=1`), `phone`; `wall` on the Mac |
-| the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`) | `applink`, `remotemix`; the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
+| the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`, `server/remote-server.js`), the Phone · iPad panel | `applink`, `remotemix`, `phonelink` (the panel's code, and the relay's count of phones); the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
 | the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
 | `.github/workflows/checks.yml`, `scripts/reach.mjs` | `npm run reach`, `npm run closedruns`, `actionlint`; `npm run macqueue -- --hours 24` for the Mac time before and after |
+| a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
@@ -95,6 +104,9 @@ deploy:
 
 - **Measure** (ubuntu, three parts side by side, ~5 min each): typecheck, every script
   parsing, the shaders compiling on SwiftShader, and the node harnesses.
+- **Check changes named** (`scripts/checkguard.mjs`, under `Measure`): a PR that moves a
+  check's bar or input names each change in its body under `Check changes:`, or is red.
+  Re-run the failed jobs after editing the body; no push is needed.
 - **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
   `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
   that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the

@@ -175,6 +175,26 @@ fn sampleLayer(t: texture_2d<f32>, uv: vec2f) -> vec4f { return textureBicubic(t
   pre-push review).
 */
 var<private> lampBg: vec3f = vec3f(1.0);
+var<private> milkScatter: f32 = 0.0;
+var<private> milkGap: f32 = 1.0;
+
+/**
+ * Milky liquids scatter light (Mie / Kubelka-Munk, PLAN 18j).
+ *
+ * 1. Black Ground (diffuse backscatter):
+ *    In two-flux Kubelka-Munk theory, a non-absorbing scattering layer of
+ *    thickness d = d_0 * gap (rest gap d_0 = 6.0 mm from DISH_REST_GAP = 0.03
+ *    on a 0.2 m plate) has optical scattering depth Sd = sc * (6.0 * gap).
+ *    Diffuse reflectance is R_KM = Sd / (1.0 + Sd), exactly conserving energy
+ *    (R + T = 1.0). Large fat globules (1-10 um) scatter flat across visible
+ *    wavelengths (Mie), providing an opaque white body (R_KM) over the ground
+ *    for dyes to sit on as pastel or vibrant colour (PLAN §4).
+ */
+fn milkDiffuseReflectance(sc: f32, gap: f32) -> f32 {
+  if (sc <= 0.001) { return 0.0; }
+  let sd = sc * (6.0 * gap);
+  return sd / (1.0 + sd);
+}
 
 /*
   A decoded dye f over the ground bg, on the ground the look asks for
@@ -182,9 +202,18 @@ var<private> lampBg: vec3f = vec3f(1.0);
   the plate always drew; at 1 the lamp filtered through the dye, which is
   what a lamp under a dish does; between, the one fading into the other.
   through is the dyeThrough the decode of f left.
+
+  Milky liquids scatter light (PLAN 18j): on the black ground, diffuse
+  backscattering provides an opaque white body (Kubelka–Munk) for dye to sit on;
+  on the lamp ground, forward extinction and halo attenuate the transmission.
 */
 fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
-  let painted = mix(bg, f.rgb, f.a);
+  var painted = mix(bg, f.rgb, f.a);
+  if (milkScatter > 0.001) {
+    let rKM = milkDiffuseReflectance(milkScatter, milkGap);
+    let effBg = mix(bg, vec3f(1.0), rKM);
+    painted = mix(effBg, f.rgb, f.a);
+  }
   if (U.lampGround <= 0.001) { return painted; }
   return mix(painted, lampBg * through, U.lampGround);
 }
@@ -529,6 +558,45 @@ fn uvToFluid(uv: vec2f, c: f32, s: f32) -> vec2f {
  */
 fn fluidFlow(vtex: texture_2d<f32>, fuv: vec2f) -> vec2f {
   return tex2(vtex, fuv).rg * U.flowRate;
+}
+
+/**
+ * Forward scattering halo around milky pools (PLAN 18j).
+ * A soft 4-tap blur of the packed scattering coefficient (vtex.a).
+ */
+fn milkScatterHalo(vtex: texture_2d<f32>, fuv: vec2f) -> f32 {
+  let d = 0.020;
+  let s0 = tex2(vtex, fuv + vec2f(-d, -d)).a;
+  let s1 = tex2(vtex, fuv + vec2f(d, -d)).a;
+  let s2 = tex2(vtex, fuv + vec2f(-d, d)).a;
+  let s3 = tex2(vtex, fuv + vec2f(d, d)).a;
+  return (s0 + s1 + s2 + s3) * 0.25;
+}
+
+/**
+ * Projector lamp transmission with aperture loss and forward halo (PLAN 18j):
+ *
+ * Collimated beam extinction with projector aperture loss:
+ * T_direct = exp(-kappa * sc * f_loss * d_eff * gap).
+ * - kappa = vec3f(0.85, 0.95, 1.20): casein micelles (50-300 nm) exhibit
+ *   Rayleigh-Gans scattering (~lambda^-1.5), scattering blue more than red
+ *   and giving transmitted light a warm cast (tR > tB).
+ * - f_loss = 0.90: f/2.0 projector lens collects ~10% of forward-scattered
+ *   light, losing 90% out of the lens pupil (PLAN 18j).
+ * - d_eff = 1.0 mm: shortcut for the effective optical thickness of the
+ *   illuminated liquid layer in show conditions (diluted emulsion).
+ * Forward lobe halo: fwd = (halo * 0.08) * exp(-sc * 0.6) * vec3f(1.05, 1.0, 0.92)
+ * adds forward-scattered light collected by the lens. Just outside the pool
+ * boundary (sc ~ 0, halo > 0), this adds light on top of the unattenuated
+ * beam, forming a soft bright forward halo (T > 1.0).
+ */
+fn milkTransmission(tIn: vec3f, vtex: texture_2d<f32>, fuv: vec2f, gap: f32) -> vec3f {
+  let sc = max(0.0, tex2(vtex, fuv).a);
+  let halo = milkScatterHalo(vtex, fuv);
+  if (sc <= 0.001 && halo <= 0.001) { return tIn; }
+  let ext = exp(-vec3f(0.85, 0.95, 1.20) * (sc * 0.90) * gap);
+  let fwd = (halo * 0.08) * exp(-sc * 0.6) * vec3f(1.05, 1.0, 0.92);
+  return tIn * ext + fwd;
 }
 `;
 
@@ -2219,6 +2287,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     strength. With no film this is 1, exactly, and nothing changes.
   */
   gapScale *= 1.0 - view.film;
+  let layerGap0 = gapScale;
   filmWater = 1.0 - view.film;
   var fluid0 = decodeFluidParts(layer0, parts0, fuv0, blurFluid, useBlur, dof);
   gapScale = 1.0;
@@ -2300,7 +2369,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var film0 = fluid0.a;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
-    fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
+    let gd0 = grainedDepth(bare0, grain);
+    fluid0.a = min(1.0, fluid0.a * gd0);
     more0 *= grain;
   }
 
@@ -2397,8 +2467,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     outColor += vec3f(1.0, 0.98, 0.95) * sb * a * (0.35 + 0.6 * fres);
     outColor += vec3f(0.95, 0.97, 1.0) * fres * a * 0.18;
   } else {
+    let sc0 = max(0.0, tex2(vel0, fuv0).a);
+    let t0 = milkTransmission(through0, vel0, fuv0, layerGap0);
+    milkScatter = sc0;
+    milkGap = layerGap0;
     outColor = onGround(outColor, fluid0,
-      throughScaled(through0, more0) * reliefOf(fluid0.rgb, tint0, alpha0));
+      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4), film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0));
+    milkScatter = 0.0;
 
     /*
       The second phase, over the dye it is moving through (H7).
@@ -2770,10 +2845,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;
     var more1 = 1.0;   // throughScaled
+    var lampMore1 = 1.0;
     if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
       more1 *= dish1.x;
+      lampMore1 *= dish1.x;
     }
 
     let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
@@ -2785,8 +2862,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // The grain after the edge, not before it: see the front plate's.
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
+      let gd1 = grainedDepth(bare1, grain);
+      fluid1.a = min(1.0, fluid1.a * gd1);
       more1 *= grain;
+      lampMore1 *= gd1;
     }
 
     let sharp1 = dof < 0.55;
@@ -2845,7 +2924,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       outColor = blendRow(outColor, fluid1.rgb, fluid1.a, bm);
     } else {
       let blended = applyBlend(outColor, fluid1.rgb, U.blendMode);
-      let painted1 = mix(outColor, blended, fluid1.a);
+      var painted1 = mix(outColor, blended, fluid1.a);
+      let sc1 = max(0.0, tex2(vel1, fuv1).a);
+      if (sc1 > 0.001) {
+        let rKM1 = milkDiffuseReflectance(sc1, layerGap0);
+        let effBg1 = mix(outColor, vec3f(1.0), rKM1);
+        painted1 = mix(effBg1, blended, fluid1.a);
+      }
+      let t1 = milkTransmission(through1, vel1, fuv1, layerGap0);
       /*
         On a lamp ground the back plate is a second filter in the light's
         path, whatever the look's Blend Mode says (a mixer row's own blend,
@@ -2854,7 +2940,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         how much of its dye is in the path (throughScaled).
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(through1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let lit1 = outColor * throughScaled(t1, lampMore1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
         outColor = painted1;

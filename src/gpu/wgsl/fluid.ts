@@ -1690,6 +1690,105 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, (textureLoad(x0, p, 0) + A.a * s) * A.b);
 }`,
 
+  /*
+    18h. Dye spreads along the flow (pre-asymptotic shear dispersion) plus molecular diffusion:
+    In a Hele-Shaw cell on show timescales (t ≪ h²/Dm ≈ 25 hours), flow has not reached
+    the asymptotic Taylor–Aris regime. Parabolic Poiseuille shear across the gap creates
+    unsteady longitudinal spreading with variance σ² ≈ 0.2 |u|² Δt².
+    Shortcut: depth-averaged 2D solver models this as an anisotropic flux tensor along u⊗u
+    with cap 0.25 cells²/step (von Neumann stability limit).
+    Cross-term fluxes are limited to maintain strict positivity, exactly conserving dye mass.
+  */
+  dyeDisperse: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+fn getDye(p: vec2i, n: i32) -> vec4f {
+  return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1)), 0);
+}
+
+fn getDisp(p: vec2i, n: i32) -> vec3f {
+  let q = clamp(p, vec2i(0), vec2i(n - 1));
+  let v = textureLoad(vel, q, 0).xy * A.a.w;
+  let gapVal = clamp(textureLoad(sq, q, 0).r, 0.004, 0.06);
+  let gapRel = gapVal / A.a.z;
+  let dm = A.a.x;
+  let kappaT = A.a.y;
+  let v2 = dot(v, v);
+  let shear = kappaT * gapRel * gapRel * v2;
+  let shearLim = min(shear, max(0.0, A.b.x - dm));
+  let fac = select(0.0, shearLim / max(v2, 1e-9), v2 > 1e-9);
+  return vec3f(
+    dm + fac * v.x * v.x,
+    dm + fac * v.y * v.y,
+    fac * v.x * v.y
+  );
+}
+
+fn fluxX(p: vec2i, DL: vec3f, DR: vec3f, n: i32) -> vec4f {
+  if (p.x < 0 || p.x >= n - 1 || p.y < 0 || p.y >= n) {
+    return vec4f(0.0);
+  }
+  let pR = p + vec2i(1, 0);
+  let Dxx = 0.5 * (DL.x + DR.x);
+  let Dxy = 0.5 * (DL.z + DR.z);
+  let cL = getDye(p, n);
+  let cR = getDye(pR, n);
+  let dc_dx = cR - cL;
+  let dc_dy = 0.25 * (
+    (getDye(p + vec2i(0, 1), n) - getDye(p - vec2i(0, 1), n)) +
+    (getDye(pR + vec2i(0, 1), n) - getDye(pR - vec2i(0, 1), n))
+  );
+  let prim = Dxx * dc_dx;
+  let cross = Dxy * dc_dy;
+  // Positivity-preserving cross-term limiter: bounds cross flux to 0.5 of primary flux magnitude,
+  // preventing cross-derivatives from pulling cell values negative or creating dye.
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
+}
+
+fn fluxY(p: vec2i, DB: vec3f, DT: vec3f, n: i32) -> vec4f {
+  if (p.y < 0 || p.y >= n - 1 || p.x < 0 || p.x >= n) {
+    return vec4f(0.0);
+  }
+  let pT = p + vec2i(0, 1);
+  let Dyx = 0.5 * (DB.z + DT.z);
+  let Dyy = 0.5 * (DB.y + DT.y);
+  let cB = getDye(p, n);
+  let cT = getDye(pT, n);
+  let dc_dy = cT - cB;
+  let dc_dx = 0.25 * (
+    (getDye(p + vec2i(1, 0), n) - getDye(p - vec2i(1, 0), n)) +
+    (getDye(pT + vec2i(1, 0), n) - getDye(pT - vec2i(1, 0), n))
+  );
+  let prim = Dyy * dc_dy;
+  let cross = Dyx * dc_dx;
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
+}
+
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let Dc = getDisp(p, n);
+  let De = getDisp(p + vec2i(1, 0), n);
+  let Dw = getDisp(p - vec2i(1, 0), n);
+  let Dn = getDisp(p + vec2i(0, 1), n);
+  let Ds = getDisp(p - vec2i(0, 1), n);
+
+  let fE = fluxX(p, Dc, De, n);
+  let fW = fluxX(p - vec2i(1, 0), Dw, Dc, n);
+  let fN = fluxY(p, Dc, Dn, n);
+  let fS = fluxY(p - vec2i(0, 1), Ds, Dc, n);
+  let netFlux = -(fE - fW + fN - fS);
+  let here = getDye(p, n);
+  let out = here + netFlux;
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
+}`,
+
   // The velocity's divergence, with the wall's ghost cells (velG in the GLSL).
   /*
     The divergence the projection solves, with the air pushing on it (H6 · A).
@@ -2735,8 +2834,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and the rim, in one kernel.
 
     A pour of volume (A.b.w 1, PLAN 18c) adds a share f of the column, a
-    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water), ρ,
-    n) in the four channels, each the share-weighted sum the carry
+    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water),
+    μs′ scatter, n) in the four channels, each the share-weighted sum the carry
     conserves. Added, not mixed in: the pour's volume goes into the thin
     solve as a source (pourVolume), and in that step the flow it makes
     carries f of the column out of the cell, which the flux-form carry
@@ -2754,7 +2853,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     middle has gone over the dish's open rim and is taken off.
 
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
-    density, index, the mode; the rim's radius for the rim).
+    scatter, index, the mode; the rim's radius for the rim).
   */
   liquidSplat0: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -3099,7 +3198,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
-    host's 'dye diffuse' stage). In: the whole dye and the oil's share, both
+    host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused
     with the oil's put back as it was (A.a.w = 0), or the oil's share as it
     was (A.a.w = 1).

@@ -283,7 +283,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
                 aria-label={id === 'front' ? `${info.name}'s fade time and grade: brightness, contrast, saturation, hue` : `${info.name}'s blend, fade time and grade`}
                 className={`flex shrink-0 items-center gap-1 rounded-md px-2 text-[12px] transition-colors hover:bg-hover ${
                   touch ? 'h-12' : 'h-7'
-                } ${graded ? 'text-accent-text' : 'text-text-2'}`}
+                } ${graded ? 'border border-accent-border bg-accent-bg text-accent-text' : 'border border-transparent text-text-2'}`}
                 data-testid={`${testId}-${id}-open`}
               >
                 {graded ? 'Graded' : 'Grade'}

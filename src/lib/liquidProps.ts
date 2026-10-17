@@ -33,7 +33,7 @@ import type { LiquidBehaviour } from '../types';
 import { DISH_METRES, DISH_REST_GAP } from './turntable.ts';
 
 /** What speciesOf reads of a bottle: its behaviour, or the deposit made from it (lib/liquidPhase.ts). */
-type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index'>;
+type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index' | 'scatter'>;
 
 /** Water's kinematic viscosity, m²/s: Thickness 0 (thinGapViscosity). */
 export const WATER_NU = 1e-6;
@@ -66,6 +66,8 @@ export interface Species {
   density: number;
   /** Refractive index. */
   index: number;
+  /** Reduced scattering coefficient μs′, 1/mm. */
+  scatter: number;
 }
 
 /**
@@ -80,7 +82,8 @@ export interface Species {
 export function speciesOf(what: Poured | undefined): Species | null {
   if (!what || (what.magnetic ?? 0) > 0 || (what.polarity ?? 0) <= -0.5) return null;
   const body = what.body ?? 0;
-  if (!(what.viscosity && what.viscosity > 0) && !(body > 0)) return null;
+  const scatter = what.scatter ?? 0;
+  if (!(what.viscosity && what.viscosity > 0) && !(body > 0) && !(scatter > 0)) return null;
   const density = what.density && what.density > 0 ? what.density : 1 + (what.weight ?? 0);
   const lnNu = what.viscosity && what.viscosity > 0
     ? Math.log((what.viscosity / density) * 1e-6 / WATER_NU)
@@ -91,7 +94,7 @@ export function speciesOf(what: Poured | undefined): Species | null {
     is thinner than water by more than alcohol's few percent, which on a
     plate whose clear liquid is water is no contrast at all.
   */
-  return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333 };
+  return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333, scatter };
 }
 
 /*
