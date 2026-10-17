@@ -223,7 +223,7 @@ try {
     await page.waitForFunction(() => (window.__band?.()?.at ?? 0) >= 20, null, { timeout: 40_000 }).catch(() => {});
     const taggedAt = Date.now();
     await tag(page, BAND);
-    await page.click('[data-testid="track-button"]');
+    await page.click('[data-testid="track-panel-button"]');
     const line = page.getByTestId('track-follow');
     const sure = await until(line, SURE(null), 40_000);
     check('track panel, the band\'s song: under its playhead, following the map, at least 50% sure', SURE(null).test(sure) && pctOf(sure) >= 50, sure || 'no line');

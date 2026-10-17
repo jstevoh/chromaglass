@@ -5973,7 +5973,6 @@ export default function App() {
               showTrackPanel ? 'bg-accent text-white' : 'hover:bg-white/10 text-white/60'
             }`}
             title={musicIntel.state.track ? `${musicIntel.state.track.title} — ${musicIntel.state.track.artist}` : 'Track intelligence'}
-            data-testid="track-button"
           >
             <Music size={14} />
             {musicIntel.state.track && !showTrackPanel && (
