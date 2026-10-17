@@ -5045,6 +5045,19 @@ commit. *Size:* S.
   dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
   so the rim needs a check of its own: a pool held against the rim by the magnet, its
   total read every second. Physics lane.
+- **19v-3. The magnet check's second press landed on the plate bar.** **Shipped**
+  (2026-10-17): Save's changed-look dot takes no width, so the bar at 1280 no longer wraps
+  when a look changes and the plate stays under the hand. `layout` and `magnet` each ask it
+  now. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+- **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
+  Found with 19v-3. In Build at 1280 × 800 the bar's children and gaps take 935–936 px of
+  its 936, the name already down to its 120 px floor. Record's labels change width while it
+  runs: "■ Stop video · 0:00" is 70 px wider than "● Video", "■ Stop · 0:00" 25 px wider
+  than "● Record", so starting a take drops the plate by a row (about 42 px) mid-show, and
+  any text that renders a pixel wider (Geist arriving late, another platform's fallback)
+  does it at rest. Give the record buttons a fixed width for their longest label (or show
+  the running time outside the bar), and give the bar some slack at 1280; extend the
+  `layout` line from 19v-3 to start and stop a take. Desk lane.
 
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
