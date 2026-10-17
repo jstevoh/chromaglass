@@ -41,7 +41,7 @@ export const BEFORE_LAMP = {
       edit('lamp grounds', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ lampBg = [^\n]*\}/g, '', 1);
       edit('front plate levels', /mixLevelled\(groundOf\(bgColor\)/g, 'mixLevelled(bgColor', 1);
       edit('decodes through the lamp', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ dyeThrough = [^\n]*\}/g, '', 2);
-      edit('back plates through the lamp', /if \(U\.lampGround > 0\.001\) \{\n\s*let lit1[\s\S]*?\} else \{\n\s*outColor = painted1;\n\s*\}/g, 'outColor = painted1;', 1);
+      edit('back plates through the lamp', /if \(U\.lampGround > 0\.001\) \{[\s\S]*?\} else \{\n\s*outColor = painted1;\n\s*\}/g, 'outColor = painted1;', 1);
       // Each call site of the two composites back to the mix it was.
       for (const [fn, n, to] of [
         ['chemOnGround', 3, (x) => x[1]],

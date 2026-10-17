@@ -125,6 +125,8 @@ try {
     await lab.create(128); lab.dye(0.4, 0.5, 0.15, BLUE, 0.5); lab.flush(); await lab.step(1);
     out.offOne = await r({ lampGround: 1 });
     out.offTwo = await r({ lampGround: 1, layerCount: 2 }, { backPlate: true, backRotation: Math.PI });
+    out.offTwoAdd = await r({ lampGround: 1, layerCount: 2, twoProjectors: 1 }, { backPlate: true, backRotation: Math.PI });
+
     // 6. The photograph.
     // With both lamps up: the hot-spots are the one lamp-ground line the
     // photograph's branches do not skip on their own.
@@ -237,21 +239,31 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
   // mirror of each point, so the light is the lamp times what the front
   // lets through here and what the back lets through there.
   const mirror = (x, y) => [S - 1 - x, S - 1 - y];
-  let err = 0, n = 0, front = 0, back = 0, both = 0;
+  let err = 0, errAdd = 0, n = 0, front = 0, back = 0, both = 0;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const [mx, my] = mirror(x, y);
     const lampHere = px(shots.bare, x, y), lampThere = px(shots.bare, mx, my);
     const tHere = px(shots.offOne, x, y).map((v, c) => v / Math.max(1, lampHere[c]));
     const tThere = px(shots.offOne, mx, my).map((v, c) => v / Math.max(1, lampThere[c]));
     const got = px(shots.offTwo, x, y);
+    const gotAdd = px(shots.offTwoAdd, x, y);
     const tH = lum(tHere), tT = lum(tThere);
     if (tH > 0.9 && tT > 0.9) continue;            // clear glass in both: nothing to read
     if (tH < 0.7 && tT > 0.95) front++; else if (tT < 0.7 && tH > 0.95) back++; else if (tH < 0.7 && tT < 0.7) both++;
-    for (let c = 0; c < 3; c++) { err += Math.abs(got[c] - lampHere[c] * tHere[c] * tThere[c]); n++; }
+    for (let c = 0; c < 3; c++) {
+      err += Math.abs(got[c] - lampHere[c] * tHere[c] * tThere[c]);
+      let expected = (lampHere[c] * tHere[c] + lampHere[c] * tThere[c]) * 0.5;
+      errAdd += Math.abs(gotAdd[c] - expected);
+      n++;
+    }
   }
   check('the lamp through the back plate and the front is the product of what each lets through, each where its own dye is',
     n > 0 && err / n <= 2 && front > 50 && back > 50 && both > 50,
     `mean error ${f2(err / Math.max(1, n))} over ${n} readings; ${front} pixels under the front's dye alone, ${back} under the back's, ${both} under both`);
+  check('two projectors add their light: each filtered by its own plate, from a lamp dimmed to half',
+    n > 0 && errAdd / n <= 2,
+    `mean error ${f2(errAdd / Math.max(1, n))} over ${n} readings`);
+
 }
 
 // ── 6. Halfway ───────────────────────────────────────────────────────

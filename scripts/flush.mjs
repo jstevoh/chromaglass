@@ -48,6 +48,13 @@
  *      clear liquid again, its share under 0.05.
  *   5. And the app's held stream, on the CPU: a second of a held Dropper
  *      pours 0.5 mL (HELD_POUR), no step of it clipped at a whole column.
+ *   6. A dish of colour flushed with water: a quarter of the dish's volume
+ *      of water poured at the middle pushes a quarter of the colour over
+ *      the rim and leaves the rest, 0.75 of the dish, to 4% (PLAN 18g).
+ *   7. And the middle of the flushed dish of colour is clear liquid again,
+ *      its density under 0.05.
+ *   8. Colour does not fade in a still dish on a thin gap: over 30 steps
+ *      with no pours, total dye is conserved to 0.5% (ratio 1.000).
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -115,6 +122,17 @@ try {
       }
       return { total: total / (N * N), mid: mid / Math.max(1, midCells), most, r2: r2 / Math.max(total, 1e-9) };
     };
+    const dyeShares = async () => {
+      const d = await lab.field('dye');
+      let total = 0, mid = 0, midCells = 0, most = 0, r2 = 0;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const v = d[(i + j * N) * 4 + 3];
+        const x = (i + 0.5) / N - 0.5, y = (j + 0.5) / N - 0.5;
+        total += v; most = Math.max(most, v); r2 += v * (x * x + y * y);
+        if (Math.hypot((i + 0.5) / N - 0.5, (j + 0.5) / N - 0.5) < 0.04) { mid += v; midCells++; }
+      }
+      return { total: total / (N * N), mid: mid / Math.max(1, midCells), most, r2: r2 / Math.max(total, 1e-9) };
+    };
     // 1. The ring, pushed by water poured at the middle, and the same pours with no volume.
     const RP = 0.04, TAKE = 1, POURS = 40;
     for (const volume of [true, false]) {
@@ -160,6 +178,34 @@ try {
       const after = await shares();
       out.flush = { full, after, dish, V: n * domeOf(FP, 1), pours: n };
     }
+    // 6, 7. A dish of colour flushed with water: colour leaves by being pushed out of the rim.
+    {
+      await fresh();
+      lab.dyeDisc(0.5, 0.5, 0.75, [1, 0, 0], 1);
+      lab.flush();
+      await lab.step(1, STILL);
+      const full = await dyeShares();
+      const dish = Math.PI * 0.25;
+      const FP = 0.05, n = Math.round(dish / 4 / domeOf(FP, 1));
+      for (let k = 0; k < n; k++) {
+        lab.addSpecies(0.5, 0.5, FP, 1, 'water', true);
+        await lab.step(1, STILL);
+      }
+      await lab.step(5, STILL);
+      const after = await dyeShares();
+      out.dyeFlush = { full, after, dish, V: n * domeOf(FP, 1), pours: n };
+    }
+    // 8. Colour does not fade in a still dish: over 30 steps with no pours, dye is conserved.
+    {
+      await fresh();
+      lab.dyeDisc(0.5, 0.5, 0.3, [1, 0, 0], 1);
+      lab.flush();
+      await lab.step(1, STILL);
+      const before = await dyeShares();
+      await lab.step(30, STILL);
+      const after = await dyeShares();
+      out.dyeStill = { before, after };
+    }
     return out;
   });
 
@@ -180,6 +226,20 @@ try {
     `the dish ${f(insideFull)} glycerine; ${fl.pours} pours of water, ${f(fl.V / fl.dish)} of its volume, leave ${f(left)} of it (the volume says ${f(wantLeft)}; with 18d-1's fade it would have been less, with no rim more)`);
   check('the middle of the flushed dish is clear liquid again', fl.after.mid < 0.05,
     `glycerine's share at the middle ${f(fl.after.mid)} (it was ${f(fl.full.mid)})`);
+
+  const dfl = r.dyeFlush;
+  const dyeInsideFull = dfl.full.total / dfl.dish, dyeLeft = dfl.after.total / dfl.full.total, dyeWantLeft = 1 - dfl.V / dfl.dish;
+  check('a quarter of the dish of water pushes a quarter of the colour over the rim',
+    Math.abs(dyeInsideFull - 1) < 0.02 && Math.abs(dyeLeft / dyeWantLeft - 1) < 0.04,
+    `the dish ${f(dyeInsideFull)} colour; ${dfl.pours} pours of water, ${f(dfl.V / dfl.dish)} of its volume, leave ${f(dyeLeft)} of it (the volume says ${f(dyeWantLeft)})`);
+  check('the middle of the flushed dish of colour is clear liquid again', dfl.after.mid < 0.05,
+    `colour's density at the middle ${f(dfl.after.mid)} (it was ${f(dfl.full.mid)})`);
+
+  const dst = r.dyeStill;
+  const stillRatio = dst.after.total / dst.before.total;
+  check('colour does not fade in a still dish on a thin gap', Math.abs(stillRatio - 1) < 0.005,
+    `30 steps still: dye ${f(dst.before.total, 5)} → ${f(dst.after.total, 5)} (${f(stillRatio, 4)})`);
+
   check('no GPU pass failed validation (a stage that never ran would read as an unmoved ring)', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the lab ran', false, e.message.slice(0, 300));

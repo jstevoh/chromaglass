@@ -96,9 +96,11 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 
 ### Wave 1. Nothing at a gig can stop the show or hand it to a stranger
 
-- **1.1** **14m, then 14o** (A, M then S): the show key to loopback only, long and timing-safe,
+- **1.1** ~~**14m, then 14o**~~ (A, M then S): the show key to loopback only, long and timing-safe,
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
-  and limits, with the report Worker's (`docs/crash-plan.md`).
+  and limits. **Shipped, this PR** (`npm run showkey` 11 of 33 → 33 of 33, `npm run
+  fingerprint-worker` 7 → 19 of 19). Left: 14m-guest, 14m-tunnel, 14m-mark, 14m-lan,
+  14m-budget, 14o-count, 14o-smoke.
 - **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
@@ -201,7 +203,7 @@ Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back
 (M); **5-actions** (S); **11-pinch** (S).
 
 Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the load-in card
-(S); **14m-guest** (M, after 1.1); **31b** a warp grid for curved walls (M, §31).
+(S); **14m-guest** (M), **14m-tunnel** (S, the Mac), **14m-mark** (S); **31b** a warp grid for curved walls (M, §31).
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
@@ -220,7 +222,7 @@ style (§31).
   it), then **18f** heat from the lamp (which unblocks 10.6
   and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
-  **18g** colour leaves by flushing and **18k-spray**.
+  ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
 - **6.4** **18e** edges from refraction (which is #219's 20d), then **31a** the projector's
   focus across the two dishes and **31d** colour at a defocused edge (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
@@ -329,6 +331,27 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
+- ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
+  Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
+  the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
+  are drawn in all, one of them the design's (the owner, 2026-10-11, with a screenshot).~~
+  **Fixed, #381** (the check first, then Antigravity's build, briefed in
+  `docs/handoff-switches.md`): `npm run switches` reads every control that says a state in
+  both states, on the desk's five layouts, every Settings section, the panels the palette
+  opens, the phone with each sheet open, Play with its sheet and the remote, and holds a
+  knob against its track to 3:1, on against off to ΔE 20, a switch's on track to the
+  accent and the switch to saying its state; a switch that will not flip is red, and each
+  surface needs a floor of controls that changed state when clicked. 429 controls and 16
+  under the bar before; after, 451 assertions green, 0 under the bar, 498 controls found
+  (403 on the desk, 86 on the phone, 9 on the remote) and 374 of the desk's flipped.
+  Every switch is now the one `SwitchPill` (`ui/index.tsx`),
+  in `Toggle`'s row or in a row of its own; the phone dock's lit sheet button, the Play
+  screen's pressed pills and the mixer's Graded take the accent trio; the Wall's chips
+  keep their white-when-on style and now say their state; the swatches, the sequencer's
+  stages, the Record panel's tabs and options and the MIDI panel's banks and tabs say
+  theirs with `aria`. Two undeclared changes in the build were put back in review: the
+  desk's tab order, and a Play sheet that opened itself on a `?debug` visit (the check's
+  URL; the app must not know it).
 - ~~**QA-20** Blow amount isn't sensitive enough.~~ **Fixed, #346**: the moving wind
   laid two bubbles every sixth step whatever the Amount (ten spawns a second at 60
   steps, twenty at 120), and each bubble pumps the colour out from under it; the
@@ -3012,72 +3035,59 @@ step's cost `docs/webgpu-plan.md` H2c, the report Worker's limits `docs/crash-pl
 the room's lights, a load-in card and the show kit `docs/rig-plan.md` (R4, R5, R8), and
 the checks and the build §19.
 
-### 14m. Anyone on the venue's network can drive the show
+### ~~14m. Anyone on the venue's network can drive the show~~
 
-**Read in the code** (`server/remote-server.js` unless named).
+**Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
+Left open from it:
 
-- The show key is four random digits (`SHOW_KEY`), about 13 bits, compared with `!==`,
-  and a wrong `hello` only closes that socket: nothing counts failures or slows the next
-  try. Through `npm run tunnel` the 9,000 keys fall in minutes.
-- On the LAN it need not be guessed. `/remote-info.json` hands the key to any request
-  without `x-forwarded-for` or `cf-connecting-ip` (`isLocalRequest`), which is every
-  device on the venue's Wi-Fi, not only the machine `remoteProtocol.ts` says it is for.
-  The socket checks no Origin or Host either, so a web page open on any phone in the
-  room can reach `ws://<laptop>:3000/remote-ws`.
-- With the key, a `hello` as `display` receives every phone's commands, and can push
-  `state` and `cast` to the phones and to the network display on the wall, set the
-  Art-Net `lights`, and toggle Record and Blackout.
-- Frames are taken up to the `ws` default of 100 MiB (`new WebSocketServer({ server,
-  path })`); the 512 KB limit is checked after the frame is buffered and made a string.
-  A socket that never says hello is never closed, and nothing caps connections. A few
-  large frames stop the Node process, and every phone, network display, OSC and Art-Net
-  with it.
-- A restart with the generated key answers every phone and network display `denied`,
-  and `useRemoteLink.ts` stops retrying for good on that, though the server's comment
-  says it is restartable mid-show.
-- Art-Net in reads every universe but its own output (`packet.universe ===
-  artnet.universe` is the only filter) into one `seen` map, so on a rig with four
-  universes each mapped setting jumps between their values. A non-numeric `ARTNET_RATE`
-  makes the rate `NaN`, and `setInterval(…, NaN)` sends every millisecond.
+- **14m-guest** (*proposed*, M): a **guest key**, now that the server has roles: a key
+  whose socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto
+  a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
+  tablet, a second projectionist, or at a party the audience's phones through a QR code
+  on a card. *Measure:* `npm run showkey`: a guest socket's `patch` is dropped.
+- **14m-tunnel** (S, the Mac): behind `npm run tunnel` the server counts each phone by
+  `cf-connecting-ip`, so tunnel phones no longer share one address's caps and lock; but
+  the upgrade's Origin check assumes the tunnel passes the phone's Host and Origin through
+  unchanged, which no cloud session can confirm (`npm run showkey` asks it with the
+  headers cloudflared is documented to send). *Measure:* on the Mac, a phone through the
+  tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
+- **14m-mark** (S): the relay now closes a socket on a frame over 512 KB, so the laptop
+  drops any message that large rather than lose its link (`useRemoteLink.ts`). The
+  cast's `mark` carries the logo as a data URL, and a big PNG logo is over that: the
+  wall then shows no logo where it used to. *Fix:* scale the mark to the wall's size
+  and send it as JPEG or WebP under 400 KB before casting. *Measure:* `npm run showkey`
+  or `remotemix`: a 2 MB logo reaches the network display.
 
-*Fix:* the key only to a loopback `req.socket.remoteAddress`, and an Origin check on the
-upgrade; a longer key from `crypto.randomInt`, compared with `timingSafeEqual`, and an
-address locked out after a few wrong hellos; a display key apart from the phones', so a
-phone's key cannot take the display role; `maxPayload: 512 * 1024`, a 5 s deadline for
-the hello and a cap per address; the generated key kept in a file beside the server, so
-a restart keeps it; an input universe, and the `ARTNET_*` numbers validated. The phone's
-join and the iPhone app's laptop remote (`appLink.ts`) must keep working.
-
-Once the server has roles, a **guest key** is a small step (*proposed*): a key whose
-socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto a
-chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
-tablet, a second projectionist, or at a party the audience's phones through a QR code
-on a card.
-
-*Measure:* extend `npm run remotemix`: a request from a LAN address gets no key; three
-wrong keys lock the address out; a 1 MB frame is refused without the process growing; a
-silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
-socket's `patch` is dropped.
+- **14m-lan** (S): the laptop's own page opened at its Wi-Fi address (not `localhost`)
+  is not handed the display key, by design, so it stays off the relay and phones see no
+  laptop. It now stays quiet rather than knock with no key. *Fix:* the desk says "open
+  this page at localhost to link phones" when a relay answers and gives it no key.
+  *Measure:* `npm run phonelink`: that page shows the words and opens no socket.
+- **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
+  address, the server refuses new joins from everyone but the laptop for 60 s. That is
+  what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years
+  for an eight-digit key; the cost is that a script with a dozen addresses can keep new
+  phones out (phones already in, the laptop and its display are untouched). If a venue
+  ever meets that, the fix is a longer key for the tunnel, not a looser budget.
 
 ### ~~14n. One malformed message can end the plate~~
 
 **Shipped, #322.** Story in `docs/plan-shipped.md`.
 
-### 14o. The song-ID Worker is open to anyone
+### ~~14o. The song-ID Worker is open to anyone~~
 
-**Read in the code.** `server/fingerprint-worker.js` answers any origin
-(`Access-Control-Allow-Origin: *`) with no key and no rate limit, and its URL is built
-into the public bundle (`VITE_FINGERPRINT_PROXY_URL`, `deploy.yml`). Anyone who reads
-the bundle can identify songs on the owner's AudD or ACRCloud account, from a script or
-from their own site. It also parses the whole multipart body (`request.formData()`)
-before its 2 MB check. The report Worker already has what this one lacks
-(`ALLOWED_ORIGINS`, a per-address limit in KV; `docs/crash-plan.md`).
+**Shipped, this PR** (`npm run fingerprint-worker`: 7 of 19 on the old Worker, 19 of 19 now).
+Story in `docs/plan-shipped.md`. Left open from it:
 
-*Fix:* the same origin list and per-address limit (per /64 on IPv6), a refusal on
-`Content-Length` before parsing, and a daily ceiling that answers "busy" rather than
-spending. The show's own origins (the site, the show server, the Mac app) stay allowed.
-*Measure:* a node harness in the manner of `npm run report-worker`: a foreign origin
-refused, the 31st request in an hour refused, a 3 MB body refused before `formData()`.
+- **14o-count** (S): the counters are in Workers KV, which takes one write a second per
+  key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
+  free plan meters about 500 lookups a day, and a second lookup from one address in the
+  same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
+  (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
+  plan's quota. *Measure:* the same harness with a store that allows one write a second.
+- **14o-smoke** (S, the owner): after creating `FINGERPRINT_LIMITS` and redeploying the
+  Worker, identify one song from the site and see it named. Nothing in CI reaches the
+  deployed Worker.
 
 ### 14p. Show night runs whatever merged last
 
@@ -3894,7 +3904,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
-| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
+| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362); 18g-2..5 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
@@ -4201,6 +4211,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   blue). Dividing it by its peak dimmed the whole plate by 1/1.4 away from it, which
   is worse; a second lamp on a lamp ground wants its light added, not multiplied. Each wants a case
   in the check, or a reason it does not need one.
+- **18b-10. Two projectors.** *Shipped (behind Two Projectors, on in Fillmore; `npm run lamp`).*
+  The Two Projectors setting models two projectors aimed at the same screen, each
+  filtered by its own plate. Shortcut: each projector's exposure is simply halved
+  (exposure normalisation) so clear glass stays at one lamp's level. Outside the back
+  plate's disc, the second projector still lights the screen there.
 
 ### 18c. A pour adds liquid, not only colour
 
@@ -4404,6 +4419,14 @@ its frame rate live. "Free" means no new passes or texture reads.
   on (heat with a strength). Turbulence stays as the declared stir dial.
 
 ### 18g. Colour leaves by flushing, not by fading
+
+**18g-1 shipped** (the open circular rim, $r \ge 0.5$, into the overflow trough; `npm run flush`, story in `docs/plan-shipped.md` §18g; #362). The rest of 18g is these items, each its own PR:
+
+- ~~**18g-1**~~ Flushing, not fading: the open rim (#362). Dye is flushed out over $r \ge 0.5$ on a thin gap as pours add volume (`npm run flush`), with zero-flux Neumann boundary conditions across `OPEN_RIM = 0.5` in `dyeDisperse`, `dampGrid` and `slumpStep` so diffusion and grid damping do not bleed dye across the rim, and a radial zero-gradient boundary condition at `OPEN_RIM` in `hsBody` so the cleared trough does not create a spurious buoyancy step at the rim. The dye-budget regulator is kept as a named safety cap pending 18c-2 (pours add volume).
+- **18g-2** airExclude and the standing bubble pump: replace the destructive multiply with volume-fraction exclusion.
+- **18g-3** capDye and solvent evaporation: model real evaporation as solvent loss leaving a coffee ring at the rim, rather than dye loss.
+- **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
+- **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
 
 - **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
   applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's
@@ -5018,6 +5041,19 @@ commit. *Size:* S.
   dish; the check now keeps its drag within 0.25 of the middle, where the old line went,
   so the rim needs a check of its own: a pool held against the rim by the magnet, its
   total read every second. Physics lane.
+- **19v-3. The magnet check's second press landed on the plate bar.** **Shipped**
+  (2026-10-17): Save's changed-look dot takes no width, so the bar at 1280 no longer wraps
+  when a look changes and the plate stays under the hand. `layout` and `magnet` each ask it
+  now. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+- **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
+  Found with 19v-3. In Build at 1280 × 800 the bar's children and gaps take 935–936 px of
+  its 936, the name already down to its 120 px floor. Record's labels change width while it
+  runs: "■ Stop video · 0:00" is 70 px wider than "● Video", "■ Stop · 0:00" 25 px wider
+  than "● Record", so starting a take drops the plate by a row (about 42 px) mid-show, and
+  any text that renders a pixel wider (Geist arriving late, another platform's fallback)
+  does it at rest. Give the record buttons a fixed width for their longest label (or show
+  the running time outside the bar), and give the bar some slack at 1280; extend the
+  `layout` line from 19v-3 to start and stop a take. Desk lane.
 
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
@@ -5292,6 +5328,8 @@ least 2:1 before it meets another.
 - **20c-1. Macro closeup cell field is a look-alike shortcut (retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
 
 - **20c-2. Settings tabs on the phone (shipped in #348's review).** The Settings rail is a strip across the top on a phone, and each tab took its group's whole width and lay under the next group: 13 of the 26 tabs took no tap, Patches among them, so the room's two new patch features (How sudden, How busy lately) could not be reached from a phone. The tabs are full width only in the desk's column now; `npm run phone` taps every tab where it is drawn, and patches each new feature from the phone.
+
+- **20c-3** (S, a check in a cloud session): `npm run phone` with `PW_WEBGPU=1` in a cloud session fails "every tab of the phone's Settings rail takes a tap where it is drawn" on main e679e6d, with 23 of 24 tabs covered (all but Master), while a script that opens the rail alone at 390×844 finds none covered. Something an earlier step leaves open lies over the strip in the full run; find what `elementFromPoint` lands on instead and close it in the check's path, or fix the overlay if a phone would meet it too. Found in 14m's PR, which ran it on main to rule its own diff out.
 
 
 ### 20d. Hairline edges from the optical path (this is 18e)
@@ -5589,7 +5627,9 @@ once the login works (23.14).*
   local `npm run dev`. *Measure:* a check that loads the site build and the app
   build and lists which controls each shows, against the table.
 - **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
-  well as an allowed origin, and the site's manual tag stays. *Measure:* in the
+  well as an allowed origin, and the site's manual tag stays. 14o's gates come first
+  and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
+  fingerprint-worker`); a good key can raise the hour's count, not skip the day's. *Measure:* in the
   manner of `npm run report-worker`: no key refused, a bad signature refused, a good
   key answered.
 - **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
@@ -6183,8 +6223,12 @@ Turing Print" work (#331), which also made the reaction grow at all.
     them when lane G is free (#307 held it), and drop the file's exemption in `npm run
     plate`'s retired-id walk.
   - Fillmore East is nearly black on the Mac (luma 0.05 at 40 s) with Dye Budget at 0.5
-    as at 0.9; find what darkens it (its layers' blend, the lamp's grade) before tuning
-    another setting.
+    as at 0.9. Found (28d, lab): on the lamp the back plate is a second filter in the same
+    light path whatever the Blend Mode says, and its wash (emerald, purple, cobalt) is the
+    complement of the front's orange, yellow and cherry: luma 0.12 and 60% near black with
+    both plates, 0.48 and none with the front alone. The owner (2026-10-11) chose to wait
+    for 18b-5 (two projectors whose light adds on the screen) rather than drop the second
+    plate.
   - Still flat on the Mac and not retuned here: Oil Wheel (motion 0.003, a dark brown
     disc; 18b-8 lists it), Deep Ocean (three bands), Bass Drop (one red: its Squeeze only
     shows with a kick). Crowd Plate is
@@ -6197,6 +6241,110 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (Double Diffusion at 1 on a still upright plate), Saffman–Taylor fingering (water
     into glycerine in the Thin Gap), a pantry dish of the liquids' natural colours (needs
     18d-12a: the automation pours colourless).
+- **28d. The looks watched as shows, and the controls ranked** (the owner, 2026-10-10:
+  "take a look at the visuals, create galleries, watch the streaming shows, and optimize
+  the controls and presets", the shows being "real light show videos from our app").
+  - *Showreel* (in progress): `npm run showreel` renders every look through the app's own
+    Render a song (`window.chromaglassRender`, as `npm run render-app` checks it) to the
+    same minute of a real record, on seed 1, and watches each clip as the film does.
+    `showreel.yml`, by hand or a PR labelled `showreel`, six Mac runners. The song is
+    Funkorama (Kevin MacLeod, CC BY 4.0), downloaded by the workflow and held to its hash:
+    the shipped library is ambient and a light show is judged on a band.
+  - *Before* (the film of 2026-10-07, 41 looks, band in a box): against the real shows'
+    2-3 swells a minute and ~9 colour changes a minute, 18 looks swelled 0.0 a minute and
+    30 changed colour 0.0 a minute; motion followed loudness second by second (r 0.34-0.67
+    on all but Fractal Dream) where the real shows follow it only over sections (r -0.13
+    to 0.22).
+  - Then: a gallery of stills and clips, the controls ranked by how much each visibly
+    changes the plate (`controls.yml`), and a ranked list of looks to fix or retire and
+    controls to bring forward, for the owner to pick; each pick its own PR.
+  - *Found* (the showreel of 2026-10-10, 41 looks): 28 move more in the breakdown than
+    in the groove; ten open on black and lose at least half of it by 30 s; nine draw
+    hairline combed lines inside the bodies; six sit on white or cream. The owner
+    (2026-10-11) chose to fix every look and retire none. The black and the combed lines
+    are Antigravity's, written up with times in `docs/showreel-findings.md`; the
+    breakdown, Classic, the five dim looks and the four untrue names are Claude's.
+  - *Fixed here* (lab numbers; each still to be judged on a Mac showreel):
+    - Red Cabbage: the pH indicator was a tint over the dye's own purple, which already
+      blocks green, so it never turned green and pink came back purple. The dye now keeps
+      its darkness and takes its pH form's colour (Beer-Lambert; each form three bands, not
+      a spectrum): hues 313-295 (all purple) to 340, 328, 319, 208, 128, 35 from acid to
+      base. Its "washed white for 20 s" is not explained (lead: clear doses on the thin gap).
+    - Chemical Clock: the reaction ran 12 steps of 0.01 a solver step, tied to the step
+      rate: a spiral every 0.73 s. Now on the show clock (0.26 reaction units a second): a
+      20 s period, fronts 0.010 of the plate a second. The dish is red at rest, clear gel.
+      Shortcut: the plate is a ~6 mm patch of the dish, as under a magnifier.
+    - Timbre Shifter: the colour was the clock plus pitch plus timbre, and pitch (6.3 dyes,
+      jumping at every chord) swamped timbre (2.7): one cyan-violet mean. A look whose colour
+      follows timbre now takes it from timbre alone (Cyberpunk Neon, Microscopic Chaos and
+      Jellyfish Bloom route colour to timbre and change too, unjudged); its dish no longer turns
+      with the timbre. Unmeasured until a Mac render.
+    - Oil Wheel: one disc, no brown LED, Lamp Warmth 0.75 to 0.3 (it took a quarter of the
+      blue), and the motor at the half a turn a minute its description says (0.232; it was a
+      turn every 21 minutes). Colorful Cosmos: a deeper paper (bare 0.58 to 0.36 luma; at 0.15 its grain fell under a level). Deep
+      Ocean: a single deep blue LED instead of the cyan 'ocean' ramp (empty plate 0.23 to
+      0.07). Galaxy: five hues instead of two (ice blue, ultramarine, magenta, amber), dye
+      budget 0.35 so it is mostly void.
+    - Left: Fillmore East waits for 18b-5 (28c). Combed lines and lost black are 18e and 18g
+      (`docs/showreel-findings.md`). Oil Wheel's sound patch on its motor goes with 28f.
+    - Left, **Soap Film** (Claude): Thin Film is drawn only where the dye's opacity is under
+      0.4, so on this look (budget 0.5, opacity ~0.94) the interference shows on the first
+      sixteenth of a ramp of dye and the sheet is the look's lavender and magenta. A fix was
+      tried here and taken out: Film Physics drawing the whole film as its own reflected
+      light (`filmTable.ts`, thickness `-ln(1-opacity)` at 414 nm a unit, clear dye, budget
+      0.25) gave Newton's series on a ramp in the lab, but it changes what Film Physics is:
+      `npm run filmlook` holds the setting to recolouring the rim rainbow at the rainbow's
+      brightness (the Mac: 23608 pixels changed outside the rainbow's footprint, film
+      luminance 133 against 40, 4/9). Doing it means a new setting or a redefined Film
+      Physics, with `filmlook` rewritten to the new contract (the check-skeptic on it), the
+      desk and the phone. Not in this PR.
+- **28f. Every look answers the music through its own patches** (the owner, 2026-10-11: use
+  the patch bay so the looks answer the music more by default; the whole plate may move with
+  the music on a small named set of looks, never as the default). Brief and findings in
+  `docs/sound-patches.md`. Step 1: the four patches that never fire (bands names under
+  `source: 'sound'`) and comet's depth of 45; sound to frame motion an opt-in per look on a
+  short list, held by `npm run framesway`; Claude writes the first three looks' patches as
+  the pattern. Step 2: two or three liquid patches per look from what is heard at once (the
+  bands and their onsets; not song shape, which hears a section bars late: the owner,
+  2026-10-11), judged on the showreel (Antigravity).
+- **28g. Follow a known song played live, by what is heard, not by the clock** (the owner,
+  2026-10-11: "if we pre record the shape of the song, how can we map that to a different
+  sounding and sometimes improvisational version of the same song?"). Today a song map
+  (`songMap.ts`) is read by playback position (`sectionAt`, `energyAt`), so it only fits the
+  recording it was made from. Instead: keep the map as sections with each one's harmonic
+  fingerprint (a 12-note chroma profile, which survives a different band, tuning of the mix
+  and instruments) and its energy; follow the live audio by online time warping (as score
+  followers do for live players), so a slower or faster take still lines up; model the song
+  as sections that may repeat, stretch or be skipped (a solo that runs long, a chorus played
+  twice), not as one timeline; and fall back to the live song shape when the match is weak
+  (a jam the map never heard). What it buys: the show knows the chorus is next and can lean
+  into the build before it is heard, where the live song shape hears a section bars late.
+  A map made from the band's own rehearsal or last night's set is the likeliest source.
+
+- **28f. Every look answers the music through its own patches** (the owner, 2026-10-11:
+  use the patch bay so the looks answer the music more by default; the whole plate may
+  move with the music on a small named set of looks, never as the default; and "only use
+  things that we can detect quickly and make changes that are appropriate for the music",
+  so no song-shape sources for the looks). Brief: `docs/sound-patches.md`.
+  - ~~28f-1 the dead patches, the named looks, the hits as a patch source (desk, phone,
+    Sound learn), the first three looks as the pattern~~ (**shipped**, this PR;
+    `docs/plan-shipped.md` 28f).
+  - **28f-2, open (Antigravity, from `docs/sound-patches.md`).** Two or three liquid
+    patches per look from the bands and the hits, following Cyberpunk, Fillmore East and
+    Lava Lamp; judged on a fresh showreel.
+  - **28f-3, open.** Ten looks still sway the dish's turn with the music through the old
+    `audioMappings.rotation` slot (27a-8). The owner's rule now says which: whole-plate
+    motion from the music only on the named looks (`FRAME_MOVING_LOOKS`). Read it with
+    the owner (a slow turn is the oil wheel's move), then move them off or onto the list,
+    and count the slot in `npm run framesway`.
+  - **28f-4, open.** Pitch is mostly the bass line on a band (72% of the showreel song's
+    frames in the octave above C1): a patch on it walks with the bass, not the melody. A
+    lead's pitch needs the analyser to find the strongest note above the bass.
+  - **28f-5, open (found here, for 27e-2).** The song's shape does not hear the showreel
+    song's breakdown (Funkorama, 104–120 s: the kick's region 22 dB down, 12 kicks in
+    14 s against 30) nor the beat's return: one drop at 7.2 s and steady after. Nothing
+    patches it now, but Follow the Song and Evolve read it. `songShape.ts` is tuned on
+    made-up songs; a sparse kick under a breakdown must read as the beat gone.
 
 - **28g. Follow a known song played live, by what is heard, not by the clock** (the owner,
   2026-10-11: "if we pre record the shape of the song, how can we map that to a different

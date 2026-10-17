@@ -1107,7 +1107,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where

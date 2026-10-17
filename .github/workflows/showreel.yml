@@ -1,0 +1,72 @@
+name: Showreel
+
+# Every look rendered to a minute of a real song, as videos to watch
+# (scripts/showreel.mjs says why the render and why this song). Asked for by
+# the owner on 2026-10-10: "real light show videos from our app". The clips
+# come back as `showreel-<k>` artifacts: per look clip.mp4, poster.jpg, the
+# watch's timeline and sheet, and showreel.json with its numbers.
+#
+# On request only, never by itself (gallery.yml says what a workflow that ran
+# on every push cost the Checks' Mac shards): Actions → Showreel → Run
+# workflow, or on a pull request by labelling it `showreel`, once per
+# labelling. A cloud session can label a PR but gets a 403 on
+# `workflow_dispatch`, so the label is how a session asks for a reel.
+#
+# The song is not in the repository. It is "Funkorama" by Kevin MacLeod
+# (incompetech.com), licensed under Creative Commons: By Attribution 4.0
+# (https://creativecommons.org/licenses/by/4.0/), downloaded here and held to
+# its hash, so a changed file fails the run instead of quietly changing every
+# clip's soundtrack.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Comma-separated look ids (blank for all)'
+        required: false
+        default: ''
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: showreel-${{ github.ref }}-${{ github.event.label.name || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  showreel:
+    name: Showreel (macOS) ${{ matrix.shard }}/6
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'showreel'
+    runs-on: macos-15
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: ffmpeg, to cut the song and watch the clips
+        run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
+      - name: The song
+        run: |
+          curl -sSfL --retry 3 -o showreel-song.mp3 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Funkorama.mp3'
+          echo '6be229815d85a0b99382b944d31098b882702c04ac7ad899e44ab7f8ba89b5ad  showreel-song.mp3' | shasum -a 256 -c -
+      - name: Render every look
+        run: npm run showreel
+        env:
+          SHOWREEL_ONLY: ${{ inputs.only }}
+          SHOWREEL_SHARD: ${{ matrix.shard }}/6
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: showreel-${{ matrix.shard }}
+          path: |
+            showreel/
+            !showreel/song.wav
+          retention-days: 30
