@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useEscape } from '../hooks/useEscape';
 import { X, Printer, Eraser, Search } from 'lucide-react';
 import { ACTION_LABELS, LEARNABLE_SETTINGS, type MidiAction, type MidiTarget } from '../lib/midi';
-import type { MidiController } from '../hooks/useMidi';
+import { useMidiLastEvent, type MidiController } from '../hooks/useMidi';
 import { PALETTE } from '../constants';
 import { controlKey, type ControllerSurface as Surface, type SurfaceControl } from '../lib/controllerSurface';
 import { livePresetId } from '../presets';
@@ -265,15 +265,16 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
   // Touching a control on the hardware selects it here, which is the fast way
   // to make a map: hand on the knob, eyes on the list.
   const lastAt = useRef(0);
+  const lastEvent = useMidiLastEvent(midi);
   useEffect(() => {
-    const e = midi.lastEvent;
+    const e = lastEvent;
     if (!e || e.at === lastAt.current) return;
     lastAt.current = e.at;
     const key = controlKey(e.source);
     const hit = surface.controls.find(c => controlKey(c) === key);
     if (hit) setSelected(hit);
     setLit(prev => ({ ...prev, [key]: performance.now() }));
-  }, [midi.lastEvent, surface.controls]);
+  }, [lastEvent, surface.controls]);
 
   // Fade the touch highlight out.
   const [, force] = useState(0);
