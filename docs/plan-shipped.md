@@ -2855,6 +2855,25 @@ controller surface (which re-renders itself every 120 ms); and the Stage sheet i
 Esc list now, which it was left off when Desk v2 added it. After: 10.8 a second with the
 sheet up, the show keys' alone (19v-1).
 
+**19v-3. The magnet check's second press landed on the plate bar.** Shipped 2026-10-17.
+Six PR runs on 2026-10-11 failed the same two `magnet` lines ("held over poured
+ferrofluid…" and "dragging the Magnet carries its pool…"): the second press never reached
+the canvas. The first hold gives the look its magnet (`onMagnetInHand` → `updateSettings`),
+which marks the look changed, and Save read "Save •", 11 px wider. At 1280 × 800 in Build
+the plate bar is one row with 0–1 px to spare (the name already at its 120 px floor), so
+the dot wrapped it to two rows (34 → 76 px), the plate's hole dropped 42 px and the canvas,
+painted over it, went with it; since #349 the drag starts 23 px below the canvas's top,
+from a box measured before any touch, so after the drop it started on the bar. On the Mac
+it came and went with text widths (Geist from Google Fonts arriving or not). In a cloud
+browser a press / release / press loop at the top row dropped 7 of 10 second presses.
+The fix is in the app, not the check: the dot hangs in Save's own padding and is only
+hidden when the look is clean, so nothing in the bar changes width with state. `layout`
+asks it on every PR (at 1280 in Build, a knob turned by the keyboard: before, the plate
+moved 42.0 px and Save 534 px; after, 0.0 and 0.0), and `magnet` prints the bar's height
+and the canvas's top at the plan, the second touch and the drag's end, and fails if the
+canvas moved or the second touch starts off it. The phone has no plate bar. Record's
+labels still change width in the same bar (19v-4).
+
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
 **Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
