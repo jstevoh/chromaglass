@@ -1846,7 +1846,7 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      gradient rather than ∇(n·h); it omits oil, film and gap thickness terms that the
      Laplacian includes, and operates per-texel so it scales with grid resolution.
   2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the step.
-  3. Pupil overlap is modeled with a smoothstep with full physical extinction (floor 0.0).
+  3. Pupil overlap is approximated by a smoothstep with a 0.0 extinction floor.
   4. The shadowgraph transport 1 - Δz · ∇²OPL is divided by local OPL, scaled by
      boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default
      projectorFocus = 0.5, Δz = 0 so the Becke term is 1 until the slider moves.

@@ -3016,10 +3016,10 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 ### 18e. Edges come from refraction (replaces the painted rims and highlights)
 
-Shipped in #355 (2026-10-11): real optical boundary physics replaces painted surface-normal shading (Sobel gradients, Blinn-Phong specular, artificial dark meniscus rims, and unphysical bright boundary lines) on projected looks.
+Shipped in #355 (2026-10-11): projector pupil aperture loss and shadowgraph Becke lines replace painted surface-normal shading (Sobel gradients, Blinn-Phong specular, artificial dark meniscus rims, and unphysical bright boundary lines) on projected looks.
 
 - **Where:** in `plate.ts`, `calcOpl` builds optical path length OPL = n·h in the derive pass (`DERIVE_WGSL`), tracking water (1.333), oil (1.470) and species mixture indices. A 3-texel 9-tap bilinear stencil derives ∇OPL and the Laplacian ∇²OPL once per frame into the derive texture (`near.xy` = gradient, `near.z` = Laplacian for projected looks; camera looks call `sobelGrad` and encode `boundaryDiff` in `near.z` to avoid display-pass re-evaluation). The display pass evaluates aperture loss from light deflected outside the projection pupil and defocus shadowgraph intensity variations (Becke line doublets).
-- **Physical model and declared shortcuts:**
+- **Model and declared shortcuts:**
   1. *Deflection angle:* approximated via small-angle deflection θ ≈ |∇density| · 0.0148 · dyeGain from the density gradient (scaled by dyeGain = max(1, boundaryContrast · 3)), rather than full ∇(n·h); this omits oil, film and gap thickness terms that the Laplacian includes, and is evaluated per-texel so it scales with grid resolution.
   2. *Pupil overlap:* modeled via a smoothstep overlap function with full extinction floor at 0.0 against numeric aperture NA = 0.35.
   3. *Shadowgraph transport:* ΔI/I ≈ -Δz · (∇²OPL / OPL) driven by `projectorFocus` (deltaZ = (projectorFocus - 0.5) · 1.5), modulated by boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default `projectorFocus = 0.5`, Δz = 0 so the Becke term is 1 until the slider moves.
