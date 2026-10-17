@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { unhandled } from '../lib/unhandled';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
@@ -113,7 +113,15 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   });
   const [map, setMapState] = useState<MidiMap>(() => loadMidiMap() ?? { format: MIDI_FORMAT, version: 1, name: 'My controller', bindings: [] });
   const [learning, setLearning] = useState<{ target: MidiTarget; mode: 'absolute' | 'relative' } | null>(null);
-  const [lastEvent, setLastEvent] = useState<{ source: MidiSource; value: number; at: number } | null>(null);
+  /*
+    The last message heard, for the MIDI panel's activity light and "Last:"
+    line and the on-screen controller's highlight: a store those three read
+    (`useMidiLastEvent`), not this hook's state. As state it re-rendered the
+    whole App twelve times a second while any control moved, a fader under a
+    hand included, for a light only an open panel shows (PLAN.md §14f;
+    `npm run renders`, the fader's lines).
+  */
+  const lastEvent = useMemo(() => new LastEventStore(), []);
   const [softTakeover, setSoftTakeoverOn] = useState(true);
   /**
    * The live shift layer.
@@ -155,7 +163,17 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   // a beat for a lamp.
   useEffect(() => {
     if (!enabled) { setClocked(false); return; }
-    const timer = setInterval(() => setClocked(performance.now() - clockSeenAt.current < 1000), 500);
+    /*
+      Only when it changes. Handing React the value it already has still
+      rendered the App once a second with MIDI on and no clock arriving
+      (`npm run renders`, a fader let go: 2.0 a second against the desk
+      clock's 1.0): an updater that bails out is not always free.
+    */
+    let shown = false;
+    const timer = setInterval(() => {
+      const on = performance.now() - clockSeenAt.current < 1000;
+      if (on !== shown) { shown = on; setClocked(on); }
+    }, 500);
     return () => clearInterval(timer);
   }, [enabled]);
 
@@ -174,7 +192,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     heardRef.current.set(sourceKey(src), now);
     // Ahead of the bindings, and regardless of them: see `noteStruck`.
     if (e.kind === 'noteon') hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)));
-    if (now - eventTick.current > 80) { eventTick.current = now; setLastEvent({ source: src, value: e.value, at: now }); }
+    if (now - eventTick.current > 80) { eventTick.current = now; lastEvent.set({ source: src, value: e.value, at: now }); }
 
     /*
       Learning the surface swallows everything.
@@ -703,3 +721,24 @@ function toggleState(a: MidiAction, t: MidiFeedback['toggles']): boolean | null 
 }
 
 export type MidiController = ReturnType<typeof useMidi>;
+
+/** What `useMidiLastEvent` reads: the last message heard, and who to tell. */
+export interface MidiLastEvent { source: MidiSource; value: number; at: number }
+class LastEventStore {
+  private value: MidiLastEvent | null = null;
+  private listeners = new Set<() => void>();
+  readonly get = (): MidiLastEvent | null => this.value;
+  readonly subscribe = (fn: () => void): (() => void) => {
+    this.listeners.add(fn);
+    return () => { this.listeners.delete(fn); };
+  };
+  set(v: MidiLastEvent): void {
+    this.value = v;
+    for (const fn of this.listeners) fn();
+  }
+}
+
+/** The last MIDI message heard, rendering only the component that asks (see `lastEvent` in `useMidi`). */
+export function useMidiLastEvent(midi: MidiController): MidiLastEvent | null {
+  return useSyncExternalStore(midi.lastEvent.subscribe, midi.lastEvent.get);
+}
