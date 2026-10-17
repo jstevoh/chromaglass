@@ -12,6 +12,7 @@ import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
 import { speciesOf } from '../src/lib/liquidProps';
 import { DEFAULT_LIQUID_TYPES } from '../src/types';
+import { DISH_METRES, DISH_REST_GAP } from '../src/lib/turntable';
 import { normalizeOutput, type OutputConfig } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
@@ -444,6 +445,16 @@ const api = {
   },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /**
+   * The shelf's bottles as src/types.ts writes them, each liquid's real
+   * numbers (viscosity, density, refractive index), and the dish's size and
+   * rest gap (lib/turntable.ts): what `npm run derive` works the optical
+   * path out from, so its expectation comes from the liquids and the dish
+   * and never from the shader it is checking.
+   */
+  liquids: DEFAULT_LIQUID_TYPES,
+  DISH_METRES,
+  DISH_REST_GAP,
   /**
    * The magnet's field as the solver and the plate both include it
    * (wgsl/spikes.ts with wgsl/magnetDisc.ts), and the TypeScript the solver

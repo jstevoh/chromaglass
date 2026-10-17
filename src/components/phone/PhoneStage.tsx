@@ -246,6 +246,16 @@ export interface PhoneStageProps {
   twoProjectors: number;
   onTwoProjectors: (v: number) => void;
   /**
+   * Projector Focus (PLAN 18e): where the projector lens's focal plane sits
+   * across the liquid layer. 0.5 is the layer in focus, today's look; either
+   * way the shadowgraph's Becke doublet appears at every front, bright on one
+   * side and dark on the other, and swaps sides through focus. A focus ring
+   * is a thing played at the projector, so it sits on the Looks sheet beside
+   * the lamp's two controls.
+   */
+  projectorFocus: number;
+  onProjectorFocus: (v: number) => void;
+  /**
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
    * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
@@ -753,6 +763,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
               display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Each plate has its own lamp on the screen, so its clear parts wash the other's colour.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
+              display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">

@@ -1245,6 +1245,19 @@ override FLIP_Y: f32 = 1.0;
 export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var viewSrc: texture_2d<u32>;
+/*
+  The poured liquids' species (PLAN 18d, src/lib/liquidProps.ts), the
+  solver's own rgba32float field: r the share of the column that is poured
+  liquid, a the share-weighted sum of their refractive indices (each bottle's
+  own, from the shelf's table in src/types.ts: glycerine 1.4746, syrup
+  1.452, alcohol 1.361, milk 1.345). Read with textureLoad, never sampled:
+  a 32-bit float texture is not filterable (the layout says so in
+  deriveLayout, src/gpu/plate.ts). 1×1 and empty when nothing is poured.
+*/
+@group(0) @binding(4) var speciesSrc: texture_2d<f32>;
+
+// The plate's clear liquid: water, n 1.333 at 589 nm and room temperature.
+const N_CLEAR: f32 = 1.333;
 
 fn viewProps(uv: vec2f) -> vec3f {
   let dims = textureDimensions(viewSrc);
@@ -1257,15 +1270,45 @@ fn viewProps(uv: vec2f) -> vec3f {
   return vec3f(oil, gap, film);
 }
 
-fn calcOpl(d: f32, v: vec3f, dyeGain: f32) -> f32 {
+/*
+  How far the poured liquids raise the column's index above the clear
+  liquid's (PLAN 18d-9): a share r of the column replaced by liquids whose
+  indices sum, share-weighted, to a gives n = (1 − r)·n_clear + a, so the
+  rise is a − r·n_clear. A column that is all glycerine reads
+  1.4746 − 1.333 = 0.1416; half glycerine, half water, half that (a mixture's
+  index is close to linear in its volume shares, the Arago–Biot rule, and
+  the field carries exactly those shares).
+*/
+fn pouredDn(uv: vec2f) -> f32 {
+  let dims = textureDimensions(speciesSrc);
+  if (dims.x <= 1u) { return 0.0; }
+  let coord = clamp(vec2i(uv * vec2f(dims)), vec2i(0), vec2i(dims) - 1);
+  let sp = textureLoad(speciesSrc, coord, 0);
+  return sp.a - sp.r * N_CLEAR;
+}
+
+/*
+  The optical path through the column, OPL = n·h, with h in rest gaps
+  (DISH_REST_GAP, 6 mm on the 0.2 m dish), so a column of clear water at
+  rest reads 1.333. v is viewProps' (oil, gap, film); dn is pouredDn's.
+  The dye's own term, d·0.015·dyeGain, is a named stand-in (refractionOptics
+  note 6): a dilute dye barely moves water's index, and this is what gives
+  a dye-only look its edges.
+*/
+fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
   let deltaDye = d * (0.015 * dyeGain);
   let deltaOil = v.x * 0.137;
   let deltaFilm = v.z * 0.087;
-  let n = 1.333 + deltaDye + deltaOil + deltaFilm;
+  let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
   let gap = v.y;
   let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   let h = hScale * (1.0 - 0.5 * v.z);
   return n * h;
+}
+
+// One tap's optical path, from its own view and its own poured index.
+fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
+  return calcOpl(d, viewProps(uv), pouredDn(uv), dyeGain);
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
@@ -1297,30 +1340,34 @@ fn calcOpl(d: f32, v: vec3f, dyeGain: f32) -> f32 {
   let g = vec2f(gradX, gradY);
 
   let vC = viewProps(in.uv);
-  let oC = calcOpl(dC, vC, dyeGain);
+  let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
 
   var o00: f32; var o10: f32; var o20: f32;
   var o01: f32; var o21: f32;
   var o02: f32; var o12: f32; var o22: f32;
 
-  if (vC.x > 0.001 || vC.z > 0.001) {
-    o00 = calcOpl(d00, viewProps(in.uv + vec2f(-ts, -ts)), dyeGain);
-    o10 = calcOpl(d10, viewProps(in.uv + vec2f( 0.0, -ts)), dyeGain);
-    o20 = calcOpl(d20, viewProps(in.uv + vec2f( ts, -ts)), dyeGain);
-    o01 = calcOpl(d01, viewProps(in.uv + vec2f(-ts,  0.0)), dyeGain);
-    o21 = calcOpl(d21, viewProps(in.uv + vec2f( ts,  0.0)), dyeGain);
-    o02 = calcOpl(d02, viewProps(in.uv + vec2f(-ts,  ts)), dyeGain);
-    o12 = calcOpl(d12, viewProps(in.uv + vec2f( 0.0,  ts)), dyeGain);
-    o22 = calcOpl(d22, viewProps(in.uv + vec2f( ts,  ts)), dyeGain);
+  // Each tap's own view and poured index wherever either can differ from
+  // the middle's: oil, a film, or any liquid poured (the species is 1×1
+  // with none, so a plate with nothing poured pays for none of these reads).
+  let poured = textureDimensions(speciesSrc).x > 1u;
+  if (vC.x > 0.001 || vC.z > 0.001 || poured) {
+    o00 = oplAt(d00, in.uv + vec2f(-ts, -ts), dyeGain);
+    o10 = oplAt(d10, in.uv + vec2f( 0.0, -ts), dyeGain);
+    o20 = oplAt(d20, in.uv + vec2f( ts, -ts), dyeGain);
+    o01 = oplAt(d01, in.uv + vec2f(-ts,  0.0), dyeGain);
+    o21 = oplAt(d21, in.uv + vec2f( ts,  0.0), dyeGain);
+    o02 = oplAt(d02, in.uv + vec2f(-ts,  ts), dyeGain);
+    o12 = oplAt(d12, in.uv + vec2f( 0.0,  ts), dyeGain);
+    o22 = oplAt(d22, in.uv + vec2f( ts,  ts), dyeGain);
   } else {
-    o00 = calcOpl(d00, vC, dyeGain);
-    o10 = calcOpl(d10, vC, dyeGain);
-    o20 = calcOpl(d20, vC, dyeGain);
-    o01 = calcOpl(d01, vC, dyeGain);
-    o21 = calcOpl(d21, vC, dyeGain);
-    o02 = calcOpl(d02, vC, dyeGain);
-    o12 = calcOpl(d12, vC, dyeGain);
-    o22 = calcOpl(d22, vC, dyeGain);
+    o00 = calcOpl(d00, vC, 0.0, dyeGain);
+    o10 = calcOpl(d10, vC, 0.0, dyeGain);
+    o20 = calcOpl(d20, vC, 0.0, dyeGain);
+    o01 = calcOpl(d01, vC, 0.0, dyeGain);
+    o21 = calcOpl(d21, vC, 0.0, dyeGain);
+    o02 = calcOpl(d02, vC, 0.0, dyeGain);
+    o12 = calcOpl(d12, vC, 0.0, dyeGain);
+    o22 = calcOpl(d22, vC, 0.0, dyeGain);
   }
 
   let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
@@ -1858,6 +1905,14 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      the 90th-percentile thin-dye rim in mixer's mid-grey contrast check (129.5 → 136.4
      without it, 130.9 → 134.7 with it). Tracked in PLAN 18e-1 (with 31a) to replace once
      the two dishes sit at separate heights in the projector's focal cone.
+  6. The dye's index, d · 0.015 · dyeGain in calcOpl (the derive pass), is a stand-in:
+     a few percent of dye in water moves its index by far less, and nothing in the
+     shelf's table gives a dye one. It is what gives a dye-only look its Becke lines.
+     The poured liquids' indices are real (the species field, PLAN 18d-9): glycerine
+     reads 1.4746 because the shelf says so, and npm run derive measures it so.
+  7. A clear poured liquid's edge (glycerine into water, no dye) reaches ∇²OPL, but
+     this function returns early where the dye's gradient is flat (gLen, from note 1),
+     so that edge draws no line yet. PLAN 18e-2: deflect by ∇OPL, not the dye's slope.
 */
 fn refractionOptics(near: vec4f) -> f32 {
   let grad = near.xy;
