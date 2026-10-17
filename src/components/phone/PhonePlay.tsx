@@ -96,6 +96,7 @@ export interface PhonePlayProps {
   onClear: () => void;
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; take: { blob: Blob; filename: string; url: string } | null };
   onAllControls: () => void;
+  onOpenAccount?: () => void;
 }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -311,6 +312,19 @@ export function PhonePlay(p: PhonePlayProps) {
           </span>
         </button>
         <div className="pointer-events-none flex shrink-0 items-center gap-1">
+          {p.onOpenAccount && (
+            <button
+              type="button"
+              onClick={p.onOpenAccount}
+              aria-label="Account"
+              data-cg-account-open=""
+              className="pointer-events-auto flex h-12 min-w-12 items-center justify-center"
+            >
+              <span className={`flex h-9 min-w-11 items-center justify-center rounded-[18px] px-3 text-[13px] font-medium text-text ${GLASS_PILL}`}>
+                Account
+              </span>
+            </button>
+          )}
           {sheet ? (
             p.onSave && (
               <Pill onPress={() => setSaveName(n => (n === null ? (p.saveSuggestion ?? 'My look') : null))} label="Save this look" testId="play-save" pressed={saveName !== null}>

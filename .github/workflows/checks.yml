@@ -531,6 +531,12 @@ jobs:
       - name: Lamp Ground 0 is the plate before the lamp
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run lampzero
+      # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
+      # against the Firebase Auth emulator, Google, Apple and magic-link
+      # sign-in, offline returning sessions, sign-out and account deletion.
+      - name: Sign-in
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run signin
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout

@@ -5690,10 +5690,16 @@ once the login works (23.14).*
   governing law, the date, how long crash reports are kept) and approves the wording.
   23.10 links both from the sign-in and account sheets; 23.12 adds keys and devices
   to the page and the licence's terms (refunds, machines a key) to the terms.
-- **23.10** (one PR, lane B; Antigravity builds, brief `docs/handoff-signin.md`): the
-  sign-in on the hosted site, on the desk and the phone, and the account sheet (the
-  email, sign out, delete the account) on each. *Measure:* `npm run signin`, 14/14,
-  and `startup` on the Mac: a returning visit's first step no later than today's bar.
+- **23.10** (**shipped**, this PR; brief `docs/handoff-signin.md`): the sign-in on the
+  hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
+  with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
+  the email, sign out with confirmation, delete the account with confirmation, and links
+  to `/privacy.html` and `/terms.html`) on the desk, the narrow overlay and the phone.
+  Returning visitors start the plate immediately from the local flag while Firebase
+  confirms in the background, and `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
+  never load Firebase. *Measure:* `npm run signin` (14/14, wired into `checks.yml`
+  `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
+  than today's bar.
 - **23.11** (one PR, `desktop/`, with 23.4): the Mac app with no key asks for the
   same sign-in once, online, then runs as the site does; with a key it never asks.
   *Measure:* `npm run desktop` with a key, with none and signed in, and with none and

@@ -527,12 +527,25 @@ export function Desk(p: DeskProps) {
           {p.status.sequence && ` · ${p.status.sequence}`}
           {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
         </span>
-        <span className="truncate" data-testid="status-running">
-          {`layout ${LAYOUT_LABEL[p.layoutName]} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
-          {l.floating.length > 0 && ` · ${l.floating.length} floating`}
-          {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
-          {p.status.rec ? ` · rec ${p.status.rec}` : ''}
-          {p.status.engine ? ` · ${p.status.engine}` : ''}
+        <span className="flex items-center gap-3 truncate">
+          <span className="truncate" data-testid="status-running">
+            {`layout ${LAYOUT_LABEL[p.layoutName]} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
+            {l.floating.length > 0 && ` · ${l.floating.length} floating`}
+            {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
+            {p.status.rec ? ` · rec ${p.status.rec}` : ''}
+            {p.status.engine ? ` · ${p.status.engine}` : ''}
+          </span>
+          {p.onOpenAccount && (
+            <button
+              type="button"
+              data-cg-account-open=""
+              onClick={p.onOpenAccount}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-text-2 hover:bg-hover hover:text-text"
+              title="Account"
+            >
+              Account
+            </button>
+          )}
         </span>
       </footer>
 

@@ -282,8 +282,16 @@ interface ArmedLook {
   sequence?: string;
 }
 
+const LazyAccountSheet = import.meta.env.VITE_FIREBASE_API_KEY
+  ? React.lazy(() => import('./components/AccountSheet'))
+  : null;
+
 export default function App() {
   const [isActive, setIsActive] = useState(true);
+  const [showAccount, setShowAccount] = useState(false);
+  const openAccount = import.meta.env.VITE_FIREBASE_API_KEY
+    ? () => setShowAccount(true)
+    : undefined;
 
   // The laptop driving the projector must not dim, sleep or screensave: what
   // it does, the wall does. Held while the plate is running and dropped the
@@ -5534,6 +5542,7 @@ export default function App() {
           onClear={() => setClearTrigger(n => n + 1)}
           recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
+          onOpenAccount={openAccount}
         />
         </PanelGuard>
       )}
@@ -5665,6 +5674,7 @@ export default function App() {
               setPhone(false);
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
+            onOpenAccount={openAccount}
           />
           </PanelGuard>
           )}
@@ -6100,6 +6110,17 @@ export default function App() {
           >
             ?
           </button>
+          {openAccount && (
+            <button
+              type="button"
+              data-cg-account-open=""
+              onClick={openAccount}
+              className="min-w-[34px] min-h-[34px] px-2 rounded-full transition-all text-[11px] font-medium hover:bg-white/10 text-white/70"
+              title="Account"
+            >
+              Account
+            </button>
+          )}
         </div>
       </div>
       )}
@@ -6152,6 +6173,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenAccount={openAccount}
           showCrumb={
             <>
               <span className="text-muted">Show</span>
@@ -6277,6 +6299,12 @@ export default function App() {
         <PanelGuard name="Stage" onClose={() => setShowStage(false)}>
           {settingsPanel({ scope: 'stage', focusSection: null, onClose: () => setShowStage(false) })}
         </PanelGuard>
+      )}
+
+      {showAccount && LazyAccountSheet && (
+        <React.Suspense fallback={null}>
+          <LazyAccountSheet onClose={() => setShowAccount(false)} />
+        </React.Suspense>
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives

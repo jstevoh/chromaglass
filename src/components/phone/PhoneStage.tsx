@@ -273,6 +273,7 @@ export interface PhoneStageProps {
   onFullLayout: () => void;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
+  onOpenAccount?: () => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -388,6 +389,17 @@ export function PhoneStage(p: PhoneStageProps) {
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
+          {p.onOpenAccount && (
+            <button
+              type="button"
+              onClick={p.onOpenAccount}
+              aria-label="Account"
+              data-cg-account-open=""
+              className="flex h-12 items-center justify-center rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
+            >
+              Account
+            </button>
+          )}
           <button
             onClick={p.onZoom}
             aria-pressed={zoomed}

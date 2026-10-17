@@ -67,6 +67,7 @@ export interface DeskProps {
   onMidi: () => void;
   onSearch: () => void;
   onOpenSettings: () => void;
+  onOpenAccount?: () => void;
   /** Gig's breadcrumb: the show and the look that is up. */
   showCrumb: ReactNode;
   /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
