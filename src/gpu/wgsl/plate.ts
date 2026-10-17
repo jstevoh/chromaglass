@@ -1842,7 +1842,7 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   and shadowgraph Becke line intensity doublets under projector defocus.
 
   Named shortcuts:
-  1. Small-angle deflection θ ≈ |∇density| · 0.015 · dyeGain is evaluated from the dye
+  1. Small-angle deflection θ ≈ |∇density| · 0.0148 · dyeGain is evaluated from the dye
      gradient rather than ∇(n·h); it omits oil, film and gap thickness terms that the
      Laplacian includes, and operates per-texel so it scales with grid resolution.
   2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the step.
@@ -1860,23 +1860,24 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      the two dishes sit at separate heights in the projector's focal cone.
 */
 fn refractionOptics(near: vec4f) -> f32 {
+  let grad = near.xy;
+  let gLen = length(grad);
   let strength = max(U.edgeRelief, select(0.0, U.boundaryContrast, U.boundaryContrast > 0.005));
-  if (strength <= 0.005) {
+  if (strength <= 0.005 || gLen <= 0.005) {
     return 1.0;
   }
-  let grad = near.xy;
   let lap = near.z;
   let opl = max(1.0, near.w);
 
   let na = DROP_NA;
   let dyeGain = max(1.0, U.boundaryContrast * 3.0);
-  let theta = length(grad) * 0.015 * dyeGain;
+  let theta = gLen * 0.0148 * dyeGain;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
   let aperture = 1.0 - smoothstep(0.0, 1.0, u);
 
   let deltaZ = (U.projectorFocus - 0.5) * 1.5;
   let shadowGain = max(1.0, U.boundaryContrast * 2.0);
-  let edgeDeflect = smoothstep(0.005, 0.05, length(grad));
+  let edgeDeflect = smoothstep(0.005, 0.05, gLen);
   let shadow = clamp(1.0 - deltaZ * (lap / opl) * shadowGain * edgeDeflect, 0.2, 2.5);
 
   return mix(1.0, aperture * shadow, strength);
