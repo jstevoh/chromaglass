@@ -156,13 +156,16 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
       )}
 
       {/* Stage strip */}
-      <div className="flex flex-col gap-1.5 mb-5" data-testid="seq-stages">
+      <div className="flex flex-col gap-1.5 mb-5" role="radiogroup" aria-label="Sequence stages" data-testid="seq-stages">
         {selected?.stages.map((st, i) => {
           const current = isRunningThis && status.stageIndex === i;
           const prog = current ? status.progress : 0;
           return (
             <button
               key={st.id}
+              type="button"
+              role="radio"
+              aria-checked={current || (editable && editIndex === i)}
               onClick={() => (isRunningThis ? onGoTo(i) : editable ? setEditIndex(editIndex === i ? null : i) : undefined)}
               className={`relative overflow-hidden text-left rounded-lg border px-3 py-2 transition-colors ${
                 current ? 'border-white/60 bg-white/10' : editIndex === i && editable ? 'border-white/40 bg-white/5' : 'border-white/10 bg-white/5 hover:bg-white/10'
