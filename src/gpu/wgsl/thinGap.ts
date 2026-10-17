@@ -357,7 +357,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     - (1.0 - a_w * a_w * a_w) / (6.0 * OIL_REL_NU) + B_poiseuille * (1.0 - a_w * a_w) * 0.5
     + C_poiseuille * (1.0 - a_w);
   let filmDrag = 1.0 / max(12.0 * Q_poiseuille, 1e-4);
-  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag;
+  /*
+    Water's viscosity falls about 2% per K (PLAN §18f).
+    Warm liquid is less viscous, reducing drag and increasing mobility M.
+  */
+  let tempVisc = exp(-0.02 * clamp(uf.z, 0.0, 50.0));
+  let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag * tempVisc;
   var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the

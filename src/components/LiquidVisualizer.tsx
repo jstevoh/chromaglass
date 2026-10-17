@@ -3998,6 +3998,7 @@ class FluidSimulation {
       smearX, smearY,
       air: settings.airVelocity > 0.1 ? settings.airVelocity : 0,
       evapFactor, time,
+      dimmer: typeof settings.dimmer === 'number' ? settings.dimmer : 1,
       // The lasting current. Damping is its drag per step — the first thing that
       // control has ever visibly done — and the cap keeps a step's travel under
       // ¾ of a cell whatever the Speed and Advection.
@@ -4058,8 +4059,9 @@ class FluidSimulation {
         const k = i + j * M;
         const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
         const dd = Math.tanh(this.density[q] - p.meanDensity);   // saturated (see the GPU twin)
+        const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
         let fx = p.rockX * dd;
-        let fy = p.currentBuoy * Math.tanh(Math.max(0, this.temp[q]) * 20) + p.rockY * dd;   // saturated heat (see the GPU twin)
+        let fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd;   // Boussinesq linear in temperature, gated on upright (see the GPU twin)
         const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
         const r = Math.sqrt(tx * tx + ty * ty);
         if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }

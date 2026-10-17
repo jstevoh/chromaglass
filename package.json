@@ -119,6 +119,7 @@
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
     "physics": "node scripts/physics.mjs",
+    "heat": "node scripts/heat.mjs",
     "bodies": "node scripts/bodies.mjs",
     "clockglass": "node scripts/clockglass.mjs",
     "microscope": "node scripts/microscope.mjs",

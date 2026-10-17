@@ -46,7 +46,7 @@ struct Sim {
   turbScale: f32,
   spin: f32,
   tension: f32,
-  free9: f32,          // was the fingering push's strength (forcesB)
+  lampHeat: f32,       // lamp intensity scaled by heating rate (PLAN 18f)
   vibI: f32,
   vibF: f32,
   drip: f32,
@@ -2245,14 +2245,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var c = textureLoad(cur, q, 0).xy;
   let temp = bilerpN(vel, uv, S.n).z;
   /*
-    tanh with its argument held in range: some GPUs take tanh as a ratio of
-    exponentials, and past about 88 the exponential is infinite and the
-    ratio is NaN. A plate anywhere hotter than 4.4 (the lamp under a standing
-    plate reaches that) turned the whole current NaN, and the flow was
-    wiped every step after it. tanh is ±1 to float precision well before 10.
+    Buoyancy is linear with temperature (Boussinesq, PLAN §18f), with the tanh
+    removed so plumes have a strength proportional to their heat rather than
+    saturating at once. S.up is gated on upright, so a level plate has no in-plane
+    buoyancy.
   */
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.up * (S.curBuoy * tanh(min(max(temp, 0.0) * 20.0, 10.0)));
+  var f = S.up * (S.curBuoy * clamp(temp, 0.0, 50.0));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -3328,7 +3327,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let cl = length(capillary);
   if (cl > A.a.y) { capillary *= A.a.y / cl; }
   let wax = textureLoad(dye, p, 0).a;
-  let rho = wax - S.meanD;
+  let oil = textureLoad(mix, p, 0).r;
+  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
+  let rho = wax - S.meanD - 0.15 * oil;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
   var heat = v.z;
   if (A.a.z > 0.0) {
@@ -3782,7 +3783,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   decayVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+
+// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
+fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
+  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
@@ -3791,7 +3799,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  v.z *= S.heatDecay;
+  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
+  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
+  var temp = v.z * cool;
+  // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
+  let d = textureLoad(dye, vec2i(id.xy), 0);
+  var absorbed = 0.0;
+  if (d.a > 1e-4) {
+    let norm = 1.0 / d.a;
+    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
+    let through = lampThrough(unit, d.a);
+    absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+  }
+  // Central hotspot of the lamp (shortcut: 1 / (1 + 2.5 r²)):
+  let toCenter = uvOf(id) - vec2f(0.5);
+  let r2 = dot(toCenter, toCenter);
+  let hotspot = 1.0 / (1.0 + r2 * 2.5);
+  temp += S.lampHeat * hotspot * absorbed * S.dt;
+  v.z = temp;
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 
