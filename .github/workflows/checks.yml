@@ -473,7 +473,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run wgsl
       # Lamp Ground 0 is the plate as it was before the lamp, byte for byte,
-      # every look (PLAN 18b, 19y): two labs, one built with the lamp's lines
+      # every look (PLAN 18b, 19z): two labs, one built with the lamp's lines
       # taken out, compared on SwiftShader, which lampzero reads back from the
       # adapter rather than trusting the flags. Here and not on the Mac
       # because it compares two compiled programs: Metal on an M4 fused a
@@ -914,6 +914,11 @@ jobs:
       - name: No grating over the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run grating
+      # Dye spreads along the flow via shear dispersion (PLAN 18h): streaks
+      # along flow lines while holding sharp cross-stream edges, conserved exactly.
+      - name: Dye dispersion along the flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run dispersion
       # Lamp Ground (PLAN 18b): on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter
       # through the dye. In the open shard: the plate shard is near its timeout.

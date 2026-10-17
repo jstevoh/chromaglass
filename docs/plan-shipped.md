@@ -2995,6 +2995,31 @@ sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
+### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+
+- **Where:** 4-iteration Jacobi dye diffusion with one constant for every colour (about 40,000× the
+  molecular rate at the slider's top, measured 2026-10-11: a drop's rms radius 4.7 → 19 →
+  37 mm at 0/5/20 s, D ≈ 1.7e-5 m²/s against food dye's ~4e-10; this said "about 1000×",
+  which was a guess), and heat on the same number (Double Diffusion only multiplies it;
+  water's κ is 1.4e-7, about 350× the dye's; heat previously shared the dye's number, leaving 12 looks with
+  0 heat spreading); the MacCormack Jacobian clamp and neighbourhood cap (`fluid.ts` advection), which
+  lose the excess; `sharpenDye`, retired (0 by default) but still in the step.
+- **The real phenomenon:** molecular diffusion is negligible at this scale ($D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$). The blur in
+  a Hele-Shaw cell is shear dispersion along the flow. On show timescales ($t \ll h^2/D_m \approx 25\text{ hours}$ across a 6 mm gap),
+  parabolic velocity shear $u(z) = 1.5 \bar{u} (1 - 4z^2/h^2)$ across the gap yields pre-asymptotic along-streamline
+  spreading with variance $\sigma^2 \approx 0.2 \bar{u}^2 (\Delta t)^2$, rather than the long-time Taylor–Aris limit.
+  Edges stay sharp where the liquid is still and streak along flow lines where it moves.
+  Heat spreads at water's own thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$, Le $\approx$ 350).
+- **What it takes:** a single explicit conservative finite-volume face-flux pass (`dyeDisperse`) with an anisotropic
+  tensor $D_L = D_m + \kappa_T (h/h_0)^2 |v|^2$, capped at 0.25 cells²/step (the von Neumann positivity limit), with
+  positivity-preserving cross-term limiting to prevent negative oscillations. Heat diffusion is decoupled from dye diffusion
+  and handled in the viscosity stage with time accumulation (`heatSeconds`) to ensure FP16 precision survival on SwiftShader.
+- **Cost:** single explicit pass (0.39 ms, 2.0% share), replacing 4-iteration Jacobi (1.3 ms), saving ~0.9 ms.
+- **Shipped (#357):** replaced 4-iteration Jacobi dye diffusion with single explicit conservative
+  finite-volume shear dispersion (`dyeDisperse`) with molecular diffusion $D_m = 4\times 10^{-10}\text{ m}^2/\text{s}$ and
+  longitudinal shear dispersion along depth-mean flow; decoupled heat diffusion to real water thermal
+  diffusivity $\kappa = 1.4\times 10^{-7}\text{ m}^2/\text{s}$ in viscosity stage. Checked by `npm run dispersion` (6/6).
+
 ### 18i. Bubbles and beads live by physics, not timers
 
 - **What was reported** (PLAN.md §18i): bubbles live 9–23 s and pop on a timer; merges are a random dice roll (`rng < dt·0.12`), pairs are pulled together by an artificial long-range force, and drift has artificial Brownian wander. Real bubbles trapped between glasses are air pancakes with no draining soap film: they do not pop on a timer, experience no long-range attraction, and run ahead of the liquid flow due to lubricating wall films (Bretherton).

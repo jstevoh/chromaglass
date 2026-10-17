@@ -224,7 +224,7 @@ style (§31).
 - **6.4** **18e** edges from refraction (which is #219's 20d), then **31a** the projector's
   focus across the two dishes and **31d** colour at a defocused edge (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
-- **6.6** ~~**18m**~~ a drop slumps under its own weight (then **18m-1** to **18m-5**), **18h**, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
+- **6.6** ~~**18m**~~ a drop slumps under its own weight (then **18m-1** to **18m-5**), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
 - **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
@@ -3895,7 +3895,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | 18a, 18c |
-| 18h | Dye spreads along the flow | Moderate: streaks where it moves, sharp where it is still | About equal to today | Better with 18a |
+| 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
@@ -4148,7 +4148,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     `hsCycles` from cold should converge on a grid that is not a power of two.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
-**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19y). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 - **18b-8. The dishes too deep for the lamp.** Eighteen looks are dishes by their own
   description but fail the rule with the dye they were given for black: on the lamp the
@@ -4425,28 +4425,13 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **Cost:** about 0.3 ms (one r16f texture and a flux pass).
 - **Gain:** a show ages the way a real plate does. It turns over, and it can dry.
 
-### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
+### 18h. Dye diffuses physically; heat its own kappa (replaces isotropic diffusion)
+**Partly shipped** (#357): single explicit finite-volume stage (`dyeDisperse`) replaces 4-iteration isotropic Jacobi diffusion; molecular diffusion $D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$ holds sharp edges; water thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$) decoupled from dye diffusion slider; limiter handles mass conservation correctly; measured by `npm run dispersion` (6/6). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-- **Where:** Jacobi dye diffusion with one constant for every colour (about 40,000× the
-  molecular rate at the slider's top, measured 2026-10-11: a drop's rms radius 4.7 → 19 →
-  37 mm at 0/5/20 s, D ≈ 1.7e-5 m²/s against food dye's ~4e-10; this said "about 1000×",
-  which was a guess), and heat on the same number (Double Diffusion only multiplies it;
-  water's κ is 1.4e-7, about 350× the dye's); the MacCormack Jacobian clamp and neighbourhood cap
-  (`fluid.ts` advection), which lose the excess; `sharpenDye`, retired (0 by default)
-  but still in the step.
-- **The real phenomenon:** molecular diffusion is negligible at this scale. The blur in
-  a Hele-Shaw cell is Taylor–Aris dispersion along the flow,
-  D_L ≈ D_m + h²|u|²/(210 D_m). Edges stay sharp where the liquid is still and streak
-  where it moves.
-- **What it takes:** the dye moved in flux form (`bodyAdvect` exists), and one or two
-  explicit passes of dispersion with a tensor built from u⊗u. The Jacobian patch exists
-  because the transport field is divergent (the noise after the projection and the
-  depth multiply), so it can go with 18a.
-- **Cost:** about the same as today's diffusion (1.3 ms where it runs), or 0.3–0.6 ms
-  explicit.
-- **Gain:** streaks along the flow, and conserved dye. Honest: a minmod flux carries
-  fine threads a little softer than MacCormack, and the plate's detail table
-  (`npm run detail`) has to hold.
+Left from 18h, each its own item:
+
+- **18h-1. Flux-form dye transport and removal of MacCormack clamp.** The dye advection stage currently uses MacCormack backtracing with neighbor bounding clamps, which causes minor mass drift (~0.4% over 60 steps) under shear flow. Moving dye advection to a conservative flux form across faces will allow removing the clamp and guaranteeing exact mass conservation during both advection and dispersion.
+- **18h-2. Dye spreads along the flow (visible streaking).** On show timescales ($t \ll 25\text{ hours}$ across 6 mm gap), shear dispersion is in the unsteady pre-asymptotic regime ($\sigma^2 \approx 0.2 v^2$). This draws the dye out into visible streaks along the flow. It requires a multi-layer or sub-stepped flux scheme to model the flow's shear without capping the dispersion at the explicit face flux limit.
 
 ### 18i. Bubbles and beads live by physics, not timers
 
@@ -5053,14 +5038,35 @@ commit. *Size:* S.
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 
-### 19y. A check that compares two compiled programs on a GPU asks the compiler
+### 19y. Compaction and helper models set from the repo, not the host
+Found 2026-10-17: the 200k compaction window chosen on 10-12 was never in effect. A cloud
+session's environment still carried `CLAUDE_CODE_AUTO_COMPACT_WINDOW=500000` with the
+percentage override at 80, so threads compacted near 400k and sat at 130–380k for most
+of their steps, each step re-reading all of it from the cache. And no agent in
+`.claude/agents/` named a model, so a helper started from the most expensive thread ran
+on that thread's model whatever the job was.
+
+Changed: `.claude/settings.json` sets the window to 200000 in its `env` block (the
+documented way a project's settings replace an inherited variable; it reaches the cloud
+threads and the Mac's own sessions alike) and `CLAUDE_CODE_SUBAGENT_MODEL` to sonnet for
+helpers that name none. `prepush-reviewer` and `check-skeptic` name opus (they judge);
+`setting-auditor`, `preset-auditor` and `video-watcher` name sonnet (they read and list).
+
+Measure: a session started after the merge shows the window at 200000 in its
+environment, and its context compacts near 160k rather than 400k (inferred from the
+percentage; to be confirmed on the first thread that reaches it). If the host's value
+still wins, the window has to move in the environment's own settings instead, which only
+the owner can change. Still open alongside it: 19m (PLAN.md as an index), now more
+pressing, as the file is about 500 KB.
+
+### 19z. A check that compares two compiled programs on a GPU asks the compiler
 **Shipped** (2026-10-11): `npm run lamp`'s first line, every look at Lamp Ground 0 byte for byte against a lab built with the lamp's lines taken out, read "different: fillmore-1969 2" on the owner's M4 on main at b2ca7d7, the same one pixel on every run, 2 levels of blue, gone with the back plate or its grade off (`node scripts/lampwhere.mjs`), none different on software WebGPU and on the GitHub runner's Mac for the same tree, and none different on the M4 again once #353 had moved the shader. Metal fuses a multiply-add into one FMA when the product has one use; the lamp's back-plate branch keeps a second use of the back plate's values alive in the plain lab and is dead code in the control, so the two programs round the painted path differently, and one ulp crossed a threshold in the grain. The line is now `npm run lampzero`, two labs on SwiftShader (which has drawn them the same on every tree since 2026-10-04 and, as a conformance rasteriser, keeps the operations as written rather than fusing them by use count), in Measure on every PR as its own part, `lab` (the `logic` part has no Chromium, so #386's first run failed there on the launch, and the `browser` part already runs twelve of its fifteen minutes). The line reads back from the adapter that SwiftShader drew both labs, and from the bundles that the control is another program, rather than trusting the flags and the plugin. The lamp's physics stay on the Mac. The story is in the scripts' own comments.
 
-- **19y-1. `npm run beams` compares two programs the same way, on the Mac.** Its first line
+- **19z-1. `npm run beams` compares two programs the same way, on the Mac.** Its first line
   holds the projector's pass against a lab built from the old pass, byte for byte, in the
   `tools` shard on Metal. It has not flipped, and the pass is small; when it does, move
   that line to Measure as lampzero was, with `openLab({ software: true })`.
-- **19y-2. Measure's `browser` part is near its timeout again.** Found 2026-10-12 placing
+- **19z-2. Measure's `browser` part is near its timeout again.** Found 2026-10-12 placing
   lampzero: the part ran 12:16 of its 15 minutes (the layout 2:49, the phone 3:14, a click
   in the app 1:04, the sound's renders 0:47, the intro 0:38, Chromium 0:30), the margin 19b
   split Measure to get back. The next Chromium check goes in a part of its own or splits
