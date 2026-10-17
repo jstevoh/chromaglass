@@ -23,6 +23,8 @@ export interface GpuStepParams {
   visc: number;         // Hele-Shaw viscosity (thick 1.5 / thin 0.5)
   nu: number;           // kinematic viscosity for momentum diffusion
   diff: number;         // dye / heat diffusivity
+  /** Lab control for dispersion.mjs; 0 in the app (PLAN 18h / 18h-2). */
+  kappaT?: number;
   buoyancy: number;
   gravity: number;      // centre-gravity strength (already × 0.05)
   tiltX: number;        // plate tilt, applied as a uniform acceleration

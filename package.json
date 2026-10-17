@@ -159,6 +159,7 @@
     "flush": "node scripts/flush.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",
+    "dispersion": "node scripts/dispersion.mjs",
     "benday": "node scripts/benday.mjs",
     "grainedge": "node scripts/grainedge.mjs",
     "turing": "node scripts/turing.mjs",

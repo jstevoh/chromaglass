@@ -2369,7 +2369,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var film0 = fluid0.a;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
-    fluid0.a = min(1.0, fluid0.a * grainedDepth(bare0, grain));
+    let gd0 = grainedDepth(bare0, grain);
+    fluid0.a = min(1.0, fluid0.a * gd0);
     more0 *= grain;
   }
 
@@ -2471,7 +2472,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     milkScatter = sc0;
     milkGap = layerGap0;
     outColor = onGround(outColor, fluid0,
-      throughScaled(t0, more0) * reliefOf(fluid0.rgb, tint0, alpha0));
+      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4), film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0));
     milkScatter = 0.0;
 
     /*
@@ -2844,10 +2845,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;
     var more1 = 1.0;   // throughScaled
+    var lampMore1 = 1.0;
     if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
       more1 *= dish1.x;
+      lampMore1 *= dish1.x;
     }
 
     let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
@@ -2859,8 +2862,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // The grain after the edge, not before it: see the front plate's.
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
+      let gd1 = grainedDepth(bare1, grain);
+      fluid1.a = min(1.0, fluid1.a * gd1);
       more1 *= grain;
+      lampMore1 *= gd1;
     }
 
     let sharp1 = dof < 0.55;
@@ -2935,7 +2940,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         how much of its dye is in the path (throughScaled).
       */
       if (U.lampGround > 0.001) {
-        let lit1 = outColor * throughScaled(t1, more1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let lit1 = outColor * throughScaled(t1, lampMore1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         outColor = mix(painted1, lit1, U.lampGround);
       } else {
         outColor = painted1;
