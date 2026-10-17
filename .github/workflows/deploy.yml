@@ -128,6 +128,10 @@ jobs:
         env:
           VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
           VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
+          VITE_FIREBASE_API_KEY: "AIzaSyA-9eWPIG37Ar_rTz0JSBEg5UE8PX5LUIY"
+          VITE_FIREBASE_AUTH_DOMAIN: "chromaglass.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "chromaglass"
+          VITE_FIREBASE_APP_ID: "1:793087423172:web:cde0ef97b16e012cef0f91"
 
       # The secret exists now, so a run that builds but cannot publish means it
       # was removed or renamed. That is worth a red X: it used to be pending
