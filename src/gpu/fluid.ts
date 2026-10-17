@@ -1535,15 +1535,17 @@ export class WebGPUFluid {
   private writeSim(p: GpuStepParams, disp: number): void {
     const f = this.simF, i = this.simI;
     const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
+    const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
-    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = 0;
+    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
     f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
       A thin gap has its drag in the projection (wgsl/thinGap.ts), so decayVel
       neither damps nor clamps it: only the heat decays there.
+      PLAN 18g: on a thin gap, colour leaves by flushing over the open rim.
+      p.evapFactor is retained as a named safety cap (regulator) and for evaporation.
     */
-    const thin = this.thinGapOn(p);
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
@@ -4723,6 +4725,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const enc = this.device.createCommandEncoder({ label: 'measure' });
     const pass = enc.beginComputePass({ label: 'measure' });
@@ -4736,7 +4739,7 @@ export class WebGPUFluid {
     this.statsFresh = !!data;
     if (data && this.statsRing.landed > this.statsLatest.at) {
       const f = new Float32Array(data);
-      const area = this.N * this.N;
+      const area = this.thinLive ? this.dishArea : this.N * this.N;
       this.statsLatest = {
         meanDensity: f[3] / area,
         meanColor: [f[0] / area, f[1] / area, f[2] / area],
@@ -4750,6 +4753,23 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
+  private dishAreaCells = 0;
+  /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
+  private get dishArea(): number {
+    if (this.dishAreaCells) return this.dishAreaCells;
+    let count = 0;
+    const n = this.N;
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n - 0.5;
+        const v = (j + 0.5) / n - 0.5;
+        if (Math.hypot(u, v) < OPEN_RIM) count++;
+      }
+    }
+    this.dishAreaCells = count;
+    return count;
+  }
+
   /**
    * The same measurement, waiting for the GPU. For harnesses, not the show:
    * it answers about the plate as it is now rather than as it was two frames
@@ -4759,6 +4779,7 @@ export class WebGPUFluid {
     const buf = new ArrayBuffer(16);
     new Float32Array(buf, 0, 1)[0] = this.N;
     new Uint32Array(buf, 4, 1)[0] = STATS_GROUPS;
+    new Float32Array(buf, 8, 1)[0] = this.thinLive ? 1 : 0;
     this.device.queue.writeBuffer(this.statsArgs, 0, buf);
     const out = this.device.createBuffer({ label: 'stats now', size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'measure now' });
@@ -4772,7 +4793,7 @@ export class WebGPUFluid {
     const f = new Float32Array(out.getMappedRange().slice(0));
     out.unmap();
     out.destroy();
-    const area = this.N * this.N;
+    const area = this.thinLive ? this.dishArea : this.N * this.N;
     return {
       meanDensity: f[3] / area,
       meanColor: [f[0] / area, f[1] / area, f[2] / area],

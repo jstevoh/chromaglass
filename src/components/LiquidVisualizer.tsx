@@ -38,7 +38,7 @@ import { grabPadPicture, padPictureSender, padPictureWanted, tapPadPicture } fro
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
-import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
+import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
@@ -1617,17 +1617,47 @@ class FluidSimulation {
     if (this.carry) { this.carry.destroy(); this.carry = null; }
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
-    for (let i = 0; i < GRID_AREA; i++) {
-      const d = dye[i * 4 + 3];
-      this.rbDensity[i] = d;
-      this.rbVx[i] = vel[i * 4];
-      this.rbVy[i] = vel[i * 4 + 1];
-      sum += d;
-      sr += dye[i * 4]; sg += dye[i * 4 + 1]; sb += dye[i * 4 + 2];
+    const isThin = this.thinGap;
+    const S = this.size;
+    let count = 0;
+    for (let j = 0; j < S; j++) {
+      for (let i = 0; i < S; i++) {
+        const idx = i + j * S;
+        const d = dye[idx * 4 + 3];
+        this.rbDensity[idx] = d;
+        this.rbVx[idx] = vel[idx * 4];
+        this.rbVy[idx] = vel[idx * 4 + 1];
+        if (isThin) {
+          const u = (i + 0.5) / S - 0.5;
+          const v = (j + 0.5) / S - 0.5;
+          if (u * u + v * v >= OPEN_RIM * OPEN_RIM) continue;
+        }
+        sum += d;
+        sr += dye[idx * 4]; sg += dye[idx * 4 + 1]; sb += dye[idx * 4 + 2];
+        count++;
+      }
     }
-    this.meanDensity = sum / GRID_AREA;
-    this.meanColor = [sr / GRID_AREA, sg / GRID_AREA, sb / GRID_AREA];
+    const area = count > 0 ? count : GRID_AREA;
+    this.meanDensity = sum / area;
+    this.meanColor = [sr / area, sg / area, sb / area];
     this.rbSeq++;
+  }
+
+  private dishAreaCells = 0;
+  /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
+  private get dishArea(): number {
+    if (this.dishAreaCells) return this.dishAreaCells;
+    let count = 0;
+    const S = this.size;
+    for (let j = 0; j < S; j++) {
+      for (let i = 0; i < S; i++) {
+        const u = (i + 0.5) / S - 0.5;
+        const v = (j + 0.5) / S - 0.5;
+        if (u * u + v * v < OPEN_RIM * OPEN_RIM) count++;
+      }
+    }
+    this.dishAreaCells = count;
+    return count;
   }
 
   private pullStateFromGpu() {
@@ -3614,10 +3644,26 @@ class FluidSimulation {
         this.vx[i] *= factor;
         this.vy[i] *= factor;
       }
-      this.density[i]  *= p.evapFactor;
-      this.densityR[i] *= p.evapFactor;
-      this.densityG[i] *= p.evapFactor;
-      this.densityB[i] *= p.evapFactor;
+      if (!this.thinGap) {
+        this.density[i]  *= p.evapFactor;
+        this.densityR[i] *= p.evapFactor;
+        this.densityG[i] *= p.evapFactor;
+        this.densityB[i] *= p.evapFactor;
+      } else {
+        const x = (i % this.size + 0.5) / this.size - 0.5;
+        const y = (Math.floor(i / this.size) + 0.5) / this.size - 0.5;
+        if (x * x + y * y >= OPEN_RIM * OPEN_RIM) {
+          this.density[i] = 0;
+          this.densityR[i] = 0;
+          this.densityG[i] = 0;
+          this.densityB[i] = 0;
+        } else {
+          this.density[i]  *= p.evapFactor;
+          this.densityR[i] *= p.evapFactor;
+          this.densityG[i] *= p.evapFactor;
+          this.densityB[i] *= p.evapFactor;
+        }
+      }
       // Per-cell soft cap — keeps color ratios but stops runaway thickness,
       // so fresh dye can always shift a cell's hue
       if (this.density[i] > 6) {
@@ -3641,8 +3687,9 @@ class FluidSimulation {
       if (isNaN(this.vx[i]))      this.vx[i]       = 0;
       if (isNaN(this.vy[i]))      this.vy[i]       = 0;
     }
-    this.meanDensity = densSum / GRID_AREA;
-    this.meanColor = [colR / GRID_AREA, colG / GRID_AREA, colB / GRID_AREA];
+    const area = this.thinGap ? this.dishArea : GRID_AREA;
+    this.meanDensity = densSum / area;
+    this.meanColor = [colR / area, colG / area, colB / area];
   }
 
   /**
@@ -3825,6 +3872,8 @@ class FluidSimulation {
       exactly nothing however steep it is. The only thing a bigger number can
       do is stop a plate exceeding what it was asked for.
     */
+    // PLAN 18g: Kept as a named safety cap until PLAN 18c-2 (pours add volume): prevents
+    // runaway saturation on looks where colour is injected without added volume.
     const regulatorEvap = Math.min(0.12, over * over * 0.6);
     /*
       Only ever upward, and H6 tried the other direction and took it out
