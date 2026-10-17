@@ -40,6 +40,26 @@
  *                   whose loop runs before the ear's in each frame would hear
  *                   every reading one frame late (the old lag, by another
  *                   route).
+ *   a fader         no sound, and a MIDI fader (a stubbed controller, one
+ *                   CC bound to the Dimmer) swept up and down sixty messages
+ *                   a second. It rendered the App once a frame while it moved
+ *                   (`rideSetting` handed React each move on an animation
+ *                   frame), 60 a second here; now React is told ten times a
+ *                   second, for the desk's number, and the plate reads the
+ *                   ride itself (PLAN.md §14f). So: the desk's Dimmer changes
+ *                   seven to ten and a half times a second (a floor too: a
+ *                   desk frozen on one value renders nothing and passes a
+ *                   ceiling), the App renders for each of those plus the
+ *                   Perform desk's clock and no more, the fader's last value
+ *                   is where the setting lands, and, where a plate draws, the
+ *                   Dimmer the plate draws changes at least twice as often as
+ *                   the desk's (read by value on every frame, so a stale copy
+ *                   cannot pass). That last one is the feature: a fix that stopped the
+ *                   renders by feeding the plate React's ten-a-second state
+ *                   would pass every count and step the picture. And a
+ *                   second after the fader stops, no frame lays a ride at all
+ *                   and the App is back to its clock: #348's first try laid
+ *                   the ride over every frame for good after one touch.
  *   the quiet page  no sound source: the App renders between 0.6 and 1.5
  *                   times a second, which is the Perform desk's "live for
  *                   m:ss" clock (a real change, once a second; a
@@ -103,22 +123,46 @@ const sample = (page) => page.evaluate(() => {
   const c = window.chromaglassCastState();
   const r = c.ear?.reads ?? { frame: 0, ask: 0, tick: 0 };
   const h = window.chromaglassDebug?.()?.hearing ?? { frames: 0, fresh: 0, ownFrame: 0 };
+  const rd = window.chromaglassDebug?.()?.riding ?? { frames: 0, laid: 0 };
   return {
+    rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0,
     t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
   };
 });
 
-async function open(browser, screen, { source, desk }) {
+/*
+  A MIDI controller with one fader, for the fader's phase: Web MIDI stubbed
+  before the app loads, enabled, and a map binding CC 7 on channel 1 to the
+  Dimmer (the room's, so no look and no track override takes it). The app
+  wires its handler onto `onmidimessage` like any input's, and the page then
+  calls it as a controller's driver would.
+*/
+const FADER_MAP = JSON.stringify({
+  format: 'chromaglass-midi', version: 1, name: 'renders', bindings: [
+    { id: 'fader', source: { kind: 'cc', channel: 0, number: 7 }, target: { kind: 'setting', key: 'dimmer', min: 0, max: 1 }, mode: 'absolute' },
+  ],
+});
+
+async function open(browser, screen, { source, desk, fader = false }) {
   const ctx = await browser.newContext({ viewport: screen.viewport, isMobile: screen.touch, hasTouch: screen.touch, deviceScaleFactor: screen.touch ? 2 : 1 });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-  await page.addInitScript(({ source, desk }) => {
+  await page.addInitScript(({ source, desk, fader, map }) => {
     try {
       localStorage.setItem('chromaglass-audio-source', source);
       localStorage.setItem('chromaglass-desk-mode', desk);
+      if (fader) {
+        localStorage.setItem('chromaglass-midi-enabled', '1');
+        localStorage.setItem('chromaglass-midi-map', map);
+      }
     } catch { /* private window */ }
+    if (fader) {
+      const input = { id: 'renders-fader', name: 'renders fader', onmidimessage: null };
+      window.__fader = input;
+      navigator.requestMIDIAccess = async () => ({ inputs: new Map([[input.id, input]]), outputs: new Map(), onstatechange: null });
+    }
     /*
       Every commit React makes, of any component, not only the App's: a
       component that listened to the ear and set its own state on every
@@ -133,7 +177,7 @@ async function open(browser, screen, { source, desk }) {
       onScheduleFiberRoot() {}, onPostCommitFiberRoot() {}, onCommitFiberUnmount() {},
       onCommitFiberRoot() { window.__commits++; },
     };
-  }, { source, desk });
+  }, { source, desk, fader, map: FADER_MAP });
   await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassCastState === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
   // Past the opening: the first seconds build pipelines, load the look and
@@ -159,6 +203,10 @@ async function measure(page) {
       frameRate: (b.frames - a.frames) / s,
       fresh: b.fresh - a.fresh,
       ownFrame: b.ownFrame - a.ownFrame,
+      rideFrames: b.rideFrames - a.rideFrames,
+      laid: b.laid - a.laid,
+      deskMoves: (b.deskMoves - a.deskMoves) / s,
+      drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
     });
   }
   return out;
@@ -205,6 +253,72 @@ try {
         check(hears, w.every(x => x.frames >= 45 && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
           w.map(x => `${x.fresh} new and ${x.ownFrame} its own of ${x.frames} frames`).join(', '));
       } else skip(hears, `no plate draws here (${w.map(x => x.frames).join(', ')} frames); held on the Mac`);
+      await ctx.close();
+    }
+    {
+      const { page, ctx } = await open(browser, screen, { source: 'none', desk: 'perform', fader: true });
+      const f = (x) => x.toFixed(1);
+      /*
+        The sweep, and a watch on the desk's own value: how many times the
+        Dimmer the App rendered changed, read on every animation frame. Up
+        and down the whole travel, so soft takeover picks the fader up on the
+        first pass through wherever the Dimmer sat.
+      */
+      const wired = await page.evaluate(() => typeof window.__fader?.onmidimessage === 'function');
+      check(`${screen.name}, a fader: the app is listening to the stubbed controller`, wired);
+      await page.evaluate(() => {
+        let v = 0, dir = 2, last, lastDrawn;
+        window.__deskMoves = 0;
+        window.__drawnMoves = 0;
+        const watch = () => {
+          const d = window.chromaglassCastState().settings.dimmer;
+          if (last !== undefined && d !== last) window.__deskMoves++;
+          last = d;
+          // And the Dimmer the plate last drew: a value, so a copy handed
+          // back unchanged frame after frame cannot pass for a moving fader.
+          const drawn = window.__cgRiding?.drawn?.dimmer;
+          if (lastDrawn !== undefined && drawn !== lastDrawn) window.__drawnMoves++;
+          lastDrawn = drawn;
+          window.__deskWatch = requestAnimationFrame(watch);
+        };
+        watch();
+        window.__sweep = setInterval(() => {
+          v += dir;
+          if (v >= 127) { v = 127; dir = -2; } else if (v <= 0) { v = 0; dir = 2; }
+          window.__faderAt = v;
+          window.__fader.onmidimessage?.({ data: new Uint8Array([0xb0, 7, v]) });
+        }, 1000 / 60);
+      });
+      // Past the first pickup: the fader has to cross the Dimmer before it takes it.
+      await page.waitForTimeout(2500);
+      const w = await measure(page);
+      check(`${screen.name}, a fader: the desk shows its value seven to ten and a half times a second`,
+        w.every(x => x.deskMoves >= 7 && x.deskMoves <= 10.5), w.map(x => `${f(x.deskMoves)}/s`).join(', '));
+      check(`${screen.name}, a fader: the App renders for those and the desk's clock, at most ${ALLOWED_EXTRA} a second besides`,
+        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits <= x.deskMoves + ALLOWED_EXTRA),
+        w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s for ${f(x.deskMoves)}`).join(', '));
+      /*
+        Twice as often as React is told, at least: at sixty messages a second
+        the plate's Dimmer changes on nearly every frame it draws (24 to 60 a
+        second on the Mac), and a plate fed only React's would change 9 times.
+      */
+      const laidLine = `${screen.name}, a fader: the plate's Dimmer moves at least twice as often as the desk's`;
+      if (PLATE) {
+        check(laidLine, w.every(x => x.rideFrames >= 45 && x.drawnMoves >= 2 * x.deskMoves && x.laid > 0),
+          w.map(x => `${f(x.drawnMoves)}/s drawn for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
+      } else skip(laidLine, `no plate draws here (${w.map(x => x.rideFrames).join(', ')} frames); held on the Mac`);
+      // Let go, and give the last tenth of a second time to reach React.
+      const at = await page.evaluate(() => { clearInterval(window.__sweep); return window.__faderAt; });
+      await page.waitForTimeout(1000);
+      const landed = await page.evaluate(() => window.chromaglassCastState().settings.dimmer);
+      check(`${screen.name}, a fader: where it stops is where the Dimmer lands`,
+        Math.abs(landed - at / 127) < 1e-6, `fader ${(at / 127).toFixed(3)}, Dimmer ${Number(landed).toFixed(3)}`);
+      const still = await measure(page);
+      const stillLine = `${screen.name}, a fader let go: no frame lays a ride, and the App renders for its clock alone (0.6 to 1.5 a second)`;
+      check(stillLine,
+        still.every(x => x.laid === 0 && x.renders >= 0.6 && x.renders <= 1.5) && (!PLATE || still.every(x => x.rideFrames >= 45)),
+        still.map(x => `${x.laid} laid of ${x.rideFrames} frames, ${f(x.renders)} renders/s`).join(', '));
+      await page.evaluate(() => cancelAnimationFrame(window.__deskWatch));
       await ctx.close();
     }
     {
