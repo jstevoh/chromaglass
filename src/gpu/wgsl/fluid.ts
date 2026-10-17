@@ -999,6 +999,72 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The ferrofluid keeps its momentum (29c, the dragged drop). A thin gap does
+    not carry the velocity along itself (wgsl/thinGap.ts, "What the step no
+    longer does"): for the oils the drag takes a push in a few steps, so where
+    the liquid is by then is where the push was. The ferrofluid is thinner
+    (FERRO_NU, 5 cSt against the default oil's 22) and its drag time in the
+    rest gap is 0.6 s, 36 steps, while a drop dragged at the hand's speed,
+    0.1 of the plate a second, crosses its own width in 30. So every cell the
+    drop entered held the oil's velocity, part of the drop's, and the
+    magnet's pull brought it up at 2.8% of the shortfall a step. Measured in
+    the lab (ferrodrag's scene, 384²): the drop topped out at 0.09 of the
+    plate a second under a pull whose Darcy speed was 0.19 and its lag grew
+    without end, 2.78R at 3 s and 5.8R at 6 s, where under a weak magnet,
+    slow enough to keep up with its own momentum, it went at 0.95 of Darcy's.
+    Real ferrofluid carries its momentum: the term the gap's step drops is
+    ρ(u·∇)u, and weighed against the drag it is Uτ/R, 2.5 for this drop
+    against the oils' tenth.
+
+    So the velocity is carried along itself here by the ferrofluid's share of
+    the cell: the cell's momentum is φ of the ferrofluid's and 1 − φ of the
+    oil's, and only the ferrofluid's part travels (one backtrace; the oil's
+    part reads as it was). Before the step's forces, so hsPrep's snapshots
+    still read each force apart, and before the projection, which takes the
+    divergence the carry leaves out as the old plate's second projection did.
+    Only with ferrofluid on the plate: every other look's step is as it was.
+  */
+  phaseMomentum: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let share = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (share <= 0.001) { textureStore(dst, p, v); return; }
+  // Where this cell's liquid was a step ago, and the ferrofluid's own velocity
+  // there: its momentum φu over its share φ across the four cells round the
+  // point, so a rim cell whose trace lands between the drop and the oil reads
+  // the drop's speed, not the oil's (the first form read the mixture's there,
+  // and the drop's back fell into a tail: its half-full area 82 of 100 cells
+  // at 3 s). Where there is next to no ferrofluid the mixture's own.
+  let uv = uvOf(id);
+  let pos = clamp(uv - v.xy * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+  let f = pos * S.n - 0.5;
+  let fl = floor(f);
+  let t = f - fl;
+  let hiN = vec2f(S.n - 1.0);
+  let lo = vec2i(clamp(fl, vec2f(0.0), hiN));
+  let hi = vec2i(clamp(fl + 1.0, vec2f(0.0), hiN));
+  let w = vec4f((1.0 - t.x) * (1.0 - t.y), t.x * (1.0 - t.y), (1.0 - t.x) * t.y, t.x * t.y);
+  let q = array<vec2i, 4>(vec2i(lo.x, lo.y), vec2i(hi.x, lo.y), vec2i(lo.x, hi.y), vec2i(hi.x, hi.y));
+  var mom = vec2f(0.0);
+  var sh = 0.0;
+  var mixed = vec2f(0.0);
+  for (var k = 0; k < 4; k++) {
+    let s = clamp(textureLoad(phase, q[k], 0).r, 0.0, 1.0);
+    let u = textureLoad(vel, q[k], 0).xy;
+    mom += w[k] * s * u;
+    sh += w[k] * s;
+    mixed += w[k] * u;
+  }
+  let back = select(mixed, mom / max(sh, 1e-4), sh > 0.01);
+  textureStore(dst, p, safeVel(vec4f(mix(v.xy, back, share), v.z, v.w)));
+}`,
+
+  /*
     And never past full: the pressure inside the ferrofluid.
 
     The flux step conserves the liquid exactly, but the flow it rides is only

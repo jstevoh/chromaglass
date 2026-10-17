@@ -1148,6 +1148,7 @@ export class WebGPUFluid {
       ['phaseCH', [R32], open.phase],
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
+      ['phaseMomentum', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
       ['phaseDisplace', [dye], open.displace],
@@ -2207,6 +2208,16 @@ export class WebGPUFluid {
     stage('viscosity', (pass) => {
       this.jacobi(pass, this.vel, visc, VISC_ITERS, 'vel');
     }, visc.some((v) => v > 0));
+
+    /*
+      The ferrofluid's momentum travels with it (phaseMomentum, and why there):
+      the velocity carried along itself by the ferrofluid's share of each
+      cell, before the snapshot below so every force is still read apart.
+    */
+    stage('phase momentum', (pass) => {
+      this.run(pass, 'phaseMomentum', this.vel.write, [this.vel.read, this.phase.read], this.arg('phase momentum', [disp, 0, 0, 0]));
+      this.vel.swap();
+    }, thin && this.phaseLive);
 
     /*
       A thin gap keeps the velocity from before the forces, so it can read
