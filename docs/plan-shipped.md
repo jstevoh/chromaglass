@@ -2913,6 +2913,31 @@ GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate
 asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
 and fifth 13.5.
 
+#### 19w-1. The deploy gate counts the fifth shard
+
+**Shipped** 2026-10-17. Found by the owner's question of that day, how often the checks find
+a real problem: going through three weeks of red runs, the deploys since 10-11 had all run
+the full Mac. `deploygate.sh` decides whether a deploy can trust the PR's green run, and one
+of its conditions is that the run ran the Mac shards. It asked for that by name, in two
+places (the run itself, and a run it carries from, 19i), as exactly
+`open, plate, show, tools`, each green. 19w added `fifth`, the gate was not told, and from
+then on a run with five green shards was "not a Mac run". `npm run deploygate -- --history 20`
+read 0 of 20 trusted, and 2 by rule 5, both from before 19w; `0487e75` (#392), for one,
+answered "did not run the Mac shards (fifth=success,open=success,plate=success,show=success,
+tools=success)". Each of those deploys re-ran every Mac check, about 55 minutes from merge
+to live, on a tree that had just passed them.
+
+The shard names now come from the one `shard: [...]` line in `checks.yml`, the checked-out
+tree's, and both places compare against that list; no such line, or two, stops the script,
+which in `deploy.yml` runs the checks in full. Adding a sixth shard needs no edit here. A run
+whose own matrix differed (a rule 5 run from before a shard was added or renamed) does not
+match and is not trusted, which is the safe way to be wrong. Replayed after: 4 of 20 trusted
+(#392, #391, #374, #379), 1 more by rule 5 (#382), and 4 needing no deploy, against 0, 2 and 4
+before. The two rule-5 merges from before 19w (#378, #380) now read false, judged against
+today's five shards, as does #357's four-shard run; the other merges since 19w are refused
+for the reasons the rules give (files both sides touched, or a commit on main since the
+run's base that went red), not for their shards.
+
 ### 19x. A moved bar names itself
 
 **Shipped** 2026-10-11. The owner asked how the session that builds physics
