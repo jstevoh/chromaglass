@@ -1036,10 +1036,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (share <= 0.001) { textureStore(dst, p, v); return; }
   // Where this cell's liquid was a step ago, and the ferrofluid's own velocity
   // there: its momentum φu over its share φ across the four cells round the
-  // point, so a rim cell whose trace lands between the drop and the oil reads
-  // the drop's speed, not the oil's (the first form read the mixture's there,
-  // and the drop's back fell into a tail: its half-full area 82 of 100 cells
-  // at 3 s). Where there is next to no ferrofluid the mixture's own.
+  // point. Momentum arrives with ferrofluid, so where the trace lands on next
+  // to none (under a quarter of a cell across the four), the cell keeps the
+  // velocity it has: the first two forms read the mixture's velocity there,
+  // and a cell at the drop's back, whose trace lands in the faint wake the
+  // flux step leaves, read the oil's return flow and was left behind, so the
+  // drop shed ferrofluid into that wake (cells over 0.01 of ferrofluid 352
+  // to 954 in 3 s, its half-full area 100 to 82 cells).
   let uv = uvOf(id);
   let pos = clamp(uv - v.xy * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
   let f = pos * S.n - 0.5;
@@ -1052,15 +1055,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let q = array<vec2i, 4>(vec2i(lo.x, lo.y), vec2i(hi.x, lo.y), vec2i(lo.x, hi.y), vec2i(hi.x, hi.y));
   var mom = vec2f(0.0);
   var sh = 0.0;
-  var mixed = vec2f(0.0);
   for (var k = 0; k < 4; k++) {
     let s = clamp(textureLoad(phase, q[k], 0).r, 0.0, 1.0);
     let u = textureLoad(vel, q[k], 0).xy;
     mom += w[k] * s * u;
     sh += w[k] * s;
-    mixed += w[k] * u;
   }
-  let back = select(mixed, mom / max(sh, 1e-4), sh > 0.01);
+  let back = select(v.xy, mom / max(sh, 1e-4), sh > 0.25);
   textureStore(dst, p, safeVel(vec4f(mix(v.xy, back, share), v.z, v.w)));
 }`,
 

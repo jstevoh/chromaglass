@@ -2217,7 +2217,7 @@ export class WebGPUFluid {
     stage('phase momentum', (pass) => {
       this.run(pass, 'phaseMomentum', this.vel.write, [this.vel.read, this.phase.read], this.arg('phase momentum', [disp, 0, 0, 0]));
       this.vel.swap();
-    }, thin && this.phaseLive);
+    }, thin && this.phaseLive && (p.phaseMomentum ?? 1) > 0);
 
     /*
       A thin gap keeps the velocity from before the forces, so it can read
