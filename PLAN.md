@@ -5605,7 +5605,17 @@ once the login works (23.14).*
 - **23.13** *(owner, before 23.10 goes live)*: a privacy page and terms, since the site
   now keeps an email per person: what is kept (the email, the account's id, later its
   keys and its devices), that it is not sold, and that deleting the account deletes it.
-  The App Store asks for both.
+  The App Store asks for both. *Drafted 2026-10-17:* `public/privacy.html` and
+  `public/terms.html`, written from what the code sends (the account, song
+  identification, lyrics, fonts, crash reports only on Send, the hosts' logs; the
+  microphone, camera, looks, recordings and phone link stay on the machine), with a
+  flashing-light warning in the terms. *Measure:* `npm run privacy` (CI, part
+  `logic`): every host the code and its servers reach and every `VITE_` service is
+  named on the page, and no `{{OWNER: …}}` mark is left. Red until the owner fills
+  those marks (a contact address that is not a personal one, who runs it, the
+  governing law, the date, how long crash reports are kept) and approves the wording.
+  23.10 links both from the sign-in and account sheets; 23.12 adds keys and devices
+  to the page and the licence's terms (refunds, machines a key) to the terms.
 - **23.10** (one PR, lane B; Antigravity builds, brief `docs/handoff-signin.md`): the
   sign-in on the hosted site, on the desk and the phone, and the account sheet (the
   email, sign out, delete the account) on each. *Measure:* `npm run signin`, 14/14,
