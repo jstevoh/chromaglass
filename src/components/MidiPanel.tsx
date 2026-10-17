@@ -272,6 +272,8 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
           {FACTORY_MAPS.map(f => (
             <button
               key={f.id}
+              type="button"
+              aria-pressed={detected?.id === f.id}
               onClick={() => midi.loadFactory(f.id)}
               className={chip(detected?.id === f.id)}
               title={detected?.id === f.id ? `${f.name} is what is plugged in` : undefined}
@@ -376,10 +378,13 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
               {midi.map.bindings.filter(b => b.bank !== undefined).length} on a layer
             </span>
           </div>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Bank">
             {Array.from({ length: midi.banks }, (_, i) => (
               <button
                 key={i}
+                type="button"
+                role="radio"
+                aria-checked={midi.bank === i}
                 onClick={() => midi.setBank(i)}
                 data-testid={`midi-bank-${i}`}
                 title={i === 0 ? 'The base layer: bindings here are live on every bank' : `Shift layer ${i + 1}`}
@@ -421,9 +426,9 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       </div>
 
       {/* Learn targets */}
-      <div className="flex gap-1 mb-3">
+      <div className="flex gap-1 mb-3" role="tablist" aria-label="Learn targets">
         {(['settings', 'actions', 'presets', 'dyes'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
         ))}
       </div>
       {midi.learning && (

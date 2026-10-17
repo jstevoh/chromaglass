@@ -5954,8 +5954,10 @@ export default function App() {
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
           <button
             onClick={() => { setShowTrackPanel(!showTrackPanel); setShowSequencer(false); }}
+            aria-pressed={showTrackPanel}
+            data-testid="track-panel-button"
             className={`relative p-2 rounded-full transition-all ${
-              showTrackPanel ? 'bg-purple-500 text-white' : 'hover:bg-white/10 text-white/60'
+              showTrackPanel ? 'bg-accent text-white' : 'hover:bg-white/10 text-white/60'
             }`}
             title={musicIntel.state.track ? `${musicIntel.state.track.title} — ${musicIntel.state.track.artist}` : 'Track intelligence'}
           >
