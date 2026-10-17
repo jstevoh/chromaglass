@@ -27,6 +27,9 @@ import { stream } from './rng';
  *     seconds, then a rest before the next. Under a minute of glide the change
  *     reads as the dish doing something; over a minute and a half it is too
  *     slow to notice at all, and the eye only sees that it is different.
+ *     That is at the default Evolve Speed: the dial stretches every time
+ *     here by up to four at its bottom and shrinks it by up to eight at its
+ *     top (evolvePace below).
  *   - **The music steers which way, over minutes.** Not the frame's treble or
  *     energy: the song shape tracker's intensity (already slow, lib/songShape)
  *     averaged again over thirty seconds, set against the song's own level
@@ -108,8 +111,13 @@ export const GLIDE_MIN = 30;
 export const GLIDE_MAX = 90;
 /** A palette change at most this often, seconds, so a run of short sections does not flicker colours. */
 const PALETTE_GAP = 75;
-/** The shortest rest between two moves, seconds, at full Evolve Speed: a move, then the dish left alone to show it. */
+/**
+ * The shortest rest between two moves at the default Evolve Speed, seconds: a
+ * move, then the dish left alone to show it. Paced like the rest (evolvePace),
+ * but never under REST_FLOOR real seconds, however fast the dial.
+ */
 export const MIN_REST = 6;
+export const REST_FLOOR = 2;
 /** Seconds of silence before Evolve stops listening for sections and runs on its clock. */
 const DEAF_AFTER = 12;
 
@@ -118,12 +126,59 @@ export const AIM_STEP = 0.08;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/**
+ * The Evolve Speed a look sits at when it sets none (DEFAULT_SETTINGS'), and
+ * the one the dial is measured from when a look's own is off (0, as Comet's).
+ */
+export const PACE_PIVOT = 0.12;
+/** How many times slower than that the bottom of the dial runs, and how many times faster the top. */
+const PACE_SLOWEST = 4;
+const PACE_FASTEST = 8;
+/** The palette never turns more often than this, seconds, however fast the dial: colours that flicker are not evolving. */
+const PALETTE_FLOOR = 20;
+
+/**
+ * How long Evolve's times run at this Evolve Speed, as a multiple of the
+ * pace described above: 1 where the look's own Evolve Speed sits, 4 at the
+ * bottom of the dial (a move every five minutes or so, glides of two to six
+ * minutes), an eighth at the top (a move every twelve seconds or so, glides
+ * of four to eleven seconds).
+ *
+ * The owner, 2026-10-11, once the slow Evolve was live: "I want evolve to go
+ * really slowly if the settings control is low - but if I ramp it up, I want
+ * it to evolve quickly." Before this the dial barely touched the pace: every
+ * glide was held to 30–90 s whatever the dial said, and from the bottom of
+ * the dial to the top the moves a minute went from 0.63 to 1.10 (npm run
+ * slowevolve). Now the whole dial is a factor of 32, log-even on each side
+ * of the default, so each step up feels like the same step: a turn from 60%
+ * to 100% speeds it up by as much, to the eye, as one from 12% to 30%.
+ *
+ * Measured from the look's own Evolve Speed, not from one number for every
+ * look: the looks set it from 0.02 to 0.3, for the hands' pours as much as
+ * for this (presets.ts), and from a fixed middle 14 of the 41 would have
+ * evolved one and a half to three and a half times slower than they did the
+ * day the owner liked them, without the dial being touched. So a look plays
+ * at the pace it always had, and the dial turned down from there slows it,
+ * turned up speeds it. Log-even on each side, so the look's own point stays
+ * exactly where it was whatever the two ends are chosen to be.
+ */
+export function evolvePace(rate: number, own: number = PACE_PIVOT): number {
+  const pivot = Number.isFinite(own) && own >= 0.01 && own < 1 ? own : PACE_PIVOT;
+  const r = clamp(Number.isFinite(rate) ? rate : pivot, 0, 1);
+  return r <= pivot
+    ? Math.pow(PACE_SLOWEST, (pivot - r) / pivot)
+    : Math.pow(1 / PACE_FASTEST, (r - pivot) / (1 - pivot));
+}
+
+
 export class SlowEvolve {
   /** Seconds left of the move under way, or of the rest after it. */
   private left = 4;
   private gliding = false;
   /** Seconds since the last glide ended (a fresh planner has rested as long as it likes). */
   private restedFor = MIN_REST;
+  /** The same in real seconds, for REST_FLOOR. */
+  private restedReal = REST_FLOOR;
   private lastTheme = '';
   /** The song's level over the last half minute, and over four. */
   loud = 0;
@@ -146,14 +201,26 @@ export class SlowEvolve {
   constructor(private rand: () => number = stream('show.drift').float) {}
 
   /**
-   * One step of `dt` seconds. `rate` is the Evolve Speed: it shortens the rests
-   * and the glides a little and lets a move use more of each dial's window.
+   * One step of `dt` seconds. `rate` is the Evolve Speed: it sets the pace
+   * against `own`, the look's own Evolve Speed (evolvePace: the glides, the
+   * rests and the palette's least gap all run that many times longer or
+   * shorter) and lets a move use more of each dial's window.
    */
-  step(dt: number, ear: EvolveEar, current: VisualizerSettings, anchor: VisualizerSettings, rate: number): EvolveStep {
+  step(dt: number, ear: EvolveEar, current: VisualizerSettings, anchor: VisualizerSettings, rate: number,
+    own: number = PACE_PIVOT): EvolveStep {
     const r = clamp(rate, 0, 1);
     const out: EvolveStep = {};
     if (r <= 0 || dt <= 0) return out;
-    this.sincePalette += dt;
+    const pace = evolvePace(r, own);
+    /*
+      The rest and the palette's gaps are counted in paced seconds, read off
+      the dial on every step, not fixed when the rest began: turned up in the
+      middle of a five-minute rest, the next move comes in seconds, which is
+      what turning it up is for. A glide under way keeps the length it began
+      with (App glides it by its own seconds); the next one takes the new pace.
+    */
+    const restDt = dt / pace;
+    this.sincePalette += dt / Math.max(pace, PALETTE_FLOOR / PALETTE_GAP);
     if (!this.primed) { this.primed = true; this.lastDrop = ear.lastDrop; this.lastSection = ear.section; }
 
     const hearing = ear.playing && ear.section !== 'quiet';
@@ -218,23 +285,27 @@ export class SlowEvolve {
       }
     }
 
-    this.left -= dt;
-    if (!this.gliding) this.restedFor += dt;
+    this.left -= this.gliding ? dt : restDt;
+    if (!this.gliding) this.restedFor += restDt;
+    if (!this.gliding) this.restedReal += dt;
     // A section change ends a rest once the dish has had its few seconds; a glide always runs to its end.
     const cued = !this.gliding && this.pendingCue !== null && this.restedFor >= MIN_REST;
     if (this.left > 0 && !cued) return out;
+    // At the top of the dial a paced rest is under a second; the dish still gets two to show the move.
+    if (!this.gliding && this.restedReal < REST_FLOOR) return out;
 
     if (this.gliding) {
       this.gliding = false;
       this.pendingCue = null;
       this.restedFor = 0;
-      this.left = MIN_REST + (30 * (1 - r)) * (0.7 + 0.6 * this.rand());
+      this.restedReal = 0;
+      this.left = MIN_REST + (30 * (1 - PACE_PIVOT)) * (0.7 + 0.6 * this.rand());
       return out;
     }
 
     const cue = this.pendingCue ?? 'clock';
     this.pendingCue = null;
-    const move = this.plan(current, anchor, r, music, ear, cue);
+    const move = this.plan(current, anchor, r, pace, music, ear, cue);
     if (move) {
       out.move = move;
       this.gliding = true;
@@ -246,7 +317,7 @@ export class SlowEvolve {
     return out;
   }
 
-  private plan(current: VisualizerSettings, anchor: VisualizerSettings, r: number, music: boolean,
+  private plan(current: VisualizerSettings, anchor: VisualizerSettings, r: number, pace: number, music: boolean,
     ear: EvolveEar, cue: EvolveMove['cue']): EvolveMove | null {
     // A theme with dials in play on this look, not the one just moved.
     const order = THEMES.map((t, i) => ({ t, i, roll: this.rand() }))
@@ -265,10 +336,18 @@ export class SlowEvolve {
         } else {
           seconds = 50 + 35 * this.rand();
         }
-        seconds *= (1.15 - 0.3 * r) * (0.88 + 0.24 * this.rand());
-        const move: EvolveMove = { theme: t.name, to, seconds: clamp(seconds, GLIDE_MIN, GLIDE_MAX), lean: this.lean, cue };
+        seconds *= (1.15 - 0.3 * PACE_PIVOT) * (0.88 + 0.24 * this.rand());
+        const move: EvolveMove = { theme: t.name, to, seconds: pace * clamp(seconds, GLIDE_MIN, GLIDE_MAX), lean: this.lean, cue };
         if ((current.macroZoom ?? 1) > 1.05 && (current.macroCamera ?? 'hold') !== 'auto') {
-          const step = (v: number) => clamp(v + (this.rand() * 2 - 1) * AIM_STEP, 0.15, 0.85);
+          /*
+            The camera never goes faster than at the default, however fast the
+            dial: a quick move is a shorter step of the aim over a shorter
+            glide, not the same step in an eighth of the time. The aim moves
+            the whole picture, and whole-picture motion made the owner ill
+            (2026-10-11); the liquids may hurry, the frame may not.
+          */
+          const reach = AIM_STEP * Math.min(1, pace);
+          const step = (v: number) => clamp(v + (this.rand() * 2 - 1) * reach, 0.15, 0.85);
           move.aim = { x: step(current.macroAimX ?? 0.5), y: step(current.macroAimY ?? 0.5) };
         }
         return move;

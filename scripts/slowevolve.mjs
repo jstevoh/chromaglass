@@ -46,7 +46,7 @@
  * (docs/judging.md).
  */
 import { readFileSync } from 'node:fs';
-import { SlowEvolve, GLIDE_MIN, GLIDE_MAX, MIN_REST } from '../src/lib/slowEvolve.ts';
+import { SlowEvolve, GLIDE_MIN, GLIDE_MAX, MIN_REST, REST_FLOOR, AIM_STEP, evolvePace } from '../src/lib/slowEvolve.ts';
 import { DRIFTABLE, FRAME_MOTION, THEMES } from '../src/lib/drift.ts';
 import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -105,7 +105,12 @@ const dist = (a, b) => {
 };
 
 /** One run: the planner stepped as App steps it, every move glided as App glides it. */
-function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, seed = 20261011, extra = {} } = {}) {
+/*
+  At the look's own Evolve Speed unless told otherwise, measured from that,
+  as App runs it: since the dial sets the pace (8d), a look run at any other
+  rate than its own is not the look the owner sees.
+*/
+function run(anchor, earAt, seconds, { rate = anchor.automateRate || DEFAULT_SETTINGS.automateRate, own = anchor.automateRate, seed = 20261011, extra = {} } = {}) {
   const rand = makeRng(seed, 'slowevolve').float;
   const shakeRand = makeRng(seed, 'shake').float;
   const ev = new SlowEvolve(rand);
@@ -118,7 +123,7 @@ function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, see
   let endedAt = null;
   for (let t = 0; t < seconds; t += DT) {
     const ear = earAt(t, shakeRand);
-    const out = ev.step(DT, ear, cur, base, rate);
+    const out = ev.step(DT, ear, cur, base, rate, own);
     if (out.palette) palettes.push({ t, section: ear.section, sinceDrop: ear.lastDrop !== null ? t - ear.lastDrop : Infinity });
     if (out.move) {
       if (glide && glide.at < 1) overlap++;
@@ -128,6 +133,7 @@ function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, see
       if (out.move.aim) { from.macroAimX = cur.macroAimX ?? 0.5; from.macroAimY = cur.macroAimY ?? 0.5; }
       glide = { move: out.move, from, at: 0, wasResting: !glide || glide.at >= 1 };
       moves.push({ t, ...out.move, section: ear.section, resting: glide.wasResting,
+        aimStep: out.move.aim ? Math.max(Math.abs(out.move.aim.x - from.macroAimX), Math.abs(out.move.aim.y - from.macroAimY)) : 0,
         sinceDrop: ear.lastDrop !== null ? t - ear.lastDrop : Infinity });
     }
     if (glide && glide.at < 1) {
@@ -161,7 +167,7 @@ function run(anchor, earAt, seconds, { rate = DEFAULT_SETTINGS.automateRate, see
 }
 
 // ── Pace: one move at a time, 30–90 s, about one a minute ──────────
-console.log('\nThe pace of it, at the default Evolve Speed');
+console.log('\nThe pace of it, each look at its own Evolve Speed');
 for (const [id, anchor] of LOOKS) {
   for (const [label, earAt] of [['a song', (t, r) => songEar(t, 0, r)], ['no music', silence]]) {
     const r = run(anchor, earAt, 600);
@@ -179,13 +185,102 @@ for (const [id, anchor] of LOOKS) {
   }
 }
 
-// ── At full Evolve Speed it is busier, and still slow ───────────────
+// ── The dial sets the pace: low creeps, high moves quickly ──────────
+/*
+  The owner, 2026-10-11, once the slow Evolve was live: "I want evolve to go
+  really slowly if the settings control is low - but if I ramp it up, I want
+  it to evolve quickly." Before this the Evolve Speed dial barely touched the
+  pace: every glide was held to 30–90 s whatever the dial, and the dial only
+  shortened the rest and the glide by a fifth or so, so the whole travel of
+  the dial was about one and a half times in moves a minute.
+
+  Measured on Classic with a song, over half an hour at each setting, so the
+  slowest still makes several moves. The dial is measured from the look's own
+  Evolve Speed (Classic's is 0.15): there the pace is the one the checks
+  above hold every look to.
+*/
+console.log('\nThe dial sets the pace');
 {
-  const r = run(look('classic'), (t, rr) => songEar(t, 0, rr), 600, { rate: 1 });
-  const g = r.moves.map(m => m.seconds);
-  check('at full Evolve Speed: more moves, still one at a time and never under 30 s',
-    r.moves.length / 10 > 0.9 && r.overlap === 0 && Math.min(...g) >= GLIDE_MIN && r.peak <= 0.008 && Math.min(...r.rests) >= MIN_REST - DT,
-    `${(r.moves.length / 10).toFixed(1)} moves/min, shortest glide ${Math.min(...g).toFixed(0)} s, shortest rest ${Math.min(...r.rests).toFixed(1)} s, fastest dial ${(r.peak * 100).toFixed(2)} %/s`);
+  const RATES = [0.02, 0.05, 0.15, 0.3, 0.6, 1];
+  const rows = RATES.map((rate) => {
+    const r = run(look('classic'), (t, rr) => songEar(t, 0, rr), 1800, { rate });
+    const g = r.moves.map(m => m.seconds);
+    return {
+      rate, r, perMin: r.moves.length / 30,
+      gMean: g.reduce((a, b) => a + b, 0) / Math.max(1, g.length), gMin: Math.min(...g),
+      restMin: r.rests.length ? Math.min(...r.rests) : Infinity,
+      restMean: r.rests.length ? r.rests.reduce((a, b) => a + b, 0) / r.rests.length : Infinity,
+    };
+  });
+  for (const w of rows) console.log(`   Evolve Speed ${String(Math.round(w.rate * 100)).padStart(3)}%: ${w.perMin.toFixed(2)} moves/min, glides ${w.gMin.toFixed(0)}–${Math.max(...w.r.moves.map(m => m.seconds)).toFixed(0)} s (mean ${w.gMean.toFixed(0)}), rests mean ${w.restMean.toFixed(0)} s, fastest dial ${(w.r.peak * 100).toFixed(2)} %/s`);
+  const at = (rate) => rows.find(w => w.rate === rate);
+  const lo = at(0.02), def = at(0.15), hi = at(1);
+  const rising = rows.every((w, i) => i === 0 || w.perMin > rows[i - 1].perMin);
+  check('every step up the dial makes more moves a minute',
+    rising, rows.map(w => `${Math.round(w.rate * 100)}% ${w.perMin.toFixed(2)}`).join(', '));
+  check('low on the dial it creeps: under half the moves of the default, each glide at least twice as long',
+    lo.perMin * 2 <= def.perMin && lo.gMean >= 2 * def.gMean,
+    `2%: ${lo.perMin.toFixed(2)} moves/min, glides ${lo.gMean.toFixed(0)} s; default: ${def.perMin.toFixed(2)}, ${def.gMean.toFixed(0)} s`);
+  check('at full it evolves quickly: five times the moves of the default or more, glides a sixth as long or less',
+    hi.perMin >= 5 * def.perMin && hi.gMean * 6 <= def.gMean,
+    `full: ${hi.perMin.toFixed(2)} moves/min, glides ${hi.gMean.toFixed(0)} s; default: ${def.perMin.toFixed(2)}, ${def.gMean.toFixed(0)} s`);
+  /*
+    Each row held to its own pace's floors, not a floor for all: a rest of a
+    single step at full speed would pass "a rest after each" and is not a
+    rest (the check-skeptic's mutant did exactly that and passed).
+  */
+  const own = look('classic').automateRate;
+  check(`and still one move at a time, each glide and rest at least its pace's shortest (rest never under ${REST_FLOOR} s)`,
+    rows.every(w => {
+      const p = evolvePace(w.rate, own);
+      return w.r.moves.length >= 2 && w.r.overlap === 0 && w.gMin >= GLIDE_MIN * p - DT
+        && w.restMin >= Math.max(REST_FLOOR, MIN_REST * p) - DT;
+    }),
+    rows.map(w => `${Math.round(w.rate * 100)}%: ${w.r.moves.length} moves, shortest glide ${w.gMin.toFixed(1)} s (floor ${(GLIDE_MIN * evolvePace(w.rate, own)).toFixed(1)}), rest ${w.restMin.toFixed(1)} s (floor ${Math.max(REST_FLOOR, MIN_REST * evolvePace(w.rate, own)).toFixed(1)}), ${w.r.overlap} overlapping`).join('; '));
+  const palGap = (r) => r.palettes.reduce((m, p, i, a) => i ? Math.min(m, p.t - a[i - 1].t) : m, Infinity);
+  /*
+    App writes a glide twice a second, so at full speed a dial moves a
+    couple of percent of its travel a write (PLAN 10-8d-2). Held to what it
+    measured when the owner first saw it, so a change that makes it jumpier
+    is seen here before it is seen on the wall.
+  */
+  check('at full, no dial moves faster than 5 % of its travel a second (2.5 % a write)',
+    hi.r.peak <= 0.05, `fastest ${(hi.r.peak * 100).toFixed(2)} %/s`);
+  /*
+    The song above never drops closer than 51 s, so it cannot test a 20 s
+    floor (the check-skeptic removed the floor and that version still
+    passed). A drop every six seconds for four minutes can: the turns must
+    come, and come no closer than 20 s, and the floor must be what holds
+    them (the closest pair within 25 s of it).
+  */
+  const drops = (t) => ({ playing: true, section: 'steady', intensity: 0.8, tension: 0, lastDrop: Math.floor(t / 6) * 6, time: t, bpm: 124 });
+  const flood = run(look('classic'), drops, 240, { rate: 1 });
+  const gap = flood.palettes.reduce((m, p, i, a) => i ? Math.min(m, p.t - a[i - 1].t) : m, Infinity);
+  check('the palette never turns twice in 20 s, even at full with a drop every six seconds',
+    flood.palettes.length >= 4 && gap >= 20 - DT && gap <= 25,
+    `${flood.palettes.length} turns in four minutes, closest two ${gap.toFixed(1)} s apart`);
+}
+{
+  // Ramped up in the middle of a long rest, the next move comes at once, not
+  // after the rest the low setting had planned. The control is the same run
+  // left at 2%: its next move after the same moment must be the slow one, or
+  // the turn is not what made the difference.
+  const after = (turnTo) => {
+    const ev = new SlowEvolve(makeRng(5, 'slowevolve').float);
+    const base = look('classic');
+    let first = null, low = 0;
+    for (let t = 0; t < 1500; t += DT) {
+      const out = ev.step(DT, silence(t), base, base, t < 600 ? 0.02 : turnTo);
+      if (out.move && t < 600) low++;
+      if (out.move && t >= 600 && first === null) first = t - 600;
+    }
+    return { first, low };
+  };
+  const { first: firstAfter, low: movedLow } = after(1);
+  const { first: leftAlone } = after(0.02);
+  check('turned up from low, it answers within half a minute, not when the slow rest would have ended',
+    firstAfter !== null && firstAfter <= 30 && movedLow > 0 && (leftAlone === null || firstAfter * 8 <= leftAlone),
+    `${movedLow} moves in ten minutes at 2%, then the first move ${firstAfter === null ? 'never' : firstAfter.toFixed(1) + ' s'} after the turn; left at 2%, ${leftAlone === null ? 'none in 15 min' : leftAlone.toFixed(1) + ' s'}`);
 }
 
 // ── The music steers it ─────────────────────────────────────────────
@@ -285,9 +380,12 @@ console.log('\nWhat it never touches');
 {
   const r = run(look('classic'), (t, rr) => songEar(t, 0, rr), 600, { rate: 1, extra: { macroMode: true, macroZoom: 3, macroCamera: 'hold' } });
   const aimed = r.moves.filter(m => m.aim).length;
-  check('the closeup\'s aim wanders a short way over each whole move',
-    aimed === r.moves.length && aimed > 0 && r.aimPeak <= 0.004,
-    `${aimed} of ${r.moves.length} moves aimed it, fastest ${(r.aimPeak * 1000).toFixed(2)} thousandths of the plate a second`);
+  // And it does move: the furthest step of a move at least half its reach at this pace.
+  const reach = AIM_STEP * Math.min(1, evolvePace(1, look('classic').automateRate));
+  const furthest = Math.max(0, ...r.moves.map(m => m.aimStep));
+  check('the closeup\'s aim wanders a short way over each whole move, no faster at full than the default allows',
+    aimed === r.moves.length && aimed > 0 && r.aimPeak <= 0.004 && furthest >= reach / 2,
+    `${aimed} of ${r.moves.length} moves aimed it, fastest ${(r.aimPeak * 1000).toFixed(2)} thousandths of the plate a second, furthest step ${(furthest * 1000).toFixed(1)} thousandths (reach ${(reach * 1000).toFixed(1)})`);
   const auto = run(look('classic'), silence, 600, { extra: { macroMode: true, macroZoom: 3, macroCamera: 'auto' } });
   check('and leaves an Auto camera to itself', auto.moves.every(m => !m.aim));
 }

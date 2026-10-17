@@ -1624,6 +1624,32 @@ with the key light. A pool is black all through. Two looks: **Ferro Maze** and
    opened, faded to or taken back now stops the move) and cues kept through a glide
    starting the next move with no rest; both fixed and checked.
 
+   **8d. The Evolve Speed dial sets the pace.** The owner, once the slow Evolve was
+   live: "I want evolve to go really slowly if the settings control is low - but if I
+   ramp it up, I want it to evolve quickly." The dial barely touched the pace: every
+   glide was held to 30–90 s whatever it said, and it shortened the rest and the glide
+   by a fifth or so. Now `evolvePace` stretches every time in the planner (the glides,
+   the rests, the palette's least gap) by up to four at the bottom of the dial and
+   shrinks it by up to eight at the top, log-even on each side of the look's own Evolve
+   Speed, so every look plays exactly as it did until the dial is turned. Measured from
+   one fixed middle (0.12), review found 14 of the 41 looks, which set their own from
+   0.02 to 0.3 for the hands' pours as much as for this, would have slowed by 1.5 to
+   3.5 times untouched. The rest is counted on the dial as it is now, so a turn up in
+   the middle of a five-minute rest is answered in seconds; it is never under 2 s. The
+   palette never turns twice in 20 s, and the closeup's aim never moves faster than at
+   the look's pace (a fast move is a shorter step of the aim): the liquids may hurry,
+   the frame may not.
+
+   Measured (`npm run slowevolve`, Classic, a song, half an hour at each), before →
+   after, moves a minute and mean glide: 2% 0.63, 66 s → 0.20, 217 s; 5% 0.63, 66 s →
+   0.27, 156 s; Classic's own 15% 0.67, 64 s → 0.67, 64 s; 30% 0.70, 62 s → 0.93,
+   44 s; 60% 0.83, 56 s → 1.87, 21 s; 100% 1.10, 48 s → 4.87, 8 s. Each of the four
+   looks the check plays, at its own Evolve Speed, still 0.6 to 0.7 moves a minute of
+   30–90 s glides. Turned from 2% to full in a rest, the next move came 2 s later (left
+   at 2%, 62 s). With a drop every 6 s at full, the palette turned 9 times in four
+   minutes, 24 s apart at the closest. The aim at full: 2.1 thousandths of the plate
+   a second (the bar is 4).
+
 ### 11. The mixer
 
 5. **The mixer on a narrow desk**, *shipped* (#196). At 1024 px the docked sheet

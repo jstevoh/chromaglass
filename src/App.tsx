@@ -1605,9 +1605,12 @@ export default function App() {
   const driftGlide = useRef(new Map<string, { from: number; to: number; at: number; seconds: number }>());
   /** Evolve's planner: when the next move starts, which dials, which way (lib/slowEvolve.ts). */
   const slowEvolveRef = useRef<SlowEvolve | null>(null);
+  /** The look's own Evolve Speed: the dial's pace is measured from it (lib/slowEvolve.ts evolvePace). */
+  const lookPaceRef = useRef(0.12);
   /*
     A look laid, opened, faded to or taken back: Evolve lets go of the move it
-    is making. A glide lasts up to a minute and a half now, and each half
+    is making. A glide lasts up to a minute and a half at the default Evolve
+    Speed (minutes low on the dial), and each half
     second it writes its dials from where they were on the old look to where
     they were going on it, so a move left running dragged two or three dials
     of the new look back toward the old one for the rest of its length (found
@@ -1913,7 +1916,9 @@ export default function App() {
     "directly reacting to frequency and bouncing around".
 
     Now it is one move at a time: a few related dials going the same way
-    together, glided over 30 to 90 seconds, steered by the song's sections and
+    together, glided over 30 to 90 seconds at the default Evolve Speed (the
+    dial stretches that up to four times or shrinks it to an eighth:
+    evolvePace), steered by the song's sections and
     its level over the last half minute, or by a slow clock with nothing
     playing. Each dial stays inside a window round where the look sat when
     evolving started; the anchor is re-taken whenever a look is laid down,
@@ -1923,7 +1928,9 @@ export default function App() {
     moves as the show. A glide writes the settings twice a second, not five
     times: a dial moving a fifth of its travel over a minute moves a third of
     a percent in half a second, which nobody can see as a step, and every
-    write re-renders the app.
+    write re-renders the app. At the top of the dial a glide is 4 to 11 s and
+    a dial may move a couple of percent of its travel a write; whether that
+    reads as steps is PLAN 10-8d-2, for the owner's eye.
   */
   useEffect(() => {
     if (!isAutomated || !isActive) {
@@ -1954,7 +1961,8 @@ export default function App() {
         time: heard?.now.time ?? 0,
         bpm: bar && bar.period > 0 && bar.beatConfidence >= 0.5 ? 60 / bar.period : 0,
       };
-      const out = (slowEvolveRef.current ??= new SlowEvolve()).step(STEP_S, ear, cur, driftAnchor.current, cur.automateRate ?? 0.12);
+      const out = (slowEvolveRef.current ??= new SlowEvolve()).step(STEP_S, ear, cur, driftAnchor.current, cur.automateRate ?? 0.12,
+        lookPaceRef.current);
       if (out.palette) for (const v of bothEngines()) v.evolvePalette();
       if (out.move) {
         const { to, seconds, aim } = out.move;
@@ -2474,6 +2482,7 @@ export default function App() {
       : pinnedPresetId ? allPresets.find(p => p.id === pinnedPresetId)?.settings : undefined;
     return lookOf(own ?? {});
   }, [docId, userPresets.presets, pinnedPresetId, allPresets]);
+  lookPaceRef.current = typeof lookValues.automateRate === 'number' ? lookValues.automateRate : 0.12;
   const lookValueOf = useCallback((key: keyof VisualizerSettings): number | undefined => {
     const v = lookValues[key];
     return typeof v === 'number' ? v : undefined;
