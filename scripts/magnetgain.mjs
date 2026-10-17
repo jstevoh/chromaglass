@@ -302,14 +302,19 @@ fn magnetRadius() -> f32 { return R; }
     `worst ${(shaderErr * 100).toFixed(3)}% apart over ${qs.length} points`);
   /*
     The far field is where the two laws are both quadratic, so the ratio of
-    the real pull to the solver's there is GAIN_phys / MAGNET_GAIN exactly
-    up to the sampling: read at Ferro Maze's magnet, b ≈ 0.02 ≪ Bs.
+    the linear law's pull to the solver's there is GAIN_phys / MAGNET_GAIN
+    exactly, up to the sampling: read at Ferro Maze's magnet, b ≈ 0.02 ≪ Bs.
+    Against the linear law and not the Langevin one, because at Ferrotec's
+    χ of 2.64 the Langevin energy is already 5% under its quadratic at
+    2.3 mT (ξ = 3χB/μ₀Ms is 0.4 there), which is the fluid's own curvature
+    and not the gain's units; the Langevin ratio is printed beside it.
   */
   const far = rows[4].steep;
   // The solver's ψ is under the quadratic by (1 + b/2Bs)/(1 + b/Bs)² in its slope, 0.84 at b 0.02.
   const sat = (1 + far.share / (2 * K.Bs)) / (1 + far.share / K.Bs) ** 2;
-  check('in the weak field the real pull over the solver\'s is GAIN_phys over MAGNET_GAIN', Math.abs(far.ratio * sat / (gainPhys / K.gain) - 1) < 0.05,
-    `${far.ratio.toFixed(3)} at Ferro Maze's magnet (b ${far.share.toFixed(3)}, where the solver's law is ${sat.toFixed(3)} of its quadratic), against ${(gainPhys / K.gain / sat).toFixed(3)}`);
+  const ratioLin = far.ratio * far.fLin / far.fLang;
+  check('in the weak field the linear law\'s pull over the solver\'s is GAIN_phys over MAGNET_GAIN', Math.abs(ratioLin * sat / (gainPhys / K.gain) - 1) < 0.05,
+    `${ratioLin.toFixed(3)} at Ferro Maze's magnet (b ${far.share.toFixed(3)}, where the solver's law is ${sat.toFixed(3)} of its quadratic), against ${(gainPhys / K.gain / sat).toFixed(3)}; the Langevin law's ${far.ratio.toFixed(3)}`);
 
   // ── The solver's drop against the Darcy speed ──
   /*
