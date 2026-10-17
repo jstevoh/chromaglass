@@ -22,6 +22,7 @@ import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '..
 import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
 import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/songMap';
 import { SongPosition, nudgeFor, type NudgeKind } from '../lib/songScore';
+import { FollowedPlace, readSection } from '../lib/followedPlace';
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
 import {
   trackSeed, newTrackState, evolveAfterListen, buildVisualParams,
@@ -56,9 +57,17 @@ export interface MusicIntelState {
   songMap: SongMap | null;
   lyrics: LyricsResult | null;
   trackState: TrackEvolutionState | null;
+  /** Where the show reads the song map, in its seconds: followed by ear where the map has harmony (lib/followedPlace.ts), else the clock. */
   positionSec: number;
   /** How far the score's nudge has moved the position from the clock's own reading, seconds (+ is later in the song). */
   nudgeSec: number;
+  /**
+   * Following the map by ear (PLAN.md 28g-2): whether the place is the
+   * follower's, and how sure, held over a second and a half. Null when there
+   * is no map, or it has no harmony to follow (made before 28g-1).
+   */
+  follow: { sure: boolean; confidence: number } | null;
+  /** The map's section at the place; none while a followed map is not sure where it is (the show leans on the song's shape then). */
   section: SongSection | null;
   line: LyricLine | null;
   sectionSentimentValue: number;
@@ -120,6 +129,8 @@ export function useMusicIntelligence(
   audioData: AudioData | null,
   music: MusicSettings,
   baseSettings: VisualizerSettings,
+  /** Every reading of the ear as it is made (hooks/useAudioAnalyzer.ts `onReading`), for the follower. */
+  onReading?: (fn: (a: AudioData) => void) => () => void,
 ): MusicIntelResult {
   const [track, setTrack] = useState<TrackIdentity | null>(null);
   const [songMap, setSongMap] = useState<SongMap | null>(null);
@@ -130,6 +141,7 @@ export function useMusicIntelligence(
   // SongPosition says why the nudge is kept beside offsetSec, not in it).
   const posClockRef = useRef(new SongPosition());
   const [nudgeSec, setNudgeSec] = useState(0);
+  const [follow, setFollow] = useState<MusicIntelState['follow']>(null);
   const [identifying, setIdentifying] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [recordingActive, setRecordingActive] = useState(false);
@@ -154,6 +166,8 @@ export function useMusicIntelligence(
   const listenStartMsRef = useRef(0);
   const lastIdentifyMsRef = useRef(-Infinity); // first attempt fires as soon as sound is present
   const lastPosRef = useRef(0);
+  /** Where the show reads the map (lib/followedPlace.ts); null while no track has been identified. */
+  const placeRef = useRef<{ place: FollowedPlace; map: SongMap | null; isrc: string } | null>(null);
   const triggerSeqRef = useRef(0);
   const presetSeqRef = useRef(0);
   const gapPendingRef = useRef(false); // saw a between-song dip; identify as soon as sound returns
@@ -206,6 +220,52 @@ export function useMusicIntelligence(
   useEffect(() => { audioRef.current = audioData; }, [audioData]);
   useEffect(() => { trackRef.current = track; }, [track]);
   useEffect(() => { songMapRef.current = songMap; }, [songMap]);
+
+  /*
+    The place in the map (PLAN.md 28g-2, lib/followedPlace.ts). A new one for
+    each song and each map (a map arrives after its song, when the first
+    listen's analysis is done); the identification's clock restarts it, as
+    it did the old clock, and tells the follower where the song was found.
+    Fed every reading of the ear, on the ear's clock; read on the tick below.
+  */
+  //
+  // Keyed on the identification's own numbers, not the track object, which
+  // is replaced for other reasons (a title filled in): a resync to the clock
+  // for nothing would undo what the follower had heard since. A new
+  // identification of the same song (a local match every twelve seconds, the
+  // service every thirty-five) is news, though: its offset is where the
+  // recording is, and a recording played back is where its fingerprint says.
+  // While the follower is sure it is not moved by it (a band live is not the
+  // recording, and its offset is the record's, not the band's); unsure, it
+  // is the best place there is.
+  const trackIsrc = track?.isrc ?? null, identifiedAtMs = track?.identifiedAtMs ?? null, offsetSec = track?.offsetSec ?? 0;
+  useEffect(() => {
+    if (trackIsrc === null || identifiedAtMs === null) { placeRef.current = null; setFollow(null); return; }
+    let held = placeRef.current;
+    if (!held || held.map !== songMap || held.isrc !== trackIsrc) {
+      held = placeRef.current = { place: new FollowedPlace(songMap), map: songMap, isrc: trackIsrc };
+    } else if (held.place.at(performance.now() / 1000).sure) return;
+    // The score's nudge (PLAN.md 28h) is part of where the song is found: a
+    // new identification while the follower is unsure keeps it, as the clock
+    // did, rather than putting the song back where the fingerprint says.
+    held.place.resync(offsetSec + posClockRef.current.nudge, identifiedAtMs / 1000, performance.now() / 1000);
+  }, [trackIsrc, identifiedAtMs, offsetSec, songMap]);
+  // Under ?debug, which map the place reads and whether it is hearing, for
+  // `npm run followview` to know a line it reads is about the map it stored.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { __followed?: () => unknown }).__followed = () => {
+      const held = placeRef.current;
+      return held ? { isrc: held.isrc, map: held.map?.isrc ?? null, harmony: held.place.following, hops: held.place.hops } : null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!onReading) return;
+    return onReading((a) => {
+      const held = placeRef.current;
+      if (held?.place.following && a.features) held.place.hear(a.features, performance.now() / 1000);
+    });
+  }, [onReading]);
   useEffect(() => { lyricsRef.current = lyrics; }, [lyrics]);
   useEffect(() => { trackStateRef.current = trackState; }, [trackState]);
 
@@ -326,8 +386,12 @@ export function useMusicIntelligence(
 
       // Position clock
       if (currentTrack?.identifiedAtMs != null) {
-        const pos = posClockRef.current.at(currentTrack, now) ?? 0;
+        const held = placeRef.current;
+        const place = held && held.isrc === currentTrack.isrc ? held.place.at(now / 1000) : null;
+        const pos = place ? place.positionSec : posClockRef.current.at(currentTrack, now) ?? 0;
         setPositionSec(pos);
+        const f = place && place.confidence !== null ? { sure: place.sure, confidence: Math.round(place.confidence * 100) / 100 } : null;
+        setFollow(prev => (prev?.sure === f?.sure && prev?.confidence === f?.confidence ? prev : f));
 
         // Lyric triggers in (lastPos, pos]
         const lyr = lyricsRef.current;
@@ -462,7 +526,7 @@ export function useMusicIntelligence(
   }, [music.enabled, stream, adoptTrack, finalizeListen]);
 
   // ── Derived: section, line, sentiment ───────────────────────────────
-  const section = useMemo(() => sectionAt(songMap, positionSec), [songMap, positionSec]);
+  const section = useMemo(() => readSection(songMap?.sections, { positionSec, sure: follow?.sure ?? false, confidence: follow?.confidence ?? null }), [songMap, positionSec, follow]);
   const line = useMemo(() => lyrics ? lineAt(lyrics.lines, positionSec) : null, [lyrics, positionSec]);
   const sectionSentimentValue = useMemo(() => {
     if (!lyrics || !section || !musicRef.current.sentimentArc) return 0;
@@ -529,9 +593,21 @@ export function useMusicIntelligence(
   */
   const seekBy = useCallback((deltaSec: number) => {
     const clock = posClockRef.current;
-    if (!trackRef.current || !Number.isFinite(deltaSec) || deltaSec === 0) return;
+    const track = trackRef.current;
+    if (!track || !Number.isFinite(deltaSec) || deltaSec === 0) return;
+    const now = performance.now();
+    clock.at(track, now);
     clock.add(deltaSec);
-    const pos = clock.at(trackRef.current, performance.now());
+    // Followed, the nudge moves the place itself (PLAN.md 28g-8): the
+    // follower is told the new place, as it is by an identification, so what
+    // it hears next steers from there. Added to the clock alone it would be
+    // lost to the first sure answer.
+    const held = placeRef.current;
+    let pos: number | null;
+    if (held && held.isrc === track.isrc) {
+      pos = Math.max(0, held.place.at(now / 1000).positionSec + deltaSec);
+      held.place.resync(pos, now / 1000);
+    } else pos = clock.at(track, now);
     setNudgeSec(clock.nudge);
     if (pos !== null) { setPositionSec(pos); lastPosRef.current = pos; }
   }, []);
@@ -544,7 +620,9 @@ export function useMusicIntelligence(
   */
   const nudgeToSection = useCallback((kind: NudgeKind) => {
     const map = songMapRef.current;
-    const pos = posClockRef.current.at(trackRef.current, performance.now());
+    const track = trackRef.current, now = performance.now();
+    const held = placeRef.current;
+    const pos = track && held && held.isrc === track.isrc ? held.place.at(now / 1000).positionSec : posClockRef.current.at(track, now);
     if (!map || pos === null) return;
     const d = nudgeFor(map, pos, kind);
     if (d !== null) seekBy(d);
@@ -655,7 +733,7 @@ export function useMusicIntelligence(
 
   return {
     state: {
-      track, songMap, lyrics, trackState, positionSec, nudgeSec, section, line,
+      track, songMap, lyrics, trackState, positionSec, nudgeSec, follow, section, line,
       sectionSentimentValue, identifying, recording: recordingActive, analyzing,
       fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
     },

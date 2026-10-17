@@ -70,7 +70,8 @@ export interface DeskProps {
   onOpenSettings: () => void;
   /** Gig's breadcrumb: the show and the look that is up. */
   showCrumb: ReactNode;
-  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null };
+  /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
+  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
   onBlackout: () => void;
   blackout: boolean;
 

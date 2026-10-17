@@ -402,7 +402,13 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
       if (stage.advance === 'time') advance = elapsed >= stage.seconds;
       else if (stage.advance === 'section') {
         const label = a.sectionLabel;
-        if (label !== null && label !== run.sectionAtEntry && elapsed >= Math.min(MIN_SECTION_SECONDS, stage.seconds)) advance = true;
+        // A stage entered with no section (no map yet, or a followed map not
+        // sure where the band is: lib/followedPlace.ts) learns the section it
+        // is in when one is first known, rather than taking that first
+        // knowing for a change: the follower becoming sure again in the same
+        // chorus is not the next section.
+        if (label !== null && run.sectionAtEntry === null) run.sectionAtEntry = label;
+        else if (label !== null && label !== run.sectionAtEntry && elapsed >= Math.min(MIN_SECTION_SECONDS, stage.seconds)) advance = true;
         // No song map (nothing identified yet): the clock runs the stage, a little long.
         else if (label === null && elapsed >= Math.max(stage.seconds, MIN_SECTION_SECONDS) * 1.5) advance = true;
       }

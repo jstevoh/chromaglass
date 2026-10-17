@@ -187,7 +187,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
       </div>
       {selected?.stages.some(st => st.advance === 'section') && !hasSections && (
         <p className="text-[10px] leading-relaxed opacity-50 mb-4">
-          Section stages wait for the song map from Track intelligence; until a track is identified they advance on their own clock.
+          Section stages wait for the song map from Track intelligence; until a track is identified, or while the show is not sure where in the song the band is, they advance on their own clock.
         </p>
       )}
 

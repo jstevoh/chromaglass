@@ -71,7 +71,13 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   on thin pools (0-finger)~~ #314, ~~the wall's gain (0-wallgain)~~ #131, ~~`qa` with no adapter
   (11-qaguard)~~ #316, ~~the other deploy reds (0-deployreds)~~ #194, ~~the wall's stamps (21-wall,
   14b-askline, 19c-wallmutant)~~, ~~the Magnet's drag (11-magnetdrag)~~ #313, ~~"Blow held still"
-  (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314.
+  (11-blowbubble)~~ #315, and ~~`tools`' "Pour lays more than Drop", which passes at 0 against 0~~ #314. And `magnet`'s second press
+  (11-magnetpress): held over the poured pool, some runs never see the press as a hold
+  (Ferrofluid stays 0, the hand's path reads one spot through the whole drag), 13/15 on
+  #382's merged head and three times on #376's branch, then green on the next run with
+  nothing changed. `held` is the hand's last pointer sample within 250 ms of the show's
+  clock (`LiquidVisualizer.tsx`): find what the second press lands on, or what stalls the
+  sample, and make the check say which.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
   docs/plan-shipped.md 19r).
 - **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
@@ -328,6 +334,18 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   five LED modes, Off and Random for a new song and the mixer's Multiply and Key were
   dropped by `updateSettings`, the phone's patches and a saved look. `npm run sanitize`
   now walks every value of every choice setting (80 kept) and runs in CI's logic part.
+- ~~**QA-31** The closeup is "even bouncier and twitchier than before": it punches,
+  pumps and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ **Fixed**
+  (27a-8, `npm run steadycam`): Macro Sync's punch-in on the kick, push with the energy
+  and treble tremor were on at its default of 0.5 outside Frame Sway, so at 6x on a 1440
+  px frame a 120 bpm song swayed the frame 0.42% of its width (6 px) and pumped the zoom
+  3.2% (the frame's edge 23 px) on every beat, and the ear now hears nearly every kick
+  where it heard a third; the lead read one cell's solver velocity, so a press of half a
+  cell a step threw the frame 0.95% (14 px) in a frame; a cut landed on a lattice cell and
+  slid 14% of the frame to the drop; and each drop random-walked 4 px rms a frame. All
+  four are 0 now: the song's hand on the frame is 0.000% at Frame Sway 0 in every mode on
+  all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
+  without, a cut lands on the drop's middle, and a drop on still paint moves 0.
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
@@ -4158,7 +4176,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     `hsCycles` from cold should converge on a grid that is not a power of two.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
-**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 - **18b-8. The dishes too deep for the lamp.** Eighteen looks are dishes by their own
   description but fail the rule with the dye they were given for black: on the lamp the
@@ -5058,6 +5076,9 @@ commit. *Size:* S.
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
 
+#### 19w-1. The deploy gate counts the fifth shard
+**Shipped** (2026-10-17): `deploygate.sh` wanted exactly four green shards by name, so after 19w it trusted no PR run and every deploy re-ran the whole Mac, about 55 minutes from merge to live. It now reads the shard names from `checks.yml`'s matrix; replayed on the last 20 merges, the deploys it trusts went from 0 (plus 2 by rule 5) to 4 (plus 1). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
 ### 19x. A moved bar names itself
 **Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a check to assert the opposite (also commit by commit, #357's case), without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19x.
 
@@ -5094,6 +5115,19 @@ percentage; to be confirmed on the first thread that reaches it). If the host's 
 still wins, the window has to move in the environment's own settings instead, which only
 the owner can change. Still open alongside it: 19m (PLAN.md as an index), now more
 pressing, as the file is about 500 KB.
+
+### 19z. A check that compares two compiled programs on a GPU asks the compiler
+**Shipped** (2026-10-11): `npm run lamp`'s first line, every look at Lamp Ground 0 byte for byte against a lab built with the lamp's lines taken out, read "different: fillmore-1969 2" on the owner's M4 on main at b2ca7d7, the same one pixel on every run, 2 levels of blue, gone with the back plate or its grade off (`node scripts/lampwhere.mjs`), none different on software WebGPU and on the GitHub runner's Mac for the same tree, and none different on the M4 again once #353 had moved the shader. Metal fuses a multiply-add into one FMA when the product has one use; the lamp's back-plate branch keeps a second use of the back plate's values alive in the plain lab and is dead code in the control, so the two programs round the painted path differently, and one ulp crossed a threshold in the grain. The line is now `npm run lampzero`, two labs on SwiftShader (which has drawn them the same on every tree since 2026-10-04 and, as a conformance rasteriser, keeps the operations as written rather than fusing them by use count), in Measure on every PR as its own part, `lab` (the `logic` part has no Chromium, so #386's first run failed there on the launch, and the `browser` part already runs twelve of its fifteen minutes). The line reads back from the adapter that SwiftShader drew both labs, and from the bundles that the control is another program, rather than trusting the flags and the plugin. The lamp's physics stay on the Mac. The story is in the scripts' own comments.
+
+- **19z-1. `npm run beams` compares two programs the same way, on the Mac.** Its first line
+  holds the projector's pass against a lab built from the old pass, byte for byte, in the
+  `tools` shard on Metal. It has not flipped, and the pass is small; when it does, move
+  that line to Measure as lampzero was, with `openLab({ software: true })`.
+- **19z-2. Measure's `browser` part is near its timeout again.** Found 2026-10-12 placing
+  lampzero: the part ran 12:16 of its 15 minutes (the layout 2:49, the phone 3:14, a click
+  in the app 1:04, the sound's renders 0:47, the intro 0:38, Chromium 0:30), the margin 19b
+  split Measure to get back. The next Chromium check goes in a part of its own or splits
+  this one as 19b did; until then a slow runner turns the part red with nothing wrong.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
@@ -6056,14 +6090,28 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     the liquid's motion. `framesway` holds every shipped look and show stage at 0; the
     Mac's `render-app` holds the app's own frames to it on Classic with the band.
     Evolve never drifts it.
-    - **27a-8, open.** What still turns or zooms the whole frame with the sound, each
-      off at the defaults: nine looks route a band to the dish's turn
+    - **27a-8, open in part.** What still turns or zooms the whole frame with the sound,
+      each off at the defaults: nine looks route a band to the dish's turn
       (`audioMappings.rotation`, about 0.02–0.05 rad/s, slow), Auto Spin's Tempo, and
-      the closeup camera's kick punch-in and energy push when zoomed (`macroSync`,
-      1.5–10% of zoom). Read each with the owner: a slow dish turn is the oil wheel's
-      own move; a punch-in on the kick is a camera move and may want Frame Sway too.
-      And Beat Squeeze's press spans the dish (Bass Drop at 0.8): measure its
+      ~~the closeup camera's kick punch-in and energy push when zoomed (`macroSync`,
+      1.5–10% of zoom)~~. Read each with the owner: a slow dish turn is the oil wheel's
+      own move. And Beat Squeeze's press spans the dish (Bass Drop at 0.8): measure its
       plate-wide radial part, which reads as a zoom on the kick.
+      - ~~**The closeup's camera** (QA-31).~~ **Shipped** (the story in
+        `docs/plan-shipped.md` §27a-8): Macro Sync's punch-in, push and treble tremor
+        ride Frame Sway (`move = sync × sway`, 0 by default; the cut on a kick stays,
+        an edit and not a move), the lead is the drop's own smoothed motion and not one
+        cell's solver velocity, a cut lands on the drop's centroid, and the drops no
+        longer random-walk. `npm run steadycam` holds every look and show stage to the
+        bit in CI's logic part.
+      - **27a-8-1.** Auto's own breathing zoom (two sines, up to 13% of the zoom on 17-
+        and 57-second cycles, `macroCamera.ts`) and the dolly-out through each whip are
+        camera moves with nothing behind them but the clock: a macro rig on a stand does
+        neither. The owner's call whether Auto keeps a slow breath as its signature or
+        sits as still as Hold and Follow (`docs/judging.md` §53).
+      - **27a-8-2.** The camera aims from a readback of the density a frame or two old
+        (`readbackAsync`), so Follow sits that far behind a fast drop. Measure the lag on
+        the Mac and, if it shows, lead by the readback's age.
 - **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick
   pressed three discs a palm wide at 0.0024 × squeeze × bass: at the default squeeze and
   an ordinary kick a ring of colour 30 cells out went 1.7 cells and back. Now the discs
@@ -6285,6 +6333,29 @@ Turing Print" work (#331), which also made the reaction grow at all.
       luminance 133 against 40, 4/9). Doing it means a new setting or a redefined Film
       Physics, with `filmlook` rewritten to the new contract (the check-skeptic on it), the
       desk and the phone. Not in this PR.
+- **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
+  #368; the showreel's first two findings). The music's hands follow how loud the passage
+  is, as an amplitude (`Passage`), and the bass's press reads the band over its ceiling:
+  on the showreel's minute the press changed 1.44× as much a second in the breakdown as
+  in the groove, now 0.54× (`npm run breakdown`). Classic: Dye Budget 0.45, Bubbles 0.05.
+  Story in docs/plan-shipped.md §28e.
+- **28e-2. Open from 28e.**
+  - The sound mappings (a look's `sceneMappings` with source `sound`, sound learn's
+    triggers) and Evolve's automation read the levels, which are ranged against ceilings
+    that fall back in 8 to 18 s, so a breakdown still turns them back up. Scale the ones
+    that move the liquid by the passage too, look by look, measured on the showreel.
+  - A render's room tracker seeds its floor at -140 dB from the first frame, which is
+    silence (the analyser's window has no samples yet), and a floor only rises from
+    levels near it, so it stays there for the whole render: the analyser window a render
+    hears through is -120 dB wide at the bottom, where live it fits the room. Seed the
+    floor from the first frame with sound, and check a render's window against live's
+    (`npm run render`).
+  - Live, the passage's reference is kept for the whole audio context, so a track
+    mastered 10 dB quieter than the one before plays its first minute or two with gentler
+    hands (0.54 a minute on, 0.78 two). Forget the reference when a song ends, from the
+    song-change clock (`useSongChange`), and hold it with `npm run breakdown`.
+  - Re-render the showreel after 28e lands (and after Antigravity's #348, #352, #353,
+    #355), and re-score Classic and the 28 busier looks against the same minute.
 - **28f. Every look answers the music through its own patches** (the owner, 2026-10-11: use
   the patch bay so the looks answer the music more by default; the whole plate may move with
   the music on a small named set of looks, never as the default). Brief and findings in
@@ -6342,23 +6413,14 @@ Turing Print" work (#331), which also made the reaction grow at all.
   long), and fall back on the live song shape when the match is weak. What it buys: the
   show knows the chorus is next and can lean into the build before it is heard. Not a
   preset patch source (28f: patches use fast readings only).
-  - **28g-1. The follower and its check** (**shipped**, this PR). `chroma.ts`: a twelve-
-    note profile, read from the analyser's tonal peaks (parabolic-refined) on a per-bin
-    quarter-second median (drums dropped), the same arithmetic in the ear
-    (`AudioReading.chroma`) and in the map (`mapChroma`, stored with every new map as
-    `SongMap.chroma`). `songFollow.ts`: the forward algorithm over a place × tempo grid
-    (0.6–1.6×), the form as transitions at the map's section ends, a leak for jumps the
-    form did not offer, a start prior, and confidence = match quality × agreement.
-    `npm run songfollow` (Measure, logic): takes 15% slower and faster on other
-    instruments 100% of hops within a bar of the very place, tempo within 3%; a band
-    speeding up 100 to 140 bpm with a bar of silence, 100%; bridge skipped, chorus
-    repeated, solo doubled, a 16-bar jam: back within 0.7–1.8 bars; joined at the second
-    verse, found in 1.9 bars; confidence 0.07 in the jam against 0.92 where followed.
-    `anchor(mapSec)` is the score's nudge (28h). The ear's frame costs 5 µs more (237 to
-    242 in node). Not wired into the show yet (28g-2).
-  - **28g-2. Use it live, with the fallback.** Run the follower in the frame loop when a
-    map with `chroma` is followed; when confidence is under about a third, the show leans
-    on `songShape.ts`; desk and phone show which map is followed and its confidence.
+  - **28g-1. The follower and its check** (**shipped**, #378; the story in
+    `docs/plan-shipped.md` §28). `chroma.ts`, `songFollow.ts`, `npm run songfollow`.
+  - **28g-2. Use it live, with the fallback** (**shipped**, this PR; the story in
+    `docs/plan-shipped.md` §28). `followedPlace.ts`: the place the show reads a map at is
+    the follower's when sure and the clock run on from the last sure place when not, with
+    no map section then (the show leans on the song's shape); the desk's status bar, the
+    track panel and the phone's Sound sheet say which song is followed and how sure.
+    `npm run songfollow` (the place, 16 more checks), `npm run followview` (the browser).
   - **28g-3. The show leans into what the map says is next** (Pacing/sequencer), and a map
     made from a file (the band's rehearsal, last night's set; §17 "hear the set ahead").
   - **28g-4. Found along the way: the worker's sections are coarse.** On the check's song
@@ -6368,17 +6430,44 @@ Turing Print" work (#331), which also made the reaction grow at all.
     starts; segment by the map's harmony at bar scale. Measured: on today's sections the
     jumps do nothing (no jumps, same numbers); on the record's true sections a repeated
     chorus is found 1.2 bars in against the leak's 1.4. Keep the jumps if better sections
-    make them earn more, else remove them.
+    make them earn more, else remove them. Agreement (half of confidence) counts the weight
+    on the same place in a section of the same label, so with these sections two copies of
+    the chorus that the worker put in one "chorus" do not agree, and confidence after a
+    jam stays near 0.5 while the follower hops between them. Agreement by the map's own
+    harmony (the last four seconds the same) was tried in 28g-2 and changed no number on
+    these takes; try it again with better sections.
   - **28g-5. Found along the way: another key.** A band that tunes down a half step, or
     plays the song in another key, rotates the whole profile; the follower would read it
     as a jam. Try the twelve rotations when confidence stays low and the profile is tonal.
   - **28g-6. Found along the way: maps made before 28g-1 have no harmony.** They follow
     nothing until the song is heard again and its map remade.
+  - **28g-7. Found along the way: a song's show while the place is unsure.** A song show's
+    actions (`useSongShows`) fire by the place, and while the follower is unsure the place
+    is the clock run on from the last sure one: a guess. The map's section is withheld then
+    (the sequencer runs a section stage on its own clock), but a show's "at the second
+    chorus" still fires on the guess. Decide whether a show's section actions wait for the
+    place to be sure, and say so on the Songs panel.
+  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped.md` §28h).
+    A nudge (`useMusicIntelligence`'s `seekBy`) moves the followed place itself:
+    `FollowedPlace.resync(mapSec, now)` starts the clock there and anchors the follower,
+    called directly, not through the identification effect (which leaves a sure place
+    alone). The clock keeps the nudge too, so an identification while the follower is
+    unsure resyncs to `offsetSec + nudge`. Open from it: the steering closes a nudged
+    place back toward what the follower hears, so a nudge of a section's edge on a sure
+    follower is corrected within a second (right when the follower is right, and a nudge
+    that will not stay when the follower is wrong); decide whether a nudge holds the
+    follower off for a few bars.
+  - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
+    is held (the check's intro, four bars of A minor into a verse that opens on it), no
+    place in it sounds different from another, and the follower slid 1.4 bars behind into
+    the verse before the next chord put it right; the place, steered rather than set,
+    held the identification's clock meanwhile and jumped once. A rehearsal map made from a
+    file (28g-3) can carry bar positions from the beat grid, which would fix the place
+    inside a held chord.
 - **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
   this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
-  - **28h-1.** The follower (28g) writes the position the score and the shows read;
-    a nudge should re-anchor the follower rather than add an offset to it. Proposed
-    to that thread: position stays in the map's own seconds.
+  - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than
+    adding an offset to it; position stays in the map's own seconds.
   - **28h-2.** Correct the score, not just the clock: drag a section's edge and save
     the map, so the next play of the song is right without a nudge. Today the nudge
     is an offset for the whole song, which fixes one late edge and moves the rest.
@@ -6442,6 +6531,14 @@ the code's entry points, the checks to add and the scenes to match, in
     decoded plainly, without the closeup's cells or lacing.
   - **29a-7.** Its cost read on the Mac (`npm run stages` with the closeup in over a
     drop): about 18 million texel reads a frame on 384², 24 sweeps warm and 200 from cold.
+  - **29a-8.** The drops' mask is 512 px across the plate (`beads.ts`), and at 6x the
+    closeup shows a ninth of the plate's width on a 1440 px frame, so the mask is
+    magnified about 25× and a drop 0.03 of the plate across is drawn from about fifteen
+    mask pixels: its edge reads blocky where the ferrofluid's surface is smooth. Draw the
+    edge from the solved surface (29a) or at the closeup's own resolution.
+  - **29a-9.** A drop reads the flow from its nearest cell (`beads.ts`), so its speed
+    steps as it crosses a cell's edge; sample the velocity bilinearly, as the solver's
+    advection does.
 - **29b. Dye on the drop: carried, spread, and shed off its back.** The water over the
   drop is the gap less the drop's height and is dragged with the drop's surface (no slip
   on the drop, no shear at the top glass's far side through the thin film), so its dye

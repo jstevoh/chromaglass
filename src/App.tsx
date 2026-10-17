@@ -6,6 +6,7 @@ import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
+import { followLine } from './lib/followedPlace';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
@@ -1497,12 +1498,21 @@ export default function App() {
     });
   }, []);
 
-  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings);
+  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings, ear.onReading);
   /*
     Performances, started and stopped by hand: T on either desk, the
     Performance dot in the desk header, or the Track panel. The note after a
     stop says what was kept, for four seconds.
   */
+  // Under ?debug, tag the song playing by name, as the desk's track panel
+  // does by hand: the phone has no track panel, and `npm run followview`
+  // checks what the phone says about a followed song.
+  const manualTagRef = useRef(musicIntel.manualTag);
+  manualTagRef.current = musicIntel.manualTag;
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { __tagSong?: (artist: string, title: string) => void }).__tagSong = (artist, title) => manualTagRef.current(artist, title);
+  }, []);
   const perfLive = !!musicIntel.performance.live;
   const { startPerformance, stopPerformance } = musicIntel;
   const togglePerformance = useCallback(() => {
@@ -3433,6 +3443,7 @@ export default function App() {
       audio: a ? {
         volume: a.volume, bass: a.bass, mid: a.mid, treble: a.treble,
         energy: a.energy, spectralCentroid: a.spectralCentroid, timbre: a.timbre, complexity: a.complexity,
+        passage: a.passage,
       } : null,
     };
     if (castingRef.current && !stageRef.current) castSendRef.current(message);   // a mirror of this canvas needs no feed
@@ -5652,6 +5663,7 @@ export default function App() {
             soundDrive={settings.audioImpact}
             songLine={audioSource === 'none' ? '' : songLine}
             score={scoreProps}
+            mapLine={followLine(musicIntel.state.follow, musicIntel.state.track?.title)}
             deaf={earDeaf}
             show={{
               running: sequencer.status.running,
@@ -6210,6 +6222,7 @@ export default function App() {
               : null,
             phone: livePhoneCount,
             rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+            song: audioSource === 'none' ? null : followLine(musicIntel.state.follow, musicIntel.state.track?.title),
           }}
           onBlackout={toggleBlackout}
           blackout={blackout}
