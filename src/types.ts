@@ -1,4 +1,5 @@
 import type { SourceName } from './lib/audioFeatures';
+import type { HitFeature } from './lib/hitSource';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -320,8 +321,13 @@ export type SceneFeature =
  * same region ranged on its own, and a look saved with one must not quietly
  * start reading the other. It shares `sound`'s master, Sound Impact, because
  * it is the same microphone.
+ *
+ * `hits` is the microphone a third time, by its moments: how hard each
+ * drum's last hit was, held and let fall over a quarter second, and the note
+ * (`lib/hitSource.ts`). Its own source because its features are its own
+ * names, and Sound Impact is its master too.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -335,7 +341,7 @@ export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName;
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature;
   /** Any numeric setting — the same list a MIDI fader can learn. */
   setting: keyof VisualizerSettings;
   /** How far the feature moves it, as a share of the setting's travel. −1..1. */
@@ -591,6 +597,7 @@ export interface VisualizerSettings {
   // Mixer
   layerCount: number;
   blendMode: BlendMode;
+  twoProjectors: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -1004,6 +1011,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
+  twoProjectors: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second

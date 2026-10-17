@@ -176,9 +176,15 @@ for (const seq of L.builtInSequences()) {
   }
 }
 const moved = [];
+const optedIn = [];
 let synced = 0;
 for (const { name, S } of looks) {
   const sway = L.frameSway(S.frameSway);
+  // A look that sets its own Frame Sway above 0 has asked the frame to move with the music (Bass Drop,
+  // PLAN 28f: the one look whose picture rocks on the kick). That is the dial doing what it is for, and the
+  // dial's own checks below measure it; here it is listed by name, and the list is pinned, so a second
+  // look that quietly turns the frame on is red until it is declared in OPT_IN.
+  if (sway > 0) { optedIn.push(name); continue; }
   if ((S.macroSync ?? 0) > 0) synced++;
   for (const mode of ['hold', 'follow', 'auto']) {
     const speed = mode === 'auto' ? 0 : 2;
@@ -186,9 +192,13 @@ for (const { name, S } of looks) {
     if (d.pan > 0 || d.zoom > 0) moved.push(`${name} ${mode} (frame ${pc(d.pan)}, zoom ${pc(d.zoom)})`);
   }
 }
-check('every shipped look and show stage, in Hold, Follow and Auto, holds the closeup still through the song: the same centre and zoom as in silence, to the bit',
-  moved.length === 0 && looks.length > 20 && synced > looks.length / 2,
-  moved.length ? moved.slice(0, 4).join('; ') : `${looks.length} looks and stages, ${synced} with Macro Sync up, 0.000% of the frame`);
+const OPT_IN = ['Bass Drop'];
+const strangers = [...new Set(optedIn)].filter((n) => !OPT_IN.includes(n));
+check('every shipped look and show stage at Frame Sway 0, in Hold, Follow and Auto, holds the closeup still through the song: the same centre and zoom as in silence, to the bit; only the declared looks turn the frame on',
+  moved.length === 0 && strangers.length === 0 && optedIn.length > 0 && looks.length - optedIn.length > 20 && synced > looks.length / 2,
+  moved.length ? moved.slice(0, 4).join('; ')
+    : strangers.length ? `undeclared looks with Frame Sway above 0: ${strangers.join(', ')}`
+    : `${looks.length - optedIn.length} looks and stages, ${synced} with Macro Sync up, 0.000% of the frame; Frame Sway on by design: ${[...new Set(optedIn)].join(', ')}`);
 
 // ── 2. The dial ──────────────────────────────────────────────────────
 {

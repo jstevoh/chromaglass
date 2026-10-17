@@ -199,6 +199,30 @@ export const FRAME_SWAY_DEFAULT = 0;
 export function frameSway(v: number | undefined): number {
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : FRAME_SWAY_DEFAULT;
 }
+/*
+  The looks that may move the frame with the music (the owner, 2026-10-11,
+  the morning after: "it's ok if the whole plate moves (or other global
+  changes) with a small subset of presets. I just don't want this kind of
+  look to be a default across all presets.").
+
+  So a look may, by name, and only these: a look on this list may set Frame
+  Sway above 0 and may patch the sound (the `sound`, `bands` or `hits`
+  source) onto a dial that moves the whole frame (`FRAME_MOTION`,
+  lib/drift.ts: the rock, the press, the kaleidoscope, the turntable, the
+  lamp's swing). Every other look holds the frame still and the music moves
+  its liquid. `npm run framesway` holds every shipped look to it, and holds
+  the list to `FRAME_MOVING_MOST` names, so it cannot quietly become the
+  default by growing.
+
+  Bass Drop, because it is the one look about the drop: its kick has thrown
+  the plate since it was written (as a patch that read nothing, until 28f),
+  and its Beat Squeeze presses the whole dish. Oil Wheel is not on it: its
+  band patched onto the dish's motor, and a real oil wheel turns at its
+  motor's speed whatever the band does, so that patch went into the liquid.
+*/
+export const FRAME_MOVING_LOOKS: ReadonlySet<string> = new Set(['bass-drop']);
+/** How many looks the list may ever hold: a handful, never the norm. */
+export const FRAME_MOVING_MOST = 4;
 /** The room the cover has to slide in for the dial: none seated, `COVER_ROOM` at full. */
 export function coverRoom(sway: number | undefined): number {
   return COVER_ROOM * frameSway(sway);

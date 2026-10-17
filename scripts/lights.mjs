@@ -16,7 +16,7 @@
 
 import { createSocket } from 'node:dgram';
 import {
-  ARTNET_PORT, ORDERS, artnetConfig, buildUniverse, decodeArtDmx, encodeArtDmx,
+  ARTNET_PORT, ORDERS, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx,
   hexToRgb, parseInMap, patchFromUniverse,
 } from '../server/artnet.js';
 
@@ -164,6 +164,28 @@ const check = (name, ok, detail = '') => {
     cfg.order === 'rgb' && cfg.count <= 170 && cfg.rate <= 44,
     `${cfg.count} fixtures, ${cfg.order}, ${cfg.rate} fps`);
   check('the default port is the one every node listens on', (cfg.port === ARTNET_PORT) && ARTNET_PORT === 6454);
+}
+
+// ── 6. Words where numbers go (PLAN 14m) ─────────────────────────────
+// Number('fast') is NaN, and Math.min and Math.max pass NaN straight through:
+// before this, ARTNET_RATE=fast gave setInterval(NaN), which Node runs every
+// millisecond, a thousand packets a second onto the lighting network, and
+// ARTNET_PORT=x sent them to no port at all. A typo in a venue's .env is the
+// ordinary way this is met, so each number falls back to its default.
+{
+  const bad = artnetConfig({ ARTNET_HOST: '10.0.0.9', ARTNET_RATE: 'fast', ARTNET_PORT: 'x', ARTNET_UNIVERSE: 'one', ARTNET_FIXTURES: 'four', ARTNET_START: 'abc' });
+  const numbers = ['port', 'universe', 'count', 'start', 'rate'];
+  check('a word where a number goes falls back to the default, never NaN',
+    numbers.every((k) => Number.isFinite(bad[k])) && bad.rate === 30 && bad.port === ARTNET_PORT && bad.universe === 0 && bad.count === 4 && bad.start === 1,
+    numbers.map((k) => `${k} ${bad[k]}`).join(', '));
+  check('so the frame clock ticks at the default rate, not every millisecond',
+    Math.round(1000 / bad.rate) === 33, `every ${Math.round(1000 / bad.rate)} ms`);
+  // A lighting network carries every universe its desk drives; Art-Net in
+  // listens to the one named, or to all of them when none is.
+  check('Art-Net in hears every universe until one is named', artnetInUniverse({}) === null);
+  check('and only the named one after', artnetInUniverse({ ARTNET_IN_UNIVERSE: '3' }) === 3 && artnetInUniverse({ ARTNET_IN_UNIVERSE: '70000' }) === 32767,
+    `3 → ${artnetInUniverse({ ARTNET_IN_UNIVERSE: '3' })}, 70000 → ${artnetInUniverse({ ARTNET_IN_UNIVERSE: '70000' })}`);
+  check('and a word there is ignored rather than read as universe NaN', artnetInUniverse({ ARTNET_IN_UNIVERSE: 'house' }) === null);
 }
 
 console.log('');

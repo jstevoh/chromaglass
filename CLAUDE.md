@@ -7,7 +7,7 @@ driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 Before starting anything that is not a bug fix, read `PLAN.md`'s **Order of work**
 (its first section: which step is next, in which lane) and then only the section your
 step names: `grep -n '^##' PLAN.md` for the map, then `sed -n` the section. Not the
-whole file: `PLAN.md` is about 60k tokens, and see "Keeping a session small" for why
+whole file: `PLAN.md` is about 124k tokens (500 KB, 2026-10-17), and see "Keeping a session small" for why
 that matters. What shipped is in `docs/plan-shipped.md`, under the same section numbers:
 `PLAN.md` keeps a one-line stub per shipped item and only the open work, so read the
 archive only when an open item needs the history behind it. When an item ships, move its
@@ -44,6 +44,14 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 - Waiting on CI, the PR subscription wakes the session when the suite completes. Set
   one fallback check-in, not a chain of half-hourly ones: each wake re-reads the whole
   context even when all it finds is "still running".
+- Batch independent tool calls into one step: each step re-sends the context, so three
+  reads in one step cost a third of three steps. A wide listing (triggers, a session's
+  events, every run of a workflow) goes to a subagent, never into the thread.
+- `.claude/settings.json` compacts every session at a 200k window
+  (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`; the cloud host's own default is 500k), and
+  runs helper agents on a cheaper model unless an agent's `model:` line says otherwise.
+  An agent that reviews or judges a check names its model; a lookup or an audit that
+  only reads and lists does not need the parent's.
 - One thread per PR (the owner, 2026-09-27). When a thread's PR has merged, its next
   piece starts in a new thread, not this one: say what it is in the closing reply.
 
