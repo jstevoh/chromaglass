@@ -53,8 +53,8 @@
  *      the rim and leaves the rest, 0.75 of the dish, to 4% (PLAN 18g).
  *   7. And the middle of the flushed dish of colour is clear liquid again,
  *      its density under 0.05.
- *   8. Colour does not fade in a still dish on a thin gap: over 30 steps
- *      with no pours, total dye is conserved to 0.5% (ratio 1.000).
+ *   8. A still dish loses no colour through its rim: over 30 steps with no
+ *      pours (at evapFactor 1), total dye is conserved to 0.5% (ratio 1.000).
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -195,7 +195,7 @@ try {
       const after = await dyeShares();
       out.dyeFlush = { full, after, dish, V: n * domeOf(FP, 1), pours: n };
     }
-    // 8. Colour does not fade in a still dish: over 30 steps with no pours, dye is conserved.
+    // 8. A still dish loses no colour through its rim: over 30 steps with no pours (evapFactor 1), dye is conserved.
     {
       await fresh();
       lab.dyeDisc(0.5, 0.5, 0.3, [1, 0, 0], 1);
@@ -237,7 +237,7 @@ try {
 
   const dst = r.dyeStill;
   const stillRatio = dst.after.total / dst.before.total;
-  check('colour does not fade in a still dish on a thin gap', Math.abs(stillRatio - 1) < 0.005,
+  check('a still dish loses no colour through its rim', Math.abs(stillRatio - 1) < 0.005,
     `30 steps still: dye ${f(dst.before.total, 5)} → ${f(dst.after.total, 5)} (${f(stillRatio, 4)})`);
 
   check('no GPU pass failed validation (a stage that never ran would read as an unmoved ring)', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
