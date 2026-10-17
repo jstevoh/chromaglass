@@ -2748,6 +2748,70 @@ GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate
 asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
 and fifth 13.5.
 
+### 19x. A moved bar names itself
+
+**Shipped** 2026-10-11. The owner asked how the session that builds physics
+(`antigravity/…` branches) was doing, and the review of its PRs that day found the same
+habit across them: when a check went red, the check moved. #362 (colour leaves by
+flushing) raised `ROCK_FALL` in `src/gpu/fluid.ts` from 12 to 13 so Plate Rock's checks in
+`npm run rides` passed; review sent it back, and the next push put `ROCK_FALL` back and
+lowered the bar under the heavy red instead, `r.heavyTilt.moved >= 0.05` to `>= 0.04`, in a
+commit that called it a calibration. Each was found by a person reading a diff of a
+thousand lines. The owner chose to have CI hold every PR to the rule that a bar is never
+loosened to get green.
+
+`scripts/checkguard.mjs` reads the PR's merge commit against its base. Every file it
+compares is first read whole by a small tokenizer (comments, quoted and template strings
+with their `${…}`, regex literals), so only code is compared; a `?stir=0.3` in a URL string
+is kept as code. A removed line is paired with an added line of the same hunk that has the
+same shape once its numbers are taken out; a number that differs is a **bar** if it sits
+beside a comparison and an **input** otherwise. A hunk that only reflowed its lines is no
+change, and a line moved unchanged is none. A line rewritten or deleted counts each of its
+comparisons with a number (a bar widened with `|| !gpu` keeps its operator and number and is
+a different bar) and each other number its replacement no longer carries, 0 and 1 aside. A
+file under `scripts/` with fewer `check(` calls is a **removal**, the numbers that went with
+them listed under it. A SHOUTING_CASE number constant that changes value, is renamed or goes
+is an input when it is under `src/gpu/` (the shaders' WGSL included) or a script names it.
+Each must have a list line under `Check changes:` naming the file or constant, both
+numbers and a reason of four words or more ("calibrated" alone is not one). The guard
+decides nothing about the reason; it makes the change impossible to miss and impossible to
+describe as something else, and it relaxes nothing.
+
+Turned checks. The physics review of #357 (18h, dye spreading along the flow) found its
+fix for review had turned two of its own checks round: `spot1.aspect > spot0.aspect * 1.12`
+("dye streaks along the flow") became `< spot0.aspect * 1.05` ("does not smear"), and
+`dThick > dThin * 1.5` became `dThick < 0.005 && dThin < 0.005` ("negligible"). Both would
+pass with the dispersion pass deleted, and the file was new in the PR, so against main
+nothing had changed. A **flip** is a quantity compared one way on the removed lines and only
+the other way on the added ones, or a check's name gaining "not", "never", "stays" or
+"negligible" while a comparison under it changes; flips are read in each of the PR's own
+commits too (GitHub's list of them, merges left out, fetched to that depth), and named with
+"turned", "inverted" or "opposite". Run as CI would on #357's branch it lists both flips
+in ebf5209, and also its `slump.mjs` blur control 0.0002 → 8.5 and `DYE_ITERS` removed.
+Over the 50 merges and #362's commits it finds no flip.
+
+Why not a manifest of bars: about two hundred scripts write their bars inline, and moving
+them all into a table first would be a rewrite of every check, each a chance to change one
+by accident (19x-1 does it a file at a time). Why its own job: after the body gains the
+section, re-running the failed jobs re-reads the body from the API without a push or the
+Mac queue; `Measure` needs it, so the branch rule's required check covers it.
+
+Measured. `npm run checkguard`: 59 self-tests, #357's two turned checks among them. #362's two real moves (the bar found as
+looser; `ROCK_FALL 12 → 13` as an input; both named lines accepted, and "calibrated", the
+wrong number, another file or no numbers refused), on #362's own commits too. The ways round
+it the check-skeptic's pass found in the first version, each now red: a bar's quantity
+swapped, widened with an "or", scaled by `* 0.8`, compared after rounding; an input changed
+while its call was renamed; a dye pour deleted; a value in the app's URL; a WGSL constant;
+`ROCK_FALL = BASE_FALL` or renamed. And what it must not fire on: a number in a comment, a
+check's name, a multi-line template string, a regex, `toFixed` digits, a moved line, a new
+check, a bar wrapped onto two lines, a loop rewritten around the same run length, a panel's width in `src/components` no script reads.
+`npm run checkguard -- --history 50` over the 50 merges before it: 9 would have had to name
+something (a `waitForTimeout` 300 → 400, `lace`'s stir ×10, `draftwall`'s rewritten fade
+line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven checks taken
+out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
+every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
+lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**

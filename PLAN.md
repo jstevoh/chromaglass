@@ -5049,6 +5049,22 @@ commit. *Size:* S.
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
 
+### 19x. A moved bar names itself
+**Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a check to assert the opposite (also commit by commit, #357's case), without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19x.
+
+- **19x-1. Bars declared where the guard can read them.** The guard reads code as written
+  because every check writes its bar inline. The checks the physics lane edits most
+  (`rides`, `physics`, `liquids`, `straw`, `slump`) could declare their bars in one object
+  per file (`const BARS = { heavyTilt: 0.05, … }`) that the guard reads by name, so a bar
+  computed from a variable two lines up is called a bar and not an input. One file at a
+  time, each bar carried over unchanged and the guard's `--base` run proving it.
+- **19x-2. Physics constants that are not SHOUTING_CASE.** The guard watches
+  `const NAME = <number>` under `src/gpu/` (WGSL included) and any a script names; a bare
+  number inside a shader's expression or a camelCase field of a preset is not watched, nor
+  a new line that bends a measured value (`moved *= 1.3`) with nothing removed. Measure how often such a number moved under
+  a red check in the last month of `antigravity/` PRs before widening it, since every
+  widening costs ordinary physics work a line in the body.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
