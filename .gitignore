@@ -44,3 +44,6 @@ film/
 
 # The Mac app's packed builds (npm run mac-app)
 desktop/release/
+
+# The show server's key, kept between launches (PLAN 14m): private to the machine.
+server/.show-key

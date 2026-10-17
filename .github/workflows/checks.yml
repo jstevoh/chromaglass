@@ -465,6 +465,17 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run report-worker
 
+      # The song-ID Worker (scripts/fingerprint-worker.mjs, PLAN.md 14o): every
+      # lookup it passes on is paid for from the owner's account and its
+      # address is in the public bundle, so what is checked is mostly what it
+      # refuses (another site, no Origin, an oversized or unsized body, the
+      # 31st an hour from one address or /64, the day's ceiling, no counter
+      # store), each read twice: the status, and that the service was never
+      # called. Node's Request and FormData only, so `logic`.
+      - name: The song-ID Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run fingerprint-worker
+
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
       # mode switch stays put. The same measurements run again inside the show
@@ -560,6 +571,16 @@ jobs:
       - name: The phone link
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/phonelink.mjs
+      # The show key (scripts/showkey.mjs, PLAN.md 14m): the show server and a
+      # phone and a laptop in browsers. A phone without the key, with a wrong
+      # one, or past three wrong ones is refused; only the laptop is handed
+      # either key; a page on another site, a flood of sockets and a frame
+      # over the cap are turned away; and the server restarted under a linked
+      # phone and laptop comes back without anyone touching either. No GPU;
+      # dist/ is the phone step's build.
+      - name: The show key
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/showkey.mjs
       # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
       # stand-in laptop on the show server's relay hears every touch, tool,
       # dye and button a phone and an iPad send, and where a touch lands in
