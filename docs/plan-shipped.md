@@ -1780,6 +1780,44 @@ and 93 of 93 phone), with React told 9.9–10.3 a second at 24 to 42 frames a se
 and the App rendering 10.9–11.6. The ear's reading for the plate's frame runs
 guarded, so a throw in it costs that frame its reading, not the plate its loop.
 
+**Shipped, the MIDI fader's half (2026-10-11).** A fader handed React every move on an
+animation frame (`rideSetting`), and the MIDI hook set its "last event" state twelve
+times a second and its clock lamp twice a second whatever it held, so with one fader
+swept at sixty messages a second (`npm run renders`, a stubbed controller on CC 7 bound
+to the Dimmer) the App rendered 121 times a second, laptop and phone, and at rest with
+MIDI on twice a second, against the desk clock's once. Now the plate reads the ride
+itself at the top of every frame (`ride` on `LiquidVisualizer`, `SettingRide.lay`), put
+where every reader in the frame loop reads, and React is handed the ride every 100 ms
+(`RIDE_VIEW_MS`), for the desk's number; the last event is a store only the MIDI panel
+and the on-screen controller subscribe to (`useMidiLastEvent`), and the lamp is set only
+when it changes. Measured: the desk's Dimmer changes 9.7 to 10.3 times a second (59.9 before),
+the App renders 11.0 a second, commits the same (121 before), where the fader stops is
+where the Dimmer lands, and a second after letting go the App renders its clock alone,
+1.0 a second (2.0 before). #348 had tried the split and taken it back for three faults,
+each answered: `lay` lays a key only while what React rendered disagrees with it, so
+once React has a move no frame copies anything (`npm run panel`: 0 of 3600 frames,
+where the first try copied all 3600); App's `ridePlate` keeps the ride off a key the
+identified track overrides, and off the wall's non-room keys while the desk builds on a
+copy; and the frame puts the result in the one `settingsRef` the whole loop reads. On
+the Mac `renders` also holds that at least half the frames during the sweep draw a move
+React has not rendered yet, and that none does once the fader is let go. The same PR
+treats a ride as a hand's write for Evolve (14t): a glide on the dial is dropped at the
+first message, the drift's anchor moves to where the fader put it, and the drift skips a
+dial a fader holds that React has not rendered yet. On the Mac (#360's run) the plate's
+Dimmer moved 33 to 38 times a second on the laptop page against the desk's 8, and 19 to
+21 on the phone page drawing 20 frames a second, with 86 to 94% of frames laying the ride;
+none once let go. The same run found the desk at 7.0 to 7.3 a second on the phone page:
+the flush was timed from the last flush, so each late timer and each wait for the next
+message lengthened the period. It is stepped on the ear's schedule now. Found in review and fixed in the
+same PR: a receiver that draws its own plate (a Chromecast, a mirror) is sent the state
+with the ride laid over it, and a ride asks the cast's throttle for a send, so it still
+hears a fader at the cast's 15 a second rather than React's 10; a preset, a Go or a desk
+slider landing within the tenth of a second before a flush hands React the ride first
+(`flushRide`), so the newer write wins as it did when the window was a frame; a look fade
+starts from where the fader has the plate, not where React last heard it; and the MIDI
+panel's activity light renders itself out 400 ms after the last message, which the App's
+renders used to do for it.
+
 ### 14v. The show takes a long time to load on the web
 
 - **Shipped:** the opening's pipelines are built three at a time (`?lanes=N` to time

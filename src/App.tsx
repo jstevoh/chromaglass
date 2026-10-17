@@ -32,7 +32,7 @@ import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DronePa
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
-import { SettingRide } from './lib/ride';
+import { SettingRide, rideSlot } from './lib/ride';
 import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
@@ -135,6 +135,12 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
 /** How often Evolve listens and steps its glides (lib/slowEvolve.ts). */
 const DRIFT_STEP_MS = 500;
+/**
+ * How often a MIDI fader's moves are handed to React, for the desk's number
+ * (PLAN.md §14f). The plate does not wait for it: it reads the ride itself.
+ * The ear's own rate (useAudioAnalyzer's EAR_VIEW_MS), for the same reason.
+ */
+const RIDE_VIEW_MS = 100;
 const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 function rememberedSource(): AudioSource {
@@ -1620,6 +1626,45 @@ export default function App() {
   const evolveLetsGo = () => { driftGlide.current.clear(); slowEvolveRef.current = null; };
 
   /*
+    A MIDI fader's ride (lib/ride.ts): `rideSetting` below says how it reaches
+    the plate and React. Declared here because the other ways into the
+    settings hand React the ride first (`flushRide`). React hears a ride
+    every RIDE_VIEW_MS, so a preset, a Go or a desk slider landing in that
+    tenth of a second would otherwise be written over by the fader's older
+    move when it flushed; flushed first, the newer write lands last and wins,
+    and the ride sees it as somebody else's and lets go, as it always has.
+  */
+  const ride = useRef(new SettingRide()).current;
+  const rideFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /*
+    The ride's schedule: when React was last handed it, stepped by
+    RIDE_VIEW_MS the way the ear steps its own (useAudioAnalyzer's
+    publishedAtRef). Timed from each flush instead, every late timer and
+    every wait for the next message was added to the period: on the Mac's
+    phone page, drawing 20 frames a second, the desk showed a fader 7.0 to
+    7.3 times a second (`npm run renders`). Never more than one step behind
+    now, so a stall does not buy a burst after it.
+  */
+  const rideMark = useRef(-Infinity);
+  const flushRide = () => {
+    if (rideFlush.current) { clearTimeout(rideFlush.current); rideFlush.current = null; }
+    const patch = ride.drain();
+    if (!patch) return;
+    const now = performance.now();
+    rideMark.current = Number.isFinite(rideMark.current) ? Math.max(rideMark.current + RIDE_VIEW_MS, now - RIDE_VIEW_MS) : now;
+    // Where Evolve's drift wanders from: a ride is a hand's write (PLAN.md 14t).
+    driftAnchor.current = { ...driftAnchor.current, ...patch };
+    setSettings(prev => ({ ...prev, ...patch }));
+    /*
+      Here and not on every message: setting a state to what it already is
+      is not always free, and per message it rendered the App another ten
+      times a second while the fader moved (`npm run renders`, 20 a second
+      for the desk's 9 before, the fader's lines).
+    */
+    setDocDirty(true);
+  };
+
+  /*
     The Mixer's take buttons (lib/mixFade.ts), declared here because both of
     the hand's ways into the settings, just below, tell them when a hand has
     taken a row's level: the hand wins, and the fade stops where it was put.
@@ -1654,6 +1699,7 @@ export default function App() {
   const updateSettings = (patch: Partial<VisualizerSettings>) => {
     const clean = sanitizePatch(patch);
     if (Object.keys(clean).length === 0) return;
+    flushRide();
     /*
       Hold stays where the closeup is (QA-12, reported by the owner as the
       picture jumping when Hold was pressed): see holdWhereItIs. Here rather
@@ -1685,6 +1731,7 @@ export default function App() {
   const removeLayer = backLook ? undefined : () => updateSettings({ layerCount: 1 });
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
+    flushRide();
     lookTakesLevels();
     evolveLetsGo();
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
@@ -1709,6 +1756,7 @@ export default function App() {
     // A saved look is a look like any other. Anything added to the app since it
     // was saved comes from the base rather than from whatever was playing,
     // and like any other it stops a take on the gel and the lumia.
+    flushRide();
     lookTakesLevels();
     evolveLetsGo();
     setSettings(prev => targetLook(prev, p.settings));
@@ -1967,8 +2015,12 @@ export default function App() {
       if (out.move) {
         const { to, seconds, aim } = out.move;
         const all: Record<string, number> = { ...to, ...(aim ? { macroAimX: aim.x, macroAimY: aim.y } : {}) };
+        const live = cur as unknown as Record<string, number>;
         for (const [k, v] of Object.entries(all)) {
-          const from = (cur as unknown as Record<string, number>)[k] ?? (k.startsWith('macroAim') ? 0.5 : undefined);
+          // A fader whose move React has not rendered yet is a hand on that
+          // dial now; the move would glide it from a value it has already left.
+          if (ride.holds(k) && ride.read(k, live) !== live[k]) continue;
+          const from = live[k] ?? (k.startsWith('macroAim') ? 0.5 : undefined);
           if (typeof from === 'number' && Number.isFinite(v)) driftGlide.current.set(k, { from, to: v, at: 0, seconds });
         }
       }
@@ -2074,53 +2126,54 @@ export default function App() {
   };
 
   /*
-    A hand on a hardware fader, answered at once and rendered once a frame.
+    A hand on a hardware fader: answered at once, drawn on the next frame, and
+    shown on the desk ten times a second.
 
     See `lib/ride.ts` for why this is not just `setSettings`. `observe` runs
     here, in the render body beside `settingsRef`, because what it needs to
     know is what React actually rendered — that is how the ride tells its own
     late writes from a preset moving the same setting underneath it.
 
-    A frame rather than a timer, so the rate matches the one thing that can
-    show the value. PLAN 14f wants the split instead (the plate reading the
-    ride itself, the desk told ten times a second), and #348 tried it on a
-    100 ms timer with the plate overlaying the ride's values every frame. It
-    went back to this because the overlay never stopped once a fader had been
-    touched, the shadow outliving the flush by design: measured, one move and
-    a render later, 3600 frames of the next 3600 still copied the whole
-    settings object, and the fader's last value sat over the identified
-    track's override of the same key (the plate read 0.6 with the track
-    asking 0.9). 14f says what a split that holds needs. Until then a move
-    reaches the plate on the frame after React renders it, and nothing runs
-    while no fader moves.
+    It used to hand React every move once a frame, so the whole App (the
+    desks, the panels, the plate's component) rendered sixty times a second
+    while a fader moved, which on a weaker laptop is dropped frames in the
+    middle of the move the fader is there to make smooth (PLAN.md §14f). It
+    is the split the ear has had since #211: the plate reads the ride itself
+    at the top of each frame (`ridePlate` below, `lay` in lib/ride.ts), and
+    React, which now only has the number on the desk to show, is told every
+    RIDE_VIEW_MS. A timer, not a frame: a backgrounded tab's timers slow to
+    one a second, which is fine, because the plate reads the ride and not
+    React, and the desk is not being looked at.
 
-    The cost is that a backgrounded tab stops flushing, which is fine: a
-    backgrounded tab has stopped drawing the plate too, so there is no show
-    to be riding, and a pending move lands on the frame after it comes
-    back.
+    A ride is a hand's write (PLAN.md 14t), so Evolve's drift treats it as
+    one, the way `updateSettings` does: a glide in flight on the same dial is
+    dropped at once, and where the drift wanders from moves to where the
+    fader put it. Before, the drift's glide wrote over the fader every tick of
+    a four-second move, and since the ride takes a value it did not send as
+    somebody else's edit, the fader lost its pickup and had to find it again;
+    and the next drift pulled the dial back into the window round the look as
+    laid.
   */
-  const ride = useRef(new SettingRide()).current;
   ride.observe(settings as unknown as Record<string, unknown>);
-  const rideFrame = useRef(0);
+  /** Tells the cast's throttle a ride moved (`castNudge` below): a receiver hears it at the cast's own rate. */
+  const castNudgeRef = useRef<() => void>(() => {});
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return;
     const clean = sanitizePatch({ [key]: value });
     if (!Object.prototype.hasOwnProperty.call(clean, key)) return;
     const sanitizedVal = clean[key] as number;
-    ride.write(String(key), sanitizedVal);
-    setDocDirty(true);
+    const k = String(key);
+    ride.write(k, sanitizedVal);
+    driftGlide.current.delete(k);
     laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
-    if (rideFrame.current) return;
-    rideFrame.current = requestAnimationFrame(() => {
-      rideFrame.current = 0;
-      const patch = ride.drain();
-      if (patch) {
-        setSettings(prev => ({ ...prev, ...patch }));
-      }
-    });
+    castNudgeRef.current();
+    if (rideFlush.current) return;
+    const wait = Math.max(0, rideMark.current + RIDE_VIEW_MS - performance.now());
+    rideFlush.current = setTimeout(() => { rideFlush.current = null; flushRide(); }, wait);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ride]);
-  useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
+  useEffect(() => () => { if (rideFlush.current) clearTimeout(rideFlush.current); }, []);
 
   // ── Cue and Go ────────────────────────────────────────────────────
   //
@@ -2301,6 +2354,34 @@ export default function App() {
   const [wallLook, setWallLook] = useState<WallLook | null>(null);
   const wallLookRef = useRef(wallLook);
   wallLookRef.current = wallLook;
+  /*
+    The plate's read of the ride, at the top of each of its frames (PLAN.md
+    §14f; `lay` in lib/ride.ts). One for each engine, because each draws its
+    own settings:
+
+    - Neither takes a key the identified track overrides. The fader moves
+      the look's setting, and the track's value is what is drawn for that
+      key (`effectiveSettings`); laid over it, the ride would undo the track.
+    - Nor the plate count. It is a structure, not a level, the stage can hold
+      more plates than the look asks for (`stageLayers`), and it is the one
+      setting the plate's component acts on through React rather than reading
+      on its frame. It reaches the plate when React renders it.
+    - While the desk builds on a copy (Preview), the wall takes only the
+      room's keys from the desk, as `wallSettings` does: the rest of what the
+      desk rides is the copy's, not the show's.
+  */
+  const overridesRef = useRef(musicIntel.overrides);
+  overridesRef.current = musicIntel.overrides;
+  const ridePlate = useMemo(() => {
+    const deskTakes = (k: string) => k !== 'layerCount' && !(overridesRef.current && k in overridesRef.current);
+    const wallTakes = (k: string) => deskTakes(k) && (!wallLookRef.current || RIG_KEYS.has(k as keyof VisualizerSettings));
+    const deskSlot = rideSlot(), wallSlot = rideSlot();
+    type Live = Record<string, unknown>;
+    return {
+      desk: (base: VisualizerSettings) => ride.lay(base as unknown as Live, deskTakes, deskSlot) as unknown as VisualizerSettings,
+      wall: (base: VisualizerSettings) => ride.lay(base as unknown as Live, wallTakes, wallSlot) as unknown as VisualizerSettings,
+    };
+  }, [ride]);
   const drafting = draftWanted && wallLook !== null;
   /*
     The wall's engine and a receiver follow `wallLook` for as long as it is
@@ -2639,8 +2720,10 @@ export default function App() {
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
+    flushRide();
     evolveLetsGo();
-    const from = settingsRef.current;
+    // From where a fader has the plate now, not where React last heard it.
+    const from = ride.lay(settingsRef.current as unknown as Record<string, unknown>, () => true, rideSlot()) as unknown as VisualizerSettings;
     const step = lookFadeStep(back);
     if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
@@ -3187,7 +3270,15 @@ export default function App() {
   const castSentCountRef = useRef(0);
   const sendCastState = useCallback((withMark = false) => {
     if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
-    const state = castStateRef.current;
+    /*
+      With a fader's moves React has not rendered yet (PLAN.md §14f): React
+      hears a ride ten times a second, and a receiver that drew only that
+      would take a ride to black as the staircase CAST_STATE_MS is there to
+      prevent. The wall's view of the ride, since a receiver draws the wall.
+    */
+    const told = castStateRef.current;
+    const laid = ridePlate.wall(told.settings);
+    const state = laid === told.settings ? told : { ...told, settings: laid };
     const send = castSendRef.current;
     castSentAtRef.current = performance.now();
     castSentTriggersRef.current = castTriggers(state);
@@ -3236,6 +3327,17 @@ export default function App() {
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
   castReadyRef.current = () => sendCastState(true);
+  /*
+    A ride between React's renders asks for a send the way a change of state
+    does (the throttle just below), so a receiver hears a fader at the cast's
+    own rate rather than at React's.
+  */
+  castNudgeRef.current = () => {
+    if (!castLinkRef.current || castTrailRef.current) return;
+    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
+    if (wait <= 0) { sendCastState(false); return; }
+    castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
+  };
   const castLinkRef = useRef('');
   useEffect(() => {
     if (!isCasting && mirrorCount === 0) {
@@ -4563,7 +4665,7 @@ export default function App() {
         ref={wallEngineRef}
         onBackLookCleared={backLookCleared}
         audioData={audioData} hear={hear}
-        settings={walled ? wallSettings : effectiveSettings}
+        settings={walled ? wallSettings : effectiveSettings} ride={ridePlate.wall}
         seedCount={wallLook ? wallLook.seedCount : seedCount} spinFlick={wallLook ? wallLook.spinFlick : spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer}
         clearTrigger={wallLook ? wallLook.clearTrigger : clearTrigger}
@@ -4609,7 +4711,7 @@ export default function App() {
           key="draft"
           ref={visualizerRef}
           draft
-          audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
+          audioData={audioData} hear={hear} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
           selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
           onAim={aimMacro}
           toolAmount={toolAmount}
