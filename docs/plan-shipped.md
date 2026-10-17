@@ -3124,23 +3124,24 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 ### 18e. Edges come from refraction (replaces the painted rims and highlights)
 
-Shipped in #355 (2026-10-11): projector pupil aperture loss and shadowgraph Becke lines replace painted surface-normal shading (Sobel gradients, Blinn-Phong specular, artificial dark meniscus rims, and unphysical bright boundary lines) on projected looks.
+Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges come from projector pupil aperture loss and shadowgraph Becke lines, in place of painted surface-normal shading. What did not ship is open in `PLAN.md` as 18e-1 (the back plate's painted line), 18e-2 (a clear pour's edge: the deflection from ∇OPL) and 18e-3 (the heat's index).
 
-- **Where:** in `plate.ts`, `calcOpl` builds optical path length OPL = n·h in the derive pass (`DERIVE_WGSL`), tracking water (1.333), oil (1.470) and species mixture indices. A 3-texel 9-tap bilinear stencil derives ∇OPL and the Laplacian ∇²OPL once per frame into the derive texture (`near.xy` = gradient, `near.z` = Laplacian for projected looks; camera looks call `sobelGrad` and encode `boundaryDiff` in `near.z` to avoid display-pass re-evaluation). The display pass evaluates aperture loss from light deflected outside the projection pupil and defocus shadowgraph intensity variations (Becke line doublets).
+- **Where:** in `src/gpu/wgsl/plate.ts`, the derive pass (`DERIVE_WGSL`) builds the optical path OPL = n·h at every texel (`calcOpl`). n is water's 1.333 plus the oil (`0.137` a unit of oil, 1.47 − 1.333), the clear film, the poured liquids' own indices from the species field (`pouredDn`, a − r·1.333 from its share r and Σ share·n, PLAN 18d-9; the layout binds it unfilterable, `deriveLayout` in `src/gpu/plate.ts`) and the dye's stand-in (below). h is the gap in rest gaps (6 mm). A 3-texel 9-tap stencil writes the dye's Sobel slope (`near.xy`), ∇²OPL (`near.z`) and OPL (`near.w`) once a frame; camera looks keep `sobelGrad` and write `boundaryDiff` in `near.z`. The display (`refractionOptics`) darkens where the deflection misses the projector's pupil and applies the defocus shadowgraph.
+- **Behaviour removed or changed on projected looks** (not camera or closeup): the Blinn–Phong and `meniscus` specular are gone from every one; where the derive pass is on (`derivedOn`), so are the `meniscus` rim, the front plate's painted `boundaryContrast` line and the oil's painted `|∇oil|·2.2` rim are gone (the oil's 8% lens brightening stays); the back plate's line is the painted 18e-1 stand-in, without the old additive white term. Camera and closeup looks draw as before.
 - **Model and declared shortcuts:**
-  1. *Deflection angle:* approximated via small-angle deflection θ ≈ |∇density| · 0.0148 · dyeGain from the density gradient (scaled by dyeGain = max(1, boundaryContrast · 3)), rather than full ∇(n·h); this omits oil, film and gap thickness terms that the Laplacian includes, and is evaluated per-texel so it scales with grid resolution.
-  2. *Pupil overlap:* modeled via a smoothstep overlap function with full extinction floor at 0.0 against numeric aperture NA = 0.35.
-  3. *Shadowgraph transport:* ΔI/I ≈ -Δz · (∇²OPL / OPL) driven by `projectorFocus` (deltaZ = (projectorFocus - 0.5) · 1.5), modulated by boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default `projectorFocus = 0.5`, Δz = 0 so the Becke term is 1 until the slider moves.
-  4. *Projector focus control:* `projectorFocus` separated from camera `focus`, wired to SettingsPanel, phone/remote, desk pins, `LIGHT_STACK` in `src/lib/drift.ts` (so Evolve holds sharp focus instead of wandering off `0.5`), and MIDI.
-  5. *Painted shortcut on Layer 1 (`PLAN 18e-1`, with `31a`):* Layer 1 keeps a painted boundary line (`edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`, gated on `fluid1.a > 0.03`) alongside `refractionOptics(near1)`. With both dishes at Δz = 0 at default focus, aperture loss alone darkens edges and leaves the back plate's Screen/Multiply separation at 9.9 in `npm run mixer` (bar > 10, 11.0 on main, 10.1 with the line), whereas applying that brightening to Layer 0 clips the 90th-percentile thin-dye rim in `mixer`'s single-dish mid-grey contrast check (`129.5 → 136.4` without it, `130.9 → 134.7` with it). Tracked in `PLAN.md` item **18e-1** (with **31a**) to replace once the two dishes sit at separate focal heights Δz in the projector cone.
-- **Measured:**
-  - `npm run derive`: 4/4 passed (Laplacian min -0.397, max 0.737; max OPL 1.377 vs 1.378 expected).
-  - `npm run microscope`: 3/3 passed (structure at 9x 22.10, well above 17.65 bar).
-  - `npm run mixer`: 68/68 passed (Screen/Multiply gap: 10.1 > 10 bar; bare glass difference: 0; paper off-dye: 0).
-  - `npm run stages`: drawing pass at 768² 2 layers: 3.57 vs 3.46 ms base/branch, 4.26 vs 4.39 ms base/branch (watcher's alternating runs; +1.7 ms regression eliminated).
-  - `npm run panel`: 190/190 passed.
-  - `npm run desk`: 40/40 passed.
-  - `npm run qa`: 142/142 passed.
+  1. *Deflection angle:* θ ≈ |∇density| · 0.0148 · dyeGain from the dye's slope, not ∇(n·h); it omits the oil, film, gap and poured-index terms the Laplacian has, and `refractionOptics` returns early where the dye's slope is flat, so an edge with no dye across it (a clear pour, a clear oil drop) draws no line yet (18e-2).
+  2. *dyeGain* = max(1, boundaryContrast · 3), a contrast gain on the step.
+  3. *Pupil overlap:* a smoothstep with a 0.0 extinction floor against `DROP_NA` = 0.25.
+  4. *Shadowgraph transport:* ΔI/I ≈ −Δz · ∇²OPL / OPL, Δz = (projectorFocus − 0.5) · 1.5, scaled by max(1, boundaryContrast · 2) and masked by an edge-deflection smoothstep; at the default 0.5, Δz = 0, so the Becke term is 1 until the control moves.
+  5. *Painted line on the back plate (18e-1, with 31a):* `edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`. Without it the back plate's Screen/Multiply separation in `npm run mixer` is 9.9 (bar > 10, 11.0 on main, 10.1 with it).
+  6. *The dye's index:* d · 0.015 · dyeGain. A dilute dye barely moves water's index and the shelf gives dyes none, so this is a stand-in; it is what gives a dye-only look its Becke lines. The poured liquids' indices are real.
+  7. *Projector Focus:* a separate setting from the camera's focus, on Settings → Look, the desks, MIDI, the remote and the phone's Looks sheet, held by Evolve (`LIGHT_STACK`, `src/lib/drift.ts`).
+- **Measured (2026-10-17, the owner's Mac):**
+  - `npm run derive`: 4/4. Becke doublet min −0.397, max 0.737 (bars −0.07 and 0.18: 4% and 10% of the light at Projector Focus 1). The optical path of glycerine and syrup poured clear, 9 mm deep, against n · 9/6 from the shelf's indices: glycerine 2.2109 against 2.2119, syrup 2.1777 against 2.1780, water 1.9990 against 1.9995 (bar 0.005). Controls: main's derive pass fails both (min 0; path 0); the pass without the poured index reads 1.9990 for all three; the depth ignored reads 1.4736; the index read from the viscosity channel reads 10.52; the dye's constant doubled still passes the path check (2.2109).
+  - `npm run microscope`: 3/3 (22.10 at 9x against the 17.65 bar).
+  - `npm run mixer`: 68/68 (back plate Screen/Multiply 10.1 > 10).
+  - `npm run lamp`: 11/11 (every look at Lamp Ground 0 as before the lamp, none different; two projectors add their light, mean error 0.51).
+  - `npm run stages` (round 2): drawing pass at 768², two layers, 3.57 vs 3.46 ms base/branch.
 
 ### 18g. Colour leaves by flushing, not by fading
 

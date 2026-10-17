@@ -18,8 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new **Projector Focus** control (`projectorFocus`, Settings → Look, MIDI, the
   desks, a sequence's stages, the remote and the phone's Looks sheet; 0.5 by default)
   moves the projector lens's focal plane across the liquid layer, strengthening or
-  inverting the Becke line doublets at dye and oil fronts. `npm run derive` checks the
-  derived optical path length and Laplacian doublet.
+  inverting the Becke line doublets at dye and oil fronts. A poured liquid's own
+  refractive index (glycerine 1.4746, syrup 1.452, from the shelf) enters the optical
+  path; `npm run derive` checks it against the shelf's numbers, and the Laplacian doublet.
+- On projected looks the oil's painted rim is gone; a clear oil drop or a clear pour with no
+  dye across its edge draws no rim line until PLAN 18e-2 deflects light by the optical path.
 
 ### Added — Two Projectors (PLAN 18b-10)
 
