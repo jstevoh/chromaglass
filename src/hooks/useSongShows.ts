@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SongMap, SongSection, TrackIdentity } from '../lib/musicTypes';
+import type { SongMap, TrackIdentity } from '../lib/musicTypes';
 import { songRefFromTrack, songLabel } from '../lib/songRef';
+import { songDuration } from '../lib/songScore';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
-import { dueActions, describeWhat, describeWhen, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
+import { dueActions, describeWhat, describeWhen, sectionsAt, showFor, type FiredState, type SongAction, type SongClock, type SongShow } from '../lib/songShows';
 
 /**
  * Runs a song's show while the song plays (see lib/songShows.ts).
@@ -37,6 +38,14 @@ export interface SongShowRuntime {
    */
   start: (showId: string, opts?: { skip?: string[]; duration?: number }) => void;
   stop: () => void;
+  /**
+   * The next time this show starts on its own (its song recognised, Follow
+   * songs on), leave the plate's look as it is rather than fading to the
+   * show's. For a show the score has just made by pinning its first cue: the
+   * person pinned a burst on a chorus, not a look change, and the look playing
+   * may be one no saved look matches (a slider moved, a fader ridden).
+   */
+  keepLook: (showId: string) => void;
 }
 
 interface Args {
@@ -55,19 +64,6 @@ interface Args {
 }
 
 const IDLE: SongShowStatus = { showId: null, song: null, t: 0, manual: false, last: null };
-
-/** Which section the song is in, and how many of each kind have begun, from the song map. */
-function sectionsAt(sections: SongSection[] | undefined, t: number): Pick<SongClock, 'section' | 'sectionCounts'> {
-  if (!sections?.length) return { section: null, sectionCounts: {} };
-  const index = sections.findIndex((s) => t >= s.start && t < s.end);
-  if (index < 0) return { section: null, sectionCounts: {} };
-  const counts: Record<string, number> = {};
-  for (let i = 0; i <= index; i++) {
-    const kind = sections[i].label.toLowerCase().replace(/[^a-z].*$/, '');
-    counts[kind] = (counts[kind] ?? 0) + 1;
-  }
-  return { section: { label: sections[index].label, index }, sectionCounts: counts };
-}
 
 export function useSongShows(a: Args): SongShowRuntime {
   const argsRef = useRef(a);
@@ -93,7 +89,7 @@ export function useSongShows(a: Args): SongShowRuntime {
       trackIsrc: x.track?.isrc ?? null,
       last: null,
     };
-    x.applyLook(show, manual ? 0 : 2);
+    if (!keepLookRef.current.delete(show.id)) x.applyLook(show, manual ? 0 : 2);
     setStatus({ showId: show.id, song: songLabel(show.song), t: fromSec, manual, last: null });
   }, []);
 
@@ -108,6 +104,9 @@ export function useSongShows(a: Args): SongShowRuntime {
   }, [begin]);
 
   const stop = useCallback(() => { runRef.current = null; setStatus(IDLE); }, []);
+
+  const keepLookRef = useRef<Set<string>>(new Set());
+  const keepLook = useCallback((showId: string) => { keepLookRef.current.add(showId); }, []);
 
   // Follow: the identified song has a show, and it is not the one running.
   useEffect(() => {
@@ -140,7 +139,7 @@ export function useSongShows(a: Args): SongShowRuntime {
       const current = skipRef.current.size ? { ...found, actions: found.actions.filter((act) => !skipRef.current.has(act.what.do)) } : found;
       run.show = current;
       const t = run.manual ? (showNow() - run.startedAt) / 1000 : Math.max(0, x.positionSec);
-      const duration = durationRef.current ?? x.track?.durationSec ?? current.song.durationSec ?? null;
+      const duration = songDuration(durationRef.current, x.track?.durationSec, current.song.durationSec, x.songMap?.durationSec);
       const clock: SongClock = {
         t, duration,
         ...sectionsAt(run.manual ? undefined : x.songMap?.sections, t),
@@ -158,5 +157,5 @@ export function useSongShows(a: Args): SongShowRuntime {
     return () => clearShowInterval(timer);
   }, [stop]);
 
-  return { status, start, stop };
+  return { status, start, stop, keepLook };
 }

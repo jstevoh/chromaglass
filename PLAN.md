@@ -6447,12 +6447,16 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (the sequencer runs a section stage on its own clock), but a show's "at the second
     chorus" still fires on the guess. Decide whether a show's section actions wait for the
     place to be sure, and say so on the Songs panel.
-  - **28g-8. Found along the way: the score's nudge.** When 28h's nudge lands (#375), it
-    calls `FollowedPlace.resync(mapSec, now)` (its third argument, the time it is now,
-    defaults to the second), which starts the clock there and anchors the follower. A
-    re-identification of the same song does not move a place that is sure; a nudge is the
-    performer's word and should, so the nudge calls it directly, not through the hook's
-    identification effect.
+  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped.md` §28h).
+    A nudge (`useMusicIntelligence`'s `seekBy`) moves the followed place itself:
+    `FollowedPlace.resync(mapSec, now)` starts the clock there and anchors the follower,
+    called directly, not through the identification effect (which leaves a sure place
+    alone). The clock keeps the nudge too, so an identification while the follower is
+    unsure resyncs to `offsetSec + nudge`. Open from it: the steering closes a nudged
+    place back toward what the follower hears, so a nudge of a section's edge on a sure
+    follower is corrected within a second (right when the follower is right, and a nudge
+    that will not stay when the follower is wrong); decide whether a nudge holds the
+    follower off for a few bars.
   - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
     is held (the check's intro, four bars of A minor into a verse that opens on it), no
     place in it sounds different from another, and the follower slid 1.4 bars behind into
@@ -6460,6 +6464,29 @@ Turing Print" work (#331), which also made the reaction grow at all.
     held the identification's clock meanwhile and jumped once. A rehearsal map made from a
     file (28g-3) can carry bar positions from the beat grid, which would fix the place
     inside a held chord.
+- **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
+  this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
+  - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than
+    adding an offset to it; position stays in the map's own seconds.
+  - **28h-2.** Correct the score, not just the clock: drag a section's edge and save
+    the map, so the next play of the song is right without a nudge. Today the nudge
+    is an offset for the whole song, which fixes one late edge and moves the rest.
+  - **28h-3.** A score that draws itself as an unknown song plays, from the live song
+    shape (`songShape.ts`: builds, drops, breakdowns), before any map exists.
+  - **28h-4.** The sequencer's own stages on the lane: a sequence started for a song
+    (`startAt`) lays its stages end to end by seconds and does not follow the nudge or
+    a section's time; show the stages against the sections, and let a stage advance
+    on a named section ("the second chorus"), not only on any section change.
+    A show started by hand from the Songs sheet keeps its own clock and reads no
+    sections, so the nudge leaves it alone.
+  - **28h-7.** A listen's replay and a recorded take count from the recognised
+    start (`songStartMs`), not the nudged position: a take made after a nudge stores
+    the unnudged start. Decide whether a take should carry the nudge.
+  - **28h-5.** The remote phone (`RemoteControl.tsx`, over the show server) does not
+    get the score yet; the phone layout's Play sheet does.
+  - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
+    maps back to the same section index, so a cue on it fires once; decide with 28g
+    whether a repeat should fire its cue again.
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
