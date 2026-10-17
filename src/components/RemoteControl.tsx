@@ -774,6 +774,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </button>
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Projector Focus" field="projectorFocus" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*

@@ -62,6 +62,9 @@ const LIGHT_STACK = new Set([
   // Starch in the dish (PLAN 26d): the reaction printed black on white or
   // deposited in the look's colours, a choice for a look, made by hand.
   'turingPrint',
+  // The projector lens's focal plane (PLAN 18e): 0.5 is sharp focus on the
+  // plate, so drifting it around 0.5 would defocus looks that ship sharp.
+  'projectorFocus',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',
