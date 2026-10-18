@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
@@ -12,6 +13,7 @@ import {
   placeFloating, raiseFloating, toggleCollapsed, whereIs,
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
+import { getEffectiveTier } from '../../lib/tierGates';
 import type { DeskProps } from './deskProps';
 
 /**
@@ -521,11 +523,29 @@ export function Desk(p: DeskProps) {
       )}
 
       {/* ── Status ────────────────────────────────────────────────── */}
-      <footer className="col-[1/-1] flex items-center justify-between gap-4 border-t border-border px-4 font-mono text-[11px] text-dim">
-        <span className="truncate" data-testid="status-hearing">
-          {p.status.audio}
-          {p.status.sequence && ` · ${p.status.sequence}`}
-          {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
+      <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[11px] text-dim">
+        <span className="flex min-w-0 items-center gap-3 truncate">
+          {p.onOpenAccount && (
+            <button
+              type="button"
+              data-cg-account-open=""
+              onClick={p.onOpenAccount}
+              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 font-sans text-[11px] font-semibold text-amber-100 transition-colors hover:border-amber-400/70 hover:bg-amber-500/25"
+              title="Profile, Settings & Store"
+              aria-label="Account"
+            >
+              <User size={12} className="shrink-0 text-amber-300" />
+              <span>Profile &amp; Store</span>
+              <span className="rounded bg-amber-500/25 px-1 py-px font-mono text-[9px] uppercase tracking-wider text-amber-200">
+                {getEffectiveTier()}
+              </span>
+            </button>
+          )}
+          <span className="truncate" data-testid="status-hearing">
+            {p.status.audio}
+            {p.status.sequence && ` · ${p.status.sequence}`}
+            {p.status.song && <span data-testid="status-song">{` · ${p.status.song}`}</span>}
+          </span>
         </span>
         <span className="flex items-center gap-3 truncate">
           <span className="truncate" data-testid="status-running">
@@ -535,17 +555,6 @@ export function Desk(p: DeskProps) {
             {p.status.rec ? ` · rec ${p.status.rec}` : ''}
             {p.status.engine ? ` · ${p.status.engine}` : ''}
           </span>
-          {p.onOpenAccount && (
-            <button
-              type="button"
-              data-cg-account-open=""
-              onClick={p.onOpenAccount}
-              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-text-2 hover:bg-hover hover:text-text"
-              title="Account"
-            >
-              Account
-            </button>
-          )}
         </span>
       </footer>
 

@@ -34,7 +34,7 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -6142,17 +6142,6 @@ export default function App() {
           >
             ?
           </button>
-          {openAccount && (
-            <button
-              type="button"
-              data-cg-account-open=""
-              onClick={openAccount}
-              className="min-w-[34px] min-h-[34px] px-2 rounded-full transition-all text-[11px] font-medium hover:bg-white/10 text-white/70"
-              title="Account"
-            >
-              Account
-            </button>
-          )}
         </div>
       </div>
       )}
@@ -6334,7 +6323,13 @@ export default function App() {
       )}
 
       {showAccount && hasAccountOrLicenseUI && (
-        <AccountSheet onClose={() => setShowAccount(false)} />
+        <AccountSheet
+          onClose={() => setShowAccount(false)}
+          onOpenSettings={() => {
+            setShowAccount(false);
+            openAllSettings();
+          }}
+        />
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
@@ -6417,9 +6412,24 @@ export default function App() {
         {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
+      {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
+      {overlayUp && !isMinimized && showControls && openAccount && (
+        <button
+          type="button"
+          data-cg-account-open=""
+          onClick={openAccount}
+          title="Profile, Settings & Store"
+          aria-label="Account"
+          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+        >
+          <User size={14} className="shrink-0 text-amber-300" />
+          <span>Profile &amp; Store</span>
+        </button>
+      )}
+
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
       {isActive && audioData && !isMinimized && overlayUp && (
-        <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
+        <div className="absolute bottom-16 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },
             { label: 'M', value: audioData.mid },

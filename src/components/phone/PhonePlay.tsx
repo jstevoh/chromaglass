@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, CirclePlus, Shuffle } from 'lucide-react';
+import { ChevronDown, CirclePlus, Shuffle, User } from 'lucide-react';
 import { TouchSlider } from '../ui/TouchSlider';
 import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
@@ -322,8 +322,9 @@ export function PhonePlay(p: PhonePlayProps) {
               data-cg-account-open=""
               className="pointer-events-auto flex h-12 min-w-12 items-center justify-center"
             >
-              <span className={`flex h-9 min-w-11 items-center justify-center rounded-[18px] px-3 text-[13px] font-medium text-text ${GLASS_PILL}`}>
-                Account
+              <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[13px] font-medium text-text ${GLASS_PILL}`}>
+                <User size={15} className="shrink-0 text-amber-300" />
+                <span>Account</span>
               </span>
             </button>
           )}

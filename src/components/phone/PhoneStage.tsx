@@ -5,7 +5,7 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video,
+  Laptop, Save, Video, User,
   Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
@@ -397,9 +397,10 @@ export function PhoneStage(p: PhoneStageProps) {
               onClick={p.onOpenAccount}
               aria-label="Account"
               data-cg-account-open=""
-              className="flex h-12 items-center justify-center rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
             >
-              Account
+              <User size={15} className="shrink-0 text-amber-300" />
+              <span>Account</span>
             </button>
           )}
           <button

@@ -26,9 +26,10 @@ async function loadFirebaseAuth() {
 
 interface AccountSheetProps {
   onClose: () => void;
+  onOpenSettings?: () => void;
 }
 
-export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
+export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSettings }) => {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [email, setEmail] = useState<string | null>(() => getCachedEmail());
@@ -197,7 +198,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950 p-5 text-neutral-100 shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="text-base font-medium text-neutral-100">Account</h2>
+          <h2 className="text-base font-medium text-neutral-100">Profile &amp; Store</h2>
           <button
             type="button"
             onClick={onClose}
@@ -222,6 +223,18 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
             {tierLabel}
           </span>
         </div>
+
+        {onOpenSettings && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            data-cg-account-settings=""
+            className="mt-3 flex min-h-[38px] w-full items-center justify-between rounded-xl border border-white/15 bg-white/[0.05] px-3.5 py-2 text-xs font-medium text-neutral-100 transition hover:bg-white/10"
+          >
+            <span>Studio &amp; Stage Settings</span>
+            <span className="text-neutral-400">Open →</span>
+          </button>
+        )}
 
         {currentTier !== 'pro' && (
           <div
@@ -476,24 +489,45 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
           </p>
         )}
 
-        <div className="mt-5 flex items-center justify-center gap-4 border-t border-white/10 pt-3 text-xs text-neutral-400">
-          <a
-            href="/privacy.html"
-            target="_blank"
-            rel="noopener"
-            className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-          >
-            Privacy Policy
-          </a>
-          <span>·</span>
-          <a
-            href="/terms.html"
-            target="_blank"
-            rel="noopener"
-            className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-          >
-            Terms of Service
-          </a>
+        <div className="mt-5 border-t border-white/10 pt-3 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-neutral-400">
+            <a
+              href="https://chromaglass.lemonsqueezy.com/billing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
+            >
+              Orders &amp; Invoices
+            </a>
+            <span>·</span>
+            <a
+              href="mailto:support@chromaglass.art"
+              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
+            >
+              Support
+            </a>
+            <span>·</span>
+            <a
+              href="/privacy.html"
+              target="_blank"
+              rel="noopener"
+              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
+            >
+              Privacy
+            </a>
+            <span>·</span>
+            <a
+              href="/terms.html"
+              target="_blank"
+              rel="noopener"
+              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
+            >
+              Terms
+            </a>
+          </div>
+          <p className="mt-2 text-[11px] leading-snug text-neutral-500">
+            Home &amp; Pro are one-time purchases (no recurring subscription). We send only sign-in links and order receipts — never marketing emails.
+          </p>
         </div>
       </div>
     </div>
