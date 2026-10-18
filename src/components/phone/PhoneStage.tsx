@@ -14,6 +14,7 @@ import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -161,6 +162,19 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /*
+    The score (PLAN 28h): the song the show has heard as a lane of sections,
+    its show's cues on it, and the nudge. On the Play sheet under the show's
+    tile, because watching the show against the song and nudging it back into
+    step is playing the show; the same component the desk's Score panel draws,
+    at the phone's sizes.
+  */
+  score?: SongScoreProps;
+  /**
+   * Following a known song's map by ear (PLAN.md 28g-2, lib/followedPlace.ts
+   * `followLine`): which song, and how sure; null with no map to follow.
+   */
+  mapLine: string | null;
   /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
   deaf: boolean;
   /*
@@ -238,6 +252,13 @@ export interface PhoneStageProps {
    */
   lampGround: number;
   onLampGround: (v: number) => void;
+  /**
+   * Two Projectors (PLAN 18b-10): each plate has its own overhead projector
+   * aimed at the screen, so its clear parts throw its lamp onto the screen
+   * and wash the other plate's colour. On the Looks sheet beside Lamp Ground.
+   */
+  twoProjectors: number;
+  onTwoProjectors: (v: number) => void;
   /**
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
@@ -742,6 +763,11 @@ export function PhoneStage(p: PhoneStageProps) {
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
+          <div className="mt-3">
+            <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
+              display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">Each plate has its own lamp on the screen, so its clear parts wash the other's colour.</p>
+          </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
               <Slider label="Ben-Day Dots" value={p.benDay} min={0} max={1} step={0.05} onChange={p.onBenDay}
@@ -846,6 +872,14 @@ export function PhoneStage(p: PhoneStageProps) {
               {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
             </p>
           )}
+          {/*
+            The desk's track panel says the same under its playhead: whether
+            the show reads the song's map where the band is heard to be, or,
+            unsure, follows the song's shape above.
+          */}
+          {p.audioSource !== 'none' && p.mapLine && (
+            <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
+          )}
           {p.audioSource !== 'none' && (
             <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
               <Slider label="Follow the song" value={p.songFollow} min={0} max={1} step={0.01} onChange={p.onSongFollow}
@@ -888,6 +922,12 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
               {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
             </p>
+          )}
+          {p.score && (
+            <>
+              <SectionLabel>The song</SectionLabel>
+              <SongScore {...p.score} touch />
+            </>
           )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}

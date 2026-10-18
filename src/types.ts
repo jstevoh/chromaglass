@@ -597,6 +597,7 @@ export interface VisualizerSettings {
   // Mixer
   layerCount: number;
   blendMode: BlendMode;
+  twoProjectors: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -891,7 +892,7 @@ export interface VisualizerSettings {
   /** Where the closeup camera is aimed, across and up the plate (0-1). */
   macroAimX?: number;
   macroAimY?: number;
-  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
+  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks; its punch with the bass, push with the energy and tremor from the treble move the frame, so they also need Frame Sway (lib/macroCamera.ts)
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
@@ -1010,6 +1011,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
+  twoProjectors: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second

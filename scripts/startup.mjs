@@ -515,6 +515,26 @@ const instruments = () => {
   timed('adapter', navigator.gpu, 'requestAdapter');
   timed('device', globalThis.GPUAdapter?.prototype, 'requestDevice');
   /*
+    The first compute pipeline the page builds is the boot's warm one
+    (src/gpu/device.ts), so its row says what the compiler's start cost
+    this run; without it, a red could not say whether the warm took the
+    stop or only moved it (the first run of the warm: 2.08 s from 1.99 s).
+  */
+  {
+    const proto = globalThis.GPUDevice?.prototype;
+    const f = proto?.createComputePipelineAsync;
+    if (f) {
+      let first = true;
+      proto.createComputePipelineAsync = function (...a) {
+        if (!first) return f.apply(this, a);
+        first = false;
+        const row = ['first compile', performance.now(), null];
+        gpuAt.push(row);
+        return f.apply(this, a).finally(() => { row[2] = performance.now(); });
+      };
+    }
+  }
+  /*
     When each promise the page's code awaits on its way to the first
     step settled: the moment its continuation begins. The page's own
     JavaScript after an `await` is no long task (above), so a stall of

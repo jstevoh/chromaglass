@@ -96,8 +96,15 @@ function crowd(drops, { palette = FILLMORE, frames = 1200, s = 4242 } = {}) {
   run lays a different carpet. 822d175a:337 was main at 6c03494 with
   Math.random seeded here; c927327f:336 is main at 38fd0a8 (after #153, still
   without drops) on show seed 4242, computed from that file, not this one.
+
+  Re-pinned a second time, for the same kind of reason: the rings' random
+  walk is gone (every drop stepped ±0.075 cells on each axis every solver
+  step, 4 px rms at 6x; lib/beads.ts, `npm run steadycam`), and with it the
+  two draws a drop made from the `plate.beads` stream each step, so the same
+  seed lays its drops in other places and the crowd on this plate has 341 of
+  them where it had 336. 64fc541f:341 is that code on show seed 4242.
 */
-const RINGS_FINGERPRINT = 'c927327f:336';
+const RINGS_FINGERPRINT = '64fc541f:341';
 const fingerprint = (bs) => {
   const f = new Float64Array(bs.length * 3);
   bs.forEach((b, i) => { f[3 * i] = b.x; f[3 * i + 1] = b.y; f[3 * i + 2] = b.r; });

@@ -1952,6 +1952,114 @@ map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` boun
 `NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
 governor's ladder and the cache as they were.
 
+### 14m. Anyone on the venue's network can drive the show
+
+**Shipped** (this PR). What changed, in `server/remote-server.js` unless named:
+
+- The show key is eight digits from `crypto.randomInt`, compared with `timingSafeEqual`,
+  kept in `server/.show-key` (mode 600, ignored by git) so a restart keeps it, and the
+  Mac app's key is eight digits too (`desktop/main.js`; a four-digit key is replaced, so
+  each phone scans the new code once).
+- Only the laptop is handed a key: `/remote-info.json` answers `key` and `displayKey`
+  to a loopback socket with a localhost Host and no forwarding headers. The display has
+  its own 32-hex key, new each launch, so a phone's key cannot take the display role.
+- Three wrong keys from an address, each within 5 minutes of the last, lock it out for
+  5 minutes (`denied` with `reason: 'locked'`, which the phone shows and waits out); a
+  good key no longer clears the count, so a guest's own join cannot reset a guesser on a
+  shared address. Past 30 wrong keys a minute across all addresses, new joins from all
+  but the laptop are refused for 60 s, so a guesser spread over a /48 of IPv6 needs
+  years (PLAN 14m-budget). A display hello with no key is not a guess and is not counted,
+  and the laptop's page at its Wi-Fi address, which is given no display key, no longer
+  knocks. At most 4 sockets per address may be open without having said hello. The
+  upgrade checks Origin (none, from
+  the native apps and the checks; a page this server served; the iPhone app; a page on
+  this machine); `maxPayload` is 512 KiB (close 1009); a socket
+  has 5 s to say hello; 16 sockets per address and 200 in all.
+- `useRemoteLink.ts`: a relay that was there and went away is looked for on the short
+  backoff, not the 30 s probe, so a laptop and phone come back after a restart by
+  themselves; a frame over the cap is dropped with a warning rather than sent.
+- Art-Net: an input universe (`artnetInUniverse`) and the `ARTNET_*` numbers falling
+  back to their defaults when they are not numbers (`npm run lights`, 30 of 30).
+
+*Measured:* `npm run showkey` on the old server 11 of 33, now 33 of 33. With the server
+down for 4 s under a linked phone and laptop, a change on the laptop had not reached
+the phone in 25 s before; now it does in 3.6 s. `applink`, `draw`, `drawwall` read the
+display's key from `/remote-info.json`, and `remotemix`, `phonelink`, `panel` pass.
+
+
+**Read in the code** (`server/remote-server.js` unless named).
+
+- The show key is four random digits (`SHOW_KEY`), about 13 bits, compared with `!==`,
+  and a wrong `hello` only closes that socket: nothing counts failures or slows the next
+  try. Through `npm run tunnel` the 9,000 keys fall in minutes.
+- On the LAN it need not be guessed. `/remote-info.json` hands the key to any request
+  without `x-forwarded-for` or `cf-connecting-ip` (`isLocalRequest`), which is every
+  device on the venue's Wi-Fi, not only the machine `remoteProtocol.ts` says it is for.
+  The socket checks no Origin or Host either, so a web page open on any phone in the
+  room can reach `ws://<laptop>:3000/remote-ws`.
+- With the key, a `hello` as `display` receives every phone's commands, and can push
+  `state` and `cast` to the phones and to the network display on the wall, set the
+  Art-Net `lights`, and toggle Record and Blackout.
+- Frames are taken up to the `ws` default of 100 MiB (`new WebSocketServer({ server,
+  path })`); the 512 KB limit is checked after the frame is buffered and made a string.
+  A socket that never says hello is never closed, and nothing caps connections. A few
+  large frames stop the Node process, and every phone, network display, OSC and Art-Net
+  with it.
+- A restart with the generated key answers every phone and network display `denied`,
+  and `useRemoteLink.ts` stops retrying for good on that, though the server's comment
+  says it is restartable mid-show.
+- Art-Net in reads every universe but its own output (`packet.universe ===
+  artnet.universe` is the only filter) into one `seen` map, so on a rig with four
+  universes each mapped setting jumps between their values. A non-numeric `ARTNET_RATE`
+  makes the rate `NaN`, and `setInterval(…, NaN)` sends every millisecond.
+
+*Fix:* the key only to a loopback `req.socket.remoteAddress`, and an Origin check on the
+upgrade; a longer key from `crypto.randomInt`, compared with `timingSafeEqual`, and an
+address locked out after a few wrong hellos; a display key apart from the phones', so a
+phone's key cannot take the display role; `maxPayload: 512 * 1024`, a 5 s deadline for
+the hello and a cap per address; the generated key kept in a file beside the server, so
+a restart keeps it; an input universe, and the `ARTNET_*` numbers validated. The phone's
+join and the iPhone app's laptop remote (`appLink.ts`) must keep working.
+
+Once the server has roles, a **guest key** is a small step (*proposed*): a key whose
+socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto a
+chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
+tablet, a second projectionist, or at a party the audience's phones through a QR code
+on a card.
+
+*Measure:* extend `npm run remotemix`: a request from a LAN address gets no key; three
+wrong keys lock the address out; a 1 MB frame is refused without the process growing; a
+silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
+socket's `patch` is dropped.
+
+### 14o. The song-ID Worker is open to anyone
+
+**Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
+Origin from the site, a localhost, the show server on a private address or the iPhone
+app (403 otherwise, and for none); its counter store bound (503); a `Content-Length` of
+at most 2 MB read before `formData()` (411 / 413), and the file measured again after;
+30 an hour per address, per /64 on IPv6 (429); 1000 a day across everyone, or
+`FINGERPRINT_DAILY_LIMIT` (503 `busy`), and a counter store that throws is `busy` too,
+with CORS, not a bare 500. The app reads any refusal as no match.
+`wrangler.toml` binds `FINGERPRINT_LIMITS`, which the owner creates before redeploying.
+*Measured:* `npm run fingerprint-worker`, 7 of 19 on the old Worker, now 19 of 19; each
+refusal also shows the service was not called.
+
+
+**Read in the code.** `server/fingerprint-worker.js` answers any origin
+(`Access-Control-Allow-Origin: *`) with no key and no rate limit, and its URL is built
+into the public bundle (`VITE_FINGERPRINT_PROXY_URL`, `deploy.yml`). Anyone who reads
+the bundle can identify songs on the owner's AudD or ACRCloud account, from a script or
+from their own site. It also parses the whole multipart body (`request.formData()`)
+before its 2 MB check. The report Worker already has what this one lacks
+(`ALLOWED_ORIGINS`, a per-address limit in KV; `docs/crash-plan.md`).
+
+*Fix:* the same origin list and per-address limit (per /64 on IPv6), a refusal on
+`Content-Length` before parsing, and a daily ceiling that answers "busy" rather than
+spending. The show's own origins (the site, the show server, the Mac app) stay allowed.
+*Measure:* a node harness in the manner of `npm run report-worker`: a foreign origin
+refused, the 31st request in an hour refused, a 3 MB body refused before `formData()`.
+
 ### 14s. The ear: the input picker (shipped)
 
 **Shipped 2026-10-05.** `chooseAudioInput` (`App.tsx`) was memoised on `[audioSource]`
@@ -2805,6 +2913,31 @@ GPU solver, as `bottles` does, and `squeeze` waits until a second holds the rate
 asks for (200 steps in 12 s), at most thirty seconds. On that run tools took 13.8 minutes
 and fifth 13.5.
 
+#### 19w-1. The deploy gate counts the fifth shard
+
+**Shipped** 2026-10-17. Found by the owner's question of that day, how often the checks find
+a real problem: going through three weeks of red runs, the deploys since 10-11 had all run
+the full Mac. `deploygate.sh` decides whether a deploy can trust the PR's green run, and one
+of its conditions is that the run ran the Mac shards. It asked for that by name, in two
+places (the run itself, and a run it carries from, 19i), as exactly
+`open, plate, show, tools`, each green. 19w added `fifth`, the gate was not told, and from
+then on a run with five green shards was "not a Mac run". `npm run deploygate -- --history 20`
+read 0 of 20 trusted, and 2 by rule 5, both from before 19w; `0487e75` (#392), for one,
+answered "did not run the Mac shards (fifth=success,open=success,plate=success,show=success,
+tools=success)". Each of those deploys re-ran every Mac check, about 55 minutes from merge
+to live, on a tree that had just passed them.
+
+The shard names now come from the one `shard: [...]` line in `checks.yml`, the checked-out
+tree's, and both places compare against that list; no such line, or two, stops the script,
+which in `deploy.yml` runs the checks in full. Adding a sixth shard needs no edit here. A run
+whose own matrix differed (a rule 5 run from before a shard was added or renamed) does not
+match and is not trusted, which is the safe way to be wrong. Replayed after: 4 of 20 trusted
+(#392, #391, #374, #379), 1 more by rule 5 (#382), and 4 needing no deploy, against 0, 2 and 4
+before. The two rule-5 merges from before 19w (#378, #380) now read false, judged against
+today's five shards, as does #357's four-shard run; the other merges since 19w are refused
+for the reasons the rules give (files both sides touched, or a commit on main since the
+run's base that went red), not for their shards.
+
 ### 19x. A moved bar names itself
 
 **Shipped** 2026-10-11. The owner asked how the session that builds physics
@@ -3016,7 +3149,7 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
 ### 18g. Colour leaves by flushing, not by fading
 
-**18g-1** (2026-10-11): flushing, not fading: the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim. Liquid carried past the circular dish rim spills into the overflow trough and leaves the plate, rather than fading away uniformly. The dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
+**18g-1** (2026-10-11): flushing at the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim, and a still dish loses no colour through its rim (`evapFactor` 1). Base evaporation still fades colour inside the dish until 18g-3/18g-5, and the dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
 
 ### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
 
@@ -3472,6 +3605,108 @@ the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% 
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
 
+## 27. Every control does something you can see
+
+### 27a-8. The closeup's camera holds still through the song (QA-31)
+
+The owner, 2026-10-11, the evening after Frame Sway seated the plate's own sway (27a-7):
+"the macro zoom is even bouncier and twitchier than before." What a real macro rig does:
+the camera sits on a copy stand or a rail over the dish, and the only thing that moves in
+the picture is the liquid. The microscope light shows and the macro references in the
+project's shared files are all locked off; a push or a pan in them is a hand on a rail
+over seconds, never a move with the beat.
+
+Measured with `npm run steadycam` (the camera driven through a 120 bpm song, a kick a beat
+and hats on the eighths, at 6x on a 1440 px frame, against the same run in silence), four
+things moved the frame that were not the liquid:
+
+- Macro Sync (0.5 by default) had three hands on the frame in every mode, outside Frame
+  Sway: a punch-in on the kick, a push with the energy and a "handheld" tremor from the
+  treble. The song swayed the frame 0.42% of its width (6 px) and pumped the zoom 3.2%
+  (the frame's edge 23 px); at Macro Bead's 0.85, 0.71% and 6.3% (46 px). And the ear
+  hears nearly every kick now where it once heard a third (`npm run kicks`), so the punch
+  landed on every beat: "even bouncier".
+- The lead aimed the camera ahead of its subject by the solver's velocity in the subject's
+  one cell, times up to sixteen cells. That velocity carries the music through the liquid
+  (Beat Squeeze's press, the kick's shove) and the noise of one cell of a turbulent field:
+  a press of half a cell a step under a drop drifting steadily threw the frame 0.95% (14
+  px) in a frame and 1.6% (24 px) over the beat, and left the drop 6.8% off centre.
+- A cut in Auto landed on the lattice cell that found the drop, not on the drop, and then
+  slid to it at 6 a second: 14% of the frame at 6x after a cut. In the check it was a
+  13.8% difference between the song and silence from one cut that fell a frame apart.
+- Each drop took a random walk of ±0.075 cells a step ("drift little on their own"), half
+  a pixel at 1x and 4 px rms sixty times a second at 6x: "twitchier". A millimetre drop
+  of oil in water has no Brownian motion to see (D = kT / 6πηR ≈ 4 × 10⁻¹⁶ m²/s, a couple
+  of microns an hour), and the bubbles already keep still on still paint (18i).
+
+Built: the punch, the push, the tremor and the rate's tightening in a loud passage ride
+Frame Sway (`move = sync × sway` in `macroCamera.ts`; `LiquidVisualizer.tsx` hands the
+camera `frameSway(settings.frameSway)`), so Macro Sync keeps what is an edit and not a
+move: the cut on a kick, and the hold spent faster in a loud passage. The lead is the
+tracked centroid's own motion smoothed over 0.6 s, from nothing on each new subject,
+scaled to cancel the rig's own two lags so a steady drift sits centred; the camera does
+not read the velocity field at all. A cut snaps to the drop's centroid, re-windowing about
+it until it stops moving. The drops' random walk is gone; the flow and the tilt alone move
+them.
+
+After, by the same check: the song's hand on the frame is 0.000% of the width and 0.000%
+of the zoom at Frame Sway 0 in Hold, Follow and Auto on every shipped look and show stage
+(70 of them), the same centre and zoom as in silence to the bit; at Frame Sway 1 the dial
+gives the 0.42% and 3.2% back, half of each at 0.5. The same half-cell press moves the
+frame 0.17% a frame with it and without, the drop 0.44% off centre; a drop drifting at 15
+cells a second sits 3.3% from the middle of the frame where it sat 27% off. A drop on
+still paint moves 0 cells a step. `npm run steadycam` runs in CI's logic part, and each of
+its controls (the gate removed, the random walk restored, the snap removed) turns it red.
+`npm run drops`' fingerprint is pinned again (the two rng draws a step gone: 341 drops
+where there were 336). The desk and the phone share the camera, and Frame Sway is on
+both; the Guide's Music Sync line says what rides it.
+
+## 28. Preset palettes: the looks refreshed for what the plate does now
+
+### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
+
+Reported by the showreel (28d, 2026-10-11): every look rendered on the Mac to the same
+minute of Funkorama, which grooves at about -17 dB, drops 7 to 8 dB into a breakdown from
+26 to 44 s and comes back. On 28 of 41 looks the plate moved more in the breakdown than in
+the groove, and Classic, the default, scored 4 of 10: a full-frame wash with brown bubble
+discs and no bodies, its motion running backwards against the music (r -0.77 over 5 s).
+
+The suspect was the ear's auto-level chasing the quiet. Measured on that minute through
+the ear a render uses (`songAudioTrack`), it was part of it, not the cause: the band
+levels the hands read fell to 0.6 to 0.76 of the groove's in the breakdown while the
+song's amplitude fell to 0.4 (each a decibel reading ranged against a ceiling that falls
+back in 8 to 18 s), so the breakdown read quieter, just not quiet enough. The cause was
+Sound Drive's bass on a thin gap, a hand on the glass that moves the liquid by the change
+in its depth (the flow is the gap's rate). The route read the bass over 70 against a
+ceiling of 85, so a loud groove's bass sat at full 0.55 of every second: the glass was
+held flat and the kicks moved nothing. The breakdown's bass, under the line, rose and
+fell with every note. Its change per second was 1.44× the groove's, and per second it
+followed Classic's measured motion at r 0.74 (Roy, Red Cabbage, Clock Glass, Aurora 0.65
+to 0.68; the looks that did follow the band, Acid Trip, Solar Flare, Cell Bloom, read
+-0.11 to -0.44 against it). The plate's rock and cover glass, the other suspect, were
+calmer in the breakdown (cover speed 9.3 cm/s against 15.4) and ran against the motion.
+
+What changed. The ear reports how loud the passage is against the song's loud passages,
+as an amplitude (`Passage` in lib/soundLevels.ts: the waveform's mean square over 2 s
+against a reference that rises in 3 s and falls in 45 s), and the music's hands are
+scaled by it: the pours, the bursts, the sparks' count and the bass's press. A hand
+answers the sound's pressure, which is an amplitude. The levels themselves are left as
+they were, because the beat clock, the meters and the mappings read them. And the press
+reads the band over its own ceiling (`bassPressLevel`), so the loud groove's kicks press
+and let go. The cast wire carries the passage, so the wall calms with the laptop.
+
+Measured (`npm run breakdown`, the band's chorus, its verse 8 dB down, the chorus; and
+the showreel's minute with `BREAKDOWN_SONG`): the press's change per second in the
+breakdown against the groove, 1.36× before and 0.54× after on the band, 1.44× and 0.54×
+on Funkorama, where the groove's own press moves 1.4× more than before; the hands'
+levels 0.87× and 0.69× before, 0.37× and 0.36× after. A song quiet from its first bar
+reads 0.91 (not a breakdown); the volume turned down 10 dB is learned in under two
+minutes (0.54 a minute on, 0.78 two).
+
+Classic: Dye Budget 0.45 (the default 0.85 filled the dish until the colours ran into one
+wash, the fault Velvet Underground was fixed of), and Bubbles 0.05 (the brown discs were
+the default 0.2, trapped air drawn dark against a full dish).
+
 ## 28f. Every look answers the music through its own patches
 
 ### 28f-1. The dead patches, the named looks, the hits as a source, the pattern
@@ -3513,6 +3748,100 @@ where the hit's own reading reached the loop for 72. `npm run framesway`: only t
 looks move the frame (before: Oil Wheel and the two show stages that play it patched
 sound onto the motor), the list one of at most four, and Bass Drop's picture slides
 0.53% of the plate at its peak.
+
+## 28g. Following a known song played live
+
+### 28g-1. The follower and its check (#378)
+
+The owner, 2026-10-11: "if we pre record the shape of the song, how can we map that to a
+different sounding and sometimes improvisational version of the same song?" `chroma.ts`:
+a twelve-note profile, read from the analyser's tonal peaks (parabolic-refined) on a
+per-bin quarter-second median (drums dropped), the same arithmetic in the ear
+(`AudioReading.chroma`) and in the map (`mapChroma`, stored with every new map as
+`SongMap.chroma`). `songFollow.ts`: the forward algorithm over a place × tempo grid
+(0.6–1.6×), the form as transitions at the map's section ends, a leak for jumps the form
+did not offer, a start prior, and confidence = match quality × agreement. `npm run
+songfollow` (Measure, logic): takes 15% slower and faster on other instruments 100% of
+hops within a bar of the very place, tempo within 3%; a band speeding up 100 to 140 bpm
+with a bar of silence, 100%; bridge skipped, chorus repeated, solo doubled, a 16-bar jam:
+back within 0.7–1.8 bars; joined at the second verse, found in 1.9 bars; confidence 0.07
+in the jam against 0.92 where followed. `anchor(mapSec)` is the score's nudge (28h). The
+ear's frame costs 5 µs more (237 to 242 in node). Online time warping and a particle
+filter were tried first and dropped (the reasons in `songFollow.ts`'s header).
+
+### 28g-2. The follower live, with the fallback (this PR)
+
+Before, the place the show read a song map at was a clock from the moment the song was
+identified. `followedPlace.ts` makes it the follower's place when the follower is sure,
+and the clock run on from the last sure place, at the last sure tempo, when it is not;
+while unsure the map's section is withheld (`section` null), so the sequencer runs a
+section stage on its own clock and the show has the song's shape heard live. A map made
+before 28g-1 (no harmony) is the old clock, to the bit. `useMusicIntelligence` builds one
+per song and map, resyncs it when the song is identified (the fingerprint's offset starts
+the clock and anchors the follower), feeds it every reading of the ear (`onReading`), and
+reads it on its tick. Measured by `npm run songfollow`, 16 checks on the place:
+
+- Identified as each take begins, the place read is within a bar of the song on 100% of
+  hops on the takes 15% slower and faster, where the old clock is 9.3 and 6.8 bars out by
+  the last chorus; the map's section read is the song's on every sure hop.
+- Set to the follower's every answer, the place stepped by up to 0.27 and 1.29 bars between
+  frames; steered (the difference closed over a second, a jump only after a second of
+  being over a bar out), it makes no step on the slower take and one on the faster, from
+  1.42 bars out to 0.03 (the intro's held chord).
+- Deciding on the follower's confidence hop by hop, a third and a quarter made the jam
+  sure for moments and the place jump 24 bars with it; 0.5 and 0.4 switched the slower
+  take fifteen times. Held over 1.5 s (rising over 0.75 s), sure at 0.5, unsure under
+  0.35: no switch once settled on either take, the jam unsure on 107 of its 112 hops from
+  its third bar, the place running on through it without a jump.
+- Two changes to the follower the place's checks found. In a jam the weight ran to the
+  slowest tempo (0.99 going in, 0.62 at the chorus after): while lost (confidence under
+  0.2) each place's weight is now spread over the tempos as the band was last known to
+  play, and the tempo is 0.95 through the jam (without it the place was sure on 17 of the
+  jam's hops and jumped 5.3 bars). And quality now rises over 1.5 s where it falls over
+  3: the place was sure of the chorus after the jam 5.4 bars in, now 1.8. The follower's
+  own numbers: confidence where followed 0.87–0.98 (was 0.74–0.93), in the jam 0.11 (was
+  0.07), every place and relock number the same; 1.0–1.5 ms a second of sound.
+- Agreement by the map's harmony instead of its section labels was tried and changed no
+  number; left as it was (28g-4).
+
+`npm run followview` (Measure, browser): the app's own band is the song, its score
+rendered as Web Audio plays it and its map made from that. Tagged by name, the Perform
+desk's status bar says "Following “…”: 87% sure"; the track panel (the laptop without a
+desk), tagged twenty seconds into the band's verse, shows the verse while a clock from the
+tag says intro, five samples of five; the phone's Sound sheet says the desk's line under
+the song's shape. A song in C sharp the band never plays: "Not sure where in “…” (0%):
+following its sound", the playhead keeping time. A map with no harmony: no line.
+
+## 28h. The score: the song drawn, its show's cues on it, and a nudge (asked 2026-10-11)
+
+The owner: now that the show hears a song and
+remembers it, draw it as a score, put the sequencer's changes on the song's shape,
+and during a show watch it and nudge the visuals back into step. Built on what was
+there: the song map (sections and energy from the first listen, `songMap.ts`) and
+the song's show (`songShows.ts`, cues that already fire "at the second chorus").
+`lib/songScore.ts` draws the sections, the energy and the playhead, and places each
+cue by running the scheduler itself over the song, so the picture cannot disagree
+with what fires. A tap on the lane picks a section; a cue added there is pinned to
+it ("this chorus only" or "every chorus"), and a song with no show gets one on the
+look that is playing. The nudge moves the song's position: a beat (half a second
+with no tempo), "Section starts now" (the show got there early) and "Next section
+now" (the song got there first), the section ones worked out from the clock at the
+press rather than the position last drawn; it lasts for that play of the song and
+survives the fingerprint's re-anchoring, which is right about the audio and blind
+to where the map put an edge (`SongPosition`). A nudge is a seek: lyric triggers
+and a replay's gestures start from where it lands. A show the score makes by
+pinning its first cue starts without fading the plate to its look. "Before the end"
+cues count from one length for the runtime and the score (`songDuration`: the
+track's, the show's note of it, then the map's). The desk's Score panel (Live) and the phone's Play sheet draw
+the same component. `npm run score` (in Measure): every cue drawn where the
+scheduler fires it, pinning, a stretched and skipped live take read through map
+time, and both section nudges (a late map edge: the chorus cue at 40 s unnudged,
+at 37 s when "Next section now" is pressed as the chorus is heard).
+
+With the followed place (28g-2, #387): a nudge moves the place the follower holds
+(`FollowedPlace.resync`, PLAN 28g-8), not only the clock's offset, and the score and
+the shows read that place. An identification while the follower is unsure resyncs to
+the fingerprint's offset plus the nudge, so a nudge survives a re-anchor.
 
 ## 29. The closeup's ferrofluid drop
 

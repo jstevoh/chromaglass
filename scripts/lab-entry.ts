@@ -61,12 +61,18 @@ type Lab = {
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
 let lab: Lab | null = null;
+/** Who drew: the adapter's vendor and architecture (`google swiftshader` on the
+ *  CPU rasteriser, Apple's on a Mac's Metal), copied out at `create` because a
+ *  GPUAdapterInfo does not cross page.evaluate. A check whose claim is the
+ *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
+let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array } | null = null;
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) throw new Error('no adapter');
+    adapterInfo = { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description };
     const wantLimits: Record<string, number> = {};
     if (adapter.limits.maxStorageBufferBindingSize) {
       wantLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
@@ -85,6 +91,8 @@ const api = {
     lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null };
     return { N, L };
   },
+  /** The adapter `create` drew on, or null before it. */
+  adapter() { return adapterInfo; },
   /** A disc of colour flat to its edge, for a force the same everywhere in a pool (`npm run thick`). */
   dyeDisc(x: number, y: number, r: number, rgb: [number, number, number], d = 1) {
     const { L, dyeAdd } = lab!;

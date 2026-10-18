@@ -72,6 +72,22 @@ export const PRESETS: Preset[] = [
       glossiness: 0.0,           // flat backlit dye — the projector look
       postBlurRadius: 0.35,
       secondLamp: 0.2,
+      /*
+        28d (the showreel, 2026-10-11): the default look scored 4 of 10. On a
+        minute of a real song it was a full-frame gradient of magenta, red,
+        yellow and blue, slowly stirred, with big brown bubble discs and no
+        bodies at all: nothing like the blobs its name promises. The plate ran
+        at the default budget (0.85), which fills the dish until the colours
+        meet everywhere and run into one wash, the same fault Velvet
+        Underground was fixed of (0.45, dark between its pools). At 0.45 the
+        regulator holds about half the colour, so the blobs stay blobs with
+        the lamp between them, which is the overhead projector's own picture.
+        And the brown discs were the default Bubbles (0.2): trapped air
+        drawn dark against a dish this full. A few, not none, because a clock
+        glass on a projector always has some.
+      */
+      dyeBudget: 0.45,
+      bubbles: 0.05,
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
         density: 'volume',       // louder = more color, but mapped gently
@@ -1429,6 +1445,7 @@ export const PRESETS: Preset[] = [
       surge: 0.6,
       layerCount: 2,
       blendMode: 'screen',
+      twoProjectors: 1,
       gooeyEffect: 0.5,
       rotationSpeed: 0.0,
       centerGravity: 0.0,

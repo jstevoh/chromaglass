@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Two Projectors (PLAN 18b-10)
+
+- **Two Projectors** (`twoProjectors`, Settings → Plates & LED; MIDI, the desks, the
+  remote, and the phone's Looks sheet), off by default and on in **Fillmore East, 1969**.
+  Off, a back plate is a second glass dish in the same projector, absorbing the front
+  plate's lamp along the same ray. On, each plate has its own overhead projector aimed at
+  the same screen, so the back plate's clear parts throw its lamp onto the screen and
+  wash the front plate's colour, and where both plates are dyed the colours add
+  (`npm run lamp`).
+
 ### Changed — the frame holds still; the music moves the liquid
 
 - With the band playing, the whole plate no longer slides under the camera on every

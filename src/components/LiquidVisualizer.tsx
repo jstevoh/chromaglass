@@ -60,8 +60,8 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressDepth, type Presser, type Stroke } from '../lib/squish';
-import { levels01 } from '../lib/soundLevels';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
+import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
@@ -8393,10 +8393,26 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // At impact=0.45 (default) + no auto → ~1.0x baseline
                   // At impact=1.0 + auto → ~4.9x baseline
                   const impactMul = (currentSettings.audioImpact ?? 0.45) / 0.45;
+                  /*
+                    How loud this passage is against the song's loud ones, as an
+                    amplitude (lib/soundLevels.ts, Passage): near 1 in the
+                    groove, about 0.4 in a breakdown 8 dB down. The music's
+                    hands in this block are scaled by it (through autoAmp: the
+                    pulse, the burst, the kick's ring, the mid's stream, the
+                    sparks, the swell; and the bass's press), because the
+                    levels they read are each ranged against their own ceiling
+                    and read a breakdown at 0.6 to 0.76 of the groove, and the
+                    press, which moves the plate on the bass's swing, read it
+                    busier than the groove (PLAN 28d, `npm run breakdown`).
+                    Beat Squeeze and Plate Rock ride the kicks, which a
+                    breakdown mostly drops, and are left as they were. Absent
+                    (a producer that cannot hear it), it is 1, the plate as it
+                    was.
+                  */
                   // Evolve used to multiply every music reaction by 2.2 — dye,
                   // heat, bursts — which is most of why it read as massive. It
                   // leaves the music's own reactions as the look sets them now.
-                  const autoAmp = impactMul;
+                  const autoAmp = musicHands(currentSettings.audioImpact ?? 0.45, currentAudioData.passage);
 
                   const centerX = Math.floor(GRID_SIZE / 2);
                   const centerY = Math.floor(GRID_SIZE / 2);
@@ -8450,7 +8466,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bassPressAt = {
                     x: bassX, y: bassY,
                     r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-                    depth: bassPressDepth(vel01, currentSettings.audioImpact ?? 0.45),
+                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage),
                   };
                   // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
                   if (vel01 > 0.25 && !activeFluid.thinGap) {
@@ -8487,7 +8503,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const rx2 = Math.floor(bassX + Math.cos(a) * rad);
                       const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * impactMul;
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * autoAmp;
                         activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward expansion with natural fluid swirl
                         const swirl = 0.2 * (DICE.music.float() - 0.5);
@@ -8534,7 +8550,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const sparkCol = trebleArea ? areaCycle(activeLayerRef.current, trebleArea, areaTime + 1.55) : colFor(3.1);
                     // Fewer, larger droplets: a cloud of one-cell specks blurs
                     // into fog, a handful of real drops stays drops.
-                    const sparks = Math.floor(treble01 * 2 * impactMul);
+                    // As many as the passage is loud (autoAmp carries it): a breakdown glitters less.
+                    const sparks = Math.floor(treble01 * 2 * autoAmp);
                     for (let s = 0; s < sparks; s++) {
                       const sp = trebleArea ? pointInArea(trebleArea, GRID_SIZE, DICE.music) : null;
                       const sx = sp ? Math.floor(sp.x) : DICE.music.int(GRID_SIZE - 20) + 10;
@@ -9213,6 +9230,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 floor: filmLevelRef.current,
                 energy: currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
                 sync: currentSettings.macroSync ?? 0,
+                // How far the music may move the frame (Frame Sway, lib/plateRock.ts):
+                // the sync's punch-in, push and tremor ride it, as the plate's own
+                // sway does; 0 by default, so the song times the cuts and moves nothing.
+                sway: frameSway(currentSettings.frameSway),
                 bass: camBass,
                 beat: kickRef.current.kick,
                 treble: currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0,

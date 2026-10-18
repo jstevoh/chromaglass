@@ -104,6 +104,24 @@ reviewer who judges the reason, and the owner's rule still holds: a bar is never
 get green. If the check is red, find why the plate fails it. Changing a test's input needs
 the physics that justifies it, checked against the old input.
 
+## Leaving a record
+
+Claude Code sessions cannot see your terminal, the owner's consoles or the repo's
+settings; they only see GitHub. Anything done outside a PR that a Claude session might
+otherwise list as still owed has to be written down, or it gets done twice or chased for
+weeks (the Firebase secrets and the privacy-page details on #390 were finished this way
+and Claude still listed them as open).
+
+Within the same day, for each of these, leave a comment on the related PR or issue, or,
+when there is no PR, a line in `PLAN.md`'s status table:
+
+- a repo secret, variable or setting you set or changed (name it, never its value);
+- another PR's body, labels or files you edited, and why;
+- a Firebase, Cloudflare, Apple or other console step the owner did with you;
+- a claim, handoff or stop you did not already put in a PR body.
+
+One or two lines is enough: what, where, when, and what is now no longer owed.
+
 ## Stopping halfway
 
 When a session runs out of credit mid-task: push what it has, even if it is red, fill in

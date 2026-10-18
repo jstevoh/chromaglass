@@ -24,8 +24,11 @@ import { readFileSync } from 'node:fs';
  * a control drawn by a shader without the thing it asks about (`npm run
  * filmlook` draws the film with the rainbow alone): the plugins are
  * esbuild's, and the tag names the bundle so it is never the plain lab's.
+ * `js` is the bundle's text, for a check to see that its control really is
+ * another program (`npm run lampzero`: a plugin whose filter matched no file
+ * would hand back the plain shader, and two plain labs agree on any GPU).
  */
-export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], tag = '' } = {}) {
+export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], tag = '', software = false } = {}) {
   const base = entry === 'scripts/lab-entry.ts' ? 'lab-page'
     : `lab-page-${entry.replace(/^.*\//, '').replace(/\.[^.]+$/, '')}`;
   const out = `node_modules/.cache/${base}${tag ? `-${tag}` : ''}.js`;
@@ -37,13 +40,22 @@ export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], ta
     res.end('<!doctype html><script type="module" src="/page.js"></script>');
   }).listen(0);
   const port = server.address().port;
+  /*
+    Off a Mac the lab has always run on SwiftShader's WebGPU, the CPU
+    rasteriser. `software` asks for it on a Mac too, for a check that
+    compares two compiled programs byte for byte (`npm run lampzero`): a
+    GPU's compiler may fuse the same arithmetic differently in two programs
+    whose text is the same where it matters, and SwiftShader does not. A
+    Chromium built without a software WebGPU adapter answers with none, and
+    the lab says so ('no adapter') rather than quietly drawing on the GPU.
+  */
   const browser = await launchChromium(chromium, {
-    args: process.platform === 'darwin' ? [] : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader'],
+    args: process.platform === 'darwin' && !software ? [] : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader'],
   });
   const page = await browser.newPage();
   page.on('console', (m) => { if (process.env.LAB_ALL || /lost|error/i.test(m.text())) console.log('  [lab]', m.text().slice(0, 300)); });
   page.on('pageerror', (e) => console.log('  [lab error]', e.message.slice(0, 300)));
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => window.labReady === true);
-  return { page, close: async () => { await browser.close(); server.close(); } };
+  return { page, js, close: async () => { await browser.close(); server.close(); } };
 }

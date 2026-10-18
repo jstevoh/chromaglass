@@ -1,0 +1,86 @@
+<!doctype html>
+<!--
+  The privacy page (PLAN.md 23.13). The site keeps an email per person once
+  sign-in (23.10) is live, and the App Store asks for a privacy page and terms
+  before the iPhone app can ship (23.15), so both exist ahead of either.
+
+  Written from what the code does, not from a template: every host the app's
+  own code reaches is named here, and `npm run privacy` fails when a new one
+  appears in src/ without a line on this page. The OWNER marks in double
+  braces are the owner's to fill (a contact address, a jurisdiction); the same
+  check fails while any is left, so the page cannot go live half written.
+
+  A static file, not a route in the app: it must open without WebGPU, without
+  sign-in and without the plate's bundle, from a store listing or a phone.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · ChromaGlass</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: dark; --bg: #07070a; --text: #e8e6e3; --muted: #9a978f; --rule: #24232a; --link: #c9b8ff; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 48px 16px 80px; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0 0 4px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 36px 0 8px; padding-top: 20px; border-top: 1px solid var(--rule); }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); font-size: 14px; }
+  a { color: var(--link); }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>Privacy</h1>
+<p class="muted">ChromaGlass · last changed 17 October 2026</p>
+
+<p>ChromaGlass is a liquid light show that runs in your browser and in the Mac app. Almost all of it happens on your own machine: the liquid, the sound it listens to and the looks you save never leave it. This page lists everything that does leave it, where it goes and why.</p>
+
+<p>We do not sell anything about you, show you ads, or use analytics or tracking of any kind.</p>
+
+<h2>Your account</h2>
+<p>To use the site you sign in with Google, with Apple, or with a link we email you. Sign-in is run by Google's Firebase Authentication, which keeps:</p>
+<ul>
+  <li>your email address,</li>
+  <li>an account id it makes for you,</li>
+  <li>which way you signed in, and when you made the account and last signed in.</li>
+</ul>
+<p>If you sign in with Apple and choose to hide your email, we only ever see the relay address Apple gives us.</p>
+<p>When paid licences and linked devices arrive, your account will also hold your licence keys and a short name for each device you link. They will be listed here before that happens.</p>
+<p>We use your email to sign you in and, if you buy a licence, to send you your key. We do not send newsletters or hand the address to anyone.</p>
+
+<h2>Deleting your account</h2>
+<p>The account sheet (on the desk and on the phone) has <em>Delete account</em>. It deletes your account and everything above from Firebase straight away. Looks and settings saved in your browser stay there until you clear them; they were never ours.</p>
+<p>You can also ask us to delete it, or ask what we hold about you, at <a href="mailto:support@chromaglass.app">support@chromaglass.app</a>.</p>
+
+<h2>What stays on your machine</h2>
+<ul>
+  <li><strong>Microphone and camera.</strong> When you let ChromaGlass hear a microphone or see a camera, the sound and picture are read in your browser to move the liquid. They are not recorded or sent anywhere, except for song identification below.</li>
+  <li><strong>Your looks, presets and settings</strong> are kept in your browser's storage.</li>
+  <li><strong>Recordings</strong> you make with Record are written to your own disk.</li>
+  <li><strong>The phone link.</strong> A phone or tablet you link to the show talks to it directly over your own network. Nothing passes through us.</li>
+  <li><strong>Stage lights.</strong> If you run the show's own small server and point it at a lighting desk (Art-Net), it sends the plate's colours to that desk over your own network. It is off unless you set it up.</li>
+</ul>
+
+<h2>What is sent, and to whom</h2>
+<ul>
+  <li><strong>Song identification</strong> (when it is switched on for the site, and only while ChromaGlass is listening to sound): a four-second sound clip is sent through our own small server at Cloudflare to AudD or ACRCloud, which answer with the song's name. We do not keep the clip. Their own privacy terms cover what they do with it.</li>
+  <li><strong>Lyrics</strong>: once a song is known, its artist, title, album and length are sent to <a href="https://lrclib.net">LRCLIB</a> (lrclib.net), a free lyrics library, to fetch its words.</li>
+  <li><strong>Fonts</strong> come from Google Fonts (fonts.googleapis.com and fonts.gstatic.com), which sees your address and browser like any website does.</li>
+  <li><strong>Crash reports</strong> are never sent on their own. If something goes wrong and you press <em>Send</em> on the report sheet, we receive what the sheet shows you first: your note, the page address, your browser, screen and graphics chip, the app's own log, and, unless you untick them, the look and its settings and a small picture of the plate. Each report is stored at Cloudflare with the time and the country it came from, not your address, and is deleted after 90 days. To stop anyone flooding us with reports, your IP address is counted for one hour and then dropped.</li>
+  <li><strong>The site itself</strong> is served by Google's Firebase Hosting, and our small servers run on Cloudflare. Like every web host they see your IP address and keep short-lived logs to keep the service running.</li>
+</ul>
+
+<h2>Children</h2>
+<p>ChromaGlass is not meant for children under 13, and we do not knowingly keep an account for one. If you think we have, write to us and we will delete it.</p>
+
+<h2>Changes</h2>
+<p>When what we keep changes, this page changes first, with its date at the top. The full history of this page is public in the project's source code.</p>
+
+<p class="muted"><a href="/terms.html">Terms</a> · <a href="/">Back to ChromaGlass</a></p>
+</main>
+</body>
+</html>

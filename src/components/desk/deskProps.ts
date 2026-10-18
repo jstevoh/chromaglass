@@ -3,6 +3,7 @@ import type { MixTakes } from '../../lib/mixFade';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import type { DeskLayout, LayoutName } from '../../lib/deskLayout';
 import type { DeskDots, DeskMode } from './DeskHeader';
+import type { SongScoreProps } from '../SongScore';
 
 /**
  * A cue: one row of the set list.
@@ -69,7 +70,8 @@ export interface DeskProps {
   onOpenSettings: () => void;
   /** Gig's breadcrumb: the show and the look that is up. */
   showCrumb: ReactNode;
-  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null };
+  /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
+  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
   onBlackout: () => void;
   blackout: boolean;
 
@@ -118,6 +120,8 @@ export interface DeskProps {
   onSetAction: (a: SetAction, name?: string) => void;
   onItemAction: (id: string, a: SetItemAction) => void;
   songNow: string | null;
+  /** The song as a score, its show's cues and the nudge (PLAN 28h); the Score panel, and the phone's Play sheet. */
+  score?: SongScoreProps;
   liveId: string | null;
   nextId: string | null;
   onCue: (id: string) => void;

@@ -33,7 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -419,12 +419,6 @@ const D_MOLECULAR = 4.0e-10; // m²/s
   presets with diffusionRate at 0 still spread heat.
 */
 const KAPPA_WATER = 1.4e-7; // m²/s
-/*
-  The dish's rim, in plate widths from the middle: the plate's inscribed
-  circle, which is all the picture ever shows of it (plate.ts keeps both
-  dishes inside it). Past it the liquid is open to the air.
-*/
-const OPEN_RIM = 0.5;
 /*
   The forces' own physics on a thin gap (PLAN 18a-2, wgsl/thinGap.ts's
   hsBody, hsPrep and hsDivergence).

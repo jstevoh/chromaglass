@@ -6,6 +6,7 @@ import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
+import { followLine } from './lib/followedPlace';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
@@ -60,7 +61,9 @@ import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
 import { useSongShows } from './hooks/useSongShows';
-import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, type ActionSet, type SongAction, type SongShow } from './lib/songShows';
+import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
+import type { SongScoreProps } from './components/SongScore';
+import { songDuration } from './lib/songScore';
 import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
@@ -1495,12 +1498,21 @@ export default function App() {
     });
   }, []);
 
-  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings);
+  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings, ear.onReading);
   /*
     Performances, started and stopped by hand: T on either desk, the
     Performance dot in the desk header, or the Track panel. The note after a
     stop says what was kept, for four seconds.
   */
+  // Under ?debug, tag the song playing by name, as the desk's track panel
+  // does by hand: the phone has no track panel, and `npm run followview`
+  // checks what the phone says about a followed song.
+  const manualTagRef = useRef(musicIntel.manualTag);
+  manualTagRef.current = musicIntel.manualTag;
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { __tagSong?: (artist: string, title: string) => void }).__tagSong = (artist, title) => manualTagRef.current(artist, title);
+  }, []);
   const perfLive = !!musicIntel.performance.live;
   const { startPerformance, stopPerformance } = musicIntel;
   const togglePerformance = useCallback(() => {
@@ -3431,6 +3443,7 @@ export default function App() {
       audio: a ? {
         volume: a.volume, bass: a.bass, mid: a.mid, treble: a.treble,
         energy: a.energy, spectralCentroid: a.spectralCentroid, timbre: a.timbre, complexity: a.complexity,
+        passage: a.passage,
       } : null,
     };
     if (castingRef.current && !stageRef.current) castSendRef.current(message);   // a mirror of this canvas needs no feed
@@ -4087,6 +4100,58 @@ export default function App() {
   });
   const songRuntimeRef = useRef(songRuntime);
   songRuntimeRef.current = songRuntime;
+
+  /*
+    The score (PLAN 28h): the song as a timeline, its show's cues on it, and
+    the nudge. One set of props for the desk's Score panel and the phone's Play
+    sheet, so a cue pinned on either lands in the same song show.
+
+    A cue pinned to a song that has no show yet makes one, named for the look
+    that is playing, for the song's next play. It starts at once (Follow
+    songs) without fading to that look: the person pinned a burst on a chorus,
+    not a look change, and the plate may be a look no saved one matches (a
+    slider moved, a fader ridden), which a fade would take back.
+  */
+  const currentShow = useMemo(() => showFor(songShows, currentSong), [songShows, currentSong]);
+  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat) => {
+    if (!currentSong) return;
+    const action: SongAction = { id: newId('act'), when, what };
+    const shows = songShowsRef.current;
+    const existing = showFor(shows, currentSong);
+    if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
+    const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
+    const saved = userPresets.presets.find(u => u.id === lookId);
+    const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
+    const look = saved ? { kind: 'saved' as const, id: saved.id, name: saved.name } : { kind: 'preset' as const, id: preset?.id ?? 'classic', name: preset?.name };
+    const id = newId('song');
+    songRuntimeRef.current.keepLook(id);
+    setSongShows([...shows, { id, song: currentSong, look, actions: [action] }]);
+  }, [currentSong, setSongShows, activePresetId, pinnedPresetId, userPresets.presets]);
+  const removeScoreCue = useCallback((actionId: string) => {
+    setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
+  }, [setSongShows]);
+  const { nudgePosition, nudgeToSection, resetNudge } = musicIntel;
+  const scoreProps = useMemo<SongScoreProps>(() => ({
+    songName: currentSong ? songLabel(currentSong) : null,
+    map: musicIntel.state.songMap,
+    phase: !musicIntel.state.track ? 'none'
+      : musicIntel.state.songMap ? 'ready'
+      : musicIntel.state.analyzing ? 'analyzing'
+      : musicIntel.state.recording ? 'hearing' : 'unmapped',
+    positionSec: musicIntel.state.positionSec,
+    nudgeSec: musicIntel.state.nudgeSec,
+    bpm: tempoLabel.bpm,
+    durationSec: songDuration(musicIntel.state.track?.durationSec, currentShow?.song.durationSec, musicIntel.state.songMap?.durationSec),
+    show: currentShow,
+    // The song's clock, which a followed show and the sequencer's section
+    // stages read. A show started by hand keeps its own (PLAN 28h-4).
+    onNudge: nudgePosition,
+    onNudgeToSection: nudgeToSection,
+    onResetNudge: resetNudge,
+    onPin: pinScoreCue,
+    onRemoveCue: removeScoreCue,
+  }), [currentSong, musicIntel.state.songMap, musicIntel.state.track, musicIntel.state.analyzing, musicIntel.state.recording,
+    musicIntel.state.positionSec, musicIntel.state.nudgeSec, tempoLabel.bpm, currentShow, nudgePosition, nudgeToSection, resetNudge, pinScoreCue, removeScoreCue]);
 
   // ── Render this song (PLAN.md §6) ───────────────────────────────
   const showSequencerRef = useRef(sequencer);
@@ -5597,6 +5662,8 @@ export default function App() {
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
             songLine={audioSource === 'none' ? '' : songLine}
+            score={scoreProps}
+            mapLine={followLine(musicIntel.state.follow, musicIntel.state.track?.title)}
             deaf={earDeaf}
             show={{
               running: sequencer.status.running,
@@ -5636,6 +5703,8 @@ export default function App() {
             onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
+            twoProjectors={settings.twoProjectors ?? 0}
+            onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
@@ -6153,6 +6222,7 @@ export default function App() {
               : null,
             phone: livePhoneCount,
             rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+            song: audioSource === 'none' ? null : followLine(musicIntel.state.follow, musicIntel.state.track?.title),
           }}
           onBlackout={toggleBlackout}
           blackout={blackout}
@@ -6193,6 +6263,7 @@ export default function App() {
           onSetAction={onSetAction}
           onItemAction={onItemAction}
           songNow={currentSong ? songLabel(currentSong) : null}
+          score={scoreProps}
           liveId={setActive ? liveItemId : activePresetId}
           nextId={setActive ? (cued?.item ?? null) : (cued?.id ?? null)}
           onCue={cueAny}
