@@ -794,6 +794,7 @@ export default function App() {
       setShowSequencer(false);
       setShowSave(false);
       setShowPalette(false);
+      setShowAccount(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -3326,8 +3327,12 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
+  const [, setLicenseTick] = useState(0);
   useEffect(() => {
+    const onLicense = () => setLicenseTick((n) => n + 1);
+    window.addEventListener('cg-license-changed', onLicense);
     void syncServerLicense();
+    return () => window.removeEventListener('cg-license-changed', onLicense);
   }, []);
 
   const loadMark = useCallback((file: File) => {

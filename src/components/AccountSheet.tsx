@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getCachedEmail } from '../lib/authFlag';
 import {
   useAccountShows,
@@ -22,7 +22,10 @@ interface AccountSheetProps {
 }
 
 export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [email, setEmail] = useState<string | null>(() => getCachedEmail());
+  const [signedOut, setSignedOut] = useState(false);
   const [confirmMode, setConfirmMode] = useState<'none' | 'signout' | 'delete'>('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +76,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
 
     const onLicenseChange = () => refreshLicenseState();
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('cg-license-changed', onLicenseChange);
     window.addEventListener('keydown', onKeyDown);
@@ -82,7 +85,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
       window.removeEventListener('cg-license-changed', onLicenseChange);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   const handleActivateKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,9 +132,12 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
       await unpublishAccountShows();
       const authMod = await loadFirebaseAuth();
       if (authMod) await authMod.signOutCurrentAccount();
-      window.dispatchEvent(new Event('cg-signed-out'));
+      setEmail(null);
+      setConfirmMode('none');
+      setSignedOut(true);
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || 'Could not sign out.');
+    } finally {
       setBusy(false);
     }
   };
@@ -143,12 +149,15 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
       await unpublishAccountShows();
       const authMod = await loadFirebaseAuth();
       if (authMod) await authMod.deleteCurrentAccount();
-      window.dispatchEvent(new Event('cg-signed-out'));
+      setEmail(null);
+      setConfirmMode('none');
+      setSignedOut(true);
     } catch (err: unknown) {
       setError(
         (err as { message?: string })?.message ||
           'Could not delete account. You may need to sign in again first.',
       );
+    } finally {
       setBusy(false);
     }
   };
@@ -284,84 +293,104 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         </div>
 
         <div className="mt-5 flex flex-col gap-2.5">
-          {confirmMode !== 'signout' ? (
-            <button
-              type="button"
-              data-cg-account-signout=""
-              disabled={busy}
-              onClick={() => {
-                setConfirmMode('signout');
-                setError(null);
-              }}
-              className="min-h-[44px] w-full rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15"
+          {signedOut ? (
+            <div
+              data-cg-signin=""
+              className="rounded-xl border border-white/15 bg-white/[0.04] p-3.5 text-center"
             >
-              Sign out
-            </button>
-          ) : (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 p-3">
-              <p className="mb-2 text-xs text-amber-200">
-                Sign out of ChromaGlass on this device?
+              <p className="text-xs text-neutral-200">
+                Signed out on this browser. The plate and show stay running; the next load will ask to sign in.
               </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  data-cg-account-signout-confirm=""
-                  disabled={busy}
-                  onClick={handleConfirmSignOut}
-                  className="min-h-[40px] flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 disabled:opacity-50"
-                >
-                  Confirm sign out
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setConfirmMode('none')}
-                  className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-2.5 min-h-[40px] w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-neutral-100 hover:bg-white/15"
+              >
+                Return to show
+              </button>
             </div>
-          )}
+          ) : (
+            <>
+              {confirmMode !== 'signout' ? (
+                <button
+                  type="button"
+                  data-cg-account-signout=""
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirmMode('signout');
+                    setError(null);
+                  }}
+                  className="min-h-[44px] w-full rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 p-3">
+                  <p className="mb-2 text-xs text-amber-200">
+                    Sign out of ChromaGlass on this device?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      data-cg-account-signout-confirm=""
+                      disabled={busy}
+                      onClick={handleConfirmSignOut}
+                      className="min-h-[40px] flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 disabled:opacity-50"
+                    >
+                      Confirm sign out
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setConfirmMode('none')}
+                      className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
-          {confirmMode !== 'delete' ? (
-            <button
-              type="button"
-              data-cg-account-delete=""
-              disabled={busy}
-              onClick={() => {
-                setConfirmMode('delete');
-                setError(null);
-              }}
-              className="min-h-[44px] w-full rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5 text-sm font-medium text-red-200 transition hover:bg-red-950/50"
-            >
-              Delete account
-            </button>
-          ) : (
-            <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3">
-              <p className="mb-2 text-xs text-red-200">
-                Permanently delete your ChromaGlass account? This cannot be undone.
-              </p>
-              <div className="flex gap-2">
+              {confirmMode !== 'delete' ? (
                 <button
                   type="button"
-                  data-cg-account-delete-confirm=""
+                  data-cg-account-delete=""
                   disabled={busy}
-                  onClick={handleConfirmDelete}
-                  className="min-h-[40px] flex-1 rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-red-400 disabled:opacity-50"
+                  onClick={() => {
+                    setConfirmMode('delete');
+                    setError(null);
+                  }}
+                  className="min-h-[44px] w-full rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5 text-sm font-medium text-red-200 transition hover:bg-red-950/50"
                 >
-                  Confirm delete account
+                  Delete account
                 </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setConfirmMode('none')}
-                  className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+              ) : (
+                <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3">
+                  <p className="mb-2 text-xs text-red-200">
+                    Permanently delete your ChromaGlass account? This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      data-cg-account-delete-confirm=""
+                      disabled={busy}
+                      onClick={handleConfirmDelete}
+                      className="min-h-[40px] flex-1 rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-red-400 disabled:opacity-50"
+                    >
+                      Confirm delete account
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setConfirmMode('none')}
+                      className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 

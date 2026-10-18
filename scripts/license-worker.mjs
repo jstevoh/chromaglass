@@ -122,11 +122,17 @@ async function mintFirebaseToken({
   return `${header}.${payload}.${toBase64Url(sig)}`;
 }
 
+const licenseEd25519 = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+const licensePrivJwk = await crypto.subtle.exportKey('jwk', licenseEd25519.privateKey);
+const licensePubJwk = await crypto.subtle.exportKey('jwk', licenseEd25519.publicKey);
+
 const WEBHOOK_SECRET = 'whsec_test_merchant_secret_23_12';
 const SITE = 'https://chromaglass.web.app';
 const makeEnv = () => ({
   LICENSE_KV: new FakeKV(),
   WEBHOOK_SECRET,
+  LICENSE_PRIVATE_KEY: JSON.stringify(licensePrivJwk),
+  LICENSE_PUBLIC_KEY: JSON.stringify(licensePubJwk),
   GOOGLE_JWKS: { keys: [googlePubJwk] },
   FIREBASE_PROJECT_ID: 'chromaglass',
 });
@@ -198,7 +204,18 @@ async function postMachine(env, path, bodyObj) {
     orderId: 'ord_1',
     tier: 'home',
   });
-  check('1c. a Worker with no WEBHOOK_SECRET configured is closed (401)', unconf.status === 401, `${unconf.status}`);
+  const noPrivEnv = { ...env, LICENSE_PRIVATE_KEY: undefined };
+  const unconfPriv = await postWebhook(noPrivEnv, {
+    event: 'order_created',
+    email: 'alice@example.com',
+    orderId: 'ord_1',
+    tier: 'home',
+  });
+  check(
+    '1c. a Worker with no WEBHOOK_SECRET (401) or no LICENSE_PRIVATE_KEY (500) fails closed',
+    unconf.status === 401 && unconfPriv.status === 500,
+    `noWebhookSecret=${unconf.status}, noLicensePrivateKey=${unconfPriv.status}`,
+  );
   check('1d. refused webhooks stored nothing in KV', env.LICENSE_KV.values.size === 0, `${env.LICENSE_KV.values.size} keys in KV`);
 }
 
@@ -264,8 +281,8 @@ let bobProToken = '';
   aliceHomeToken = aliceBody.keys?.[0]?.token ?? '';
   bobProToken = bobBody.keys?.[0]?.token ?? '';
 
-  const aliceVerified = await verifyLicenseKey(aliceHomeToken);
-  const bobVerified = await verifyLicenseKey(bobProToken);
+  const aliceVerified = await verifyLicenseKey(aliceHomeToken, licensePubJwk);
+  const bobVerified = await verifyLicenseKey(bobProToken, licensePubJwk);
 
   check(
     "4a. a good token receives its own keys and no one else's",
@@ -300,7 +317,7 @@ let bobProToken = '';
   const aliceJwt = await mintFirebaseToken({ email: 'alice@example.com' });
   const aliceBody = await (await getKeys(env, aliceJwt)).json();
   const upgradedKey = aliceBody.keys?.[0];
-  const verified = upgradedKey ? await verifyLicenseKey(upgradedKey.token) : { valid: false };
+  const verified = upgradedKey ? await verifyLicenseKey(upgradedKey.token, licensePubJwk) : { valid: false };
   check(
     '5. an upgrade webhook upgrades Alice from Home to a signed Pro key',
     up.status === 200 &&

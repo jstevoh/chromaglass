@@ -17,7 +17,6 @@
 
 import {
   DEFAULT_PUBLIC_JWK,
-  TEST_PRIVATE_JWK,
   MAX_MACHINES_PER_KEY,
   ONE_YEAR_MS,
   signLicenseKey,
@@ -56,6 +55,9 @@ export default {
     try {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
       if (!env?.LICENSE_KV) return json({ error: 'not configured' }, 503, cors);
+      if (!env?.LICENSE_PRIVATE_KEY) {
+        return json({ error: 'LICENSE_PRIVATE_KEY is not configured' }, 500, cors);
+      }
 
       if (url.pathname === '/webhook') {
         if (request.method !== 'POST') return json({ error: 'POST only' }, 405, cors);
@@ -85,6 +87,8 @@ export default {
 async function handleWebhook(request, env, cors) {
   const secret = env.WEBHOOK_SECRET;
   if (!secret || typeof secret !== 'string') return json({ error: 'unauthorised' }, 401, cors);
+  const privateJwk = env.LICENSE_PRIVATE_KEY;
+  if (!privateJwk) return json({ error: 'LICENSE_PRIVATE_KEY is not configured' }, 500, cors);
 
   const sigHeader =
     request.headers.get('X-Signature') ||
@@ -114,7 +118,6 @@ async function handleWebhook(request, env, cors) {
   const keyId =
     (typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : '') ||
     (orderId ? `key_${orderId}` : `key_${Date.now().toString(36)}_${rand(6)}`);
-  const privateJwk = env.LICENSE_PRIVATE_KEY || TEST_PRIVATE_JWK;
 
   if (event === 'order_created' || event === 'license_created') {
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);

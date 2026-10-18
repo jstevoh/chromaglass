@@ -94,16 +94,26 @@ export function stripEmailSignInParams(): void {
   }
 }
 
+import {
+  getCachedLicenseStatus,
+  hasStoredLicenseTokenSync,
+  verifyStoredLicense,
+} from './licenseKey';
+
 export function hasValidLicenseSync(): boolean {
   if (typeof window === 'undefined') return false;
   const w = window as unknown as { __CHROMAGLASS_NATIVE__?: { license?: { valid?: boolean } } };
   if (w.__CHROMAGLASS_NATIVE__?.license?.valid) return true;
-  try {
-    const t = localStorage.getItem('chromaglass-license-tier');
-    return t === 'home' || t === 'pro';
-  } catch {
-    return false;
-  }
+  return getCachedLicenseStatus().valid;
+}
+
+export function hasStoredLicenseCandidateSync(): boolean {
+  return hasStoredLicenseTokenSync();
+}
+
+export async function verifyStoredLicenseOnLoad(): Promise<boolean> {
+  const status = await verifyStoredLicense();
+  return status.valid;
 }
 
 export function requiresDesktopSignInSync(): boolean {

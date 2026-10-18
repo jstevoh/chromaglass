@@ -26,8 +26,6 @@ export interface LicenseStatus {
 }
 
 const STORAGE_KEY_TOKEN = 'chromaglass:license-key';
-const STORAGE_KEY_PAYLOAD = 'chromaglass:license-payload';
-const STORAGE_KEY_TIER = 'chromaglass-license-tier';
 
 export const DEFAULT_PUBLIC_JWK: JsonWebKey = {
   kty: 'OKP',
@@ -53,16 +51,20 @@ function fromBase64Url(str: string): Uint8Array | null {
 }
 
 let cachedVerifyKey: CryptoKey | null = null;
+let cachedVerifyJwkX: string | null = null;
 
 async function getVerifyKey(): Promise<CryptoKey> {
-  if (cachedVerifyKey) return cachedVerifyKey;
+  const override = (globalThis as { __cgTestLicensePublicKey?: JsonWebKey }).__cgTestLicensePublicKey;
+  const jwk = override ?? DEFAULT_PUBLIC_JWK;
+  if (cachedVerifyKey && cachedVerifyJwkX === (jwk.x ?? null)) return cachedVerifyKey;
   cachedVerifyKey = await crypto.subtle.importKey(
     'jwk',
-    DEFAULT_PUBLIC_JWK,
+    jwk,
     { name: 'Ed25519' },
     false,
     ['verify'],
   );
+  cachedVerifyJwkX = jwk.x ?? null;
   return cachedVerifyKey;
 }
 
@@ -121,62 +123,135 @@ export async function verifyLicenseKey(
   };
 }
 
-export function getCachedLicenseStatus(): LicenseStatus {
+const FREE_STATUS: LicenseStatus = {
+  valid: false,
+  tier: 'free',
+  token: null,
+  payload: null,
+  email: null,
+  id: null,
+};
+
+// In-memory state populated ONLY after `verifyLicenseKey` verifies the Ed25519
+// signature of a `cg1.` token. Plain strings in `localStorage` are never trusted
+// without cryptographic verification.
+let verifiedState: LicenseStatus = FREE_STATUS;
+let pendingVerification: Promise<LicenseStatus> | null = null;
+
+function notifyLicenseChanged(status: LicenseStatus): void {
+  if (typeof window === 'undefined') return;
   try {
-    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const raw = localStorage.getItem(STORAGE_KEY_PAYLOAD);
-    if (!token || !raw) {
-      return { valid: false, tier: 'free', token: null, payload: null, email: null, id: null };
-    }
-    const payload = JSON.parse(raw) as LicensePayload;
-    if (payload && (payload.tier === 'home' || payload.tier === 'pro')) {
-      if (typeof payload.exp === 'number' && payload.exp <= Date.now()) {
-        return { valid: false, tier: 'free', token: null, payload: null, email: null, id: null, error: 'expired' };
-      }
-      return {
-        valid: true,
-        tier: payload.tier,
-        token,
-        payload,
-        email: payload.email ?? null,
-        id: payload.id ?? null,
-        maxMachines: payload.maxMachines,
-      };
-    }
+    window.dispatchEvent(
+      new CustomEvent('chromaglass:license-changed', {
+        detail: { tier: status.tier, payload: status.payload },
+      }),
+    );
+    window.dispatchEvent(new Event('cg-license-changed'));
+  } catch {
+    // ignore
+  }
+}
+
+function recordVerifiedLicense(
+  token: string,
+  payload: LicensePayload,
+  machines?: number,
+  maxMachines?: number,
+): LicenseStatus {
+  const trimmed = token.trim();
+  verifiedState = {
+    valid: true,
+    tier: payload.tier,
+    token: trimmed,
+    payload,
+    email: payload.email,
+    id: payload.id,
+    machines,
+    maxMachines: maxMachines ?? payload.maxMachines,
+  };
+  try {
+    localStorage.setItem(STORAGE_KEY_TOKEN, trimmed);
   } catch {
     // ignore storage errors
   }
-  return { valid: false, tier: 'free', token: null, payload: null, email: null, id: null };
+  notifyLicenseChanged(verifiedState);
+  return verifiedState;
 }
 
-export function setCachedLicense(token: string, payload: LicensePayload): void {
+export function hasStoredLicenseTokenSync(): boolean {
+  if (typeof window === 'undefined') return false;
   try {
-    localStorage.setItem(STORAGE_KEY_TOKEN, token.trim());
-    localStorage.setItem(STORAGE_KEY_PAYLOAD, JSON.stringify(payload));
-    localStorage.setItem(STORAGE_KEY_TIER, payload.tier);
-    window.dispatchEvent(new CustomEvent('chromaglass:license-changed', { detail: { tier: payload.tier, payload } }));
-    window.dispatchEvent(new Event('cg-license-changed'));
+    const raw = localStorage.getItem(STORAGE_KEY_TOKEN);
+    return typeof raw === 'string' && raw.trim().startsWith('cg1.');
   } catch {
-    // ignore
+    return false;
   }
+}
+
+export async function verifyStoredLicense(): Promise<LicenseStatus> {
+  if (typeof window === 'undefined') return FREE_STATUS;
+  let storedToken: string | null = null;
+  try {
+    storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
+  } catch {
+    storedToken = null;
+  }
+  if (!storedToken || !storedToken.trim()) {
+    verifiedState = FREE_STATUS;
+    return FREE_STATUS;
+  }
+  const trimmed = storedToken.trim();
+  if (verifiedState.valid && verifiedState.token === trimmed && verifiedState.payload) {
+    if (typeof verifiedState.payload.exp === 'number' && verifiedState.payload.exp <= Date.now()) {
+      clearCachedLicense();
+      return { ...FREE_STATUS, error: 'expired' };
+    }
+    return verifiedState;
+  }
+  const res = await verifyLicenseKey(trimmed);
+  if (!res.valid) {
+    try {
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+    } catch {
+      // ignore
+    }
+    verifiedState = { ...FREE_STATUS, error: res.error };
+    notifyLicenseChanged(verifiedState);
+    return verifiedState;
+  }
+  return recordVerifiedLicense(trimmed, res.payload);
+}
+
+if (typeof window !== 'undefined' && hasStoredLicenseTokenSync()) {
+  pendingVerification = verifyStoredLicense();
+}
+
+export function getCachedLicenseStatus(): LicenseStatus {
+  if (!verifiedState.valid || !verifiedState.payload) {
+    return verifiedState;
+  }
+  if (typeof verifiedState.payload.exp === 'number' && verifiedState.payload.exp <= Date.now()) {
+    verifiedState = { ...FREE_STATUS, error: 'expired' };
+    return verifiedState;
+  }
+  return verifiedState;
 }
 
 export function clearCachedLicense(): void {
+  verifiedState = FREE_STATUS;
+  pendingVerification = null;
   try {
     localStorage.removeItem(STORAGE_KEY_TOKEN);
-    localStorage.removeItem(STORAGE_KEY_PAYLOAD);
-    localStorage.removeItem(STORAGE_KEY_TIER);
-    window.dispatchEvent(new CustomEvent('chromaglass:license-changed', { detail: { tier: 'free', payload: null } }));
-    window.dispatchEvent(new Event('cg-license-changed'));
   } catch {
     // ignore
   }
+  notifyLicenseChanged(FREE_STATUS);
 }
 
 export async function activateLocalLicenseKey(token: string): Promise<LicenseStatus> {
   const res = await verifyLicenseKey(token);
   if (!res.valid) {
-    return { valid: false, tier: 'free', token: null, payload: null, email: null, id: null, error: res.error };
+    return { ...FREE_STATUS, error: res.error };
   }
   let machines = 1;
   let maxMachines = res.payload.maxMachines;
@@ -195,12 +270,7 @@ export async function activateLocalLicenseKey(token: string): Promise<LicenseSta
       };
       if (body.ok === false) {
         return {
-          valid: false,
-          tier: 'free',
-          token: null,
-          payload: null,
-          email: null,
-          id: null,
+          ...FREE_STATUS,
           error: body.error || 'invalid-signature',
         };
       }
@@ -210,29 +280,14 @@ export async function activateLocalLicenseKey(token: string): Promise<LicenseSta
     } else if (srv.status === 409 || srv.status === 403 || srv.status === 400) {
       const body = (await srv.json().catch(() => ({}))) as { error?: string };
       return {
-        valid: false,
-        tier: 'free',
-        token: null,
-        payload: null,
-        email: null,
-        id: null,
+        ...FREE_STATUS,
         error: body.error || 'machine-limit',
       };
     }
   } catch {
-    // No local show server (pure static web): local verification stands.
+    // No local show server (pure static web): local Ed25519 verification stands.
   }
-  setCachedLicense(token.trim(), res.payload);
-  return {
-    valid: true,
-    tier: res.payload.tier,
-    token: token.trim(),
-    payload: res.payload,
-    email: res.payload.email,
-    id: res.payload.id,
-    machines,
-    maxMachines,
-  };
+  return recordVerifiedLicense(token.trim(), res.payload, machines, maxMachines);
 }
 
 export async function deactivateLocalLicenseKey(): Promise<void> {
@@ -262,26 +317,20 @@ export async function syncServerLicense(): Promise<LicenseStatus> {
       if (info.valid && rawKey) {
         const verified = await verifyLicenseKey(rawKey);
         if (verified.valid) {
-          setCachedLicense(rawKey, verified.payload);
-          return {
-            valid: true,
-            tier: verified.payload.tier,
-            token: rawKey,
-            payload: verified.payload,
-            email: verified.payload.email,
-            id: verified.payload.id,
-            machines: Array.isArray(info.machines) ? info.machines.length : info.machines,
-            maxMachines: info.maxMachines,
-          };
+          const machineCount = Array.isArray(info.machines) ? info.machines.length : info.machines;
+          return recordVerifiedLicense(rawKey, verified.payload, machineCount, info.maxMachines);
         }
       }
       if (info.valid === false && info.error) {
         clearCachedLicense();
-        return { valid: false, tier: 'free', token: null, payload: null, email: null, id: null, error: info.error };
+        return { ...FREE_STATUS, error: info.error };
       }
     }
   } catch {
     // Static web host without /license-info.json
   }
-  return getCachedLicenseStatus();
+  if (pendingVerification) {
+    await pendingVerification;
+  }
+  return verifyStoredLicense();
 }

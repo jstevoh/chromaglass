@@ -22,11 +22,11 @@ function showsEndpoint(): string {
   return import.meta.env.VITE_FIREBASE_SHOWS_URL || '/account-shows';
 }
 
-function getShowSessionId(port: number): string {
+function getShowSessionId(port: number, key: string): string {
   try {
     const existing = sessionStorage.getItem(SHOW_SESSION_ID_KEY);
     if (existing) return existing;
-    const created = 'show-' + String(port) + '-' + Math.random().toString(36).slice(2, 8);
+    const created = 'show-' + String(port) + '-' + String(key || 'local') + '-' + Date.now().toString(36);
     sessionStorage.setItem(SHOW_SESSION_ID_KEY, created);
     return created;
   } catch {
@@ -159,7 +159,7 @@ export function usePublishAccountShow(enabled: boolean, lookName: string | null)
       const primaryHost = info.hosts[0] || window.location.hostname || '127.0.0.1';
       const relay = 'http://' + primaryHost + ':' + String(info.port);
       const url = relay + '/?remote=1&key=' + encodeURIComponent(info.key);
-      const id = getShowSessionId(info.port);
+      const id = getShowSessionId(info.port, info.key);
       publishedId = id;
       const label = lookName ? `${lookName} (${primaryHost}:${info.port})` : `Show (${primaryHost}:${info.port})`;
       await publishAccountShow({

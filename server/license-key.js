@@ -17,17 +17,6 @@ export const DEFAULT_PUBLIC_JWK = {
   x: 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw',
 };
 
-/** Default signing key for local harnesses (`npm run license-worker`, `npm run desktop`). Production Workers pass `env.LICENSE_PRIVATE_KEY`. */
-export const TEST_PRIVATE_JWK = {
-  kty: 'OKP',
-  crv: 'Ed25519',
-  alg: 'Ed25519',
-  ext: true,
-  key_ops: ['sign'],
-  x: 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw',
-  d: 'xbDgG9vbDN23tn_bcFZuKJowTVLRI4sB3IdHbS0297A',
-};
-
 export const MAX_MACHINES_PER_KEY = 2;
 export const ONE_YEAR_MS = 365 * 24 * 3600 * 1000;
 
@@ -55,7 +44,9 @@ function fromBase64Url(str) {
 let cachedVerifyKey = null;
 let cachedVerifyJwkStr = '';
 
-async function getVerifyKey(publicJwk = DEFAULT_PUBLIC_JWK) {
+async function getVerifyKey(
+  publicJwk = (typeof process !== 'undefined' && process.env?.LICENSE_PUBLIC_KEY) || DEFAULT_PUBLIC_JWK,
+) {
   const jwk = typeof publicJwk === 'string' ? JSON.parse(publicJwk) : publicJwk;
   const str = JSON.stringify(jwk);
   if (cachedVerifyKey && cachedVerifyJwkStr === str) return cachedVerifyKey;
@@ -65,7 +56,10 @@ async function getVerifyKey(publicJwk = DEFAULT_PUBLIC_JWK) {
   return key;
 }
 
-export async function signLicenseKey(payload, privateJwk = TEST_PRIVATE_JWK) {
+export async function signLicenseKey(payload, privateJwk) {
+  if (!privateJwk) {
+    throw new Error('LICENSE_PRIVATE_KEY is required to sign a licence key');
+  }
   const now = typeof payload?.issuedAt === 'number' ? payload.issuedAt : Date.now();
   const normalized = {
     id: String(payload?.id || `cgk_${now.toString(36)}`),
@@ -85,7 +79,7 @@ export async function signLicenseKey(payload, privateJwk = TEST_PRIVATE_JWK) {
   return `${signingInput}.${toBase64Url(sig)}`;
 }
 
-export async function verifyLicenseKey(token, publicJwk = DEFAULT_PUBLIC_JWK) {
+export async function verifyLicenseKey(token, publicJwk) {
   if (typeof token !== 'string') return { valid: false, error: 'missing key' };
   const trimmed = token.trim();
   const parts = trimmed.split('.');

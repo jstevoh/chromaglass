@@ -10,6 +10,8 @@ import {
   hasEmailSignInLink,
   getPendingEmail,
   hasValidLicenseSync,
+  hasStoredLicenseCandidateSync,
+  verifyStoredLicenseOnLoad,
   requiresDesktopSignInSync,
 } from './lib/authFlag';
 
@@ -153,21 +155,13 @@ function Loading() {
 function Gate() {
   const gateActive =
     show && (Boolean(import.meta.env.VITE_FIREBASE_API_KEY) || requiresDesktopSignInSync());
-  const [phase, setPhase] = useState<'app' | 'completing-link' | 'signin'>(() => {
+  const [phase, setPhase] = useState<'app' | 'verifying-license' | 'completing-link' | 'signin'>(() => {
     if (!gateActive) return 'app';
     if (hasValidLicenseSync() || isSignedInCached()) return 'app';
     if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
+    if (hasStoredLicenseCandidateSync()) return 'verifying-license';
     return 'signin';
   });
-
-  useEffect(() => {
-    if (!gateActive) return;
-    const onSignedOut = () => {
-      if (!hasValidLicenseSync()) setPhase('signin');
-    };
-    window.addEventListener('cg-signed-out', onSignedOut);
-    return () => window.removeEventListener('cg-signed-out', onSignedOut);
-  }, [gateActive]);
 
   useEffect(() => {
     if (!gateActive) return;
@@ -176,6 +170,19 @@ function Gate() {
         void import('./lib/firebaseAuth').then((m) => m.verifyReturningUserInBackground());
       }
       return;
+    }
+    if (phase === 'verifying-license') {
+      let cancelled = false;
+      void verifyStoredLicenseOnLoad()
+        .then((valid) => {
+          if (!cancelled) setPhase(valid ? 'app' : 'signin');
+        })
+        .catch(() => {
+          if (!cancelled) setPhase('signin');
+        });
+      return () => {
+        cancelled = true;
+      };
     }
     if (phase === 'completing-link') {
       if (import.meta.env.VITE_FIREBASE_API_KEY) {
@@ -196,7 +203,7 @@ function Gate() {
     }
   }, [gateActive, phase]);
 
-  if (phase === 'completing-link') {
+  if (phase === 'completing-link' || phase === 'verifying-license') {
     return <Loading />;
   }
   if (phase === 'signin') {

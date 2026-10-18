@@ -33,6 +33,10 @@ const tempDir = mkdtempSync(join(tmpdir(), 'cg-tiers-'));
 const licenseFile = join(tempDir, 'license.json');
 const showKeyFile = join(tempDir, 'show-key');
 
+const testKeypair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+const testPrivateJwk = await crypto.subtle.exportKey('jwk', testKeypair.privateKey);
+const testPublicJwk = await crypto.subtle.exportKey('jwk', testKeypair.publicKey);
+
 if (!process.env.TIERS_SKIP_BUILD) {
   const env = { ...process.env };
   delete env.VITE_FIREBASE_API_KEY;
@@ -69,22 +73,31 @@ async function waitFor(fn, ms = 45_000) {
 }
 
 try {
-  const homeKey = await signLicenseKey({
-    tier: 'home',
-    email: 'home@example.com',
-    id: 'lic-home-check',
-  });
-  const proKey = await signLicenseKey({
-    tier: 'pro',
-    email: 'pro@example.com',
-    id: 'lic-pro-check',
-  });
-  const expiredKey = await signLicenseKey({
-    tier: 'pro',
-    email: 'expired@example.com',
-    id: 'lic-exp-check',
-    exp: Date.now() - 120_000,
-  });
+  const homeKey = await signLicenseKey(
+    {
+      tier: 'home',
+      email: 'home@example.com',
+      id: 'lic-home-check',
+    },
+    testPrivateJwk,
+  );
+  const proKey = await signLicenseKey(
+    {
+      tier: 'pro',
+      email: 'pro@example.com',
+      id: 'lic-pro-check',
+    },
+    testPrivateJwk,
+  );
+  const expiredKey = await signLicenseKey(
+    {
+      tier: 'pro',
+      email: 'expired@example.com',
+      id: 'lic-exp-check',
+      exp: Date.now() - 120_000,
+    },
+    testPrivateJwk,
+  );
   const tamperedKey = `${homeKey.slice(0, -4)}AAAA`;
 
   serverProc = spawn(process.execPath, ['server/remote-server.js'], {
@@ -95,6 +108,7 @@ try {
       REMOTE_DIST: DIST,
       SHOW_KEY_FILE: showKeyFile,
       CHROMAGLASS_LICENSE_FILE: licenseFile,
+      LICENSE_PUBLIC_KEY: JSON.stringify(testPublicJwk),
     },
     stdio: 'ignore',
   });
@@ -212,8 +226,18 @@ try {
   // 5 & 6. Unlicensed sign-in gate (23.11) and offline license key unlock (23.4 & 23.11)
   {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.addInitScript((jwk) => {
+      window.__cgTestLicensePublicKey = jwk;
+    }, testPublicJwk);
     const page = await ctx.newPage();
+    // Seed forged localStorage flags/tokens before navigation to verify Ed25519 signature check cannot be bypassed via storage
     await page.goto(`${ORIGIN}/?debug&requireSignIn=1&tierGates=1`);
+    await page.evaluate((badKey) => {
+      localStorage.setItem('chromaglass-license-tier', 'pro');
+      localStorage.setItem('chromaglass:license-payload', JSON.stringify({ tier: 'pro', id: 'forged' }));
+      localStorage.setItem('chromaglass:license-key', badKey);
+    }, tamperedKey);
+    await page.reload();
     const gateShown = await waitFor(
       () => page.locator('[data-cg-signin]').isVisible().catch(() => false),
       20_000,
@@ -222,7 +246,7 @@ try {
       .evaluate(() => typeof window.chromaglassSettings === 'function')
       .catch(() => false);
     check(
-      '5. unlicensed launch with requireSignIn=1 shows the gate and does not start the plate behind it',
+      '5. unlicensed or forged-localStorage launch with requireSignIn=1 shows the gate and does not start the plate behind it',
       gateShown && !appBehind,
     );
 
@@ -269,6 +293,9 @@ try {
   // 8, 9, 10, 11. Free-site tiles (23.2), Record & Render caps + watermark (23.5), Logo mark restriction (23.6), and Home -> Pro unlock
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await ctx.addInitScript((jwk) => {
+      window.__cgTestLicensePublicKey = jwk;
+    }, testPublicJwk);
     const page = await ctx.newPage();
     await page.goto(`${ORIGIN}/?debug&tierGates=1`);
     await waitFor(

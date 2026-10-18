@@ -223,16 +223,20 @@ try {
   // ── 9. Licence keys (PLAN 23.3) ──
   {
     const { signLicenseKey } = await import('../server/license-key.js');
-    const goodKey = await signLicenseKey({ id: 'key_songid_1', tier: 'home', email: 'dj@example.com' });
+    const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+    const privJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const pubJwk = await crypto.subtle.exportKey('jwk', kp.publicKey);
+    const goodKey = await signLicenseKey({ id: 'key_songid_1', tier: 'home', email: 'dj@example.com' }, privJwk);
     const badKey = goodKey.slice(0, -4) + (goodKey.endsWith('AAAA') ? 'BBBB' : 'AAAA');
 
-    const gatedEnv = { ...fresh(), REQUIRE_LICENSE_KEY: '1' };
+    const keyFresh = () => ({ ...fresh(), LICENSE_PUBLIC_KEY: pubJwk });
+    const gatedEnv = { ...keyFresh(), REQUIRE_LICENSE_KEY: '1' };
     const noKey = await run(post(), gatedEnv);
     check('with REQUIRE_LICENSE_KEY set, a request with no key is refused before the service is asked',
       noKey.status === 401 && noKey.spent === 0 && noKey.read === 0,
       `${noKey.status}, service called ${noKey.spent}, body read ${noKey.read}`);
 
-    const badSig = await run(post({ headers: { 'X-ChromaGlass-Key': badKey } }), fresh());
+    const badSig = await run(post({ headers: { 'X-ChromaGlass-Key': badKey } }), keyFresh());
     check('a key with a bad signature is refused before the service is asked',
       badSig.status === 401 && badSig.spent === 0 && badSig.read === 0,
       `${badSig.status}, service called ${badSig.spent}, body read ${badSig.read}`);
@@ -243,7 +247,7 @@ try {
       `${goodAns.status} ${JSON.stringify(goodAns.body)}`);
 
     // A good key raises the hourly count past RATE_PER_HOUR, but never skips DAILY_LIMIT.
-    const hourEnv = fresh();
+    const hourEnv = keyFresh();
     const hourNow = Math.floor(Date.now() / 3_600_000);
     await hourEnv.FINGERPRINT_LIMITS.put(`rl:198.51.100.77:${hourNow}`, String(RATE_PER_HOUR));
     const withoutKeyAt30 = await run(post({ ip: '198.51.100.77' }), hourEnv);
