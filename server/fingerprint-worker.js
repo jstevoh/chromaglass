@@ -60,6 +60,7 @@ export const DAILY_LIMIT = 1000;
 // server reached over the Wi-Fi, which is plain http on a private address with
 // a port. The lookalike `https://chromaglass.web.app.example` fails on the `$`.
 const ALLOWED_ORIGINS = [
+  /^https:\/\/(www\.)?chromaglass\.art$/,
   /^https:\/\/chromaglass\.web\.app$/,
   /^https:\/\/chromaglass\.firebaseapp\.com$/,
   /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,

@@ -25,6 +25,7 @@ import {
 } from './license-key.js';
 
 const ALLOWED_ORIGINS = [
+  /^https:\/\/(www\.)?chromaglass\.art$/,
   /^https:\/\/chromaglass\.web\.app$/,
   /^https:\/\/chromaglass\.firebaseapp\.com$/,
   /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
