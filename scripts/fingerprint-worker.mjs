@@ -219,6 +219,42 @@ try {
       r.status === 503 && r.body?.error === 'busy' && r.headers.get('Access-Control-Allow-Origin') === SITE && r.spent === 0,
       `${r.status} ${JSON.stringify(r.body)}, Allow-Origin ${r.headers.get('Access-Control-Allow-Origin')}, service called ${r.spent}`);
   }
+
+  // ── 9. Licence keys (PLAN 23.3) ──
+  {
+    const { signLicenseKey } = await import('../server/license-key.js');
+    const goodKey = await signLicenseKey({ id: 'key_songid_1', tier: 'home', email: 'dj@example.com' });
+    const badKey = goodKey.slice(0, -4) + (goodKey.endsWith('AAAA') ? 'BBBB' : 'AAAA');
+
+    const gatedEnv = { ...fresh(), REQUIRE_LICENSE_KEY: '1' };
+    const noKey = await run(post(), gatedEnv);
+    check('with REQUIRE_LICENSE_KEY set, a request with no key is refused before the service is asked',
+      noKey.status === 401 && noKey.spent === 0 && noKey.read === 0,
+      `${noKey.status}, service called ${noKey.spent}, body read ${noKey.read}`);
+
+    const badSig = await run(post({ headers: { 'X-ChromaGlass-Key': badKey } }), fresh());
+    check('a key with a bad signature is refused before the service is asked',
+      badSig.status === 401 && badSig.spent === 0 && badSig.read === 0,
+      `${badSig.status}, service called ${badSig.spent}, body read ${badSig.read}`);
+
+    const goodAns = await run(post({ headers: { 'X-ChromaGlass-Key': goodKey } }), gatedEnv);
+    check('a good signed key is answered',
+      goodAns.status === 200 && goodAns.body?.match === true && goodAns.spent === 1,
+      `${goodAns.status} ${JSON.stringify(goodAns.body)}`);
+
+    // A good key raises the hourly count past RATE_PER_HOUR, but never skips DAILY_LIMIT.
+    const hourEnv = fresh();
+    const hourNow = Math.floor(Date.now() / 3_600_000);
+    await hourEnv.FINGERPRINT_LIMITS.put(`rl:198.51.100.77:${hourNow}`, String(RATE_PER_HOUR));
+    const withoutKeyAt30 = await run(post({ ip: '198.51.100.77' }), hourEnv);
+    const withKeyAt30 = await run(post({ ip: '198.51.100.77', headers: { 'X-ChromaGlass-Key': goodKey } }), hourEnv);
+    const dayNow = Math.floor(Date.now() / 86_400_000);
+    await hourEnv.FINGERPRINT_LIMITS.put(`day:${dayNow}`, String(DAILY_LIMIT));
+    const withKeyAtDayCap = await run(post({ ip: '198.51.100.77', headers: { 'X-ChromaGlass-Key': goodKey } }), hourEnv);
+    check('a good key raises the hourly count past RATE_PER_HOUR, and still stops at DAILY_LIMIT',
+      withoutKeyAt30.status === 429 && withKeyAt30.status === 200 && withKeyAtDayCap.status === 503 && withKeyAtDayCap.spent === 0,
+      `no-key@${RATE_PER_HOUR}=${withoutKeyAt30.status}, key@${RATE_PER_HOUR}=${withKeyAt30.status}, key@dayCap=${withKeyAtDayCap.status}`);
+  }
 } catch (e) {
   check('the run finished', false, e.stack ?? e.message);
 }

@@ -501,6 +501,9 @@ jobs:
       - name: The song-ID Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run fingerprint-worker
+      - name: The licence-key Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run license-worker
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
@@ -545,6 +548,13 @@ jobs:
       - name: Linking devices by account
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run accountlink
+      # Licensing and tiers (PLAN.md 23.2, 23.4, 23.5, 23.6, 23.11,
+      # scripts/tiers.mjs): offline Ed25519 signature verification, 2-machine
+      # limit, Home->Pro upgrade, unlicensed gate, free-tier tiles, 15s/720p
+      # caps + corner mark, and logo mark lock.
+      - name: Licensing and tiers
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run tiers
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout

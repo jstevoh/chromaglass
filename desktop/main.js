@@ -89,7 +89,13 @@ if (!app.requestSingleInstanceLock()) {
 /** The laptop's window: the desks and the plate. */
 let showWindow = null;
 /** What the show server was started with, for the menu's details. */
-const show = { port: 0, osc: 0, key: '' };
+const show = {
+  port: 0,
+  osc: 0,
+  key: '',
+  requireSignIn: false,
+  license: { valid: false, tier: 'free', email: null, id: null, exp: null, error: null, enforced: false },
+};
 
 /**
  * The show key, kept between launches.
@@ -210,6 +216,10 @@ const webPreferences = () => ({
   contextIsolation: true,
   sandbox: true,
   backgroundThrottling: false,
+  additionalArguments: [
+    `--chromaglass-license=${Buffer.from(JSON.stringify(show.license)).toString('base64url')}`,
+    `--chromaglass-require-signin=${show.requireSignIn ? '1' : '0'}`,
+  ],
 });
 
 /*
@@ -311,10 +321,32 @@ async function start() {
   show.port = await choosePort();
   show.key = showKey();
   show.osc = Number(process.env.OSC_PORT ?? 9000);
+  show.requireSignIn = Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
+  const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
+  process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;
   // The server reads its settings from the environment, as it does in a terminal.
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
   process.env.OSC_PORT = String(show.osc);
+  const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
+  const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
+  await licenseMgr.initFromEnv();
+  const initialStatus = await licenseMgr.currentStatus();
+  let initialError = null;
+  if (process.env.CHROMAGLASS_LICENSE_KEY && !initialStatus.valid) {
+    const { verifyLicenseKey } = await import(pathToFileURL(join(ROOT, 'server', 'license-key.js')).href);
+    const check = await verifyLicenseKey(process.env.CHROMAGLASS_LICENSE_KEY);
+    initialError = check.error ?? 'invalid-signature';
+  }
+  show.license = {
+    valid: initialStatus.valid,
+    tier: initialStatus.tier,
+    email: initialStatus.email,
+    id: initialStatus.id,
+    exp: initialStatus.exp,
+    error: initialError,
+    enforced: initialStatus.enforced,
+  };
   await import(pathToFileURL(SERVER).href);
   await serverUp(show.port);
 

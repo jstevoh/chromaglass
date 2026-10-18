@@ -27,6 +27,7 @@ import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
+import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -156,12 +157,22 @@ const lanAddresses = () =>
     .map((n) => n.address);
 
 const handleAccountShows = createAccountShowsHandler();
+const licenseManager = createServerLicenseManager();
+void licenseManager.initFromEnv();
 
 // ── Static files, with SPA fallback ────────────────────────────────────
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname === ACCOUNT_SHOWS_PATH) {
     void handleAccountShows(req, res, url);
+    return;
+  }
+  if (
+    url.pathname === LICENSE_INFO_PATH ||
+    url.pathname === LICENSE_ACTIVATE_PATH ||
+    url.pathname === LICENSE_DEACTIVATE_PATH
+  ) {
+    void licenseManager.handleRequest(req, res, url.pathname, isLaptop(req));
     return;
   }
   // The display asks for this before opening a socket, so a page served from

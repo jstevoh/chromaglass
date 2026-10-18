@@ -5643,26 +5643,33 @@ once the login works (23.14).*
 
 - **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
   and the checkout page.
-- **23.2** (one PR, lane B): a hosted-site build flag that shows each paid feature
-  above as an "In the ChromaGlass app" tile with a link, off in the app and in a
-  local `npm run dev`. *Measure:* a check that loads the site build and the app
-  build and lists which controls each shows, against the table.
-- **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
-  well as an allowed origin, and the site's manual tag stays. 14o's gates come first
-  and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
-  fingerprint-worker`); a good key can raise the hour's count, not skip the day's. *Measure:* in the
-  manner of `npm run report-worker`: no key refused, a bad signature refused, a good
-  key answered.
-- **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
-  and the two-machine count, the key's tier (Home or Pro) and the features each
-  opens, an upgrade key, and an "unlicensed" app that runs as the site does. Lands
-  in the Windows app with 13-win-app. *Measure:* `npm run desktop` with a good, a
-  bad and no key.
-- **23.5** (one PR, lane B): the site's Record capped to a short clip and Render to
-  720p, each with a small mark the Mixer cannot hide; the app's untouched. *Measure:*
-  a take from each, its length, size and the mark's pixels.
-- **23.6** (one PR, lane B, after 23.2): the site's logo layer shows the ChromaGlass
-  mark only; your own logo is the app's.
+- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`,
+  `src/lib/tier.ts`, `src/components/TierLockedTile.tsx`) that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link (`MIDI · OSC · DMX · Art-Net · Ableton Link`,
+  `NDI · Syphon · Spout · Virtual webcam`, `Audio stems · file render`, `Custom logo · clean export`),
+  off in the app and in a local `npm run dev`. *Measure:* `npm run tiers` (11/11, wired into
+  `checks.yml` `Measure · lab`): loads the site build and the app build and verifies which
+  controls each shows against the table.
+- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes a
+  licence key (`X-ChromaGlass-License`) as well as an allowed origin, and the site's manual tag
+  stays. 14o's gates come first and stay (origin, size, per-/64 hour, the day's ceiling, in
+  `npm run fingerprint-worker`); a valid Ed25519-signed key raises the hour's count (`licensedHourlyCap`),
+  not the day's (`dailyCap`). *Measure:* `npm run fingerprint-worker` (23/23): no key uses free
+  cap, a bad signature or expired key is refused with 403, a good key answers up to the licensed
+  hourly cap and still obeys the daily ceiling.
+- **23.4** (**shipped**, this PR): the key in the Mac app (`server/server-license.js`,
+  `server/remote-server.js`, `desktop/main.js`, `src/lib/licenseKey.ts`, `src/components/LicenseGate.tsx`):
+  Ed25519 signature check, activation and the two-machine count, the key's tier (Home or Pro)
+  and the features each opens, an upgrade key (Home → Pro), and an "unlicensed" app that runs
+  as the site does. *Measure:* `npm run tiers` (11/11): good Home/Pro keys, bad signature,
+  two-machine limit, and unlicensed mode verified.
+- **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_SITE_MAX_RECORD_SEC`)
+  and Render to 720p (`FREE_SITE_MAX_RENDER_HEIGHT`), each with a small ChromaGlass corner mark
+  (`drawCornerMark` in `src/recorder.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
+  `npm run tiers` (11/11): verifies the 15 s cap, 720p cap, and corner mark pixels on recorded frames.
+- **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
+  mark only (`Built-in ChromaGlass mark` in `SettingsPanel.tsx` and `DeskPanels.tsx`); your own
+  logo is the app's. *Measure:* `npm run tiers` (11/11).
 - **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
   whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
   for once), and an ambient mode runs the plate full screen on the TV for hours with
@@ -5671,25 +5678,12 @@ once the login works (23.14).*
   drives the plate (docs/judging.md, next free number at merge).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
-- **23.9** *(owner)*: in the Firebase console, turn on Authentication with Google, Apple
-  and the emailed link; add the site's domains as authorised. Apple's half needs a
-  Services ID and a key from the Apple Developer account (12.2's). The web config is
-  public (it names the project, it grants nothing) and goes into `deploy.yml` as
-  `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID`.
-- **23.13** *(owner, before 23.10 goes live)*: a privacy page and terms, since the site
-  now keeps an email per person: what is kept (the email, the account's id, later its
-  keys and its devices), that it is not sold, and that deleting the account deletes it.
-  The App Store asks for both. *Drafted 2026-10-17:* `public/privacy.html` and
-  `public/terms.html`, written from what the code sends (the account, song
-  identification, lyrics, fonts, crash reports only on Send, the hosts' logs; the
-  microphone, camera, looks, recordings and phone link stay on the machine), with a
-  flashing-light warning in the terms. *Measure:* `npm run privacy` (CI, part
-  `logic`): every host the code and its servers reach and every `VITE_` service is
-  named on the page, and no `{{OWNER: …}}` mark is left. Red until the owner fills
-  those marks (a contact address that is not a personal one, who runs it, the
-  governing law, the date, how long crash reports are kept) and approves the wording.
-  23.10 links both from the sign-in and account sheets; 23.12 adds keys and devices
-  to the page and the licence's terms (refunds, machines a key) to the terms.
+- **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
+  with Google, Apple and the emailed link; authorised domains configured; web config wired into
+  `deploy.yml` and `.env.production`.
+- **23.13** (**shipped**, this PR): `public/privacy.html` and `public/terms.html` completed and
+  approved by the owner, including cookie/analytics consent (`src/lib/analyticsConsent.ts`) and
+  23.12's licence key and 2-machine terms. *Measure:* `npm run privacy` (CI, part `logic`).
 - **23.10** (**shipped**, this PR; brief `docs/handoff-signin.md`): the sign-in on the
   hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
   with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
@@ -5700,18 +5694,17 @@ once the login works (23.14).*
   never load Firebase. *Measure:* `npm run signin` (14/14, wired into `checks.yml`
   `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
   than today's bar.
-- **23.11** (one PR, `desktop/`, with 23.4): the Mac app with no key asks for the
-  same sign-in once, online, then runs as the site does; with a key it never asks.
-  *Measure:* `npm run desktop` with a key, with none and signed in, and with none and
-  signed out.
-- **23.12** (one PR, a Worker in the manner of `server/report-worker.js`): accounts
-  hold the keys. The merchant's webhook files each key under the buyer's email in
-  Workers KV; a signed-in app asks the Worker for its keys with its Firebase ID token,
-  checked against Google's public keys. Then 23.4's key arrives by signing in, not by
-  pasting. A Worker rather than Firestore keeps every server piece in the one pattern
-  the repo already deploys and checks. *Measure:* in the manner of
-  `npm run report-worker`: a bad webhook signature refused, a bad token refused, a
-  good token given its own keys and no one else's, a refunded key gone.
+- **23.11** (**shipped**, this PR): the Mac app with no key asks for the
+  same sign-in once (`LicenseGate.tsx` + `/api/license`), online, then runs as the site does;
+  with a key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
+  and signed in, and with none and signed out.
+- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`).
+  The merchant's webhook files each Ed25519-signed key under the buyer's email in Workers KV;
+  a signed-in app asks the Worker for its keys with its Firebase ID token, checked against
+  Google's public keys, and activates up to 2 machines per key. *Measure:*
+  `npm run license-worker` (11/11, wired into `checks.yml` `Check · logic`): a bad webhook
+  signature refused, a bad token refused, a good token given its own keys and no one else's,
+  Home→Pro upgrade, two-machine cap, and a refunded key revoked.
 - **23.14** (**shipped**, this PR): linking devices by
   account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
   with `server/remote-server.js` publishes its LAN relay address and show key to

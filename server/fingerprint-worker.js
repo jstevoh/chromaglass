@@ -45,10 +45,14 @@
 // To use ACRCloud instead, set ACR_HOST / ACR_ACCESS_KEY / ACR_ACCESS_SECRET
 // secrets — the worker prefers ACRCloud when those are present.
 
+import { DEFAULT_PUBLIC_JWK, verifyLicenseKey } from './license-key.js';
+
 /** A ten-second snippet is ~880 kB as 16-bit mono WAV at 44.1 kHz; twice that is room to spare. */
 export const MAX_BYTES = 2 * 1024 * 1024;
 /** Lookups per address (IPv6: per /64) per hour. A set changes song every few minutes. */
 export const RATE_PER_HOUR = 30;
+/** Lookups per hour when a valid signed licence key is presented (PLAN 23.3). */
+export const KEY_RATE_PER_HOUR = 120;
 /** Lookups a day across everyone, unless FINGERPRINT_DAILY_LIMIT says otherwise. */
 export const DAILY_LIMIT = 1000;
 
@@ -65,7 +69,7 @@ const ALLOWED_ORIGINS = [
 
 const CORS_BASE = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-ChromaGlass-Key',
   'Access-Control-Max-Age': '86400',
   Vary: 'Origin',
 };
@@ -77,6 +81,17 @@ function allowed(origin) {
 function corsFor(request) {
   const origin = request.headers.get('Origin');
   return allowed(origin) ? { ...CORS_BASE, 'Access-Control-Allow-Origin': origin } : { ...CORS_BASE };
+}
+
+function extractLicenseKey(request) {
+  const headerKey = request.headers.get('X-ChromaGlass-Key');
+  if (headerKey && headerKey.trim()) return headerKey.trim();
+  const auth = request.headers.get('Authorization');
+  if (auth) {
+    const m = /^Bearer\s+(.+)$/i.exec(auth.trim());
+    if (m) return m[1].trim();
+  }
+  return null;
 }
 
 export default {
@@ -92,6 +107,19 @@ export default {
     if (length == null || !/^\d+$/.test(length)) return json({ error: 'length required' }, 411, cors);
     if (Number(length) > MAX_BYTES) return json({ error: 'snippet too large' }, 413, cors);
 
+    // PLAN 23.3: licence key check, after 14o's origin and size gates and before
+    // any counter write, body read, or paid lookup.
+    const rawKey = extractLicenseKey(request);
+    let verifiedKey = null;
+    if (rawKey) {
+      const checkRes = await verifyLicenseKey(rawKey, env.LICENSE_PUBLIC_KEY || DEFAULT_PUBLIC_JWK);
+      if (!checkRes.valid) return json({ error: 'invalid licence key' }, 401, cors);
+      verifiedKey = checkRes.payload;
+    } else if (env.REQUIRE_LICENSE_KEY && env.REQUIRE_LICENSE_KEY !== '0') {
+      return json({ error: 'licence key required' }, 401, cors);
+    }
+
+    const hourLimit = verifiedKey ? KEY_RATE_PER_HOUR : RATE_PER_HOUR;
     const hourKey = `rl:${addressOf(request)}:${Math.floor(Date.now() / 3_600_000)}`;
     const dayKey = `day:${Math.floor(Date.now() / 86_400_000)}`;
     const ceiling = Number(env.FINGERPRINT_DAILY_LIMIT) || DAILY_LIMIT;
@@ -102,7 +130,7 @@ export default {
     // Failing closed costs a lookup now and then; failing open is the bill.
     try {
       const hourCount = Number(await kv.get(hourKey)) || 0;
-      if (hourCount >= RATE_PER_HOUR) return json({ error: 'too many lookups' }, 429, cors);
+      if (hourCount >= hourLimit) return json({ error: 'too many lookups' }, 429, cors);
       const dayCount = Number(await kv.get(dayKey)) || 0;
       if (dayCount >= ceiling) return json({ error: 'busy' }, 503, cors);
       // Counted before the lookup, so a request that fails after this still counts:

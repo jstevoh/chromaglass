@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { getCachedEmail } from '../lib/authFlag';
 import {
-  getCurrentUserEmail,
-  signOutCurrentAccount,
-  deleteCurrentAccount,
-} from '../lib/firebaseAuth';
-import {
   useAccountShows,
   joinAccountShow,
   unpublishAccountShows,
 } from '../lib/accountShows';
+import {
+  activateLocalLicenseKey,
+  deactivateLocalLicenseKey,
+  syncServerLicense,
+} from '../lib/licenseKey';
+import { getActiveLicenseInfo, getEffectiveTier } from '../lib/tierGates';
+
+async function loadFirebaseAuth() {
+  if (!import.meta.env.VITE_FIREBASE_API_KEY) return null;
+  return import('../lib/firebaseAuth');
+}
 
 interface AccountSheetProps {
   onClose: () => void;
@@ -20,26 +26,109 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
   const [confirmMode, setConfirmMode] = useState<'none' | 'signout' | 'delete'>('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [licenseInfo, setLicenseInfo] = useState(() => getActiveLicenseInfo());
+  const [effectiveTier, setEffectiveTier] = useState(() => getEffectiveTier());
+  const [keyInput, setKeyInput] = useState('');
+  const [licenseBusy, setLicenseBusy] = useState(false);
+  const [licenseError, setLicenseError] = useState<string | null>(() => getActiveLicenseInfo().error);
   const accountShows = useAccountShows();
+
+  const refreshLicenseState = () => {
+    setLicenseInfo(getActiveLicenseInfo());
+    setEffectiveTier(getEffectiveTier());
+  };
 
   useEffect(() => {
     let cancelled = false;
-    getCurrentUserEmail().then((liveEmail) => {
+    loadFirebaseAuth().then(async (authMod) => {
+      if (!authMod || cancelled) return;
+      const liveEmail = await authMod.getCurrentUserEmail();
       if (!cancelled && liveEmail) {
         setEmail(liveEmail);
       }
+      const licensesUrl = import.meta.env.VITE_FIREBASE_LICENSES_URL as string | undefined;
+      if (licensesUrl) {
+        const token = await authMod.getCurrentIdToken();
+        if (cancelled || !token) return;
+        try {
+          const res = await fetch(`${licensesUrl.replace(/\/$/, '')}/keys`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          });
+          if (!res.ok) return;
+          const data = (await res.json()) as { keys?: Array<{ key?: string; tier?: string; revoked?: boolean }> };
+          const activeRemote = (data.keys ?? []).find((k) => k.key && !k.revoked);
+          if (activeRemote?.key && !getActiveLicenseInfo().valid) {
+            await activateLocalLicenseKey(activeRemote.key);
+            if (!cancelled) refreshLicenseState();
+          }
+        } catch {
+          // offline or unreachable
+        }
+      }
     });
+    syncServerLicense().then(() => {
+      if (!cancelled) refreshLicenseState();
+    });
+
+    const onLicenseChange = () => refreshLicenseState();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('cg-license-changed', onLicenseChange);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       cancelled = true;
+      window.removeEventListener('cg-license-changed', onLicenseChange);
+      window.removeEventListener('keydown', onKeyDown);
     };
-  }, []);
+  }, [onClose]);
+
+  const handleActivateKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = keyInput.trim();
+    if (!trimmed) return;
+    setLicenseBusy(true);
+    setLicenseError(null);
+    try {
+      const res = await activateLocalLicenseKey(trimmed);
+      if (res.valid) {
+        setKeyInput('');
+        refreshLicenseState();
+      } else {
+        setLicenseError(
+          res.error === 'expired'
+            ? 'This license key has expired.'
+            : res.error === 'machine-limit'
+              ? 'This license key is already active on 2 machines.'
+              : 'Invalid license key signature.',
+        );
+      }
+    } catch {
+      setLicenseError('Could not verify license key.');
+    } finally {
+      setLicenseBusy(false);
+    }
+  };
+
+  const handleDeactivateKey = async () => {
+    setLicenseBusy(true);
+    setLicenseError(null);
+    try {
+      await deactivateLocalLicenseKey();
+      refreshLicenseState();
+    } finally {
+      setLicenseBusy(false);
+    }
+  };
 
   const handleConfirmSignOut = async () => {
     setBusy(true);
     setError(null);
     try {
       await unpublishAccountShows();
-      await signOutCurrentAccount();
+      const authMod = await loadFirebaseAuth();
+      if (authMod) await authMod.signOutCurrentAccount();
       window.dispatchEvent(new Event('cg-signed-out'));
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || 'Could not sign out.');
@@ -52,7 +141,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     setError(null);
     try {
       await unpublishAccountShows();
-      await deleteCurrentAccount();
+      const authMod = await loadFirebaseAuth();
+      if (authMod) await authMod.deleteCurrentAccount();
       window.dispatchEvent(new Event('cg-signed-out'));
     } catch (err: unknown) {
       setError(
@@ -63,9 +153,18 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     }
   };
 
+  const tierLabel =
+    licenseInfo.valid
+      ? licenseInfo.tier === 'pro'
+        ? 'Pro'
+        : 'Home'
+      : effectiveTier === 'free'
+        ? 'Free'
+        : 'Unlocked';
+
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -90,11 +189,67 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
           </button>
         </div>
 
-        <div className="mt-4">
-          <div className="text-xs uppercase tracking-wider text-neutral-500">Signed in as</div>
-          <div className="mt-1 truncate text-sm font-medium text-neutral-100">
-            {email || 'Signed-in user'}
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wider text-neutral-500">Signed in as</div>
+            <div className="mt-1 truncate text-sm font-medium text-neutral-100">
+              {email || licenseInfo.email || 'Signed-in user'}
+            </div>
           </div>
+          <span
+            data-cg-license-tier={licenseInfo.valid ? licenseInfo.tier : effectiveTier}
+            className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200"
+          >
+            {tierLabel}
+          </span>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-neutral-400">License Key</span>
+            {licenseInfo.valid && (
+              <button
+                type="button"
+                data-cg-license-deactivate=""
+                disabled={licenseBusy}
+                onClick={handleDeactivateKey}
+                className="text-[11px] text-neutral-400 underline hover:text-neutral-200"
+              >
+                Deactivate machine
+              </button>
+            )}
+          </div>
+          <form onSubmit={handleActivateKey} className="mt-2 flex gap-1.5">
+            <input
+              type="text"
+              data-cg-license-input=""
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder={
+                licenseInfo.valid
+                  ? `Active (${licenseInfo.tier.toUpperCase()}) — paste key to upgrade`
+                  : 'Paste license key (cg1...)'
+              }
+              aria-label="License key"
+              className="min-h-[36px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-neutral-100 placeholder-neutral-500 focus:border-amber-400/60 focus:outline-none"
+            />
+            <button
+              type="submit"
+              data-cg-license-activate=""
+              disabled={licenseBusy || !keyInput.trim()}
+              className="min-h-[36px] shrink-0 rounded-lg bg-amber-500/90 px-3 py-1.5 text-xs font-medium text-neutral-950 transition hover:bg-amber-400 disabled:opacity-40"
+            >
+              {licenseInfo.valid ? 'Upgrade' : 'Activate'}
+            </button>
+          </form>
+          {licenseError && (
+            <p
+              data-cg-license-error=""
+              className="mt-1.5 text-xs text-red-300"
+            >
+              {licenseError}
+            </p>
+          )}
         </div>
 
         <div className="mt-4">

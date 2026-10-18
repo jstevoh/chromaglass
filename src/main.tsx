@@ -9,6 +9,8 @@ import {
   isSignedInCached,
   hasEmailSignInLink,
   getPendingEmail,
+  hasValidLicenseSync,
+  requiresDesktopSignInSync,
 } from './lib/authFlag';
 
 // The black box, first: whatever goes wrong from here on has a line
@@ -36,6 +38,7 @@ const Root = params.has('remote')
 const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
   : null;
+const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only
@@ -148,17 +151,20 @@ function Loading() {
 }
 
 function Gate() {
-  const gateActive = Boolean(import.meta.env.VITE_FIREBASE_API_KEY) && show;
+  const gateActive =
+    show && (Boolean(import.meta.env.VITE_FIREBASE_API_KEY) || requiresDesktopSignInSync());
   const [phase, setPhase] = useState<'app' | 'completing-link' | 'signin'>(() => {
     if (!gateActive) return 'app';
-    if (isSignedInCached()) return 'app';
+    if (hasValidLicenseSync() || isSignedInCached()) return 'app';
     if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
     return 'signin';
   });
 
   useEffect(() => {
     if (!gateActive) return;
-    const onSignedOut = () => setPhase('signin');
+    const onSignedOut = () => {
+      if (!hasValidLicenseSync()) setPhase('signin');
+    };
     window.addEventListener('cg-signed-out', onSignedOut);
     return () => window.removeEventListener('cg-signed-out', onSignedOut);
   }, [gateActive]);
@@ -193,8 +199,11 @@ function Gate() {
   if (phase === 'completing-link') {
     return <Loading />;
   }
-  if (phase === 'signin' && LazySignIn) {
-    return <LazySignIn onSignedIn={() => setPhase('app')} />;
+  if (phase === 'signin') {
+    if (LazySignIn) {
+      return <LazySignIn onSignedIn={() => setPhase('app')} />;
+    }
+    return <LazyLicenseGate onUnlocked={() => setPhase('app')} />;
   }
   return <Root />;
 }

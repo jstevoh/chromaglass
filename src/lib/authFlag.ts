@@ -93,3 +93,27 @@ export function stripEmailSignInParams(): void {
     // ignore
   }
 }
+
+export function hasValidLicenseSync(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as { __CHROMAGLASS_NATIVE__?: { license?: { valid?: boolean } } };
+  if (w.__CHROMAGLASS_NATIVE__?.license?.valid) return true;
+  try {
+    const t = localStorage.getItem('chromaglass-license-tier');
+    return t === 'home' || t === 'pro';
+  } catch {
+    return false;
+  }
+}
+
+export function requiresDesktopSignInSync(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as { __CHROMAGLASS_NATIVE__?: { requireSignIn?: boolean } };
+  if (w.__CHROMAGLASS_NATIVE__?.requireSignIn) return true;
+  try {
+    return new URLSearchParams(window.location.search).get('requireSignIn') === '1';
+  } catch {
+    return false;
+  }
+}
+

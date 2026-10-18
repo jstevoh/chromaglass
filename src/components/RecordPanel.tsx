@@ -155,6 +155,21 @@ export function RecordPanel({
                 </div>
               </div>
 
+              {recorder.maxDurationSec !== null && (
+                <div
+                  data-cg-app-tile="full-record"
+                  data-cg-record-free-cap={String(recorder.maxDurationSec)}
+                  className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-[12px] leading-relaxed text-amber-100"
+                >
+                  <div className="font-semibold text-amber-200">
+                    In the ChromaGlass app · Full-length unmarked Record
+                  </div>
+                  <p className="mt-0.5 text-amber-100/90">
+                    On the free site, clips are capped at {recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlock Home or Pro for full-length unmarked takes.
+                  </p>
+                </div>
+              )}
+
               {/* Status & Primary Control Card */}
               <div className="rounded-xl border border-border bg-surface p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -93,6 +93,8 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
+import { isFreeTierGated } from './lib/tierGates';
+import { syncServerLicense } from './lib/licenseKey';
 import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
@@ -283,14 +285,19 @@ interface ArmedLook {
   sequence?: string;
 }
 
-const LazyAccountSheet = import.meta.env.VITE_FIREBASE_API_KEY
-  ? React.lazy(() => import('./components/AccountSheet'))
-  : null;
+import AccountSheet from './components/AccountSheet';
+
+const hasAccountOrLicenseUI =
+  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
+  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
+      new URLSearchParams(window.location.search).get('tierGates') === '1'));
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
   const [showAccount, setShowAccount] = useState(false);
-  const openAccount = import.meta.env.VITE_FIREBASE_API_KEY
+  const openAccount = hasAccountOrLicenseUI
     ? () => setShowAccount(true)
     : undefined;
 
@@ -3319,7 +3326,18 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
+  useEffect(() => {
+    void syncServerLicense();
+  }, []);
+
   const loadMark = useCallback((file: File) => {
+    const effectiveFile = isFreeTierGated()
+      ? new File(
+          [`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`],
+          'chromaglass-mark.svg',
+          { type: 'image/svg+xml' },
+        )
+      : file;
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result ?? '');
@@ -3335,7 +3353,7 @@ export default function App() {
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
       img.src = url;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(effectiveFile);
   }, [castSend]);
 
   const clearMark = useCallback(() => {
@@ -6303,10 +6321,8 @@ export default function App() {
         </PanelGuard>
       )}
 
-      {showAccount && LazyAccountSheet && (
-        <React.Suspense fallback={null}>
-          <LazyAccountSheet onClose={() => setShowAccount(false)} />
-        </React.Suspense>
+      {showAccount && hasAccountOrLicenseUI && (
+        <AccountSheet onClose={() => setShowAccount(false)} />
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
