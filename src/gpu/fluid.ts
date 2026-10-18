@@ -2809,9 +2809,9 @@ export class WebGPUFluid {
         press drew the ferrofluid into the middle), the filter moving volume
         too (phaseGrid, and why).
       */
-      // By the ferrofluid's own velocity (phaseVelocity, and why); the lab's
-      // control (phaseMomentum 0) carries it by the mixture's, as before.
-      this.phaseOwnVel = (p.phaseMomentum ?? 1) > 0;
+      // With the ferrofluid's drift (phaseVelocity, and why); the lab's
+      // control (phaseDrift 0) carries it by the mixture's, as before.
+      this.phaseOwnVel = (p.phaseDrift ?? 1) > 0;
       if (this.phaseOwnVel) {
         if (!this.phaseVelT) {
           this.phaseVelT = this.disposer.track(this.device.createTexture({

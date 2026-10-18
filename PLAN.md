@@ -6302,7 +6302,9 @@ the code's entry points, the checks to add and the scenes to match, in
 - ~~**29c. The drop follows the hand and holds together.**~~ **Shipped** (#373; the story in
   `docs/plan-shipped.md` §29c): the rim's force read against the ferrofluid's own drag, the
   moving edge compressed back (29c-1), the gain derived and what is kept of it named (29c-2),
-  the check `npm run ferrodrag` and the derivation `npm run magnetgain`. If the closeup's
+  the ferrofluid's momentum carried with it (phaseMomentum) and the rim riding the body's
+  velocity (phaseVelocity, 29c-4), the check `npm run ferrodrag` and the derivation `npm run
+  magnetgain`. If the closeup's
   camera ever follows the drop, it follows smoothly and never with the sound (the sway work's
   `frameSway`, default 0, stays the only way sound moves the frame). Still open:
   - **29c-1. The moving edge is compressed back to the grid's width** (phaseCompress:
@@ -6332,23 +6334,39 @@ the code's entry points, the checks to add and the scenes to match, in
     twice at the hand's magnet. It never shows in the pull (the guard is the speed there,
     29c-5), only in how saturated the maze reads the field (phaseMu's `sat`), which every
     labyrinth look is tuned on: move Bs to the physics with the maze looks re-read.
-  - **29c-4. The ferrofluid in a rim cell rides the cell's mean velocity, not its own
-    column's.** Two liquids side by side in the gap go at their own Darcy speeds under the
-    one pressure (the rim's force now says so, phaseForce); the phase's flux step still
-    carries the cell's mean, which in a half-full cell is slower than the ferrofluid by the
-    clear liquid's share. The drift flux φ(1−φ)(u_ff − u_clear), with u_ff − u_clear =
-    M_ff·f − (M_ff − M_clear)·∇p from hsGradient's pressure, would carry it at its own.
-    Measured without it (`npm run magnetgain`, a drop eight cells across): the rim at 0.81 of
-    the core's speed, the drop at 0.68 of the sharp drop's Darcy speed at thirty steps.
+  - ~~**29c-4. The ferrofluid in a rim cell rides the cell's mean velocity, not its own
+    column's.**~~ **Shipped** (#373; the story in `docs/plan-shipped.md` §29c): the share is
+    carried by the ferrofluid's own velocity, extended from the body (the cells over
+    PHASE_BODY, 0.9) over the rim within PHASE_REACH cells, a Gaussian a cell wide
+    (phaseVelocity), with the ferrofluid's momentum carried along its own trace
+    (phaseMomentum). A shortcut standing in for the interface the grid cannot draw: a real
+    rim is the drop's own liquid and moves with it, and the drift flux φ(1−φ)(u_ff −
+    u_clear) of the two Darcy speeds under the one pressure would carry a mixed cell's
+    ferrofluid at its own, where the extension carries it at the body's.
   - **29c-5. The hand's speed limit is the grid's.** A real drop under a hand's magnet is
     pinned to it, its Darcy speed under the Kelvin force metres a second (`npm run magnetgain`
     prints each magnet's); the solver's is MAGNET_CELLS, 2.4 cells a step, 0.375 of the plate
-    a second on 384² and 0.19 on 768², and the drop goes at about half of that (the rim,
-    29c-4), so a hand dragged faster than about 0.15 of the plate a second on 384² leaves it
-    behind. The hand's own carry already takes substeps for its speed (handSubs, up to
+    a second on 384² and 0.19 on 768². The drop follows a hand at 0.1 of the plate a second
+    with a lag of 1.4 radii (`npm run ferrodrag`, 29c-4); how much faster it can follow, and
+    what its shape pays, is not measured, so a hand dragged faster may leave it behind. The
+    hand's own carry already takes substeps for its speed (handSubs, up to
     CARRY_SUBSTEPS at CARRY_COURANT of a cell each): the magnet's asked cells a step should set
     the phase's substeps the same way, with the velocity's own advection checked at that
     speed.
+  - **29c-6. The projection reads one mobility.** thinProject takes u = u* − ∇p with the one
+    coefficient for every cell, so the pressure that pushes the oil out of a moving drop's way
+    moves the oil no more easily than the ferrofluid, where the real oil gives way ν_ff/ν_clear
+    (4.48) times as easily. A circular drop driven by a body force f in the gap goes at
+    f h²/(12(μ_ff + μ_clear)), its inside under one pressure gradient and the oil's return flow
+    a dipole round it: 0.82 of the ferrofluid's own Darcy speed at that ratio, and half of it
+    with the oil as hard to move as the ferrofluid. With every cell relaxed to its Darcy speed
+    each step the solver's drop would go at that half; its oil's velocity persists between steps
+    (the oil's drag relaxes it more slowly than the ferrofluid's), so under `npm run magnetgain`'s
+    weak magnet the drop goes MG_PLACEHOLDER. The fix is a mobility per cell in the projection,
+    ∇·(k(φ)∇p) = ∇·u* with k the inverse of the cell's viscosity, which costs the pressure solve
+    its constant coefficient (the same stencil with k on each face, and a multigrid that
+    coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law with
+    a bar of 34%, wide for this.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

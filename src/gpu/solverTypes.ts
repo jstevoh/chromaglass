@@ -143,8 +143,10 @@ export interface GpuStepParams {
    * liquid round it.
    */
   ferroViscosity?: number;
-  /** The ferrofluid's own velocity: its momentum carried with it (phaseMomentum) and its share carried by it (phaseVelocity), 1 on; 0 is the lab's control, the step as it was with neither. */
+  /** The ferrofluid's momentum carried with it (phaseMomentum), 1 on; 0 is the lab's control, the step without it. */
   phaseMomentum?: number;
+  /** The ferrofluid's share carried by its own velocity, the drop's where a cell is part oil (phaseVelocity), 1 on; 0 is the lab's control, the share carried by the mixture's velocity as before. */
+  phaseDrift?: number;
   /**
    * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
    * as before the Press on the ferrofluid (PLAN 15d), so `npm run

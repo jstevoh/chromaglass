@@ -3514,13 +3514,45 @@ Found, in three rounds of review and a takeover:
   hand's magnet asks 7.8 plate widths a second at 6e-6 against the guard's 0.375 on 384²).
   MAGNET_GAIN stays 6e-6, a tenth of the physics, named with its reason (29c-2: the looks'
   far pools, and the contact line's pinning the solver lacks); the guard is named as the
-  hand's speed limit (29c-5); the saturation knee (29c-3) and the rim's drift flux (29c-4)
-  are the shortcuts left.
+  hand's speed limit (29c-5); the saturation knee (29c-3) and the projection's one
+  mobility (29c-6) are the shortcuts left.
+- **The ferrofluid's momentum stayed behind.** With the rim's force in, the dragged drop
+  still fell behind, 2.78R at 3 s and 5.8R at 6 s with no equilibrium: it topped out at 0.09
+  of the plate a second under a pull whose Darcy speed was 0.19, where under a weak magnet,
+  slow enough to keep up with its own momentum, it went at 0.95 of Darcy's. A thin gap does
+  not carry the velocity along itself (`wgsl/thinGap.ts`, right for the oils, whose drag
+  takes a push in a few steps), but the ferrofluid's drag time in the rest gap is 0.6 s, 36
+  steps, and a drop dragged at the hand's speed crosses its own width in 30: every cell it
+  entered held the oil's velocity, and the pull brought it up at 2.8% of the shortfall a
+  step. Weighed against the drag the dropped term, ρ(u·∇)u, is Uτ/R, 2.5 for this drop
+  where the oils are under a tenth. phaseMomentum carries the velocity along itself by the
+  ferrofluid's share of each cell, before the step's forces (its momentum φu over its share
+  where the trace lands; the oil's part reads as it was; a look without ferrofluid runs the
+  step as before): the drop reaches the magnet's speed, 0.099 of the plate a second, and its
+  lag settles at 1.85R. `phaseMomentum: 0` runs the step without it, the lab's control.
+- **The carry's wake.** With the momentum carried the half-full area fell from 100 to 82
+  cells over 3 s and the cells over 0.01 of ferrofluid grew from 352 to 972, a tenth of the
+  drop's ferrofluid shed and eaten by the sharpening steps. The step has one velocity a
+  cell, the mixture's, and the rim's force drives a mixed cell to the share's part of the
+  drop's speed, so the faint back of the rim rode the oil's return flow and the flux step
+  left it behind (the axis behind the drop at 1 s, the rim carried by the nine cells round
+  it by share: the rim's last cells at 0.93 of the core's speed, the wake behind them at
+  0.84 down to 0.39 of it). A real interface has no such cell: the liquid on both sides of
+  it moves with it. phaseVelocity carries the share by the ferrofluid's own velocity,
+  extended from the body (the cells over 0.9 ferrofluid) over the rim within four cells, a
+  Gaussian a cell wide, as a level set's is, so the whole rim translates with the body: at
+  3 s the wake is 86 cells (3.6 cells' worth of ferrofluid, centred on the drop) where the
+  nine-cell carry left 721 (18 cells' worth, 2.5 radii behind and falling back 0.8 radii a
+  second), the half-full area 109 cells, the cells over 0.01 268, the rear rim at 0.99 of
+  the core's speed, and the lag 1.41R (1.79R with the nine-cell carry, 1.85R with none).
+  Named as the shortcut it is (29c-4): a mixed cell's ferrofluid rides the body's velocity
+  nearby, standing in for the interface the grid cannot draw.
 - phaseMu and mazeReady run as on main (maze and spikes only); the first rounds had them on
   every ferrofluid look.
 
-Checks: `npm run ferrodrag` (new, lab; 3/3: lag LAG_PLACEHOLDER with the rim's force at main's
-gain, 5.88R without it, bar 2R; the half-full area within 15%; nothing moves without a
-magnet) and `npm run magnetgain` (new, lab; the field, the weak-field ratio, the drop at the
+Checks: `npm run ferrodrag` (new, lab; 3/3: lag 1.41R at main's gain with the rim's
+force, the momentum carried and the rim riding the body, 2.78R with the rim's force alone,
+5.88R without it, bar 2R; the half-full area within 15%, 100 → 109 cells; nothing moves
+without a magnet, 0.002 cells) and `npm run magnetgain` (new, lab; the field, the weak-field ratio, the drop at the
 two-phase Darcy speed and its rim at 0.7 of its core, the dragged magnet under the guard).
 Both on the Mac's `open` shard.

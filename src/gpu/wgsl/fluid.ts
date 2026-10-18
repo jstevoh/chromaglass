@@ -1042,7 +1042,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // and a cell at the drop's back, whose trace lands in the faint wake the
   // flux step leaves, read the oil's return flow and was left behind, so the
   // drop shed ferrofluid into that wake (cells over 0.01 of ferrofluid 352
-  // to 954 in 3 s, its half-full area 100 to 82 cells).
+  // to 972 in 3 s, its half-full area 100 to 82 cells, a tenth of its
+  // ferrofluid gone; phaseVelocity, below, is what carries the rim).
   let uv = uvOf(id);
   let pos = clamp(uv - v.xy * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
   let f = pos * S.n - 0.5;
@@ -1066,45 +1067,114 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    The ferrofluid's own velocity, for its carry (29c-4, the rim's drift). The
-    step has one velocity a cell, the mixture's: where a cell is part
-    ferrofluid and part oil it is the two liquids' momentum together, and at
-    a moving drop's edge that is the drop's speed blended with the oil
-    slipping back past it. The ferrofluid there is the drop's own liquid and
-    goes with it (the real interface is sharp, and the oil slips along it),
-    so carrying the share by the mixture's velocity left the rim behind: the
-    crescent, and once the momentum travelled (phaseMomentum) a faint wake
-    shed from the edge (ferrodrag's scene: cells over 0.01 of ferrofluid 352
-    to 972 in 3 s, the half-full area 100 to 82). So the share is carried by
-    the ferrofluid's own velocity: the cell's where it is all ferrofluid, and
-    at its edge the velocity of the ferrofluid round it, the nine cells'
-    weighted by their share through a [1 2 1]² window; the mixture's where
-    there is next to none round it. Its divergence is not the mixture's,
-    which is the two liquids' continuity: the share rises where the
-    ferrofluid's own flow converges, as a drop's edge is drawn in.
+    The ferrofluid's own velocity, for its carry (29c-4, the rim's drift).
+    The step has one velocity a cell, the mixture's, and a cell part
+    ferrofluid and part oil is driven to the share's part of the drop's
+    speed (phaseForce: the pull is the share's, the drag the mixture's), so
+    a drop's rim moved slower than its body, the thinner the slower.
+    Carrying the share by the mixture's velocity stretched the rim out
+    behind (the crescent) and left a faint wake riding the oil, which does
+    not move (ferrodrag's scene, 3 s: cells over 0.01 of ferrofluid 352 to
+    972, the half-full area 100 to 82 cells, a tenth of the drop's
+    ferrofluid shed into the wake and eaten there by the sharpening steps).
+    A real interface has no such cell: the liquid on both sides of it moves
+    with it, and the rim is the drop's own liquid. The two-fluid form of
+    that is the drift flux: the share moves with the mixture's velocity and,
+    on top, with J = φ(1−φ)(u_ff − u_mix), the ferrofluid's own velocity
+    relative to the mixture's, which is zero in a cell that is all oil or
+    all ferrofluid and so moves nothing past full or below empty, and is
+    the form phaseCompress already uses for its sharpening. So the share is
+    carried at φ·u_mix + (1−φ)·u_ff, with u_ff the velocity of the drop the
+    cell's ferrofluid belongs to: a first-order least-squares fit (a
+    velocity and its two gradients) over the body's cells within
+    PHASE_REACH (those over PHASE_BODY, each by how far past it and by a
+    Gaussian PHASE_SIGMA cells wide), read off at the cell. A rim cell with
+    no body in reach keeps the mixture's velocity: a smear too thin to have
+    a body moves as the mixture does.
+
+    Why a fit and not the body's mean velocity: the first form put the mean
+    in place of the mixture's velocity in every rim cell (a hard switch at
+    PHASE_BODY), and a mean is biased towards where the body is. Under the
+    glass's squeeze the velocity grows outward (u ∝ r), so a rim cell read
+    the body's slower velocity from inside it and was carried slower than
+    the liquid it is part of, and the drop packed: ferropress's middle rose
+    to 1.025 of full with the glass down (main 0.960, the bar 3% of 0.956).
+    The switch also made the carrying field patchy where a body's cells
+    came and went (a rim cell's velocity jumped between its own and the
+    body's), and on the Mac's GPU a weaker form of it raised domes with no
+    magnet at all (spikes: 23 domes in one piece, main 0) and lost fingers
+    and the maze (fingers 3 of 4, maze 3 of 4). A fit with gradients is
+    exact for a translation, a squeeze and a rotation, so under the press
+    the rim reads the velocity the squeeze gives its own position and the
+    pool spreads as main's does; a ridge of PHASE_RIDGE cells² on the fit's
+    moments keeps the gradients bounded where the body in reach is a cell
+    or two. And the blend by the cell's own share, not a switch, changes a
+    cell's carry by the oil's part of it: a body cell is all but untouched,
+    a faint cell rides the drop. Measured on ferrodrag's scene (main's
+    gain, 3 s): XX_N01 cells over 0.01 (the wake XX_WAKE cells' worth,
+    centred XX_WDX radii behind the drop), the half-full area XX_AREA
+    cells, the lag XX_LAG radii, where the mixture's carry alone gives
+    2.78 and the bar is 2.
   */
   phaseVelocity: `${HEAD}
+const PHASE_BODY = 0.9;
+const PHASE_REACH = 4;
+const PHASE_SIGMA = 2.0;
+const PHASE_RIDGE = 0.1;
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var phase: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let n = S.n;
+  let ni = i32(S.n);
   let v = textureLoad(vel, p, 0);
   let own = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
-  if (own >= 0.9) { textureStore(dst, p, v); return; }
-  var m = vec2f(0.0);
+  // All oil or all ferrofluid: no drift, the mixture's velocity is its own.
+  if (own <= 0.001 || own >= 0.999) { textureStore(dst, p, v); return; }
+  // The fit's moments over the body in reach: weight, position, position
+  // squared (xx, xy, yy), velocity, and position times velocity.
   var s = 0.0;
-  for (var j = -1; j <= 1; j++) {
-    for (var i = -1; i <= 1; i++) {
-      let q = clampP(p + vec2i(i, j), n);
-      let w = f32((2 - abs(i)) * (2 - abs(j))) * clamp(textureLoad(phase, q, 0).r, 0.0, 1.0);
-      m += w * textureLoad(vel, q, 0).xy;
+  var sx = vec2f(0.0);
+  var sxx = vec3f(0.0);
+  var su = vec2f(0.0);
+  var sxu = vec2f(0.0);
+  var syu = vec2f(0.0);
+  for (var j = -PHASE_REACH; j <= PHASE_REACH; j++) {
+    for (var i = -PHASE_REACH; i <= PHASE_REACH; i++) {
+      let q = p + vec2i(i, j);
+      if (any(q < vec2i(0)) || any(q >= vec2i(ni))) { continue; }
+      let body = clamp((textureLoad(phase, q, 0).r - PHASE_BODY) / (1.0 - PHASE_BODY), 0.0, 1.0);
+      if (body <= 0.0) { continue; }
+      let x = vec2f(f32(i), f32(j));
+      let w = body * exp(-0.5 * dot(x, x) / (PHASE_SIGMA * PHASE_SIGMA));
+      let u = textureLoad(vel, q, 0).xy;
       s += w;
+      sx += w * x;
+      sxx += w * vec3f(x.x * x.x, x.x * x.y, x.y * x.y);
+      su += w * u;
+      sxu += w * x.x * u;
+      syu += w * x.y * u;
     }
   }
-  let u = select(v.xy, m / max(s, 1e-6), s > 0.05);
+  var ride = v.xy;
+  if (s > 0.0) {
+    // The body's mean position and velocity, the central moments with the
+    // ridge, and the gradients from the 2×2 normal equations; the fit read
+    // at this cell, which is the origin.
+    let xm = sx / s;
+    let um = su / s;
+    let cxx = sxx.x / s - xm.x * xm.x + PHASE_RIDGE;
+    let cxy = sxx.y / s - xm.x * xm.y;
+    let cyy = sxx.z / s - xm.y * xm.y + PHASE_RIDGE;
+    let cxu = sxu / s - xm.x * um;
+    let cyu = syu / s - xm.y * um;
+    let det = cxx * cyy - cxy * cxy;
+    let gx = (cyy * cxu - cxy * cyu) / det;
+    let gy = (cxx * cyu - cxy * cxu) / det;
+    ride = um - gx * xm.x - gy * xm.y;
+  }
+  let u = mix(ride, v.xy, own);
   textureStore(dst, p, safeVel(vec4f(u, v.z, v.w)));
 }`,
 
