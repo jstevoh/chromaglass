@@ -14,6 +14,7 @@ import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
@@ -162,6 +163,14 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /*
+    The score (PLAN 28h): the song the show has heard as a lane of sections,
+    its show's cues on it, and the nudge. On the Play sheet under the show's
+    tile, because watching the show against the song and nudging it back into
+    step is playing the show; the same component the desk's Score panel draws,
+    at the phone's sizes.
+  */
+  score?: SongScoreProps;
   /**
    * Following a known song's map by ear (PLAN.md 28g-2, lib/followedPlace.ts
    * `followLine`): which song, and how sure; null with no map to follow.
@@ -948,6 +957,12 @@ export function PhoneStage(p: PhoneStageProps) {
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
               {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
             </p>
+          )}
+          {p.score && (
+            <>
+              <SectionLabel>The song</SectionLabel>
+              <SongScore {...p.score} touch />
+            </>
           )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
