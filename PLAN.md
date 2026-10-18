@@ -3335,6 +3335,24 @@ for, and the GPU was asked for only after they had arrived and drawn.
   in nine a fix cannot be judged by its own PR's runs (eight greens in a row happen
   by chance two times in five); it is judged by `npm run flakes -- --check 'no stop
   in the opening'` over the week before its merge against the week after (19aa).
+  **Tried 2026-10-18 (PR #396), and it did not work.** Warming the compiler at boot
+  and holding the app's first render for it went red on all three Mac runs of its
+  own PR, each version on the same line: an empty kernel (stop 2.08 s from 1.99 s),
+  a built fill-shaped kernel (2.13 s from 2.19 s; the warm built in 0.13 s and the
+  opening's own `fill` was still given 2.6 s after it was asked), and that kernel
+  run once with the queue awaited (3.35 s from 3.42 s, the warm costing 0.2 s). At
+  the 11% base rate three reds in a row is about one in 700, so the warm does not
+  help and may hurt, and it was taken out. What the last run showed: the stop is
+  not Metal's compiler starting (the warm started it). It is the opening's own
+  `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside the display's render
+  pipeline (2.64 s) while the frame asked at 3.42 s waited for the GPU process
+  until 6.80 s: long animation frame 3.37 s, rendering delayed, 0.00 s blocked, no
+  script and no long task. A kernel of another shape does not shorten that
+  compile. The next thing to try is not a warm: ask the opening's first fills
+  before the display's pipeline and let the intro's frames wait until they are
+  given (the stop is then at a time nothing is drawn), judged as above. `npm run
+  startup` now prints the page's first compute pipeline ("first compile asked …,
+  given …"), judged by nothing.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
